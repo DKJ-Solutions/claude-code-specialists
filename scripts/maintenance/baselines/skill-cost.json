@@ -19,67 +19,67 @@
                                    "OnInvoke":  2600,
                                    "Version":  "4.17.0"
                                },
-    "workflow-davekjohn/adopt-config":  {
+    "contributing-davekjohn/adopt-config":  {
                                             "AlwaysOn":  150,
                                             "OnInvoke":  1600,
                                             "Version":  "4.17.0"
                                         },
-    "workflow-davekjohn/adopt-workflow-folder":  {
+    "contributing-davekjohn/adopt-workflow-folder":  {
                                                      "AlwaysOn":  180,
                                                      "OnInvoke":  2900,
                                                      "Version":  "4.17.0"
                                                  },
-    "workflow-davekjohn/check-branch-entry":  {
+    "contributing-davekjohn/check-branch-entry":  {
                                                   "AlwaysOn":  170,
                                                   "OnInvoke":  1500,
                                                   "Version":  "4.17.0"
                                               },
-    "workflow-davekjohn/cut-release":  {
+    "contributing-davekjohn/cut-release":  {
                                            "AlwaysOn":  320,
                                            "OnInvoke":  16300,
                                            "Version":  "4.17.0"
                                        },
-    "workflow-davekjohn/fix-mojibake":  {
+    "contributing-davekjohn/fix-mojibake":  {
                                             "AlwaysOn":  230,
                                             "OnInvoke":  2200,
                                             "Version":  "4.17.0"
                                         },
-    "workflow-davekjohn/fold-changelog":  {
+    "contributing-davekjohn/fold-changelog":  {
                                               "AlwaysOn":  240,
                                               "OnInvoke":  6000,
                                               "Version":  "4.17.0"
                                           },
-    "workflow-davekjohn/handover":  {
+    "contributing-davekjohn/handover":  {
                                         "AlwaysOn":  180,
                                         "OnInvoke":  2600,
                                         "Version":  "4.17.0"
                                     },
-    "workflow-davekjohn/lock":  {
+    "contributing-davekjohn/lock":  {
                                     "AlwaysOn":  200,
                                     "OnInvoke":  2200,
                                     "Version":  "4.17.0"
                                 },
-    "workflow-davekjohn/new-branch":  {
+    "contributing-davekjohn/new-branch":  {
                                           "AlwaysOn":  170,
                                           "OnInvoke":  7500,
                                           "Version":  "4.17.0"
                                       },
-    "workflow-davekjohn/open-pr":  {
+    "contributing-davekjohn/open-pr":  {
                                        "AlwaysOn":  260,
                                        "OnInvoke":  7600,
                                        "Version":  "4.17.0"
                                    },
-    "workflow-davekjohn/park":  {
+    "contributing-davekjohn/park":  {
                                     "AlwaysOn":  190,
                                     "OnInvoke":  2400,
                                     "Version":  "4.17.0"
                                 },
-    "workflow-davekjohn/release-notes-page":  {
+    "contributing-davekjohn/release-notes-page":  {
                                                   "AlwaysOn":  240,
                                                   "OnInvoke":  3100,
                                                   "Version":  "4.17.0"
                                               },
-    "workflow-davekjohn/ship-pr":  {
+    "contributing-davekjohn/ship-pr":  {
                                        "AlwaysOn":  220,
                                        "OnInvoke":  7100,
                                        "Version":  "4.17.0"

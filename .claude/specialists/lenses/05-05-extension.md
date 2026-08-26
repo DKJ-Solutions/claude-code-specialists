@@ -75,7 +75,7 @@ carries the type.
 
 Creating the branch and creating its changelog entry file are no longer two separate manual steps —
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
-again on an existing branch simply resumes it) and writes `workflow-davekjohn/development-cycle.md` in the
+again on an existing branch simply resumes it) and writes `contributing-davekjohn/development-cycle.md` in the
 same run — one document holding both jobs: the step phases, and the `## DEPLOY:` section that is the entry.
 It also **completes the version suffix**, appending `-v1` to a name that carries none, so a second cycle on
 the same subject is a deliberately typed `-v2`. **One script since August 7, 2026** —
@@ -112,7 +112,7 @@ table above).
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
 [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). The PR is called
 `<branch-type>: <the entry's Branch title>`, so the prefix mirrors the branch type by construction and the
-words are the ones already in the DEPLOY section of `workflow-davekjohn/development-cycle.md`. `-Title` is still accepted and ignored, with a
+words are the ones already in the DEPLOY section of `contributing-davekjohn/development-cycle.md`. `-Title` is still accepted and ignored, with a
 warning naming the title the entry gives.
 
 **That rule used to live in this very paragraph, and was violated five PRs in a row.** It read "the title
@@ -159,7 +159,7 @@ started.
 
 **The PR body fills itself in** via `open-pr.ps1` — simply leave out `-Body`. The script ticks the
 right "Type of change" box (from the branch prefix), fills "What does this change do?" with the
-description from the changelog entry (the DEPLOY section of `workflow-davekjohn/development-cycle.md`), and ticks the two checklist items
+description from the changelog entry (the DEPLOY section of `contributing-davekjohn/development-cycle.md`), and ticks the two checklist items
 it can honestly verify ("Changelog entry written" + "Requested by Dave"). The first is judged on the file
 actually **holding** an entry, not on its existing — a branch cut before August 23, 2026 carries the trunk's
 old empty copy, so a self-ticking box keyed on existence would tick for a branch that wrote nothing. Only
@@ -355,7 +355,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   `worktree-lane.ps1` (`-Name` to open, `-HandBack` to release the branch again) does both ends and
   never touches the primary's HEAD when opening; the portable half, the measurement, and the declined
   one-line alternative to `ship-pr.ps1` are in the
-  [`worktree-lane` skill](../../../plugins/workflows/workflow-davekjohn/skills/worktree-lane/SKILL.md).
+  [`worktree-lane` skill](../../../plugins/workflows/contributing-davekjohn/skills/worktree-lane/SKILL.md).
   Two things learned building it that are easy to rediscover the expensive way: pointing
   `CLAUDE_PROJECT_DIR` at another tree **breaks the source-repo guard**, correctly — that variable says
   which repo the session is on, and the tree one call writes to is `-RepoRoot`'s job (the #101
@@ -390,7 +390,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 
 **First, where these scripts live for everyone else.** The paths below are this repo's own
 `scripts/`, which stays the canonical source and is unchanged. What changed on August 8, 2026 is the
-**mirror**: every script in this section now travels in `workflow-davekjohn`, the opt-in
+**mirror**: every script in this section now travels in `contributing-davekjohn`, the opt-in
 pack, instead of in the core. So in a consuming repo Derek has this toolbox **only if that repo
 enabled the workflow** — and if it did not, he opens branches and PRs with plain `git` and `gh`,
 following that repo's own conventions. That is the intended outcome rather than a degraded one:
@@ -400,7 +400,7 @@ entitled to its own. Do not read a consumer without these scripts as misconfigur
 Derek prefers not to touch the git commands by hand. His toolbox:
 
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or
-  idempotently resume) the branch and, in the same move, write its `workflow-davekjohn/development-cycle.md`.
+  idempotently resume) the branch and, in the same move, write its `contributing-davekjohn/development-cycle.md`.
   `-Intent` records where you left off / what is next **at the top of that document, above the phases** —
   deliberately not in the DEPLOY section, whose text folds verbatim into `CHANGELOG.md`; `-Park` commits
   that one file and pushes the branch to `origin` for later / another device — **still no PR** (#162).

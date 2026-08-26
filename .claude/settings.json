@@ -10,7 +10,7 @@
   },
   "enabledPlugins": {
     "team-alpha@claude-code-specialists": true,
-    "workflow-davekjohn@claude-code-specialists": true
+    "contributing-davekjohn@claude-code-specialists": true
   },
   "extraKnownMarketplaces": {
     "claude-code-specialists": {

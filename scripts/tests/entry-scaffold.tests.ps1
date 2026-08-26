@@ -167,7 +167,7 @@ try {
     $ErrorActionPreference = $prevEap
 }
 
-# ONE DOCUMENT, at a fixed path: workflow-davekjohn/development-cycle.md, not feat-round-trip-v1.md in the
+# ONE DOCUMENT, at a fixed path: contributing-davekjohn/development-cycle.md, not feat-round-trip-v1.md in the
 # root and not a pair under branch/. The path comes from the same lib the readers use.
 $writtenDoc = Join-Path $fixture ((Get-BranchFilePaths).File)
 Assert-True (Test-Path -LiteralPath $writtenDoc) 'the writer produced the development cycle in the fixture'
@@ -201,7 +201,7 @@ Assert-Equal $stepsBefore @(Get-BranchProgressFindings -Text $withProse).Count '
 # made to write and refresh them. Inbound #810 is what the arrangement still cost: the guidance was in the
 # file NEXT TO the one you write in. The merged document carries its own, so the reference is gone and this
 # assert is that it stays gone -- a directory nobody maintains is a directory that drifts.
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixture 'workflow-davekjohn\branch'))) 'the writer creates no branch/ directory -- the document carries its own guidance'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixture 'contributing-davekjohn\branch'))) 'the writer creates no branch/ directory -- the document carries its own guidance'
 
 # AND THE GUIDANCE IS IN THE FILE A BRANCH ACTUALLY GETS, which is the half #810 reported. Asserted on one
 # of the blocks the report named rather than on "some comment exists": a document that kept the headings and
@@ -1252,7 +1252,7 @@ Assert-True ($bfp.OlderDeployment.EndsWith('branch-changelog.md')) 'and its entr
 $resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID"
 if (Test-Path -LiteralPath $resolveFx) { Remove-Item -Recurse -Force -LiteralPath $resolveFx }
 New-Item -ItemType Directory -Path (Join-Path $resolveFx ($bfp.Directory -replace '/', '\')) -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $resolveFx 'workflow-davekjohn\branch') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $resolveFx 'contributing-davekjohn\branch') -Force | Out-Null
 try {
     Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'nothing present: the resolver names the CURRENT one, so a writer creates that'
     [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')), "# ``feat/in-flight`` cycle`n")
@@ -1447,7 +1447,7 @@ $adminEntry = @(
     ''
     '### Pull Request'
     ''
-    'Plugins: workflow-davekjohn'
+    'Plugins: contributing-davekjohn'
     ''
     '[PR #1](https://example.test/1) - merged 2026-08-10'
 ) -join "`n"
@@ -1649,7 +1649,7 @@ Write-Host "Get-EntryLinkTargets / Get-EntryLinkFindings -- the entry's links re
 # relative link in it has to be root-relative -- which means it looks wrong in the file being edited and
 # only becomes right after it moves. A consumer merged two '../../scripts/...' links that landed at the
 # root pointing outside the repo, with every gate green.
-# ONE '../' SINCE AUGUST 23, 2026, not two: the document sits directly in workflow-davekjohn/ rather than in
+# ONE '../' SINCE AUGUST 23, 2026, not two: the document sits directly in contributing-davekjohn/ rather than in
 # a branch/ subdirectory of it, so the wrong-but-resolving form an author naturally writes is one level
 # shallower. The depth comes from the seam (Get-BranchFilePaths.Directory), which is what the suggester
 # reads -- so this fixture is the depth the suggester will actually try.

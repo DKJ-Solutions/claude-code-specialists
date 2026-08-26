@@ -11,9 +11,9 @@ consulted, and what a contributor can rely on even if they know nothing else abo
 
 ## The layer on top: the workflow folder
 
-This repo runs the `workflow-davekjohn` plugin, and that plugin carries its own contributing page:
+This repo runs the `contributing-davekjohn` plugin, and that plugin carries its own contributing page:
 
-📄 **[`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md)**
+📄 **[`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md)**
 
 **When the plugin is installed, that page applies on top of this one — and where the two disagree, the
 plugin's page wins.** It does not replace the standard workflow above; it extends it with the plugin's

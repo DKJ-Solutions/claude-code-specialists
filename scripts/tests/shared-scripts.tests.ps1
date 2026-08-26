@@ -923,7 +923,7 @@ Testing the default (no -RepoRoot) path.
 
     # .claude-plugin/marketplace.json (issue #885): these three fixtures put CHANGELOG.md at ROOT and
     # assert on it there -- Get-DefaultChangelogPath tests exactly this file's presence, so without it
-    # each fixture reads as a CONSUMER and the fold isolates into a workflow-davekjohn/ that does not
+    # each fixture reads as a CONSUMER and the fold isolates into a contributing-davekjohn/ that does not
     # exist here, which is a different failure than the one this scenario is about.
     function New-FoldMarketplaceStub {
         param([Parameter(Mandatory)][string]$Dir)

@@ -13,7 +13,7 @@ readable on their own.
 is the record working rather than a defect — so links may be repointed when a target moves, and prose
 is not rewritten. The one line that may be corrected is one that was *false when it was written*; the
 rule and how to mark such a correction are in
-[`RELEASES-portable.md`](../plugins/workflows/workflow-davekjohn/RELEASES-portable.md#once-it-has-landed-it-is-a-published-record--and-that-protects-only-what-was-true).
+[`RELEASES-portable.md`](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md#once-it-has-landed-it-is-a-published-record--and-that-protects-only-what-was-true).
 
 **Older notes are in the language they were written in.** The repo switched to English on July 20,
 2026 and history is not rewritten, so the earliest notes here are Dutch — one of the deliberate
@@ -30,13 +30,13 @@ tooling cut it, so it belongs here and survives anything being uninstalled. Two 
 belong to the workflow instead, and are one layer up rather than repeated here:
 
 - **The hand-written note per release** — one document with a named section per reader — is in
-  [`workflow-davekjohn/releases/audience/`](../workflow-davekjohn/releases/audience/). It exists
+  [`workflow-davekjohn/releases/audience/`](../contributing-davekjohn/releases/audience/). It exists
   *because* the tier model exists: a repo without that workflow writes no such note. The generated
   notes here are its raw material, not its replacement.
 - **How a release is cut**, and this repo's answers to it — the seam values, the local decisions —
   are in
-  [`workflow-davekjohn/releases/README.md`](../workflow-davekjohn/releases/README.md) over
-  [`RELEASES-portable.md`](../plugins/workflows/workflow-davekjohn/RELEASES-portable.md), which states
+  [`workflow-davekjohn/releases/README.md`](../contributing-davekjohn/releases/README.md) over
+  [`RELEASES-portable.md`](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md), which states
   what it covers rather than being summarised here twice.
 
 That is the layering this repo uses throughout: the root holds what is true regardless, and the
@@ -70,40 +70,40 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
-| [4.19.0](../workflow-davekjohn/releases/audience/4.x/4.19.0.md) | 2026-08-24 | Minor | A branch carries one document through four phases, the close-out gains three shapes, and findings become issues instead of questions |
-| [4.18.0](../workflow-davekjohn/releases/audience/4.x/4.18.0.md) | 2026-08-21 | Minor | Consumer-reported repairs across the sync, the cut and the branch files, plus a shared Shopify preview push |
-| [4.17.0](../workflow-davekjohn/releases/audience/4.x/4.17.0.md) | 2026-08-20 | Minor | The Shopify floor gains its pre-task sync, and the branch-entry convention gains a shipped gate |
-| [4.16.0](../workflow-davekjohn/releases/audience/4.x/4.16.0.md) | 2026-08-20 | Minor | The Shopify floor gains the install path it shipped without |
-| [4.15.0](../workflow-davekjohn/releases/audience/4.x/4.15.0.md) | 2026-08-20 | Minor | A two-section branch entry, a live-theme guard for team-shopify, and a release-notes page you can scan |
-| [4.14.0](../workflow-davekjohn/releases/audience/4.x/4.14.0.md) | 2026-08-19 | Minor | The root docs hold without a plugin installed, and the workflow layer sits on top |
-| [4.13.0](../workflow-davekjohn/releases/audience/4.x/4.13.0.md) | 2026-08-16 | Minor | The changelog entry halves, the changelog reads newest first, and /continue becomes /handover |
-| [4.12.0](../workflow-davekjohn/releases/audience/4.x/4.12.0.md) | 2026-08-16 | Minor | A finding is measured before it is repaired, and a gate records what it proved |
-| [4.11.0](../workflow-davekjohn/releases/audience/4.x/4.11.0.md) | 2026-08-15 | Minor | A prompt inbox for assignments, and a third of the always-on layer moved off the load path |
-| [4.10.0](../workflow-davekjohn/releases/audience/4.x/4.10.0.md) | 2026-08-15 | Minor | The Claude App marketplace publishes a chosen subset, and an inbound report's subject is verified before it is routed |
-| [4.9.0](../workflow-davekjohn/releases/audience/4.x/4.9.0.md) | 2026-08-15 | Minor | the workflow gathers into its own root folder at the consumer, and what the plugin ships is held to what a consumer can actually use |
-| [4.8.0](../workflow-davekjohn/releases/audience/4.x/4.8.0.md) | 2026-08-13 | Minor | The branch and release conventions and the consumer test gate now travel with the plugin |
-| [4.7.0](../workflow-davekjohn/releases/audience/4.x/4.7.0.md) | 2026-08-13 | Minor | The documents describe what the tooling actually writes: the entry's tier shape, the post-merge step, and a seam that escaped in a third spelling |
-| [4.6.0](../workflow-davekjohn/releases/audience/4.x/4.6.0.md) | 2026-08-12 | Minor | One audience tier per repo, and releases/ reduced to three reader-named roots |
-| [4.5.0](../workflow-davekjohn/releases/audience/4.x/4.5.0.md) | 2026-08-11 | Minor | Repairs across the entry, PR-body and release-document machinery: gates and documents that pointed at retired shapes now name the ones actually written. |
-| [4.4.0](../workflow-davekjohn/releases/audience/4.x/4.4.0.md) | 2026-08-11 | Minor | The merged note model gets its first written instance, and a release now times itself end to end |
-| [4.3.0](../workflow-davekjohn/releases/audience/4.x/4.3.0.md) | 2026-08-11 | Minor | One hand-written release note per release, a generated Release page, and the performance engineer owns wall-clock |
-| [4.2.0](../workflow-davekjohn/releases/audience/4.x/4.2.0.md) | 2026-08-10 | Minor | The consumer release document is named and written for its reader, and three silent failures gain a check |
-| [4.1.0](../workflow-davekjohn/releases/audience/4.x/4.1.0.md) | 2026-08-10 | Minor | The workflow's portable half: a consumer can copy the PR template and the contribution cycle, and three seams stop failing quietly |
-| [4.0.0](../workflow-davekjohn/releases/audience/4.x/4.0.0.md) | 2026-08-09 | Major | Chapter 3 consolidated (v3.0.0 -> v3.10.0) |
+| [4.19.0](../contributing-davekjohn/releases/audience/4.x/4.19.0.md) | 2026-08-24 | Minor | A branch carries one document through four phases, the close-out gains three shapes, and findings become issues instead of questions |
+| [4.18.0](../contributing-davekjohn/releases/audience/4.x/4.18.0.md) | 2026-08-21 | Minor | Consumer-reported repairs across the sync, the cut and the branch files, plus a shared Shopify preview push |
+| [4.17.0](../contributing-davekjohn/releases/audience/4.x/4.17.0.md) | 2026-08-20 | Minor | The Shopify floor gains its pre-task sync, and the branch-entry convention gains a shipped gate |
+| [4.16.0](../contributing-davekjohn/releases/audience/4.x/4.16.0.md) | 2026-08-20 | Minor | The Shopify floor gains the install path it shipped without |
+| [4.15.0](../contributing-davekjohn/releases/audience/4.x/4.15.0.md) | 2026-08-20 | Minor | A two-section branch entry, a live-theme guard for team-shopify, and a release-notes page you can scan |
+| [4.14.0](../contributing-davekjohn/releases/audience/4.x/4.14.0.md) | 2026-08-19 | Minor | The root docs hold without a plugin installed, and the workflow layer sits on top |
+| [4.13.0](../contributing-davekjohn/releases/audience/4.x/4.13.0.md) | 2026-08-16 | Minor | The changelog entry halves, the changelog reads newest first, and /continue becomes /handover |
+| [4.12.0](../contributing-davekjohn/releases/audience/4.x/4.12.0.md) | 2026-08-16 | Minor | A finding is measured before it is repaired, and a gate records what it proved |
+| [4.11.0](../contributing-davekjohn/releases/audience/4.x/4.11.0.md) | 2026-08-15 | Minor | A prompt inbox for assignments, and a third of the always-on layer moved off the load path |
+| [4.10.0](../contributing-davekjohn/releases/audience/4.x/4.10.0.md) | 2026-08-15 | Minor | The Claude App marketplace publishes a chosen subset, and an inbound report's subject is verified before it is routed |
+| [4.9.0](../contributing-davekjohn/releases/audience/4.x/4.9.0.md) | 2026-08-15 | Minor | the workflow gathers into its own root folder at the consumer, and what the plugin ships is held to what a consumer can actually use |
+| [4.8.0](../contributing-davekjohn/releases/audience/4.x/4.8.0.md) | 2026-08-13 | Minor | The branch and release conventions and the consumer test gate now travel with the plugin |
+| [4.7.0](../contributing-davekjohn/releases/audience/4.x/4.7.0.md) | 2026-08-13 | Minor | The documents describe what the tooling actually writes: the entry's tier shape, the post-merge step, and a seam that escaped in a third spelling |
+| [4.6.0](../contributing-davekjohn/releases/audience/4.x/4.6.0.md) | 2026-08-12 | Minor | One audience tier per repo, and releases/ reduced to three reader-named roots |
+| [4.5.0](../contributing-davekjohn/releases/audience/4.x/4.5.0.md) | 2026-08-11 | Minor | Repairs across the entry, PR-body and release-document machinery: gates and documents that pointed at retired shapes now name the ones actually written. |
+| [4.4.0](../contributing-davekjohn/releases/audience/4.x/4.4.0.md) | 2026-08-11 | Minor | The merged note model gets its first written instance, and a release now times itself end to end |
+| [4.3.0](../contributing-davekjohn/releases/audience/4.x/4.3.0.md) | 2026-08-11 | Minor | One hand-written release note per release, a generated Release page, and the performance engineer owns wall-clock |
+| [4.2.0](../contributing-davekjohn/releases/audience/4.x/4.2.0.md) | 2026-08-10 | Minor | The consumer release document is named and written for its reader, and three silent failures gain a check |
+| [4.1.0](../contributing-davekjohn/releases/audience/4.x/4.1.0.md) | 2026-08-10 | Minor | The workflow's portable half: a consumer can copy the PR template and the contribution cycle, and three seams stop failing quietly |
+| [4.0.0](../contributing-davekjohn/releases/audience/4.x/4.0.0.md) | 2026-08-09 | Major | Chapter 3 consolidated (v3.0.0 -> v3.10.0) |
 
 ### 3.x
 
 | Version | Date | Type | Title |
 |---|---|---|---|
-| [3.10.0](../workflow-davekjohn/releases/audience/3.x/3.10.0.md) | 2026-08-09 | Minor | Teams and workflows |
-| [3.9.0](../workflow-davekjohn/releases/audience/3.x/3.9.0.md) | 2026-08-09 | Minor | A consumer can adopt the source's release config with one command |
-| [3.8.0](../workflow-davekjohn/releases/audience/3.x/3.8.0.md) | 2026-08-08 | Minor | The workflow becomes opt-in, and the product has one changelog |
-| [3.7.0](../workflow-davekjohn/releases/audience/3.x/3.7.0.md) | 2026-08-07 | Minor | The branch files take their designed form |
-| [3.6.0](../workflow-davekjohn/releases/audience/3.x/3.6.0.md) | 2026-08-06 | Minor | The changelog ranks itself by reach and weight, a branch keeps its plan in branch/, and a filled lens survives the teardown |
-| [3.5.0](../workflow-davekjohn/releases/audience/3.x/3.5.0.md) | 2026-08-05 | Minor | The changelog gets three tiers and a release has to earn its bump, and the shared workflow stops assuming it runs in the repo it was written in |
-| [3.4.0](../workflow-davekjohn/releases/audience/3.x/3.4.0.md) | 2026-08-04 | Minor | Every shared script has a page, and the changelog leads with the release instead of archiving them |
-| [3.3.0](../workflow-davekjohn/releases/audience/3.x/3.3.0.md) | 2026-08-04 | Minor | A release now writes for three readers, and a third gate keeps scaffolding out of it |
-| [3.2.0](../workflow-davekjohn/releases/audience/3.x/3.2.0.md) | 2026-08-03 | Minor | One product, one marketplace: renamed and flattened, with the release cut shared and three tiers deep |
+| [3.10.0](../contributing-davekjohn/releases/audience/3.x/3.10.0.md) | 2026-08-09 | Minor | Teams and workflows |
+| [3.9.0](../contributing-davekjohn/releases/audience/3.x/3.9.0.md) | 2026-08-09 | Minor | A consumer can adopt the source's release config with one command |
+| [3.8.0](../contributing-davekjohn/releases/audience/3.x/3.8.0.md) | 2026-08-08 | Minor | The workflow becomes opt-in, and the product has one changelog |
+| [3.7.0](../contributing-davekjohn/releases/audience/3.x/3.7.0.md) | 2026-08-07 | Minor | The branch files take their designed form |
+| [3.6.0](../contributing-davekjohn/releases/audience/3.x/3.6.0.md) | 2026-08-06 | Minor | The changelog ranks itself by reach and weight, a branch keeps its plan in branch/, and a filled lens survives the teardown |
+| [3.5.0](../contributing-davekjohn/releases/audience/3.x/3.5.0.md) | 2026-08-05 | Minor | The changelog gets three tiers and a release has to earn its bump, and the shared workflow stops assuming it runs in the repo it was written in |
+| [3.4.0](../contributing-davekjohn/releases/audience/3.x/3.4.0.md) | 2026-08-04 | Minor | Every shared script has a page, and the changelog leads with the release instead of archiving them |
+| [3.3.0](../contributing-davekjohn/releases/audience/3.x/3.3.0.md) | 2026-08-04 | Minor | A release now writes for three readers, and a third gate keeps scaffolding out of it |
+| [3.2.0](../contributing-davekjohn/releases/audience/3.x/3.2.0.md) | 2026-08-03 | Minor | One product, one marketplace: renamed and flattened, with the release cut shared and three tiers deep |
 | [3.1.2](development/3.x/3.1.2.md) | 2026-08-02 | Patch | Round v12 processed: the teardown papers corrected, and the staleness gate reaches into prose |
 | [3.1.1](development/3.x/3.1.1.md) | 2026-08-02 | Patch | The v11 follow-up: the gates see what they claim to see |
 | [3.1.0](development/3.x/3.1.0.md) | 2026-08-01 | Minor | Every finding of test rounds v9 and v10, processed — and a gate so a PR closes what it fixes |

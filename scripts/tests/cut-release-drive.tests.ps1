@@ -202,7 +202,7 @@ A fixture release page.
 
 $HistoryMajors
 "@
-    New-Item -ItemType Directory -Path (Join-Path $root 'workflow-davekjohn\releases\audience\1.x') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn\releases\audience\1.x') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root 'releases\development\1.x') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $root 'releases\github\1.x') -Force | Out-Null
 
@@ -323,7 +323,7 @@ try {
     $root4 = New-CutFixture -Name 'tier1' -AudienceTier 1 -EntryTopTier 1
     $r4 = Invoke-Cut -Root $root4 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-Equal 0 $r4.Code 'tier 1: the minor is earned by the tier-1 entry and the cut succeeds'
-    $note4 = Join-Path $root4 'workflow-davekjohn\releases\audience\1.x\1.5.0.md'
+    $note4 = Join-Path $root4 'contributing-davekjohn\releases\audience\1.x\1.5.0.md'
     Assert-True (Test-Path -LiteralPath $note4) 'tier 1: the hand-written note was drafted'
     if (Test-Path -LiteralPath $note4) {
         $n4 = Get-Content -LiteralPath $note4 -Raw
@@ -358,7 +358,7 @@ try {
     $root5 = New-CutFixture -Name 'tier2' -EntryTopTier 2
     $r5 = Invoke-Cut -Root $root5 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-Equal 0 $r5.Code 'tier 2: the minor is earned by the tier-2 entry and the cut succeeds'
-    $note5 = Join-Path $root5 'workflow-davekjohn\releases\audience\1.x\1.5.0.md'
+    $note5 = Join-Path $root5 'contributing-davekjohn\releases\audience\1.x\1.5.0.md'
     Assert-True (Test-Path -LiteralPath $note5) 'tier 2: the hand-written note was drafted'
     if (Test-Path -LiteralPath $note5) {
         $n5 = Get-Content -LiteralPath $note5 -Raw

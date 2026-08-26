@@ -204,7 +204,7 @@ days.
 **The lever is unchanged and the constraint on it is unchanged**, so this is a re-measurement rather than
 a new proposal: the `paths:`-scoped candidates were assessed above and the easy room was spent then. What
 has arrived since is a large, genuinely path-scoped body — the release, changelog, tier and significance
-machinery, inert until somebody touches `workflow-davekjohn/**`, `CHANGELOG.md` or runs a cut. It is also
+machinery, inert until somebody touches `contributing-davekjohn/**`, `CHANGELOG.md` or runs a cut. It is also
 the body with the worst failure mode if scoped: a rule that is gone after a `/compact` is gone in the
 middle of a release, which is exactly when it is being followed.
 
@@ -245,7 +245,7 @@ earlier tables, which is the second half of the under-count):
 | `.claude/specialists/SPECIALISTS.md` (the seam) | 7,982 | ~2,600 | 3.12 |
 | **documents** | **113,793** | **~36,500** | |
 | `team-alpha` listing | — | 3,009 | **API-measured** |
-| `workflow-davekjohn` listing | — | 2,317 | **API-measured** |
+| `contributing-davekjohn` listing | — | 2,317 | **API-measured** |
 | **total** | | **~41,800** | range ~40,600–43,900 |
 
 **~41,800 tokens, not ~30,205.** The plugin listing has also *fallen* since v2.10.0 — 3,009 against the
@@ -414,7 +414,7 @@ only while it says when each one was opened.
    inside the writing and nobody waited for. The gate share breaks down as 231s of suites inside the cut,
    200s of the same suites when the note's pull request opened, and 8m 36s of `lint-en-tests` on that pull
    request, which is **56%** of the release and the only place a real reduction can come from. The full table
-   is in [`releases/audience/4.x/4.4.0.md`](../../../workflow-davekjohn/releases/audience/4.x/4.4.0.md).
+   is in [`releases/audience/4.x/4.4.0.md`](../../../contributing-davekjohn/releases/audience/4.x/4.4.0.md).
 
    **Two cautions travel with the number, and they matter more than it does.** That release carried **two**
    entries against `v4.2.0`'s seven, so it measures the clock well and the writing gain not at all — less to
@@ -510,7 +510,7 @@ only while it says when each one was opened.
    | minor / major (carries a document) | **14m 34s** | 231s suites in the cut · 200s the same suites at `open-pr` · **443s** median `lint-en-tests` on that pull request |
    | patch (no document, no pull request) | **3m 51s** | the 231s cut suites alone |
 
-   The two local legs are cited from [`releases/audience/4.x/4.4.0.md`](../../../workflow-davekjohn/releases/audience/4.x/4.4.0.md),
+   The two local legs are cited from [`releases/audience/4.x/4.4.0.md`](../../../contributing-davekjohn/releases/audience/4.x/4.4.0.md),
    which took them from git timestamps. **The 7m 48s CI run on the release commit is excluded** because it
    blocks nobody.
 

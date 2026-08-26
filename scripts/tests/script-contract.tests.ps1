@@ -2,7 +2,7 @@
 .SYNOPSIS
     Regression tests for the script-contract check (scripts/sync/check-script-contract.ps1, issue
     #147) and its SessionStart hook
-    (plugins/workflows/workflow-davekjohn/hooks/script-contract-sessioncheck.ps1).
+    (plugins/workflows/contributing-davekjohn/hooks/script-contract-sessioncheck.ps1).
 
 .DESCRIPTION
     Dependency-free: no Pester, plain PowerShell. Integration-style -- runs the REAL check script (and
@@ -45,7 +45,7 @@ $Script        = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
 # blueprint generator. The scenarios below still run the real CHECK; the asserts about how records are
 # DECLARED read the lib, which is where they are now.
 $ContractLib   = Join-Path $RepoRoot 'scripts\lib\script-contract-lib.ps1'
-$Hook          = Join-Path $RepoRoot 'plugins\workflows\workflow-davekjohn\hooks\script-contract-sessioncheck.ps1'
+$Hook          = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\hooks\script-contract-sessioncheck.ps1'
 $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $RepoConfigSrc = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $Fixture       = Join-Path ([System.IO.Path]::GetTempPath()) "script-contract-test-fixture-$PID"
@@ -155,7 +155,7 @@ function New-FixtureConsumer {
     # testing the record it is about -- the check reports the folder missing as its own [ERROR], which
     # would otherwise leak into every fixture. -OmitWorkflowFolder is the dedicated negative case.
     if (-not $OmitWorkflowFolder) {
-        New-Item -ItemType Directory -Path (Join-Path $root 'workflow-davekjohn') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn') -Force | Out-Null
     }
 
     if (-not $OmitBranchInfo) {
@@ -199,7 +199,7 @@ try {
     # tightening, never required maintenance.
     $okCount = @([regex]::Matches($r.Out, '\[OK\]')).Count
     Assert-True ($okCount -ge 27) 'happy path: at least twenty-seven [OK] lines -- every declared record this repo defines (four mandatory functions plus every optional: Get-LiveStage, the two Get-Roster* made optional by #445, the four Get-Entry* stub-wording knobs, Get-PrMergeMethod, Get-MojibakePaths, the cut-release knobs from #417 plus Get-ReleaseMajorMinMinors, Get-ReleaseHistoryPath and Get-ReleaseNoteRoot (inbound #616), BOTH note-wording maps (Get-ReleaseNoteWording, which the cut reads first, and Get-InternalNoteWording, its fallback -- inbound #605), Get-BranchTypes from inbound #580, Get-ReleaseAudienceTier from inbound #620, and the two release-notes-page knobs from August 15, 2026 -- Get-ReleasePageTitle and Get-ReleasePageWorkerName, both answered here) plus the workflow-folder existence line (August 14, 2026), nothing else'
-    Assert-Match '\[OK\]\s+workflow folder: workflow-davekjohn/ exists' $r.Out 'happy path: the workflow folder is reported present'
+    Assert-Match '\[OK\]\s+workflow folder: contributing-davekjohn/ exists' $r.Out 'happy path: the workflow folder is reported present'
     # inbound #203: the run names the root it inspected and how it resolved it. Asserted on the clean
     # run too, not only on a drifted one -- the [SCOPE] line is context that must always be emitted, so
     # that the hook has something to surface the moment a finding does appear.
@@ -231,7 +231,7 @@ try {
     $c = New-FixtureConsumer -OmitWorkflowFolder
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 1 $r.Code 'missing workflow folder: exit-code 1'
-    Assert-Match "\[ERROR\].*'workflow-davekjohn/' does not exist" $r.Out 'missing workflow folder: the ERROR names the folder'
+    Assert-Match "\[ERROR\].*'contributing-davekjohn/' does not exist" $r.Out 'missing workflow folder: the ERROR names the folder'
     Assert-Match 'adopt-workflow-folder' $r.Out 'missing workflow folder: the finding names the skill that scaffolds it'
     $errCountWf = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
     Assert-Equal 1 $errCountWf 'missing workflow folder: exactly one error -- every contract record is still satisfied'
@@ -374,7 +374,7 @@ try {
     # THE FALLBACK TEXT ITSELF CHANGED (issue #885): the literal 'releases/README.md' became the short
     # computed-default description Get-ReleasePluginTier already set the precedent for, since the real
     # default now differs between a source repo and a consumer.
-    Assert-Match "\[INFO\].*'Get-ReleaseHistoryPath' missing from scripts\\repo-config\.ps1.*used by: cut-release, new-internal-note.*optional.*falls back to 'releases/README\.md \(source\) or workflow-davekjohn/releases/history\.md \(consumer\), computed'" $r.Out 'optional absent: INFO names the function, both callers and the fallback'
+    Assert-Match "\[INFO\].*'Get-ReleaseHistoryPath' missing from scripts\\repo-config\.ps1.*used by: cut-release, new-internal-note.*optional.*falls back to 'releases/README\.md \(source\) or contributing-davekjohn/releases/history\.md \(consumer\), computed'" $r.Out 'optional absent: INFO names the function, both callers and the fallback'
 
     # --- 6d. Get-LiveStage: absent -> [INFO] naming the empty-string fallback, exit 0 (issue #177) ----
     #     Mirrors test 6c above (Get-ChangelogHeading, issue #178): Get-LiveStage is Optional in the
@@ -664,7 +664,7 @@ function Get-RosterIgnoredIds { return @() }
     $liveStagePattern = 'Lib\s*=\s*''scripts\\repo-config\.ps1'';\s*Function\s*=\s*''Get-LiveStage'';\s*Scripts\s*=\s*@\(''cut-release skill''\);(?:(?!Lib\s*=)[\s\S])*?Optional\s*=\s*\$true;\s*Default\s*=\s*'''''
     Assert-True ([regex]::IsMatch($contractSrc, $liveStagePattern)) "contract: record for 'Get-LiveStage' still declared, attributed to scripts\repo-config.ps1 / 'cut-release skill', Optional with an empty-string Default"
 
-    $cutReleaseSkillPath = Join-Path $RepoRoot 'plugins\workflows\workflow-davekjohn\skills\cut-release\SKILL.md'
+    $cutReleaseSkillPath = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\skills\cut-release\SKILL.md'
     Assert-True (Test-Path -LiteralPath $cutReleaseSkillPath) 'contract: cut-release SKILL.md exists at the path the Get-LiveStage record is attributed to'
     if (Test-Path -LiteralPath $cutReleaseSkillPath) {
         $skillText = [System.IO.File]::ReadAllText($cutReleaseSkillPath)

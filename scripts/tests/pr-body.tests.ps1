@@ -702,7 +702,7 @@ Assert-True ($reference[0] -eq (Get-PrTemplateCanonicalPlaceholder)) `
 
 # The shipped file on disk, not just the function: a reference nobody can copy is not a reference. The
 # lint gate holds these byte for byte; this asserts the file exists at the path the docs send people to.
-$refOnDisk = Join-Path $PSScriptRoot '..\..\plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'
+$refOnDisk = Join-Path $PSScriptRoot '..\..\plugins\workflows\contributing-davekjohn\templates\pull_request_template.md'
 Assert-True (Test-Path -LiteralPath $refOnDisk) `
     'the reference template is actually shipped at the path the skill and CONTRIBUTING-portable name'
 if (Test-Path -LiteralPath $refOnDisk) {

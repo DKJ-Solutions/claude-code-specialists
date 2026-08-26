@@ -68,21 +68,16 @@ infrastructure.
   as an error — `ship-pr`, `fix-mojibake`, `verify-resolved-issues` and `check-script-contract` are in that
   state today, and the first three are real gaps rather than deliberate ones. This is the safety guard that
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
-  runs before a release. **Check 23, `[plugin-kind]`, added August 9, 2026, guards the naming rule a
-  session hook now depends on:** every published plugin must be `team-*` under `plugins/teams/` or
-  `workflow-*` under `plugins/workflows/`, and a name carrying neither prefix is an error rather than a
-  style note. The reason it has teeth: the core team's `workflow-sessioncheck` hook (below) decides what
-  counts as a workflow by that prefix alone, so a workflow published under a different name would be
-  invisible to the count that exists to catch two enabled at once — the directory half of the check keeps
-  the tree readable, but the naming half is the one a reader cannot see for themselves.
-- **`plugins/teams/team-alpha/hooks/workflow-sessioncheck.ps1`** — the fourth informational, read-only
-  SessionStart hook, registered in that plugin's `hooks/hooks.json` alongside `roster-sessioncheck`. It
-  counts the enabled plugin ids whose name starts with `workflow-`, stays silent at zero (a repo may run
-  the specialists on plain git/gh, and this hook having an opinion about that would be exactly what the
-  teams/workflows split exists to stop) and at one (the ordinary state), and at two or more prints an
-  `[ERROR]` naming each id together with the settings layer that enabled it — because a conflict arriving
-  from the machine layer looks identical from inside the repo to one the repo caused. Same posture as its
-  three siblings: it never blocks (always exit 0) and writes nothing.
+  runs before a release. **Check 23, `[plugin-kind]`, added August 9, 2026, and its reason was replaced on
+  August 26, 2026 rather than left standing:** every published plugin must be `team-*` under
+  `plugins/teams/` or `workflow-*` under `plugins/workflows/`, and a name carrying neither prefix is an
+  error rather than a style note. It used to have teeth because the core team's `workflow-sessioncheck`
+  hook decided what counted as a workflow by that prefix alone — that hook was retired with
+  `workflow-default` under [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886), so the
+  borrowed justification is gone. **What replaced it is internal to the check and stronger for it:** the
+  directory half is *derived* from the name, so a plugin matching neither prefix falls through both
+  branches and has its location held against nothing at all. An unprefixed name does not read untidily —
+  it switches the check off for itself, silently.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
   (`scripts/tests/*.tests.ps1`) on every PR and every push to `main`, so the guard also applies to
   work that comes about outside `open-pr.ps1`. **"The same" is literal since August 7, 2026** — the step
@@ -265,7 +260,7 @@ infrastructure.
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
   `plugins/teams/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
-  `plugins/workflows/workflow-davekjohn/` (everything branch- and release-shaped). Three things to
+  `plugins/workflows/contributing-davekjohn/` (everything branch- and release-shaped). Three things to
   know before touching it:
   - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
     both used to look for a script's documenting page at a hardcoded `plugins\teams\team-alpha\skills\…`,
@@ -639,7 +634,7 @@ than a clear-out** (Dave, August 7, 2026;
 [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508)). Two of those descriptions were
 measured stale during a sweep that was looking for exactly that, one of them consumer-facing. The
 alternative — deleting the shape from every document and pointing at
-the generated reference under `workflow-davekjohn/branch/templates/`, a directory the merged development
+the generated reference under `contributing-davekjohn/branch/templates/`, a directory the merged development
 cycle has since retired — was weighed and declined: the prose costs every reader on
 every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
 section names**, and that was settled by measuring four candidate rules against the tree rather than by
@@ -687,7 +682,7 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
-the DEPLOY section of `workflow-davekjohn/development-cycle.md`, so everything else it asked was already answered four lines lower. Measured
+the DEPLOY section of `contributing-davekjohn/development-cycle.md`, so everything else it asked was already answered four lines lower. Measured
 over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
 single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
 `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and
@@ -716,7 +711,7 @@ the prefix checklist: **5 of their 60 PRs ticked two rows and 2 ticked none**, w
 **The template's shape is shipped, and the placeholder list moved so a gate could reach it** (same
 issue). `.github/pull_request_template.md` cannot live in the plugin — GitHub reads it only from that
 path in the consumer's own repo — so what ships is a reference to copy and diff against, at
-`plugins/workflows/workflow-davekjohn/templates/pull_request_template.md`, held byte for byte to
+`plugins/workflows/contributing-davekjohn/templates/pull_request_template.md`, held byte for byte to
 `Get-PrTemplateReference`. The three recognised placeholder strings were three literals inside
 `open-pr.ps1`, which meant **nothing outside that script could read them**: the reference could not be
 held against the list that has to recognise it, and that gap is the defect the issue reported. They now

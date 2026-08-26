@@ -62,8 +62,8 @@ turns ordinary progress into an error under PowerShell's `Stop` preference.
 
 ## The seam answers it reads
 
-Every one is fetched through `Get-Command`, so this script depends on **neither workflow plugin** and a
-repo running `workflow-default` gets identical behaviour.
+Every one is fetched through `Get-Command`, so this script depends on **no workflow plugin** and a repo
+running none at all gets identical behaviour.
 
 | function | required? | what its absence costs |
 |---|---|---|

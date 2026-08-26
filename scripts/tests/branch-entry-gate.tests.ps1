@@ -46,7 +46,7 @@ function New-Consumer {
        and a branch NAME, which the caller passes. #>
     param([Parameter(Mandatory = $true)][string]$Label, [string]$RepoConfig = '')
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("entrygate-$PID-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
-    New-Item -ItemType Directory -Path (Join-Path $dir 'workflow-davekjohn\branch') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $dir 'contributing-davekjohn\branch') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib') -Force | Out-Null
     $script:trees += $dir
     if ($RepoConfig) {

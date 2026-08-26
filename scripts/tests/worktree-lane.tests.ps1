@@ -187,8 +187,8 @@ try {
     Assert-Equal 'main' (Get-HeadBranch -Dir $fa) "open: the PRIMARY still sits on main (the load-bearing guarantee)"
     # The -RepoRoot delegation: the dossier belongs to the lane, and the primary must not have gained
     # a copy. Asserting only the first half would pass for a script that wrote into both.
-    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'workflow-davekjohn\development-cycle.md')) "open: the development cycle is written in the lane"
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'workflow-davekjohn\development-cycle.md'))) "open: the primary did NOT gain one"
+    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development-cycle.md')) "open: the development cycle is written in the lane"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development-cycle.md'))) "open: the primary did NOT gain one"
 
     # --- (b) A refused branch name rolls the lane back completely -----------------------------------
     Write-Host "worktree-lane.ps1 -- rolls back when new-branch refuses the name" -ForegroundColor Cyan

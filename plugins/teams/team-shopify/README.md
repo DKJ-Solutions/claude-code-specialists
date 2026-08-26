@@ -147,8 +147,8 @@ only for a belt-and-braces refusal — and the guard hook blocks a live-aimed pu
 recognised the target. So an unanswered seam costs one of two independent refusals, and the script says so
 out loud instead of blocking a preview.
 
-Every one of them is read through `Get-Command`, so **this plugin depends on neither workflow plugin**: a
-repo on `workflow-default`, on `workflow-davekjohn`, or on neither gets identical behaviour. That includes
+Every one of them is read through `Get-Command`, so **this plugin depends on no workflow plugin at all**: a
+repo on `contributing-davekjohn` and a repo on none get identical behaviour. That includes
 the branch-name flattening `push-preview` needs — Shopify rejects a theme name containing `/`, so the
 branch name is taken from `Get-BranchInfo`'s `SafeName` where the repo has it and falls back to replacing
 `/` with `-`, which is the same answer.

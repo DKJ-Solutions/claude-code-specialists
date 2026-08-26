@@ -502,7 +502,7 @@ function Get-RosterIgnoredIds {
 $repoConfigWorkflowPart = @'
 # --- The workflow plugin's half -------------------------------------------------------------------
 # These are read by the branch/release scripts (open-pr, fold-changelog, ship-pr, cut-release). They
-# are here because this repo enabled workflow-davekjohn; without that plugin nothing
+# are here because this repo enabled contributing-davekjohn; without that plugin nothing
 # reads them. Fill in the VUL-IN values below and remove the VUL-IN markers.
 
 # VUL-IN: GitHub repo hosting this repository (owner/name), e.g. 'DaveKJohn/my-repo'.
@@ -661,8 +661,16 @@ $repoConfigRosterPart = $repoConfigRosterPart.Replace('__SEAM_ROSTER_PATH__', $s
 # question is the lesson of inbound #294. A chain that could not be read at all degrades to "no": the
 # roster half is what every consumer needs, and writing a workflow half nobody reads is the defect being
 # repaired, so the safe direction is to leave it out and say so.
-$workflowPluginName = 'workflow-davekjohn'
-$hasWorkflowPack = ($pluginNames -contains $workflowPluginName)
+# TWO NAMES ARE ACCEPTED WHILE CONSUMERS MIGRATE (#886, August 26, 2026). The plugin was renamed
+# 'workflow-davekjohn' -> 'contributing-davekjohn', and this reader is in the CORE team, which every
+# consumer enables and updates on its own schedule -- so a consumer can be on a core that knows the new
+# name while their settings still say the old one. Matching only the new name would then write the roster
+# half alone and say the pack is not enabled, which is the exact silent-degradation defect the paragraph
+# above describes as the thing being repaired. The old name is a migration allowance, not a second
+# supported id: it can go once every register entry has moved.
+$workflowPluginName  = 'contributing-davekjohn'
+$workflowPluginNames = @($workflowPluginName, 'workflow-davekjohn')
+$hasWorkflowPack = (@($pluginNames | Where-Object { $workflowPluginNames -contains $_ }).Count -gt 0)
 
 $repoConfigScaffold = $repoConfigHeader + $repoConfigRosterPart
 if ($hasWorkflowPack) {

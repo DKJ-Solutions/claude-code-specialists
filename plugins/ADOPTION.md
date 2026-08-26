@@ -48,37 +48,32 @@ the marketplace offers. Which specialists live in which plugin and who they are 
 the [root README](../README.md).
 
 **The workflow slot is different in kind, so decide about it deliberately rather than by habit — and
-decide is the right word, because leaving it empty is no longer the default it once was.** Two plugins
-answer "how does work move through this repo," and exactly one may be enabled: `workflow-default`, which
-imposes nothing and asks the specialists to read what your repo already states about its own
-conventions, and `workflow-davekjohn`, which carries no specialists at all but is DaveKJohn's own branch,
+"decide" now means deciding whether to fill it at all.** One plugin answers "how does work move through
+this repo": `contributing-davekjohn`, which carries no specialists at all but is DaveKJohn's own branch,
 changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `ship-pr`,
-`fold-changelog`, `cut-release`, `park`, `fix-mojibake`). **`workflow-default` is the one this page's
-default settings block enables, and it is the one to leave enabled** unless you deliberately want
-`workflow-davekjohn`'s method instead. Two consequences worth knowing before you switch to it:
+`fold-changelog`, `cut-release`, `park`, `fix-mojibake` among others). **Leaving the slot empty is what
+this page's default settings block does, and it is a complete answer** — your repo keeps the way of
+working it already had. Two consequences worth knowing before you enable the one that exists:
 
-- **Switching onto it later is an enable, a *disable*, and a re-run of `specialists-init`** — which then
-  adds the config it needs. **One thing does have to be undone, in the same edit:** set the outgoing
-  workflow to `false` in `.claude/settings.json`. Exactly one workflow may hold the slot, and
-  `team-alpha`'s `workflow-sessioncheck` hook reports `[ERROR] 2 workflows are enabled at once` when two
-  do — because two workflows answer the same questions differently and nothing tells the specialists
-  which answer is yours. **The `[ERROR]` arrives at the *next* session start**, which is one step after
-  the commit that switched: so the wrong state gets committed, pushed and reviewed before anything
-  complains. **Disabling is not uninstalling** — the plugin stays on the machine and switching back is
-  the same one-line edit in reverse.
+- **Enabling it later is a plain enable + re-run of `specialists-init`**, which then adds the config it
+  needs. Nothing has to be undone — and that sentence is finally true rather than merely short. It said
+  the same thing until August 20, 2026 while it was **false**, because a second workflow then had to be
+  set to `false` in the same edit or `team-alpha`'s `workflow-sessioncheck` hook reported
+  `[ERROR] 2 workflows are enabled at once` at the *next* session start — one step after the commit that
+  switched, so the wrong state got committed, pushed and reviewed first (inbound
+  [#785](https://github.com/DaveKJohn/claude-code-specialists/issues/785)). Both the second plugin and
+  that hook were removed on August 26, 2026
+  ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)), so there is nothing left to
+  turn off and nothing left to warn you.
 - **Enabling it makes your repo owe it two files** — `scripts/repo-config.ps1` (repo name, lint gate)
   and `scripts/lib/branch-info.ps1` (your branch-prefix table). `specialists-init` scaffolds both, and a
-  session check tells you if a function is missing; **answering them is step 3**, below. On
-  `workflow-default` you are asked for neither — it reads your repo instead of asking you to configure
-  it.
+  session check tells you if a function is missing; **answering them is step 3**, below. Enable no
+  workflow and you are asked for neither.
 
-> **The first bullet said "Nothing has to be undone first" until August 20, 2026, and it was false**
-> (inbound [#785](https://github.com/DaveKJohn/claude-code-specialists/issues/785)). The check that
-> falsifies it ships in the same marketplace, and both [INSTALL.md](../INSTALL.md) and this page
-> correctly say elsewhere that exactly one workflow may be enabled — the one place describing the
-> *transition* told the reader the opposite. A consumer that followed it literally enabled the new
-> workflow, left the old one at `true`, committed that, and met the standing `[ERROR]` at the restart
-> that was meant to *verify* the adoption.
+> **If your `.claude/settings.json` still names `workflow-default`, remove that line.** It was the
+> plugin that used to hold this slot by default. The id resolves to nothing at your next
+> `claude plugin marketplace update`, and nothing warns you — the hook that would have had an opinion
+> about your workflow keys is the one that went with it.
 
 
 ## The four steps
@@ -114,9 +109,8 @@ gets everything under `created`, which is the sample above. A repo that already 
 `scripts/repo-config.ps1` sees that one move to `already present` instead. So a figure that is *higher*
 than the sample is not an error, and neither is one that is lower: what matters is that each pair adds up
 and that the skill names anything it skipped. If you enabled an add-on team as well, expect its
-specialists on top of these. `workflow-default`, on the other hand, changes nothing here: it carries no
-specialists and needs no script scaffold, so this sample's numbers hold whether or not it is enabled
-alongside `team-alpha`.
+specialists on top of these. `contributing-davekjohn`, on the other hand, changes nothing here: it carries no
+specialists, so this sample's numbers hold whether or not it is enabled alongside `team-alpha`.
 
 > The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
 > 2 already present` — captured in a repo that already had them, and therefore inverted for exactly the
@@ -157,8 +151,8 @@ The set as of this release:
 
 | skill | shipped by | what your repo lacks without it | what reports it |
 |---|---|---|---|
-| `adopt-config` | `workflow-davekjohn` | the seam values that state the shared way of working — step 1 *scaffolds* `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`, this answers them | `script-contract-sessioncheck` |
-| `adopt-workflow-folder` | `workflow-davekjohn` | `workflow-davekjohn/` itself — the only location the shared scripts read the branch dossier and the release documents from | `script-contract-sessioncheck` |
+| `adopt-config` | `contributing-davekjohn` | the seam values that state the shared way of working — step 1 *scaffolds* `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`, this answers them | `script-contract-sessioncheck` |
+| `adopt-workflow-folder` | `contributing-davekjohn` | `contributing-davekjohn/` itself — the only location the shared scripts read the branch dossier and the release documents from | `script-contract-sessioncheck` |
 | `adopt-shopify-floor` | `team-shopify` | the live-theme guard's id half, a starter `.theme-check.yml`, and the CI gate that runs it | `shopify-floor-sessioncheck` |
 
 **Enumerate it from your own slash list rather than from this table.** A plugin added after this release

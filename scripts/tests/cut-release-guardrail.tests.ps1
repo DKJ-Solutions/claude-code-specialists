@@ -326,7 +326,7 @@ Assert-True $versionCell.Success "found the line that builds the overview row's 
 Assert-True ($versionCell.Success -and $versionCell.Value -notmatch '"notes/') `
     'the Version cell carries no bare "notes/" literal -- the short form the two asserts above cannot see'
 # SINCE AUGUST 14, 2026 THE CELL IS A COMPUTED RELATIVE PATH, not a leaf stripped with
-# `-replace '^releases/'`: a consumer whose history lives at workflow-davekjohn/releases/README.md is
+# `-replace '^releases/'`: a consumer whose history lives at contributing-davekjohn/releases/README.md is
 # the root-outside-releases/ case the old line's own comment said no repo had asked for yet. The cell
 # must come from Get-RelativeLinkPath, anchored on the history file's directory, fed by the seam.
 Assert-True ($versionCell.Success -and $versionCell.Value -match 'Get-RelativeLinkPath') `

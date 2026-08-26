@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Tests for scripts/task/adopt-workflow-folder.ps1 -- the scaffold that places the workflow's own
-    root folder (workflow-davekjohn/) in a consuming repo.
+    root folder (contributing-davekjohn/) in a consuming repo.
 
 .DESCRIPTION
     What is covered, and why these four:
@@ -80,11 +80,10 @@ function Invoke-Adopt {
 # Every file -Apply must place. Read from the same claim the script makes rather than restated per
 # assert, so a target added there fails ONE list here instead of passing unexamined.
 $ExpectedFiles = @(
-    'workflow-davekjohn\README.md',
-    'workflow-davekjohn\CLAUDE.md',
-    'workflow-davekjohn\CONTRIBUTING.md',
-    'workflow-davekjohn\releases\README.md',
-    'workflow-davekjohn\releases\audience\.gitkeep'
+    'contributing-davekjohn\README.md',
+    'contributing-davekjohn\CONTRIBUTING.md',
+    'contributing-davekjohn\releases\README.md',
+    'contributing-davekjohn\releases\audience\.gitkeep'
 )
 
 try {
@@ -97,8 +96,8 @@ try {
     $r1 = Invoke-Adopt -Dir $c1
     Assert-Equal 0 $r1.Code 'dry run: exit 0'
     Assert-Match 'DRY RUN' $r1.Out 'dry run: says so out loud'
-    Assert-Match '\[create\]\s+workflow-davekjohn/README\.md' $r1.Out 'dry run: lists the folder README as to-create'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c1 'workflow-davekjohn'))) 'dry run: the folder was not created'
+    Assert-Match '\[create\]\s+contributing-davekjohn/README\.md' $r1.Out 'dry run: lists the folder README as to-create'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c1 'contributing-davekjohn'))) 'dry run: the folder was not created'
 
     # --- 2. -Apply places the whole folder ----------------------------------------------------------
     Write-Host "adopt-workflow-folder -- -Apply places every file" -ForegroundColor Cyan
@@ -113,15 +112,15 @@ try {
     # folder was also their reference. The document exists only while a branch is open now, so placing one
     # would hand them a file their own first fold deletes -- the only entry in this list that is not
     # permanently theirs.
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'workflow-davekjohn\development-cycle.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'workflow-davekjohn\branch'))) '-Apply: and no branch/ directory is placed any more'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\development-cycle.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\branch'))) '-Apply: and no branch/ directory is placed any more'
     # THE FOLDER PAGE MUST NOT CARRY A HISTORY TABLE, and this assert is the regression guard on inbound
     # #786. It did until August 20, 2026: the page was scaffolded with a '## Release history' heading, a
     # table, and a VUL-IN promising that the cut would insert its rows there -- while this same command's
     # closing advice told the reader to leave Get-ReleaseHistoryPath at the repo root. Two statements in
     # one run that cannot both be true, and the consumer who followed the advice got a table that stays
     # empty forever. The page now points at the seam's answer instead.
-    $relText = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\releases\README.md'), [System.Text.Encoding]::UTF8)
+    $relText = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\releases\README.md'), [System.Text.Encoding]::UTF8)
     Assert-True ($relText -notmatch '\| Version \| Date \| Type \| Title \|') '-Apply: the folder page carries NO history table (the list is not here)'
     Assert-Match 'releases/README\.md' $relText '-Apply: it names where the list actually lives instead'
     # And the closing block names the two seams only this repo can answer.
@@ -131,11 +130,11 @@ try {
     # --- 3. Additive: a re-run never overwrites what somebody wrote --------------------------------
     Write-Host "adopt-workflow-folder -- re-run keeps every existing file" -ForegroundColor Cyan
     $marker = '# HAND-EDITED -- the scaffold must never win over this line'
-    [System.IO.File]::WriteAllText((Join-Path $c2 'workflow-davekjohn\CONTRIBUTING.md'), $marker)
+    [System.IO.File]::WriteAllText((Join-Path $c2 'contributing-davekjohn\CONTRIBUTING.md'), $marker)
     $r3 = Invoke-Adopt -Dir $c2 -ScriptArgs @('-Apply')
     Assert-Equal 0 $r3.Code 're-run: exit 0'
-    Assert-Match '\[exists\]\s+workflow-davekjohn/CONTRIBUTING\.md' $r3.Out 're-run: the edited file is reported as left alone'
-    $kept = [System.IO.File]::ReadAllText((Join-Path $c2 'workflow-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match '\[exists\]\s+contributing-davekjohn/CONTRIBUTING\.md' $r3.Out 're-run: the edited file is reported as left alone'
+    $kept = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Equal $marker $kept 're-run: the hand-edited content survives byte for byte'
 
     # --- 4. A plugin-publishing repo is refused ------------------------------------------------------
@@ -144,7 +143,7 @@ try {
     $r4 = Invoke-Adopt -Dir $c4 -ScriptArgs @('-Apply')
     Assert-Equal 1 $r4.Code 'plugin source: exit 1'
     Assert-Match 'REFUSED' $r4.Out 'plugin source: says it is refusing, and why'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c4 'workflow-davekjohn'))) 'plugin source: nothing was written'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c4 'contributing-davekjohn'))) 'plugin source: nothing was written'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

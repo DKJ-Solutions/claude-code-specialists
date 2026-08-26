@@ -97,7 +97,7 @@ function New-Fixture {
     # releases/development/ and releases/internal/ and every assertion below expects them there.
     # Get-DefaultReleaseDevelopmentNotesRoot / Get-DefaultReleaseInternalNotesRoot test exactly this
     # file's presence, so without it the fixture reads as a consumer and the script looks for its
-    # notes inside a workflow-davekjohn/ this fixture does not have.
+    # notes inside a contributing-davekjohn/ this fixture does not have.
     New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBom)
     if ($null -ne $NotesContent) {

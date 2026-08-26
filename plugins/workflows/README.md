@@ -13,32 +13,40 @@ splitting them is in the root README under
 
 | Folder | What it is |
 |---|---|
-| [`workflow-default/`](workflow-default/) | **The workflow a repo gets when it has not chosen one.** It imposes nothing; its one skill, `discover-workflow`, reads what the repo already states about how work moves through it and writes the answer down, including where the repo is silent. It has [its own README](workflow-default/README.md). |
-| [`workflow-davekjohn/`](workflow-davekjohn/) | **DaveKJohn's own branch-and-entry model, packaged so a repo can choose it.** The branch, PR, changelog and release skills, the shared scripts behind them, the two session hooks that belong to running this across several repos, and a config blueprint holding the source's own answers to the repo-owned seam. It has [its own README](workflow-davekjohn/README.md). |
+| [`contributing-davekjohn/`](contributing-davekjohn/) | **DaveKJohn's own branch-and-entry model, packaged so a repo can choose it.** The branch, PR, changelog and release skills, the shared scripts behind them, the session hooks that belong to running this across several repos, and a config blueprint holding the source's own answers to the repo-owned seam. It has [its own README](contributing-davekjohn/README.md). |
 
-`workflow-default` is what a repo keeps unless it deliberately decides otherwise. The name of the other
-one is a statement rather than vanity: it carries an owner's name because it is *his* branch discipline
-and not a standard, which is exactly why a repo has to choose it rather than receive it.
+**One folder, and the name is a statement rather than vanity:** it carries an owner's name because it is
+*his* branch discipline and not a standard, which is exactly why a repo has to choose it rather than
+receive it.
 
-## At most one, ever — and it is checked
+## There is no default workflow, and that is the answer rather than a gap
 
-**Two enabled workflows would hand the specialists two contradicting answers to the same question**,
-with nothing in the session saying which one is this repo's; they would then pick, silently and
-differently each time. That is not hypothetical — the two plugins here genuinely disagree, by design,
-about whether a branch owes an entry file and a step list before it can open a PR.
+This directory held a second plugin, `workflow-default`, until August 26, 2026
+([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)). It was described as *"the
+workflow a repo gets when it has not chosen one"*, and removing it was Dave's call on a simple reading:
+**a consuming repo already has its own way of working before any plugin is installed.** Its contributing
+rules, its branch conventions and its release steps are its own, written by whoever runs it. A plugin
+asserting itself as the *default* method claims a slot that was never empty.
 
-Since August 9, 2026 the rule is enforced rather than merely written down. The
-`workflow-sessioncheck` SessionStart hook counts the enabled plugin ids beginning with `workflow-`,
-and prints an `[ERROR]` naming each one together with the settings layer that enabled it once there is
-more than one. It never blocks, and stays silent at zero enabled workflows as well as at one — zero is
-a legitimate state, not an oversight.
+So the honest shape is one opt-in and no baseline. A repo that enables nothing here keeps exactly what
+it had, which is what it wanted; a repo that enables `contributing-davekjohn` has deliberately adopted
+somebody else's discipline on top of its own.
 
-**That hook lives in the core team, not in these plugins**, and deliberately so: the core is the one
-plugin every consuming repo enables, so it is the only place a check can see *all* the enabled
-workflows at once. Putting a copy in each workflow would be symmetrical and would fail in exactly the
-case it is needed — a conflict takes two plugins, and only one of them has to have left the check out.
-It also keeps `workflow-default` free of hooks entirely, which is what lets it stay as thin as it is
-meant to be.
+**Nothing checks how many workflows are enabled, and that rule was retired rather than lost.** Until
+this change a `workflow-sessioncheck` SessionStart hook in the core team counted enabled plugin ids
+beginning with `workflow-` and raised an `[ERROR]` above one, on the argument that two enabled workflows
+would hand the specialists two contradicting answers to the same question. That argument rested on the
+two plugins here genuinely disagreeing about whether a branch owes an entry before it can open a PR —
+and with one of them gone there is nothing left to disagree with. #886 also settled the wider question
+in the other direction: this workflow keeps its changelog and its releases inside **its own folder**, so
+a repo's own contributing rules and this one can stand side by side without colliding. Coexistence is
+now a supported answer, not a misconfiguration.
+
+**What that costs, stated because it is a real risk and not a hypothetical.** If a second workflow
+plugin is ever added here, nothing will notice two of them being enabled at once, and the specialists
+will again get two answers with nothing saying which is this repo's. The guard is retired on the state
+of the tree, not on a proof that the failure is impossible — so adding a second workflow means
+answering this question again, deliberately, rather than discovering that the check quietly went away.
 
 ## The name is load-bearing, and so is sitting here
 
@@ -47,9 +55,12 @@ A workflow is named `workflow-<name>` and lives under `plugins/workflows/`; a te
 [`check-plugin-integrity.ps1`](../../scripts/lint/check-plugin-integrity.ps1) holds every published
 plugin to both halves of that pairing.
 
-The naming half is the one that cannot be seen by reading the tree, and it is the reason the check
-exists: the count above keys on the `workflow-` prefix and nothing else, so a workflow published under
-a different name would never be counted and could sit enabled alongside another in silence.
+**The naming half's reason changed with the guard, and the check says so too.** It used to be that the
+count above keyed on the `workflow-` prefix, so a workflow published under another name would never be
+counted. With no count left, what keeps the naming rule is internal to the check: **the directory rule
+is derived from the name.** A plugin matching neither prefix falls through both branches, so its
+location is held against nothing at all — an unprefixed name does not read untidily, it switches the
+check off for itself.
 
 ## What a workflow folder holds
 
@@ -59,16 +70,13 @@ a different name would never be counted and could sit enabled alongside another 
   lives.
 - **`scripts/`** — the scripts and libs those skills run, mirrored from this repo's own `scripts/` and
   held to it by the shared-script drift lint. Do not edit a mirror: a change lands in the source first
-  and travels here. See the [scripts README](workflow-davekjohn/scripts/README.md). Even
-  `workflow-default` has one, for a single function: it writes its document inside the seam, and where
-  the seam is has one source rather than a literal per reader.
-- **`hooks/`, `blueprint/`** — only where a workflow needs them. `workflow-davekjohn` carries both;
-  `workflow-default` carries neither, which is the point of it.
+  and travels here. See the [scripts README](contributing-davekjohn/scripts/README.md).
+- **`hooks/`, `blueprint/`** — only where a workflow needs them; `contributing-davekjohn` carries both.
 
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
 
-## The seam: what `workflow-davekjohn` expects from your repo
+## The seam: what `contributing-davekjohn` expects from your repo
 
 Its shared scripts dot-source two **repo-owned** files — `scripts/repo-config.ps1` and
 `scripts/lib/branch-info.ps1` — so the parts that legitimately differ per repo are answered by the
@@ -81,13 +89,10 @@ root README under
 the seam consists of, file by file, is under
 [The seam, specified](../../README.md#the-seam-specified).
 
-`workflow-default` expects nothing: there is no seam to fill in, because there is no method to
-configure.
+## Enabling it, and going back
 
-## Switching from one to the other
-
-Swapping workflows is an ordinary plugin change rather than a migration, but the two directions are
-not quite symmetric — `workflow-default`'s own README describes both under
-[Switching to another workflow](workflow-default/README.md#switching-to-another-workflow). Enabling
-one in the first place is part of the adoption path in [`../INSTALL.md`](../../INSTALL.md);
-[`../UNINSTALL.md`](../../UNINSTALL.md) is its mirror.
+Enabling a workflow is an ordinary plugin change rather than a migration, and there is no longer a
+second one to switch between: the two directions are **on** and **off**. Turning it off leaves the repo
+with its own way of working, which it never stopped having — that is the whole reason there is no
+default here. Enabling it in the first place is part of the adoption path in
+[`../INSTALL.md`](../../INSTALL.md); [`../UNINSTALL.md`](../../UNINSTALL.md) is its mirror.

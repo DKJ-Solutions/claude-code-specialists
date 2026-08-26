@@ -43,10 +43,10 @@ which this half is the summary of.
 
 **1. Write your repo's own `.claude/settings.json`** (create `.claude/` beside your `README.md` if it
 is not there). A complete, pasteable file; if you already have one, merge these two keys into it.
-Strict JSON — no comments, no trailing commas. `team-alpha` and `workflow-default` are both on by
-default — the latter imposes nothing, it just reads your repo's own conventions (see
-[Switching workflows](#switching-workflows) if you want `workflow-davekjohn` instead). Add a line per
-add-on team you want.
+Strict JSON — no comments, no trailing commas. `team-alpha` is the only plugin you need: **there is no
+default workflow to receive**, and a repo that enables none keeps the way of working it already had. Add a
+line per add-on team you want, and add `contributing-davekjohn` only if you deliberately want that method (see
+[Enabling the workflow](#enabling-the-workflow)).
 
 ```json
 {
@@ -56,8 +56,7 @@ add-on team you want.
     }
   },
   "enabledPlugins": {
-    "team-alpha@claude-code-specialists": true,
-    "workflow-default@claude-code-specialists": true
+    "team-alpha@claude-code-specialists": true
   }
 }
 ```
@@ -71,7 +70,6 @@ it, the next command fails with `Marketplace … not found`.
 claude plugin marketplace update claude-code-specialists                     # never skip: install does not refresh
 claude plugin marketplace list                                               # came the entry from YOUR repo's settings?
 claude plugin install team-alpha@claude-code-specialists --scope project    # once per plugin
-claude plugin install workflow-default@claude-code-specialists --scope project    # once per plugin
 ```
 
 `--scope project` is not optional — without it the install goes machine-wide and writes no
@@ -111,7 +109,7 @@ belongs to, and why**, before doing it. Look for that invariant, not for a fixed
 
 An install writes **nothing** into your repo — it is a clone into the plugin cache — and Step 2 answers
 only what `team-alpha` needs. Every other plugin that owns repo state ships its own `adopt-*` skill:
-`adopt-config` and `adopt-workflow-folder` (`workflow-davekjohn`), `adopt-shopify-floor`
+`adopt-config` and `adopt-workflow-folder` (`contributing-davekjohn`), `adopt-shopify-floor`
 (`team-shopify`). Your slash list holds exactly the ones your enabled plugins ship, namespaced as
 `<plugin>:adopt-*`, and each is additive and a dry run until you add `-Apply`. Skip this and a session
 check reports what is missing at every session start — which is how a consumer ends up discovering the
@@ -128,27 +126,32 @@ specialist serves *here*, and an unfilled lens does nothing. Budget writing time
 [step 4 on the adoption page](plugins/ADOPTION.md#the-four-steps) states the cost and the two things
 that reliably surface while you do it.
 
-### Switching workflows
+### Enabling the workflow
 
-Exactly one workflow plugin may be enabled at a time — `workflow-default` or `workflow-davekjohn`, never
-both — because two would hand the specialists two different answers to "how does work move through this
-repo" with no way to tell which one is yours (see
-[Teams and workflows](README.md#teams-and-workflows--whats-the-difference) in the root README). To
-switch, flip the two `enabledPlugins` keys, then repeat Step 1's refresh + install for the newly enabled
-one and restart. Moving **onto** `workflow-davekjohn` also asks your repo for two files it reads —
-`scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` — which the next `specialists-init` run
-scaffolds. Moving **onto** `workflow-default` needs nothing further: it reads what your repo already
-states and writes one document the first time its skill runs.
+**There is no default workflow, and that is the answer rather than a gap.** Your repo already has a way
+of working before any plugin is installed — its branch conventions, its contribution guide, its release
+steps — so a plugin claiming the slot by default would claim something that was never empty. Enable
+`contributing-davekjohn` if you deliberately want *that* method; enable nothing and the specialists use plain
+git/gh against your own conventions.
 
-**If you get this wrong — both flipped on, or the old one never turned off — you find out at your next
-session start, not at the moment you made the mistake.** The core team's `workflow-sessioncheck` hook
-counts the enabled workflow plugin ids on every `SessionStart`, and once it counts two or more it prints
-a line that opens with the exact marker `[ERROR]`, naming each enabled id together with the settings
-layer that enabled it — `~/.claude/settings.json` (machine-wide), your repo's own `.claude/settings.json`,
-or `.claude/settings.local.json` (personal) — so you know which file to open rather than guessing. It does
-**not** block: the session starts anyway, because a configuration mistake you can fix in one line is not
-grounds for refusing you your own repo. One enabled workflow, or zero, is the ordinary state and produces
-no line at all.
+A second plugin, `workflow-default`, used to hold the slot and describe itself as "the workflow a repo
+gets when it has not chosen one". It was removed on August 26, 2026
+([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)) for exactly the reason above.
+**If your `.claude/settings.json` still names it, remove that line** — the id resolves to nothing at your
+next `claude plugin marketplace update`, and nothing warns you.
+
+To turn the workflow on, add its key to `enabledPlugins`, then repeat Step 1's refresh + install for it
+and restart. It asks your repo for two files it reads — `scripts/repo-config.ps1` and
+`scripts/lib/branch-info.ps1` — which the next `specialists-init` run scaffolds. Turning it back off
+removes nothing it already wrote: your entry files and your config stay, and the skills that read them
+stop.
+
+**Nothing counts your enabled workflows any more, and that is worth knowing rather than discovering.**
+Until #886 the core team's `workflow-sessioncheck` hook counted the enabled ids beginning with
+`workflow-` on every `SessionStart` and printed an `[ERROR]` at two or more, naming the settings layer
+that enabled each. It was retired together with the second plugin, because one plugin cannot collide with
+itself. There is nothing to get wrong here today — but if this family ever ships a second workflow, no
+session start will tell you both are on.
 
 ### Staying up to date — the two commands
 
@@ -187,7 +190,7 @@ your own lenses, which do not travel with the plugin.
 > **This section is for a repo that already has this family installed under the plugin ids it used
 > before it split into teams and a workflow** — `specialists@claude-code-specialists`,
 > `specialists-lifehub@claude-code-specialists`, `specialists-shopify@claude-code-specialists`,
-> `specialists-ecomm@claude-code-specialists`, or `specialists-workflow-davekjohn@claude-code-specialists`.
+> `specialists-ecomm@claude-code-specialists`, or `specialists-contributing-davekjohn@claude-code-specialists`.
 > It is neither the quickstart above (you are not adopting for the first time) nor the adoption manual
 > below (you are not connecting a repo that has never seen this family) — it is a third procedure, and
 > it earns its own section because a mechanical id swap alone silently loses something neither of the
@@ -200,7 +203,7 @@ your own lenses, which do not travel with the plugin.
 | `specialists-lifehub@claude-code-specialists` | `team-lifehub@claude-code-specialists` |
 | `specialists-shopify@claude-code-specialists` | `team-shopify@claude-code-specialists` |
 | `specialists-ecomm@claude-code-specialists` | `team-ecomm@claude-code-specialists` |
-| `specialists-workflow-davekjohn@claude-code-specialists` | `workflow-davekjohn@claude-code-specialists` |
+| `specialists-contributing-davekjohn@claude-code-specialists` | `contributing-davekjohn@claude-code-specialists` |
 
 Every plugin is now either a **team** (who the specialists are) or a **workflow** (how work moves
 through the repo) — see
@@ -211,11 +214,13 @@ the one genuinely new rule in this table rather than a renaming of an old one.
 ### Decide your workflow first
 
 **Which half of this applies to you depends on one thing: whether you had
-`specialists-workflow-davekjohn` enabled.**
+`specialists-contributing-davekjohn` enabled.**
 
-- **If you did**, its replacement in the table — `workflow-davekjohn` — is a workflow, so a
-  straight swap carries your answer across and you are covered. Read on anyway for the one new rule:
-  exactly one workflow may be enabled, so make sure you did not also pick up a second.
+- **If you did**, its replacement in the table — `contributing-davekjohn` — is a workflow, so a
+  straight swap carries your answer across and you are covered -- note that the id has been renamed once
+  more since, from `contributing-davekjohn` to `contributing-davekjohn`
+  ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)), so the name in the table is
+  the one to enable.
 - **If you did not**, the table gives you back every team and leaves you with **no workflow enabled at
   all** — because none of the ids you are removing was one, so the swap has nothing to carry over.
   That is the case for every consumer in this project's own register, and it is the part of the
@@ -224,23 +229,23 @@ the one genuinely new rule in this table rather than a renaming of an old one.
   Enabling none is a legitimate answer and the session check stays deliberately quiet about it — which
   is exactly why nothing will remind you.
 
-Decide on purpose, before you touch a command, between the two plugins that answer it:
+Decide on purpose, before you touch a command, whether you want the one plugin that answers it:
 
-- **`workflow-default`** — needs nothing further from your repo: it reads what your repo already states
-  about its own conventions and writes one document the first time its skill runs.
-- **`workflow-davekjohn`** — the specific branch, changelog and release model. This is a rename and
-  nothing more: it was already its own opt-in plugin under the old name, so if you had it you are
-  choosing it again rather than for the first time. It asks your repo for two files it reads,
-  `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` — already covered under
-  [Switching workflows](#switching-workflows), which applies here unchanged: the `specialists-init` run
+- **Nothing enabled** — a complete answer, and the ordinary one. Your repo keeps the conventions it
+  already has, and the specialists work against those with plain git/gh. A `workflow-default` plugin used
+  to occupy this position and describe it as a workflow of its own; it was removed on August 26, 2026
+  ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)), because an empty slot needed
+  no plugin to represent it.
+- **`contributing-davekjohn`** — the specific branch, changelog and release model. It asks your repo for two
+  files it reads, `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` — already covered under
+  [Enabling the workflow](#enabling-the-workflow), which applies here unchanged: the `specialists-init` run
   under [After the reinstall](#after-the-reinstall) below scaffolds both.
 
-Install **exactly one of the two**, or deliberately neither. Neither is a real answer — the specialists
-then use plain `git`/`gh` and follow whatever your repo already does — and it is the only one of the
-three states nothing will ever remind you of. What is refused is *both*: two workflows answer the same
-questions differently and nothing tells the specialists which answer is yours, which is what the core
-team's session check reports at the next session start. Carry your choice into the install command
-below.
+Install it, or deliberately do not. **Neither is a real answer** — the specialists then use plain
+`git`/`gh` and follow whatever your repo already does — and nothing will ever remind you of that state,
+which is the whole reason to pick it on purpose rather than by omission. There is no longer a second
+workflow to be refused alongside it, and no session check counting them: both went with `workflow-default`
+on August 26, 2026. Carry your choice into the install command below.
 
 ### The command sequence
 
@@ -255,7 +260,7 @@ replacement plus the one workflow you decided on above, then restart.
 > to remove a plugin its catalogue no longer advertises. **Measured on 2026-08-09**, on the source repo
 > itself, in exactly this order: after
 > `claude plugin marketplace update claude-code-specialists` the uninstalls of
-> `specialists@claude-code-specialists` and `specialists-workflow-davekjohn@claude-code-specialists`
+> `specialists@claude-code-specialists` and `specialists-contributing-davekjohn@claude-code-specialists`
 > both returned `✔ Successfully uninstalled plugin`. `uninstall` resolves against your install record,
 > not against the catalogue. What is *not* claimed here is anything about whether `uninstall` refreshes
 > the cache — nobody has tested that, and this page has been caught generalising an untested claim from
@@ -270,7 +275,7 @@ claude plugin uninstall specialists@claude-code-specialists --scope project
 claude plugin uninstall specialists-lifehub@claude-code-specialists --scope project
 claude plugin uninstall specialists-shopify@claude-code-specialists --scope project
 claude plugin uninstall specialists-ecomm@claude-code-specialists --scope project
-claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists --scope project
+claude plugin uninstall specialists-contributing-davekjohn@claude-code-specialists --scope project
 ```
 
 ```powershell
@@ -285,9 +290,8 @@ claude plugin install team-lifehub@claude-code-specialists --scope project
 claude plugin install team-shopify@claude-code-specialists --scope project
 claude plugin install team-ecomm@claude-code-specialists --scope project
 
-# 3c. Your workflow -- exactly ONE of these two, or neither. Never both.
-claude plugin install workflow-default@claude-code-specialists --scope project
-# claude plugin install workflow-davekjohn@claude-code-specialists --scope project
+# 3c. The workflow -- opt-in. Uncomment it only if you deliberately want this method.
+# claude plugin install contributing-davekjohn@claude-code-specialists --scope project
 ```
 
 **4. Restart your Claude Code session.**
@@ -303,7 +307,7 @@ go in, and any diff beyond that is formatting.
 Once the new session comes up, re-run `specialists-init` (see [Step 2](#step-2--run-the-bootstrap-skill)
 above). It is purely additive, so a repo that already has its seam, its lenses and its roster keeps all
 of that; it only adds what the newly installed plugin brings — a new add-on team's specialists, or
-`workflow-davekjohn`'s two script scaffolds. Then verify the same way a fresh install does: the
+`contributing-davekjohn`'s two script scaffolds. Then verify the same way a fresh install does: the
 `installed_plugins.json` query under [Step 1](#step-1--enable-and-install) above, read against your new
 ids rather than your old ones. One `project` line per plugin you just installed, each ending in
 `payload present`, is what you are checking for — the count is part of the check here exactly as it is
@@ -350,7 +354,7 @@ might find, the third is what you are moving to:
 Read the same three rows for an add-on team (`specialists-shopify` → `plugins/teams/team-shopify/`) and
 for the workflow — with one exception worth knowing before you go looking for it: the workflow plugin
 **first shipped in `v3.8.0`**, so it only ever existed under the flat layout
-(`plugins/specialists-workflow-davekjohn/`). There is no two-level form of that path to find.
+(`plugins/specialists-contributing-davekjohn/`). There is no two-level form of that path to find.
 
 So the line in your `.claude/specialists/SPECIALISTS.md` changes as follows — **bound to this repo's
 layout as of `v4.5.0`, which the table above is read off, and to the marketplace name
@@ -399,14 +403,14 @@ count moves while you are rewriting prefixes, you have edited one line too many.
 
 ### If you call the shared workflow scripts yourself
 
-**Two things `workflow-davekjohn@4.0.0` changed that a consumer building on those scripts has to act on**,
+**Two things `contributing-davekjohn@4.0.0` changed that a consumer building on those scripts has to act on**,
 neither of which was named as a breaking change when it shipped (inbound
 [#556](https://github.com/DaveKJohn/claude-code-specialists/issues/556) and
 [#557](https://github.com/DaveKJohn/claude-code-specialists/issues/557), both measured on 2026-08-09). If
 you only ever invoke the skills, both are handled for you and you can skip this.
 
 **`scripts/release/new-changelog-entry.ps1` is gone.** It existed in `specialists@3.1.2` and does not exist
-in `workflow-davekjohn@4.0.0`; what it did now lives in `scripts/lib/entry-scaffold-lib.ps1` plus
+in `contributing-davekjohn@4.0.0`; what it did now lives in `scripts/lib/entry-scaffold-lib.ps1` plus
 `scripts/task/new-branch.ps1`. Resolved through the documented seam it fails **loudly** — the lookup says
 the script does not exist in the plugin — so nothing goes quietly wrong; the problem was that nothing said
 it was coming.
@@ -420,9 +424,9 @@ it was coming.
   warn**, not a refusal, and the entry's type falls back to whatever `Get-EntryFallbackType` says.
 
 **The branch's own file moved out of your repo root.** A branch used to carry `<branch-name>.md` beside
-your `README.md`; it now carries one `workflow-davekjohn/development-cycle.md`, which holds both jobs as
+your `README.md`; it now carries one `contributing-davekjohn/development-cycle.md`, which holds both jobs as
 sections — `## PLAN` / `## CREATE` / `## TEST` for what still has to happen, and
-`` ## DEPLOY: `<branch>` `` for what the change does. It was a pair under `workflow-davekjohn/branch/`
+`` ## DEPLOY: `<branch>` `` for what the change does. It was a pair under `contributing-davekjohn/branch/`
 between August 6 and August 23, 2026, with reference copies under `branch/templates/`; both are gone, and
 the guidance those copies held is inside the document.
 
@@ -532,21 +536,20 @@ the marketplace offers. Which specialists live in which plugin and who they are 
 the [root README](README.md).
 
 **The workflow slot is different in kind, so decide about it deliberately rather than by habit — and
-decide is the right word, because leaving it empty is no longer the default it once was.** Two plugins
-answer "how does work move through this repo," and exactly one may be enabled: `workflow-default`, which
-imposes nothing and asks the specialists to read what your repo already states about its own
-conventions, and `workflow-davekjohn`, which carries no specialists at all but is DaveKJohn's own branch,
+"decide" now means deciding whether to fill it at all.** One plugin answers "how does work move through
+this repo": `contributing-davekjohn`, which carries no specialists at all but is DaveKJohn's own branch,
 changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `ship-pr`,
-`fold-changelog`, `cut-release`, `park`, `fix-mojibake`). **`workflow-default` is the one this page's
-default settings block enables, and it is the one to leave enabled** unless you deliberately want
-`workflow-davekjohn`'s method instead. Two consequences worth knowing before you switch to it:
+`fold-changelog`, `cut-release`, `park`, `fix-mojibake` among others). **Leaving the slot empty is the
+default and a complete answer** — your repo keeps its own conventions, which it never stopped having.
+A second plugin, `workflow-default`, used to be enabled here to represent that emptiness; it was removed
+on August 26, 2026 ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)). Two
+consequences worth knowing before you enable the one that is left:
 
-- **Switching onto it later is a plain enable + re-run of `specialists-init`**, which then adds the
+- **Enabling it later is a plain enable + re-run of `specialists-init`**, which then adds the
   config it needs. Nothing has to be undone first.
 - **Enabling it makes your repo owe it two files** — `scripts/repo-config.ps1` (repo name, lint gate)
   and `scripts/lib/branch-info.ps1` (your branch-prefix table). `specialists-init` scaffolds both, and a
-  session check tells you if a function is missing. On `workflow-default` you are asked for neither —
-  it reads your repo instead of asking you to configure it.
+  session check tells you if a function is missing. Enable nothing and you are asked for neither.
 
 ### Before you start
 
@@ -701,9 +704,9 @@ not be.
 > one. On the fresh profile this was measured on, neither existed yet, and one consumer reasonably read
 > *"in your repo's `.claude/`"* as something still to be **installed** rather than **created**.
 
-Set the marketplace source and the plugins you want in it (always the core team; always exactly one
-workflow — `workflow-default` unless you deliberately want `workflow-davekjohn`'s method instead, see
-[Switching workflows](#switching-workflows) in the quickstart half; an add-on team only if your repo has
+Set the marketplace source and the plugins you want in it (always the core team; a workflow only if you
+deliberately want `contributing-davekjohn`'s method — there is no default one, see
+[Enabling the workflow](#enabling-the-workflow) in the quickstart half; an add-on team only if your repo has
 that domain). What follows is a **complete, pasteable file** — if you already have a
 `.claude/settings.json`, merge these two keys into the object that is there instead of pasting over it:
 
@@ -715,8 +718,7 @@ that domain). What follows is a **complete, pasteable file** — if you already 
     }
   },
   "enabledPlugins": {
-    "team-alpha@claude-code-specialists": true,
-    "workflow-default@claude-code-specialists": true
+    "team-alpha@claude-code-specialists": true
   }
 }
 ```
@@ -770,8 +772,7 @@ of your repo, preceded once by a refresh of that cached clone:
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
 claude plugin install team-alpha@claude-code-specialists --scope project    # 2. then install, per plugin
-claude plugin install workflow-default@claude-code-specialists --scope project    # 2. then install, per plugin
-# and line 2 again for each add-on team you enabled
+# and line 2 again for each add-on team you enabled, and for contributing-davekjohn if you enabled it
 ```
 
 **Line 1 matters most right here, because this is the command the failure was measured on.** Without
@@ -1147,7 +1148,7 @@ release stays absent until you restart — `claude plugin update`'s own `Restart
 literally true here. Don't trust the skill counter those two commands print as evidence either way:
 it excludes any skill with `disable-model-invocation: true`. **14 of the 19 skills across the six
 shipped plugins** carry that flag — `cut-release`, `fold-changelog`, `open-pr` and `ship-pr` among
-them, all four of them `workflow-davekjohn`'s rather than `team-alpha`'s — so an unchanged count, or
+them, all four of them `contributing-davekjohn`'s rather than `team-alpha`'s — so an unchanged count, or
 even `0 skills`, proves nothing about whether a new skill has actually landed. The only reliable check
 is the slash list itself.
 

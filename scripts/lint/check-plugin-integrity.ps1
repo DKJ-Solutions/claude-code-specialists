@@ -139,10 +139,13 @@
          accusing three correct comments that quote a user path to explain a path-mangling bug.
      23. a plugin's name says which kind it is, and it must sit where that says: 'team-*' under
          plugins/teams/, 'workflow-*' under plugins/workflows/, and every plugin one or the other. The
-         core team's workflow-sessioncheck counts enabled workflows BY THAT PREFIX, so a workflow named
-         otherwise would never be counted and could be enabled alongside another in silence.
+         directory rule is DERIVED from the prefix, so a plugin matching neither has its location held
+         against nothing -- an unprefixed name switches the check off for itself rather than merely
+         reading untidily. (Until #886 the reason was the core's workflow-sessioncheck counting by that
+         prefix; that hook was retired with workflow-default and the argument above is the one that
+         survives it.)
      24. the PR template keeps the two promises open-pr makes about it: the shipped reference under
-         plugins/workflows/workflow-davekjohn/templates/ byte for byte against Get-PrTemplateReference,
+         plugins/workflows/contributing-davekjohn/templates/ byte for byte against Get-PrTemplateReference,
          and THIS repo's own .github/pull_request_template.md only to the contract (one placeholder line
          the matcher recognises). Deliberately weaker for the second, which is genuinely repo-owned: a
          byte rule would refuse a correct change the day it grows a section. A heading is no longer part
@@ -557,7 +560,7 @@ $linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
 # file at PLUGIN level matched no rule at all, which is where a plugin's own README.md sits: the first page
 # a consumer reads, its links never once validated. Measured on the day this was widened: six such files,
 # five of them already in the tree (plugins\teams\README.md, plugins\workflows\README.md, both workflow
-# plugin READMEs, and workflow-davekjohn\scripts\README.md) and the sixth the portable contribution guide
+# plugin READMEs, and contributing-davekjohn\scripts\README.md) and the sixth the portable contribution guide
 # added by that same change -- a consumer-facing page whose whole purpose is to be copied, and whose dead
 # links would therefore be copied with it. All six were clean, so this arrives green; the point is that
 # nothing would have said otherwise.
@@ -1220,7 +1223,7 @@ $lifecycleFiles = @($linkFiles | Where-Object {
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
     # The moved release pages are the same history at their workflow-folder address (August 14, 2026).
-    if ($rel -match '^workflow-davekjohn\\releases\\') { return $false }
+    if ($rel -match '^contributing-davekjohn\\releases\\') { return $false }
     # A root <branch-name>.md entry file is history in the making; same reasoning as CHANGELOG.md.
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
     # branch/ is the same subject at its new address. Both files: the entry is history in the making, and
@@ -1764,7 +1767,7 @@ Write-Coverage -Category 'mojibake' -Checked $mjFiles `
     } elseif ($mjFiles -eq 0) {
         'the repair tool ran but did not state how many files it examined, so this count is not evidence of scope'
     } else {
-        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root (the changelog and the root docs), every *.md under workflow-davekjohn/ (the entry whose text is pasted into CHANGELOG.md, the step list, and the templates), plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
+        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root (the changelog and the root docs), every *.md under contributing-davekjohn/ (the entry whose text is pasted into CHANGELOG.md, the step list, and the templates), plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
     })
 
 # --- 15. unbound output samples: an expectation that cannot hold everywhere -------------------------------
@@ -2065,9 +2068,10 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 #
 # History is excluded exactly as checks 11 and 12 exclude it: CHANGELOG.md's ENTRIES and the per-plugin
 # copies, the release notes, RELEASE.md, and the branch's own document, which is history in the making.
-# workflow-davekjohn/CLAUDE.md and CONTRIBUTING.md are deliberately NOT excluded -- they are documents ABOUT
-# the shape, which is precisely this check's subject. The page that used to carry that role,
-# branch/README.md, went with the merge on August 23, 2026; its answers moved into those two.
+# contributing-davekjohn/CONTRIBUTING.md is deliberately NOT excluded -- it is a document ABOUT the shape,
+# which is precisely this check's subject. Two pages used to carry that role and both are gone into it:
+# branch/README.md at the merge on August 23, 2026, and this folder's own CLAUDE.md on August 26 (#886).
+# One page now, and the check reaches it the same way.
 #
 # AND NEITHER IS CHANGELOG.md'S INTRO (August 8, 2026). It went out with the rest of that file on the history
 # grounds above, and this repo had already written down why that reasoning does not reach the intro:
@@ -2149,7 +2153,7 @@ $scFiles = @($linkFiles | Where-Object {
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
     # The moved release pages are the same history at their workflow-folder address (August 14, 2026).
-    if ($rel -match '^workflow-davekjohn\\releases\\') { return $false }
+    if ($rel -match '^contributing-davekjohn\\releases\\') { return $false }
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
     # The branch's own document only -- NOT the whole folder. It is history in the making above and a scratch
     # pad below; the folder's own pages are the convention itself and are checked.
@@ -2194,7 +2198,7 @@ if (Test-Path -LiteralPath $scChangelog) {
 }
 
 Write-Coverage -Category 'entry-shape' -Checked $scChecked `
-    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; workflow-davekjohn/branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
+    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; contributing-davekjohn/branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
 
 # --- 21. The config blueprint matches what the source's own libs say right now -----------------------------
 #
@@ -2276,18 +2280,21 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
     -Note "the '-File' argument of every runnable command in the shipped skill pages, held against being machine-specific. The subject is the COMMAND and not the path, chosen by measuring: a tree-wide absolute-path rule is born with three findings, all three correct comments that quote a user path in order to explain a path-mangling bug. A '<plugin>' placeholder passes on purpose -- angle brackets ask the reader to substitute, an absolute path reads as a line to paste"
 
 # --- 23. a plugin's name says which kind it is, and it must sit where that says ---------------------------
-# Since August 9, 2026 the prefix is a MECHANISM, not a label. The core team's workflow-sessioncheck
-# decides what counts as a workflow by asking whether the plugin's name starts with 'workflow-', and it
-# does that on purpose: a workflow written by somebody else is then covered by naming alone, without
-# having to carry any code of ours. That only holds while the name is trustworthy, which is what this
-# check is for.
+# WHAT THIS CHECK IS FOR, RESTATED (August 26, 2026, issue #886) BECAUSE ITS ORIGINAL REASON EXPIRED.
+# From August 9, 2026 the prefix was a MECHANISM: the core team's workflow-sessioncheck decided what
+# counted as a workflow by asking whether the plugin's name started with 'workflow-', so a workflow
+# named otherwise would never be counted and two could be enabled in silence. That hook and the
+# exclusivity rule it enforced were RETIRED with workflow-default, so that argument is gone and is not
+# quietly left standing here -- a check whose stated reason no longer holds is worse than one with no
+# comment, because the next reader trusts it.
 #
-# TWO HALVES, AND THE SECOND IS THE ONE WITH TEETH. The directory rule ('team-*' under plugins/teams/,
-# 'workflow-*' under plugins/workflows/) keeps the tree readable, and a reader can see a violation.
-# The NAME rule cannot be seen: a plugin called 'davekjohn-workflow' would be a workflow that the
-# session check never counts, so enabling it alongside another would pass in silence -- the exact
-# failure the check exists to prevent, arriving through the door of a naming choice nobody thought was
-# load-bearing. So an unprefixed name is an error rather than a style note.
+# THE TEETH THAT SURVIVE, and they are this check's own. The two halves are not independent: the
+# DIRECTORY rule is DERIVED FROM THE NAME. A plugin called neither 'team-*' nor 'workflow-*' falls
+# through both branches below, so its location is never held against anything -- an unprefixed name
+# does not merely read untidily, it switches this check off for that plugin, silently and for as long
+# as nobody counts the Checked total against the published set. That is why the else-branch is an
+# error and not a style note, and the reason is now internal to the check rather than borrowed from a
+# hook in another plugin.
 #
 # ANCHORED ON THE PUBLISHED SET, so a directory that is not a plugin is not held to a rule about
 # plugins. That is what lets plugins/teams/agent-shared/ sit beside the teams it feeds without being
@@ -2295,6 +2302,15 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # never sees it. Worth knowing before anyone hardens the directory half into a filesystem sweep:
 # 'every directory under plugins/teams/ is named team-*' is a DIFFERENT check from this one, and it
 # would be false the moment it was written.
+
+# TWO PREFIXES NAME THE SAME KIND SINCE AUGUST 26, 2026 (#886), AND THAT IS DELIBERATE. The directory
+# plugins/workflows/ holds the KIND -- a way of working -- and the prefix names WHOSE it is. The plugin
+# in it was renamed 'contributing-davekjohn' -> 'contributing-davekjohn' because that is what it does: it
+# serves one owner's contributing rules, not a workflow among several. Dave kept the directory name
+# (decision A on that issue), so a 'contributing-*' plugin living under plugins/workflows/ is the
+# intended shape rather than a mismatch nobody noticed. 'workflow-*' is still accepted: it is what a
+# plugin from anybody else would be called, and refusing it would make this family's rename somebody
+# else's problem.
 $kindChecked = 0
 foreach ($p in $publishedPlugins) {
     $kindChecked++
@@ -2303,16 +2319,16 @@ foreach ($p in $publishedPlugins) {
         if ($rel -notmatch '^plugins\\teams\\') {
             Add-Error "[plugin-kind] '$($p.Name)' is a team by its name but its source is '$rel' -- a team belongs under plugins/teams/."
         }
-    } elseif ($p.Name -like 'workflow-*') {
+    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*') {
         if ($rel -notmatch '^plugins\\workflows\\') {
-            Add-Error "[plugin-kind] '$($p.Name)' is a workflow by its name but its source is '$rel' -- a workflow belongs under plugins/workflows/."
+            Add-Error "[plugin-kind] '$($p.Name)' is a way of working by its name but its source is '$rel' -- 'workflow-*' and 'contributing-*' both belong under plugins/workflows/."
         }
     } else {
-        Add-Error "[plugin-kind] '$($p.Name)' is neither 'team-*' nor 'workflow-*'. Every plugin here is one or the other, and the name is what says which: the core team's workflow-sessioncheck counts enabled workflows BY THAT PREFIX, so a workflow named otherwise would never be counted and could be enabled alongside another in silence."
+        Add-Error "[plugin-kind] '$($p.Name)' is none of 'team-*', 'workflow-*' or 'contributing-*'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the prefix, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
     }
 }
 Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
-    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a workflow by name, and sits in the directory its name claims. The naming half is the one that cannot be seen by reading the tree: the prefix is what the core's session check counts workflows by, so an unprefixed workflow would be invisible to it" })
+    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name, and sits in the directory its name claims -- 'workflow-*' and 'contributing-*' both map to plugins/workflows/, the directory naming the KIND while the prefix names whose it is. The naming half is the one that cannot be seen by reading the tree: the directory rule is derived from the prefix, so an unprefixed plugin is silently held to nothing" })
 
 # --- 24. the PR template keeps the two promises open-pr makes about it ------------------------------------
 # WHAT THIS IS FOR, measured at a consumer rather than imagined (#573). open-pr fills the PR body's
@@ -2346,7 +2362,7 @@ Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
 # repo that does not define it is correct, exactly the shape recorded for Get-BranchTypes.
 $prtChecked = 0
 $prtNote = ''
-$prtRefRel = 'plugins\workflows\workflow-davekjohn\templates\pull_request_template.md'
+$prtRefRel = 'plugins\workflows\contributing-davekjohn\templates\pull_request_template.md'
 $prtRefPath = Join-Path $RepoRoot $prtRefRel
 $prtExpected = ((Get-PrTemplateReference) -join "`n").TrimEnd()
 if (-not (Test-Path -LiteralPath $prtRefPath)) {
@@ -2488,7 +2504,7 @@ Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
 # findable by neither reading nor this gate, and the first three bytes are the only vantage point from which
 # it exists at all.
 #
-# A REPAIR, NOT A PRECAUTION. plugins/workflows/workflow-davekjohn/skills/adopt-config/SKILL.md shipped with
+# A REPAIR, NOT A PRECAUTION. plugins/workflows/contributing-davekjohn/skills/adopt-config/SKILL.md shipped with
 # EF BB BF in 4.1.0 -- the only one of the eleven skills across the two shipped plugins to carry it, and the
 # only model-invocable one absent from the agent's skill listing. A frontmatter parser that wants '---' at
 # offset 0 sees a BOM in front of it and reads the file as having no frontmatter, so the skill has no name

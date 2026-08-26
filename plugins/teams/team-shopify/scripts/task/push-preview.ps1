@@ -28,9 +28,9 @@
     outright here, and team-shopify's PreToolUse guard blocks a push aimed at live independently of this
     script.
 
-    IT DEPENDS ON NEITHER WORKFLOW PLUGIN. Every seam it reads is fetched through Get-Command, exactly as
-    sync-main does, so a repo on workflow-default gets identical behaviour -- including the branch name
-    flattening, which falls back to replacing '/' with '-' where Get-BranchInfo is absent.
+    IT DEPENDS ON NO WORKFLOW PLUGIN. Every seam it reads is fetched through Get-Command, exactly as
+    sync-main does, so a repo that enables no workflow at all gets identical behaviour -- including the
+    branch name flattening, which falls back to replacing '/' with '-' where Get-BranchInfo is absent.
 
     Inbound #805. The argument lists and the two output readers live in the preview-theme lib beside this
     file, which is what makes them testable without a store; this script is the part that invokes them.

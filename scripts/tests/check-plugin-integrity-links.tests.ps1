@@ -116,12 +116,12 @@ try {
     # after the move. Both halves are asserted, because a fix that simply stopped scanning branch/ would
     # satisfy the first and lose the check entirely.
     Write-Host "check 4 coverage -- an entry's links are judged where the text LANDS" -ForegroundColor Cyan
-    $entryDirFx = Join-Path $Fixture 'workflow-davekjohn\branch'
+    $entryDirFx = Join-Path $Fixture 'contributing-davekjohn\branch'
     New-Item -ItemType Directory -Path $entryDirFx -Force | Out-Null
     $entryFx    = Join-Path $entryDirFx 'branch-deployment.md'
     $progressFx = Join-Path $entryDirFx 'branch-cycle.md'
     # 'connectors/README.md' exists in this fixture and is root-relative -- exactly the shape an entry
-    # writes, and exactly what resolving from workflow-davekjohn/branch/ would call dead.
+    # writes, and exactly what resolving from contributing-davekjohn/branch/ would call dead.
     [System.IO.File]::WriteAllText($entryFx,
         "## Fixture entry`n`nSee [the connectors README](connectors/README.md) and [nope]($deadLink).`n", $Utf8NoBom)
     # The step list never travels, so it keeps the ordinary nested convention: '../../' to reach the root.
@@ -131,9 +131,9 @@ try {
     $b4 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($b4.Out -match 'dead link ''connectors/README\.md''')) `
         'entry links: a root-relative link in the entry is NOT dead -- it is judged from the repo root, where the fold puts the text'
-    Assert-True ($b4.Out -match [regex]::Escape('.\workflow-davekjohn\branch\branch-deployment.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
+    Assert-True ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\branch\branch-deployment.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
         'entry links: a genuinely dead link in the entry IS still reported -- the rebase is not a way out of the check'
-    Assert-True (-not ($b4.Out -match [regex]::Escape('.\workflow-davekjohn\branch\branch-cycle.md'))) `
+    Assert-True (-not ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\branch\branch-cycle.md'))) `
         'entry links: the step list keeps the ordinary nested convention -- it never travels, so ../../ is correct there'
 
     Remove-Item -LiteralPath $entryFx, $progressFx -Force

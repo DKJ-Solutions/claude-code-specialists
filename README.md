@@ -24,7 +24,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
-| **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the standard branch + PR workflow, which holds with no plugin installed; the entry, the fold and the cut are the layer on top, in [`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md) |
+| **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the standard branch + PR workflow, which holds with no plugin installed; the entry, the fold and the cut are the layer on top, in [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) |
 | see **the version history** | [`releases/README.md`](releases/README.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
@@ -105,16 +105,16 @@ shipped alongside them was.
 [`scripts/repo-config.ps1`](scripts/repo-config.ps1) looks like the seam that makes the workflow
 adaptable, and its 19 functions genuinely do let a consumer change the trunk name, the merge method and
 the folder grouping. But those are *parameters* of a single changelog model, and the model itself is
-fixed in [`entry-scaffold-lib.ps1`](plugins/workflows/workflow-davekjohn/scripts/lib/entry-scaffold-lib.ps1). A consumer
+fixed in [`entry-scaffold-lib.ps1`](plugins/workflows/contributing-davekjohn/scripts/lib/entry-scaffold-lib.ps1). A consumer
 could tune our way of working; they could not have their own. And
-[`check-script-contract.ps1`](plugins/workflows/workflow-davekjohn/scripts/sync/check-script-contract.ps1) *enforces*
+[`check-script-contract.ps1`](plugins/workflows/contributing-davekjohn/scripts/sync/check-script-contract.ps1) *enforces*
 that they supply those functions — so a repo that worked differently was not adapted to. It was told at
 every session start that it was misconfigured.
 
 **What the packaging now does about it.** Both files named above are in the paths they are because the
 47% moved out on the same day: the workflow skills, their scripts, the two session hooks that audit a
 repo against this way of working, and the libs only those scripts read now ship as
-[`workflow-davekjohn`](#teams-and-workflows--whats-the-difference) — enabled by choice, absent
+[`contributing-davekjohn`](#teams-and-workflows--whats-the-difference) — enabled by choice, absent
 by default. The enforcement went with them, which is the half that mattered most: a repo that works
 differently is no longer told anything at session start, because the checker that had the opinion is
 not there. And `specialists-init` stops scaffolding what it cannot justify — a consumer without the
@@ -128,7 +128,7 @@ enforcement out fixed the repo that works differently; it left the repo that wor
 re-deriving twenty values by hand, because the checker only ever named the **fallback** a shared script
 uses — never what this repo chose, or why. The pack therefore ships a **config blueprint**: each seam
 function with the source's own text, comments and reasoning included, and a marker saying whether that
-answer is safe to take. The [`adopt-config`](plugins/workflows/workflow-davekjohn/skills/adopt-config/SKILL.md)
+answer is safe to take. The [`adopt-config`](plugins/workflows/contributing-davekjohn/skills/adopt-config/SKILL.md)
 skill reads it, **places** what states the shared way of working, and **proposes** — never places — what
 states what a repo *is*, in a document a person works through.
 
@@ -145,31 +145,34 @@ a placeholder overrides a documented fallback that is usually right, so absent b
 repo.** That split arrived on August 8, 2026, when the branch/release workflow moved out of the core
 into a pack of its own — the packaging consequence of
 [the plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo). Read the table with
-that split in mind: `team-lifehub`, `team-shopify` and `team-ecomm` are add-on teams, `workflow-davekjohn`
-and `workflow-default` are the two competing answers to the workflow question, and only the core team is
-for everyone. **Teams stack** — a consuming repo enables
-`team-alpha` plus as many add-on teams as its domain calls for. **Workflows do not stack** — at most one
-may be enabled at a time, because two workflows would hand the specialists two contradicting answers to
-the same question about how work moves through the repo.
+that split in mind: `team-lifehub`, `team-shopify` and `team-ecomm` are add-on teams,
+`contributing-davekjohn` is the one answer offered to the workflow question, and only the core team is
+for everyone. **Teams stack** — a consuming repo enables `team-alpha` plus as many add-on teams as its
+domain calls for. **There is only one workflow, and it is opt-in** — a repo that enables none keeps the
+way of working it already had.
 
-**That "at most one" is enforced since August 9, 2026, not merely stated.** A SessionStart hook in the
-core team, `workflow-sessioncheck`
-(`plugins/teams/team-alpha/hooks/workflow-sessioncheck.ps1`), counts the enabled plugin ids whose name
-starts with `workflow-`. It never blocks — it always exits 0, whatever it finds, because a session start
-is not the place to refuse somebody their own repo over a configuration question they can fix in one
-line — and it writes nothing. **Zero enabled workflows stays silent**, and that is a legitimate state
-rather than an oversight: this page already says "Enable nothing and the specialists use plain git/gh."
-**One enabled workflow also stays silent**, because that is the ordinary case and a session start should
-be quiet about ordinary states. Only at **two or more** does it print an `[ERROR]` naming each enabled id
-together with the settings layer that enabled it (`~/.claude/settings.json`, `.claude/settings.json`, or
-`.claude/settings.local.json`), because a conflict introduced from the machine layer looks identical from
-inside the repo to one the repo caused. **The naming half is what makes that count trustworthy in the
-first place**: lint check 23 (`[plugin-kind]`) in
-[`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds every published plugin to
-being `team-*` under `plugins/teams/` or `workflow-*` under `plugins/workflows/`, because the hook above
-counts a workflow by that prefix and nothing else. A workflow published under a different name would be
-invisible to the count and could sit enabled alongside another in silence — the exact failure the hook
-exists to catch, arriving through a naming choice nobody thought was load-bearing.
+**"At most one workflow" was a checked rule until August 26, 2026, and it is recorded here rather than
+quietly dropped** ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)). A
+SessionStart hook in the core team, `workflow-sessioncheck`, counted the enabled plugin ids whose name
+started with `workflow-` and printed an `[ERROR]` at two or more, naming each id together with the
+settings layer that enabled it — because a conflict introduced from the machine layer looks identical
+from inside the repo to one the repo caused. It never blocked and it wrote nothing.
+
+**What removed it was removing the second workflow.** The rule's whole force came from `workflow-default`
+existing to collide with: two enabled workflows would hand the specialists two contradicting answers
+about how a branch is named, what a change owes before it can open a PR, what a release is. With one
+plugin left there is no second answer, and #886 settled the wider question the other way too — this
+workflow keeps its changelog and its releases in **its own folder**, so it stands beside a repo's own
+contributing rules instead of competing with them. **The cost is stated rather than hidden:** if a second
+workflow is ever added here, nothing will notice both being enabled, so that day means answering the
+question again rather than finding the check gone.
+
+**The naming rule outlived the count that justified it, on a reason of its own.** Lint check 23
+(`[plugin-kind]`) in [`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds every
+published plugin to being `team-*` under `plugins/teams/` or `workflow-*` under `plugins/workflows/`. It
+used to say the hook counted a workflow by that prefix and nothing else; now the teeth are internal —
+**the directory half is derived from the name**, so a plugin matching neither prefix has its location
+held against nothing at all, and an unprefixed name switches the check off for itself.
 
 | Plugin | What it is | Who it's for |
 |---|---|---|
@@ -177,8 +180,7 @@ exists to catch, arriving through a naming choice nobody thought was load-bearin
 | [`team-lifehub/`](plugins/teams/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
-| [`workflow-default/`](plugins/workflows/workflow-default/) | **The workflow — a way of working, not a team.** What a repo gets when it has not chosen a workflow: it imposes nothing, and ships one skill, `discover-workflow`, that reads what the repo already states about how work moves through it — its branch names, its CI, its contribution guide, its own scripts — and records the answer, including where the repo is silent. Carries **no specialists**. | Every repo, by default, until it deliberately picks `workflow-davekjohn` instead. |
-| [`workflow-davekjohn/`](plugins/workflows/workflow-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the eight workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config`), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that wants *this* workflow, in place of `workflow-default`. |
+| [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, and the two session hooks that belong to running this across several repos. Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -189,17 +191,16 @@ core is written repo-neutrally (no repo names, paths, or script names — that c
 consumer's repo lens); the add-on teams name their domain explicitly, because only a matching repo
 enables them.
 
-**The workflow slot sits on neither team axis, and the two plugins in it answer a different question
-than "what kind of repo is this".** `workflow-davekjohn` carries an owner's name because it is *his*
-branch discipline, not a standard; `workflow-default` carries none, because it imposes none — it is the
-deliberate absence of a method, read from what the repo already states rather than assumed. A repo that
-adopts the specialists gets colleagues; it does not get somebody else's branch discipline along with
-them, and `workflow-default` is what makes that true by default rather than merely by omission. The
-measurement that forced the split: of what the core used to ship, **9%** described a craft and **47%**
-was workflow machinery — so most of what a consumer received was a way of working they had never chosen.
-What that costs a repo which enables **only** the core team plus `workflow-default` is stated plainly
-under [Adoption](#adoption-the-bootstrap-path): no branch scripts, no `branch-info.ps1` to fill in, and
-a `repo-config.ps1` holding the roster half alone.
+**The workflow slot sits on neither team axis, and the plugin in it answers a different question than
+"what kind of repo is this".** `contributing-davekjohn` carries an owner's name because it is *his* branch
+discipline, not a standard. A repo that adopts the specialists gets colleagues; it does not get somebody
+else's branch discipline along with them — and since August 26, 2026 that is true **by there being
+nothing in the slot to receive**, rather than by a `workflow-default` plugin standing in the slot to
+impose nothing. The measurement that forced the split: of what the core used to ship, **9%** described a
+craft and **47%** was workflow machinery — so most of what a consumer received was a way of working they
+had never chosen. What that costs a repo which enables **only** the core team, no workflow at all, is
+stated plainly under [Adoption](#adoption-the-bootstrap-path): no branch scripts, no `branch-info.ps1`
+to fill in, and a `repo-config.ps1` holding the roster half alone.
 
 ### The e-commerce-related plugins
 
@@ -208,7 +209,7 @@ Two of the plugins serve a **commercial webshop** and are built to work together
 - **`team-shopify`** — the *platform* layer: theme code, store management, configuration for a Shopify store.
 - **`team-ecomm`** — the platform-agnostic *disciplines* that any webshop needs: SEO, CRO, and performance/SEA.
 
-They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `team-ecomm`. The other plugins — `team-alpha` (the core team), `team-lifehub` and the two workflow plugins (`workflow-default`, `workflow-davekjohn`) — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
+They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `team-ecomm`. The other plugins — `team-alpha` (the core team), `team-lifehub` and the workflow plugin `contributing-davekjohn` — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
 
 ## What lives here and what doesn't
 
@@ -223,15 +224,12 @@ Rendall), and the **repo-neutral bootstrap skill** `specialists-init`.
 **Doesn't:** governance (`CLAUDE.md`, the workflow rules), safety hooks, or MCP config. Those stay
 at repo level deliberately, because they differ per repo (or are safety-critical). The plugins
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
-repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), the skill
-`discover-workflow` (`workflow-default`'s own repo-neutral read, see
-[Teams and workflows](#teams-and-workflows--whats-the-difference)), and four informational, read-only
-SessionStart hooks that never block — `roster-sessioncheck` (roster-drift signaling) plus
-`workflow-sessioncheck` (flags two or more enabled workflows, see
-[Teams and workflows](#teams-and-workflows--whats-the-difference)) in the **core team**, and
-`connector-sessioncheck` (sync signaling) plus `script-contract-sessioncheck` (signals when a repo's own
-workflow libs no longer expose a function the shared scripts call) in
-**`workflow-davekjohn`**; see the [connectors README](connectors/README.md).
+repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), and three
+informational, read-only SessionStart hooks that never block — `roster-sessioncheck` (roster-drift
+signaling) in the **core team**, and `connector-sessioncheck` (sync signaling) plus
+`script-contract-sessioncheck` (signals when a repo's own workflow libs no longer expose a function the
+shared scripts call) in **`contributing-davekjohn`**; see the
+[connectors README](connectors/README.md).
 The add-on teams `team-lifehub` and `team-shopify` may carry domain skills that a repo shares.
 
 **Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
@@ -249,8 +247,8 @@ The full picture, top-level folder by folder:
   [README](plugins/README.md) states that split side by side, with the test question that decides
   which kind a new plugin is): the teams under
   [`plugins/teams/`](plugins/teams/) (`team-alpha`, `team-lifehub`, `team-shopify`, `team-ecomm`) and
-  the workflows under [`plugins/workflows/`](plugins/workflows/) (`workflow-default`,
-  `workflow-davekjohn`), each of those two directories carrying its own README for what belongs in it
+  the workflow under [`plugins/workflows/`](plugins/workflows/) (`contributing-davekjohn`, the only one),
+  each of those two directories carrying its own README for what belongs in it
   and the rules that govern it. One folder per plugin, each carrying
   `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and beside the four teams
   **[`plugins/teams/agent-shared/`](plugins/teams/agent-shared/)**, the canonical source of the shared
@@ -277,17 +275,17 @@ The full picture, top-level folder by folder:
   [`scripts/README.md`](scripts/README.md) is the directory-by-directory map, with the entry points and
   the four gates. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `team-alpha`, the
-  branch/release workflow in `workflow-davekjohn` — see its own
-  [README](plugins/workflows/workflow-davekjohn/scripts/README.md).
+  branch/release workflow in `contributing-davekjohn` — see its own
+  [README](plugins/workflows/contributing-davekjohn/scripts/README.md).
 - **`releases/`** — what a cut *generated*: `development/<X>.x/<X.Y.Z>.md` (the complete note per
   version) and `github/<X>.x/<X.Y.Z>.md` (that version's GitHub Release body), described in
   [`releases/README.md`](releases/README.md) — **which also carries the dated list of every release
   ever cut**, and holds with no plugin installed. That is where the `## Releases` section of
   `CHANGELOG.md` points. One layer up, in
-  [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md), sit the things the
+  [`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md), sit the things the
   *workflow* owns: this repo's seam answers, its local decisions, and the hand-written note per version
   under `audience/`. The cutting process itself travels with the plugin as
-  [`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md).
+  [`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md).
 - **`.claude/`** — the repo layer, on the seam described under
   [The seam, specified](#the-seam-specified): `specialists/SPECIALISTS.md` (the inclusion carrying the
   body import, the lens import and the roster), `specialists/lenses/` (this repo's own repo lenses),
@@ -367,10 +365,10 @@ repo itself, which consumes itself) only pulls in merged changes after the `vers
 bumped — a merge without a release stays invisible to consumers, and a shared agent-def change
 therefore always lands here first, never the other way around. The full mechanics — cutting a
 release, the three release documents, the lint guardrails — are in
-[`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release),
+[`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md#cutting-a-release),
 with this repo's release list in [`releases/README.md`](releases/README.md) and its own answers to the
 workflow in
-[`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md).
+[`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md).
 
 ## Manuals — the split model
 
@@ -542,12 +540,12 @@ matters operationally for the skills/subagents/hooks split described under
 bundled in a plugin works across all three surfaces, but a **subagent** or a **hook** runs only in
 Cowork and in Claude Code — in a plain Claude.ai Chat session they show up grayed out (see
 [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)).
-Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the four
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`,
-`workflow-sessioncheck`) function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
+Concretely for claude-code-specialists: the specialists roster (the subagents under Chris) and the three
+SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`)
+function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
-`cut-release`, `adopt-config`, `adopt-workflow-folder`, `discover-workflow`, `lock`, `handover`,
+`cut-release`, `adopt-config`, `adopt-workflow-folder`, `lock`, `handover`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `prune-merged`,
 `measure-skill`, `worktree-lane`, `orchestrator`)<!-- /skills:all -->
 remain available there.
@@ -631,7 +629,7 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`, `discover-workflow`,
+`start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`,
 `lock`, `handover`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
 `prune-merged`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
 **mechanism** (branch, PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a
@@ -675,7 +673,7 @@ shares once the version bump is committed (tag + push, branch cleanup), as a che
 of its own (issue #177). That checklist also covers the GitHub Release, whose body is the highest
 release tier the repo has and whose other tiers go along as
 attachments — a manual closing step this repo takes at every release (see
-[RELEASES-portable.md](plugins/workflows/workflow-davekjohn/RELEASES-portable.md#cutting-a-release)),
+[RELEASES-portable.md](plugins/workflows/contributing-davekjohn/RELEASES-portable.md#cutting-a-release)),
 just not one `cut-release.ps1`
 itself automates. *Which* bumps get a Release is repo policy and lives in the release manager's lens,
 not in the portable checklist.
@@ -1180,13 +1178,15 @@ reminder is what a derivation makes unnecessary.
    documents themselves.
 2. **The name, and where it sits.** `team-<name>` under `plugins/teams/`, `workflow-<name>` under
    `plugins/workflows/` — for a **team**, always the first; a **workflow** is the rare exception, see
-   the diverging note at step 4 below. Since August 9, 2026 this is not a style preference: the prefix
-   decides both which directory the plugin has to sit in and, for a workflow, whether the core team's
-   `workflow-sessioncheck` hook counts it at all when it checks that at most one workflow is enabled.
+   the diverging note at step 4 below. Since August 9, 2026 this is not a style preference, and since
+   [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) the reason is a different
+   one: the prefix used to decide whether the core team's `workflow-sessioncheck` hook counted the
+   plugin at all, and that hook is retired. What remains is stronger for being local — **the directory
+   rule is derived from the prefix**, so a name matching neither is held to no location rule at all.
    Lint check 23 (`[plugin-kind]`) in
    [`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds both halves of that
-   pairing, so getting this step wrong is caught before the PR merges rather than at the next session
-   that happens to enable two workflows at once.
+   pairing, so getting this step wrong is caught before the PR merges rather than by a reader noticing
+   the plugin sits somewhere its name does not claim.
 3. **The marketplace entry** — register the plugin in
    [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) with a repo-relative
    `source`.
@@ -1209,9 +1209,9 @@ its own marketplace. See [One product, one repository](#one-product-one-reposito
 Changes to this repo go through a branch + Pull Request to `main`, and that much holds whether or not
 any plugin is installed — it is [`CONTRIBUTING.md`](CONTRIBUTING.md), the standard workflow, three
 rules long. **The branch dossier, the changelog entry that folds at the merge, the significance model
-and the release cut are the `workflow-davekjohn` layer on top**, and they are described in
-[`workflow-davekjohn/CONTRIBUTING.md`](workflow-davekjohn/CONTRIBUTING.md) — this repo's answers — over
-[`CONTRIBUTING-portable.md`](plugins/workflows/workflow-davekjohn/CONTRIBUTING-portable.md), the half
+and the release cut are the `contributing-davekjohn` layer on top**, and they are described in
+[`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) — this repo's answers — over
+[`CONTRIBUTING-portable.md`](plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md), the half
 that travels with the plugin. Where the two disagree, the plugin's page wins.
 
 The governance is in [`CLAUDE.md`](CLAUDE.md): the safety rules, the three direct-on-`main` exceptions
@@ -1231,6 +1231,6 @@ which is what [The seam, specified](#the-seam-specified) is for.
   machine-side removal, in the order they have to happen.
 - **Releases** — the full version history is in [`releases/README.md`](releases/README.md); the
   cutting-a-release mechanics travel with the workflow plugin as
-  [`RELEASES-portable.md`](plugins/workflows/workflow-davekjohn/RELEASES-portable.md), with this repo's
+  [`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md), with this repo's
   answers to it in
-  [`workflow-davekjohn/releases/README.md`](workflow-davekjohn/releases/README.md).
+  [`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md).
