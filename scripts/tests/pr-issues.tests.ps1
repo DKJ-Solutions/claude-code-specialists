@@ -440,6 +440,78 @@ $onlyOne = '[{"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","complet
 $line7 = Get-CheckWaitReport -ChecksJson $onlyOne -RequiredNamesJson $requiredOnly -WaitedSeconds 598
 Assert-True ($line7 -like "*'lint-en-tests' finished last*") 'one check governs its own wait -- Sort-Object over a single item still answers'
 Assert-True ($line7 -like '*, required*')                    'and is still labelled from the ruleset'
+# --- -Resolves TOGETHER WITH -RefreshBody: the block must survive the refresh (#919) -----------------
+#
+# THE #341-#343 FAILURE REACHED THROUGH THE DOOR BUILT TO PREVENT IT. Everything above asserts that the
+# closing block is COMPOSED correctly; nothing asserted that it still reaches GitHub. On PR #916,
+# 'open-pr.ps1 -Resolves 913 -RefreshBody' published a body closing nothing: the two body edits run
+# SEQUENTIALLY on one variable, the block was appended first, and the refresh then replaced it. The run
+# printed a lost-section warning and exited 0, which is why it read as a success.
+#
+# WHY THE REFRESH CAN REACH THAT FAR is local to a heading-less PR template, which is this repo's shape:
+# with no heading above the placeholder the description is the body's LEADING section, and with no
+# heading below it there is no stop -- so the leading section is the whole body. Both halves are
+# Update-PrBodySection's documented behaviour, and both are right on their own. It is the ORDER that
+# loses the block, which is why this section asserts the composition rather than either lib.
+Write-Host "-Resolves survives -RefreshBody (#919)" -ForegroundColor Cyan
+
+# Dot-sourced HERE rather than beside the lib at the top, deliberately: this is the one section that
+# needs the other PR lib, and the reason it needs it IS the finding -- each lib was correct alone.
+. (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
+
+# The published body of an open PR in this repo: the pasted DEPLOY section, then the block open-pr
+# appended on an earlier run. No heading precedes it, exactly as the template produces.
+$publishedBody = @'
+### DEPLOY: `fix/refresh-body-drops-the-resolves-block-v1`
+
+The description as it was published, which the refresh is about to rewrite.
+
+### Resolved issues
+
+Closes #919
+'@
+$entryDescription = @'
+### DEPLOY: `fix/refresh-body-drops-the-resolves-block-v1`
+
+The description as the changelog entry now words it.
+'@
+
+Assert-Set @(919) (Get-ClosedIssueNumbers -Text $publishedBody) 'setup: the published body closes #919 before either edit runs'
+
+# THE MECHANISM, PINNED. A leading-section refresh with no stops replaces the whole body -- so the old
+# order really did lose the block, and this assert is what would notice if that ever stopped being true
+# (a template gaining a heading changes the answer, and this section would then need re-reading).
+$oldOrder = Add-ResolvesBlock -Body $publishedBody -Issues @(919)
+$oldOrder = Update-PrBodySection -Body $oldOrder -Heading '' -Content $entryDescription -StopAtHeading @()
+Assert-Set @() (Get-ClosedIssueNumbers -Text $oldOrder) 'append-then-refresh loses the closing keyword -- the shape measured on PR #916'
+
+# THE ORDER open-pr.ps1 RUNS SINCE #919: refresh first, append last. No new knowledge of stops or
+# heading levels is needed for it -- the append is idempotent per issue, so it restores what the
+# rewrite took and is a no-op where nothing was taken.
+$newOrder = Update-PrBodySection -Body $publishedBody -Heading '' -Content $entryDescription -StopAtHeading @()
+$newOrder = Add-ResolvesBlock -Body $newOrder -Issues @(919)
+Assert-Set @(919) (Get-ClosedIssueNumbers -Text $newOrder) 'refresh-then-append keeps the closing keyword -- GitHub still closes #919 at the merge'
+Assert-True ($newOrder -like '*the changelog entry now words it*') 'and the refresh still did its own job'
+
+# ONE BLOCK, NOT TWO. The append runs on every -Resolves run, so a body the refresh did NOT eat must
+# come back unchanged -- a second 'Closes #919' would be a duplicate section on every push.
+$survived = Add-ResolvesBlock -Body $publishedBody -Issues @(919)
+Assert-Equal $publishedBody $survived 'appending to a body that already closes the issue is a no-op, so a surviving block is not doubled'
+Assert-Equal 1 ([regex]::Matches($newOrder, '(?m)^\s*Closes\s+#919\b').Count) 'exactly one closing keyword in the assembled body'
+
+# AND THE SCRIPT ITSELF STILL RUNS THEM IN THAT ORDER. The asserts above prove the composition; this one
+# proves open-pr.ps1 uses it, which is the half that was wrong. Read from the source for the same reason
+# the placeholder coupling in pr-body.tests.ps1 is: nothing else can see a re-swap, and it fails silently.
+$openPrPath = Join-Path $PSScriptRoot '..\release\open-pr.ps1'
+Assert-True (Test-Path -LiteralPath $openPrPath) 'open-pr.ps1 exists where this suite looks for it'
+$openPrText  = [System.IO.File]::ReadAllText((Resolve-Path $openPrPath).Path, [System.Text.Encoding]::UTF8)
+$idxExisting = $openPrText.IndexOf('if ($existingPr) {')
+$idxRefresh  = if ($idxExisting -ge 0) { $openPrText.IndexOf('if ($RefreshBody) {', $idxExisting) } else { -1 }
+$idxAppend   = if ($idxExisting -ge 0) { $openPrText.IndexOf('Add-ResolvesBlock -Body $newBody', $idxExisting) } else { -1 }
+Assert-True ($idxExisting -ge 0) 'the existing-PR path is still recognisable in open-pr.ps1'
+Assert-True ($idxRefresh -gt $idxExisting) 'the -RefreshBody block sits on the existing-PR path'
+Assert-True ($idxAppend -gt $idxRefresh)   'open-pr.ps1 appends the closing block AFTER the refresh, not before it (#919)'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
