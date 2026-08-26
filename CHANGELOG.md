@@ -32,6 +32,57 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/refresh-body-drops-the-resolves-block-v1` · 20260826-162404
+
+`open-pr.ps1` now refreshes the PR description **before** it appends the closing block, instead of after
+([#919](https://github.com/DaveKJohn/claude-code-specialists/issues/919)). The two edits on the
+existing-PR path run sequentially on one variable, so the second consumed the first: with the block
+appended first, `-RefreshBody` replaced it and the run published a body that closes nothing. It printed a
+lost-section warning and exited 0, which is why it read as a success -- measured on PR #916, where #913
+stopped being a closing reference and was reinstated by hand.
+
+The reason a refresh can reach that far is a **heading-less PR template**, which is what this repo and the
+shipped reference both carry: with no heading above the placeholder the description is the body's leading
+section, and with no heading below it there is no stop, so the leading section is the whole body. Both
+halves are `Update-PrBodySection`'s documented behaviour. Nothing about them changes here.
+
+`Add-ResolvesBlock` is idempotent per issue, so appending **last** is a no-op where the block survived and
+restores it where it did not -- no new knowledge of stops or heading levels is needed. The comparison moved
+with it: the append is now measured against the body as it went in, so a run that only refreshes no longer
+announces a closing keyword it never added. And the lost-section warning stops firing for
+`### Resolved issues` on its own, because the block is back before that check runs.
+
+**The guard is the half that makes this stick.** `pr-issues.tests.ps1` gains a `#919` section asserting
+the composition in both directions -- append-then-refresh loses the keyword, refresh-then-append keeps it --
+plus a source-order assert that reads `open-pr.ps1` and requires the append to sit after the refresh. This
+suite exists for the #341-#343 failure, where three PRs repaired issues and left eight of them open; #919
+is that same failure reached through the door built to prevent it, and nothing asserted that the block
+still arrived.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`open-pr.ps1` ships with the `contributing-davekjohn` workflow, and so does the reference
+`pull_request_template.md` -- which carries **no headings**, exactly the shape that makes the description
+the whole body. So a consumer running `-Resolves` together with `-RefreshBody` met this on their own PRs,
+in the tooling rather than in anything they wrote, and met it silently: the run warns, exits 0, and the
+issue simply stays open after the merge. They notice the first time they look for a closed issue and find
+it open, which may be long after the merge that should have closed it. Nothing they already do changes,
+and no template of theirs needs editing.
+
+**Score:** 3
+
+#### Pull Request
+
+open-pr refreshes the body before it adds the Resolved issues block
+
+Plugins: contributing-davekjohn
+
+[PR #931](https://github.com/DaveKJohn/claude-code-specialists/pull/931)
+
+---
+
 ### DEPLOY: `fix/new-branch-intent-lands-in-plan-v1` · 20260826-161931
 
 `new-branch.ps1 -Intent` now writes its parking note as the opening paragraph of the document's first
