@@ -25,6 +25,52 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `feat/gate-validates-import-targets-v1` · 20260826-093433
+
+The lint gate now resolves every `@`-import target it can see, and refuses a dead one whose target is
+in the tree. Check 4 has validated `[text](target)` links since the beginning; an `@`-import is a
+different syntax and matched none of it, so no gate in this repo had ever resolved one --
+[issue #874](https://github.com/DaveKJohn/claude-code-specialists/issues/874).
+
+**Why this class is not just another dead link.** A dead link costs a reader one click. A dead import
+costs the **session the whole document**: Claude Code drops one it cannot resolve without erroring, so
+nothing fails and the instructions simply are not there. This repo's always-on path is assembled out of
+exactly three imports, and two of them are not repo-relative -- so the layer that vanishes is the one
+carrying the safety rules or the roster, and the only symptom is a session behaving as if it had never
+read them.
+
+Check 28 reuses the parser in `scripts/lib/measure-context-lib.ps1` rather than restating the three
+resolution rules, so the gate and `scripts/maintenance/measure-always-on.ps1` cannot drift on what an
+import means or where it resolves from. Two discriminators keep it honest, both measured before it was
+written: a fenced `@(...)` is PowerShell, and a target containing whitespace is prose -- seven and one of
+the twelve column-0 `@` lines in the tree respectively. A target outside the repo is counted and named,
+never refused, because a `~/`-relative import points into the plugin marketplace clone and CI is a
+machine without one.
+
+**Born green**, this repo's standing bar for a new check: 294 files scanned, 2 resolving in-tree imports,
+1 outside the repo, 1 line read as prose, 0 findings and 0 exemptions.
+
+**Score:** 3
+
+### What makes this deploy extra special
+
+N/A. The check itself lives in `scripts/lint/`, which is this repo's own gate and does not travel to a
+consumer. What does travel is the plugin mirror of `measure-always-on.ps1`, and only its wording changed
+there -- the sentence saying no gate covers this class was true when it was written and is not any more.
+No consumer behaviour changes.
+
+**Score:** N/A
+
+### Pull Request
+
+the lint gate validates every '@'-import target
+
+Plugins: workflow-davekjohn
+
+[PR #901](https://github.com/DaveKJohn/claude-code-specialists/pull/901)
+
+---
+
 ## DEPLOY: `fix/the-deploy-section-is-locked-at-the-pr-v1` · 20260825-234507
 
 The DEPLOY section is now **one text in all four places it lands** -- the branch's own
