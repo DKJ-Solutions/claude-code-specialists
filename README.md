@@ -537,6 +537,36 @@ Three rules govern when and how to reach for it:
 This is opt-in, not a generic prose scan: a doc with zero spans passes silently. See the check's
 docstring in `check-plugin-integrity.ps1` for the full mechanics.
 
+### The plugin-scoped sibling, for a table that enumerates ONE plugin
+
+The two rules above are also the two reasons that marker cannot serve a document listing the skills of
+a single plugin: its canonical set is the whole marketplace, and *wrap tightly* is unmeetable in a
+two-column table whose second column is prose. Since August 26, 2026 there is a second, separately
+opt-in marker for that case ([#920](https://github.com/DaveKJohn/claude-code-specialists/issues/920)),
+checked by **check 29** (`[skill-list-plugin]`):
+
+```
+<!-- skills:plugin -->
+| [`skill-name`](skills/skill-name/SKILL.md) | anything at all in this column |
+<!-- /skills:plugin -->
+```
+
+It differs from its sibling in exactly two respects, and in nothing else — same fence masking, same
+hard errors on an unpaired or nested marker, same silent pass on zero spans:
+
+- **The plugin is the document's own.** It is resolved from the file's path, not named in the marker,
+  so the marker cannot claim a plugin the document does not live in. A span in a file that belongs to
+  no published plugin is a hard error rather than a silent skip, and the finding points at
+  `skills:all` as the marker that would have served.
+- **A claim is a link target, never a backtick.** Only a link resolving to
+  `<this plugin>/skills/<one>/SKILL.md` counts; prose, backticked paths, flags and links elsewhere are
+  ignored. So there is no *wrap tightly* rule here — the table needs no rewriting to be markable.
+
+Reach for it when a document enumerates one plugin's skills, and for `skills:all` when it enumerates
+the marketplace's. Neither is generic: measured over all four plugins, a rule that simply required
+every plugin README to list its skills would be born with 8 findings on two documents that never
+claimed to enumerate anything.
+
 ## Where this runs: Chat, Cowork, and Claude Code
 
 Anthropic's Claude product has three relevant surfaces: **Chat** (a conversation), **Cowork** (a

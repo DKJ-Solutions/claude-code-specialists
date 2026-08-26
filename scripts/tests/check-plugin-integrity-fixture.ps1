@@ -6,7 +6,7 @@
     NOT NAMED *.tests.ps1 ON PURPOSE: the test gate globs that pattern, and this file asserts
     nothing. It is dot-sourced by the four suites that do:
 
-      check-plugin-integrity-links.tests.ps1      checks 4 and 10 -- the scan set and the skill spans
+      check-plugin-integrity-links.tests.ps1      checks 4, 10, 28 and 29 -- the scan set and the spans
       check-plugin-integrity-commands.tests.ps1   checks 11 and 12 -- printed commands and queries
       check-plugin-integrity-entries.tests.ps1    checks 13, 13b, 14-16 -- entries, templates, figures
       check-plugin-integrity-docs.tests.ps1       checks 18-27 and -SkipCheck -- scripts, docs, manifests

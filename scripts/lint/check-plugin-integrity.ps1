@@ -168,6 +168,18 @@
          measured on a middot in entry-scaffold-lib.ps1 that came out wrong in every generated changelog
          template. Check 14 sees that damage one layer downstream, in the generated markdown; this sees
          the literal upstream. A BOM is deliberately NOT a finding: on a .ps1 it is the fix.
+     28. every '@'-import target resolves. A dead markdown link costs a reader one click; a dead import
+         costs the SESSION THE WHOLE DOCUMENT, because Claude Code drops one it cannot resolve without
+         erroring. Reuses measure-context-lib's own parser rather than restating its three resolution
+         rules. (Listed here from August 26, 2026 -- the check shipped without its line in this list.)
+     29. a plugin's OWN skill enumeration: an opt-in <!-- skills:plugin --> ... <!-- /skills:plugin -->
+         span, held against the skills/ of the plugin the DOCUMENT ITSELF sits in (resolved from its
+         path, not named in the marker). The two ways it is not check 10: the canonical set is that one
+         plugin's rather than the marketplace's, and a claim is a LINK TARGET resolving to
+         skills/<one>/SKILL.md rather than any backtick-quoted token -- so a two-column table with prose
+         and backticked paths in the second column needs no rewriting to be markable. Opt-in for the
+         reason check 10 is: measured over all four plugins, a generic version yields 8 findings on two
+         documents that never claimed to enumerate anything.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .PARAMETER SkipCheck
@@ -1088,10 +1100,19 @@ foreach ($lf in $linkFiles) {
     # duplicate further down would otherwise just sit there as silent, unchecked prose instead of
     # being reported).
     $consumedEndIndices = New-Object System.Collections.Generic.HashSet[int]
+    # The mirror of $consumedEndIndices, added August 26, 2026 with check 29 -- see the note there. Every
+    # BEGIN this walk VISITS, so the sweep below can report a second BEGIN pasted INSIDE an already-open
+    # span. That case was silent here from the start: the walk jumps from a span's opener straight past
+    # its END, so a nested BEGIN is never visited, and the span pairs across it as though it were prose.
+    # The duplicate-END half was reported from day one; this is the same defect facing the other way, and
+    # it was found by walking into it on check 29's own branch, where a run came out green for the wrong
+    # reason. Born green here: 0 findings across the whole scan set at introduction.
+    $visitedBeginIndices = New-Object System.Collections.Generic.HashSet[int]
     $searchStart = 0
     while ($searchStart -le $maskedContent.Length) {
         $beginMatch = $skillBeginRegex.Match($maskedContent, $searchStart)
         if (-not $beginMatch.Success) { break }
+        [void]$visitedBeginIndices.Add($beginMatch.Index)
         $beginLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $beginMatch.Index), "`n").Count
         $spanStart = $beginMatch.Index + $beginMatch.Length
         $endMatch = $skillEndRegex.Match($maskedContent, $spanStart)
@@ -1133,6 +1154,14 @@ foreach ($lf in $linkFiles) {
         if ($consumedEndIndices.Contains($m.Index)) { continue }
         $endLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $m.Index), "`n").Count
         Add-Error "[skill-list] ${rel}: '<!-- /skills:all -->' at line $endLineNo has no matching '<!-- skills:all -->'."
+    }
+    foreach ($m in $skillBeginRegex.Matches($maskedContent)) {
+        if ($visitedBeginIndices.Contains($m.Index)) { continue }
+        $beginLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $m.Index), "`n").Count
+        Add-Error ("[skill-list] ${rel}: '<!-- skills:all -->' at line $beginLineNo sits INSIDE an already-open" +
+            " span, so it is not the opener of anything -- the span that swallowed it closes at the next" +
+            " '<!-- /skills:all -->' and its contents were checked as one. Usually this means the marker was" +
+            " written in prose above a real span; show it in a fenced block instead.")
     }
 }
 if ($skillSpanCount -eq 0) {
@@ -2715,6 +2744,171 @@ Write-Coverage -Category 'import' -Checked $importScanFiles.Count `
         'the scan set is empty -- no dead @-import anywhere could be found, which is not the same as there being none'
     } else {
         "every file check 4 reads for links, read again for column-0 '@'-imports and resolved through measure-context-lib's own parser. Found $importResolved resolving in-tree import(s) and $importExternal outside the repo (not a finding: a '~/'-relative import points into the plugin marketplace clone, which CI does not have). $importNotAPath line(s) began with '@' and were read as prose rather than as a path. Fenced blocks are excluded, as in check 4. A dead import is not a dead link: Claude Code drops it silently and the session loses the WHOLE document"
+    })
+
+# --- 29. a plugin's OWN skill enumeration, scoped to that plugin and read from its links ------------------
+# THE HALF CHECK 10 CANNOT HOLD, split out of #873 and measured in #920. Check 10 exists for a document
+# that claims to list EVERY skill in the marketplace, and both of its defining properties make it the
+# wrong instrument for a document that claims to list every skill of ONE plugin:
+#
+#   * its canonical set is repo-wide -- built from Get-PluginSubdirs over every published plugin -- so a
+#     span in plugins/workflows/contributing-davekjohn/README.md, which enumerates the 16 that plugin
+#     ships, would report the team plugins' skills as 'missing';
+#   * every backtick-quoted token inside its span is a claimed name, which is why its own author
+#     condition is 'wrap tightly'. That table is two columns and three of its rows carry a backticked
+#     path or flag in the SECOND one -- so the span could not close around only the names without
+#     making the prose worse in order to satisfy a checker.
+#
+# So this is a second, separately opt-in sentinel rather than a relaxation of check 10. It differs in
+# exactly those two respects and in nothing else: same fence masking, same unpaired-marker errors, same
+# symmetric END sweep, same silent pass on zero spans.
+#
+#   1. SCOPE. The plugin is resolved from the FILE'S OWN PATH, through Get-PluginNameForPath -- the same
+#      function the fold uses to decide which plugins a PR touched. A span in a file under no plugin root
+#      is a hard error rather than a silent skip: the marker's whole meaning is 'this plugin', and a file
+#      that belongs to none has made a claim nothing can adjudicate.
+#   2. THE CLAIM IS THE LINK, NOT THE BACKTICKS. Every markdown link inside the span whose target
+#      resolves to <this plugin>/skills/<one>/SKILL.md is one claimed skill; everything else inside the
+#      span -- prose, backticked paths, flags, links elsewhere -- is ignored. That is what lets a
+#      two-column table with running prose in the second column be marked without rewriting it, and it
+#      needs no author condition at all. Resolution is relative to the document's own directory, exactly
+#      as check 4 resolves a relative link.
+#
+# EXACTLY ONE segment between 'skills' and 'SKILL.md', mirroring check 10's canonical walk: a level-3
+# progressive-disclosure page at skills/<name>/references/SKILL.md is not a top-level skill and is not
+# read as a claim.
+#
+# THE COMPARISON IS ON FOLDER NAMES, where check 10 compares frontmatter 'name:' values. A link target
+# can only ever name a DIRECTORY, so the directory is the only thing this span is able to claim. Should
+# a skill's folder ever diverge from its frontmatter name, that divergence is check 3's domain, not
+# this one's, and this check keeps answering the question it can actually answer: does the table link
+# to every skill directory this plugin ships, and to nothing else.
+#
+# WHY IT MUST STAY OPT-IN, measured across all four plugins before it was proposed (#920): a generic
+# rule -- 'a plugin README lists every skill it ships' -- would be born needing an exemption list.
+# contributing-davekjohn ships 16 and lists 16; team-alpha ships 4 and lists 0; team-shopify ships 4
+# and lists 0; team-ecomm ships 0. So a non-opt-in version produces 8 findings on two documents that
+# never claimed to enumerate anything, which is the shape this repo has scar tissue from (check 10's
+# own prose scan rejected at 147 hits, the stale-path check declined at 124, check 27's exemption
+# argument). An explicit sentinel fires on exactly the one table that means it.
+#
+# THE RECURRENCE THIS CLOSES: that table's correctness was guarded only by 'count when you add one',
+# which has failed three times -- nine/twelve, thirteen/fourteen, fourteen/sixteen.
+#
+# BORN GREEN: 1 span, 16 claimed, 16 canonical, 0 findings at introduction.
+$pluginSkillBeginRegex = [regex]'<!--\s*skills:plugin\s*-->'
+$pluginSkillEndRegex = [regex]'<!--\s*/skills:plugin\s*-->'
+$pluginSkillLinkRegex = [regex]'\]\(([^)\s]+)\)'
+$pluginSkillSpanCount = 0
+$pluginSkillClaimTotal = 0
+# Cached per plugin: the walk below is cheap, but a document could carry several spans and there is no
+# reason to re-read a plugin's skills/ tree for each one.
+$pluginSkillCanonicalCache = @{}
+foreach ($lf in $linkFiles) {
+    $content = [System.IO.File]::ReadAllText($lf, [System.Text.Encoding]::UTF8)
+    # The cheap test first, on the RAW text, exactly as check 28 does for '@': masking is a split and a
+    # regex-replace per line, and the overwhelming majority of this few-hundred-document set carries no
+    # marker at all. A raw match is a superset of a masked one -- masking only ever removes markers, it
+    # never creates one -- so skipping here can never skip a file the masked scan would have found.
+    if (-not $pluginSkillBeginRegex.IsMatch($content) -and -not $pluginSkillEndRegex.IsMatch($content)) { continue }
+    $maskedContent = Get-FenceMaskedText -Text $content
+    $rel = $lf.Replace($RepoRoot, '.')
+    $ownerName = Get-PluginNameForPath -PluginRoots $publishedPlugins -Path $lf.Substring($RepoRoot.Length)
+    $ownerRoot = $null
+    if ($ownerName) { $ownerRoot = Get-PluginRootByName -PluginRoots $publishedPlugins -Name $ownerName }
+    $consumedEndIndices = New-Object System.Collections.Generic.HashSet[int]
+    # Every BEGIN the walk actually VISITS -- whether it opened a span or was reported unpaired. The
+    # sweep after the loop uses it to find the mirror image of the duplicate-END case: a SECOND BEGIN
+    # pasted INSIDE an already-open span is never visited at all, because the walk jumps from a span's
+    # opener straight past its END. Check 10 reports the duplicate END and is silent on this one; the
+    # asymmetry was found on this branch, by writing the marker in prose above a real span -- the two
+    # markers then paired across the whole table and the run came out GREEN, for the wrong reason.
+    $visitedBeginIndices = New-Object System.Collections.Generic.HashSet[int]
+    $searchStart = 0
+    while ($searchStart -le $maskedContent.Length) {
+        $beginMatch = $pluginSkillBeginRegex.Match($maskedContent, $searchStart)
+        if (-not $beginMatch.Success) { break }
+        [void]$visitedBeginIndices.Add($beginMatch.Index)
+        $beginLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $beginMatch.Index), "`n").Count
+        $spanStart = $beginMatch.Index + $beginMatch.Length
+        $endMatch = $pluginSkillEndRegex.Match($maskedContent, $spanStart)
+        if (-not $endMatch.Success) {
+            Add-Error "[skill-list-plugin] ${rel}: '<!-- skills:plugin -->' at line $beginLineNo has no matching '<!-- /skills:plugin -->'."
+            $searchStart = $spanStart
+            continue
+        }
+        [void]$consumedEndIndices.Add($endMatch.Index)
+        $searchStart = $endMatch.Index + $endMatch.Length
+        if (-not $ownerRoot) {
+            Add-Error ("[skill-list-plugin] ${rel}: <!-- skills:plugin --> span at line $beginLineNo sits in a file that" +
+                " belongs to no published plugin, so there is no plugin whose skills it could be held against." +
+                " This marker is plugin-scoped by definition -- for a marketplace-wide enumeration use" +
+                " <!-- skills:all --> (check 10) instead.")
+            continue
+        }
+        if (-not $pluginSkillCanonicalCache.ContainsKey($ownerName)) {
+            $ownerSkillDirs = New-Object System.Collections.Generic.HashSet[string]
+            $ownerSkillsRoot = Join-Path $ownerRoot.Root 'skills'
+            if (Test-Path -LiteralPath $ownerSkillsRoot -PathType Container) {
+                Get-ChildItem -Path $ownerSkillsRoot -Recurse -Filter 'SKILL.md' -File |
+                    Where-Object { $_.FullName -match '\\skills\\[^\\]+\\SKILL\.md$' } | ForEach-Object {
+                        [void]$ownerSkillDirs.Add((Split-Path (Split-Path $_.FullName -Parent) -Leaf))
+                    }
+            }
+            $pluginSkillCanonicalCache[$ownerName] = $ownerSkillDirs
+        }
+        $ownerCanonical = $pluginSkillCanonicalCache[$ownerName]
+        # The claim set. Read from the RAW text at the same offsets, not from the mask -- the mask only
+        # ever blanks fenced blocks, and a span never legitimately contains one, so the two agree here;
+        # reading the raw text keeps the target byte-exact regardless.
+        $spanText = $content.Substring($spanStart, $endMatch.Index - $spanStart)
+        $spanDir = Split-Path -Parent $lf
+        $ownerSkillsPrefix = (Join-Path $ownerRoot.Root 'skills').TrimEnd('\') + '\'
+        $claimed = New-Object System.Collections.Generic.HashSet[string]
+        foreach ($m in $pluginSkillLinkRegex.Matches($spanText)) {
+            $target = $m.Groups[1].Value
+            if ($target -match '^(https?:|mailto:|#)') { continue }
+            $target = ($target -split '#')[0]
+            if (-not $target) { continue }
+            $resolved = $null
+            try { $resolved = [System.IO.Path]::GetFullPath((Join-Path $spanDir ($target -replace '/', '\'))) } catch { $resolved = $null }
+            if (-not $resolved) { continue }
+            if (-not $resolved.StartsWith($ownerSkillsPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+            if ($resolved -notmatch '\\skills\\[^\\]+\\SKILL\.md$') { continue }
+            [void]$claimed.Add((Split-Path (Split-Path $resolved -Parent) -Leaf))
+        }
+        $missing = @($ownerCanonical | Where-Object { -not $claimed.Contains($_) } | Sort-Object)
+        $extra = @($claimed | Where-Object { -not $ownerCanonical.Contains($_) } | Sort-Object)
+        if ($missing.Count -gt 0) {
+            Add-Error ("[skill-list-plugin] ${rel}: <!-- skills:plugin --> span at line $beginLineNo claims to enumerate" +
+                " every skill of plugin '$ownerName' but links to none for: $($missing -join ', ').")
+        }
+        if ($extra.Count -gt 0) {
+            Add-Error ("[skill-list-plugin] ${rel}: <!-- skills:plugin --> span at line $beginLineNo links into" +
+                " '$ownerName'/skills/ for name(s) that ship no SKILL.md there: $($extra -join ', ').")
+        }
+        $pluginSkillSpanCount++
+        $pluginSkillClaimTotal += $claimed.Count
+    }
+    foreach ($m in $pluginSkillEndRegex.Matches($maskedContent)) {
+        if ($consumedEndIndices.Contains($m.Index)) { continue }
+        $endLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $m.Index), "`n").Count
+        Add-Error "[skill-list-plugin] ${rel}: '<!-- /skills:plugin -->' at line $endLineNo has no matching '<!-- skills:plugin -->'."
+    }
+    foreach ($m in $pluginSkillBeginRegex.Matches($maskedContent)) {
+        if ($visitedBeginIndices.Contains($m.Index)) { continue }
+        $beginLineNo = 1 + [regex]::Matches($maskedContent.Substring(0, $m.Index), "`n").Count
+        Add-Error ("[skill-list-plugin] ${rel}: '<!-- skills:plugin -->' at line $beginLineNo sits INSIDE an" +
+            " already-open span, so it is not the opener of anything -- the span that swallowed it closes at" +
+            " the next '<!-- /skills:plugin -->' and its contents were checked as one. Usually this means the" +
+            " marker was written in prose above a real span; show it in a fenced block instead.")
+    }
+}
+Write-Coverage -Category 'skill-list-plugin' -Checked $pluginSkillSpanCount `
+    -Note $(if ($pluginSkillSpanCount -eq 0) {
+        "no <!-- skills:plugin --> span anywhere in the set check 4 reads. The marker is opt-in, so zero is a pass and not a gap -- but nothing about any plugin's own skill table is being asserted by this run"
+    } else {
+        "opt-in <!-- skills:plugin --> span(s), each held against the skills/ of the plugin the DOCUMENT ITSELF sits in (resolved via Get-PluginNameForPath, not named in the marker), with $pluginSkillClaimTotal claim(s) read from LINK TARGETS rather than from backticks -- so prose and backticked paths elsewhere in the row cost nothing. Check 10 is the marketplace-wide sibling and cannot serve this: its canonical set spans every plugin"
     })
 
 # --- Report ---------------------------------------------------------------------------------------------

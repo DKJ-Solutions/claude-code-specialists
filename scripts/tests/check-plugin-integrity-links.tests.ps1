@@ -1,8 +1,9 @@
 <#
 .SYNOPSIS
     check-plugin-integrity.ps1, part 1 of 4: check 4 (the dead-link scan set), check 10 (the
-    marked <!-- skills:all --> spans) and check 28 (the '@'-import targets), plus scenario 16 -- a root
-    entry file is scanned before the fold.
+    marked <!-- skills:all --> spans), check 28 (the '@'-import targets) and check 29 (the
+    plugin-scoped <!-- skills:plugin --> spans), plus scenario 16 -- a root entry file is scanned
+    before the fold.
 
 .DESCRIPTION
     The fixture, the assert helpers and Invoke-Integrity live in check-plugin-integrity-fixture.ps1,
@@ -12,8 +13,16 @@
 
     Check 4 guards file-set COVERAGE rather than the scan engine: if the $linkFiles list is refactored
     and drops CONTRIBUTING.md, the connectors README or one of the four payload layers, that must fail
-    loudly here. Check 10's fifteen scenarios cover the span mechanics, the fence masking in both
-    directions, and the symmetric orphan-END sweep.
+    loudly here. Check 10's sixteen scenarios cover the span mechanics, the fence masking in both
+    directions, and the two symmetric sweeps -- the orphan END, and (since August 26, 2026, scenario
+    14b) the nested BEGIN that used to pair across an open span in silence.
+
+    Check 29 is check 10's plugin-scoped sibling, and its eleven scenarios sit beside check 10's for the
+    same reason check 28's sit beside check 4's: same scan set, same marker mechanics, one deliberate
+    difference each. The two that matter are asserted head-on -- the SCOPE (27, which manufactures a
+    third skill in a second plugin so the two canonical sets genuinely differ) and the LINK-versus-
+    BACKTICK reading (28). Without the manufactured skill the fixture's two sets coincide and the scope
+    assertion is vacuous, which is the failure mode this suite exists to prevent.
 
     Check 28 is check 4's sibling -- the same scan set, a different syntax -- and its scenarios pin the
     resolution rule (file-relative, NOT repo-root-relative) separately from both discriminators (a fenced
@@ -465,6 +474,32 @@ try {
     Assert-True ($r14.Out -match [regex]::Escape('span at line 3 is missing: skill-beta')) 'scenario 14: the span closed early at the first END -- skill-beta (now outside it) is reported missing'
     Assert-True ($r14.Out -match [regex]::Escape("'<!-- /skills:all -->' at line 6 has no matching '<!-- skills:all -->'")) 'scenario 14: the surplus second END is reported separately, on its own line'
 
+    # --- Scenario 14b: the MIRROR of 14 -- a second BEGIN pasted INSIDE an already-open span. Silent
+    # here from the day this check shipped, and for the same structural reason 14 describes facing the
+    # other way: the walk jumps from a span's opener straight past its END, so a BEGIN in between is
+    # never visited and the span simply pairs across it. Found on August 26, 2026 by walking into it on
+    # check 29's branch, where the marker was written in prose above a real span and the run came out
+    # GREEN -- the prose BEGIN had paired with the real END, swallowing the real BEGIN and checking the
+    # whole table as one span. A pass for the wrong reason is worse than a finding, so both halves are
+    # asserted: the nested BEGIN is reported, AND the enumeration it swallowed is still checked (one
+    # span, not two, and no spurious missing name).
+    Write-Host "check 10 -- a second BEGIN pasted inside a real span is caught, not silently swallowed" -ForegroundColor Cyan
+    $s14bLines = @(
+        '# Contributing'                                # line 1
+        ''                                              # line 2
+        '<!-- skills:all -->'                           # line 3
+        '- `skill-alpha`'                               # line 4
+        '<!-- skills:all -->'                           # line 5 -- nested, opens nothing
+        '- `skill-beta`'                                # line 6
+        '<!-- /skills:all -->'                          # line 7
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s14bLines -join "`n") + "`n"), $Utf8NoBom)
+
+    $r14b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r14b.Out -match [regex]::Escape("'<!-- skills:all -->' at line 5 sits INSIDE an already-open span")) 'scenario 14b: the nested second BEGIN is reported, with the correct line number'
+    Assert-True (-not ($r14b.Out -match '\[skill-list\].*is missing:')) 'scenario 14b: and the swallowed enumeration was still checked as one span -- no spurious missing name. Anchored on the tag, not on the bare phrase: [shared-script] says "source is missing:" too, and an unanchored assert fails on it'
+    Assert-True ($r14b.Out -match [regex]::Escape('checked 1 <!-- skills:all --> span(s)')) 'scenario 14b: exactly one span, not two -- the nested BEGIN opened nothing'
+
     # --- Scenario 15: an END inside a code fence -- no error. Proves the masking is symmetric: a
     # fenced END is exactly as invisible to the sweep as a fenced BEGIN was in scenario 9/10.
     Write-Host "check 10 -- an END inside a code fence is invisible too (symmetric masking)" -ForegroundColor Cyan
@@ -612,6 +647,244 @@ try {
     Remove-Item -LiteralPath $impSibling -Force
     Assert-True (-not ((Invoke-Integrity -FixtureRoot $Fixture).Out -match '\[import\] \.')) `
         'import: the fixture is clean again once the probes are gone'
+
+    # === check 29: a plugin's OWN skill enumeration, scoped and read from its links =====================
+    # 25-35. WHY THESE SIT BESIDE CHECK 10'S RATHER THAN IN A SUITE OF THEIR OWN: the two checks share the
+    #        scan set, the fence masking and the whole marker mechanic, and they differ in exactly two
+    #        respects (#920). Both differences are asserted head-on -- the SCOPE in 27 and the
+    #        LINK-versus-BACKTICK reading in 28 -- because each is satisfiable by an implementation that
+    #        gets the other wrong. A plugin-scoped check that quietly used the marketplace-wide canonical
+    #        set passes every other scenario here, which is precisely why 27 manufactures a third skill in
+    #        a SECOND plugin: without it the fixture's two sets coincide and the scope assertion is
+    #        vacuous.
+    #
+    #        The document under test is the plugin's own README rather than CONTRIBUTING.md, and that is
+    #        not incidental: this marker resolves its plugin from the FILE'S OWN PATH, so a root document
+    #        cannot carry a valid one at all -- which is scenario 31.
+    $PluginSkillFindingPattern = '\[skill-list-plugin\].*(links to none for:|ship no SKILL\.md there:|has no matching|sits INSIDE|belongs to no published plugin)'
+    $pluginReadme = Join-Path $Fixture 'plugins\teams\team-alpha\README.md'
+
+    # --- Scenario 25: a complete plugin-scoped span passes, and the coverage line proves it read the
+    # links rather than merely finding the markers ---------------------------------------------------
+    Write-Host "check 29 -- a complete <!-- skills:plugin --> span passes" -ForegroundColor Cyan
+    $p25Lines = @(
+        '# team-alpha'
+        ''
+        '<!-- skills:plugin -->'
+        ''
+        '| skill | when |'
+        '|---|---|'
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | the first one |'
+        '| [`skill-beta`](skills/skill-beta/SKILL.md) | the second one |'
+        ''
+        '<!-- /skills:plugin -->'
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p25Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q25 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q25.Out -match $PluginSkillFindingPattern)) 'scenario 25: a complete plugin-scoped span reports no [skill-list-plugin] finding'
+    Assert-True ($q25.Out -match [regex]::Escape('[skill-list-plugin] checked 1')) 'scenario 25: exactly one span was counted'
+    Assert-True ($q25.Out -match [regex]::Escape('with 2 claim(s) read from LINK TARGETS')) 'scenario 25: both rows were read as claims -- the coverage line proves the links were parsed, not just the markers found'
+
+    # --- Scenario 26: a span that omits one of the plugin's skills fails, naming it ------------------
+    Write-Host "check 29 -- a span omitting one of the plugin's skills fails" -ForegroundColor Cyan
+    $p26Lines = @(
+        '# team-alpha'
+        ''
+        '<!-- skills:plugin -->'
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | the only row |'
+        '<!-- /skills:plugin -->'
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p26Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q26 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q26.Out -match [regex]::Escape("links to none for: skill-beta")) 'scenario 26: the omitted skill is named -- this is the drift the check exists to stop'
+    Assert-Equal 1 $q26.Code 'scenario 26: and it fails the gate'
+
+    # --- Scenario 27 (the SCOPE difference, and the reason this check exists at all): the canonical set
+    # is THIS plugin's, not the marketplace's. A third skill is manufactured in a SECOND plugin, so the
+    # two sets differ -- 3 marketplace-wide against 2 for team-alpha -- and both are asserted in the same
+    # run: check 10's span sees 3, check 29's span passes with 2. Under the marketplace-wide set this
+    # span would report skill-gamma missing, which is exactly what #920 measured and why a second marker
+    # was needed rather than a wider check 10 ----------------------------------------------------------
+    Write-Host "check 29 -- the canonical set is the DOCUMENT'S OWN plugin, not the marketplace" -ForegroundColor Cyan
+    $gammaDir = Join-Path $Fixture 'plugins\teams\team-shopify\skills\skill-gamma'
+    New-Item -ItemType Directory -Path $gammaDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $gammaDir 'SKILL.md'), "---`nname: skill-gamma`n---`n`n# Gamma`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText($pluginReadme, (($p25Lines -join "`n") + "`n"), $Utf8NoBom)
+    $s27Lines = @(
+        '# Contributing'
+        ''
+        '<!-- skills:all -->'
+        '- `skill-alpha`'
+        '- `skill-beta`'
+        '- `skill-gamma`'
+        '<!-- /skills:all -->'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s27Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q27 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q27.Out -match [regex]::Escape('against 3 canonical skill(s)')) 'scenario 27: the marketplace-wide set really is 3 -- so the two sets genuinely differ in this run'
+    Assert-True (-not ($q27.Out -match $PluginSkillFindingPattern)) 'scenario 27: and the plugin-scoped span still passes with 2 -- skill-gamma belongs to another plugin and is not its business'
+    Assert-True ($q27.Out -match [regex]::Escape('with 2 claim(s) read from LINK TARGETS')) 'scenario 27: two claims, not three -- the scope is the document own plugin'
+
+    Remove-Item -LiteralPath (Split-Path -Parent $gammaDir) -Recurse -Force
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), "# Contributing`n`nNo markers here.`n", $Utf8NoBom)
+
+    # --- Scenario 28 (the OTHER difference): a claim is a LINK TARGET, never a backtick. This is the
+    # constraint that made check 10 unusable for a two-column table -- three rows of the real one carry a
+    # backticked path or flag in their second column, and under check 10's rule each of those is a claimed
+    # skill name. Here they are prose. A backticked name that is NOT a link is asserted too, in the same
+    # span, because "ignores backticks" and "reads links" can each be implemented without the other -----
+    Write-Host "check 29 -- prose and backticked paths in a row are not claims; the link is" -ForegroundColor Cyan
+    $p28Lines = @(
+        '# team-alpha'
+        ''
+        '<!-- skills:plugin -->'
+        '| skill | when |'
+        '|---|---|'
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | scaffolds `contributing-davekjohn/`, and takes `--force` |'
+        '| [`skill-beta`](skills/skill-beta/SKILL.md) | stays out of the built-in `/continue` way |'
+        '| `not-a-skill` | a backticked token with no link at all -- prose, not a claim |'
+        '<!-- /skills:plugin -->'
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p28Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q28 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q28.Out -match $PluginSkillFindingPattern)) 'scenario 28: backticked paths, flags and a bare backticked token inside the span cost nothing -- no author condition is needed'
+    Assert-True ($q28.Out -match [regex]::Escape('with 2 claim(s) read from LINK TARGETS')) 'scenario 28: still exactly 2 claims -- the three extra backtick runs were not read as names'
+
+    # --- Scenario 29: a link into this plugin's skills/ for a name that ships no SKILL.md ------------
+    # The mirror of 26, and the case a renamed skill folder produces. Check 4 reports the dead link too;
+    # this asserts the [skill-list-plugin] half, which is the one that says WHY it matters.
+    Write-Host "check 29 -- a link to a skill this plugin does not ship is reported" -ForegroundColor Cyan
+    $p29Lines = @(
+        '# team-alpha'
+        ''
+        '<!-- skills:plugin -->'
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | real |'
+        '| [`skill-beta`](skills/skill-beta/SKILL.md) | real |'
+        '| [`skill-ghost`](skills/skill-ghost/SKILL.md) | renamed away, or never there |'
+        '<!-- /skills:plugin -->'
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p29Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q29 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q29.Out -match [regex]::Escape('ship no SKILL.md there: skill-ghost')) 'scenario 29: the phantom row is named'
+    Assert-Equal 1 $q29.Code 'scenario 29: and it fails the gate'
+
+    # --- Scenario 30: the DEPTH DECOY, on the claim side this time. Check 10 binds its canonical walk to
+    # exactly one segment between skills/ and SKILL.md; the same binding has to hold for a LINK, or a
+    # level-3 progressive-disclosure page would be read as a claimed skill and reported as an extra ----
+    Write-Host "check 29 -- a link to a level-3 SKILL.md is not a claim" -ForegroundColor Cyan
+    $p30Lines = @(
+        '# team-alpha'
+        ''
+        '<!-- skills:plugin -->'
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | real |'
+        '| [`skill-beta`](skills/skill-beta/SKILL.md) | real |'
+        '| deeper reading | [the reference page](skills/skill-alpha/references/SKILL.md) |'
+        '<!-- /skills:plugin -->'
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p30Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q30 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q30.Out -match $PluginSkillFindingPattern)) 'scenario 30: the level-3 page is not read as a claimed skill, so it is not an extra'
+    Assert-True ($q30.Out -match [regex]::Escape('with 2 claim(s) read from LINK TARGETS')) 'scenario 30: and it did not inflate the claim count either'
+
+    # --- Scenario 31: a span in a document that belongs to NO plugin is a hard error, not a silent skip.
+    # The marker means "this plugin", and a root document has none -- so there is nothing to adjudicate
+    # against, and the honest answer is to say so rather than to pass. The message points at check 10,
+    # which is the marker the author almost certainly wanted ------------------------------------------
+    Write-Host "check 29 -- a span outside any plugin is refused, and points at the right marker" -ForegroundColor Cyan
+    [System.IO.File]::WriteAllText($pluginReadme, "# team-alpha`n`nNo markers here.`n", $Utf8NoBom)
+    $s31Lines = @(
+        '# Contributing'
+        ''
+        '<!-- skills:plugin -->'
+        '- [`skill-alpha`](plugins/teams/team-alpha/skills/skill-alpha/SKILL.md)'
+        '<!-- /skills:plugin -->'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s31Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q31 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q31.Out -match [regex]::Escape('belongs to no published plugin')) 'scenario 31: a span in a root document is refused rather than silently skipped'
+    Assert-True ($q31.Out -match [regex]::Escape('<!-- skills:all --> (check 10) instead')) 'scenario 31: and the finding names the marker that WOULD serve there'
+    Assert-Equal 1 $q31.Code 'scenario 31: and it fails the gate'
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), "# Contributing`n`nNo markers here.`n", $Utf8NoBom)
+
+    # --- Scenario 32: an unpaired BEGIN, reported with its line number -------------------------------
+    Write-Host "check 29 -- an unpaired BEGIN is reported" -ForegroundColor Cyan
+    $p32Lines = @(
+        '# team-alpha'                                    # line 1
+        ''                                                # line 2
+        '<!-- skills:plugin -->'                          # line 3
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | no closer follows |'
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p32Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q32 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q32.Out -match [regex]::Escape("'<!-- skills:plugin -->' at line 3 has no matching '<!-- /skills:plugin -->'")) 'scenario 32: the unpaired BEGIN is reported, with the correct line number'
+    Assert-Equal 1 $q32.Code 'scenario 32: a typo-ed sentinel must never read as "no span here"'
+
+    # --- Scenario 33: a lone orphan END, the symmetric half ------------------------------------------
+    Write-Host "check 29 -- a lone orphan END is reported" -ForegroundColor Cyan
+    $p33Lines = @(
+        '# team-alpha'                                    # line 1
+        ''                                                # line 2
+        '<!-- /skills:plugin -->'                         # line 3
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p33Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q33 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q33.Out -match [regex]::Escape("'<!-- /skills:plugin -->' at line 3 has no matching '<!-- skills:plugin -->'")) 'scenario 33: the orphan END is reported, with the correct line number'
+
+    # --- Scenario 34: a SECOND BEGIN inside an already-open span -- the mirror of check 10's scenario
+    # 14b, shipped with it. This is the case that made the repair necessary: on this check's own branch
+    # the marker was written in prose above the real span, the two paired across the whole table, and the
+    # run came out GREEN with the real BEGIN swallowed. Both halves asserted, as in 14b -----------------
+    Write-Host "check 29 -- a second BEGIN inside a real span is caught, not silently swallowed" -ForegroundColor Cyan
+    $p34Lines = @(
+        '# team-alpha'                                    # line 1
+        ''                                                # line 2
+        '<!-- skills:plugin -->'                          # line 3
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | real |'
+        '<!-- skills:plugin -->'                          # line 5 -- nested, opens nothing
+        '| [`skill-beta`](skills/skill-beta/SKILL.md) | real |'
+        '<!-- /skills:plugin -->'                         # line 7
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p34Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q34 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q34.Out -match [regex]::Escape("'<!-- skills:plugin -->' at line 5 sits INSIDE an already-open span")) 'scenario 34: the nested second BEGIN is reported, with the correct line number'
+    Assert-True (-not ($q34.Out -match [regex]::Escape('links to none for:'))) 'scenario 34: and the swallowed rows were still checked as one span -- no spurious missing name'
+    Assert-True ($q34.Out -match [regex]::Escape('[skill-list-plugin] checked 1')) 'scenario 34: exactly one span, not two'
+
+    # --- Scenario 35: a fenced example of the marker is invisible, and the fixture is clean again -----
+    # The convention this check inherits from check 10: a fence is the supported way to SHOW the bare
+    # marker text. Asserted on the span COUNT rather than on the absence of a finding, because zero
+    # findings is also what a check that stopped reading the file would produce.
+    Write-Host "check 29 -- a fenced example is not a live marker, and the fixture ends clean" -ForegroundColor Cyan
+    $p35Lines = @(
+        '# team-alpha'
+        ''
+        'Wrap the table like this:'
+        ''
+        '```'
+        '<!-- skills:plugin -->'
+        '<!-- /skills:plugin -->'
+        '```'
+    )
+    [System.IO.File]::WriteAllText($pluginReadme, (($p35Lines -join "`n") + "`n"), $Utf8NoBom)
+
+    $q35 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q35.Out -match $PluginSkillFindingPattern)) 'scenario 35: a fenced example produces no finding'
+    Assert-True ($q35.Out -match [regex]::Escape('[skill-list-plugin] checked 0')) 'scenario 35: the fenced markers never become a span at all -- invisible, not merely passing'
+
+    Remove-Item -LiteralPath $pluginReadme -Force
+    $q35b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q35b.Out -match '\[skill-list-plugin\] \.')) 'scenario 35: the fixture is clean again once the plugin README is gone'
+
 
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

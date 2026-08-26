@@ -71,23 +71,31 @@ like a decision:
 
 **Dropping the count is the cheaper half of the repair, and it has been tried on its own before — it did
 not stop the drift, it only made it quieter.** So it is gone from the heading and from the layout table
-above, and the reason this table is still not machine-checked is written down here rather than left as a
-risk. The source repo's lint gate does hold marked enumeration spans to the real skill set (`[skill-list]`,
-check 10 of `scripts/lint/check-plugin-integrity.ps1`) — and this table cannot carry one, for two reasons
-that are properties of that check rather than of this document:
+above — and since August 26, 2026 the table below is **machine-checked**, which is the half that actually
+closes the recurrence. The source repo's lint gate holds marked enumeration spans to the real skill set,
+and this table now carries one.
+
+**It took a second marker to get there, and the reason is worth keeping**, because it is a property of the
+older check rather than of this document. The marketplace-wide `skills:all` span (`[skill-list]`, check 10
+of `scripts/lint/check-plugin-integrity.ps1`) could not serve here on two counts:
 
 - **Its canonical set is repo-wide.** It is built from every published plugin's `skills/`, so it holds a
-  span to *all* the skills the marketplace ships. This table enumerates one plugin's, so a span here would
+  span to *all* the skills the marketplace ships. This table enumerates one plugin's, so a span there would
   report every team plugin's skills as missing.
-- **Every backtick-quoted token inside a span counts as a claimed name**, so the span has to close around
-  nothing but the names. A two-column table cannot honour that: three rows below carry a backticked path or
+- **Every backtick-quoted token inside its span counts as a claimed name**, so that span has to close around
+  nothing but the names. A two-column table cannot honour it: three rows below carry a backticked path or
   flag in their second column.
 
-A variant scoped to one plugin, reading each row's **link target** instead of its backticks, would fit both
-constraints; it is filed as
-[#920](https://github.com/DaveKJohn/claude-code-specialists/issues/920) rather than built here. Until it
-exists, the only thing keeping this table true is that whoever adds a skill adds a row. **Count when you
-add one.**
+The `skills:plugin` span (`[skill-list-plugin]`, check 29) is the plugin-scoped sibling that answers both
+([#920](https://github.com/DaveKJohn/claude-code-specialists/issues/920)). It resolves the plugin from the
+**document's own path** rather than from anything written in the marker, and it reads each row's **link
+target** — `skills/<name>/SKILL.md` — instead of its backticks, so prose and backticked paths anywhere else
+in a row cost nothing. Adding a skill to this plugin without adding a row now turns the source repo's
+gate red rather than relying on somebody remembering. *Count when you add one* has been retired; the
+check counts. That gate runs where this plugin is **maintained**, not where it is installed — nothing
+below changes for you, and nothing here asks you to run anything.
+
+<!-- skills:plugin -->
 
 | skill | when |
 |---|---|
@@ -107,6 +115,8 @@ add one.**
 | [`handover`](skills/handover/SKILL.md) | opening the next one — reads that record back (named for the file it reads, and to stay out of the built-in `/continue`'s way) |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |
 | [`measure-skill`](skills/measure-skill/SKILL.md) | pricing what a skill costs the sessions that carry it — always-on against on-invoke tokens, the delta against a stored baseline, and the wall-clock of the script behind it |
+
+<!-- /skills:plugin -->
 
 ## What it expects from your repo — the seam
 
