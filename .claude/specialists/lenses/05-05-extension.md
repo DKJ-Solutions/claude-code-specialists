@@ -401,8 +401,10 @@ Derek prefers not to touch the git commands by hand. His toolbox:
 
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-Park]` — create (or
   idempotently resume) the branch and, in the same move, write its `contributing-davekjohn/development-cycle.md`.
-  `-Intent` records where you left off / what is next **at the top of that document, above the phases** —
-  deliberately not in the DEPLOY section, whose text folds verbatim into `CHANGELOG.md`; `-Park` commits
+  `-Intent` records where you left off / what is next **as the opening paragraph of `PLAN`, without a
+  heading** — above the phases until #908/#925 (August 26, 2026), which is the one region the preamble
+  rule refuses, so the scaffolder wrote a document its own branch-entry gate rejected. Deliberately not in
+  the DEPLOY section, whose text folds verbatim into `CHANGELOG.md`; `-Park` commits
   that one file and pushes the branch to `origin` for later / another device — **still no PR** (#162).
   Without `-Park`: no push, no PR — just the branch + the document on disk. See
   [Step 3 above](#classifying-naming-and-creating-a-branch).
