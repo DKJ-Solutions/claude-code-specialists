@@ -1,9 +1,15 @@
 # `scripts/` — the canonical source of everything this repo runs
 
-**This directory is the source. Everything else is a copy of it.** Twenty-eight of the files here are
-mirrored into the plugins for consumers to run — twenty-seven scripts and one HTML template — and the
-mirror is generated rather than maintained, so a
-change lands *here* and travels outward, never the other way around. The mirror's own page, written for the
+**This directory is the source. Everything else is a copy of it.** Most of the files here are mirrored
+into the plugins for consumers to run — scripts, plus one HTML template — and the mirror is generated
+rather than maintained, so a change lands *here* and travels outward, never the other way around. The
+authoritative list is the registry itself: `Get-SharedScriptPairs` in
+[`lib/shared-scripts-lib.ps1`](lib/shared-scripts-lib.ps1), which
+[`sync/build-shared-scripts.ps1`](sync/build-shared-scripts.ps1) generates from and lint check 8 holds
+the mirrors to. **This page deliberately states no count**, because it kept getting one wrong: a prose
+tally of a machine-held list is wrong when typed and wrong again after the next entry, which is the
+lesson the root [`CLAUDE.md`](../CLAUDE.md) records about counting a name inside the document that
+carries it. Ask the registry. The mirror's own page, written for the
 consumer who only has the copy, is
 [`plugins/workflows/workflow-davekjohn/scripts/README.md`](../plugins/workflows/workflow-davekjohn/scripts/README.md).
 
@@ -11,12 +17,17 @@ Three consequences worth knowing before you touch anything:
 
 - **Never *run* a shared script from the plugin cache while you are in this repo — run the copy here.**
   The cache holds the last *released* mirror, so it lags this directory by however many merges have landed
-  since. Two silent failures measured on one day; see below. **Fourteen of the sixteen shared entry points
-  now refuse outright** ([`lib/source-repo-guard-lib.ps1`](lib/source-repo-guard-lib.ps1)) and name the
-  local path to run instead. The two exceptions are `sync/check-roster-sync.ps1` and
-  `sync/check-script-contract.ps1`: both SessionStart hooks invoke those from the plugin by design, so a
-  refusal there would fail every session start in this repo. That gap is deliberate and stated rather than
-  quietly left.
+  since. Two silent failures measured on one day; see below. **Every shared entry point refuses outright**
+  ([`lib/source-repo-guard-lib.ps1`](lib/source-repo-guard-lib.ps1)) and names the local path to run
+  instead — with exactly two exceptions, `sync/check-roster-sync.ps1` and `sync/check-script-contract.ps1`:
+  both are invoked from the plugin by a SessionStart hook, so a refusal there would fail every session
+  start in this repo. That reason is specific to being a hook and extends to nothing else.
+  **The rule is held by a test rather than by this sentence** —
+  [`tests/source-repo-guard.tests.ps1`](tests/source-repo-guard.tests.ps1) derives the entry points from
+  the registry and fails on any that lacks the guard, so a new one is caught on the day it is registered.
+  That assert exists because this line previously carried a hand-typed ratio and was wrong: the suite had
+  always tested whether the guard *decides* correctly and never whether it is *called*, and
+  `maintenance/measure-always-on.ps1` had gone into the registry without it (#897).
 - **Never edit a file under `plugins/*/scripts/`.** Change the source here and run
   [`sync/build-shared-scripts.ps1`](sync/build-shared-scripts.ps1). Lint check 8 reports a hand-edited
   mirror as drift.

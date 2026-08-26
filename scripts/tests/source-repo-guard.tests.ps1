@@ -239,6 +239,67 @@ finally {
     }
 }
 
+# --- COVERAGE: the guard is WIRED IN, not merely correct ------------------------------------------------
+# EVERYTHING ABOVE TESTS WHETHER THE GUARD DECIDES CORRECTLY. Nothing tested whether it is actually
+# CALLED, and that is the half that went wrong. Measured August 26, 2026 while repairing the stale
+# tallies of issue #897: scripts/README.md claimed "fourteen of the sixteen shared entry points now
+# refuse outright" and named two exceptions with a sound reason -- both are SessionStart hooks, invoked
+# from the plugin by design, so refusing there would fail every session start in this repo. The real
+# figures were 20 of 23, and the third absentee was scripts/maintenance/measure-always-on.ps1, which is
+# no such hook. Its own skill page prints '${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1'
+# and then says to run the local copy instead -- precisely the shape the guard exists for. A gap, not an
+# exception, almost certainly missed when that script joined the registry the day before.
+#
+# WHY A TEST AND NOT A PROSE COUNT. The claim it replaces was a hand-typed ratio over a registry that can
+# be asked, in a page nothing checks -- so it was wrong when written and would be wrong again after the
+# next entry point. This assert derives the set from Get-SharedScriptPairs, so a new entry point is held
+# to the rule on the day it is registered rather than on the day somebody re-counts.
+#
+# THE EXCEPTION LIST IS NAMED HERE AND NOWHERE ELSE, and it is deliberately short. Adding to it is a
+# decision that has to be argued in this file, which is the property the README could never have: a page
+# can go stale in silence, a failing assert cannot.
+. (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
+
+# Both are invoked from the plugin by a SessionStart hook, so a refusal would fail every session start in
+# this repo. That reason is specific to being a hook -- it does not extend to a script somebody runs.
+$guardExempt = @(
+    'scripts\sync\check-roster-sync.ps1',
+    'scripts\sync\check-script-contract.ps1'
+)
+
+$entryPoints = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
+    Where-Object { -not $_.LibOnly } |
+    Select-Object -ExpandProperty SourceRel -Unique)
+
+Assert-True ($entryPoints.Count -gt 0) `
+    'coverage: the registry yields entry points at all -- an empty set would pass every assert below while checking nothing'
+
+$missingGuard = @()
+foreach ($ep in $entryPoints) {
+    if ($guardExempt -contains $ep) { continue }
+    $epPath = Join-Path $RepoRoot $ep
+    if (-not (Test-Path -LiteralPath $epPath -PathType Leaf)) {
+        $missingGuard += "$ep (registered but absent from the tree)"
+        continue
+    }
+    $epText = [System.IO.File]::ReadAllText($epPath, [System.Text.Encoding]::UTF8)
+    if ($epText -notmatch 'source-repo-guard-lib') { $missingGuard += $ep }
+}
+Assert-True ($missingGuard.Count -eq 0) `
+    "coverage: every shared entry point dot-sources the guard, except the named SessionStart-hook scripts$(if ($missingGuard.Count) { ' -- WITHOUT IT: ' + ($missingGuard -join ', ') })"
+
+# AND THE EXEMPTIONS ARE HELD TO BEING REAL. An exemption for a script that no longer exists, or that has
+# since gained the guard, is a licence nobody is using -- and the next reader would take it as evidence
+# that the entry is still needed. Same reasoning as the checks in the lint gate that refuse to carry a
+# stale exclusion.
+foreach ($ex in $guardExempt) {
+    $exPath = Join-Path $RepoRoot $ex
+    Assert-True (Test-Path -LiteralPath $exPath -PathType Leaf) `
+        "coverage: the exemption for $ex names a file that exists"
+    Assert-True ($entryPoints -contains $ex) `
+        "coverage: the exemption for $ex names a registered entry point, so it is exempting something real"
+}
+
 Write-Host ''
 if ($script:fail -gt 0) {
     Write-Host "FAILED: $($script:fail) of $($script:pass + $script:fail) asserts." -ForegroundColor Red

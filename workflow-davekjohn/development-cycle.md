@@ -87,24 +87,62 @@ whole directory. The root page is the half #897 explicitly records as untouched 
 
 ## CREATE
 
-- [ ] Add the source-repo guard to `scripts/maintenance/measure-always-on.ps1`, and regenerate its mirror
-- [ ] Rewrite the two stale tallies in `scripts/README.md` without numbers, and replace the entry-point ratio with the rule plus its two named exceptions
-- [ ] Leave the mirror README alone -- it belongs to #886
+- [x] Add the source-repo guard to `scripts/maintenance/measure-always-on.ps1`, and regenerate its mirror -- `build-shared-scripts.ps1` updated exactly one mirror, the rest already in sync
+- [x] Rewrite the two stale tallies in `scripts/README.md` without numbers, and replace the entry-point ratio with the rule plus its two named exceptions. Swept the page afterwards for any other hand-typed tally: none left
+- [x] Leave the mirror README alone -- it belongs to #886
 
 ## TEST
 
-- [ ] A COVERAGE assert in `scripts/tests/source-repo-guard.tests.ps1`: every non-`LibOnly` entry point in the registry dot-sources the guard, except the two named SessionStart-hook scripts. The suite tests the guard's logic today and nothing tests that it is actually WIRED IN -- which is why this gap was invisible
-- [ ] That assert must be RED before the fix and green after, verified in that order rather than asserted
-- [ ] `check-plugin-integrity.ps1` green on the real tree
-- [ ] The full suite green (`scripts/tests/*.tests.ps1`), the same set CI runs
+- [x] A COVERAGE assert in `scripts/tests/source-repo-guard.tests.ps1`: every non-`LibOnly` entry point in the registry dot-sources the guard, except the two named SessionStart-hook scripts. The suite tests the guard's logic today and nothing tests that it is actually WIRED IN -- which is why this gap was invisible
+- [x] That assert must be RED before the fix and green after, verified in that order rather than asserted -- **red** naming `scripts\maintenance\measure-always-on.ps1`, then **green**, 26 asserts
+- [x] Two asserts the plan did not call for: the entry-point set must be non-empty (an empty registry would satisfy the coverage assert while checking nothing), and each exemption must name a file that exists AND is a registered entry point -- so the licence cannot outlive what it excuses
+- [x] `check-plugin-integrity.ps1` green on the real tree -- 0 findings
+- [x] The full suite green (`scripts/tests/*.tests.ps1`), the same set CI runs -- 53 suites, 0 failing, 482s
+- [x] `measure-always-on.ps1` still runs from its own copy after the guard went in -- checked, not assumed
 
 ## DEPLOY: `fix/the-guard-covers-every-entry-point-v1`
 
-**Score:**
+`scripts/maintenance/measure-always-on.ps1` now carries the source-repo guard, and
+[`scripts/README.md`](scripts/README.md) states the rule instead of counting it.
+
+**The gap, and why nothing saw it.** The guard refuses a shared script that is running from a released
+copy inside the repo that maintains it -- the mechanism behind
+[#897](https://github.com/DaveKJohn/claude-code-specialists/issues/897)'s subject. `measure-always-on.ps1`
+joined the shared registry on August 25 without it, while `scripts/README.md` claimed every shared entry
+point but two carried it. Both named exceptions are sound: they are invoked from the plugin by a
+SessionStart hook, so refusing there would fail every session start here. This one is no hook -- its own
+skill page prints `${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/measure-always-on.ps1` and then says to run
+the local copy instead, which is precisely what the guard exists to enforce rather than request.
+
+It was invisible because **the guard's suite tested whether the guard decides correctly and never whether
+it is called.** That half is now asserted off the registry, so the next entry point is held to the rule on
+the day it is registered rather than on the day somebody re-counts. Two supporting asserts keep the assert
+itself honest: the entry-point set must be non-empty, and an exemption must name a file that exists and is
+registered -- a licence cannot outlive what it excuses.
+
+**A stale measurement tool is the worst place for this gap**, which is why it is repaired rather than
+exempted. A stale copy of a measuring script does not fail; it reports. That file's own docstring is the
+record of what a plausible wrong number costs here: the chars-per-token factor was inherited unexamined
+through three hand measurements and was ~19% too generous, so every derived figure was under-stated while
+looking precise.
+
+**The page stops counting, and that is the durable half.** Its two tallies were both wrong, and re-typing
+them would have been wrong again twice over: the registry holds **43** pairs today and **42** the moment
+#886 removes `workflow-default`, because `check-report-lib` is deliberately registered to two other
+plugins as well. So the counts are gone -- the registry is named as the authority, and the entry-point
+claim is a rule with two named exceptions held by a test. Same resolution the root `CLAUDE.md` reached
+about counting a name inside the document that carries it.
+
+**Score:** 3
 
 ### What makes this deploy extra special
 
-**Score:**
+N/A. A consumer receives the mirrored `measure-always-on.ps1` with the guard in it, and the guard is a
+no-op for them by construction -- it refuses only where the repo being operated on holds its own copy of
+the running script, which a consumer never does. The README and the test are source-side. No consumer
+behaviour changes.
+
+**Score:** N/A
 
 ### Pull Request
 
