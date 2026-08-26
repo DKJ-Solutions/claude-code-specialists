@@ -283,6 +283,32 @@ try {
         '## DEPLOY: `feat/thing`', '', 'It does the thing.', '', '**Score:** 3'))
     $r = Invoke-Gate -Dir $preTranslated -Branch 'feat/thing'
     Assert-True ($r.Code -eq 0) 'shape/#899: a translated guidance block passes -- the rule reads the blockquote, not the words'
+
+    # 8. #915 -- THE REAL SCAFFOLDED PREAMBLE, which is the one shape none of the seven above ever fed this
+    #    gate. Scenarios 1-7 spell their head out by hand (with reason: the region's SHAPE is the subject of
+    #    #899, and a formatter call would have read as though it were incidental) -- but that hand-written
+    #    head is also why a generator writing a BROKEN preamble shipped green. Format-DevelopmentCycle
+    #    composed the heading levels from the knobs with '+' inside a ',' array literal, so ',' bound first
+    #    and dropped four bare '###'/'####' lines into the guidance; this gate read them as branch content
+    #    and refused every document new-branch wrote, here and in every consumer taking the plugin.
+    #
+    #    So the preamble comes from the FORMATTER and the phases stay written out: the suite's stated rule
+    #    ("the entry states come from the real formatters") applied to the half that had been exempt. Taken
+    #    up to the first phase heading rather than by a line count, so the guidance may grow without this
+    #    scenario going stale.
+    $scaffoldPreamble = @()
+    foreach ($cycleLine in (Format-DevelopmentCycle -Branch 'feat/thing' -Id '20260826-000000')) {
+        if ($cycleLine -match ('^#{' + (Get-BranchCycleSectionLevel) + '}\s+\S')) { break }
+        $scaffoldPreamble += $cycleLine
+    }
+    Assert-True ($scaffoldPreamble.Count -gt 4) 'shape/#915: (the fixture really carries the generated guidance, not an empty head)'
+    $phaseHashes = '#' * (Get-BranchCycleSectionLevel)
+    $shapeReal = New-SourceRepoFixture -Label 'shape-real-preamble'
+    Set-Entry -Dir $shapeReal -Lines ($scaffoldPreamble + @(
+        "$phaseHashes PLAN", '', "$phaseHashes CREATE", '', '- [x] Did the thing', '', "$phaseHashes TEST", ''
+    ) + $shapeEntry)
+    $r = Invoke-Gate -Dir $shapeReal -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 0) 'shape/#915: the preamble the scaffolder actually writes passes the gate that reads it'
 }
 finally {
     foreach ($d in $script:trees) {

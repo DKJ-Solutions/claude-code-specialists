@@ -1780,6 +1780,25 @@ Assert-True ([string]((Get-BranchFileWording).StepsGuidance -join ' ') -match 'F
 # measured, and this is the assert that keeps it repaired.
 Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match 'FROM THE REPO ROOT') 'and it reaches the document a branch is handed, not a reference beside it'
 
+# #915 -- EVERY GUIDANCE ELEMENT IS A BLOCKQUOTE LINE, and this assert exists because nothing ever counted
+# the array. In PowerShell ',' binds TIGHTER than '+', so an element written as 'a' + $H + 'b' inside the
+# literal is ARRAY concatenation of its neighbours rather than string concatenation: the four composed lines
+# became twelve elements, four of them a bare '###' or '####' alone, and check-branch-entry.ps1 read those as
+# branch content in the generic region -- refusing the document new-branch had just written, on every branch
+# in every consumer. It fails into WELL-FORMED output, so only a count catches it.
+#
+# ASSERTED AS A SHAPE, NOT AS A COUNT. Every element of this block opens the blockquote, so a split element
+# shows up here as a line that does not -- and the assert needs no maintenance when the wording changes. A
+# pinned element count would go red on every legitimate edit and be raised rather than read.
+$guidanceElements = @((Get-BranchFileWording).StepsGuidance)
+$notQuoted = @($guidanceElements | Where-Object { $_ -notmatch '^>' })
+foreach ($stray in $notQuoted) { Write-Host "         stray element: '$stray'" -ForegroundColor Red }
+Assert-Equal 0 $notQuoted.Count "every guidance element opens with '>' -- an element split by ',' binding over '+' surfaces here as a bare marker"
+# AND THE COMPOSED LEVEL REACHES THE DOCUMENT INLINE, which is the reader-facing half of the same defect: a
+# split element still renders, with the marker orphaned onto its own line where it reads as a heading.
+$phaseHashes = '#' * (Get-BranchCycleSectionLevel)
+Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n") -match ('FOUR `' + $phaseHashes + '` HEADINGS')) 'and the level composed from the knob reaches the document on one line, not orphaned onto its own'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
