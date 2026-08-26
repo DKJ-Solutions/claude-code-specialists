@@ -39,6 +39,32 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+function ConvertTo-NativeArgumentToken {
+    <#
+        One argument, quoted the way CreateProcess parses it back apart. Start-Process joins
+        -ArgumentList on SPACES and quotes nothing, so an argument carrying a space would arrive at the
+        child as two -- which is why this exists and why it is not needed on the & path, where
+        PowerShell does the quoting itself.
+
+        The backslash rule is the fiddly half and it is not optional: inside quotes, a run of
+        backslashes immediately before the closing quote is halved by the parser, so a value ending in
+        '\' would escape the very quote that terminates it. Doubling that run is the documented fix.
+        An empty string becomes '""', which is a real argument rather than nothing at all.
+
+        Internal to this lib (no export, no contract row): it exists only to serve the -Utf8 path
+        below.
+    #>
+    param([AllowEmptyString()][Parameter(Mandatory = $true)][string]$Value)
+
+    if ($Value -eq '') { return '""' }
+    if ($Value -notmatch '[\s"]') { return $Value }
+
+    # Double any backslash run that precedes a quote, and any that ends the value; escape the quotes.
+    $escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+    $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
+    return '"' + $escaped + '"'
+}
+
 function Invoke-NativeCapture {
     <#
         Run $FilePath with $Arguments under $ErrorActionPreference = 'Continue' and return a
@@ -48,12 +74,38 @@ function Invoke-NativeCapture {
                        cannot pollute a machine-readable stdout (e.g. gh --json).
           - ExitCode : $LASTEXITCODE recorded immediately after the command ran.
         EAP is always restored (finally), whether the command succeeds, fails, or throws.
+
+        -Utf8: DECODE THE OUTPUT AS UTF-8 INSTEAD OF WITH THE CONSOLE CODE PAGE (issue #907,
+        August 26, 2026). Windows PowerShell 5.1 decodes a native child's stdout with
+        [Console]::OutputEncoding, so the SAME command returns different strings on cp65001 and cp850.
+        For a progress line that is cosmetic; for output the caller then PARSES or COMPARES it is a
+        wrong answer that arrives as a plausible value. Measured on the DEPLOY lock: gh's UTF-8
+        em-dash 'e2 80 94' came back as 'c3 94 c3 87 c3 b6' on a cp850 console, so the lock refused a
+        PR whose body was intact and named a line that reads as correct -- in a gate with no -Force.
+        Pass -Utf8 wherever the output is DATA rather than progress.
+
+        WHY A REDIRECT AND NOT [Console]::OutputEncoding = UTF8 AROUND THE CALL. That setter is
+        SetConsoleOutputCP: console-WIDE, not per-process. The test gate runs every suite with
+        -NoNewWindow on one shared console, and a sibling holding UTF-8 is exactly how inbound #821
+        stayed invisible -- an assert green under the gate and red on its own.
+        .claude/rules/language-layers.md states the prohibition outright. Redirecting to a file and
+        reading it with an explicit UTF-8 decode touches no shared state and is provably immune:
+        measured identical on cp65001, cp850 and cp437.
+
+        THE -Utf8 PATH IS A DIFFERENT MECHANISM, not a flag on the same one, so two things differ and
+        both are deliberate. Output comes back as an ARRAY OF LINES (strings) rather than whatever
+        objects the & operator produced -- ErrorRecords included, which is what a caller merging
+        stderr was really getting. And the child is started by Start-Process, so $Arguments are quoted
+        here rather than by PowerShell; see ConvertTo-NativeArgumentToken above.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$Arguments = @(),
-        [switch]$DiscardStderr
+        [switch]$DiscardStderr,
+        [switch]$Utf8
     )
+
+    if ($Utf8) { return Invoke-NativeCaptureUtf8 -FilePath $FilePath -Arguments $Arguments -DiscardStderr:$DiscardStderr }
 
     $prevEap = $ErrorActionPreference
     try {
@@ -69,6 +121,78 @@ function Invoke-NativeCapture {
     }
 
     return [pscustomobject]@{ Output = $output; ExitCode = $code }
+}
+
+function Invoke-NativeCaptureUtf8 {
+    <#
+        The -Utf8 arm of Invoke-NativeCapture; see that function's docstring for WHY. Split out rather
+        than nested in an if/else because the two share no lines: different launcher, different
+        capture, different decode. Callers pass -Utf8 instead of naming this.
+
+        Start-Process -PassThru THEN $proc.Handle THEN WaitForExit is the proven pattern from
+        Invoke-TestSuiteGate below, and reading .Handle is NOT a no-op: without it .NET does not retain
+        the OS handle and .ExitCode comes back EMPTY once the child has exited -- empty is not 0, and
+        that is how this file's own gate once judged every green suite as failed.
+
+        Capture goes to FILES rather than pipes: with -Wait-less Start-Process a full pipe buffer
+        deadlocks, and a file cannot. Temp directory is per-process AND per-call, so two captures in
+        one script cannot read each other's output.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [switch]$DiscardStderr
+    )
+
+    $capDir  = Join-Path ([System.IO.Path]::GetTempPath()) ("native-capture-$PID-" + [guid]::NewGuid().ToString('n'))
+    $outFile = Join-Path $capDir 'out.txt'
+    $errFile = Join-Path $capDir 'err.txt'
+
+    try {
+        New-Item -ItemType Directory -Path $capDir -Force | Out-Null
+
+        $startArgs = @{
+            FilePath               = $FilePath
+            NoNewWindow            = $true
+            PassThru               = $true
+            RedirectStandardOutput = $outFile
+            RedirectStandardError  = $errFile
+        }
+        # An EMPTY -ArgumentList is an error in Windows PowerShell 5.1, so it is omitted rather than
+        # passed empty -- a command with no arguments is a normal call, not a special case.
+        if ($Arguments.Count -gt 0) {
+            $startArgs['ArgumentList'] = @($Arguments | ForEach-Object { ConvertTo-NativeArgumentToken -Value $_ })
+        }
+
+        $proc = Start-Process @startArgs
+        $null = $proc.Handle
+        $proc.WaitForExit()
+        $code = $proc.ExitCode
+
+        # No BOM on the decoder: a BOM-emitting child is not something gh or git does, and
+        # UTF8Encoding($false) still strips one if it is there.
+        $utf8 = New-Object System.Text.UTF8Encoding $false
+        $text = ''
+        if (Test-Path -LiteralPath $outFile) { $text = [System.IO.File]::ReadAllText($outFile, $utf8) }
+        if (-not $DiscardStderr -and (Test-Path -LiteralPath $errFile)) {
+            $text += [System.IO.File]::ReadAllText($errFile, $utf8)
+        }
+
+        # Lines, to match what the & path hands back. A single trailing newline is the terminator of
+        # the last line rather than an empty line after it, so it is dropped; anything else is content.
+        $lines = @()
+        if ($text.Length -gt 0) {
+            $text = $text -replace "`r`n", "`n"
+            if ($text.EndsWith("`n")) { $text = $text.Substring(0, $text.Length - 1) }
+            $lines = @($text -split "`n")
+        }
+
+        return [pscustomobject]@{ Output = $lines; ExitCode = $code }
+    } finally {
+        if (Test-Path -LiteralPath $capDir) {
+            Remove-Item -Recurse -Force -LiteralPath $capDir -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Invoke-TestSuiteGate {

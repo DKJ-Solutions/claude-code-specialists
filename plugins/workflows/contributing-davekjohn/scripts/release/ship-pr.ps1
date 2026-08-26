@@ -380,7 +380,11 @@ passed, so a re-run picks up from here. There is no -Force for this gate.
 # comparison itself is Test-DeployLock in pr-body-lib, the same function the CI gate calls, so "diverged"
 # has one definition rather than two.
 if (Test-Path -LiteralPath $shipProgressPath) {
-    $lockView = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+    # -Utf8 IS LOAD-BEARING HERE (issue #907): the other side of this comparison is read with an
+    # explicit UTF-8 decode one line below, and without it this side would be decoded with the console
+    # code page instead -- so on cp850 an em-dash in the section came back as three characters and the
+    # lock refused a PR whose body was intact.
+    $lockView = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @(
         'pr', 'view', "$pr", '--json', 'body', '--repo', $repo)
     if ($lockView.ExitCode -eq 0) {
         $lockBody = ''

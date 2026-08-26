@@ -216,13 +216,15 @@ by a suite rather than by reading, and neither would have raised anything at run
   have been printed *as* a pending change. It reads the level from the lib now and skips the pending heading;
   the no-library fallback accepts both levels, because that branch cannot ask.
 
-**This section is pure ASCII on purpose, and it is not a house style.** The DEPLOY lock compares the section
-against the PR body, and `ship-pr` reads that body through a non-UTF-8 decode -- so any non-ASCII character
-makes a clean document mismatch a mojibake copy of itself
-([#907](https://github.com/DaveKJohn/claude-code-specialists/issues/907), still open). Three em-dashes were
-flattened to `--` to get this merged, exactly as
-[#906](https://github.com/DaveKJohn/claude-code-specialists/pull/906) did the day before. Do not copy the
-convention; fix the decode.
+**This section is pure ASCII, and by the time it merged it no longer had to be.** It was flattened while
+[#907](https://github.com/DaveKJohn/claude-code-specialists/issues/907) was open -- the DEPLOY lock compares
+the section against the PR body, `ship-pr` read that body through a non-UTF-8 decode, and any non-ASCII
+character therefore made a clean document mismatch a mojibake copy of itself. Three em-dashes went to `--` to
+get this merged, exactly as [#906](https://github.com/DaveKJohn/claude-code-specialists/pull/906) had done the
+day before. [#910](https://github.com/DaveKJohn/claude-code-specialists/pull/910) closed that hole while this
+branch was still open, and it landed on `main` between this PR opening and its merge -- so the flattening is
+left standing here as the last instance of a workaround that is already gone, not as a convention. Write the
+next one normally.
 
 **Score:** 4
 

@@ -367,7 +367,10 @@ Write-Host "[OK] '$entryRel' keeps its shape: $($topHeadings.Count) '$('#' * $ph
 # change, so this gate names it and merges anyway; a section that no longer matches the PR is not a
 # judgement at all, it is two copies of one text disagreeing, and the fold is about to pick one.
 if ($Pr) {
-    $lockView = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'view', "$Pr", '--json', 'body')
+    # -Utf8 for the same reason ship-pr.ps1 passes it (issue #907): this body is COMPARED against the
+    # document, so it must not be decoded with whatever console code page the run inherited. CI runs
+    # UTF-8 and would not have shown it; a local run of this gate is where it bites.
+    $lockView = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'view', "$Pr", '--json', 'body')
     if ($lockView.ExitCode -ne 0) {
         Write-Host "[INFO] PR #$Pr's body could not be read, so the DEPLOY lock was not checked." -ForegroundColor DarkYellow
         Write-Host '       That is a statement about the token or the network, not about the section.' -ForegroundColor DarkYellow

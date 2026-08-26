@@ -75,7 +75,10 @@ if (-not $Repo) {
     $Repo = Get-RepoName
 }
 
-$view = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'view', "$Pr", '--repo', $Repo, '--json', 'body', '-q', '.body') -DiscardStderr
+# -Utf8 (issue #907): the body is scanned for 'Resolves #N'. The markers are ASCII, but a mis-decode
+# shifts nothing about them -- what it does is corrupt the surrounding prose this same string is
+# reported back in, and the class is the one the language rule says never to leave to the console.
+$view = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'view', "$Pr", '--repo', $Repo, '--json', 'body', '-q', '.body') -DiscardStderr
 if ($view.ExitCode -ne 0) {
     # A warning, not an error: the merge itself already succeeded, and failing here must not make a
     # completed ship look failed. The pointer names the manual check.

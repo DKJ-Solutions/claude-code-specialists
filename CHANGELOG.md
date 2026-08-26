@@ -32,6 +32,54 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/native-capture-utf8-read-v1` · 20260826-132946
+
+The DEPLOY lock refused correct work. `ship-pr` read the PR body back through the console decoder while
+reading the branch document as explicit UTF-8, so on a non-UTF-8 console the two sides of one comparison
+were decoded differently: `gh`'s em-dash `e2 80 94` arrived as `c3 94 c3 87 c3 b6`, and the lock refused a
+PR whose body was intact, naming a line that reads as correct — in a gate with no `-Force`.
+
+**The boundary #907 declined to guess is the console code page, and nothing about the PR.** The report was
+right that the trigger is narrower than "any em-dash" and right not to guess: PR #905 passed and #906 failed
+because `[Console]::OutputEncoding` differed between the runs, not because their entries did. Measured by
+putting the report's own bytes through the real helper -- identical on cp65001, mangled on cp850 and cp437.
+
+**This entry deliberately carries em-dashes, where the previous one had to be flattened to ASCII.** That
+flattening was option 3 from the report applied by hand, and it said so itself so nobody would copy it as a
+house style. Writing this one normally is the proof that the reason for it is gone — and it was held
+against the real PR body on a cp850 console before the merge, not only in the suite.
+
+**The repair is the one the language rule already prescribes, and the report's own option 1 named half of
+it.** `Invoke-NativeCapture` gains an opt-in `-Utf8` that redirects the child's output to a file and decodes
+it as UTF-8 explicitly. The bracketed alternative in that option -- setting `[Console]::OutputEncoding`
+around the call -- is forbidden in writing: that setter is console-wide, and the test gate runs every suite
+on one console. Option 2 was declined for the reason the report gave against itself, and option 3 is what
+the previous entry had to do by hand.
+
+**Four call sites, not one.** The report named `ship-pr`; the subject is every read that pulls prose through
+this decoder, and there are four. The CI gate's copy of the same lock is one of them -- it never bit because
+CI runs UTF-8, which is exactly the shape of defect that waits for a local run.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- these scripts ship in the workflow plugin, so a consumer does receive the fix. But it repairs a gate
+refusing correct work rather than changing anything they do: a consumer on a UTF-8 console never saw it, and
+one on cp850 gets a lock that stops lying. Nothing to learn and nothing to adopt.
+
+**Score:** N/A
+
+#### Pull Request
+
+the PR-body read no longer depends on the console code page
+
+Plugins: contributing-davekjohn
+
+[PR #910](https://github.com/DaveKJohn/claude-code-specialists/pull/910)
+
+---
+
 ### DEPLOY: `fix/settings-json-trailing-newline-v1` · 20260826-123558
 
 `.claude/settings.json` did not end with a newline. Installing `contributing-davekjohn` into this checkout
