@@ -108,4 +108,4 @@ block carrying no seam is returned untouched.
 
 #### Pull Request
 
-fix: the no-tier fallback drops the whole audience paragraph, not one line of it
+the no-tier fallback drops the whole audience paragraph, not one line of it
