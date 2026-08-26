@@ -14,6 +14,22 @@ on:
   push:
     branches: [main]
 
+# ONE RUN PER REF, AND `cancel-in-progress` IS CONDITIONAL RATHER THAN `true` -- the fold is why.
+# A PR run that a later push supersedes is measuring a commit nobody will merge, so killing it is
+# free: `synchronize` fires on every push, which is how PR #933 came to carry three consecutive full
+# runs of one branch at ~7m40s each, on a runner whose minutes bill double.
+#
+# A push to `main` shares its group with the NEXT push to `main`, never with a PR -- github.ref is
+# refs/pull/N/merge there and refs/heads/main here, so the two can never collide and the condition is
+# not what separates them. What it protects against is this repo's own trunk rhythm: ship-pr pushes to
+# `main` TWICE per branch, the merge commit and then the fold commit that clears the branch document.
+# Measured August 26, 2026: 6s apart on #932 and 7m on #933. Under a plain `true` the fold would cancel
+# the merge commit's own run -- at a 6s gap, always -- and a cancelled check is not a passing one, so the
+# commit the `main` ruleset gates on would sit there having never been gated.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint-en-tests:
     runs-on: windows-latest
