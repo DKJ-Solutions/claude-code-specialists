@@ -25,6 +25,35 @@ a release with nobody to announce it to.
 
 ---
 
+## DEPLOY: `fix/settings-json-trailing-newline-v1` · 20260826-123558
+
+`.claude/settings.json` did not end with a newline. Installing `contributing-davekjohn` into this checkout
+rewrote the file and added one, which is the only reason anybody noticed: it surfaced as a one-line diff on
+`main` that nobody had authored.
+
+**The newline is kept rather than reverted, and that is the whole change.** A text file ending without one
+is the defect: any tool that appends to it, and any diff that touches its last line, reports a change to a
+line nobody edited. Reverting would have restored a file that produces a phantom diff the next time a
+plugin is installed here -- and this repo consumes its own plugins, so that is a recurring event rather
+than a hypothetical one.
+
+**Score:** 1
+
+### What makes this deploy extra special
+
+N/A -- `.claude/settings.json` is this checkout's own harness config. It is not plugin payload, it ships in
+no release, and no consumer of the specialists plugins ever reads it.
+
+**Score:** N/A
+
+### Pull Request
+
+settings.json ends with a newline
+
+[PR #909](https://github.com/DaveKJohn/claude-code-specialists/pull/909)
+
+---
+
 ## DEPLOY: `fix/the-changelog-intro-names-the-current-folder-v1` · 20260826-114730
 
 `CHANGELOG.md`'s intro named `workflow-davekjohn/CONTRIBUTING.md` in the text of a link already pointing at
