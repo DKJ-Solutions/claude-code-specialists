@@ -64,13 +64,15 @@ about what the file was called when the note was written.
 
 - [x] The class is empty: the same `git grep` that found the one instance returns nothing across the live layers
 - [x] The two history occurrences are untouched — verified by the same query scoped to `releases/` and `contributing-davekjohn/releases/`
-- [x] Lint gate and all test suites green
+- [x] Lint gate and all test suites green; the shape gate reports 4 `##` headings and nothing but guidance above the first
+- [x] **The DEPLOY lock refused this PR twice, and the refusal was diagnosed rather than worked around blind.** Byte comparison of the line it named: the document holds `e2 80 94` (a correct UTF-8 em-dash), the body as `ship-pr` reads it holds `c3 94 c3 87 c3 …` — those three bytes each decoded as a separate character and re-encoded. The body **on GitHub is intact**; fetching it through Git Bash returns `e2 80 94`. So the mangle is entirely in the read-back, on this `nl-NL` machine. Filed with the bytes and the isolated repro as [#907](https://github.com/DaveKJohn/claude-code-specialists/issues/907)
+- [~] Not fixed here. Dropped deliberately: the repair candidates touch `Invoke-NativeCapture`, which has many callers, on a machine-specific symptom — and PR #905 carried em-dashes through the same lock an hour earlier and passed, so the trigger is narrower than "any em-dash" and the boundary needs finding before anything is changed. A one-line changelog fix is the wrong branch to carry that
 
 ## DEPLOY: `fix/the-changelog-intro-names-the-current-folder-v1`
 
 `CHANGELOG.md`'s intro named `workflow-davekjohn/CONTRIBUTING.md` in the text of a link already pointing at
 `contributing-davekjohn/CONTRIBUTING.md`. One line, and the intro is the one part of that file which is live
-prose rather than history — every release cut copies it through verbatim, so it would have shipped a dead
+prose rather than history -- every release cut copies it through verbatim, so it would have shipped a dead
 path into the next release notes.
 
 **What it corrects is the reach of a rule, not a typo.** #905 renamed a folder that published notes link
@@ -79,11 +81,18 @@ into, and followed the doctrine those notes carry: repoint targets, never rewrit
 as a live statement rather than a record. Measured after the fix: one instance in the live layers, now zero,
 and the two in history left as the testimony they are.
 
+**This entry is written in ASCII on purpose, and it is not a house style.** The DEPLOY lock refused to merge
+it while it carried em-dashes -- not because the section had changed, but because `ship-pr` reads the PR body
+through a non-UTF-8 decode, so a clean document was being compared against a mojibake body
+([#907](https://github.com/DaveKJohn/claude-code-specialists/issues/907), filed with the byte proof). The
+dashes were flattened to get one line of documentation merged, and the underlying defect is somebody's own
+branch rather than a convention anybody should copy.
+
 **Score:** 2
 
 ### What makes this deploy extra special
 
-N/A — the changelog intro is read by whoever opens this repo's changelog, not by a consumer of the plugins.
+N/A -- the changelog intro is read by whoever opens this repo's changelog, not by a consumer of the plugins.
 A reader who clicked the link landed in the right place either way; only the label was wrong.
 
 **Score:** N/A
