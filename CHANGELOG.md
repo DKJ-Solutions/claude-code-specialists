@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/audience-paragraph-drops-whole-v1` · 20260826-195936
+
+A repo that states no audience tier now has the whole audience paragraph dropped from its branch
+document's guidance, instead of only the line carrying the `{0}` seam. The fallback in
+`Format-DevelopmentCycle` removed one line of a three-line sentence, so the two that finished it stayed
+behind: every such document opened a paragraph mid-sentence and referred to "that reader" after the
+clause naming that reader had been dropped. `Remove-EntryAudienceGuidance` now finds the paragraph by
+shape -- a separator being a line that is empty once a leading `>` is stripped -- and takes one fencing
+separator with it, so nothing doubles up where it stood.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+This repo could not reach the defect and never will: `scripts/repo-config.ps1` states tier 2, so the
+fallback does not run here. It was a consumer-only failure in the one document a consumer meets on every
+single branch, which is why nothing in this tree caught it and why the assert has to drive the no-tier
+path deliberately.
+
+The repair is found by SHAPE rather than marked in the wording, and that choice is the durable half.
+`StepsGuidance` is a translation seam: a marker in the text would put the burden on whoever translates
+the block and would fail silently the moment they dropped it. Reading the shape instead survives
+translation -- the same reasoning `check-branch-entry.ps1` already applies to the preamble check. A
+consumer who replaced the wording with their own prose still gets exactly their own prose back, because a
+block carrying no seam is returned untouched.
+
+**Score:** 3
+
+#### Pull Request
+
+the no-tier fallback drops the whole audience paragraph, not one line of it
+
+Plugins: contributing-davekjohn
+
+[PR #934](https://github.com/DaveKJohn/claude-code-specialists/pull/934)
+
+---
+
 ### DEPLOY: `feat/one-wording-merge-loop-v1` · 20260826-195859
 
 Two getters in `entry-scaffold-lib.ps1` each merged a consumer's wording overrides over a defaults map,
