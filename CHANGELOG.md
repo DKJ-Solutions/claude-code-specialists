@@ -32,6 +32,62 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-guidance-array-parenthesises-its-levels-v1` · 20260826-152509
+
+`new-branch.ps1` writes a usable `development-cycle.md` again. Four lines of `$script:BranchFileDefaults.StepsGuidance`
+composed their heading levels as `'opening text' + $script:BranchCyclePhaseHashes + 'closing text'` inside a
+comma-separated array literal -- and in PowerShell `,` binds tighter than `+`, so that is not string
+concatenation at all. It parses as *array* concatenation of the neighbouring elements --
+`('previous', 'opening text') + '###' + ('closing text', 'next')` -- turning one element into three. The array held **38
+elements where 30 are written**, four of them a naked `###` or `####` alone on a line. `check-branch-entry.ps1`
+read those four as branch-specific content in the region that must be generic and exited 1 -- so the
+scaffolder wrote a document the gate refuses, and `open-pr.ps1` would not push it. That blocked **every**
+branch, here and in every consumer taking the workflow plugin; the branch that hit it first was unblocked by
+repairing its own document by hand, which left the generator untouched. Introduced by
+[#911](https://github.com/DaveKJohn/claude-code-specialists/pull/911), reported as
+[#915](https://github.com/DaveKJohn/claude-code-specialists/issues/915), and reproduced here by creating this
+branch before touching anything.
+
+**The repair is four pairs of parentheses, and the comment beside them is the durable half.** `+` is settled
+before `,` ever sees it. The same edit lands in the byte-identical plugin mirror
+`plugins/workflows/contributing-davekjohn/scripts/lib/entry-scaffold-lib.ps1`, because that is the copy a
+consumer actually runs. What the note above the lines now records is that the parentheses are load-bearing --
+without it they read as redundant grouping, and the next editor tidying them away reproduces the defect
+exactly.
+
+**Why it shipped green is the part worth keeping.** The composition fails into *well-formed* output: a
+document that renders, with four markers merely orphaned onto lines of their own. Nothing read the array
+back. Two guards now do. `entry-scaffold.tests.ps1` asserts that every element of the block opens the
+blockquote -- a **shape**, deliberately not a count, because a pinned count goes red on every legitimate
+wording edit and gets raised rather than read. And `branch-entry-gate.tests.ps1` gains scenario 8, which feeds
+the gate the preamble `Format-DevelopmentCycle` actually produces. That is the real gap: the suite's own
+header states that entry states come from the real formatters and never from a literal, and the seven shape
+scenarios were the documented exception -- they spell their head out by hand, for a stated reason. That
+exemption is why a generator writing a broken preamble passed a suite whose whole subject is that preamble.
+Both guards were confirmed to fail against the defect before being trusted.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+`entry-scaffold-lib.ps1` is plugin payload: the `contributing-davekjohn` workflow ships it, so a consumer that
+takes this plugin gets a scaffolder writing a document its own CI gate refuses -- every new branch, with no
+way past it, since neither `open-pr.ps1` nor the gate has a `-Force`. The failure arrives at branch creation,
+before any work is done, and the visible symptom is a document that looks fine. Nothing needs migrating: the
+next branch after the update is written correctly, and a document already repaired by hand stays valid.
+
+**Score:** 4
+
+#### Pull Request
+
+the scaffolded cycle document composes its heading levels without splitting the guidance array
+
+Plugins: contributing-davekjohn
+
+[PR #921](https://github.com/DaveKJohn/claude-code-specialists/pull/921)
+
+---
+
 ### DEPLOY: `docs/contributing-numbered-steps-v1` · 20260826-150053
 
 `contributing-davekjohn/CONTRIBUTING.md` now carries the step numbering
