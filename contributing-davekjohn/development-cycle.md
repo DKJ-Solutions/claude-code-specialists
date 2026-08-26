@@ -4,21 +4,13 @@
 > `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.
 > open-pr and ship-pr both refuse while one is still open, and there is no `-Force`.
 >
-> **FOUR `
-###
-` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top
-> level. A section needing its own heading goes in as a `
-####
-` UNDER whichever of the four owns
+> **FOUR `###` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top
+> level. A section needing its own heading goes in as a `####` UNDER whichever of the four owns
 > it. No gate sees a heading, so this one is on you (Dave, August 26, 2026).
 >
-> **AND NOTHING BRANCH-SPECIFIC ABOVE `
-###
- PLAN`** -- everything between the title and that heading
+> **AND NOTHING BRANCH-SPECIFIC ABOVE `### PLAN`** -- everything between the title and that heading
 > is this guidance, which is identical in every branch document. A status line, a note about
-> THIS branch or an instruction to a session belongs under one of the four, normally as a `
-####
-`
+> THIS branch or an instruction to a session belongs under one of the four, normally as a `####`
 > in PLAN. Same rule, same reason: no gate reads this region (Dave, August 26, 2026).
 >
 > **DEPLOY takes no steps of its own, and it is WRITTEN LAST** -- it is what the branch DID, once
@@ -94,6 +86,7 @@ what makes "four `##` in total" literally true rather than true-if-you-only-coun
 - [x] `check-plugin-integrity.ps1` green -- it carries the dead-link scan, and both the renumber and the move relocate headings. 291 links and 291 imports re-scanned, 0 findings
 - [x] Every `scripts/tests/*.tests.ps1` suite green -- 52 suites, all passing
 - [x] Re-checked `sync-rules.tests.ps1`, which first read as failing: it prints `OK: all 61 asserts passed` and is the one suite ending without an explicit `exit 0`, so an IN-PROCESS run leaves `$LASTEXITCODE` at the last `git` call inside it. Both `open-pr` and CI run each suite as its own process (`Invoke-TestSuiteGate` reads `Process.ExitCode`), where it exits 0. A measurement artefact of how it was invoked, not a defect -- nothing filed
+- [x] `check-branch-entry.ps1` green -- CI first reported this branch as carrying content above the first `##`. The gate was right: the scaffolder had written the guidance block as fragments, with `###` and `####` at column 0. Diagnosed to PowerShell binding `,` tighter than `+` inside an array literal, filed as [#918](https://github.com/DaveKJohn/claude-code-specialists/issues/918), and this branch's own copy of the block repaired by hand so the check reports honestly
 - [~] No test was added. Dropped with the reason: nothing reads this page. The lint gate's link scan is the only automated statement about it, and it already covers the class of defect a move introduces
 
 ### DEPLOY: `docs/contributing-numbered-steps-v1`
