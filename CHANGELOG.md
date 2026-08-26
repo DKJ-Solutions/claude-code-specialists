@@ -32,6 +32,59 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/pr-title-carries-branch-prefix-v1` · 20260826-194448
+
+`open-pr.ps1` now refuses a branch whose changelog entry gives its title a type prefix the script is about
+to add itself ([#936](https://github.com/DaveKJohn/claude-code-specialists/issues/936)). The type comes off
+the branch name and is composed in front of the entry's words, so a title typed as `fix: the fallback
+drops ...` on a `fix/` branch becomes `fix: fix: the fallback drops ...`. That is not hypothetical: PR
+[#934](https://github.com/DaveKJohn/claude-code-specialists/pull/934) opened under exactly that title
+earlier the same day, and nothing refused it -- `open-pr` prints the composed title as a `DarkGray`
+progress line and carries on, so it was caught by eye in `ship-pr`'s output and repaired by hand with
+`gh pr edit --title`.
+
+**`Get-PrTitle` still strips nothing, and that is the repair rather than the absence of one.** The doubled
+line is not only what the PR is called: the same words are the folded entry's `#### Pull Request` section,
+so they travel verbatim into `CHANGELOG.md` and on into the release documents. Stripping in the composer
+would have corrected the copy a reviewer sees for a day and kept the copy that lasts. The refusal sends the
+author back to the entry, which is the single edit that fixes both -- the same doctrine the link gate states
+one block above, where a fold-time rewrite was declined for the same reason.
+
+**The guard is bounded to the branch's own prefix**, which is what makes it safe to refuse on.
+`Get-PrTitlePrefixFinding` matches `<this branch's type>:` and never `^\w+:` -- the fear of a stripper that
+mangles a legitimate title like `sync-roster: the ignore list is empty` is precisely why the guard was left
+out when `Get-PrTitle` was written, and its docstring asked to be revisited if the case ever arrived. It
+did, so the paragraph now records what happened and where the guard went instead of predicting that it
+never would.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Both changed files are shared scripts, so every consumer receives this gate through the next plugin update
+rather than by choosing to -- and the gate refuses at the last step of a branch, which is the worst place to
+meet a surprise. Two decisions are there for that reader specifically.
+
+It is `-Force`-able, unlike the link and impact gates and like the scaffold gate it most resembles: this
+refuses text somebody actually wrote, and a consumer whose branch table names a prefix that could
+legitimately open a sentence should get a warning rather than a branch it cannot ship. And the finding is
+bounded to that consumer's *own* prefix, read from their table, so a repo whose types are `style/` or
+`liquid/` is held to its own convention and not to this one.
+
+**Score:** 2
+
+#### Pull Request
+
+the entry's title is refused when it already carries the branch's own type prefix
+
+Plugins: contributing-davekjohn
+
+Plugins: contributing-davekjohn
+
+[PR #937](https://github.com/DaveKJohn/claude-code-specialists/pull/937)
+
+---
+
 ### DEPLOY: `fix/ci-concurrency-supersedes-pr-runs-v1` · 20260826-194414
 
 `.github/workflows/ci.yml` now declares a `concurrency` group keyed on the workflow and the ref, so one
