@@ -130,19 +130,19 @@ by one, because the issue asked for a release-note step this page did not have; 
 that step, so the two now agree and the paragraph was describing a gap that had closed. The subject itself did
 not go away with it and is now [#914](https://github.com/DaveKJohn/claude-code-specialists/issues/914).
 
-**Score:** 2
+It changes how the page reads for anyone following the cycle here -- every step reference in it is a different
+string than it was -- but the cycle it describes is unchanged, and the one genuinely new step is a convention
+rather than a mechanism. A reader notices the moment they open the page; nobody has to do anything differently
+except queue behind an in-flight merge.
 
-Reason: it changes how the page reads for anyone following the cycle here -- every step reference in it is a
-different string than it was -- but the cycle it describes is unchanged, and the one genuinely new step is a
-convention rather than a mechanism. A reader notices the moment they open the page; nobody has to do anything
-differently except queue behind an in-flight merge.
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:** N/A
-
 Nothing here reaches a consumer. This page is this repo's own set of answers; the portable half that ships
 with the plugin is untouched.
+
+**Score:** N/A
 
 #### Pull Request
 
