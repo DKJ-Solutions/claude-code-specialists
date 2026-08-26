@@ -44,7 +44,7 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`RELEASES-portable.md`](RELEASES-portable.md) | the release workflow: the tier model, what a release must earn, the release documents, and how one is cut — your own `contributing-davekjohn/releases/README.md` holds your answers and your release list |
 | [`DEVELOPMENT-portable.md`](DEVELOPMENT-portable.md) | the document a branch works in: its two halves, the dossier form, the three step marks, the version suffix, its branch-long lifetime, and what the fold does at the merge |
 | [`TICKETWORK-portable.md`](TICKETWORK-portable.md) | the rules for the layer *before* a branch, in a repo whose work arrives from somebody else's tracker: whether a request can be built as written, and how the answer is recorded. Rules and reasoning only — no template and no script, deliberately |
-| [`skills/`](skills/) | the twelve skills a specialist invokes — this is where most of the workflow lives |
+| [`skills/`](skills/) | the skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
 | [`hooks/`](hooks/) | two read-only SessionStart checks that never block, both belonging to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck` |
 | [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-config` skill |
@@ -53,21 +53,41 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
 
-## The twelve skills
+## The skills
 
-**All of them, deliberately.** This table listed nine under the heading "The nine skills" while the
-directory held twelve — `lock`, `handover` and `prompt` had each arrived without a row, and the count in
-the heading is what made the gap look like a decision. A partial list of an enumerable set is worse than
-none: a reader who finds four of their skills undocumented here cannot tell which of the two documents is
-wrong. `prompt` itself is gone since ([#882](https://github.com/DaveKJohn/claude-code-specialists/issues/882),
-Dave) — the count below has dropped back to twelve for a real reason this time, not a gap.
+**All of them, deliberately — and the heading no longer says how many.** A partial list of an enumerable
+set is worse than none: a reader who finds one of their skills undocumented here cannot tell which of the
+two documents is wrong. It has been wrong three times, and every time a number is what made the gap look
+like a decision:
 
-**It happened again, and the shape is worth naming: dropping the count did not stop the drift, it only
-made it quieter.** `check-branch-entry` shipped without a row and stayed missing until August 21, 2026,
-when `prune-merged` was added and the set was recounted — 13 rows against 14 directories. Nothing here is
-machine-checked: the source repo's own README carries marked skill spans that its lint gate holds to the
-canonical set, and this table carries none, so the only thing keeping it true is that whoever adds a skill
-counts the rows. **Count when you add one.**
+- nine rows under the heading "The nine skills" while the directory held twelve — `lock`, `handover` and
+  `prompt` had each arrived without one (`prompt` itself is gone since
+  [#882](https://github.com/DaveKJohn/claude-code-specialists/issues/882), Dave);
+- thirteen rows against fourteen directories — `check-branch-entry` had shipped without a row and stayed
+  missing until August 21, 2026, when `prune-merged` was added and the set was recounted;
+- fourteen rows against sixteen directories, under a heading still reading twelve — `measure-skill` and
+  `worktree-lane` both absent, repaired here
+  ([#873](https://github.com/DaveKJohn/claude-code-specialists/issues/873), August 26, 2026).
+
+**Dropping the count is the cheaper half of the repair, and it has been tried on its own before — it did
+not stop the drift, it only made it quieter.** So it is gone from the heading and from the layout table
+above, and the reason this table is still not machine-checked is written down here rather than left as a
+risk. The source repo's lint gate does hold marked enumeration spans to the real skill set (`[skill-list]`,
+check 10 of `scripts/lint/check-plugin-integrity.ps1`) — and this table cannot carry one, for two reasons
+that are properties of that check rather than of this document:
+
+- **Its canonical set is repo-wide.** It is built from every published plugin's `skills/`, so it holds a
+  span to *all* the skills the marketplace ships. This table enumerates one plugin's, so a span here would
+  report every team plugin's skills as missing.
+- **Every backtick-quoted token inside a span counts as a claimed name**, so the span has to close around
+  nothing but the names. A two-column table cannot honour that: three rows below carry a backticked path or
+  flag in their second column.
+
+A variant scoped to one plugin, reading each row's **link target** instead of its backticks, would fit both
+constraints; it is filed as
+[#920](https://github.com/DaveKJohn/claude-code-specialists/issues/920) rather than built here. Until it
+exists, the only thing keeping this table true is that whoever adds a skill adds a row. **Count when you
+add one.**
 
 | skill | when |
 |---|---|
@@ -75,6 +95,7 @@ counts the rows. **Count when you add one.**
 | [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
 | [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `contributing-davekjohn/development-cycle.md` in one move |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
+| [`worktree-lane`](skills/worktree-lane/SKILL.md) | one branch has to be built while another one ships — opens a branch in its own worktree, and hands it back when it is ready to ship |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |
 | [`ship-pr`](skills/ship-pr/SKILL.md) | open → wait for CI → merge → fold, in one motion |
 | [`fold-changelog`](skills/fold-changelog/SKILL.md) | the fold on its own, after a merge done by hand |
@@ -85,6 +106,7 @@ counts the rows. **Count when you add one.**
 | [`lock`](skills/lock/SKILL.md) | closing a session — records where the work stands before a context clear |
 | [`handover`](skills/handover/SKILL.md) | opening the next one — reads that record back (named for the file it reads, and to stay out of the built-in `/continue`'s way) |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |
+| [`measure-skill`](skills/measure-skill/SKILL.md) | pricing what a skill costs the sessions that carry it — always-on against on-invoke tokens, the delta against a stored baseline, and the wall-clock of the script behind it |
 
 ## What it expects from your repo — the seam
 
