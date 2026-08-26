@@ -32,6 +32,34 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/intent-placement-in-the-skill-page-v1` · 20260826-163806
+
+The `new-branch` skill page and the DevOps lens now name where `-Intent` actually writes: the opening
+paragraph of `PLAN`, without a heading. Both still described the pre-#908 placement at the top of the
+document. The skill page is the only documentation a consumer has for that parameter, so it also tells
+anyone holding a branch scaffolded before August 26, 2026 what to move and where.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer reading the skill page would have been told to expect the intent somewhere the scaffolder no
+longer writes it, and -- worse -- would have had no way to connect a refused branch document to the
+parameter that caused it. The page now carries both the correct placement and the one-line repair for a
+branch already in flight.
+
+**Score:** 3
+
+#### Pull Request
+
+the new-branch skill page and Derek's lens name the intent's real place
+
+Plugins: contributing-davekjohn
+
+[PR #932](https://github.com/DaveKJohn/claude-code-specialists/pull/932)
+
+---
+
 ### DEPLOY: `fix/refresh-body-drops-the-resolves-block-v1` · 20260826-162404
 
 `open-pr.ps1` now refreshes the PR description **before** it appends the closing block, instead of after
