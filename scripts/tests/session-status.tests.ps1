@@ -151,7 +151,7 @@ function New-Fixture {
                     else { Get-EntryMarker -Tier 1 -Audience 0 }
         Set-Utf8 (Join-Path $dir 'CHANGELOG.md') @(
             '# Changelog', '', 'Intro paragraph.', '',
-            '## `feat/a-branch` changelog', '',
+            (('#' * (Get-EntryHeadingLevel)) + ' `feat/a-branch` changelog'), '',
             $tierZero, '', 'because.', '', "$ScoreLabel 4", '',
             $tierTop, '', 'and it reaches further.', '', "$ScoreLabel 3", ''
         )
@@ -389,7 +389,7 @@ try {
     $na = New-Fixture; $fixtures += $na
     Set-Utf8 (Join-Path $na 'CHANGELOG.md') @(
         '# Changelog', '', 'Intro paragraph.', '',
-        '## `feat/na-branch` changelog', '',
+        (('#' * (Get-EntryHeadingLevel)) + ' `feat/na-branch` changelog'), '',
         (Get-EntryMarker -Tier 0), '', 'because.', '', "$ScoreLabel 2", '',
         (Get-EntryMarker -Tier 2), '', 'and it reaches nobody outside.', '', "$ScoreLabel $NaLabel", ''
     )

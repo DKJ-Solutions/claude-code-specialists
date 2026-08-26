@@ -6,8 +6,8 @@ different readers, and they are sections of one document rather than two files:
 
 | half | subject | who reads it | lifetime |
 |---|---|---|---|
-| `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** | whoever is working on the branch | removed at the merge; never folded |
-| ``## DEPLOY: `<branch>` `` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then removed with the rest |
+| `### PLAN` · `### CREATE` · `### TEST` | what still **must happen** | whoever is working on the branch | removed at the merge; never folded |
+| ``### DEPLOY: `<branch>` `` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then removed with the rest |
 
 It is written by the shared
 [`scripts/task/new-branch.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/task/new-branch.ps1)
@@ -97,15 +97,15 @@ stand.
 
 The document is scaffolded with **PLAN**, **CREATE** and **TEST** as headings, and **DEPLOY** is the fourth
 phase — written by the formatter that owns what goes in it, because that section *is* the changelog entry.
-So a branch moves through a recognisable arc instead of an ad-hoc list. **Four `##` headings, never a
-fifth**: anything else you need is a `###` under one of them. The step half of the gate still reads step
+So a branch moves through a recognisable arc instead of an ad-hoc list. **Four `###` headings, never a
+fifth**: anything else you need is a `####` under one of them. The step half of the gate still reads step
 marks only, so a heading of any level is invisible *to that half* and the arc stays drawn on top of the
 mechanism rather than inside it.
 **A phase with nothing under it is not a finding**: a branch that had nothing to test says so by leaving
 that heading bare, exactly as a branch with no step list at all is permitted.
 
 **Two shape rules, and only one of them is checked in your repo.** `check-branch-entry.ps1` refuses a
-document whose region between the H1 and the first `##` carries anything but the guidance block — that
+document whose region between the title and the first `###` carries anything but the guidance block — that
 one holds **everywhere**, because it reads the shape rather than the text: guidance is blockquoted
 whatever language it has been translated into, so a `>`-less paragraph there is this branch's own content
 sitting where every branch document is identical. The **heading count** is refused only in the repo that
@@ -358,10 +358,10 @@ about is answered before a PR opens.
 ### Four things about this shape, each of which someone has got wrong before
 
 - **The PR line is not yours to write.** The fold fills `### Pull Request` from the merge itself.
-- **Nothing may use `##` inside the section, and `###` only for its named headings.** A `##` becomes a
+- **Nothing may use `###` inside the section, and `####` only for its named headings.** A `###` becomes a
   *separate change* the moment the fold pastes this into `CHANGELOG.md` — one that declares no impact, so it
-  reads as tier 0. A `###` collides with the named headings, truncating whichever one it lands in. Use
-  `####` or bold. Your lint gate checks this where you have one — the source repo's does, reading the DEPLOY
+  reads as tier 0. A `####` collides with the named headings, truncating whichever one it lands in. Use
+  `#####` or bold. Your lint gate checks this where you have one — the source repo's does, reading the DEPLOY
   section out of the document rather than the whole file.
 - **The `###` headings are exact.** They are what the parsers look for; a misspelling means the entry
   silently loses that declaration and the gates read nothing.
@@ -452,10 +452,18 @@ trunk-declaring document is about exactly that case.
 
 **How such a document is told from a written one is the branch NAME, not the heading level**, and that
 changed with the merge. The two files it replaces each opened with an `#` while empty and the entry with an
-`##` once written, so one look at the first line answered it. One document cannot use that test: its `#` is
-its title in both states, and the `##` below it is a section of it. So the test is the name — the trunk's
+`##` once written, so one look at the first line answered it. One document cannot use that test: its `##` is
+its title in both states, and the `###` below it is a section of it. So the test is the name — the trunk's
 while the document is empty, yours once it is not. It used to be what made folding twice impossible; the
 fold removes the file now, so a second run simply finds nothing.
+
+**And on August 26, 2026 that stopped being a preference and became the only test that works.** Both level
+pairs moved one deeper, which put this document's title at the level an entry used to occupy — so the
+level-based test would now read an empty trunk document as a foldable change and hand the fold an empty entry
+to paste in, on the trunk, unprompted. `Test-IsChangelogEntryFile` therefore answers on the declared name
+*before* it looks at any depth: a document naming the trunk is a reset, full stop. The lesson generalises past
+this one function — **the name survives a re-level and the level does not**, so anything load-bearing keys on
+the name.
 
 ## The file is written under you, once per cycle
 

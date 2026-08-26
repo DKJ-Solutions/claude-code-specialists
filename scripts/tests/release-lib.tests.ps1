@@ -142,6 +142,18 @@ function New-FlatEntry {
 $WhatRx = [regex]::Escape((Get-EntrySectionHeadings)['What'])
 $TypeRx = [regex]::Escape((Get-EntrySectionHeadings)['Type'])
 
+# AND SO DO THE LEVELS, for exactly the same reason one paragraph up. The fixture builder has always composed
+# its heading and section levels from the lib; the asserts wrote them out as '##' and '###', so shifting both
+# pairs one level down on August 26, 2026 turned fourteen structural assertions into failures about depth. What
+# each of them is about is the RELATIONSHIP -- an entry's own heading, its sections one under that -- and the
+# absolute number was never the subject. Written as hash runs rather than counts because that is what the
+# asserts splice into regexes.
+$EntryH   = '#' * (Get-EntryHeadingLevel)
+$EntryS   = '#' * (Get-EntrySectionLevel)
+# One level SHALLOWER than an entry: what '## [Unreleased]' occupies, and what an entry written between
+# August 5 and August 26, 2026 carries. Used by the legacy-shape asserts.
+$EntryLeg = '#' * ((Get-EntryHeadingLevel) - 1)
+
 function New-FlatChangelog {
     <# An intro plus the given entry blocks, '---'-separated, as the fold leaves the document. #>
     param([string[]]$Entries, [string]$Intro = '')
@@ -158,8 +170,8 @@ Write-Host "the fixture builder produces what the parsers expect" -ForegroundCol
 # that did not contain what it was written to contain (the em-dash heading split across three lines by
 # the comma operator), and every assert in that section was running against a document nobody wrote.
 $probe = New-FlatEntry -Heading "#99 $midDot A probe" -Rows @('| 2 | 4 | consumers notice |', '| 1 | 3 | colleagues too |') -Pr 99
-Assert-Match $probe '(?m)^## #99 ' 'fixture: the entry heading is an H2'
-Assert-Equal 3 (@([regex]::Matches($probe, '(?m)^### ')).Count) 'fixture: it carries exactly three H3 sections'
+Assert-Match $probe ('(?m)^' + $EntryH + ' #99 ') 'fixture: the entry heading is at the entry level'
+Assert-Equal 3 (@([regex]::Matches($probe, ('(?m)^' + $EntryS + ' '))).Count) 'fixture: it carries exactly three sections at the section level'
 $probeImpact = Resolve-EntryImpact -EntryText $probe
 Assert-Equal $true $probeImpact.Table 'fixture: the impact table is found by the real parser'
 Assert-Equal 2 $probeImpact.Tier 'fixture: and reads back the tier the rows declare'
@@ -202,10 +214,10 @@ Write-Host "Get-EntryHeadingPattern -- the exact level, not a range" -Foreground
 # THE ONE DECISION IN THE PARSER THAT CANNOT BE LOOSENED. An entry carries H3 sections of its own, so a
 # pattern accepting H3 as well reads every entry as four -- in well-formed markdown, with no error.
 $rx = Get-EntryHeadingPattern
-Assert-Equal $true  ('## #22 x' -match $rx) 'the entry level matches'
-Assert-Equal $false ('### What does this change do?' -match $rx) 'an H3 section does NOT match -- otherwise one entry reads as four'
+Assert-Equal $true  (($EntryH + ' #22 x') -match $rx) 'the entry level matches'
+Assert-Equal $false (($EntryS + ' What does this change do?') -match $rx) 'a section-level heading does NOT match -- otherwise one entry reads as four'
 Assert-Equal $false ('# Changelog' -match $rx) 'the document title does not match either'
-Assert-Equal 2 (Get-EntryHeadingLevel) 'the level is 2, read from the format rather than counted here'
+Assert-Equal 3 (Get-EntryHeadingLevel) 'the level is 3, read from the format rather than counted here'
 
 Write-Host "Get-FencedLineFlags -- one owner, reached from here through the lib below" -ForegroundColor Cyan
 # THE FUNCTION MOVED DOWN A LAYER and this whole block is the proof that the move is invisible from here:
@@ -239,18 +251,48 @@ Assert-Equal 1 (@(Get-FencedLineFlags -Lines @('')).Count) 'flags: an empty line
 Write-Host "Split-Changelog -- no sections at all" -ForegroundColor Cyan
 $s = Split-Changelog -Content $sample
 Assert-Equal 3 $s.Entries.Count 'every entry block below the intro is collected'
-Assert-Match $s.Entries[0] '^## #22 ' 'the first entry is the first one in the document'
-Assert-Match $s.Entries[2] '^## #20 ' 'and the last is the last'
+Assert-Match $s.Entries[0] ('^' + $EntryH + ' #22 ') 'the first entry is the first one in the document'
+Assert-Match $s.Entries[2] ('^' + $EntryH + ' #20 ') 'and the last is the last'
 Assert-Equal 'listed in [releases/README.md](releases/README.md).' $s.Head[-1] 'the head stops at the first entry heading, trailing blank stripped'
 Assert-Equal "`n" $s.Nl 'an LF document reports LF'
 Assert-Equal "`r`n" (Split-Changelog -Content ($sample -replace "`n", "`r`n")).Nl 'and a CRLF document reports CRLF'
+
+# --- '## [Unreleased]' IS PART OF THE HEAD, which is what buys the fold and the cut their behaviour for
+#     free (Dave, August 26, 2026). It sits one level shallower than an entry, so this splitter's boundary --
+#     "the first entry heading" -- lands BELOW it without knowing it exists. Two consequences follow, and
+#     both are asserted rather than described: a cut writes the head back, so the pending heading survives
+#     with no entries under it; and a fold inserts at the top of the entry list, which is directly beneath
+#     it. Neither needed a rule of its own, and this is the assert that says so -- if the pending heading
+#     ever drifts to the entry level, the fold starts inserting above it and the cut starts deleting it.
+Write-Host "'## [Unreleased]' sits in the head, not in the entries" -ForegroundColor Cyan
+$pendDoc = New-FlatChangelog -Entries @($e22, $e21) -Intro (
+    @('# Changelog', '', 'An intro.', '', (Get-ChangelogUnreleasedHeading)) -join "`n")
+$pendSplit = Split-Changelog -Content $pendDoc
+Assert-Equal (Get-ChangelogUnreleasedHeading) $pendSplit.Head[-1] 'the pending heading is the LAST line of the head, so a cut that rewrites the head keeps it'
+Assert-Equal 2 $pendSplit.Entries.Count 'and it is not counted as one of the entries'
+Assert-Match $pendSplit.Entries[0] ('^' + $EntryH + ' #22 ') 'the first entry is still the first real entry -- the fold inserts here, directly under the pending heading'
+Assert-Equal ((Get-EntryHeadingLevel) - 1) (Get-ChangelogUnreleasedLevel) 'the pending heading sits exactly one level above an entry -- the property all of the above rests on'
+
+# THE INVARIANT THE WHOLE SHIFT TURNS ON, asserted in the lib that folds and the lib that cuts. DEPLOY is a
+# phase of the cycle document AND the entry pasted into CHANGELOG.md, so the fold is a verbatim paste only
+# while those two levels are one number. Nothing held them together before August 26, 2026 -- they merely
+# happened to agree, so re-levelling either alone would have silently restored per-document re-levelling.
+Assert-Equal (Get-EntryHeadingLevel) (Get-BranchCycleSectionLevel) 'the cycle document DEPLOY phase and a changelog entry sit at ONE level -- what makes the fold a paste rather than a re-level'
+
+# AND THE CUT LEAVES IT STANDING, which is the other half of the same property. Convert-ChangelogForRelease
+# keeps the head and drops every entry, so the pending heading survives with nothing under it -- a fresh
+# empty section rather than a bare intro somebody has to re-add a heading to. Asserted on the function rather
+# than reasoned from the head assert above, because "the head is kept" is the claim that could change.
+$pendReset = Convert-ChangelogForRelease -Content $pendDoc
+Assert-Match $pendReset ('(?m)^' + [regex]::Escape((Get-ChangelogUnreleasedHeading)) + '$') 'a cut leaves a fresh pending heading behind, not a bare intro'
+Assert-NoMatch $pendReset ('(?m)^' + $EntryH + ' #22 ') 'and the entries it released are gone from it'
 # THE SEAM IS GONE, not merely unused: there is no map left to ask which headings count.
 Assert-NoParameter -Command 'Split-Changelog' -Names @('TierSections', 'FallbackHeading', 'TierHeadings')
 Assert-Equal $null (Get-Command 'Resolve-ChangelogTierSections' -ErrorAction SilentlyContinue) 'Resolve-ChangelogTierSections is retired with the sections it resolved'
 
 # AN ENTRY'S OWN SECTIONS STAY INSIDE IT. This is the assert that catches "one entry rendering as
 # four", which is well-formed markdown and therefore invisible to an eye.
-Assert-Equal 3 (@([regex]::Matches($s.Entries[0], '(?m)^### ')).Count) "the entry keeps its three H3 sections rather than being split at them"
+Assert-Equal 3 (@([regex]::Matches($s.Entries[0], ('(?m)^' + $EntryS + ' '))).Count) "the entry keeps its three sections at the section level rather than being split at them"
 Assert-Match $s.Entries[0] '(?m)^\[PR #22\]' 'and its PR footer'
 Assert-Match $s.Entries[0] '(?m)^Plugins: team-alpha$' 'and its Plugins line'
 # The '---' separators between entries are structure, not content.
@@ -258,8 +300,8 @@ Assert-NoMatch $s.Entries[0] '(?m)^---\s*$' 'the separator between entries is no
 
 # A PRE-FORMAT H3 ENTRY IS NOT A BOUNDARY, and that is exactly why the fold promotes one to H2 before
 # pasting it in: left at H3 it is absorbed into the entry above and inherits that entry's PR link.
-$withH3 = New-FlatChangelog -Entries @($e22 + "`n`n### #7 $midDot An older entry $midDot Fix $midDot 2026-01-01`n`nBody seven.")
-Assert-Equal 1 (Split-Changelog -Content $withH3).Entries.Count 'an H3 entry heading is absorbed, not counted -- the reason the fold promotes it'
+$withH3 = New-FlatChangelog -Entries @($e22 + "`n`n$EntryS #7 $midDot An older entry $midDot Fix $midDot 2026-01-01`n`nBody seven.")
+Assert-Equal 1 (Split-Changelog -Content $withH3).Entries.Count 'a heading deeper than the entry level is absorbed, not counted -- the reason the fold promotes it'
 
 Write-Host "Split-Changelog -- fenced code is not structure" -ForegroundColor Cyan
 # TWO PLACES IT MATTERS, and the first is new with the flat model: the INTRO. This repo's own changelog
@@ -273,7 +315,7 @@ $introQuotes = @(
 ) -join "`n"
 $fencedIntro = Split-Changelog -Content (New-FlatChangelog -Entries @($e21) -Intro $introQuotes)
 Assert-Equal 1 $fencedIntro.Entries.Count 'an intro that quotes an entry heading in a fence does not move the boundary'
-Assert-Match $fencedIntro.Entries[0] '^## #21 ' 'the real first entry is still the first entry'
+Assert-Match $fencedIntro.Entries[0] ('^' + $EntryH + ' #21 ') 'the real first entry is still the first entry'
 Assert-Match (($fencedIntro.Head -join "`n")) '(?m)^## #1 ' 'and the quoted heading stayed in the head, inside its fence'
 
 # And the second: an entry body that quotes a heading -- the v2.13.3 defect, at the new level. Also
@@ -285,11 +327,11 @@ $quoted = @(
 $e11 = New-FlatEntry -Heading "#11 $midDot Real entry" -Rows @('| 1 | 2 | fine |') -Pr 11 -ExtraBody $quoted
 $fencedDoc = Split-Changelog -Content (New-FlatChangelog -Entries @($e11, $e21))
 Assert-Equal 2 $fencedDoc.Entries.Count 'fenced: two entries, not three -- the quoted heading is not a new entry'
-Assert-Match $fencedDoc.Entries[0] '^## #11 ' 'fenced: the first entry is the real one'
+Assert-Match $fencedDoc.Entries[0] ('^' + $EntryH + ' #11 ') 'fenced: the first entry is the real one'
 Assert-Match $fencedDoc.Entries[0] '## #99' 'fenced: the quoted heading is KEPT inside the entry body'
 Assert-Match $fencedDoc.Entries[0] '(?m)^id: 1$' 'fenced: a --- inside the fence does not strip the lines after it'
 Assert-Equal 2 (@([regex]::Matches($fencedDoc.Entries[0], '(?m)^```')).Count) 'fenced: the fence survives intact (both markers present)'
-Assert-Match $fencedDoc.Entries[1] '^## #21 ' 'fenced: the second entry is the next real one'
+Assert-Match $fencedDoc.Entries[1] ('^' + $EntryH + ' #21 ') 'fenced: the second entry is the next real one'
 
 Write-Host "Split-Changelog -- nothing to release" -ForegroundColor Cyan
 # THIS REPLACES TWO RETIRED REFUSALS ("could not find the heading" and "this repo declares no section
@@ -299,7 +341,7 @@ Assert-Throws { Split-Changelog -Content "# Changelog`n`nOnly an intro, nothing 
 $emptyErr = ''
 try { Split-Changelog -Content "# Changelog`n`nNothing.`n" } catch { $emptyErr = $_.Exception.Message }
 Assert-Match $emptyErr 'nothing to release' 'and the message says what is wrong rather than naming a heading'
-Assert-Match $emptyErr 'H2' 'and states where an entry is expected'
+Assert-Match $emptyErr ('H' + (Get-EntryHeadingLevel)) 'and states where an entry is expected'
 
 Write-Host "Split-Changelog -- a leftover section heading is refused, not released" -ForegroundColor Cyan
 # THE CONSUMER DEFECT THIS GUARDS, measured on both pre-flat shapes before the guard existed. Every '## '
@@ -321,7 +363,7 @@ $legacySingle = @(
 ) -join "`n"
 $legacyErr = ''
 try { Split-Changelog -Content $legacySingle } catch { $legacyErr = $_.Exception.Message }
-Assert-Match $legacyErr 'declare neither' 'a pre-flat single-section document is refused rather than parsed'
+Assert-Match $legacyErr 'are neither an entry nor the pending section' 'a pre-flat single-section document is refused rather than parsed'
 Assert-Match $legacyErr ([regex]::Escape("'## Pull Requests'")) 'and the refusal names the offending block'
 Assert-Match $legacyErr ([regex]::Escape("'## Releases'")) 'including the release history, which the cut would have deleted'
 Assert-Match $legacyErr 'Migrate the document first' 'and says what to do about it'
@@ -335,7 +377,7 @@ Assert-Throws { Split-Changelog -Content $legacyTiers } 'a document still carryi
 # BOTH LEGITIMATE SHAPES STILL PASS, which is what makes the discriminator exact rather than a heuristic.
 Assert-Equal 3 (Split-Changelog -Content $sample).Entries.Count 'the current format passes: the three named sections are the declaration'
 $preFormatDoc = New-FlatChangelog -Entries @(
-    "## #99 $midDot An entry from before the format $midDot Fix $midDot 2026-08-01`n`nBody prose, no named sections.")
+    "$EntryH #99 $midDot An entry from before the format $midDot Fix $midDot 2026-08-01`n`nBody prose, no named sections.")
 Assert-Equal 1 (Split-Changelog -Content $preFormatDoc).Entries.Count 'a pre-format entry passes: it declares its type in its heading'
 # AND IT IS NOT KEYED ON THE '#NN', deliberately: the fold cannot reach gh on a manual merge and then writes
 # a legitimate entry with no number, saying so on the console. A gate keying on the number would report the
@@ -354,7 +396,7 @@ Assert-Equal $false (Test-EntryDeclaresShape -EntryText "## Pull Requests`n`nThe
 Write-Host "Get-PullRequestEntries -- document order IS the fold's ranking" -ForegroundColor Cyan
 $entries = @(Get-PullRequestEntries -Content $sample)
 Assert-Equal 3 $entries.Count 'three entries extracted'
-Assert-Match $entries[0] '^## #22 ' 'first entry first'
+Assert-Match $entries[0] ('^' + $EntryH + ' #22 ') 'first entry first'
 Assert-Match $entries[0] '\[PR #22\]' 'first entry contains the PR link'
 # THE FUNCTION MUST NOT SORT, and this is the assert that says so. The fold placed each entry at its
 # ranked position when it landed -- the cut empties the list, so document order at cut time is what the
@@ -362,7 +404,7 @@ Assert-Match $entries[0] '\[PR #22\]' 'first entry contains the PR link'
 # numbers, and PowerShell's Sort-Object is not stable, so it could differ from the published one.
 $outOfOrder = New-FlatChangelog -Entries @($e20, $e22)   # tier 0 first, tier 2 second
 $keptOrder = @(Get-PullRequestEntries -Content $outOfOrder)
-Assert-Match $keptOrder[0] '^## #20 ' 'a lower-ranked entry sitting first STAYS first -- the parser does not re-rank'
+Assert-Match $keptOrder[0] ('^' + $EntryH + ' #20 ') 'a lower-ranked entry sitting first STAYS first -- the parser does not re-rank'
 
 Write-Host "Get-PullRequestEntriesByTier -- the tier comes from the entry" -ForegroundColor Cyan
 # THE REVERSAL THIS CHANGE IS ABOUT. This function's own header used to say deriving the tier from the
@@ -373,13 +415,13 @@ Assert-Equal 3 $byTier.Count 'one group per tier present'
 Assert-Equal 2 $byTier[0].Tier 'highest tier first'
 Assert-Equal 'Tier 2 - consumers' $byTier[0].Heading 'the group carries the heading a release document gives it'
 Assert-Equal 1 $byTier[0].Entries.Count 'tier 2 holds the entry that claimed it'
-Assert-Match $byTier[0].Entries[0] '^## #22 ' 'and it is the right one'
+Assert-Match $byTier[0].Entries[0] ('^' + $EntryH + ' #22 ') 'and it is the right one'
 Assert-Equal 1 $byTier[1].Tier 'tier 1 second'
 Assert-Equal 0 $byTier[2].Tier 'tier 0 last'
 # GROUPED ON THE HIGHEST TIER CLAIMED, so the groups stay DISJOINT. #22 declares tier 2 AND tier 1; it
 # belongs to the tier-2 group only, or the record would hold it twice.
 Assert-Equal 1 $byTier[1].Entries.Count 'the entry claiming both tiers appears ONCE, in its highest group'
-Assert-Match $byTier[1].Entries[0] '^## #21 ' 'so tier 1 holds only the entry whose highest claim is tier 1'
+Assert-Match $byTier[1].Entries[0] ('^' + $EntryH + ' #21 ') 'so tier 1 holds only the entry whose highest claim is tier 1'
 Assert-Equal 3 (@($byTier | ForEach-Object { $_.Entries }).Count) 'every entry is in exactly one group'
 
 Write-Host "Get-PullRequestEntriesByTier -- Declared is a measurement, not bookkeeping" -ForegroundColor Cyan
@@ -440,18 +482,31 @@ Assert-Equal (Get-TrailingBlanks $cut1) (Get-TrailingBlanks $cut2) 'blank lines:
 Assert-Equal 1 (Get-TrailingBlanks $cut1) 'blank lines: and that gap is a single closing newline'
 
 Write-Host "Set-EntryHeadingLevel -- the whole block shifts, not the first line" -ForegroundColor Cyan
-# THE DEFECT THIS EXISTS FOR: re-levelling only the entry heading leaves its three H3 sections at the
+# THE TWO LEVELS THIS BLOCK SHIFTS BETWEEN ARE COMPOSED, NOT TYPED, for the reason given at the $EntryH
+# definition above. They were the literals 2 and 3 until August 26, 2026, and when both pairs moved one
+# level down that cost more than four red asserts: with an entry ALREADY at the level these calls asked
+# for, the shift became a no-op and three of them went GREEN while testing nothing. 'A canonical block
+# still renders deeper' passed on a block that had not moved. A literal here does not merely go stale --
+# it goes stale in the direction that hides itself.
+$CanonL = Get-EntryHeadingLevel
+$DeepL  = $CanonL + 1
+$DeepH  = '#' * $DeepL
+$DeepS  = '#' * ($DeepL + 1)
+# THE DEFECT THIS EXISTS FOR: re-levelling only the entry heading leaves its sections at the
 # level of the entry ABOVE them -- one entry rendering as four, in markdown no parser complains about.
-$shifted = Set-EntryHeadingLevel -EntryText $e22 -EntryLevel 3
-Assert-Match $shifted '^### #22 ' 'the entry heading lands at the requested level'
-Assert-Equal 3 (@([regex]::Matches($shifted, '(?m)^#### ')).Count) 'and its three sections moved with it, to one level below'
-Assert-NoMatch $shifted ('(?m)^### ' + $WhatRx) 'no section is left at the entry level'
-# SHIFTED BY A DELTA, so structure inside the entry survives whatever it is.
-$withSub = New-FlatEntry -Heading "#50 $midDot Nested" -ExtraBody "#### A sub-heading in the body"
-$deep = Set-EntryHeadingLevel -EntryText $withSub -EntryLevel 3
-Assert-Match $deep '(?m)^##### A sub-heading in the body$' 'an H4 in a body keeps its relative depth'
+$shifted = Set-EntryHeadingLevel -EntryText $e22 -EntryLevel $DeepL
+Assert-Match $shifted ('^' + $DeepH + ' #22 ') 'the entry heading lands at the requested level'
+Assert-Equal 3 (@([regex]::Matches($shifted, '(?m)^' + $DeepS + ' ')).Count) 'and its three sections moved with it, to one level below'
+Assert-NoMatch $shifted ('(?m)^' + $DeepH + ' ' + $WhatRx) 'no section is left at the entry level'
+# SHIFTED BY A DELTA, so structure inside the entry survives whatever it is. This one shifts SHALLOWER on
+# purpose: the body sub-heading sits one below the section level, and with the canonical entry now at H3
+# a deeper shift would land it on H6 -- exactly where the clamp two blocks down also puts it, so the
+# assert could no longer tell a working delta from a clamped one.
+$withSub = New-FlatEntry -Heading "#50 $midDot Nested" -ExtraBody (('#' * ((Get-EntrySectionLevel) + 1)) + ' A sub-heading in the body')
+$deep = Set-EntryHeadingLevel -EntryText $withSub -EntryLevel ($CanonL - 1)
+Assert-Match $deep ('(?m)^' + ('#' * (Get-EntrySectionLevel)) + ' A sub-heading in the body$') 'a sub-heading in a body keeps its relative depth'
 # A delta of 0 changes nothing but the newline style.
-Assert-Equal ($e22 -replace "`r`n", "`n") (Set-EntryHeadingLevel -EntryText $e22 -EntryLevel 2) 'a delta of 0 returns the block unchanged'
+Assert-Equal ($e22 -replace "`r`n", "`n") (Set-EntryHeadingLevel -EntryText $e22 -EntryLevel $CanonL) 'a delta of 0 returns the block unchanged'
 # THE DELTA IS MEASURED FROM THE BLOCK, NOT ASSUMED TO BE CANONICAL. It used to be computed as
 # '$EntryLevel - Get-EntryHeadingLevel', which is the shift a block ALREADY at the canonical level needs --
 # true of every caller in this file, since they read entries straight out of CHANGELOG.md, and false for
@@ -459,18 +514,19 @@ Assert-Equal ($e22 -replace "`r`n", "`n") (Set-EntryHeadingLevel -EntryText $e22
 # computed a delta of ZERO and returned it untouched, silently: measured on new-internal-note.ps1, where
 # every bullet came out without its type because the sections of the block handed to Resolve-EntryType were
 # still one level below where that reader looks.
-$deeper = Set-EntryHeadingLevel -EntryText $e22 -EntryLevel 3     # canonical -> deeper, as a renderer does
-Assert-Match $deeper '(?m)^### #22 ' 'a canonical block still renders deeper'
-$backAgain = Set-EntryHeadingLevel -EntryText $deeper -EntryLevel 2
-Assert-Match $backAgain '(?m)^## #22 ' 'and a DEEPER block normalises back to canonical -- the case that silently did nothing'
-Assert-Equal 3 (@([regex]::Matches($backAgain, '(?m)^### ')).Count) 'with its three sections coming back with it'
+$deeper = Set-EntryHeadingLevel -EntryText $e22 -EntryLevel $DeepL     # canonical -> deeper, as a renderer does
+Assert-Match $deeper ('(?m)^' + $DeepH + ' #22 ') 'a canonical block still renders deeper'
+$backAgain = Set-EntryHeadingLevel -EntryText $deeper -EntryLevel $CanonL
+Assert-Match $backAgain ('(?m)^' + $EntryH + ' #22 ') 'and a DEEPER block normalises back to canonical -- the case that silently did nothing'
+Assert-Equal 3 (@([regex]::Matches($backAgain, '(?m)^' + $EntryS + ' ')).Count) 'with its three sections coming back with it'
 Assert-Equal ($e22 -replace "`r`n", "`n") $backAgain 'the round trip is lossless, which is what makes the reader downstream able to trust it'
 # A block with no heading at all has nothing to measure from: returned normalised, not guessed at.
 Assert-Equal "Just prose.`n`nMore prose." (Set-EntryHeadingLevel -EntryText "Just prose.`r`n`r`nMore prose." -EntryLevel 4) 'a block with no heading is left alone apart from the newline normalisation'
-Assert-NoMatch (Set-EntryHeadingLevel -EntryText ($e22 -replace "`n", "`r`n") -EntryLevel 2) "`r" 'and normalizes CRLF to LF either way'
+Assert-NoMatch (Set-EntryHeadingLevel -EntryText ($e22 -replace "`n", "`r`n") -EntryLevel $CanonL) "`r" 'and normalizes CRLF to LF either way'
 # FENCE-AWARE: an entry documenting the entry format quotes these headings, and shifting a quoted one
-# corrupts the example.
-$shiftedQuote = Set-EntryHeadingLevel -EntryText $e11 -EntryLevel 3
+# corrupts the example. The '##' below stays a literal deliberately: it is the arbitrary text the fixture
+# quotes inside its fence, not a level this format owns, so it must come back out exactly as it went in.
+$shiftedQuote = Set-EntryHeadingLevel -EntryText $e11 -EntryLevel $DeepL
 Assert-Match $shiftedQuote '(?m)^## #99 ' 'a heading quoted inside a fence is NOT shifted'
 # CLAMPED AT H6, which markdown has no level beyond: the line stays a heading rather than becoming
 # literal '#######' text.
@@ -691,8 +747,8 @@ Write-Host "Convert-EntryHeadingToTitle (the metadata a stakeholder does not hav
 # That case USED TO RETURN THE HEADING UNCHANGED -- the guard asked whether any TRAILING field had been
 # dropped, which is a different question from whether anything had -- so the consumer document, whose
 # whole reason for calling this is that its reader has no PR numbers, kept every one of them.
-Assert-Equal '## Consumer feature' ((Convert-EntryHeadingToTitle -EntryText $e22) -split "`n")[0] 'the leading #NN is dropped even with no trailing field -- the current shape'
-Assert-Match (Convert-EntryHeadingToTitle -EntryText $e22) ('(?m)^### ' + $WhatRx + '$') 'and the body is untouched'
+Assert-Equal ($EntryH + ' Consumer feature') ((Convert-EntryHeadingToTitle -EntryText $e22) -split "`n")[0] 'the leading #NN is dropped even with no trailing field -- the current shape'
+Assert-Match (Convert-EntryHeadingToTitle -EntryText $e22) ('(?m)^' + $EntryS + ' ' + $WhatRx + '$') 'and the body is untouched'
 $hIn = "### #426 $midDot Some title $midDot Feat $midDot 2026-08-03`n`nBody stays.`n`nAnd a second paragraph."
 $hOut = Convert-EntryHeadingToTitle -EntryText $hIn
 Assert-Equal '### Some title' (($hOut -split "`n")[0]) 'the fully-dated historical shape reduces to the bare title'

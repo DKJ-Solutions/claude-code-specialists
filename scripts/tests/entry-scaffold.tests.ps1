@@ -80,6 +80,20 @@ Remove-Item Function:\Get-EntryBodyHeading
 # --- 2. Get-EntryScaffoldFindings: the pure matcher -----------------------------------------------
 Write-Host "Get-EntryScaffoldFindings (the matcher)" -ForegroundColor Cyan
 $midDot = [char]0x00B7
+
+# THE FORMAT'S LEVELS COME FROM THE LIB, and they are declared HERE -- at the top, before the first fixture --
+# because a fixture further down the file cannot use a variable defined below it. That is not a style point:
+# the tilde-fence and fenced-insert fixtures sit above where these used to live, kept their literal '##' when
+# everything else was composed, and were the last four failures of the shift on August 26, 2026.
+#
+# A document's SHAPE depends on the relationships, not the numbers: the pending heading is one level shallower
+# than an entry, an entry one shallower than its sections, and a tier sub-heading follows the section level.
+# Writing any of them out makes this file a second declaration of the format, free to drift from the one the
+# functions under test read.
+$entryH = '#' * (Get-EntryHeadingLevel)
+$sectH  = '#' * (Get-EntrySectionLevel)
+$tierH  = '#' * (Get-EntryTierSubLevel)
+$pendH  = Get-ChangelogUnreleasedHeading
 $wording = Get-EntryScaffoldWording
 
 $written = "### A real title $midDot Feat $midDot 2026-08-03`n`nThis entry says what the change does.`n"
@@ -655,7 +669,7 @@ Assert-True ((Remove-EntryImpactTable -EntryText $tildeEntry) -match 'quoted') '
 # And the ranker, which is where a fence-blind read cost an ordering (PR #478).
 $tildeList = @(
     '', 'Intro.', '',
-    '## #20 Tier 2, quoting the format in tilde fences', '',
+    "$entryH #20 Tier 2, quoting the format in tilde fences", '',
     '~~~text', '## #19 A quoted heading', '', '| Tier | Significance | Why |', '|---|---|---|', '| 0 | - | - |', '~~~', '',
     '### Who is this for', '', '| Tier | Significance | Why |', '|---|---|---|', '| 2 | 4 | consumers notice |', '',
     '---', '',
@@ -663,7 +677,7 @@ $tildeList = @(
 ) -join "`n"
 $tildeOff = Get-EntryInsertOffset -SectionText $tildeList -Tier 1 -Score 3
 $tildeTop = ((($tildeList.Substring($tildeOff)) -split "`r?`n")[0]).Trim()
-Assert-Equal '## #20 Tier 2, quoting the format in tilde fences' $tildeTop 'tilde: the insert lands on the real first entry'
+Assert-Equal "$entryH #20 Tier 2, quoting the format in tilde fences" $tildeTop 'tilde: the insert lands on the real first entry'
 Assert-True ($tildeTop -ne '## #19 A quoted heading') 'tilde: a heading quoted in a ~~~ fence is not an entry boundary either'
 
 # THE SECOND DEFINITION IS GONE. Asserted on absence, like the retired renderers in release-lib's suite:
@@ -714,8 +728,18 @@ Assert-True ($foldText -match 'Get-PreFlatChangelogRefusal') 'and it reads the s
 # THE MEASURED DEFECT. A consumer on the pre-flat shape had their entry folded ABOVE '## Pull Requests'
 # with exit 0 and no warning, because the fold read the first '## ' as the top of the list. cut-release
 # refused over the identical assumption; the text is shared now so the two cannot drift.
-$flatDoc = "# Changelog`n`nIntro.`n`n## A real change`n`n### What does this change do?`n`nBody.`n"
-Assert-Equal '' (Get-PreFlatChangelogRefusal -Content $flatDoc -Consequence 'x') 'pre-flat: a flat document produces no refusal'
+$flatDoc = "# Changelog`n`nIntro.`n`n$pendH`n`n$entryH A real change`n`n$sectH What does this change do?`n`nBody.`n"
+Assert-Equal '' (Get-PreFlatChangelogRefusal -Content $flatDoc -Consequence 'x') 'pre-flat: a current document produces no refusal'
+# AND THE SHAPE THIS ONE REPLACED IS NOW REFUSED, which is the point of the shift rather than a side effect
+# (August 26, 2026). Entries used to sit at the level the pending heading now occupies, so a document still in
+# that shape has its entries read as part of the intro: invisible to the entry loop, preserved by every cut,
+# and the document parses as holding nothing to release. Silent, and it would empty a consumer's changelog --
+# so the head is scanned and the refusal names the way out.
+$priorFlat = "# Changelog`n`nIntro.`n`n" + ('#' * (Get-ChangelogUnreleasedLevel)) +
+             " A real change`n`n$entryH What does this change do?`n`nBody.`n"
+$priorRef = Get-PreFlatChangelogRefusal -Content $priorFlat -Consequence 'x'
+Assert-True ($priorRef -ne '') 'pre-flat: the shape written before the shift IS refused rather than silently emptied'
+Assert-True ($priorRef -match [regex]::Escape($pendH)) 'pre-flat: and the refusal names the pending heading the document is missing'
 Assert-Equal '' (Get-PreFlatChangelogRefusal -Content "# Changelog`n`nIntro only.`n" -Consequence 'x') 'pre-flat: a document with NO entries yields nothing -- there is no block to misread'
 Assert-Equal '' (Get-PreFlatChangelogRefusal -Content '' -Consequence 'x') 'pre-flat: and an empty document does not throw'
 # The consumer's actual document: both section headings, a real pre-format entry filed under the first.
@@ -725,29 +749,35 @@ $refusal = Get-PreFlatChangelogRefusal -Content $preFlatDoc -Consequence 'THE CA
 Assert-True ($refusal -ne '') 'pre-flat: the pre-flat shape IS refused'
 Assert-True ($refusal -match "'## Pull Requests'") 'pre-flat: the offending block is named'
 Assert-True ($refusal -match "'## Releases'") 'pre-flat: and so is the second -- both, or a reader migrates half a document'
-Assert-True ($refusal -match '2 H2 block') 'pre-flat: the COUNT is stated, which is the number the consumer saw go wrong'
+Assert-True ($refusal -match '2 heading') 'pre-flat: the COUNT is stated, which is the number the consumer saw go wrong'
 Assert-True ($refusal -match 'THE CALLER SAYS THIS') 'pre-flat: the caller''s consequence clause is spliced in -- the one part that differs between the cut and the fold'
 Assert-True ($refusal -match 'Migrate the document first') 'pre-flat: the way out is in the message, not only the diagnosis'
 # THE PRE-FORMAT ENTRY UNDER THAT HEADING IS NOT ACCUSED. It declares its type in its heading, which is a
 # legitimate shape -- so a refusal counting it would tell a consumer to migrate an entry that is already fine.
 Assert-True ($refusal -notmatch 'An older change') 'pre-flat: a pre-format entry is not one of the findings'
 # Fence-aware, like every reader here: a document DESCRIBING the pre-flat shape is not in it.
-$quotedDoc = "# Changelog`n`nThe old shape was:`n`n" + '```text' + "`n## Pull Requests`n" + '```' + "`n`n## A real change`n`n### What does this change do?`n`nBody.`n"
+$quotedDoc = "# Changelog`n`nThe old shape was:`n`n" + '```text' + "`n$pendH`n## Pull Requests`n" + '```' + "`n`n$pendH`n`n$entryH A real change`n`n$sectH What does this change do?`n`nBody.`n"
 Assert-Equal '' (Get-PreFlatChangelogRefusal -Content $quotedDoc -Consequence 'x') 'pre-flat: a section heading quoted in a fence is not a section heading'
 # Get-ChangelogEntryBlocks, the boundary reader underneath it -- the intro is dropped, the entries are not.
 $blocks = @(Get-ChangelogEntryBlocks -Content $flatDoc)
 Assert-Equal 1 $blocks.Count 'blocks: the intro is not one of them'
-Assert-True ($blocks[0].StartsWith('## A real change')) 'blocks: and the block starts at the entry heading'
+Assert-True ($blocks[0].StartsWith("$entryH A real change")) 'blocks: and the block starts at the entry heading'
 Assert-Equal 0 @(Get-ChangelogEntryBlocks -Content "# Changelog`n`nIntro only.`n").Count 'blocks: a document with no entry yields an empty array rather than the intro'
 
 # --- The insert offset ----------------------------------------------------------------------------
-# ENTRIES ARE H2 HERE, matching the flat list the fold writes since August 5, 2026 -- and this fixture is
-# where that mattered first: the function's $EntryPattern default moved from '### ' to '## ', so a fixture
-# left at H3 stopped having any entry boundaries at all and every offset silently became "the end". Four
-# asserts went red at once, which is the loud version of a failure that in the real document would have been
-# one entry quietly appended at the bottom.
-$section = "`nIntro.`n`n## #10 Top`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 5 | big |`n`n---`n`n" +
-           "## #11 Mid`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | ok |`n`n---`n`n"
+# ENTRIES SIT AT THE ENTRY LEVEL HERE, and this fixture is where that has now mattered TWICE. First on
+# August 5, 2026: the function's $EntryPattern default moved from '### ' to '## ', so a fixture left at H3
+# stopped having any entry boundaries at all and every offset silently became "the end". Four asserts went red
+# at once, which is the loud version of a failure that in the real document would have been one entry quietly
+# appended at the bottom.
+#
+# AND AGAIN ON AUGUST 26, 2026, in exactly the same shape, because the fixture was repaired by typing '##'
+# rather than by composing the level. When the pair shifted to H3 these eleven asserts went red for the
+# identical reason -- and the default that moved under them was itself a literal, which is why it is now
+# resolved from Get-EntryHeadingLevel in the function body. Composed here for the same reason: a fixture that
+# states the format is a second definition of it, and this one has been wrong twice.
+$section = "`nIntro.`n`n$entryH #10 Top`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 5 | big |`n`n---`n`n" +
+           "$entryH #11 Mid`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | ok |`n`n---`n`n"
 function Get-InsertLabel {
     param([int]$Score, [int]$Tier = 1)
     $off = Get-EntryInsertOffset -SectionText $section -Score $Score -Tier $Tier
@@ -767,7 +797,7 @@ foreach ($case in @(
     @{ Score = 5; Tier = 0; What = 'tier 0 on the highest score, which used to sink below tier 1' }
     @{ Score = 0; Tier = 0; What = 'a tier-0 entry declaring nothing' }
 )) {
-    Assert-Equal '## #10 Top' (Get-InsertLabel -Score $case.Score -Tier $case.Tier) `
+    Assert-Equal "$entryH #10 Top" (Get-InsertLabel -Score $case.Score -Tier $case.Tier) `
         "insert: $($case.What) still lands at the top -- the list is a record, not a ranking"
 }
 # AND THE SIGNIFICANCE IS STILL READ, somewhere else, which is what makes ignoring it here safe rather than
@@ -800,7 +830,7 @@ Assert-Equal $emptySection.Length (Get-EntryInsertOffset -SectionText $emptySect
 # order is what the release documents inherit.
 $fencedList = @(
     '', 'Intro.', '',
-    '## #20 Real, tier 2, and it documents the format', '',
+    "$entryH #20 Real, tier 2, and it documents the format", '',
     'The shape is:', '',
     '```text',
     '## #19 A quoted heading',
@@ -826,8 +856,8 @@ function Get-FencedInsertLabel {
 # quotes a heading. With every entry landing at the top, that reasoning is gone and the danger is not: the
 # top must be the REAL first entry, never the heading quoted inside the fence three lines into it. A
 # fence-blind reader would still find a boundary there and split somebody's fenced block down the middle.
-Assert-Equal '## #20 Real, tier 2, and it documents the format' (Get-FencedInsertLabel -Score 3 -Tier 1) 'insert/fenced: the top is the real first entry'
-Assert-Equal '## #20 Real, tier 2, and it documents the format' (Get-FencedInsertLabel -Score 5 -Tier 2) 'insert/fenced: and the rank does not move it'
+Assert-Equal "$entryH #20 Real, tier 2, and it documents the format" (Get-FencedInsertLabel -Score 3 -Tier 1) 'insert/fenced: the top is the real first entry'
+Assert-Equal "$entryH #20 Real, tier 2, and it documents the format" (Get-FencedInsertLabel -Score 5 -Tier 2) 'insert/fenced: and the rank does not move it'
 # THE ONE THAT NAMES THE DEFECT DIRECTLY: never the quoted heading. This is what the old rank-based assert
 # was really protecting, said without going through the ranking.
 Assert-True ((Get-FencedInsertLabel -Score 3 -Tier 1) -ne '## #19 A quoted heading') 'insert/fenced: and never the heading quoted inside the fence'
@@ -839,7 +869,7 @@ Assert-Equal 2 $blockImpact.Tier 'insert/fenced: the entry reads as tier 2 from 
 # be shifted by one byte per line. Asserted by the resulting label rather than the number.
 $crlfList = $fencedList -replace "`n", "`r`n"
 $crlfOff = Get-EntryInsertOffset -SectionText $crlfList -Score 3 -Tier 1
-Assert-Equal '## #20 Real, tier 2, and it documents the format' ((($crlfList.Substring($crlfOff)) -split "`r?`n")[0]).Trim() 'insert/fenced: a CRLF document lands in the same place -- the offsets keep step with the lines'
+Assert-Equal "$entryH #20 Real, tier 2, and it documents the format" ((($crlfList.Substring($crlfOff)) -split "`r?`n")[0]).Trim() 'insert/fenced: a CRLF document lands in the same place -- the offsets keep step with the lines'
 
 # --- The rubric -----------------------------------------------------------------------------------
 $rubric = @(Get-EntrySignificanceRubric)
@@ -890,8 +920,8 @@ $sigRows = @(
 $sigText = (Format-EntrySignificanceSections -Rows $sigRows) -join "`n"
 # LOWEST FIRST, which is the opposite of the table. These sections are walked by a person filling them in,
 # and that walk starts at tier 0 -- each answer decides whether there is a next one.
-Assert-True ($sigText.IndexOf('#### Tier 0') -lt $sigText.IndexOf('#### Tier 1')) 'sections: tier 0 comes first, because that is the order they are filled in'
-Assert-True ($sigText.IndexOf('#### Tier 1') -lt $sigText.IndexOf('#### Tier 2')) 'sections: and tier 1 before tier 2'
+Assert-True ($sigText.IndexOf(("$tierH Tier 0")) -lt $sigText.IndexOf(("$tierH Tier 1"))) 'sections: tier 0 comes first, because that is the order they are filled in'
+Assert-True ($sigText.IndexOf(("$tierH Tier 1")) -lt $sigText.IndexOf(("$tierH Tier 2"))) 'sections: and tier 1 before tier 2'
 Assert-True ($sigText -match ('(?m)^' + [regex]::Escape((Get-EntryScoreLabel)) + ' 5$')) 'sections: the score is its own line, echoing the retired Tier: line'
 # THE ROUTING QUESTIONS BELONG TO THE TEMPLATE NOW (Dave, August 7, 2026). They are comments, and the file
 # a branch gets carries none -- so the claim they were written for moved with them: it is the reference
@@ -918,9 +948,9 @@ $sigScaffold = (Format-EntrySignificanceSections) -join "`n"
 # consumer" from "nobody got to tier 2 yet". Each tier is answered now: a score, or 'N/A' with a line
 # saying why.
 foreach ($t in 0..(Get-EntryTierMax)) {
-    Assert-True ($sigScaffold -match ('(?m)^#### Tier ' + $t + '$')) "scaffold: tier $t has a section of its own"
+    Assert-True ($sigScaffold -match (('(?m)^' + $tierH + ' Tier ') + $t + '$')) "scaffold: tier $t has a section of its own"
 }
-Assert-Equal 3 (@([regex]::Matches($sigScaffold, '(?m)^#### Tier \d+$')).Count) 'scaffold: exactly the three the model has, no more'
+Assert-Equal 3 (@([regex]::Matches($sigScaffold, ('(?m)^' + $tierH + ' Tier \d+$'))).Count) 'scaffold: exactly the three the model has, no more'
 Assert-True ($sigScaffold -match ('(?m)^' + [regex]::Escape((Get-EntryScoreLabel)) + '\s*$')) 'scaffold: the score is a question left standing, not a number nobody chose'
 # BOTH DECORATIONS READ BACK, one is written. Every entry in CHANGELOG.md carries the plain 'Score:'.
 Assert-True ([regex]::IsMatch('**Score:** 4', (Get-EntryScorePattern))) 'the bold form is read'
@@ -950,9 +980,9 @@ Write-Host "'N/A' is a tier declaring it reaches nobody" -ForegroundColor Cyan
 # PRESENCE says nothing about reach -- the answer inside does. Counting a section rather than its answer
 # would file every entry as tier 2 and publish repo-internal work to consumers.
 $naLabel = Get-EntryScoreNotApplicable
-$naEntry = "### Significance`n`n#### Tier 0`n`nmatters here`n`n**Score:** 3`n`n" +
-           "#### Tier 1`n`nno colleague can observe it`n`n**Score:** $naLabel`n`n" +
-           "#### Tier 2`n`nand no consumer either`n`n**Score:** $naLabel`n"
+$naEntry = "$sectH Significance`n`n$tierH Tier 0`n`nmatters here`n`n**Score:** 3`n`n" +
+           "$tierH Tier 1`n`nno colleague can observe it`n`n**Score:** $naLabel`n`n" +
+           "$tierH Tier 2`n`nand no consumer either`n`n**Score:** $naLabel`n"
 $naImpact = Resolve-EntryImpact -EntryText $naEntry
 Assert-Equal 0 $naImpact.Tier "N/A: the reach is the highest SCORED tier, not the highest section present"
 Assert-Equal $true $naImpact.Declared 'N/A: and the entry has still declared itself -- that is a decision, not a silence'
@@ -963,14 +993,14 @@ Assert-Equal 0 @(Get-EntryImpactFindings -EntryText $naEntry).Count 'N/A: a full
 
 # AN UNANSWERED TIER IS NOT AN N/A, and keeping those apart is the reason the flag exists at all. Both read
 # back as score 0; only one of them is a decision somebody made.
-$blankEntry = "### Significance`n`n#### Tier 0`n`nmatters here`n`n**Score:** 3`n`n#### Tier 1`n`nsomething`n`n**Score:**`n"
+$blankEntry = "$sectH Significance`n`n$tierH Tier 0`n`nmatters here`n`n**Score:** 3`n`n$tierH Tier 1`n`nsomething`n`n**Score:**`n"
 $blankRow = @((Resolve-EntryImpact -EntryText $blankEntry).Rows | Where-Object { $_.Tier -eq 1 })[0]
 Assert-Equal $false ([bool]$blankRow.NotApplicable) 'blank: an unanswered score is NOT flagged as N/A'
 Assert-Equal 0 ([int]$blankRow.Score) 'blank: and reads as 0, the fail-safe direction'
 
 # THE LADDER STILL CANNOT BE SKIPPED, and N/A is the new way to try it: tier 1 declaring it reaches nobody
 # while tier 2 is scored says a change consumers notice gives this project's colleagues nothing.
-$skipEntry = "### Significance`n`n#### Tier 0`n`na`n`n**Score:** 2`n`n#### Tier 1`n`nb`n`n**Score:** $naLabel`n`n#### Tier 2`n`nc`n`n**Score:** 4`n"
+$skipEntry = "$sectH Significance`n`n$tierH Tier 0`n`na`n`n**Score:** 2`n`n$tierH Tier 1`n`nb`n`n**Score:** $naLabel`n`n$tierH Tier 2`n`nc`n`n**Score:** 4`n"
 $skipFindings = @(Get-EntryImpactFindings -EntryText $skipEntry)
 Assert-True ($skipFindings.Count -gt 0) 'ladder: N/A under a scored tier is refused'
 Assert-True (@($skipFindings -match 'cumulative').Count -gt 0) 'ladder: and the refusal names the reason rather than asking for a number'
@@ -978,16 +1008,16 @@ Assert-True (@($skipFindings -match 'cumulative').Count -gt 0) 'ladder: and the 
 # A score the rubric has no meaning for is still an error, and the message now offers N/A as the other
 # legitimate answer -- a gate that says "write 1 to 5" at somebody who meant "this reaches nobody" is
 # asking them to invent a number.
-$badNa = Resolve-EntryImpact -EntryText "### Significance`n`n#### Tier 1`n`nwhy`n`n**Score:** nvt`n"
+$badNa = Resolve-EntryImpact -EntryText "$sectH Significance`n`n$tierH Tier 1`n`nwhy`n`n**Score:** nvt`n"
 Assert-True (@($badNa.Errors).Count -gt 0) 'a score that is neither a number nor N/A is reported'
 Assert-True (@($badNa.Errors -match [regex]::Escape($naLabel)).Count -gt 0) 'and the message names N/A as the other way to answer'
 
 Write-Host "A malformed section is reported rather than absorbed" -ForegroundColor Cyan
-$badTier = "### Significance`n`n#### Tier two`n`nwhy`n`nScore: 3`n"
+$badTier = "$sectH Significance`n`n$tierH Tier two`n`nwhy`n`nScore: 3`n"
 Assert-True (@((Resolve-EntryImpact -EntryText $badTier).Errors).Count -gt 0) 'a non-numeric tier is an error, not a section that silently vanishes'
-$badScore = "### Significance`n`n#### Tier 0`n`nwhy`n`nScore: 9`n"
+$badScore = "$sectH Significance`n`n$tierH Tier 0`n`nwhy`n`nScore: 9`n"
 Assert-True (@((Resolve-EntryImpact -EntryText $badScore).Errors -match 'outside the rubric').Count -gt 0) 'a score outside the rubric is named as such'
-$dupTier = "### Significance`n`n#### Tier 0`n`na`n`nScore: 1`n`n#### Tier 0`n`nb`n`nScore: 2`n"
+$dupTier = "$sectH Significance`n`n$tierH Tier 0`n`na`n`nScore: 1`n`n$tierH Tier 0`n`nb`n`nScore: 2`n"
 Assert-True (@((Resolve-EntryImpact -EntryText $dupTier).Errors -match 'a second time').Count -gt 0) 'the same tier twice is two answers to one question'
 
 Write-Host "A reason below the score line is named as misplaced, not as missing (inbound #596)" -ForegroundColor Cyan
@@ -997,7 +1027,7 @@ Write-Host "A reason below the score line is named as misplaced, not as missing 
 # natural next move instead of moving the text. Measured in the reporting repo: three tiers, all three
 # answered, all three refused as unanswered.
 $scoreLabel  = Get-EntryScoreLabel
-$belowEntry  = "### Significance`n`n#### Tier 0`n`n$scoreLabel 3`n`nthe reason, written under the score`n"
+$belowEntry  = "$sectH Significance`n`n$tierH Tier 0`n`n$scoreLabel 3`n`nthe reason, written under the score`n"
 $belowRow    = @((Resolve-EntryImpact -EntryText $belowEntry).Rows | Where-Object { $_.Tier -eq 0 })[0]
 Assert-Equal '' ([string]$belowRow.Why) 'below-score: the reason is still NOT the Why -- the gate must keep refusing, or the fold publishes that tier empty'
 Assert-Equal 'the reason, written under the score' ([string]$belowRow.WhyBelowScore) 'below-score: but the text is kept, which is what lets the refusal name the real defect'
@@ -1011,7 +1041,7 @@ Assert-True ($belowTier[0].Label -match [regex]::Escape($scoreLabel)) 'below-sco
 # THE OTHER HALF, and the reason this is two asserts rather than one: an entry with nothing written must
 # STILL say 'no reason'. A change that renamed both cases to the same thing would pass a test that only
 # checked the new wording, and would have thrown away the distinction it was built to make.
-$emptyTierEntry = "### Significance`n`n#### Tier 0`n`n$scoreLabel 3`n"
+$emptyTierEntry = "$sectH Significance`n`n$tierH Tier 0`n`n$scoreLabel 3`n"
 $emptyTierFind  = @(@(Get-EntryScaffoldFindings -EntryText $emptyTierEntry -Wording (Get-EntryScaffoldWording)) |
     Where-Object { $_.Marker -match 'Tier' })
 Assert-Equal 1 $emptyTierFind.Count 'empty tier: still one finding'
@@ -1021,21 +1051,21 @@ Assert-Equal 'a tier with no reason' $emptyTierFind[0].Label 'empty tier: and it
 # templates put guidance comments in the section, and a comment sitting under the score is this format's
 # own prose -- counted as a misplaced reason it would accuse an entry nobody has written in yet of having
 # put its answer in the wrong place, on every consumer, from the first branch.
-$commentBelow = "### Significance`n`n#### Tier 1`n`n$scoreLabel`n<!-- Why does this matter to a colleague? -->`n"
+$commentBelow = "$sectH Significance`n`n$tierH Tier 1`n`n$scoreLabel`n<!-- Why does this matter to a colleague? -->`n"
 $commentRow   = @((Resolve-EntryImpact -EntryText $commentBelow).Rows | Where-Object { $_.Tier -eq 1 })[0]
 Assert-Equal '' ([string]$commentRow.WhyBelowScore) 'guidance below the score is this format''s prose, not a misplaced reason'
 
 # THE RELEASE GATE READS THE SAME ROW, so it carried the same misdiagnosis -- and it is the worse place to
 # meet it: a cut happens days later, when whoever wrote the entry is not the one reading the refusal.
-$belowRanked = "### Significance`n`n#### Tier 0`n`nabove, correctly`n`n$scoreLabel 2`n`n" +
-               "#### Tier 1`n`n$scoreLabel 3`n`nthe colleague-facing reason, one line too low`n"
+$belowRanked = "$sectH Significance`n`n$tierH Tier 0`n`nabove, correctly`n`n$scoreLabel 2`n`n" +
+               "$tierH Tier 1`n`n$scoreLabel 3`n`nthe colleague-facing reason, one line too low`n"
 $belowRankFindings = @(Get-EntryImpactFindings -EntryText $belowRanked)
 Assert-Equal 1 $belowRankFindings.Count 'below-score: the ranking gate reports the tier once'
 Assert-True ($belowRankFindings[0] -match 'BELOW') 'below-score: and names the placement rather than asking for a Why that is already written'
 
 # THE LEGACY TABLE SHAPE CANNOT CARRY THE PROPERTY, so both gates ask before reading it. Without that guard
 # every pre-section entry -- and CHANGELOG.md is full of them -- would throw on a property that is not there.
-$tableNoWhy = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | |`n"
+$tableNoWhy = "$sectH Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | |`n"
 $tableRow   = @((Resolve-EntryImpact -EntryText $tableNoWhy).Rows | Where-Object { $_.Tier -eq 1 })[0]
 Assert-Equal $null $tableRow.PSObject.Properties['WhyBelowScore'] 'table shape: carries no WhyBelowScore -- there is no score LINE to be below'
 $tableFindings = @(Get-EntryImpactFindings -EntryText $tableNoWhy)
@@ -1048,7 +1078,7 @@ Write-Host "Every refusal is worded in the shape the entry uses, not in the one 
 # THE SHAPE IS RECORDED, which is what makes the wording possible at all. Asserted per shape rather than
 # via one round trip: the property is read by a gate that must tell a real table from the two shapes that
 # have no columns, and a stamp that were merely "not none" could not.
-Assert-Equal 'sections' (Resolve-EntryImpact -EntryText "#### Tier 0`n`nr`n`n$scoreLabel 1`n").Shape 'shape: the sections are named as such'
+Assert-Equal 'sections' (Resolve-EntryImpact -EntryText "$tierH Tier 0`n`nr`n`n$scoreLabel 1`n").Shape 'shape: the sections are named as such'
 Assert-Equal 'table' (Resolve-EntryImpact -EntryText "| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | w |`n").Shape 'shape: the legacy table is named as such'
 Assert-Equal 'line' (Resolve-EntryImpact -EntryText "### T`n`nTier: 2`n`nBody.").Shape 'shape: the pre-table line too -- "wrote it the old way"'
 Assert-Equal 'none' (Resolve-EntryImpact -EntryText "### T`n`nBody only.").Shape 'shape: and an entry declaring nothing is not the same as one of the three'
@@ -1059,14 +1089,14 @@ Assert-Equal 'none' (Resolve-EntryImpact -EntryText "### T`n`nBody only.").Shape
 # one, since a table genuinely has three and its own wording is the accurate one there.
 $sectionCases = @(
     @{ What  = 'no reason under a scored tier'
-       Entry = "### Significance`n`n#### Tier 0`n`nr`n`n$scoreLabel 2`n`n#### Tier 1`n`n$scoreLabel 3`n"
-       Table = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | |`n" }
+       Entry = "$sectH Significance`n`n$tierH Tier 0`n`nr`n`n$scoreLabel 2`n`n$tierH Tier 1`n`n$scoreLabel 3`n"
+       Table = "$sectH Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 3 | |`n" }
     @{ What  = 'a tier with no score under a scored one'
-       Entry = "### Significance`n`n#### Tier 0`n`nr`n`n$scoreLabel 2`n`n#### Tier 1`n`nwritten`n`n$scoreLabel`n`n#### Tier 2`n`nconsumers`n`n$scoreLabel 4`n"
-       Table = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | - | written |`n| 2 | 4 | consumers |`n" }
+       Entry = "$sectH Significance`n`n$tierH Tier 0`n`nr`n`n$scoreLabel 2`n`n$tierH Tier 1`n`nwritten`n`n$scoreLabel`n`n$tierH Tier 2`n`nconsumers`n`n$scoreLabel 4`n"
+       Table = "$sectH Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | - | written |`n| 2 | 4 | consumers |`n" }
     @{ What  = 'a rung of the ladder missing altogether'
-       Entry = "### Significance`n`n#### Tier 0`n`nr`n`n$scoreLabel 2`n`n#### Tier 2`n`nconsumers`n`n$scoreLabel 4`n"
-       Table = "### Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |`n" }
+       Entry = "$sectH Significance`n`n$tierH Tier 0`n`nr`n`n$scoreLabel 2`n`n$tierH Tier 2`n`nconsumers`n`n$scoreLabel 4`n"
+       Table = "$sectH Significance`n`n| Tier | Significance | Why |`n|---|---|---|`n| 2 | 4 | consumers |`n" }
 )
 foreach ($case in $sectionCases) {
     $sec = @(Get-EntryImpactFindings -EntryText $case.Entry)
@@ -1080,7 +1110,7 @@ foreach ($case in $sectionCases) {
 }
 
 # THE MISSING-SECTION REFUSAL NAMES THE HEADING THE FORMATTER WRITES, held against the formatter rather
-# than against a literal. A refusal telling an author to add '#### Tier 1' while the writer emits something
+# than against a literal. A refusal telling an author to add '$tierH Tier 1' while the writer emits something
 # else is the same defect one level down, and only a shared source can rule it out.
 $ladder = @(Get-EntryImpactFindings -EntryText $sectionCases[2].Entry)
 Assert-True ($ladder[0].Contains((Get-EntryTierSectionMarker -Tier 1))) 'ladder: the refusal quotes the marker the formatter writes'
@@ -1097,7 +1127,7 @@ Assert-True (-not ($lineShape[0] -match 'column')) 'line shape: and not sent to 
 Write-Host "Stripping the declaration for the documents that travel outward" -ForegroundColor Cyan
 $sigBlock = (Format-EntryBlock -Branch 'feat/t' -Description 'T' -Type 'feat' -Body 'body text' -ImpactRows $sigRows) -join "`n"
 $sigStripped = Remove-EntrySignificanceDeclaration -EntryText $sigBlock
-Assert-True (-not ($sigStripped -match '#### Tier')) 'stripped: every tier section is gone, not just the first'
+Assert-True (-not ($sigStripped -match '$tierH Tier')) 'stripped: every tier section is gone, not just the first'
 Assert-True (-not [regex]::IsMatch($sigStripped, '(?m)' + (Get-EntryScorePattern))) 'stripped: and the scores with them -- a self-assigned number at a consumer is a marketing claim'
 # THE HEADING GOES WITH THEM, and this assert is inherited rather than invented: leaving it standing was
 # measured on the table this shape replaced, shipping a named question with nothing under it into 17
@@ -1111,7 +1141,7 @@ $mixed = $sigBlock + "`n`n| Tier | Significance | Why |`n|---|---|---|`n| 1 | 2 
 Assert-True (-not ((Remove-EntrySignificanceDeclaration -EntryText $mixed) -match '\| Tier \| Significance \|')) 'stripped: an entry carrying both shapes loses both'
 
 # Fence-aware, like every reader here: this repo's own README quotes the whole shape.
-$fencedSig = "### Significance`n`n" + '```text' + "`n#### Tier 2`n`nquoted`n`nScore: 5`n" + '```' + "`n`n#### Tier 0`n`nreal`n`nScore: 1`n"
+$fencedSig = "$sectH Significance`n`n" + '```text' + "`n$tierH Tier 2`n`nquoted`n`nScore: 5`n" + '```' + "`n`n$tierH Tier 0`n`nreal`n`nScore: 1`n"
 $fencedRes = Resolve-EntryImpact -EntryText $fencedSig
 Assert-Equal 0 $fencedRes.Tier 'fenced: a tier section QUOTED inside a fence is not a declaration'
 Assert-Equal 1 @($fencedRes.Rows).Count 'fenced: only the real section is read'
@@ -1189,13 +1219,42 @@ foreach ($phase in $phases) {
     Assert-True ($freshScaffold -match "(?m)^$cycleSec\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
 }
 # THE CYCLE FILE IS A DOCUMENT, NOT A BLOCK WAITING TO BE PASTED INTO ONE (Dave, August 19, 2026): its
-# title is an H1 and its phases are the H2 sections under it, one level shallower than the entry beside
+# title is an H2 and its phases are the H3 sections under it, one level shallower than the entry beside
 # it. Asserted as a RELATION as well as two numbers, because the numbers are the part a consumer may
 # re-level and the relation is the part that must hold whatever they choose.
-Assert-Equal 1 (Get-BranchCycleHeadingLevel) "the cycle file's own heading is an H1 -- it is opened on its own and never travels"
-Assert-Equal 2 (Get-BranchCycleSectionLevel) 'and its phases are the H2 sections of that document'
+#
+# BOTH NUMBERS MOVED ONE DOWN ON AUGUST 26, 2026 (Dave), with the entry pair and CONTRIBUTING.md's own
+# sections. The relations below did not move, and that is the whole reason they are asserted separately.
+Assert-Equal 2 (Get-BranchCycleHeadingLevel) "the cycle file's own heading is an H2 -- it is opened on its own and never travels"
+Assert-Equal 3 (Get-BranchCycleSectionLevel) 'and its phases are the H3 sections of that document'
 Assert-True ((Get-BranchCycleSectionLevel) -eq ((Get-BranchCycleHeadingLevel) + 1)) 'the sections sit exactly one level under the title'
 Assert-True ((Get-BranchCycleHeadingLevel) -lt (Get-EntryHeadingLevel)) 'and the whole file sits shallower than the entry, which has to arrive at CHANGELOG.md its own level'
+# THE INVARIANT THE WHOLE SHIFT TURNS ON, and the one assert that would have caught it going wrong. DEPLOY is
+# a phase of the cycle file AND the entry that folds into CHANGELOG.md, so the fold is a verbatim paste only
+# while those two levels are the same number. Nothing asserted this before August 26, 2026: the two pairs
+# happened to line up, and a re-level of either one alone would have silently re-introduced the per-document
+# re-levelling that the paste replaced.
+Assert-Equal (Get-EntryHeadingLevel) (Get-BranchCycleSectionLevel) 'and the DEPLOY phase sits at exactly the entry level -- what makes the fold a verbatim paste rather than a re-level'
+
+# A DOCUMENT SCAFFOLDED BEFORE THE SHIFT STILL FOLDS, and this is the assert the shift itself depends on
+# rather than a courtesy to consumers. The branch that moved these levels was created before it moved them,
+# so the fold that runs after its merge meets a cycle document at the OLD pair -- title one shallower, DEPLOY
+# one shallower. If the readers had been pinned to the new pair, that fold would have found no DEPLOY heading
+# and pasted nothing into CHANGELOG.md, silently. Every consumer holding a branch when the plugin updates
+# under them is the same case, in bulk.
+$priorPair = @(
+    ('#' * ((Get-BranchCycleHeadingLevel) - 1)) + ' Development cycle: `feat/before-the-shift-v1` ' + (Get-EntryIdSeparator) + ' 20260825-120000'
+    ''
+    ('#' * ((Get-BranchCycleSectionLevel) - 1)) + ' PLAN'
+    ''
+    ('#' * ((Get-BranchCycleSectionLevel) - 1)) + ' DEPLOY: `feat/before-the-shift-v1`'
+    ''
+    'What it deploys.'
+) -join "`n"
+Assert-Equal 'feat/before-the-shift-v1' (Get-BranchFileDeclaredBranch -Text $priorPair) 'a document at the PRE-SHIFT levels still names its branch -- the idempotency and fold-target test'
+$priorHalves = Split-DevelopmentCycle -Text $priorPair
+Assert-True (([string]$priorHalves.Entry) -match 'DEPLOY: `feat/before-the-shift-v1`') 'and its DEPLOY section is still found, so the fold after THIS branch merges has something to paste'
+Assert-True ((Get-DevelopmentCycleEntryPattern) -ne '') 'and the pattern that finds it spans both levels rather than pinning one'
 # DEPLOY CARRIES NO STEP, and this is the assert that records why (Dave, August 14, 2026; shown as a
 # heading since August 19). It is not a step but the RESULT -- the deployment entry beside this file, which
 # is the half that travels into CHANGELOG.md at the merge. A DEPLOY checkbox could only be unresolvable,
@@ -1284,7 +1343,7 @@ Assert-True ($templateCycle.Contains((Get-EntryMergeStampTemplatePlaceholder))) 
 # any of the six matchers had kept its bare '\s*$', the entry would report the section as ABSENT -- read
 # by the gates as "not answered yet" and by the fold as nothing to fill.
 $stamped = Set-EntryMergeStamp -EntryText $bareEntry -Stamp '20260819-171500'
-Assert-True ($stamped -match ('(?m)^## DEPLOY: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the fold stamps the landing moment onto the entry''s own heading'
+Assert-True ($stamped -match ('(?m)^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the fold stamps the landing moment onto the entry''s own heading'
 Assert-True (-not ($stamped -match '(?m)^### Pull Request .+\d{8}-\d{6}')) 'and not onto the Pull Request heading, where it sat for four days'
 # Get-EntrySectionAnswer, not -Body: the guidance comment is unconditional since August 23, 2026, so the
 # RAW body opens with the form. The answer reader strips it, which is what open-pr composes the PR title
@@ -1297,7 +1356,7 @@ Assert-True (Test-EntryDeclaresShape -EntryText $stamped) 'and the entry still d
 # Restamped rather than appended to, so folding twice cannot grow a line of timestamps -- and a heading
 # still carrying the TEMPLATE's placeholder comes out with a real stamp.
 $twice = Set-EntryMergeStamp -EntryText $stamped -Stamp '20260820-090000'
-Assert-True ($twice -match '(?m)^## DEPLOY: .+ 20260820-090000$') 'a second fold restamps'
+Assert-True ($twice -match ('(?m)^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: .+ 20260820-090000$')) 'a second fold restamps'
 Assert-True (-not ($twice -match '20260819-171500')) 'and does not leave the first stamp behind'
 Assert-Equal $bareEntry (Set-EntryMergeStamp -EntryText $bareEntry -Stamp '') 'an empty stamp changes nothing -- a fold with no PR leaves the heading bare'
 
@@ -1307,7 +1366,19 @@ Assert-Equal $bareEntry (Set-EntryMergeStamp -EntryText $bareEntry -Stamp '') 'a
 # asserted beside the no-op, because the fold's correctness rests on the pair and not on either alone.
 $preDossier = "### A title $md Feat $md 2026-08-05`n`nTier: 0`n`nSome body text.`n"
 Assert-True (-not (Test-EntryHasSection -EntryText $preDossier -Key 'PullRequest')) 'a pre-dossier entry has no Pull Request section, so the fold knows the heading cannot hold the date'
-Assert-Equal $preDossier (Set-EntryMergeStamp -EntryText $preDossier -Stamp '20260819-171500') 'and the stamp is a silent no-op there -- which is exactly why the closing line has to carry it'
+# AND SINCE AUGUST 26, 2026 THE STAMP LANDS ON ITS HEADING RATHER THAN NOWHERE, because that shape's level
+# and today's entry level are now the same number. The pre-dossier entry was an H3 while an entry was an H2;
+# both pairs then moved one down, so H3 is what an entry IS. There is no way to tell the two apart by depth
+# any more -- recorded here rather than worked around, because the alternative would be a reader guessing at
+# an era.
+#
+# IT COSTS NOTHING IN PRACTICE, and that is why it is accepted rather than repaired. Set-EntryMergeStamp is
+# only ever called by the fold, on the entry it is folding, which is a freshly written current-shape entry.
+# No caller hands it a historical one. What the assert protects is the shape of the output -- a stamp on the
+# entry's own heading, not a second one appended somewhere else.
+$preStamped = Set-EntryMergeStamp -EntryText $preDossier -Stamp '20260819-171500'
+Assert-True ($preStamped -match ('(?m)^' + ('#' * (Get-EntryHeadingLevel)) + ' A title .* 20260819-171500$')) 'and a shape sharing the entry level is stamped on its own heading -- the two are no longer distinguishable by depth'
+Assert-Equal 1 (@([regex]::Matches($preStamped, '20260819-171500')).Count) 'once, not twice -- the stamp replaces rather than accumulates'
 
 # THE ENTRIES ALREADY WRITTEN SAY 'changelog' IN THEIR HEADING, and every one of them is in CHANGELOG.md
 # right now. The type is read off that word, and Test-EntryDeclaresShape ends on the type -- so a reader
@@ -1567,7 +1638,7 @@ $audienceScaffold = (Format-EntrySignificanceSections -WithGuidance) -join "`n"
 Assert-True ($audienceScaffold -notmatch ('(?m)^#+ ' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'tier 0 gets no heading of its own -- the entry heading above it is its section'
 Assert-Equal '' (Get-EntryTierSectionMarker -Tier 0) 'and the marker says so, so a writer cannot emit one'
 Assert-True ($audienceScaffold -match ('(?m)^#{' + (Get-EntryTierSubLevel) + '} ' + [regex]::Escape((Get-EntryTierHigherHeading)) + '$')) 'and the audience tier is the entry''s first inner heading'
-Assert-Equal 3 (Get-EntryTierSubLevel) 'which is the entry''s own section level in the named shape'
+Assert-Equal (Get-EntrySectionLevel) (Get-EntryTierSubLevel) 'which is the entry''s own section level in the named shape -- asserted as the RELATION, because the number moved on August 26, 2026 and the relation did not'
 Assert-True ($audienceScaffold -notmatch '(?m)^#{3,4} Tier \d+$') 'and no heading names a tier by its number at all'
 foreach ($gone in @(Get-EntryTierHigherRetiredHeadings)) {
     Assert-True ($audienceScaffold -notmatch [regex]::Escape($gone)) "nor the retired wording '$gone' it replaced"
@@ -1589,7 +1660,7 @@ Assert-True ($audienceScaffold -notmatch '\{0\}') 'and the placeholder is resolv
 # place reads as "no tier above 0" -- a claim about the change, made by a heading nobody read.
 # TODAY'S SHAPE: the entry heading IS tier 0's section, and the audience tier is an H3 under it. Built from
 # the seams rather than typed, so a level change cannot leave this assert testing yesterday.
-$higherRead = Resolve-EntryImpact -EntryText ("## DEPLOY: ``feat/a`` $(Get-EntryIdSeparator) 1`n`nwhy`n`n**Score:** 1`n`n" + ('#' * (Get-EntryTierSubLevel)) + ' ' + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
+$higherRead = Resolve-EntryImpact -EntryText (("#" * (Get-EntryHeadingLevel)) + " DEPLOY: ``feat/a`` " + (Get-EntryIdSeparator) + " 1`n`nwhy`n`n**Score:** 1`n`n" + ('#' * (Get-EntryTierSubLevel)) + ' ' + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
 Assert-Equal 0 @($higherRead.Errors).Count 'the current shape parses without complaint in a repo that has an audience tier'
 Assert-Equal 2 (@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 }).Count + 1) 'and resolve to this repo audience tier, so its score is not lost'
 Assert-Equal 4 ([int](@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 })[0].Score)) 'with the score the author actually wrote'

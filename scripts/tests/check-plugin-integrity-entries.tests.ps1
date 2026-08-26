@@ -36,25 +36,34 @@ try {
     #     section level that is not one of the declared sections. Both halves are asserted here, and so is
     #     the case that must stay silent -- the three real section headings, which the pre-flat version of
     #     this check would have reported as three defects each.
+    #
+    #     AND SHIFTED ONE LEVEL DEEPER AGAIN (August 26, 2026), when '## [Unreleased]' took H2 and both level
+    #     pairs moved down. The levels below are COMPOSED from the lib rather than typed, which is the whole
+    #     lesson of that shift for this file: a fixture that states the format in literals is a second
+    #     definition of it, and the check under test reads the first one. Typed out, these headings went on
+    #     describing yesterday's document while the gate judged today's.
     $s34Md = [char]0x00B7
+    $s34EntryH = '#' * (Get-EntryHeadingLevel)
+    $s34SectH  = '#' * (Get-EntrySectionLevel)
+    $s34SubH   = '#' * ((Get-EntrySectionLevel) + 1)
     $s34Sections = @(
-        '### What does this change do?'
+        "$s34SectH What does this change do?"
         ''
         'A body with a correctly demoted sub-heading.'
         ''
-        '#### Tested'
+        "$s34SubH Tested"
         ''
         'All green.'
         ''
-        '### Significance'
+        "$s34SectH Significance"
         ''
-        '#### Tier 0'
+        "$s34SubH Tier 0"
         ''
         'Only this repo notices.'
         ''
         'Score: 2'
         ''
-        '### Type of change'
+        "$s34SectH Type of change"
         ''
         'Fix'
     )
@@ -135,7 +144,7 @@ try {
 
     Write-Host 'check 13 -- an entry is an H2 with three named H3 sections, and a body heading may be neither' -ForegroundColor Cyan
     $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
-    $s34Good = @('## A fixture entry') + @('') + $s34Sections
+    $s34Good = @("$s34EntryH A fixture entry") + @('') + $s34Sections
     [System.IO.File]::WriteAllText($s34Entry, (($s34Good -join "`n") + "`n"), $Utf8NoBom)
     $r34a = Invoke-Integrity -FixtureRoot $Fixture
     # THE ASSERT THAT MATTERS MOST HERE, because the whole entry format would trip a level-only rule: the
@@ -145,9 +154,9 @@ try {
     Assert-True ($r34a.Out -match '\[entry-heading\] checked') 'scenario 34: and the entry file WAS examined -- the pass is not an empty scan'
     Assert-True ($r34a.Out -match '\[entry-heading\].*1 unfolded entry\(ies\)') 'scenario 34: an H2 entry file is RECOGNISED as one -- the detector was H3-only until August 5, 2026, so this check silently judged nothing'
 
-    # Defect one: a heading at the entry's own level inside the body. This is the old '### Tested' defect,
+    # Defect one: a heading at the entry's own level inside the body. This is the old "$s34SectH Tested" defect,
     # one level up, and now the worse one -- it becomes a separate entry rather than a stray sub-heading.
-    $s34Bad = @($s34Good) -replace '^#### Tested$', '## Tested'
+    $s34Bad = @($s34Good) -replace ("^" + $s34SubH + " Tested$"), "$s34EntryH Tested"
     [System.IO.File]::WriteAllText($s34Entry, (($s34Bad -join "`n") + "`n"), $Utf8NoBom)
     $r34b = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($r34b.Out -match 'entry-heading.*fix-a-branch-name\.md:7') 'scenario 34: an H2 in an entry body is reported, with its line number'
@@ -157,7 +166,7 @@ try {
     # Defect two, new with the format: a heading at the SECTION level that is not a declared section. The
     # dangerous version of this is a MISSPELLED section heading, which costs the entry its declaration
     # silently -- so the fixture uses exactly that rather than an obviously unrelated word.
-    $s34Typo = @($s34Good) -replace '^### Significance$', '### Significanse'
+    $s34Typo = @($s34Good) -replace ('^' + $s34SectH + ' Significance$'), "$s34SectH Significanse"
     [System.IO.File]::WriteAllText($s34Entry, (($s34Typo -join "`n") + "`n"), $Utf8NoBom)
     $r34c = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($r34c.Out -match 'entry-heading.*fix-a-branch-name\.md:11') 'scenario 34: a misspelled section heading is reported, with its line'
@@ -168,26 +177,26 @@ try {
     # mention-versus-use question this file answers in four other checks, and one this repo's own entry
     # files do (the entry for this very change quotes the format).
     $s34Fenced = @(
-        '## A fixture entry'
+        "$s34EntryH A fixture entry"
         ''
-        '### What does this change do?'
+        "$s34SectH What does this change do?"
         ''
         'The wrong form looks like this:'
         ''
         '```markdown'
-        '## Tested'
-        '### Significanse'
+        "$s34EntryH Tested"
+        "$s34SectH Significanse"
         '```'
         ''
-        '### Significance'
+        "$s34SectH Significance"
         ''
-        '#### Tier 0'
+        "$s34SubH Tier 0"
         ''
         'Only this repo notices.'
         ''
         'Score: 2'
         ''
-        '### Type of change'
+        "$s34SectH Type of change"
         ''
         'Fix'
     )
@@ -200,11 +209,11 @@ try {
     # remote the day the format landed. It must still be RECOGNISED (line 1 is skipped whatever its level,
     # because the fold promotes it) while its body is judged by the same rules.
     $s34Legacy = @(
-        '### An older entry ' + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
+        "$s34SectH An older entry " + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
         ''
         'Body prose.'
         ''
-        '## Not allowed here either'
+        "$s34EntryH Not allowed here either"
     )
     [System.IO.File]::WriteAllText($s34Entry, (($s34Legacy -join "`n") + "`n"), $Utf8NoBom)
     $r34e = Invoke-Integrity -FixtureRoot $Fixture
@@ -221,7 +230,7 @@ try {
         ''
         'Everything merged since the last release, furthest reach first.'
         ''
-        '## #123 ' + $s34Md + ' A real entry'
+        "$s34EntryH #123 " + $s34Md + ' A real entry'
         ''
     ) + $s34Sections + @('')
     [System.IO.File]::WriteAllText($s34Cl, (($s34ClGood -join "`n") + "`n"), $Utf8NoBom)
@@ -236,7 +245,7 @@ try {
     # the one before it. The scenario is the fold's own output rather than a hand-built line, because that
     # is the shape nobody would have thought to type.
     $s34ClStamped = @($s34ClGood) + @(
-        '### Pull Request ' + $s34Md + ' 20260819-171500'
+        "$s34SectH Pull Request " + $s34Md + ' 20260819-171500'
         ''
         '[PR #123](https://gh.test/pr/123)'
         ''
@@ -249,7 +258,7 @@ try {
     # THE TOLERANCE IS THE STAMP, NOT THE NAME. A misspelling still has to be caught: this is the failure
     # the exact comparison exists for, and a tail that swallowed anything after the name would have traded
     # one silent defect for another.
-    $s34ClMisspelled = @($s34ClStamped) -replace '^### Pull Request ', '### Pull request '
+    $s34ClMisspelled = @($s34ClStamped) -replace ("^" + $s34SectH + " Pull Request "), "$s34SectH Pull request "
     [System.IO.File]::WriteAllText($s34Cl, (($s34ClMisspelled -join "`n") + "`n"), $Utf8NoBom)
     $r34f3 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($r34f3.Out -match 'entry-heading. CHANGELOG') 'scenario 34: a MISSPELLED section heading is still reported, stamp or no stamp'
@@ -260,7 +269,7 @@ try {
     # A body sub-heading written at the entry's own level, in the middle of a formatted entry. It SPLITS the
     # entry: the three sections land across two blocks, so the phantom's first section is whichever one
     # followed it -- never the first. That is the rule, and it is structural rather than a guess about intent.
-    $s34ClStray = @($s34ClGood) -replace '^#### Tested$', '## Tested'
+    $s34ClStray = @($s34ClGood) -replace ("^" + $s34SubH + " Tested$"), "$s34EntryH Tested"
     [System.IO.File]::WriteAllText($s34Cl, (($s34ClStray -join "`n") + "`n"), $Utf8NoBom)
     $r34g = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:11') 'scenario 34: a body heading at the entry level is reported, with its line'
@@ -271,7 +280,7 @@ try {
     # fold cannot reach gh on a manual merge, and then it writes a legitimate entry with no number and no PR
     # footer, saying so on the console. Keying on the number would report the fold's own documented output as
     # a defect.
-    $s34ClNoPr = @($s34ClGood) -replace ('^## #123 ' + [regex]::Escape($s34Md) + ' A real entry$'), '## A real entry with no PR number'
+    $s34ClNoPr = @($s34ClGood) -replace ('^## #123 ' + [regex]::Escape($s34Md) + ' A real entry$'), "$s34EntryH A real entry with no PR number"
     [System.IO.File]::WriteAllText($s34Cl, (($s34ClNoPr -join "`n") + "`n"), $Utf8NoBom)
     $r34h = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r34h.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: an entry with no PR number but with its sections is accepted -- the manual-merge fold'
@@ -284,11 +293,11 @@ try {
         ''
         'Intro.'
         ''
-        '## #99 ' + $s34Md + ' An entry from before the format ' + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
+        "$s34EntryH #99 " + $s34Md + ' An entry from before the format ' + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
         ''
         'Body prose, no named sections.'
         ''
-        '#### A properly demoted sub-heading'
+        "$s34SubH A properly demoted sub-heading"
         ''
         'More prose.'
         ''
@@ -307,9 +316,9 @@ try {
         ''
         'Intro.'
         ''
-        '## #123 ' + $s34Md + ' A real entry'
+        "$s34EntryH #123 " + $s34Md + ' A real entry'
         ''
-        '## A sub-heading that swallowed the entry'
+        "$s34EntryH A sub-heading that swallowed the entry"
         ''
     ) + $s34Sections + @('')
     [System.IO.File]::WriteAllText($s34Cl, (($s34ClAbsorbed -join "`n") + "`n"), $Utf8NoBom)
@@ -327,15 +336,15 @@ try {
         ''
         'Intro.'
         ''
-        '## #123 ' + $s34Md + ' A real entry'
+        "$s34EntryH #123 " + $s34Md + ' A real entry'
         ''
-        '### What does this change do?'
+        "$s34SectH What does this change do?"
         ''
         '# A body heading that climbs above every entry'
         ''
-        '### Tested'
+        "$s34SectH Tested"
         ''
-        '### Type of change'
+        "$s34SectH Type of change"
         ''
         'Fix'
         ''

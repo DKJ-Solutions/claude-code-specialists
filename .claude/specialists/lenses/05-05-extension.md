@@ -76,7 +76,7 @@ carries the type.
 Creating the branch and creating its changelog entry file are no longer two separate manual steps —
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
 again on an existing branch simply resumes it) and writes `contributing-davekjohn/development-cycle.md` in the
-same run — one document holding both jobs: the step phases, and the `## DEPLOY:` section that is the entry.
+same run — one document holding both jobs: the step phases, and the `### DEPLOY:` section that is the entry.
 It also **completes the version suffix**, appending `-v1` to a name that carries none, so a second cycle on
 the same subject is a deliberately typed `-v2`. **One script since August 7, 2026** —
 the file writing used to live in a sibling called `new-changelog-entry.ps1`, invoked as a child process,

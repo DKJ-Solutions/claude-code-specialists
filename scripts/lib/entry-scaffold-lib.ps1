@@ -711,14 +711,33 @@ $script:EntrySignificanceMax = 5
 # so the audience tier's sub-heading is the entry's FIRST inner heading and belongs at the entry's section
 # level -- the same level 'Pull Request' has always carried, which is what makes the entry two H3 sections
 # again instead of one H3 and one H4 nested under a heading that no longer exists.
-$script:EntryTierSubLevel   = 3
-# THE RETIRED LEVEL, RECOGNISED AND NEVER WRITTEN. Every entry in CHANGELOG.md, in every release document
-# and in every consumer's tree carries this heading at '####' right now, and they meet the new level through
-# a plugin update rather than by choosing to. Every regex matching a tier sub-heading is therefore built as a
-# RANGE across both levels -- read both, write one, the same rule this file gives every retired string. A
-# reader that forgot the old level would read those entries as declaring tier 0 alone, which is the silent
-# direction that empties a release.
-$script:EntryTierSubLevelRetired = 4
+# DERIVED, NOT STATED, SINCE AUGUST 26, 2026 -- and the paragraph above is the argument for it. It says this
+# heading "belongs at the entry's section level", and it was written as a literal 3 that happened to equal
+# that level. When both level pairs shifted one down, the section level became 4 and this stayed at 3: the
+# audience tier's heading was then one level SHALLOWER than the sections it sits beside, which closed the
+# opening question's section instead of sitting next to it. The symptom was exactly the one measured when this
+# level last moved, three days earlier -- a fixture with no audience tier going from four scaffold findings to
+# five, the fifth being the opening question its own tiers had orphaned. Reading it off the section level
+# means the next re-level cannot reproduce that.
+# RESOLVED IN THE GETTER, NOT HERE, and that is not style -- it is the only place it works. This constant is
+# declared some two thousand lines ABOVE $script:EntrySectionLevel, so reading that variable at this point
+# yields nothing. Assigning it here failed loudly and immediately ("the variable cannot be retrieved because
+# it has not been set") the moment any script dot-sourced this lib, which is the good direction for a
+# load-order mistake to fail in. The value below is the fallback for a caller that somehow reaches it before
+# the section level exists; Get-EntryTierSubLevel is what every reader actually goes through.
+$script:EntryTierSubLevel   = 4
+# THE RETIRED LEVEL, RECOGNISED AND NEVER WRITTEN. Every regex matching a tier sub-heading is built as a
+# RANGE spanning this value, the written one and the entry's section level -- read every level, write one, the
+# same rule this file gives every retired string. A reader that forgot an old level would read those entries
+# as declaring tier 0 alone, which is the silent direction that empties a release.
+#
+# IT IS 3 SINCE AUGUST 26, 2026, WHERE IT WAS 4, and the swap is not a correction of the old value -- it is
+# what keeps the range spanning BOTH. The numbered shape wrote '#### Tier N' and the named shape that replaced
+# it on August 23 wrote it at H3; three days later the level pairs shifted one down and the written level
+# became 4 again. So 4 is now covered by the WRITTEN value and 3 is the one that would otherwise fall out of
+# the range, which is where it has to be stated. Every entry sitting in CHANGELOG.md right now carries this
+# heading at H3, so getting this backwards would misread the whole pending list.
+$script:EntryTierSubLevelRetired = 3
 $script:EntryTierSubPrefix  = 'Tier'
 # BOLD SINCE THE DOSSIER FORM (Dave, August 6, 2026), and the plain form is still read. 'Score:' sat as bare
 # prose in a section that is otherwise all prose, so it did not read as the field it is; '**Score:**' does.
@@ -745,8 +764,13 @@ function Get-EntryTierSubLevel {
         SO AN UNCONFIGURED CONSUMER SEES NO CHANGE, which is the direction every conditional in this file
         takes. A repo that has stated no audience tier keeps the document it had yesterday, byte for byte.
     #>
-    if (Test-EntryTierSectionsAreNamed) { return $script:EntryTierSubLevel }
-    return $script:EntryTierSubLevelRetired
+    # BOTH SHAPES ARE DERIVED FROM THE SECTION LEVEL, not stated (August 26, 2026). The paragraphs above say
+    # what each shape needs -- the named tier BESIDE the entry sections, the numbered ones one level INSIDE
+    # the opening question -- and both were written as literals that happened to match. When the section level
+    # moved they stopped matching, and the symptom was the one measured above: the opening question reported
+    # as unanswered on every freshly scaffolded entry, because its own tiers had closed its section.
+    if (Test-EntryTierSectionsAreNamed) { return (Get-EntrySectionLevel) }
+    return ((Get-EntrySectionLevel) + 1)
 }
 
 function Get-EntryTierSubLevelRange {
@@ -761,7 +785,15 @@ function Get-EntryTierSubLevelRange {
         both, and the range has to span whatever the two constants happen to be rather than assuming which
         of them is the smaller.
     #>
-    $levels = @($script:EntryTierSubLevel, $script:EntryTierSubLevelRetired, $script:EntrySectionLevel)
+    # BOTH SHAPES' WRITTEN LEVELS ARE ASKED FOR RATHER THAN ASSUMED, and the retired floor is folded in
+    # alongside them. After August 26, 2026 there are three levels this heading has ever been written at:
+    # H3 (the named shape before the shift), H4 (the numbered shape before it, and the named shape after) and
+    # H5 (the numbered shape after). A range that only spanned today's two would stop reading every entry
+    # sitting in CHANGELOG.md right now -- and misreading those is the silent direction that empties a
+    # release, which is why this builder exists at all.
+    $named    = (Get-EntrySectionLevel)
+    $numbered = (Get-EntrySectionLevel) + 1
+    $levels = @($named, $numbered, $script:EntryTierSubLevelRetired, $script:EntrySectionLevel)
     $min = ($levels | Measure-Object -Minimum).Minimum
     $max = ($levels | Measure-Object -Maximum).Maximum
     return '#{' + $min + ',' + $max + '}'
@@ -1718,7 +1750,7 @@ function Read-EntryTierSections {
     # unmistakably this shape.
     $zeroNames = @(@((Get-EntrySectionHeadings)['What']) + @(Get-EntrySectionRetiredNames -Key 'What') |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    $zeroRx = '^\s*#{' + $script:EntrySectionLevel + '}\s+(?:' +
+    $zeroRx = '^\s*' + (Get-EntrySectionLevelRange) + '\s+(?:' +
         ((@($zeroNames) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
     # --- AND SINCE AUGUST 23, 2026 THE ENTRY'S OWN HEADING IS TIER 0'S SECTION ------------------------
     #
@@ -2289,7 +2321,7 @@ function Remove-EmptyImpactSection {
     $headings = @((Get-EntrySectionHeadings)['Significance']) + @(Get-EntrySectionRetiredNames -Key 'Significance') |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     if (@($headings).Count -eq 0) { return $EntryText }
-    $headingRx = '^#{' + (Get-EntrySectionLevel) + '}\s+(?:' +
+    $headingRx = '^' + (Get-EntrySectionLevelRange) + '\s+(?:' +
         ((@($headings) | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')\s*$'
 
     $pair = Get-EntryLineFlagPairs -EntryText $EntryText
@@ -2458,10 +2490,17 @@ function Remove-EntryAdminSections {
     $names = @($names | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
     if ($names.Count -eq 0) { return $EntryText }
 
-    $hashes = '#' * $script:EntrySectionLevel
-    $headRx = '^\s*' + $hashes + '\s+(' + ((@($names | ForEach-Object { [regex]::Escape($_) })) -join '|') + ')' +
+    # THE RANGE, NOT THE WRITTEN LEVEL, and this function is the one that paid for the difference. The four
+    # admin sections it strips exist almost exclusively in LEGACY entries -- that is what makes them admin --
+    # so a pattern pinned to the level entries are written at today matches the shape that needs stripping
+    # least. Pinned exactly, it went blind the moment the section level shifted on August 26, 2026, which is
+    # the same defect its own header describes from the other direction: a stripper aimed one level away from
+    # the sections it is meant to remove, and 125 of 396 lines of a consumer's release draft made of the four
+    # sections nobody stripped.
+    $headRx = '^\s*' + (Get-EntrySectionLevelRange) + '\s+(' +
+        ((@($names | ForEach-Object { [regex]::Escape($_) })) -join '|') + ')' +
         (Get-EntrySectionHeadingTail)
-    # Any heading at this level or shallower closes the section: the next '###', or the next entry.
+    # Any heading at the section level or shallower closes the section: the next sibling, or the next entry.
     $closeRx = '^\s*#{1,' + $script:EntrySectionLevel + '}\s'
 
     $pair = Get-EntryLineFlagPairs -EntryText $EntryText
@@ -2535,8 +2574,20 @@ function Get-EntryInsertOffset {
         # retired section headings get, applied to a signature.
         [int]$Score = 0,
         [int]$Tier = 0,
-        [string]$EntryPattern = '(?m)^## '
+        # DEFAULTED TO EMPTY AND RESOLVED IN THE BODY, because a parameter default cannot call a function in
+        # this scope and a LITERAL default is how this went wrong (August 26, 2026). It read '(?m)^## ' -- the
+        # entry level of the day it was written -- so when the level shifted, every caller relying on the
+        # default saw a document with no entries in it. The fold then ranked a new entry against an empty
+        # list and appended it, which reverses the ranked order without erroring: three entries folded
+        # low-then-high came out exactly backwards, and the only thing that noticed was this suite.
+        [string]$EntryPattern = ''
     )
+    # The default, resolved where a function call is legal. An explicit pattern from a caller still wins --
+    # a document mid-migration is read by passing its own level in.
+    if ([string]::IsNullOrEmpty($EntryPattern)) {
+        $EntryPattern = '(?m)^' + ('#' * (Get-EntryHeadingLevel)) + ' '
+    }
+
     # FENCE-AWARE, LIKE EVERY OTHER READER OF THIS FORMAT -- and this function was the one that was not.
     # Measured on the fold of PR #477, in the document PR #476 had just created: that entry quotes
     # '## #475 <midDot> ...' inside a ```text fence, as the worked example of the format it introduces. A
@@ -2860,22 +2911,56 @@ function Get-EntryFirstSectionKey {
     return @($script:EntryWrittenSectionKeys)[0]
 }
 
-# The heading levels, stated once. An entry is an H2 and its sections are H3 -- in the entry FILE and in
-# CHANGELOG.md alike, which is new: the file used to carry H3 entries that the fold pasted in unchanged, and
-# the release renderers re-levelled them per document. One level everywhere means the file a contributor
-# writes looks exactly like the block that lands.
-$script:EntryHeadingLevel  = 2
-$script:EntrySectionLevel  = 3
+# The heading levels, stated once. An entry is an H3 and its sections are H4 -- in the entry FILE and in
+# CHANGELOG.md alike, which is what makes the fold a verbatim paste: the file used to carry entries at a
+# different level that the release renderers re-levelled per document. One level everywhere means the file a
+# contributor writes looks exactly like the block that lands.
+#
+# WHY H3 AND NOT H2 (Dave, August 26, 2026). CHANGELOG.md now carries a '## [Unreleased]' heading that every
+# pending entry sits under, so H2 is taken and an entry nests one level inside it. That heading is part of the
+# document's HEAD as far as Split-Changelog is concerned -- it sits above the first entry -- which is what
+# makes a cut leave it behind and a fold insert directly beneath it, with no boundary rule of its own.
+#
+# THE PAIR BELOW MOVES WITH THIS ONE, and the equality is the contract: BranchCycleSectionLevel must equal
+# EntryHeadingLevel or the fold stops being a verbatim paste. release-lib.tests.ps1 asserts it directly.
+$script:EntryHeadingLevel  = 3
+$script:EntrySectionLevel  = 4
 
 function Get-EntryHeadingLevel {
-    <# The number of '#' an entry's own heading carries (2). Read by the writer, the fold's file test and
+    <# The number of '#' an entry's own heading carries (3). Read by the writer, the fold's file test and
        the renderers, so no caller counts hashes for itself. #>
     return $script:EntryHeadingLevel
 }
 
 function Get-EntrySectionLevel {
-    <# The number of '#' an entry's inner sections carry (3). #>
+    <# The number of '#' an entry's inner sections carry (4). #>
     return $script:EntrySectionLevel
+}
+
+# The shallowest level an entry's sections have ever been WRITTEN at. Stated rather than derived, because it
+# is a fact about history and nothing in today's format implies it.
+$script:EntrySectionLevelRetired = 3
+
+function Get-EntrySectionLevelRange {
+    <#
+        The '#{min,max}' fragment matching an entry's section heading at the level it is written at OR at any
+        level it HAS been written at. For READERS only -- Get-EntrySectionHeading writes the exact level.
+
+        WHY EVERY READER NEEDS IT, measured on August 26, 2026 when the pair shifted one down. A legacy entry
+        is a coherent document at the OLD pair: a retired entry heading at H2 with its sections at H3. Every
+        reader that pinned the section level exactly went blind to those sections the moment the level moved
+        -- and blind is the bad direction here, because a section that cannot be found reads as a section
+        that is not there. The one that made it visible was Remove-EntryAdminSections: it stopped stripping
+        the four admin sections out of legacy entries, which is how 125 of 396 lines of a consumer's release
+        draft became 'Branch title' printed under the heading it had just become. Exactly the defect its own
+        suite was written to prevent, re-entering through the level rather than through the stripper.
+
+        THE SAME SHAPE AS Get-EntryTierSubLevelRange, deliberately: read every level, write one.
+    #>
+    $levels = @($script:EntrySectionLevel, $script:EntrySectionLevelRetired)
+    $min = ($levels | Measure-Object -Minimum).Minimum
+    $max = ($levels | Measure-Object -Maximum).Maximum
+    return '#{' + $min + ',' + $max + '}'
 }
 
 # THE CYCLE FILE SITS ONE LEVEL SHALLOWER, because it is a whole document rather than a fragment (Dave,
@@ -2890,16 +2975,28 @@ function Get-EntrySectionLevel {
 # ever folded. The cycle file's idempotency test is Get-BranchFileDeclaredBranch, which compares the branch
 # NAME the heading carries and reads both levels -- so a reset and a written cycle file sharing one level
 # costs nothing, and the file now reads as one document in both states.
-$script:BranchCycleHeadingLevel = 1
-$script:BranchCycleSectionLevel = 2
+# SHIFTED ONE LEVEL DOWN ON AUGUST 26, 2026 (Dave), together with the entry pair above and
+# CONTRIBUTING.md's own four sections. The relationship is unchanged and it is the relationship that
+# matters: this file's SECTION level still equals the entry's HEADING level, which is what makes DEPLOY a
+# verbatim paste. What moved is where both pairs sit, because '## [Unreleased]' now occupies H2 in
+# CHANGELOG.md. The reading was Dave's: the edited spec on #894 asks for four '###' phases and a '##'
+# title, and its dividers carry a '#'.
+$script:BranchCycleHeadingLevel = 2
+$script:BranchCycleSectionLevel = 3
+
+# The same two levels as literal hash runs, for the guidance text that has to SHOW them to a reader. Derived
+# here so the prose and the parser cannot disagree; see the note at StepsGuidance for why they are
+# concatenated into that text rather than interpolated.
+$script:BranchCyclePhaseHashes = '#' * $script:BranchCycleSectionLevel
+$script:BranchCycleSubHashes   = '#' * ($script:BranchCycleSectionLevel + 1)
 
 function Get-BranchCycleHeadingLevel {
-    <# The number of '#' the cycle file's own heading carries (1). #>
+    <# The number of '#' the cycle file's own heading carries (2). #>
     return $script:BranchCycleHeadingLevel
 }
 
 function Get-BranchCycleSectionLevel {
-    <# The number of '#' the cycle file's sections -- the phases and 'Where I left off' -- carry (2). #>
+    <# The number of '#' the cycle file's sections -- the phases and 'Where I left off' -- carry (3). #>
     return $script:BranchCycleSectionLevel
 }
 
@@ -2921,6 +3018,46 @@ function Get-BranchCycleSectionLevel {
 # The names deliberately did not gain an 'Entry' prefix on the way down: these readers scan a whole
 # CHANGELOG rather than one entry, so a name claiming otherwise would be wrong at every call site --
 # and keeping them meant the move changed no call site in either lib.
+
+# --- THE PENDING SECTION: '## [Unreleased]' -------------------------------------------------------
+#
+# The heading every un-cut entry sits under (Dave, August 26, 2026), and the reason the entry pair moved to
+# H3/H4. It reverses the flat shape of August 5, 2026 -- an intro followed directly by one entry per change --
+# and the argument for reversing it is that the spec on #894 asks for a named pending section by name, three
+# times, while the tree had no such heading anywhere outside CONTRIBUTING.md's own prose.
+#
+# IT IS PART OF THE DOCUMENT'S HEAD, NOT AN ENTRY, and that single fact is what makes the rest free. Because
+# it sits one level SHALLOWER than an entry, Split-Changelog's boundary -- "the first entry heading" -- lands
+# below it without knowing it exists. So a cut, which writes the head back and drops the entries, leaves a
+# fresh empty '## [Unreleased]' behind on its own; and a fold, which inserts at the top of the entries,
+# inserts directly beneath it on its own. Neither needed a rule about it.
+#
+# THE LABEL IS A SEAM because a consumer may translate it, and the LEVEL is derived rather than stated so it
+# cannot drift from the entry level it is defined against.
+$script:ChangelogUnreleasedLabel = '[Unreleased]'
+
+function Get-ChangelogUnreleasedLabel {
+    <# The text of the pending section's heading, without its hashes ('[Unreleased]'). #>
+    return $script:ChangelogUnreleasedLabel
+}
+
+function Get-ChangelogUnreleasedLevel {
+    <# The number of '#' the pending heading carries -- exactly one shallower than an entry, which is what
+       keeps it in the head rather than in the entry list. #>
+    return ((Get-EntryHeadingLevel) - 1)
+}
+
+function Get-ChangelogUnreleasedHeading {
+    <# The pending section's whole heading line ('## [Unreleased]'). #>
+    return (('#' * (Get-ChangelogUnreleasedLevel)) + ' ' + (Get-ChangelogUnreleasedLabel))
+}
+
+function Get-ChangelogUnreleasedPattern {
+    <# The anchored regex matching that heading and nothing else. Exact level, for the same reason
+       Get-EntryHeadingPattern is exact: a range would match an entry below it. #>
+    return ('^#{' + (Get-ChangelogUnreleasedLevel) + '}\s+' +
+        [regex]::Escape((Get-ChangelogUnreleasedLabel)) + '\s*$')
+}
 
 function Get-EntryHeadingPattern {
     <#
@@ -3044,15 +3181,54 @@ function Get-PreFlatChangelogRefusal {
     $level = Get-EntryHeadingLevel
     $blocks = @(Get-ChangelogEntryBlocks -Content $Content)
     $notEntries = @($blocks | Where-Object { -not (Test-EntryDeclaresShape -EntryText $_) })
-    if ($notEntries.Count -eq 0) { return '' }
 
-    $names = @($notEntries | ForEach-Object { "'" + (($_ -split "`r?`n")[0]) + "'" })
-    return ("CHANGELOG.md carries $($notEntries.Count) H$level block(s) that declare " +
-        "neither an entry's named sections nor a change type: $($names -join ', '). Every " +
-        "H$level below the intro is read as one change, so $Consequence. That is what a pre-flat " +
-        "CHANGELOG.md looks like to this parser: a section heading ('## Pull Requests', " +
-        "'## Tier N - Pull Requests', '## Releases') sits at the level an entry now occupies. Migrate the " +
-        "document first: drop the section headings, promote each entry to H$level, and " +
+    # AND THE HEAD IS SCANNED TOO, SINCE AUGUST 26, 2026, because the entry level moved DOWN and took this
+    # guard's reach with it. Measured as a red suite on the day of the shift, on the fixture that had proved
+    # the guard worked: a pre-flat document whose tier sections are H2 and whose entries are H3 used to be
+    # refused, because the tier headings sat at the entry level and declared nothing. With an entry at H3
+    # those H2 headings are one level SHALLOWER than an entry, so Split-Changelog's boundary lands below them
+    # and they disappear into the head -- unseen by the loop above, preserved by every cut, and the document
+    # parses as one perfectly good entry. Quietly wrong output from a guard that exists to prevent exactly
+    # that is worse than no guard, so the head gets the same treatment as the entries.
+    #
+    # THE PENDING HEADING IS THE ONE LEGITIMATE OCCUPANT of that level in the head, which is what makes the
+    # test cheap: anything else at it is a leftover. Fence-aware, because this repo's own intro documents the
+    # entry format and quotes these headings inside a fence.
+    # THE WHOLE DOCUMENT, NOT ONLY THE HEAD, and stopping at the first entry was a measured miss rather than
+    # a simplification. The consumer document this guard was built from has TWO leftover headings with a real
+    # entry between them -- '## Pull Requests', the entry, then '## Releases' -- so a scan that broke at the
+    # entry found the first and not the second. Both loops missed it: too shallow for the entry loop, too far
+    # down for a head-only one. And half a diagnosis is the worst outcome here, because the consumer migrates
+    # what they were told about and the cut deletes the rest. The suite asked for both from the start; the
+    # assert had been passing on the example list inside the message text rather than on a finding.
+    $unreleasedRx = Get-ChangelogUnreleasedPattern
+    $headStrayRx  = '^#{' + (Get-ChangelogUnreleasedLevel) + '}\s+\S'
+    $headStrays   = @()
+    $headLines    = @($Content -split '\r?\n')
+    $headFenced   = Get-FencedLineFlags -Lines $headLines
+    $seenPending  = $false
+    for ($h = 0; $h -lt $headLines.Count; $h++) {
+        if ($headFenced[$h]) { continue }
+        if ($headLines[$h] -notmatch $headStrayRx) { continue }
+        # Exactly ONE pending heading is legitimate. A second is a leftover like any other -- two pending
+        # sections mean the fold has been inserting into whichever it found first.
+        if ((-not $seenPending) -and $headLines[$h] -match $unreleasedRx) { $seenPending = $true; continue }
+        $headStrays += $headLines[$h]
+    }
+
+    if ($notEntries.Count -eq 0 -and $headStrays.Count -eq 0) { return '' }
+
+    $names = @(@($notEntries | ForEach-Object { "'" + (($_ -split "`r?`n")[0]) + "'" }) +
+        @($headStrays | ForEach-Object { "'" + $_ + "'" }))
+    $notEntries = @($notEntries) + @($headStrays)
+    $pending = Get-ChangelogUnreleasedHeading
+    return ("CHANGELOG.md carries $($notEntries.Count) heading(s) that are neither an entry nor the " +
+        "pending section: $($names -join ', '). An H$level below the pending heading is read as one " +
+        "change, and an H$(Get-ChangelogUnreleasedLevel) above it is read as part of the intro, so " +
+        "$Consequence. That is what a pre-flat CHANGELOG.md looks like to this parser: a section heading " +
+        "('## Pull Requests', '## Tier N - Pull Requests', '## Releases') sits either at the level an " +
+        "entry occupies or at the one the pending section does. Migrate the document first: drop the " +
+        "section headings, put a single '$pending' under the intro, promote each entry to H$level, and " +
         "give it the three named sections. An entry written before this format is fine as it is -- it " +
         "declares its type in its heading.")
 }
@@ -3126,7 +3302,7 @@ function Get-EntrySectionBody {
     if ($names.Count -eq 0) { return '' }
     $body = Get-EntryTextOutsideFences -EntryText $EntryText
     $lines = @($body -split '\r?\n')
-    $rx = '^#{' + $script:EntrySectionLevel + '}\s+(?:' +
+    $rx = '^' + (Get-EntrySectionLevelRange) + '\s+(?:' +
         ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')' +
         (Get-EntrySectionHeadingTail)
 
@@ -3167,7 +3343,7 @@ function Test-EntryHasSection {
     $names = @(@((Get-EntrySectionHeadings)[$Key]) + @(Get-EntrySectionRetiredNames -Key $Key) |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($names.Count -eq 0) { return $false }
-    $rx = '(?m)^#{' + $script:EntrySectionLevel + '}\s+(?:' +
+    $rx = '(?m)^' + (Get-EntrySectionLevelRange) + '\s+(?:' +
         ((@($names) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')' +
         (Get-EntrySectionHeadingTail)
     return [bool]([regex]::IsMatch((Get-EntryTextOutsideFences -EntryText $EntryText), $rx))
@@ -3712,7 +3888,7 @@ function Test-EntryDeclaresShape {
         if (-not $heading) { continue }
         # The tolerant tail, because 'Pull Request' carries the merge stamp once the fold has run -- and a
         # folded entry that stopped declaring its shape would be read as a leftover section heading.
-        $rx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$heading) +
+        $rx = '^' + (Get-EntrySectionLevelRange) + '\s+' + [regex]::Escape([string]$heading) +
             (Get-EntrySectionHeadingTail)
         foreach ($line in $lines) {
             if ($line -match $rx) { return $true }
@@ -3724,7 +3900,7 @@ function Test-EntryDeclaresShape {
     # nothing, and the entry-only sections have already had their say.
     $currentType = (Get-EntrySectionHeadings)['Type']
     if ($currentType) {
-        $typeRx = '^#{' + $script:EntrySectionLevel + '}\s+' + [regex]::Escape([string]$currentType) + '\s*$'
+        $typeRx = '^' + (Get-EntrySectionLevelRange) + '\s+' + [regex]::Escape([string]$currentType) + '\s*$'
         foreach ($line in $lines) {
             if ($line -match $typeRx) { return $false }
         }
@@ -4136,13 +4312,19 @@ $script:BranchFileDefaults = [ordered]@{
         '> `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.',
         '> open-pr and ship-pr both refuse while one is still open, and there is no `-Force`.',
         '>',
-        '> **FOUR `##` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top',
-        '> level. A section needing its own heading goes in as a `###` UNDER whichever of the four owns',
+        # THE LEVELS ARE COMPOSED FROM THE KNOBS, not typed (August 26, 2026). This guidance states the
+        # document's own shape, so a literal '##' here is a second copy of BranchCycleSectionLevel that is
+        # free to disagree with it -- and it did, for the length of one branch: the levels shifted and this
+        # text went on telling every new branch to write the shape the scaffolder no longer produced.
+        # Concatenated rather than interpolated because a backtick is PowerShell's escape character, so a
+        # double-quoted string carrying markdown backticks reads them as escapes.
+        '> **FOUR `' + $script:BranchCyclePhaseHashes + '` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top',
+        '> level. A section needing its own heading goes in as a `' + $script:BranchCycleSubHashes + '` UNDER whichever of the four owns',
         '> it. No gate sees a heading, so this one is on you (Dave, August 26, 2026).',
         '>',
-        '> **AND NOTHING BRANCH-SPECIFIC ABOVE `## PLAN`** -- everything between the H1 and that heading',
+        '> **AND NOTHING BRANCH-SPECIFIC ABOVE `' + $script:BranchCyclePhaseHashes + ' PLAN`** -- everything between the title and that heading',
         '> is this guidance, which is identical in every branch document. A status line, a note about',
-        '> THIS branch or an instruction to a session belongs under one of the four, normally as a `###`',
+        '> THIS branch or an instruction to a session belongs under one of the four, normally as a `' + $script:BranchCycleSubHashes + '`',
         '> in PLAN. Same rule, same reason: no gate reads this region (Dave, August 26, 2026).',
         '>',
         '> **DEPLOY takes no steps of its own, and it is WRITTEN LAST** -- it is what the branch DID, once',
@@ -4502,16 +4684,18 @@ function Format-BranchFileHeader {
     $trunk = Get-BranchTrunkName
     $shown = if ($Branch) { $Branch } else { $trunk }
     $lines = New-Object System.Collections.Generic.List[string]
-    # THE RESET STATE IS AN H1, AND FOR THE ENTRY THAT IS LOAD-BEARING rather than cosmetic:
-    # Test-IsChangelogEntryFile decides "is there an entry here" on the heading level, so a written entry's
-    # H2 folds while the trunk's own empty file never can, and folding twice is impossible rather than
-    # merely unlikely. This formatter serves the RESET, hence Level 1.
+    # THE CYCLE FILE CARRIES ITS OWN LEVEL IN BOTH STATES, and it loses nothing by that: it is never folded,
+    # so no reader has to tell its two states apart by level. What does tell them apart is the branch NAME in
+    # the heading -- the trunk's for a reset file, the branch's for a written one -- which
+    # Get-BranchFileDeclaredBranch reads at every level.
     #
-    # THE CYCLE FILE IS AN H1 IN BOTH STATES SINCE AUGUST 19, 2026, and it loses nothing by that: it is
-    # never folded, so no reader has to tell its two states apart by level. What does tell them apart is
-    # the branch NAME in the heading -- the trunk's for a reset file, the branch's for a written one --
-    # which Get-BranchFileDeclaredBranch reads at either level.
-    $lines.Add((Format-BranchFileHeadingLine -Branch $shown -Title $Title -Level 1 -Suffix $Suffix))
+    # READ FROM THE KNOB SINCE AUGUST 26, 2026, WHERE IT WAS A LITERAL 1. The argument for the literal was
+    # that Test-IsChangelogEntryFile decided "is there an entry here" on the LEVEL, so an H1 reset could never
+    # be mistaken for a foldable entry. Shifting the cycle file to an H2 put it inside the range that test
+    # accepts, so the guarantee had to move somewhere a re-level cannot reach: that function now answers on
+    # the declared branch NAME, and returns false for the trunk before it ever looks at a heading depth. With
+    # the guarantee anchored there, this line is free to follow the format.
+    $lines.Add((Format-BranchFileHeadingLine -Branch $shown -Title $Title -Level (Get-BranchCycleHeadingLevel) -Suffix $Suffix))
     if ($shown -eq $trunk) {
         $lines.Add('')
         $lines.Add('')
@@ -4792,15 +4976,23 @@ function Get-BranchFileDeclaredBranch {
     # and a predicate that cannot read the title line answers '' for every scaffolded document, which is
     # exactly the state that hands the next run permission to overwrite somebody's work.
     #
-    # BOTH LEVELS AND EVERY SHAPE, because this is the idempotency test and getting it wrong is the expensive
+    # EVERY LEVEL AND EVERY SHAPE, because this is the idempotency test and getting it wrong is the expensive
     # direction rather than the loud one. It reads '# `feat/x` cycle' (branch first, until August 23),
     # '## Branch `feat/x` changelog' (a lead word, for three days in August), and today's title-first form.
-    # A reset file is an H1 and a legacy written entry is an H2; both have to be read.
     #
-    # THE FIRST MATCH IN THE DOCUMENT WINS, which is what keeps the wide prefix safe: every branch document
-    # and every entry block opens with its own heading, so a backticked word in some later heading is never
-    # reached. Callers pass a whole file or a whole entry, never a fragment starting mid-document.
-    $headingRx = '^#{1,2}\s+[^`]*`([^`]+)`'
+    # THE RANGE IS 1..3 SINCE AUGUST 26, 2026, when both level pairs shifted one down. The levels it has to
+    # cover, and none of them is optional: a cycle file's title is an H2 today and an H1 before the shift, an
+    # entry's own heading is an H3 today and an H2 before it, and a reset file is an H1 in every era. A
+    # document written on either side of the shift has to be read, because the fold that runs after THIS
+    # branch merges will meet a cycle file scaffolded at the old levels -- and so will every consumer with a
+    # branch in flight when the plugin updates under them.
+    #
+    # WIDENING IT COSTS NOTHING BECAUSE THE FIRST MATCH WINS. Every branch document and every entry block
+    # opens with its own heading, so a deeper heading further down is never reached; callers pass a whole
+    # file or a whole entry, never a fragment starting mid-document. That is also why this may be a range
+    # while Get-EntryHeadingPattern must not be one -- that pattern scans a document for EVERY entry
+    # boundary, so an entry's own inner sections would parse as siblings. This one stops at the first hit.
+    $headingRx = '^#{1,3}\s+[^`]*`([^`]+)`'
     $label = (Get-BranchFileWording).BranchLabel
     $lineRx = '^\*\*' + [regex]::Escape([string]$label) + ':\*\*\s*`([^`]+)`\s*$'
 
@@ -4905,7 +5097,16 @@ function Get-DevelopmentCycleEntryPattern {
     $titles = @(@([string]$w.ChangelogTitle) + @(Get-BranchFileRetiredChangelogTitles) |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     $titleRx = ($titles | ForEach-Object { [regex]::Escape([string]$_) }) -join '|'
-    $level = '^#{' + $script:EntryHeadingLevel + '}\s+'
+    # A RANGE, AND THE DOCSTRING ABOVE IS WHY IT IS SAFE HERE. Matching the level is explicitly not enough --
+    # the heading also has to carry the branch name in backticks and the entry's title word -- so accepting
+    # one level shallower cannot pull in PLAN, CREATE or TEST, which carry neither. That is the difference
+    # between this pattern and Get-EntryHeadingPattern, which is an exact level precisely because it has
+    # nothing but the level to go on.
+    #
+    # IT HAS TO BE A RANGE SINCE AUGUST 26, 2026, and this branch is the proof: the document that folds THIS
+    # change was scaffolded at the old levels, so a pattern pinned to the new one would fail to find its own
+    # DEPLOY heading at the merge. Same for every consumer holding a branch when the plugin updates.
+    $level = '^#{' + ($script:EntryHeadingLevel - 1) + ',' + $script:EntryHeadingLevel + '}\s+'
     # TWO SHAPES, ONE WRITTEN. Today's heading leads with the title and a colon and may close with the merge
     # stamp -- '## DEPLOY: `feat/x-v1` * 20260823-101500'. Every entry written before August 23, 2026 puts
     # the branch first and the title last, with nothing after it. A branch in flight carries the old shape
@@ -5018,11 +5219,32 @@ function Test-BranchChangelogIsFilled {
     $declared = Get-BranchFileDeclaredBranch -Text $Text
     if ($declared -and $declared -ne (Get-BranchTrunkName)) { return $true }
 
-    # The level test, unchanged from before August 23, 2026: both levels are accepted because an entry
-    # written before the flat format is still an entry.
+    # A DOCUMENT DECLARING THE TRUNK IS A RESET, AND THAT IS NOW THE ANSWER RATHER THAN A FALL-THROUGH
+    # (August 26, 2026). It used to fall through to the level test below and be rejected there, because the
+    # reset heading was an H1 and no entry level reached it. The cycle file's title is an H2 now, which the
+    # level test accepts -- so the old arrangement would have called an empty trunk document an entry and
+    # handed the fold an empty change to paste into CHANGELOG.md, on the trunk, unprompted.
+    #
+    # THE NAME IS THE RIGHT DISCRIMINATOR AND THE LEVEL NEVER WAS, which is the lesson worth keeping: an
+    # entry always declares the branch it belongs to, a reset always declares the trunk, and neither fact
+    # moves when somebody re-levels the document. The level test survives below only for documents that
+    # declare no branch at all.
+    if ($declared -eq (Get-BranchTrunkName)) { return $false }
+
+    # The level test: two levels are accepted because an entry written before the current format is still an
+    # entry. WHICH TWO CHANGED DIRECTION ON AUGUST 26, 2026, and reading it as 'entry level plus one' would
+    # now be wrong in both halves. It used to mean the PRE-FLAT shape, which was one level DEEPER than the
+    # flat entry it preceded (H3 against H2). After the shift the flat entry is itself an H3, so the level
+    # still to cover is the one ABOVE: the H2 every entry written between August 5 and August 26 carries, and
+    # every entry sitting in a consumer's un-cut CHANGELOG.md right now.
+    #
+    # THE PRE-FLAT SHAPE NEEDS NO SEPARATE SLOT ANY MORE, because it collided with the new canonical level:
+    # both are H3. That collision is harmless HERE -- this function only asks "is this an entry file at all"
+    # -- and it is discriminated where it matters, by Get-PreFlatChangelogRefusal, which keys on whether a
+    # block declares an entry's named sections rather than on how deep its heading is.
     $entryLevel  = Get-EntryHeadingLevel
-    $legacyLevel = $entryLevel + 1
-    $rx = '^#{' + $entryLevel + ',' + $legacyLevel + '}\s'
+    $legacyLevel = $entryLevel - 1
+    $rx = '^#{' + $legacyLevel + ',' + $entryLevel + '}\s'
     foreach ($line in ($Text -split '\r?\n')) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         return ($line -match $rx)

@@ -408,7 +408,7 @@ try {
     # reset with the branch. Still asserted as the WHOLE line -- the stronger claim, because it proves
     # nothing at all was appended.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    Assert-True ($headLine1 -match '^## DEPLOY: `feat/my-task-v1`$') 'entry heading names its title and the branch, whole and at the entry level'
+    Assert-True ($headLine1 -match ('^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: `feat/my-task-v1`$')) 'entry heading names its title and the branch, whole and at the entry level'
     Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the PR title'
     Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is readable -- off the branch the heading names'
     # NO DATE AND NO STAMP, which is the same claim in two shapes: a 'yyyy-MM-dd' would read as the landing
@@ -444,7 +444,7 @@ try {
     # than once as prose -- so what is empty on a fresh entry is each tier's REASON, and that is what the
     # gate names. Asserted through the gate rather than through the section's text, because the section is
     # no longer empty: it holds the headings the author has to fill in.
-    Assert-True ((Get-EntrySectionAnswer -EntryText $entryText1 -Key 'What') -match '#### ') 'the body section holds the tier sub-sections to answer'
+    Assert-True ((Get-EntrySectionAnswer -EntryText $entryText1 -Key 'What') -match (('#' * ((Get-EntrySectionLevel) + 1)) + ' ')) 'the body section holds the tier sub-sections to answer'
     $gate1 = @(Get-EntryScaffoldFindings -EntryText $entryText1 -Wording (Get-EntryScaffoldWording))
     Assert-True (@($gate1 | Where-Object { $_.Label -match 'no reason' }).Count -gt 0) `
         'and the gate names the unanswered tiers, so an unwritten entry cannot reach a PR'
@@ -536,7 +536,7 @@ try {
     Assert-Equal $maliciousTitle (Get-EntryDescription -EntryText $entryTextF) 'malicious title: FULLY and unchanged in its section, and nothing appended (no argv splitting)'
     # ...and the heading is untouched by it, which is new ground the split opened: a payload that escaped its
     # section would show up here first.
-    Assert-True ((($entryTextF -split "`r?`n")[0]) -match '^## DEPLOY: `feat/injection-check-v1`$') 'malicious title: and the heading still names the branch, nothing more'
+    Assert-True ((($entryTextF -split "`r?`n")[0]) -match ('^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: `feat/injection-check-v1`$')) 'malicious title: and the heading still names the branch, nothing more'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type still reads off that heading rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"

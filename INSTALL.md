@@ -445,7 +445,7 @@ the guidance those copies held is inside the document.
 
 **And one seam function in your `scripts/repo-config.ps1` may now be dead code.** `Get-ChangelogHeading`
 named the `##` section a folded entry was filed under; `CHANGELOG.md` has no section headings any more — it
-is an intro followed by one `##` per change — so nothing reads that function, and `check-script-contract`
+is an intro, then `## [Unreleased]`, then one `###` per change — so nothing reads that function, and `check-script-contract`
 no longer names it either (inbound
 [#561](https://github.com/DaveKJohn/claude-code-specialists/issues/561)). **Nothing reports this**, which is
 the point of mentioning it: if you still define it, possibly with a test around it, it answers a question

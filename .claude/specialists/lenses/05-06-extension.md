@@ -21,7 +21,8 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 ### Changelog
 
-`CHANGELOG.md` (repo root) is an **intro followed by one `##` per change, with no section headings at all**
+`CHANGELOG.md` (repo root) is an **intro, then `## [Unreleased]`, then one `###` per change, with no other
+section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
 `` ## DEPLOY: `feat/x` `` — with two `###` sections under it since August 16, 2026:
 `What makes this deploy extra special` and `Pull Request`, which carries the PR title and which the fold
@@ -564,7 +565,7 @@ it moved into the `Pull Request` section where the rest of the PR's facts alread
 the DEPLOY heading's own text (tier 0's answer, under no heading of its own, with
 `### What makes this deploy extra special` beside it for the audience tier, each closing with `**Score:**`)
 and `Pull Request` — the title, then the `Plugins:` line and the
-`[PR #N](…)` footer the **fold** writes underneath it, with the landing moment stamped on the `## DEPLOY:` heading. `Plugins:` stays a plain line,
+`[PR #N](…)` footer the **fold** writes underneath it, with the landing moment stamped on the `### DEPLOY:` heading. `Plugins:` stays a plain line,
 because a heading around one fact is more structure than content.
 
 **Every one of the six is still READ**, here and in every consumer: `CHANGELOG.md`, the release documents

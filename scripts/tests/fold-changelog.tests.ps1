@@ -83,6 +83,13 @@ function Assert-Equal {
 $script:fixtures = @()
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
+# The entry format's levels, composed from the lib rather than typed. Both pairs shifted one deeper on
+# August 26, 2026, and the fixtures below state the format the fold reads -- so a literal here is a second
+# definition of it, which is exactly what turned 57 assertions in this file red on the day of the shift.
+$foldEntryH = '#' * (Get-EntryHeadingLevel)
+$foldSectH  = '#' * (Get-EntrySectionLevel)
+$foldPendH  = Get-ChangelogUnreleasedHeading
+
 # The fixture changelog's intro, kept as one variable so the tests can assert it came through untouched
 # rather than re-describing it. Deliberately contains NO '## ' line: in the flat model the intro is
 # everything above the first entry heading, so an intro that carried one would move the boundary.
@@ -154,12 +161,12 @@ function New-EntryFile {
         [string]$Type = 'Feat',
         [string]$ExtraBody = ''
     )
-    $lines = @("## $Title", '', '### What does this change do?', '', 'Demo entry body.')
+    $lines = @("$foldEntryH $Title", '', "$foldSectH What does this change do?", '', 'Demo entry body.')
     if ($ExtraBody) { $lines += @('', $ExtraBody) }
     $lines += @(
-        '', '### Who is this for', '',
+        '', "$foldSectH Who is this for", '',
         '| Tier | Significance | Why |', '|---|---|---|', $Rows,
-        '', '### Type of change', '', $Type
+        '', "$foldSectH Type of change", '', $Type
     )
     [System.IO.File]::WriteAllText((Join-Path $Dir $Name), (($lines -join "`n") + "`n"), $Utf8NoBom)
 }
@@ -176,7 +183,14 @@ function New-LegacyEntryFile {
     param([string]$Dir, [string]$Name, [string]$Title, [string]$Tier = '0', [switch]$NoTierLine, [string]$ExtraBody = '')
     $md = [char]0x00B7
     $tierLine = if ($NoTierLine) { '' } else { "Tier: $Tier`n`n" }
-    $body = "### $Title $md Feat $md 2026-01-01`n`n$tierLine" + "Demo entry body.`n" + $ExtraBody
+    # ONE LEVEL DEEPER THAN AN ENTRY, expressed as that relationship rather than as a number. What makes this
+    # shape legacy is not the digit 3 but that it is NOT the entry level -- which is why the fold has to
+    # promote it before pasting, or it would be absorbed into the entry above and inherit its PR link. Written
+    # as a literal '###' until August 26, 2026, when the entry level moved to 3 and this fixture quietly
+    # became a CURRENT-shape entry: nothing to promote, so two asserts about the promotion went red while the
+    # mechanism they test was untouched.
+    $legacyH = '#' * ((Get-EntryHeadingLevel) + 1)
+    $body = "$legacyH $Title $md Feat $md 2026-01-01`n`n$tierLine" + "Demo entry body.`n" + $ExtraBody
     [System.IO.File]::WriteAllText((Join-Path $Dir $Name), $body, $Utf8NoBom)
 }
 
@@ -198,13 +212,13 @@ function Get-EntryOrder {
         because the latter passes on every possible ordering, including the reverse.
     #>
     param([string]$Changelog)
-    return @([regex]::Matches($Changelog, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() })
+    return @([regex]::Matches($Changelog, ('(?m)^' + $foldEntryH + ' (.+)$')) | ForEach-Object { $_.Groups[1].Value.Trim() })
 }
 
 function Get-ChangelogIntro {
     <# Everything above the first entry heading. The fold must never write into this. #>
     param([string]$Changelog)
-    $m = ([regex]'(?m)^## ').Match($Changelog)
+    $m = ([regex]('(?m)^' + $foldEntryH + ' ')).Match($Changelog)
     if (-not $m.Success) { return $Changelog }
     return $Changelog.Substring(0, $m.Index)
 }
@@ -287,13 +301,13 @@ Assert-True ($changelogText -notmatch '(?m)^# Contributing')               'CONT
 # flattened these three into H2s and turned one entry into four.
 Assert-Equal 1 @(Get-EntryOrder -Changelog $changelogText).Count 'the folded entry is exactly ONE entry heading, not four'
 foreach ($section in @('What does this change do?', 'Who is this for', 'Type of change')) {
-    Assert-True ($changelogText -match ('(?m)^### ' + [regex]::Escape($section) + '\s*$')) "the '$section' section kept its own level"
+    Assert-True ($changelogText -match ('(?m)^' + $foldSectH + ' ' + [regex]::Escape($section) + '\s*$')) "the '$section' section kept its own level"
 }
 # THE HEADING IS LEFT EXACTLY AS THE AUTHOR WROTE IT (Dave, August 5, 2026). The fold used to prepend
 # '#NN <midDot> ' to the title; the number is on the closing line now, where the url makes it clickable.
 # Asserted as the WHOLE heading line, anchored: a prefix match would pass with anything prepended.
 Assert-Equal 'Demo thing' @(Get-EntryOrder -Changelog $changelogText)[0] 'the heading is exactly the title -- nothing is prepended to it'
-Assert-True ($changelogText -notmatch ('(?m)^## #\d+ ' + [regex]::Escape([char]0x00B7))) 'no entry heading carries a PR number'
+Assert-True ($changelogText -notmatch ('(?m)^' + $foldEntryH + ' #\d+ ' + [regex]::Escape([char]0x00B7))) 'no entry heading carries a PR number'
 # And the number is not LOST, which is the whole reason it could leave the heading. This fixture has no PR
 # (the fold's gh call finds nothing by design here), so the assert is on the mechanism rather than a number:
 # the fold writes the number in exactly one place, and that place is the closing line.
@@ -326,7 +340,7 @@ Assert-Equal 'The first one' (@(Get-EntryOrder -Changelog $clE))[0] 'empty list:
 # THE BLANK LINE IS ENSURED, NOT ASSUMED. An intro whose last line had no blank line after it would leave
 # '...releases/README.md.## The first one' -- which markdown renders as one paragraph and no heading at all,
 # so nothing would look broken until a parser went looking for the entry.
-Assert-True ($clE -match "(?m)^\s*$[\r\n]+## The first one") 'empty list: with a blank line between the intro and the heading'
+Assert-True ($clE -match ('(?m)^\s*$[\r\n]+' + $foldEntryH + ' The first one')) 'empty list: with a blank line between the intro and the heading'
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host "fold-all -- a consumer-extended prefix still folds" -ForegroundColor Cyan
@@ -553,7 +567,7 @@ Assert-True ($clL -match '(?m)^Tier: 2$') 'legacy entry: its Tier: line is CARRI
 $orderL = @(Get-EntryOrder -Changelog $clL)
 Assert-Equal 2 $orderL.Count 'legacy entry: it is an entry boundary in its own right'
 Assert-True ($orderL[0] -match 'Written before the table') 'legacy entry: and its tier-2 line still ranks it above the tier-1 entry'
-Assert-True ($clL -notmatch '(?m)^### Written before the table') 'legacy entry: nothing is left at the old level'
+Assert-True ($clL -notmatch ('(?m)^' + ('#' * ((Get-EntryHeadingLevel) + 1)) + ' Written before the table')) 'legacy entry: nothing is left at the old level'
 Assert-True ($rL.Output -match 'pre-flat entry format') 'legacy entry: and the promotion is reported rather than done silently'
 
 Write-Host "An entry with no declaration at all is tier 0, and says so" -ForegroundColor Cyan
