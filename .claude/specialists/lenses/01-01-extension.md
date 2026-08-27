@@ -68,18 +68,20 @@ product: agent defs, manuals, docs, and tooling.
   that the report and the pickup were the same team an hour apart — the same shape as the fifth inbound
   pattern in the `triage-inbound` skill, and the same argument for recounting even when the report is
   your own.
-- **The inbound verification, and the five ways a report fails on pickup.** An inbound item is verified
-  as still standing before it is routed, and four more things are checked beside the symptom: whether its
+- **The inbound verification, and the six ways a report fails on pickup.** An inbound item is verified
+  as still standing before it is routed, and five more things are checked beside the symptom: whether its
   **reasoning** has expired, whether the **repair** it proposes names a mechanism that exists, whether its
-  **subject** exists at all, and whether the **size** it reports is the size of the subject. Each fails
+  **subject** exists at all, whether the **size** it reports is the size of the subject, and whether the
+  **repo** it names is the one the symptom is actually in. Each fails
   independently, and getting any of them wrong produces a repair that satisfies the report and is wrong —
   which is worse than the original defect, because it now carries a citation. **The measurements behind
-  all five live in the `triage-inbound` skill**
+  all six live in the `triage-inbound` skill**
   ([`.claude/skills/triage-inbound/SKILL.md`](../../skills/triage-inbound/SKILL.md)): #469, repaired on
   `main` inside the same morning it was filed; #456, whose three load-bearing facts had expired in four
   days; #566, proposing a `Resolve-PluginScript` that exists nowhere in the tree; #660, designing a board
-  for a `pair-cli` that occurs nowhere but in its own report; and the four of 22 own reports whose counts
-  were wrong, one of them wrong in its verdict. They moved out of this always-loaded lens on
+  for a `pair-cli` that occurs nowhere but in its own report; the four of 22 own reports whose counts
+  were wrong, one of them wrong in its verdict; and #954, whose two dead links were real, live, and in
+  the reporter's own tree rather than ours. They moved out of this always-loaded lens on
   August 22, 2026, found by `/doctor`: 94 lines that are only read during a triage were costing every
   session ~2,300 tokens. **The rule stays here, the evidence is one invocation away** — which is this
   repo's own convention for where a measurement belongs, not a concession to size.

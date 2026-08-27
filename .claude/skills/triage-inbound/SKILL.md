@@ -1,6 +1,6 @@
 ---
 name: triage-inbound
-description: The measured evidence behind this repo's inbound-item verification — the five ways a filed report fails on pickup (already repaired, reasoning expired, proposed repair names something that does not exist, subject does not exist, size mis-measured), each with the issue that produced it. Use when an inbound issue is being picked up here, when a report's symptom, reason, repair, size or subject is being checked against the tree, or when deciding whether a standing report is still routable.
+description: The measured evidence behind this repo's inbound-item verification — the six ways a filed report fails on pickup (already repaired, reasoning expired, proposed repair names something that does not exist, subject does not exist, size mis-measured, the symptom is in the reporter's own tree), each with the issue that produced it. Use when an inbound issue is being picked up here, when a report's symptom, reason, repair, size, subject or repo is being checked against the tree, or when deciding whether a standing report is still routable.
 ---
 
 # Triaging an inbound item — the evidence
@@ -12,13 +12,14 @@ description: The measured evidence behind this repo's inbound-item verification 
 > and manuals carry no repo-specific detail at all while skills carry the evidence behind a
 > procedure"* ([`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation)).
 
-Five things are checked before an inbound item is routed, and each one fails independently: the
+Six things are checked before an inbound item is routed, and each one fails independently: the
 **symptom** may already be repaired, the **reasoning** may have expired, the **repair** it proposes
-may name a mechanism that does not exist, the **subject** may not exist at all, and the **size** it
-reports is almost never the size of the subject. Below is the instance that produced each, because a
-pattern without its measurement is just advice.
+may name a mechanism that does not exist, the **subject** may not exist at all, the **size** it
+reports is almost never the size of the subject, and the **repo** it names may not be the one the
+symptom is in. Below is the instance that produced each, because a pattern without its measurement is
+just advice.
 
-## The five patterns, as measured here
+## The six patterns, as measured here
 
 - **Where the inbound verification was measured.** The portable rule — an inbound item is verified as
   still standing before it is routed — was written after
@@ -114,3 +115,36 @@ pattern without its measurement is just advice.
   is your own, and especially then. **And a timing is a count too**: #714's headline was a stopwatch
   reading taken while the machine ran a team-wide review, which is why the re-measure states the machine
   state and the n beside every figure.
+- **The sixth pattern: the symptom is real, it is live right now, and it is in the REPORTER's tree.**
+  [#954](https://github.com/DaveKJohn/claude-code-specialists/issues/954), closed August 27, 2026. It
+  reported two dead GitHub blob URLs — `plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md`,
+  404 against the `contributing-davekjohn/` form's 200 — in `releases/README.md`, above its horizontal
+  rule. Every one of those facts was verified and true, and the dead links exist. **In djcylow-react.**
+  Here, `grep -rn "plugins/workflows/workflow-davekjohn" .` over the whole tree returns **zero** live
+  hits: the seven survivors are inside archived release notes as visible prose whose link targets already
+  point at the new path, which is the published-record rule working. And the page the report names has no
+  mirrored section for them to be in — `grep -c '^---' releases/README.md` returns **0**, no horizontal
+  rule at all. Two commits emptied it, and the first is the point: `94476de6` (August 13, 2026, inbound
+  [#646](https://github.com/DaveKJohn/claude-code-specialists/issues/646)) moved the mirrored process half
+  **out of that file** and into `RELEASES-portable.md`, taking both URLs with it; `8797f7a5` (August 26,
+  #886) then corrected the path in its new home.
+  **What made it invisible is the report's own justification, which is the part to distrust.** It argued
+  *"the content above the rule is a verbatim mirror of the source's page, so a local fix would just
+  restart drift"* — sound reasoning from an identity the two trees had **stopped sharing thirteen days
+  earlier**, by the very change that ended the mirroring. A mirror is the one construct where "which
+  repo's tree is this path in?" cannot be answered by reading the content, because being identical is the
+  whole design. So resolve the path in **your** tree before accepting the attribution, and where it
+  resolves nowhere, go and read the reporter's copy. Theirs was at
+  `contributing-davekjohn/releases/README.md` — a *different path* than the report names, whose own
+  `releases/README.md` returns 404, so the named file existed on neither side. **The tell for a stale
+  mirror is datable from inside it**: line 482 of their copy still describes `RELEASES-portable.md` as a
+  proposal ("source for a **`RELEASES-portable.md`** in the plugin"), which pins the mirror to before #646
+  landed, while the two dead links sat at 196 and 289 above the rule at 336.
+  **And the proposed repair fails a fourth way**, on the tree that does have the defect: repointing two
+  URLs preserves a ~4,000-word hand-maintained mirror of a process half that no longer exists upstream —
+  the exact cost #646 was filed to end — and it would drift again at the next rename. The remedy is to
+  replace everything above the rule with a pointer to the plugin's page, which is what
+  `adopt-workflow-folder` scaffolds. **What separates this from the first pattern:** #469 was repaired
+  here, so verifying it *closed* it. Here nothing was repaired away — the defect is live, it is simply
+  not ours, and the closure's whole value is telling the reporter which file to open and what to do that
+  is not what they asked for.

@@ -217,6 +217,20 @@ ever checked, under the requester's own name, in the house style, which is preci
 settled. So ask them, early and plainly. A requester who does not recognise a name in their own filed idea
 has answered the question in one line, and no amount of further searching would have.
 
+**And one more thing the tree answers, which is *which* tree.** Every check above silently assumes the
+defect is in the tree you are standing in. A reporter measuring from another repo can be right about the
+symptom, the reason and the line number, and wrong about whose file it is — so resolve the path in your
+own tree before accepting the attribution. Where it resolves to nothing, the finding has neither
+collapsed nor been repaired: it is somebody else's, and the assignment becomes telling them which file to
+open.
+
+**Mirrored content is where this hides, and a report citing the mirror is the one to distrust.** *"This
+is a verbatim copy of yours, so a local fix would just drift"* is sound only while the copies are still
+the same — and being identical is the mirror's whole design, so its content can never tell you which side
+you are reading. Date it instead: a stale copy usually describes as planned something that has since
+shipped. Then check what your side did with it, because a mirror *retired* upstream makes their proposed
+fix the wrong fix — repointing a link inside a copy they should no longer keep.
+
 ## The repo's own way of working comes first
 
 <!-- BEGIN shared:repo-way-of-working -- GENERATED, do not edit here -->
