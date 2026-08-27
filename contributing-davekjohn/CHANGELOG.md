@@ -31,3 +31,41 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `feat/shopify-sync-pr-body-seam-v1` · 20260827-215731
+
+`team-shopify`'s pre-task sync now writes the PR body itself, on **both** paths, and a consumer can replace
+it. The body names what was TAKEN from live as well as what was held back, and gives every path its kind in
+words -- `changed on live`, `new on live`, `gone from live` -- so a deletion on live reads as a deletion
+instead of as a filename in a list. `Get-ShopifySyncPrBody` receives the classified rows and the composed
+body and returns whatever the repo's own review policy needs around them.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+**The PR body is the record, and in some repos it is the only one.** Where a consumer has ruled that the
+sync PR does not wait for a review -- provided it states plainly what a third party did -- nobody reads the
+diff by design. *"The diff shows what came in, never what was held back"* was the script's own instinct and
+it was the right half of a two-half problem: the diff of a sync branch cannot show what live no longer has
+either. That is not hypothetical. Inbound #1000 arrived with the failure already measured in the reporting
+repo's sync PR #350, where a flat file list could not say that a template had disappeared.
+
+**And the path that had no body at all was the default one.** The merging variant composed a partial body;
+the non-merging variant composed none and printed a `gh pr create` line without `--body`, plus a list for
+the operator to paste in. Merging is opt-in, so the common case was the empty one -- the sort of gap that
+survives because every consumer who hits it works around it locally, which is exactly what the reporting
+repo had been doing since the time-window era.
+
+**Score:** N/A
+
+#### Pull Request
+
+team-shopify sync-main: a seam for the sync PR body
+
+Plugins: team-shopify
+
+[PR #1014](https://github.com/DaveKJohn/claude-code-specialists/pull/1014)
+
+---
+
