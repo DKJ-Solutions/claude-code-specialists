@@ -57,8 +57,9 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
 - **The branch document comes from the shared formatter** -- the same one `new-branch` and the fold
   call -- so the scaffold cannot write a shape of its own.
 - **Refused in a repo that publishes plugins** (`.claude-plugin/marketplace.json` present). The source
-  repo of this workflow keeps its `CONTRIBUTING.md` and `releases/` at its root by its own decision;
-  only its branch dossier lives in the folder there.
+  repo of this workflow arranges that folder by hand, and its answer differs from what this command
+  writes: it keeps no root `CONTRIBUTING.md` at all, holding that floor in its `CLAUDE.md` instead
+  (Dave, August 27, 2026), while the page scaffolded here assumes you have one.
 - **A leftover root `branch/` from before the move is yours to remove by hand** -- the scripts read
   only the new location, deliberately without a dual-read fallback.
 - **The folder itself is permanent** (issue #885). No command in this plugin removes

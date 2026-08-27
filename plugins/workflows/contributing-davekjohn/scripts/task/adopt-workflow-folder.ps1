@@ -14,8 +14,8 @@
           README.md              what this folder is, and where each page's portable half lives
           CONTRIBUTING.md        this repo's answers to CONTRIBUTING-portable.md, plus the session rules for
                                  this folder -- one page since #886, not two
-          releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not
-                                 here -- it is at the repo root; see the closing advice)
+          releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is a
+                                 second file beside it, not this one; see the closing advice)
           releases/audience/     where the cut drafts the hand-written note (kept by .gitkeep until then)
           (development-cycle.md is NOT placed -- it lives only while a branch is open)
 
@@ -40,9 +40,13 @@
     with the thing it existed for.
 
     REFUSED IN A REPO THAT PUBLISHES PLUGINS (.claude-plugin/marketplace.json present). The source repo
-    of this workflow deliberately keeps its CONTRIBUTING.md and releases/ at its root -- it is the
-    product's home, not a consumer -- and only its branch dossier lives in the folder (Dave,
-    August 14, 2026). Scaffolding the full folder there would build the layout its owner declined.
+    of this workflow arranges that folder by hand -- it is the product's home, not a consumer -- so
+    scaffolding it there would write a layout over one its owner composed deliberately.
+    AND ITS ANSWER DIFFERS FROM WHAT THIS COMMAND WRITES, in one way worth knowing before copying it:
+    the source has NO root CONTRIBUTING.md, keeping that floor in its CLAUDE.md instead (Dave,
+    August 27, 2026), while the page scaffolded below assumes a consumer has one. That is the source's
+    own housekeeping rather than the model -- see CONTRIBUTING-portable.md, which recommends the root
+    page and says why.
 
 .PARAMETER Apply
     Write the files. Without it the command is a DRY RUN that prints exactly what it would create and
@@ -71,14 +75,14 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # workshop root copy falls back to the git root. Same resolution as every other mirrored script.
 $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 
-# A repo that publishes plugins is a workflow SOURCE, not a consumer, and its docs deliberately live at
-# its root -- see the header. This is the same one-file test the source-repo guard uses for the same
+# A repo that publishes plugins is a workflow SOURCE, not a consumer, and it arranges that folder by
+# hand -- see the header. This is the same one-file test the source-repo guard uses for the same
 # distinction, and it is what keeps this refusal out of every genuine consumer's way.
 if (Test-Path -LiteralPath (Join-Path $repoRoot '.claude-plugin\marketplace.json') -PathType Leaf) {
     Write-Host 'REFUSED: this repo publishes plugins, so it is a workflow source rather than a consumer.' -ForegroundColor Red
-    Write-Host 'The source keeps its CONTRIBUTING.md and releases/ at the repo root by its own decision'
-    Write-Host '(Dave, August 14, 2026) -- only the branch dossier lives in contributing-davekjohn/ there,'
-    Write-Host 'and new-branch creates that on its own. Nothing was written.'
+    Write-Host 'The source arranges contributing-davekjohn/ by hand, and its answer differs from what this'
+    Write-Host 'command writes: it keeps NO root CONTRIBUTING.md at all (Dave, August 27, 2026), while the'
+    Write-Host 'page scaffolded here assumes you have one. Nothing was written.'
     exit 1
 }
 

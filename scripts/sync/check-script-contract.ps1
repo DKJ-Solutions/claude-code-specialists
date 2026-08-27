@@ -295,8 +295,9 @@ if ($contractLibs.Count -gt 0 -and $presentLibs.Count -eq 0) {
 # cannot create it -- an install is a clone into the plugin cache -- so the one signal a consumer gets
 # is this line, surfaced at session start by the script-contract hook ([ERROR] is what that hook
 # forwards, which is why this is not an [INFO]). EXISTENCE ONLY, deliberately: the folder's contents
-# differ legitimately per repo (the source keeps its docs at the repo root and carries only branch/
-# here), so anything finer would need the per-repo exemption list this repo keeps declining.
+# differ legitimately per repo (the source composes its own by hand, and since August 27, 2026 it holds
+# more than a consumer's scaffold writes), so anything finer would need the per-repo exemption list this
+# repo keeps declining.
 # Placed AFTER the bootstrap marker: a repo that has not been through specialists-init already got the
 # one message that names its actual state, and this line would be noise on top of it.
 # BOTH FOLDER NAMES SATISFY THIS (#886, August 26, 2026). The folder renamed 'workflow-davekjohn/' ->

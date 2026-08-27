@@ -303,16 +303,31 @@ document is generated at all are yours too (`Get-ReleaseNotesGrouping`, `Get-Rel
 
 ---
 
-## The two contributing pages, and which one wins
+## The two contributing layers, and which one wins
 
-A repo running this workflow carries **two** contributing pages, deliberately (Dave, August 14, 2026):
+A repo running this workflow carries **two layers**, deliberately (Dave, August 14, 2026):
 
-- the root `CONTRIBUTING.md` is the **standard workflow** — what holds before any plugin is consulted,
-  and what stays meaningful the day the plugin is absent: a fresh checkout, a teardown, a contributor
-  who installed nothing;
+- a **floor** — what holds before any plugin is consulted, and what stays meaningful the day the plugin
+  is absent: a fresh checkout, a teardown, a contributor who installed nothing. Normally that is your
+  root `CONTRIBUTING.md`;
 - `contributing-davekjohn/CONTRIBUTING.md` (the `adopt-workflow-folder` skill scaffolds it) is the
   **workflow's layer**: everything this plugin owns, plus your repo's answers to its seams. **Where the
   two disagree, the workflow's page wins.**
 
 So adopting this workflow never rewrites your root page — the folder file arrives beside it and takes
 precedence only where they conflict.
+
+**Which file carries the floor is yours, and the source repo answers it differently from the
+recommendation.** On August 27, 2026 it deleted its root `CONTRIBUTING.md` and kept the floor in its
+`CLAUDE.md`, on the grounds that an always-on document already stated the same three rules — never
+directly on the trunk, a branch + PR, the required CI check — and a second copy is a thing to keep in
+sync rather than a safety net. **Nothing in this workflow depends on that choice**: every gate reads your
+branch's own `development-cycle.md`, never a contributing page, so both answers work.
+
+**The recommendation is still the root page, for two reasons that have nothing to do with the gates.**
+GitHub links a root `CONTRIBUTING.md` from the new-issue and new-pull-request pages and from the
+repository sidebar, and it recognises that file only in the root, `.github/` or `docs/` — a page in
+`contributing-davekjohn/` gets none of that surfacing. And it is the file a drive-by contributor looks
+for by name. Both matter most in a public repo with contributors who have installed nothing, which is
+precisely the reader the floor exists for. Keep the root page unless you can say why your repo is not
+that case.
