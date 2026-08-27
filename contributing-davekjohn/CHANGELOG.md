@@ -32,6 +32,135 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/readoption-warns-for-the-two-note-roots-v1` · 20260827-203637
+
+Re-adopting the workflow folder now tells you about the two generated note roots that moved, which was
+the one relocation in that family with no warning behind it. `adopt-workflow-folder.ps1` has printed an
+explicit re-adoption note for `Get-ReleaseHistoryPath` and for the root `CHANGELOG.md` since #885
+isolated them -- "your next cut starts a NEW list here", "any entry pending there right now will NOT be
+picked up". [#914](https://github.com/DaveKJohn/claude-code-specialists/issues/914) did the same thing
+to `Get-ReleaseChangelogNotesRoot` and `Get-ReleaseGithubNotesRoot` on August 26 and nothing followed
+it: the scaffold text was updated, the migration-warning block was not, and `cut-release.ps1` only
+asserts the resolved paths. So an existing consumer's next cut would open two fresh trees inside the
+folder and leave the real history at the repo root, silently.
+
+The block now resolves both seams and names their answers on every run, and warns only where a
+pre-#914 tree is actually still sitting at the root -- with the file count, because the scale is what
+makes it legible, and with both honest ways out rather than a preference. The legacy paths are asked of
+`Get-PreIsolationSeamPath`, the same lookup the cut's own tolerance uses, so the two halves of one
+mechanism cannot drift apart again -- which is the shape of defect this family keeps producing.
+
+Filed as inbound [#955](https://github.com/DaveKJohn/claude-code-specialists/issues/955). Its exhibit
+had already been repaired by hand at the consumer by the time it was picked up; the gap it reported had
+not, and the TEST section above records both.
+
+For this repo the durable half is that the warning is derived rather than restated: the next seam to
+isolate gets its warning by being added to one lookup, not by somebody remembering this block exists.
+That is exactly what #914 did not get.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+If you still keep `releases/development/` or `releases/github/` at your repo root, re-running
+`adopt-workflow-folder` now says so -- which tree it found, how many notes are in it, and that your
+next cut writes somewhere else and leaves it behind. Between 4.20.0 and this version nothing told you:
+one consumer only caught it by going looking. Two ways out, both fine: `git mv` the tree onto the path
+the run prints, or define the seam in `scripts/repo-config.ps1` to keep pointing at your root tree.
+Nothing is moved for you and nothing is refused.
+
+**Score:** 4
+
+#### Pull Request
+
+Re-adoption warns about the two generated note roots #914 moved
+
+Plugins: contributing-davekjohn
+
+[PR #1009](https://github.com/DaveKJohn/claude-code-specialists/pull/1009)
+
+---
+
+### DEPLOY: `fix/record-count-assert-counts-what-it-claims-v1` · 20260827-201934
+
+The contract drift guard's record-count assert enforced a floor of **29** and explained it as *"the
+twenty-eight below plus the dedicated Get-LiveStage block"*. Neither number was real: the lib holds 36
+records and the table below the assert holds 23, so the arithmetic described neither set. It is
+`Assert-Equal 36` now, against the lib, and the message says so -- with the table's own count stated
+beside it rather than folded into the same sentence.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**The slack was the defect, not the prose.** Seven records of headroom meant a record could be deleted
+and the guard would say nothing -- measured, not argued: with `Get-ReleaseMajorMinMinors` removed the lib
+has 35 and `-ge 29` still passes. That contradicts what the table's own comments promise twice, that a
+retired record *"would have to change the count assert too, which is the conversation that should
+happen."* A floor cannot force a conversation in either direction; an equality does, and the message now
+says to change the number in the same commit and name which record moved.
+
+**The two numbers were never the same set, and the old sentence made them look like one.** The lib's
+records are what the check reads; `$expectedContract` is what this test pins by name. 36 and 23, with
+`Get-LiveStage` asserted separately after the loop -- so the test file names 24 of the 36 and the rest
+rest on the `Returns` assert alone. Stating that plainly is worth more than the count it replaces: it
+tells the next reader which records are actually guarded by name.
+
+**Score:** N/A
+
+#### Pull Request
+
+the contract record-count assert counts what it claims, and stops explaining a floor with arithmetic that never matched
+
+[PR #1008](https://github.com/DaveKJohn/claude-code-specialists/pull/1008)
+
+---
+
+### DEPLOY: `fix/placeholder-tolerance-keeps-its-own-history-v1` · 20260827-201804
+
+The list of PR-template placeholder lines `open-pr.ps1` recognises stops being a list of paths only a
+migrated repo could have. `Get-PrDescriptionPlaceholderDefaults` is documented append-only -- "RECOGNISE
+ALL, WRITE ONE" -- because a consumer's PR template is their file, and an unrecognised placeholder is a
+PR body with no description at all. The rename in [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)
+rewrote the four strings carrying the folder name instead of appending to them, which inverted the whole
+purpose: a consumer who has not migrated is by definition still carrying `workflow-davekjohn` in their
+template, so the four strings kept *for* them became the four that no longer matched them. Measured in
+`smartwatchbanden` on the 4.20.0 update and before any migration: 0 matches out of 7. The pre-rename
+forms are back beside the current ones, recovered from the rename commit's own parent so they are the
+strings that were really shipped rather than a reconstruction.
+
+Two things travel with it. The docstring's history line said the entry path moved under
+`contributing-davekjohn/` on August 14, 2026 -- the rename had rewritten the prose too, and on that date
+the folder was named `workflow-davekjohn`. The rename is now a dated step of its own, so the list's
+shape and its explanation agree again. And `pr-body.tests.ps1` gains the assert nobody had: the four
+forms by name, plus the structural rule behind them -- every entry naming the folder must exist under
+*both* folder names, because a form present under one and absent under the other is a rewrite. That
+second assert is what makes the next rename fail loudly instead of quietly, and it was verified by
+re-applying the defect.
+
+Closes [#952](https://github.com/DaveKJohn/claude-code-specialists/issues/952).
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+If your PR template still says `workflow-davekjohn/...`, `open-pr` fills in your PR description again.
+Between 4.20.0 and this version it did not: it warned and opened the PR with no description, because the
+strings kept for exactly your case had been rewritten to the new folder name. Nothing to migrate --
+adopting the new template remains optional, and both forms are recognised from here on.
+
+**Score:** 4
+
+#### Pull Request
+
+The PR-placeholder tolerance list keeps the folder name each string was written with
+
+Plugins: contributing-davekjohn
+
+[PR #1007](https://github.com/DaveKJohn/claude-code-specialists/pull/1007)
+
+---
+
 ### DEPLOY: `fix/test-capture-flattens-the-console-wrap-v1` · 20260827-200044
 
 Two test suites stop failing on the width of the console they happen to run in.
