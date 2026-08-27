@@ -198,10 +198,12 @@ to repair a PowerShell file.
   Measured on a test suite that dot-sourced the repo config and assigned a local of that name three lines
   after reading the seam: the next call returned the test's own absolute path instead of the repo-relative
   answer. **It failed visibly only because a later assert used the value** — a caller that merely *reads*
-  the seam after such an assignment gets a wrong answer with nothing to notice. Two halves to the remedy,
-  and both are worth having: in a lib, keep the backing variable's name distinctive enough that no caller
-  will pick it; in a caller, do not name a local after a function you are calling. There is no scoping
-  operator that fixes this from the caller's side, which is why it is a naming rule.
+  the seam after such an assignment gets a wrong answer with nothing to notice. **The remedy is on the
+  caller's side: do not name a local after a function you are calling.** The lib cannot save you, and a
+  config lib whose variables are named `$script:<what the getter returns>` is right to keep that
+  convention — one variable renamed for safety while its neighbours keep the pattern reads as a mistake
+  and teaches nothing. There is no scoping operator that fixes it either, which is why it is a naming rule
+  rather than a mechanism.
 - **A `sed` substitution meant to write a code-point escape can silently write the wrong literal instead.**
   GNU `sed`'s replacement syntax treats `\u` as "uppercase the next character," not as a code-point escape —
   so `sed -i 's/\[-–—,\]/[-\u2013\u2014,]/'` consumed the backslash before each escape and wrote the literal
