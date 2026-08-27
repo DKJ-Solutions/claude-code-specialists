@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/workflow-folder-holds-the-repo-documents-v1` · 20260827-150731
+
+Every document the contribution cycle produces or governs now lives in `contributing-davekjohn/`.
+`CHANGELOG.md` and the release list moved in -- the list as `history.md`, because that folder's
+`releases/README.md` is its seam-answers page -- and the root `CONTRIBUTING.md` was folded into the
+folder's own contributing page rather than moved beside it. The tooling followed through the seams that
+already existed for exactly this: `Get-ChangelogPath`, `Get-ReleaseHistoryPath` and
+`Get-ReleaseInternalNotesRoot` are now stated in `scripts/repo-config.ps1`, so this repo stopped being the
+one repo answering them differently from every consumer. Nothing about a consumer changed -- those
+defaults have pointed into the workflow folder since #885.
+
+Three records were amended rather than silently flipped, because each one argued for the root and the
+argument has to stay legible: the August 19, 2026 answer at `Get-ReleaseHistoryPath` (its premise, "a
+folder a teardown removes", expired when #885 made that folder permanent), the August 14, 2026 layering
+note the root contributing page carried, and the two contract records a consumer reads.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing published changes. The plugins, their skills and every seam DEFAULT are untouched; what
+moved is where this one repo keeps its own documents. The one consumer-visible edit is a paragraph in
+`RELEASES-portable.md` that had described the source's layout as if it were a rule, which it never was.
+
+**Score:** N/A
+
+#### Pull Request
+
+the workflow folder holds the changelog, the contributing page and the release history
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #980](https://github.com/DaveKJohn/claude-code-specialists/pull/980)
+
+---
+
 ### DEPLOY: `docs/inbound-sixth-pattern-mirror-in-the-reporters-tree-v1` · 20260827-142712
 
 Triaging an inbound item now checks six things instead of five, and the sixth is **which tree the symptom
