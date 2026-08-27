@@ -32,6 +32,71 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/the-branch-document-is-called-development-v1` · 20260827-212315
+
+The branch's working document is called **Development**. `contributing-davekjohn/development-cycle.md`
+becomes `contributing-davekjohn/development.md`, its heading becomes ``## Development: `<branch>` ``, and
+the four functions that carried `DevelopmentCycle` in their names carry `Development`. Shorter, and
+"cycle" was doing no work the four phase headings underneath it -- PLAN, CREATE, TEST, DEPLOY -- were not
+already doing.
+
+**Recognise all, write one**, for the fifth time on this document, and by now the answer is the pattern
+rather than a decision: `PriorNameFile` joins the names `Resolve-BranchFilePath` reads and nothing writes
+the old one again. Eight names read, one written. A branch open across the rename -- including the branch
+that performed it, which is why this is measured rather than asserted -- resolves to its own document for
+every `-Kind`. The pair that never existed, `workflow-davekjohn/development.md`, is deliberately absent:
+the folder was renamed on August 26 and the document on August 27, so no branch can ever have carried it,
+and a row for it would be a name to read that nothing wrote.
+
+**The PR-placeholder tolerance list got a form APPENDED, not substituted** -- which is the
+[#952](https://github.com/DaveKJohn/claude-code-specialists/issues/952) discipline applied the same day
+it was established, to the very next rename that would have broken it. Its structural assert had to learn
+one thing in the process: it demanded every folder-naming form under *both* folder names, and the new
+`contributing-davekjohn/development.md` form has no old-folder counterpart. That assert is now
+one-directional -- old implies new, never the reverse -- because demanding the reverse would force a name
+into the list that nothing can ever have written, which is a different way of making the list lie about
+history.
+
+**And the rename exposed a gap in `CLAUDE.md`'s own safety bound, which is the part worth keeping.** The
+fold exception is bounded to two paths, and the second was stated as a *filename*. This document has now
+been renamed four times -- so on the day of each rename, every branch already open carried a name the
+bound did not list, which put its own fold outside the exception it runs under. Nobody noticed, three
+times. The bound is now named by its resolver: still exactly two paths, still checkable after the fact
+because the commit prints what it touched, and no longer a spelling that goes stale under the tooling it
+governs.
+
+Closes [#963](https://github.com/DaveKJohn/claude-code-specialists/issues/963) and
+[#958](https://github.com/DaveKJohn/claude-code-specialists/issues/958). #963 named two different words
+-- `Development` in its title, `Developing` in its body -- and Dave settled it on `Development`, which is
+also #958's word.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+`new-branch` writes `contributing-davekjohn/development.md` from here on, with
+``## Development: `<branch>` `` as its heading. **Nothing to migrate and nothing breaks.** A branch you
+have open right now keeps its `development-cycle.md`: every script and all four gates still read it, fold
+it and clear it, exactly as they still read the four names before it and the pre-rename folder. Your next
+branch simply gets the shorter name.
+
+Two things you may want to touch, both optional. If your PR template still names the old file, `open-pr`
+fills your description in either way -- both forms are recognised -- and the shipped reference template
+carries the new one if you would rather copy it. And if you overrode the heading via
+`Get-BranchFileWordingOverrides`, your word is untouched: this changed the default, not your answer.
+
+**Score:** 3
+
+#### Pull Request
+
+The branch document is called Development, not Development cycle
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1013](https://github.com/DaveKJohn/claude-code-specialists/pull/1013)
+
+---
+
 ### DEPLOY: `fix/the-source-test-means-what-its-name-says-v1` · 20260827-210632
 
 `Test-IsWorkflowSourceRepo` was `Test-Path .claude-plugin/marketplace.json`, which answers **does this
