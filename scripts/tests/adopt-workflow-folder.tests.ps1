@@ -53,13 +53,22 @@ function Assert-Match {
 }
 
 function New-FixtureConsumer {
-    param([string]$Label, [switch]$AsPluginSource)
+    <#
+        -AsWorkflowSource writes a marketplace that publishes THIS workflow; -AsOtherPluginSource writes
+        one that publishes something else. The second shape used to be unreachable: the switch was
+        -AsPluginSource and wrote an empty '{}', because the refusal was `Test-Path marketplace.json` and
+        any manifest would do. Issue #998 (August 27, 2026) narrowed it, so the fixture has to say WHAT is
+        published, and the two cases are now distinguishable -- which is the whole point.
+    #>
+    param([string]$Label, [switch]$AsWorkflowSource, [switch]$AsOtherPluginSource)
     $root = Join-Path $Fixture "consumer-$Label"
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
     New-Item -ItemType Directory -Path $root -Force | Out-Null
-    if ($AsPluginSource) {
+    if ($AsWorkflowSource -or $AsOtherPluginSource) {
+        $plugin = if ($AsWorkflowSource) { 'contributing-davekjohn' } else { 'some-other-product' }
+        $manifest = '{ "name": "fixture", "plugins": [ { "name": "' + $plugin + '", "source": "./x" } ] }'
         New-Item -ItemType Directory -Path (Join-Path $root '.claude-plugin') -Force | Out-Null
-        [System.IO.File]::WriteAllText((Join-Path $root '.claude-plugin\marketplace.json'), '{}')
+        [System.IO.File]::WriteAllText((Join-Path $root '.claude-plugin\marketplace.json'), $manifest)
     }
     return $root
 }
@@ -142,13 +151,26 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $kept = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Equal $marker $kept 're-run: the hand-edited content survives byte for byte'
 
-    # --- 4. A plugin-publishing repo is refused ------------------------------------------------------
-    Write-Host "adopt-workflow-folder -- refused in a repo that publishes plugins" -ForegroundColor Cyan
-    $c4 = New-FixtureConsumer -Label 'source' -AsPluginSource
+    # --- 4. THE SOURCE OF THIS WORKFLOW is refused ---------------------------------------------------
+    Write-Host "adopt-workflow-folder -- refused in the source of this workflow" -ForegroundColor Cyan
+    $c4 = New-FixtureConsumer -Label 'source' -AsWorkflowSource
     $r4 = Invoke-Adopt -Dir $c4 -ScriptArgs @('-Apply')
-    Assert-Equal 1 $r4.Code 'plugin source: exit 1'
-    Assert-Match 'REFUSED' $r4.Out 'plugin source: says it is refusing, and why'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c4 'contributing-davekjohn'))) 'plugin source: nothing was written'
+    Assert-Equal 1 $r4.Code 'workflow source: exit 1'
+    Assert-Match 'REFUSED' $r4.Out 'workflow source: says it is refusing, and why'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c4 'contributing-davekjohn'))) 'workflow source: nothing was written'
+
+    # --- 4b. A repo that publishes OTHER plugins is NOT refused (issue #998) -------------------------
+    # THE CASE THIS SCRIPT USED TO GET WRONG, and the harm was concrete: the refusal was `Test-Path
+    # marketplace.json`, so a repo publishing an unrelated product was told it "arranges
+    # contributing-davekjohn/ by hand" and turned away from the one command that scaffolds the folder it
+    # needs. Under Dave's own one-product-one-repository rule that repo is the next product, and it
+    # consumes this workflow like any other consumer.
+    Write-Host "adopt-workflow-folder -- a repo publishing OTHER plugins is a consumer" -ForegroundColor Cyan
+    $c5 = New-FixtureConsumer -Label 'other-source' -AsOtherPluginSource
+    $r5 = Invoke-Adopt -Dir $c5 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r5.Code 'other plugins: exit 0 -- not refused'
+    Assert-True ($r5.Out -notmatch 'REFUSED') 'other plugins: no refusal in the output'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c5 'contributing-davekjohn\README.md')) 'other plugins: the folder really was scaffolded'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

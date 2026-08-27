@@ -62,18 +62,30 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
 function New-Fixture {
     <#
-        A throwaway repo root: a plain directory (a consumer -- no marketplace.json) or one carrying an
-        empty .claude-plugin/marketplace.json (a source, per Test-IsWorkflowSourceRepo's own test). Not
-        a git repo on purpose -- RepoRoot is passed explicitly, the same fixture shape every other suite
-        in this folder uses.
+        A throwaway repo root in one of three shapes. Not a git repo on purpose -- RepoRoot is passed
+        explicitly, the same fixture shape every other suite in this folder uses.
+
+          (default)          a consumer: no .claude-plugin/marketplace.json at all;
+          -Source            the source of THIS workflow: a marketplace publishing 'contributing-davekjohn';
+          -PublishesOther    a repo that publishes plugins but NOT this workflow.
+
+        THE THIRD SHAPE IS THE POINT OF ISSUE #998 (August 27, 2026) and did not exist before it. This
+        function used to write an empty '{}' for -Source, which was enough while Test-IsWorkflowSourceRepo
+        was `Test-Path marketplace.json` -- and that is exactly the conflation: an empty manifest publishes
+        nothing, so calling it a source was the test's mistake reproduced in the fixture. The manifest is
+        read now, so -Source has to publish something and the third shape can exist to prove the two are
+        told apart. Dave's one-product-one-repository rule makes that shape a real repo, not a contrivance:
+        the next product gets its own marketplace and consumes this workflow.
     #>
-    param([Parameter(Mandatory)][string]$Label, [switch]$Source)
+    param([Parameter(Mandatory)][string]$Label, [switch]$Source, [switch]$PublishesOther)
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) "seam-lib-test-$PID-$Label"
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    if ($Source) {
+    if ($Source -or $PublishesOther) {
+        $plugin = if ($Source) { 'contributing-davekjohn' } else { 'some-other-product' }
+        $manifest = '{ "name": "fixture", "plugins": [ { "name": "' + $plugin + '", "source": "./x" } ] }'
         New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
-        [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBom)
+        [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), $manifest, $Utf8NoBom)
     }
     return $dir
 }
@@ -111,15 +123,21 @@ Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn' 'Get-Changel
     'consumer, exact match "workflow-davekjohn" (PRE-RENAME) with no trailing path: still passes'
 Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn\CHANGELOG.md' 'Get-ChangelogPath') `
     'consumer, backslash-separated in-folder path: passes (the \ -> / normalization works)'
-# THE CASE THAT PROVES THE SHORT-CIRCUIT, NOT JUST THE FOLDER MATCH: the exact same relative path that
-# gets refused for the consumer below passes here, unchanged, because Test-IsWorkflowSourceRepo exempts
-# a source repo outright before the folder check ever runs.
+# THE SOURCE REPO IS NOT EXEMPT ANY MORE (issue #998, August 27, 2026), and this assert is the inversion
+# of the one that stood here. It read 'source repo, path outside the folder: still passes -- exempt
+# regardless of where it resolves', and proved a short-circuit that ran before the folder check. That
+# exemption is gone: its stated reason was that a source's own computed defaults ARE root files, and #998
+# retired the source branch from every one of them, so there was nothing left for it to protect. What it
+# protected in the meantime was the repo that maintains this guard -- the one repo it never ran against.
 #
-# 'README.md' AND NOT 'CHANGELOG.md' SINCE #956: the changelog's pre-isolation answer now passes for a
-# consumer too, so asserting it here would no longer prove the exemption -- it would prove the legacy
-# tolerance one line below. The path has to be one a consumer is still refused, and this is that path.
-Assert-True (Test-ReturnsNormally $sourceDir 'README.md' 'Get-ChangelogPath') `
-    'source repo, path outside the folder: still passes -- exempt regardless of where it resolves'
+# 'README.md' is still the right path to test with, for the reason the old comment gave: since #956 the
+# changelog's pre-isolation answer passes for a consumer too, so a path that proves anything here has to
+# be one no repo is allowed. This is that path, and now no repo is allowed it.
+# The REFUSAL half of this is asserted in the child-process section below, where Invoke-AssertChild
+# exists. What belongs here is the half that still returns normally:
+
+Assert-True (Test-ReturnsNormally $sourceDir 'CHANGELOG.md' 'Get-ChangelogPath') `
+    "source repo, the seam's own pre-isolation answer: still passes -- recognised, not exempted"
 
 # --- 1b. The pre-isolation answers (issue #956) -- every seam in the set, and the per-seam bound ------
 # WHY EACH OF THE FIVE IS LISTED rather than one standing in for the rest: the tolerance is a per-seam
@@ -228,6 +246,17 @@ Assert-True ($rCross.Flat -match "'releases/github'") `
 $rDeep = Invoke-AssertChild $consumerDir 'CHANGELOG.md/pending' 'Get-ChangelogPath'
 Assert-True ($rDeep.Code -eq 1) 'consumer, a path BELOW the legacy answer: refused (the match is exact)'
 
+# THE SOURCE REPO IS REFUSED TOO, which is the inversion issue #998 landed. It used to be exempt
+# outright -- a short-circuit ahead of the folder check -- on the reasoning that a source's own computed
+# defaults ARE root files. #998 retired the source branch from every one of those defaults, so there was
+# nothing left for the exemption to protect, and what it protected in the meantime was the repo that
+# maintains this guard: the one repo it never ran against.
+$rSource = Invoke-AssertChild $sourceDir 'README.md' 'Get-ChangelogPath'
+Assert-True ($rSource.Code -eq 1) `
+    'source repo, path outside the folder: REFUSED -- the guard runs against its own repo now'
+Assert-True ($rSource.Flat -match 'Get-ChangelogPath') `
+    'source repo: and the refusal names the seam, exactly as it does for a consumer'
+
 
 # --- 2b. Get-PreIsolationSeamPath itself: the lookup, and the seam that must stay absent from it -----
 # ASSERTED DIRECTLY AS WELL AS THROUGH THE GUARD, because the two failures are different: the guard
@@ -275,19 +304,48 @@ Assert-True ($dfltGithubSrc -eq 'contributing-davekjohn/releases/github') `
 Assert-True ($dfltGithubSrc -eq (Get-DefaultReleaseGithubNotesRoot -RepoRoot $consumerDir)) `
     'and the same for a consumer, for the same reason'
 
-# THE THREE THAT STILL BRANCH, and the reason is not symmetry: a repo's changelog and its release list
-# exist whichever tooling cut them, so a source keeps them at its root. #914 did not include the internal
-# note either, so its branch stands until somebody asks for it.
-Assert-True ((Get-DefaultChangelogPath -RepoRoot $sourceDir) -eq 'CHANGELOG.md') `
-    'the changelog path still keeps a source at its own root file'
-Assert-True ((Get-DefaultChangelogPath -RepoRoot $consumerDir) -eq 'contributing-davekjohn/CHANGELOG.md') `
-    'and still isolates a consumer'
-Assert-True ((Get-DefaultReleaseHistoryPath -RepoRoot $sourceDir) -eq 'releases/README.md') `
-    'the release history still keeps a source at releases/README.md -- it stayed behind at #914'
-Assert-True ((Get-DefaultReleaseInternalNotesRoot -RepoRoot $sourceDir) -eq 'releases/internal') `
-    'the internal-note root still branches: #914 did not include it'
-Assert-True ((Get-DefaultReleaseInternalNotesRoot -RepoRoot $consumerDir) -eq 'contributing-davekjohn/releases/internal') `
-    'and a consumer still gets the isolated answer for it'
+# AND THE OTHER THREE STOPPED BRANCHING TOO (issue #998, August 27, 2026), so ALL FIVE now answer one
+# string for every repo. The three held out on the reasoning that a changelog and a release list exist
+# whichever tooling cut them, so a source keeps them at its root. Both halves expired: #980 moved this
+# repo's changelog and release list into contributing-davekjohn/ and STATED the seams, so the root answer
+# was inert in the one repo it was written for; and the test the branch rested on detects "publishes
+# plugins" rather than "is this workflow's source", so its only surviving effect was to hand a root file
+# to some future repo for a reason unrelated to changelogs.
+#
+# ASSERTED AS source-EQUALS-consumer rather than as two literals, deliberately: the claim being pinned is
+# that no branch remains, and a pair of literals would still pass if somebody reinstated a branch that
+# happened to compute the same two strings.
+foreach ($pair in @(
+        @{ Fn = 'Get-DefaultChangelogPath';             Want = 'contributing-davekjohn/CHANGELOG.md' },
+        @{ Fn = 'Get-DefaultReleaseHistoryPath';        Want = 'contributing-davekjohn/releases/history.md' },
+        @{ Fn = 'Get-DefaultReleaseInternalNotesRoot';  Want = 'contributing-davekjohn/releases/internal' })) {
+    $src = & $pair.Fn -RepoRoot $sourceDir
+    $con = & $pair.Fn -RepoRoot $consumerDir
+    Assert-True ($src -eq $pair.Want) "$($pair.Fn): a SOURCE repo gets the isolated answer '$src'"
+    Assert-True ($src -eq $con)       "$($pair.Fn): and a consumer gets the same -- no branch left"
+}
+
+# --- 3b. Test-IsWorkflowSourceRepo itself: it means what its name says (issue #998) ------------------
+# THE THIRD FIXTURE SHAPE IS THE WHOLE TEST. A repo that publishes plugins but not THIS workflow used to
+# answer $true -- the test was `Test-Path marketplace.json` -- and under Dave's one-product-one-repository
+# rule that repo is the next product, consuming this workflow while publishing its own. It was on course
+# to be handed this repo's layout and turned away by adopt-workflow-folder with a message telling it that
+# it arranges that folder by hand.
+Write-Host "seam-lib.ps1 -- Test-IsWorkflowSourceRepo means what its name says (issue #998)" -ForegroundColor Cyan
+Assert-True (Test-IsWorkflowSourceRepo -RepoRoot $sourceDir) `
+    'a marketplace publishing contributing-davekjohn IS this workflow''s source'
+Assert-True (-not (Test-IsWorkflowSourceRepo -RepoRoot $consumerDir)) `
+    'a repo with no marketplace at all is not'
+$otherDir = New-Fixture -Label 'publishes-other' -PublishesOther
+Assert-True (-not (Test-IsWorkflowSourceRepo -RepoRoot $otherDir)) `
+    'a repo that publishes OTHER plugins is not -- the case the old one-file test got wrong'
+# AN UNREADABLE MANIFEST IS A CONSUMER, NOT AN EXCEPTION: every caller asks this in order to be more
+# careful, so "cannot tell" has to fall to the careful side rather than throw in somebody's session.
+$brokenDir = New-Fixture -Label 'broken-manifest' -PublishesOther
+[System.IO.File]::WriteAllText((Join-Path $brokenDir '.claude-plugin\marketplace.json'), '{ not json', $Utf8NoBom)
+Assert-True (-not (Test-IsWorkflowSourceRepo -RepoRoot $brokenDir)) `
+    'a manifest that will not parse answers false rather than throwing'
+Remove-Item -Recurse -Force -LiteralPath $otherDir, $brokenDir -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force -LiteralPath $consumerDir -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force -LiteralPath $sourceDir -ErrorAction SilentlyContinue
 Remove-Item -Force -LiteralPath $wrapperPath -ErrorAction SilentlyContinue

@@ -186,14 +186,20 @@ try {
     Write-Host 'the document shape'
 
     function New-SourceRepoFixture {
-        <# Same fixture as New-Consumer plus the one file that makes Test-IsWorkflowSourceRepo say yes.
+        <# Same fixture as New-Consumer plus the manifest that makes Test-IsWorkflowSourceRepo say yes.
            Written here rather than as a flag on New-Consumer so the two callers read differently at the
-           call site -- which of the two a scenario builds IS the thing under test. #>
+           call site -- which of the two a scenario builds IS the thing under test.
+
+           THE MANIFEST HAS TO PUBLISH THE WORKFLOW SINCE ISSUE #998 (August 27, 2026). It used to carry
+           an EMPTY plugins array, which was enough while that test was `Test-Path marketplace.json` --
+           and an empty marketplace publishing nothing is precisely the repo the old test called a source
+           by mistake. The test reads the manifest now, so the fixture has to name what it publishes. #>
         param([Parameter(Mandatory = $true)][string]$Label)
         $dir = New-Consumer -Label $Label
         New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'),
-            "{ `"name`": `"fixture`", `"plugins`": [] }`n", (New-Object System.Text.UTF8Encoding($false)))
+            "{ `"name`": `"fixture`", `"plugins`": [ { `"name`": `"contributing-davekjohn`", `"source`": `"./x`" } ] }`n",
+            (New-Object System.Text.UTF8Encoding($false)))
         return $dir
     }
 
