@@ -32,6 +32,62 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/ship-in-the-background-by-default-v1` · 20260827-164510
+
+Shipping a branch no longer costs the session the length of CI. `ship-pr.ps1` is started as a background
+command and the session carries straight on -- the merge cannot move before `lint-en-tests` is green
+whichever way the script runs, so a foreground wait only ever bought a second look at a result
+`open-pr`'s own gates had given minutes earlier. Measured on PR #980 the same day: `lint-en-tests` at
+11m48s against the same suites locally at 292s, and over 65 blocking runs a median CI leg of 8m 01s --
+9h 45m a week at 73 merged PRs. Nothing about the wait itself changes, and no ruleset is touched: what
+changes is who holds the session open while it runs.
+
+**The condition travels with the default everywhere it is written**, because the invitation alone is
+unsafe. Step 5 runs `git checkout main` in the tree the script was started from, so the next move after
+backgrounding a ship is either a lane -- `worktree-lane.ps1 -Name`, the worktree is where you build and
+the primary checkout is where you ship -- or nothing at all. `ship-pr` now prints both at the one moment
+the reader is about to need them: three lines as the wait begins, naming the hand-off, the lane and the
+`git checkout main` that makes it necessary. The rule itself is in the `ship-pr` and `worktree-lane`
+skills, in `CONTRIBUTING-portable.md` section 4, in this repo's own PULL REQUEST step 2.4 and in Derek's
+lens, where the same window had been documented as a hazard to harden against rather than as the move to
+make.
+
+Two larger shapes were named and declined rather than overlooked, and #985 stays open as their home: a
+green-and-unmerged reporter at session start, which would have re-added half of the `session-status`
+reporter #957 removed on purpose five minutes before #985 was filed; and a detached watcher that merges
+when the check passes, which would put the merge and the fold -- a commit landing directly on `main`
+under a named exception -- behind a process nobody is reading.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow pays this bill, and until now the workflow's own documentation told them
+to pay it: backgrounding appears throughout the portable pages as a *hazard window that the gates were
+hardened against*, never as the move to make, so a reader following the pages sat through CI on every
+PR. The measurement is the part that travels -- a median 8m 01s CI leg is 9h 45m a week at this repo's
+merge rate, and a consumer merging a tenth as often still loses an hour. The condition travels with it,
+which is what makes this shippable rather than merely encouraging: `worktree-lane` already existed and
+already carried the same measurement, and the two skills now point at each other as two halves of one
+default instead of describing the same window from opposite sides.
+
+It also closes a smaller gap the issue itself walked into. #985 proposed leaning on `session-status`,
+which had been deleted from `main` five minutes before it was filed -- so the report a consumer would
+read as the plan named a script no longer in the tree. Reading the two declined shapes beside the one
+that shipped is what a consumer needs in order not to build the reporter again.
+
+**Score:** 3
+
+#### Pull Request
+
+Backgrounding the ship is the default, and ship-pr says so at the wait
+
+Plugins: contributing-davekjohn
+
+[PR #990](https://github.com/DaveKJohn/claude-code-specialists/pull/990)
+
+---
+
 ### DEPLOY: `fix/check-wait-zero-date-overflow-v1` · 20260827-154618
 
 `ship-pr` no longer dies between the merge decision and the merge when a check registers while the CI
