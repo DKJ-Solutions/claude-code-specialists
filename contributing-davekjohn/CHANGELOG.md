@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/review-429-tally-needs-no-count-v1` · 20260827-181941
+
+The comment above `claude-code-review.yml`'s **Why the review failed** step no longer counts this
+workflow's red runs. It said the 429 hit `all FOUR of its red runs`; there were thirteen when issue #974
+read the logs and sixteen a day later, when this branch re-measured them before repairing. Wrong by
+roughly 3x when it was typed, and wrong again before anybody could correct it -- which is the argument
+for a condition rather than a correction: **every red run whose log carries this diagnostic has named
+429.** That sentence stays true on the next one. The count was load-bearing, though, and the comment now
+says so: four occurrences across two days reads as an oddity, sixteen reads as *most PRs opened in a busy
+window get no review*, which is the actual behaviour a reader needs.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**The one run that could not be attributed is now outside the sentence rather than contradicted by it.**
+Run 32984348328 reports `conclusion: failure` while its job carries `conclusion: null` and an empty
+`steps` array, and `--log-failed` returns nothing -- so the diagnostic never ran and the 429 claim has
+nothing to rest on there. Under `THE ONE CAUSE` that run was a silent counter-example. Under a
+conditional it is simply out of reach, and the comment says which run and why, so the next reader who
+finds it does not re-open the question.
+
+**This is the second time this repo has repaired a tally by deleting it rather than correcting it.**
+`CLAUDE.md` already records the first -- a count of Dave's own name, written inside the document that
+carries the name, wrong when typed and wrong again after the next edit. Same shape here: a count of a
+workflow's red runs, inside the workflow that produces them. The repair is deliberately the same one,
+and the comment names the lesson so the pattern is legible rather than coincidental.
+
+**Score:** N/A
+
+#### Pull Request
+
+the review workflow's 429 note states a condition instead of a count that goes stale
+
+[PR #995](https://github.com/DaveKJohn/claude-code-specialists/pull/995)
+
+---
+
 ### DEPLOY: `feat/claim-the-issue-before-you-work-it-v1` · 20260827-174131
 
 A session that picks up an issue now claims it first, by assigning it to the account it is logged in as,
