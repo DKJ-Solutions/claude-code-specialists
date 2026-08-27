@@ -464,6 +464,56 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
     Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false).Reason -ne '') 'verdict/reason: take-live carries a reason'
     Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Reason -ne '') 'verdict/reason: and so does a conflict'
 
+
+    # --- The PR body ---------------------------------------------------------------------------------
+    # THE ONE ASSERT THAT WOULD HAVE CAUGHT INBOUND #1000 is 'body/take: the taken paths are named at
+    # all'. Before it, the body carried only the held-back half, and every other property here -- counts,
+    # reasons, grouping -- was true of that body too. A suite can be entirely green over a report that
+    # omits the half a reader came for, which is why the assert is worded as presence rather than shape.
+    Write-Host ''
+    Write-Host 'New-SyncPrBody'
+
+    Assert-Equal 'changed on live' (Get-SyncFileKind -Status 'M') 'kind/M: both sides have it and it differs'
+    Assert-Equal 'new on live'     (Get-SyncFileKind -Status 'A') 'kind/A: live has it and the trunk does not'
+    # The #350 case: a flat list cannot say this, and it is the one that needs a second look.
+    Assert-Equal 'gone from live'  (Get-SyncFileKind -Status 'D') 'kind/D: the trunk has it and live does not'
+
+    $takeReason = 'content this repo has never held for this path: a third party wrote it on live'
+    $rowsTake = @(
+        [pscustomobject]@{ Status = 'M'; Path = 'sections/header.liquid'; Reason = $takeReason }
+        [pscustomobject]@{ Status = 'A'; Path = 'snippets/promo.liquid';  Reason = $takeReason }
+    )
+    $rowsKeep = @(
+        [pscustomobject]@{ Status = 'D'; Path = 'templates/page.back-to-school.json'; Reason = 'only the trunk has this file; a sync never deletes' }
+        [pscustomobject]@{ Status = 'M'; Path = 'config/settings_data.json';          Reason = 'live holds a version this repo has had before; the trunk has moved on since' }
+    )
+    $body = New-SyncPrBody -Take $rowsTake -Keep $rowsKeep
+
+    Assert-True ($body -match 'sections/header\.liquid' -and $body -match 'snippets/promo\.liquid') 'body/take: the taken paths are named at all'
+    Assert-True ($body -match 'changed on live -- .sections/header\.liquid.') 'body/take: with the kind in front of the path, not a bare list'
+    Assert-True ($body -match 'gone from live -- .templates/page\.back-to-school\.json.') 'body/keep: a path live no longer has is reported as gone, the #350 case'
+    Assert-True ($body -match '\*\*Taken from live \(2\)\*\*' -and $body -match '\*\*Held back, the trunk wins \(2\)\*\*') 'body/counts: both halves carry their own count'
+    Assert-True ($body -match [regex]::Escape($takeReason)) 'body/reason: the verdict''s reason travels into the body'
+    # Grouped, not repeated: two files share one reason, so that sentence appears once.
+    Assert-Equal 1 ([regex]::Matches($body, [regex]::Escape($takeReason)).Count) 'body/group: a shared reason is printed once, not once per file'
+    # The caller's order is the console's order, so the body lines up with what the operator just read.
+    Assert-True ($body.IndexOf('sections/header.liquid') -lt $body.IndexOf('snippets/promo.liquid')) 'body/order: files keep the caller''s order'
+    Assert-True ($body.IndexOf('Taken from live') -lt $body.IndexOf('Held back')) 'body/order: and the taken half comes first'
+
+    # Both empty halves keep a sentence rather than a silent gap: an absent section reads as an oversight,
+    # and 'nothing was held back' is a finding.
+    $emptyKeep = New-SyncPrBody -Take $rowsTake -Keep @()
+    Assert-True ($emptyKeep -match 'Nothing was held back by the content rule\.') 'body/empty: an empty held-back half says so in words'
+    $emptyTake = New-SyncPrBody -Take @() -Keep $rowsKeep
+    Assert-True ($emptyTake -match 'Nothing was taken from live\.') 'body/empty: and so does an empty taken half'
+    Assert-True ((New-SyncPrBody -Take @() -Keep @()) -match 'Nothing was taken from live\.') 'body/empty: neither half is required for a body at all'
+
+    # A $null in a row array is what a caller's filter leaves behind; it must not become a blank bullet.
+    $withNull = New-SyncPrBody -Take @($rowsTake[0], $null) -Keep @()
+    Assert-Equal 1 ([regex]::Matches($withNull, '(?m)^- ').Count) 'body/null: an empty row is dropped rather than printed as a blank bullet'
+    Assert-True ($withNull -match '\*\*Taken from live \(1\)\*\*') 'body/null: and it is not counted either'
+
+    Assert-True ((New-SyncPrBody -Take $rowsTake -Keep $rowsKeep -Intro 'Custom intro.') -match '^Custom intro\.') 'body/intro: the opening line is the caller''s to set'
 }
 finally {
     foreach ($d in $script:trees) {

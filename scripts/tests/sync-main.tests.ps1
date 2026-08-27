@@ -291,6 +291,66 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $live 'sections\dropped.liquid'))) 'ours/deleted: and the deleted file was never written back'
     Assert-True (Test-Path -LiteralPath (Join-Path $live 'sections\brand-new.liquid')) 'take: the taken file IS written'
 
+    # --- The PR body on the non-merging path -------------------------------------------------------
+    # THE PATH THAT USED TO COMPOSE NO BODY AT ALL (inbound #1000). It is also the DEFAULT path -- the
+    # seam that merges is opt-in -- so the repo with no body was the common one, not the edge.
+    $bodyFile = ''
+    if ($r.Out -match '--body-file "([^"]+)"') { $bodyFile = $Matches[1]; $script:trees += $bodyFile }
+    Assert-True ($bodyFile -and (Test-Path -LiteralPath $bodyFile)) 'body/file: the non-merging path writes the body and hands over its path'
+    $prBody = if ($bodyFile -and (Test-Path -LiteralPath $bodyFile)) { [System.IO.File]::ReadAllText($bodyFile) } else { '' }
+    Assert-True ($prBody -match 'new on live -- .sections/brand-new\.liquid.') 'body/take: what was taken is in the body, with its kind'
+    Assert-True ($prBody -match 'gone from live -- .sections/only-trunk\.liquid.') 'body/keep: and a path live no longer has is reported as GONE, not as a bare filename'
+    Assert-True ($prBody -match 'changed on live -- .sections/theme\.liquid.') 'body/keep: a held-back edit keeps its own kind too'
+
+    # --- The body seam: a consumer whose review policy IS the PR body ------------------------------
+    Write-Host ''
+    Write-Host 'the PR body seam'
+    $seamSrc = @(
+        'function Get-ShopifySyncPrBody {',
+        '    param($Take, $Keep, $Default)',
+        '    return "SEAM-TEMPLATE take=$($Take.Count) keep=$($Keep.Count)" + [Environment]::NewLine + $Default',
+        '}'
+    ) -join "`n"
+    $seamRepo = New-Consumer -Label 'bodyseam' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com' -ExtraSeams $seamSrc
+    Add-FixtureCommit -Dir $seamRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    $seamMirror = New-Mirror -Label 'bodyseam' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+    $r = Invoke-Sync -Dir $seamRepo -Mirror $seamMirror
+    Assert-True ($r.Out -match 'composed by Get-ShopifySyncPrBody') 'seam/body: an answered seam is used, and the run says so'
+    $seamFile = ''
+    if ($r.Out -match '--body-file "([^"]+)"') { $seamFile = $Matches[1]; $script:trees += $seamFile }
+    $seamBody = if ($seamFile -and (Test-Path -LiteralPath $seamFile)) { [System.IO.File]::ReadAllText($seamFile) } else { '' }
+    Assert-True ($seamBody -match '^SEAM-TEMPLATE') 'seam/body: the consumer''s own wording is what the PR gets'
+    # THE ROWS THEMSELVES REACH IT TOO, and that is what this asserts rather than -Default alone: a seam is
+    # handed the classified data so it can order, filter or count it, and passing an array through a
+    # scriptblock's $args is exactly where one silently arrives unwrapped.
+    Assert-True ($seamBody -match 'take=1 keep=0') 'seam/body: -Take and -Keep arrive as the arrays they are, not unwrapped'
+    # -Default is the half that makes the seam cheap to answer: a consumer wraps the composed body rather
+    # than rebuilding it, so it keeps every kind and reason without knowing how they are spelled.
+    Assert-True ($seamBody -match 'new on live -- .sections/from-editor\.liquid.') 'seam/body: and -Default carries the composed body into it'
+
+    # A SEAM THAT THROWS IS REPORTED, NOT SWALLOWED. Every other seam here degrades silently because its
+    # default is a correct answer; this one means the consumer asked for a specific record and got the
+    # generic one -- which is the failure #1000 was filed about, so it says so on the run.
+    $badRepo = New-Consumer -Label 'bodythrow' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com' `
+        -ExtraSeams 'function Get-ShopifySyncPrBody { param($Take, $Keep, $Default) throw ''no body today'' }'
+    Add-FixtureCommit -Dir $badRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    $badMirror = New-Mirror -Label 'bodythrow' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+    $r = Invoke-Sync -Dir $badRepo -Mirror $badMirror
+    Assert-True ($r.Code -eq 0) 'seam/throw: a broken body seam costs the custom body, never the sync'
+    Assert-True ($r.Out -match 'Get-ShopifySyncPrBody threw' -and $r.Out -match 'no body today') 'seam/throw: and it is reported by name, with the fault'
+    $badFile = ''
+    if ($r.Out -match '--body-file "([^"]+)"') { $badFile = $Matches[1]; $script:trees += $badFile }
+    $badBody = if ($badFile -and (Test-Path -LiteralPath $badFile)) { [System.IO.File]::ReadAllText($badFile) } else { '' }
+    Assert-True ($badBody -match 'new on live -- .sections/from-editor\.liquid.') 'seam/throw: the default body is written instead'
+
     # --- Both sides moved: a conflict, and nothing written -----------------------------------------
     # The one thing the floor still decides. It can only ever escalate to a human, which is why a wrong
     # floor now costs an extra conflict report instead of silent data loss.

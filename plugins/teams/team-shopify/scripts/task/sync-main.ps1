@@ -78,6 +78,15 @@
     consumers this came from answer it differently, which is why it is a seam
     (Get-ShopifySyncMerges) instead of a hardcoded choice.
 
+    THE PR BODY IS THE RECORD, AND IN SOME REPOS IT IS THE ONLY ONE (inbound #1000). Where a consumer has
+    ruled that the sync PR does not wait for a review -- provided it states plainly what a third party
+    did -- nobody reads the diff by design, so the body is the whole audit trail. The default body
+    therefore names BOTH halves, every path with its kind in words: 'changed on live', 'new on live',
+    'gone from live'. A flat file list is the shape that has already failed: in a consumer's sync PR #350
+    nothing in the body recorded that live had made a template DISAPPEAR. Whatever else a repo needs
+    around that -- its own template, a checkbox, its own wording -- is Get-ShopifySyncPrBody's answer,
+    which receives the same rows and the default body to build on.
+
     WHAT IT NEVER DOES: it does not push to live, publish a theme, or delete one. It reads from live and
     writes to git. team-shopify's PreToolUse guard covers those three acts independently and is not
     weakened here.
@@ -92,6 +101,13 @@
       Get-ShopifySyncBranchPrefix     the drift branch's prefix. Default: 'sync/live-'.
       Get-ShopifySyncMerges           $true to open the PR and merge it once CI is green.
                                       Default: $false -- push, then stop.
+      Get-ShopifySyncPrBody           the PR body. Called with -Take, -Keep (the classified rows, each
+                                      carrying Status/Path/Reason) and -Default (the body the script
+                                      composed), and it returns the body to use -- so a consumer whose
+                                      review policy IS the PR body can put its own template, its own
+                                      checkboxes or its own wording around it. Default: what
+                                      New-SyncPrBody composes, which names both halves and every path
+                                      with its kind.
       Get-TrunkBranchName             the trunk. Default: 'main'.
       Get-PrMergeMethod               only read when Get-ShopifySyncMerges is true. Default: 'merge'.
 
@@ -223,6 +239,48 @@ if (-not $store -or $store -match 'VUL-IN') {
     Write-Host 'No store domain: Get-ShopifyStoreDomain is unanswered and -Store was not given.' -ForegroundColor Red
     Write-Host '  Answering the seam is the durable fix; -Store gets you through this run.'
     exit 1
+}
+
+# --- The body seam, read at the moment it is needed -------------------------------------------------
+# ONE SEAM, DELIBERATELY NOT READ WITH THE OTHERS ABOVE. Every answer in that block is a scalar known
+# before the work starts; this one is a FUNCTION OF THE VERDICT, so it can only be called once the rows
+# exist. Capturing its ScriptBlock in the block above and invoking it here was the first shape and it is
+# the wrong one: the consumer's function may call anything else its repo-config.ps1 defines, and by then
+# that child scope -- the only place those definitions ever lived -- is gone. So the file is dot-sourced
+# again, here, with the same StrictMode-off try/catch for the same reason: repo-config.ps1 belongs to the
+# consumer, and a fault in it must cost the custom body, never the sync.
+#
+# AND A FAULT IS REPORTED RATHER THAN SWALLOWED. The default answers above are correct answers, so
+# falling back to one is silent by design. A body seam that exists and throws is different: the consumer
+# asked for a specific record and got the generic one, which is precisely the failure inbound #1000 was
+# filed about. It says so on the run.
+function Get-SyncPrBodySeamAnswer {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [object[]]$Take = @(),
+        [object[]]$Keep = @(),
+        [Parameter(Mandatory = $true)][string]$Default
+    )
+
+    return & {
+        Set-StrictMode -Off
+        $root = $args[0]; $take = $args[1]; $keep = $args[2]; $default = $args[3]
+        $configPath = Join-Path $root 'scripts\repo-config.ps1'
+        if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return '' }
+        try { . $configPath } catch { return '' }
+        if (-not (Get-Command Get-ShopifySyncPrBody -ErrorAction SilentlyContinue)) { return '' }
+        try {
+            $answer = [string](Get-ShopifySyncPrBody -Take $take -Keep $keep -Default $default)
+        } catch {
+            Write-Host "Get-ShopifySyncPrBody threw, so the PR body is the default one: $($_.Exception.Message)" -ForegroundColor Yellow
+            return ''
+        }
+        if (-not $answer.Trim()) {
+            Write-Host 'Get-ShopifySyncPrBody answered with nothing, so the PR body is the default one.' -ForegroundColor Yellow
+            return ''
+        }
+        return $answer
+    } $RepoRoot $Take $Keep $Default
 }
 
 $trunk        = if (([string]$seam.Trunk).Trim())        { ([string]$seam.Trunk).Trim() }        else { 'main' }
@@ -514,16 +572,38 @@ try {
     & git push -u origin $branch
     if ($LASTEXITCODE -ne 0) { Write-Host "Push failed. The commit is local on $branch." -ForegroundColor Red; exit 1 }
 
+    # --- the PR body, composed ONCE for both paths --------------------------------------------------
+    # BOTH PATHS, AND THAT IS THE HALF INBOUND #1000 MADE THE CASE FOR. The merging path used to compose
+    # a body naming only what was held back, and the non-merging path composed none at all -- it printed
+    # a 'gh pr create' line with no --body and told the operator to copy the exclusions in by hand. The
+    # default path is the one most consumers run, so the path with no body was the common one.
+    #
+    # THE FILE RATHER THAN AN INLINE --body ON THE PRINTED LINE. A body is multi-line markdown, and a
+    # command line an operator pastes cannot carry it: quoted newlines survive neither a copy out of a
+    # console nor a paste into a different shell. --body-file is what gh has for this, so the run writes
+    # the body and hands over the path. It is left behind on purpose -- the operator needs it AFTER this
+    # process is gone, which is also why it does not go in the mirror the finally block removes.
+    $defaultBody = New-SyncPrBody -Take $take -Keep $keep
+    $seamBody    = Get-SyncPrBodySeamAnswer -RepoRoot $repoRoot -Take $take -Keep $keep -Default $defaultBody
+    $body        = if ($seamBody) { $seamBody } else { $defaultBody }
+    if ($seamBody) { Write-Host 'PR body: composed by Get-ShopifySyncPrBody.' -ForegroundColor DarkGray }
+
     if (-not $merges) {
+        $bodyFile = Join-Path ([System.IO.Path]::GetTempPath()) ("sync-pr-body-$PID-" + ($branch -replace '[^A-Za-z0-9]', '-') + '.md')
+        [System.IO.File]::WriteAllText($bodyFile, $body, (New-Object System.Text.UTF8Encoding($false)))
         Write-Host ''
         Write-Host 'Done -- and deliberately NOT merged.' -ForegroundColor Green
         Write-Host 'Open the PR, look at what the third parties changed, and merge it yourself:' -ForegroundColor Green
-        Write-Host "  gh pr create --base $trunk --head $branch --title `"$msg`"" -ForegroundColor Cyan
-        if ($keep.Count -gt 0) {
-            Write-Host ''
-            Write-Host "Put these $($keep.Count) exclusion(s) in the PR body -- the diff shows what came in," -ForegroundColor Yellow
-            Write-Host '  never what was held back:' -ForegroundColor Yellow
-            foreach ($r in $keep) { Write-Host "  $($r.Path) -- $($r.Reason)" -ForegroundColor Yellow }
+        Write-Host "  gh pr create --base $trunk --head $branch --title `"$msg`" --body-file `"$bodyFile`"" -ForegroundColor Cyan
+        Write-Host ''
+        if ($seamBody) {
+            # The claim below is about the DEFAULT body's shape, and a seam is free to drop either half.
+            # Printing it over somebody else's body would be this script vouching for a record it did not
+            # write -- the one thing the whole change is about.
+            Write-Host '  The body is Get-ShopifySyncPrBody''s; read it before you open the PR.' -ForegroundColor DarkGray
+        } else {
+            Write-Host "  The body names all $($take.Count) taken and $($keep.Count) held-back path(s) with their kind." -ForegroundColor DarkGray
+            Write-Host '  The diff shows what came in, never what was held back or what live no longer has.' -ForegroundColor DarkGray
         }
         exit 0
     }
@@ -532,13 +612,6 @@ try {
     # Only reached where Get-ShopifySyncMerges says so. It uses nothing but 'gh': a consumer on either
     # workflow plugin, or on neither, gets the same behaviour, and Get-PrMergeMethod is read defensively
     # above rather than required.
-    $body = if ($keep.Count -gt 0) {
-        "Third-party drift from the live theme.`n`nHeld back by the content rule ($($keep.Count)):`n" +
-        (($keep | ForEach-Object { "- ``$($_.Path)`` -- $($_.Reason)" }) -join "`n")
-    } else {
-        'Third-party drift from the live theme. Nothing was held back by the content rule.'
-    }
-
     & gh pr create --base $trunk --head $branch --title $msg --body $body
     if ($LASTEXITCODE -ne 0) { Write-Host 'Could not open the PR. The branch is pushed; open it by hand.' -ForegroundColor Red; exit 1 }
 

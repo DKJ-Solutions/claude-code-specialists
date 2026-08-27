@@ -85,8 +85,14 @@ git: it never pushes to live, publishes, or deletes a theme.
   what third parties changed before it becomes the base of new branches, so it pushes a `sync/live-…`
   branch and hands you the PR command. A repo that would rather auto-merge says so through
   `Get-ShopifySyncMerges`.
-- **The exclusions are the half a reviewer cannot see.** The diff shows what came in; it does not show
-  what was held back. The script prints that list, and it belongs in the PR body.
+- **The PR body is the record, and the diff is not.** The diff of a sync branch shows what came *in*; it
+  cannot show what was held back, and it cannot show that live made a file *disappear*. So the script
+  composes the body itself on both paths — both halves, every path with its kind in words (`changed on
+  live`, `new on live`, `gone from live`) — and the non-merging path hands you `gh pr create …
+  --body-file <path>` rather than a list to copy in by hand. A repo whose review policy *is* the PR body
+  wraps its own template around it through `Get-ShopifySyncPrBody`. It was a flat file list until
+  inbound [#1000](https://github.com/DaveKJohn/claude-code-specialists/issues/1000), and a flat list had
+  already failed: in a consumer's own sync PR nothing recorded that a template had gone from live.
 
 **And it refuses rather than guessing when it has no reference point** — no previous sync commit and no
 tag. That refusal is the rule protecting itself: without a floor, *every* file looks untouched by the
