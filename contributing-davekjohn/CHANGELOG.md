@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/two-contributing-pages-gets-its-condition-v1` · 20260827-191634
+
+`CONTRIBUTING-portable.md` now says what has to happen **before** a repo retires its root
+`CONTRIBUTING.md`: inventory it section by section and move anything that lives nowhere else. The
+condition #965 asked for was already added by #991 -- the floor is the repo's to place, the root page is
+the recommendation, and the source's own reason for differing is written out. What was missing is the
+step that makes the removal safe rather than merely tidy. Measured in one consumer the same day: of seven
+sections, six were restatements of its root `CLAUDE.md`, and three rules lived **only** on the page being
+deleted -- one of them a safety rule about pushing to the live theme. No gate reads a contributing page,
+so dropping it would have been silent.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**The plugin's own README was shipping a 404 to consumers, and telling them the wrong thing beside it.**
+Its worked-example link pointed at the source's root `CONTRIBUTING.md`, which #980 deleted on August 27,
+2026 -- confirmed 404 rather than assumed -- while the sentence around it still said to pair the portable
+page with a root `CONTRIBUTING.md`, unconditionally, which is the very prescription #965 was filed
+against. Both are repaired, and the link now resolves. #965 named this file; it had simply not been part
+of the branch that fixed the page next to it.
+
+**The instruction is written from a measurement, which is what stops it reading as tidiness.** Six of
+seven sections were restatement -- so the honest summary of a drifting root page is *mostly safe to
+delete*, and that is exactly why the pass is needed: the danger is the minority, it is invisible from a
+skim, and a page far enough out of date to be worth retiring is the page whose contents you can no longer
+predict from memory. The same page's gate list named three test suites on a day its `CLAUDE.md` named ten.
+
+**Score:** 3
+
+#### Pull Request
+
+retiring the root contributing page needs an inventory first, and the README's worked example is not a 404
+
+Plugins: contributing-davekjohn
+
+Plugins: contributing-davekjohn
+
+[PR #1004](https://github.com/DaveKJohn/claude-code-specialists/pull/1004)
+
+---
+
 ### DEPLOY: `docs/an-inconsistency-is-a-kind-of-finding-v1` · 20260827-190508
 
 The filing rule now names an **inconsistency** as a kind of finding, and says it is always filed. The
