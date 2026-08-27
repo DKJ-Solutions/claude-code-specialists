@@ -174,6 +174,48 @@ function Get-DefaultReleaseInternalNotesRoot {
     return "$(Get-WorkflowFolderName -RepoRoot $RepoRoot)/releases/internal"
 }
 
+function Get-PreIsolationSeamPath {
+    <#
+        THE ANSWER EACH ISOLATED SEAM GAVE BEFORE IT ISOLATED (issue #956, August 27, 2026), and the only
+        value Assert-WorkflowIsolatedSeamPath below accepts outside the workflow folder. One entry per
+        seam in that assert's set, and nothing else: this is a lookup of history, not a list of
+        preferences.
+
+        WHY IT EXISTS. #885 and #914 moved these seams' defaults into the workflow folder, and a consumer
+        meets that through a plugin update rather than by choosing to -- exactly the situation the assert
+        already tolerates for the FOLDER's own rename. A consumer that keeps its CHANGELOG.md at the repo
+        root is not an un-migrated state to be corrected but a layout, and both Shopify consumers answered
+        the seam that way independently (#956: smartwatchbanden and xoxowildhearts, 14 and 24 pending
+        entries). The assert refused it with exit 1, so the fold failed AFTER the merge had landed and the
+        entry had to be folded by hand.
+
+        THE ARGUMENT IS NOT NEW, ONLY APPLIED IN A SECOND PLACE. Get-ReleaseNoteRoot is exempt from the
+        assert outright, and its stated reason is that it is "the one seam whose whole point is to keep
+        meaning what it meant yesterday." That is true of every seam here for the repo that was already
+        folding into the root before the folder existed. So the tolerance is written per seam INSIDE the
+        guard rather than as a second blanket exemption: a typo'd 'README.md' is still refused for every
+        one of them, which an exemption would not do.
+
+        TWO NAMES FOR THE CHANGELOG NOTES ROOT. #914 relocated that tree and renamed it in one move
+        (releases/development -> <folder>/releases/changelog), so a consumer sitting at the root may carry
+        either the pre-rename directory or the renamed one beside its siblings. Both are the same layout
+        answered at the same place, so both are recognised.
+
+        NOT KEYED ON THE SEAM'S CURRENT DEFAULT, deliberately: that default is computed and will move
+        again. These strings are what the tooling wrote before the move, which is a fact about the past
+        and therefore does not go stale.
+    #>
+    param([Parameter(Mandatory)][string]$SeamName)
+    switch ($SeamName) {
+        'Get-ChangelogPath'             { return @('CHANGELOG.md') }
+        'Get-ReleaseHistoryPath'        { return @('releases/README.md') }
+        'Get-ReleaseChangelogNotesRoot' { return @('releases/development', 'releases/changelog') }
+        'Get-ReleaseGithubNotesRoot'    { return @('releases/github') }
+        'Get-ReleaseInternalNotesRoot'  { return @('releases/internal') }
+    }
+    return @()
+}
+
 function Assert-WorkflowIsolatedSeamPath {
     <#
         THE PROVENANCE PREFLIGHT (issue #885, group D): the backstop under the four seams groups A and E
@@ -183,6 +225,26 @@ function Assert-WorkflowIsolatedSeamPath {
         this catches is a repo's own EXPLICIT override resolving somewhere it should not, e.g. a typo'd
         Get-ChangelogPath pointing at 'README.md' and the cut truncating a file it does not own. Call this
         right after a seam of that kind resolves, before anything is read from or written to the path.
+
+        TWO ANSWERS PASS, NOT ONE (issue #956, August 27, 2026): the workflow folder, and the seam's own
+        PRE-ISOLATION answer from Get-PreIsolationSeamPath above -- read that function for why a root
+        CHANGELOG.md is a layout rather than a mistake, and for the measurement that forced it. Before
+        this, the guard could not tell a typo from a layout and treated both as a typo: it refused with
+        exit 1 and had no opt-out, so the fold and the cut were hard-blocked in a consumer that had been
+        folding into a root CHANGELOG.md since before the folder existed.
+
+        THE SHAPE #956 PROPOSED FIRST WAS DECLINED, and the reason is worth keeping. It offered warning
+        instead of refusing "where the resolved path exists and is non-empty", on the grounds that a
+        typo'd README.md and a real 24-entry CHANGELOG.md are distinguishable by looking at the target.
+        By that test they are not: README.md exists and is non-empty in every repo, so the one case this
+        guard's own docstring names as its reason would have passed with a warning while the cut went on
+        to truncate it. What separates the two is not whether the target has content but whether the seam
+        is pointing where it used to point, which is what the lookup above answers.
+
+        SILENT ON THE LEGACY MATCH, deliberately. A recognised layout is not a finding, and this runs at
+        every fold and every cut -- a line printed there would be noise in a repo that has answered the
+        seam the same way for months. Telling an existing consumer that a default moved under them
+        belongs to the adoption run, which is where re-adoption warnings already live (issue #955).
 
         DELIBERATELY NOT UNIVERSAL. Get-ReleaseNoteRoot is read the same way but is NOT checked here and
         must never be: its own contract record argues, on purpose, that its default stays at the root
@@ -217,6 +279,20 @@ function Assert-WorkflowIsolatedSeamPath {
     foreach ($root in $allowedRoots) {
         if ($normalized -eq $root -or $normalized -like "$root/*") { return }
     }
-    Write-Error "$SeamName resolved to '$RelativePath', outside contributing-davekjohn/ -- this repo is a workflow consumer (issue #885), and this seam is one of the ones that isolates into that folder by default. Nothing was read or written. If '$RelativePath' is genuinely where this belongs, move it under contributing-davekjohn/ instead of pointing the seam outside it."
+    # AND THE SEAM'S OWN PRE-ISOLATION ANSWER, EXACT MATCH ONLY (#956). Exact, not prefix: every call site
+    # passes the resolved seam value itself, so the legacy layout is that value or it is not that layout --
+    # a prefix match would additionally wave through paths BELOW a legacy file, which no caller produces
+    # and which a typo could.
+    $legacyRoots = @(Get-PreIsolationSeamPath -SeamName $SeamName)
+    foreach ($legacy in $legacyRoots) {
+        if ($normalized -eq $legacy) { return }
+    }
+    if ($legacyRoots.Count -gt 0) {
+        $legacyList = ($legacyRoots | ForEach-Object { "'$_'" }) -join ' or '
+        $allowedClause = "the only answer accepted outside that folder is $legacyList, which is where this seam pointed before it isolated"
+    } else {
+        $allowedClause = 'no answer outside that folder is accepted for it'
+    }
+    Write-Error "$SeamName resolved to '$RelativePath'. This repo is a workflow consumer (issue #885) and this seam isolates into contributing-davekjohn/ by default; $allowedClause. Nothing was read or written. If '$RelativePath' is genuinely where this belongs, move it under contributing-davekjohn/ instead of pointing the seam outside it."
     exit 1
 }
