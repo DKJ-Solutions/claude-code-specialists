@@ -3228,6 +3228,113 @@ function Get-EntryHeadingPattern {
     return '^#{' + (Get-EntryHeadingLevel) + '}\s'
 }
 
+function Get-EntryBlockHeadingLevel {
+    <#
+        Pure: the level of the heading an entry block OPENS with -- 2 for a block written in the flat
+        window (August 5-26, 2026), 3 for one written at today's level -- or 0 for a block that carries
+        no heading at all.
+
+        MEASURED FROM THE BLOCK, WHICH IS THE WHOLE POINT OF NAMING IT. Every other answer to "what level
+        is this entry at" in this system was DERIVED from the current level, and a derived answer is wrong
+        for exactly the blocks that need one: an entry written before the level last moved. The measured
+        instance is inbound #953 -- the fold built its legacy-promotion range as
+        '#{level,level+1}', which said H3-or-H4 once the level reached 3. H4 is a level no entry has ever
+        opened with, and H2 -- the level every flat-window entry carries -- fell outside it. A consumer
+        folding a pending entry written before their plugin update therefore got it inserted unpromoted,
+        as a sibling of '## [Unreleased]' rather than a child of it.
+
+        FENCE-AWARE, like every structure reader in this file: an entry documenting the entry format quotes
+        these headings inside a fence, and the quoted one must not be mistaken for the block's own.
+
+        0 RATHER THAN A GUESS for a headingless block. There is nothing to measure, and a caller that
+        needs to know can compare -- inventing a level would put a heading on prose.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+    $lines = @(($EntryText -replace "`r`n", "`n") -split "`n")
+    $fenced = Get-FencedLineFlags -Lines $lines
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($fenced[$i]) { continue }
+        $m = [regex]::Match($lines[$i], '^(#{1,6})\s')
+        if ($m.Success) { return $m.Groups[1].Value.Length }
+    }
+    return 0
+}
+
+function Set-EntryHeadingLevel {
+    <#
+        Pure: shifts EVERY heading in an entry block so the entry's own heading sits at $EntryLevel, and
+        its inner sections move with it. Returns the block with LF newlines.
+
+        WHY THE WHOLE BLOCK AND NOT JUST THE FIRST LINE. Until August 5, 2026 an entry was a heading plus
+        prose, so re-levelling meant rewriting one line -- and the renderer did exactly that, with a '^'
+        anchored to the start of the block. An entry now carries three H3 sections of its own
+        ('### What does this change do?' and its siblings), so shifting only the heading would leave those
+        sections at the level of the ENTRY above them: one entry rendering as four, in well-formed markdown
+        that no parser would complain about.
+
+        SHIFTED BY A DELTA, NOT SET TO A LEVEL. Every non-fenced heading moves by the same amount, which
+        preserves the structure inside the entry whatever it is -- an H4 sub-heading in a body stays one
+        level below the section it is in. Setting levels absolutely would need this function to know which
+        headings are which, and it does not need to know.
+
+        FENCE-AWARE, for the reason every parser in this file is: an entry documenting the entry format
+        quotes these headings inside a fence -- this repo's own changelog does -- and shifting a quoted
+        heading corrupts the example.
+
+        A DELTA OF 0 RETURNS THE BLOCK UNCHANGED apart from the newline normalisation, so a document that
+        renders entries at their native level pays nothing.
+
+        THE DELTA IS MEASURED FROM THE BLOCK, NOT ASSUMED, and that is a repair rather than a refinement
+        (August 5, 2026). It used to be '$EntryLevel - Get-EntryHeadingLevel' -- the shift needed by a block
+        that is ALREADY at the canonical level, which every caller here happens to pass, since they read
+        entries straight out of CHANGELOG.md. Handed a block that is already deeper the function therefore
+        computed the wrong delta and, for the exact case of normalising one BACK to canonical, computed
+        zero and silently returned the block untouched. Its own contract above promises "so the entry's own
+        heading sits at $EntryLevel", which is what it now does.
+        Measured on new-internal-note.ps1, which reads entries out of the developer notes (where they sit
+        one level deeper, under the tier headings) and normalises them so the section readers can find
+        anything: every bullet came out without its type, because the block handed to Resolve-EntryType had
+        never been shifted and its sections were still one level below where that reader looks.
+
+        A BLOCK WITH NO HEADING AT ALL is returned normalised and otherwise untouched -- there is nothing to
+        measure from, and inventing a level would be worse than leaving prose alone.
+
+        CLAMPED AT H6, which markdown has no level beyond. Reached only by a deeply nested body in a deeply
+        nested document; clamping keeps the line a heading rather than turning it into literal '#######'
+        text, which is what markdown renders past six.
+
+        IT LIVES IN THIS LIB RATHER THAN IN release-lib.ps1 SINCE inbound #953 (August 27, 2026), and the
+        move is what let the FOLD reuse it. fold-changelog-entry.ps1 deliberately depends only on the small
+        libs -- release-lib pulls the whole plugin tree in behind it, and that dependency was cut on
+        August 9, 2026 on purpose -- so the fold could not call this function and carried its own
+        first-line-only promotion instead. Two answers to one question, and the fold's was the wrong one.
+        Moving the function DOWN to where the format itself is defined keeps every existing caller
+        working unchanged (release-lib dot-sources this file) and leaves one re-leveller in the system.
+        Exactly the move Get-FencedLineFlags made, for the same reason.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        [Parameter(Mandatory)][int]$EntryLevel
+    )
+    $lines = @(($EntryText -replace "`r`n", "`n") -split "`n")
+    # The block's own level comes from the one reader that measures it, so this function and the fold's
+    # report of what it did cannot disagree about what an entry was written at.
+    $ownLevel = Get-EntryBlockHeadingLevel -EntryText $EntryText
+    if ($ownLevel -eq 0) { return ($lines -join "`n") }
+    $delta = $EntryLevel - $ownLevel
+    if ($delta -eq 0) { return ($lines -join "`n") }
+
+    $fenced = Get-FencedLineFlags -Lines $lines
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($fenced[$i]) { continue }
+        $m = [regex]::Match($lines[$i], '^(#{1,6})(\s.*)$')
+        if (-not $m.Success) { continue }
+        $level = [Math]::Max(1, [Math]::Min(6, $m.Groups[1].Value.Length + $delta))
+        $lines[$i] = ('#' * $level) + $m.Groups[2].Value
+    }
+    return ($lines -join "`n")
+}
+
 function Split-EntryBlocks {
     <#
         Turns a run of lines into entry blocks. A new block starts at every entry heading

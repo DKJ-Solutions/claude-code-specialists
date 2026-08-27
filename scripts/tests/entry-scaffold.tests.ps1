@@ -689,6 +689,22 @@ Assert-True ($relLibText -notmatch '(?m)^function Get-FencedLineFlags') 'one own
 Assert-True ($relLibText -match 'Get-FencedLineFlags') 'one owner: but it still calls it, by the same name, from the lib it dot-sources'
 $escLibText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1'), [System.Text.Encoding]::UTF8)
 Assert-Equal 1 (@([regex]::Matches($escLibText, '(?m)^function Get-FencedLineFlags')).Count) 'one owner: and this lib defines it exactly once'
+
+# THE RE-LEVELLER MOVED THE SAME WAY, for the same reason and with the same guard (inbound #953,
+# August 27, 2026). Set-EntryHeadingLevel lived in release-lib, which the FOLD deliberately does not depend
+# on -- so the fold carried a second, first-line-only answer to "bring this entry to the current level", and
+# that answer was the wrong one. Asserted on absence for the reason above: with both libs loaded, a re-added
+# copy would be shadowed and invisible.
+Assert-True ($relLibText -notmatch '(?m)^function Set-EntryHeadingLevel') 'one owner: release-lib no longer DEFINES the re-leveller'
+Assert-True ($relLibText -match 'Set-EntryHeadingLevel') 'one owner: but it still calls it from the lib it dot-sources'
+Assert-Equal 1 (@([regex]::Matches($escLibText, '(?m)^function Set-EntryHeadingLevel')).Count) 'one owner: and this lib defines it exactly once'
+Assert-Equal 1 (@([regex]::Matches($escLibText, '(?m)^function Get-EntryBlockHeadingLevel')).Count) 'one owner: and the level READER it measures with lives beside it, once'
+# AND THE FOLD MUST NOT GO BACK TO DERIVING A LEGACY RANGE FROM TODAY'S LEVEL -- that is the defect itself,
+# not a style point: '#{level,level+1}' was correct while the entry level was 2 and silently wrong the day it
+# moved to 3.
+$foldLibText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\fold-changelog-entry.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($foldLibText -match 'Set-EntryHeadingLevel') 'the fold re-levels through the shared function'
+Assert-True ($foldLibText -notmatch [regex]::Escape('(Get-EntryHeadingLevel) + 1)')) 'the fold derives no legacy heading range from the current level any more'
 # NO INLINE WALK LEFT ANYWHERE IN THE OWNER LIB: the two removers used to carry one each, and an inline
 # walk is how the tilde gap survived unnoticed in the first place.
 #

@@ -733,75 +733,12 @@ function Convert-RootRelativeLinks {
 # table, or the canonical four) recognises, while only the repo's own table may accuse an author of a
 # wrong type. See Resolve-EntryType's header.
 
-function Set-EntryHeadingLevel {
-    <#
-        Pure: shifts EVERY heading in an entry block so the entry's own heading sits at $EntryLevel, and
-        its inner sections move with it. Returns the block with LF newlines.
-
-        WHY THE WHOLE BLOCK AND NOT JUST THE FIRST LINE. Until August 5, 2026 an entry was a heading plus
-        prose, so re-levelling meant rewriting one line -- and the renderer did exactly that, with a '^'
-        anchored to the start of the block. An entry now carries three H3 sections of its own
-        ('### What does this change do?' and its siblings), so shifting only the heading would leave those
-        sections at the level of the ENTRY above them: one entry rendering as four, in well-formed markdown
-        that no parser would complain about.
-
-        SHIFTED BY A DELTA, NOT SET TO A LEVEL. Every non-fenced heading moves by the same amount, which
-        preserves the structure inside the entry whatever it is -- an H4 sub-heading in a body stays one
-        level below the section it is in. Setting levels absolutely would need this function to know which
-        headings are which, and it does not need to know.
-
-        FENCE-AWARE, for the reason every parser in this file is: an entry documenting the entry format
-        quotes these headings inside a fence -- this repo's own changelog does -- and shifting a quoted
-        heading corrupts the example.
-
-        A DELTA OF 0 RETURNS THE BLOCK UNCHANGED apart from the newline normalisation, so a document that
-        renders entries at their native level pays nothing.
-
-        THE DELTA IS MEASURED FROM THE BLOCK, NOT ASSUMED, and that is a repair rather than a refinement
-        (August 5, 2026). It used to be '$EntryLevel - Get-EntryHeadingLevel' -- the shift needed by a block
-        that is ALREADY at the canonical level, which every caller here happens to pass, since they read
-        entries straight out of CHANGELOG.md. Handed a block that is already deeper the function therefore
-        computed the wrong delta and, for the exact case of normalising one BACK to canonical, computed
-        zero and silently returned the block untouched. Its own contract above promises "so the entry's own
-        heading sits at $EntryLevel", which is what it now does.
-        Measured on new-internal-note.ps1, which reads entries out of the developer notes (where they sit
-        one level deeper, under the tier headings) and normalises them so the section readers can find
-        anything: every bullet came out without its type, because the block handed to Resolve-EntryType had
-        never been shifted and its sections were still one level below where that reader looks.
-
-        A BLOCK WITH NO HEADING AT ALL is returned normalised and otherwise untouched -- there is nothing to
-        measure from, and inventing a level would be worse than leaving prose alone.
-
-        CLAMPED AT H6, which markdown has no level beyond. Reached only by a deeply nested body in a deeply
-        nested document; clamping keeps the line a heading rather than turning it into literal '#######'
-        text, which is what markdown renders past six.
-    #>
-    param(
-        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
-        [Parameter(Mandatory)][int]$EntryLevel
-    )
-    $lines = @(($EntryText -replace "`r`n", "`n") -split "`n")
-    $fencedForLevel = Get-FencedLineFlags -Lines $lines
-    $ownLevel = 0
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($fencedForLevel[$i]) { continue }
-        $hm = [regex]::Match($lines[$i], '^(#{1,6})\s')
-        if ($hm.Success) { $ownLevel = $hm.Groups[1].Value.Length; break }
-    }
-    if ($ownLevel -eq 0) { return ($lines -join "`n") }
-    $delta = $EntryLevel - $ownLevel
-    if ($delta -eq 0) { return ($lines -join "`n") }
-
-    $fenced = Get-FencedLineFlags -Lines $lines
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($fenced[$i]) { continue }
-        $m = [regex]::Match($lines[$i], '^(#{1,6})(\s.*)$')
-        if (-not $m.Success) { continue }
-        $level = [Math]::Max(1, [Math]::Min(6, $m.Groups[1].Value.Length + $delta))
-        $lines[$i] = ('#' * $level) + $m.Groups[2].Value
-    }
-    return ($lines -join "`n")
-}
+# Set-EntryHeadingLevel MOVED DOWN into entry-scaffold-lib.ps1 (inbound #953, August 27, 2026), which this
+# file dot-sources -- so every caller here reaches it unchanged. It went where the entry FORMAT is defined
+# because the FOLD needed it and cannot depend on this lib: fold-changelog-entry.ps1's dot-source was
+# deliberately narrowed to the small libs on August 9, 2026, and being unable to call the re-leveller is
+# what left it promoting a legacy entry's first line by hand. Same move as Get-FencedLineFlags, same reason:
+# one owner, reachable from the lower lib.
 
 function Format-RankedEntries {
     <#

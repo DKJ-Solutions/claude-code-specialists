@@ -549,26 +549,47 @@ foreach ($file in $entryFiles) {
         Write-Host "  ($file declares no tier -- filed as tier 0, which no release can be cut from on its own.)" -ForegroundColor DarkYellow
     }
 
-    # THE ENTRY'S OWN HEADING IS BROUGHT TO THE CURRENT LEVEL, whatever level it was written at. An entry
-    # file created before August 5, 2026 opens with an H3, and the document it is landing in is a flat list
-    # of H2s -- an H3 in that list is not an entry boundary to any reader of it (Get-EntryInsertOffset, the
-    # release renderers, a human scanning the file), so it would be absorbed into the block above it and
-    # inherit that block's PR link.
+    # THE ENTRY IS BROUGHT TO THE CURRENT LEVEL AS A WHOLE BLOCK, whatever level it was written at -- its
+    # own heading AND the sections under it, shifted by one delta. An entry written at any other level is
+    # not an entry boundary to any reader of this list (Get-EntryInsertOffset, the release renderers, a
+    # human scanning the file), so it would be absorbed into the block above it and inherit that block's
+    # PR link.
     #
     # DONE HERE RATHER THAN INSIDE THE PR BLOCK BELOW, which is where it started out. The prepend of
     # '#NN <midDot> ' only runs when gh found a PR, and an entry folded WITHOUT one -- a manual merge, or gh
-    # unavailable -- would then have kept its H3 silently. Two jobs, two substitutions.
+    # unavailable -- would then have kept its written level silently. Two jobs, two substitutions.
     #
-    # count 1, so only the entry's OWN heading moves. A '### ' section heading inside the body ('### Who is
-    # this for') has to keep its level, and a replace-all would flatten every one of them and turn one entry
-    # into four.
+    # IT WAS A FIRST-LINE REGEX UNTIL inbound #953 (August 27, 2026), and it was wrong twice over:
+    #
+    #   * THE RANGE WAS DERIVED FROM TODAY'S LEVEL -- '#{level,level+1}', which reads as H3-or-H4 now that
+    #     the level is 3. H4 is a level no entry has ever opened with, and H2 -- the level every entry
+    #     written in the flat window (August 5-26, 2026) carries -- fell outside it. The range had been
+    #     correct while the level was 2 and silently stopped being correct when the level moved, which is
+    #     the whole argument for measuring a legacy level instead of computing one.
+    #   * AND EVEN WHERE IT MATCHED IT MOVED ONE LINE. Its own comment argued for count 1 so a '### '
+    #     section inside the body would keep its level -- true while the delta is 0 and nothing needs to
+    #     move, and exactly backwards for the case the promotion exists for. A flat-window entry is H2 with
+    #     H3 sections; lifting only its heading to H3 puts the heading and its own sections at ONE level,
+    #     and Split-EntryBlocks then reads that single entry as four. Widening the range would have turned
+    #     a stray-heading defect into a split-entry one.
+    #
+    # SO IT CALLS THE RE-LEVELLER THAT ALREADY SOLVED THIS. Set-EntryHeadingLevel measures the block's own
+    # level and shifts every non-fenced heading by that delta -- the repair the release renderers got on
+    # August 5, 2026 for the identical reason, and the reason it moved down into entry-scaffold-lib is that
+    # this script could not reach it in release-lib.
+    #
+    # MEASURED IN djcylow-react: a pending branch-changelog.md written at the flat H2 level folded into a
+    # freshly migrated CHANGELOG.md landed as '## `branch` changelog' -- a sibling of '## [Unreleased]'
+    # rather than a child of it -- while all seven pre-existing entries sat correctly at H3.
     $entryHashes = '#' * (Get-EntryHeadingLevel)
-    $legacyHeading = '(?m)^#{' + (Get-EntryHeadingLevel) + ',' + ((Get-EntryHeadingLevel) + 1) + '} '
-    # An already-current heading is replaced by itself, so string inequality IS "this was promoted" -- no
-    # second test of the first line, which would be a separate answer to a question already answered.
-    $promoted = ([regex]$legacyHeading).Replace($entryContent, "$entryHashes ", 1)
-    if ($promoted -ne $entryContent) {
-        Write-Host "  ($file was written in the pre-flat entry format -- its heading is promoted to '$entryHashes ' so it is an entry boundary in the list.)" -ForegroundColor DarkYellow
+    # The level the AUTHOR wrote it at, read before the shift, because that -- not string inequality -- is
+    # what the message below reports. Inequality would also fire on the re-leveller's newline normalisation.
+    $writtenLevel = Get-EntryBlockHeadingLevel -EntryText $entryContent
+    # Back to the document's newline: Set-EntryHeadingLevel returns pure LF (it is a pure function over a
+    # block) and everything assembled around this one uses $nl, which is CRLF wherever CHANGELOG.md is.
+    $promoted = (Set-EntryHeadingLevel -EntryText $entryContent -EntryLevel (Get-EntryHeadingLevel)) -replace "`n", $nl
+    if ($writtenLevel -ne 0 -and $writtenLevel -ne (Get-EntryHeadingLevel)) {
+        Write-Host "  ($file was written with its entry heading at H$writtenLevel -- the whole block is re-levelled to '$entryHashes ' so it is an entry boundary in the list and its sections stay beneath it.)" -ForegroundColor DarkYellow
     }
     $entryContent = $promoted
 
