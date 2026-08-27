@@ -44,7 +44,8 @@
     a single tick. So every park commit carries a `Backing:` line -- how many steps are resolved, how many
     files are committed on this branch besides this document, how many are uncommitted here -- and, when
     the plan reads as FINISHED with nothing behind it, a paragraph saying so in as many words.
-    session-status prints it back for every parked branch. COUNTS, NEVER FILENAMES: the uncommitted figure
+    READ IT WITH 'git log -1 --pretty=%B origin/<branch>'; the reporter that used to print it back for every
+    parked branch went with /lock and /handover (#957). COUNTS, NEVER FILENAMES: the uncommitted figure
     describes work nobody asked to publish. It is a note and never a gate -- see the block at the call.
 
     NO SOURCE-REPO GUARD, and that is the documented precedent rather than an omission. A hook invokes

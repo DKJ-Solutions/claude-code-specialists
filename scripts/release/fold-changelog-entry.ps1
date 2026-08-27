@@ -222,8 +222,8 @@ if ($repo -match 'VUL-IN') {
 
 # Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): this script used to probe inline for
 # every other seam it reads and hard-code the changelog path outright. The changelog is the one seam
-# three different readers (this script, cut-release.ps1, session-status.ps1) must agree on, so it is the
-# one read through the shared definition rather than a fourth private idiom.
+# more than one reader (this script and cut-release.ps1; session-status.ps1 was a third until #957) must
+# agree on, so it is the one read through the shared definition rather than a fourth private idiom.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
 # BOM-less UTF8 -- Set-Content -Encoding UTF8 always adds a BOM in Windows PowerShell 5.1,

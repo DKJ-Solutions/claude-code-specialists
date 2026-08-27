@@ -43,8 +43,11 @@ discovered. It is hand-maintained beside a registry that can be asked, which is 
 three rows were missing when the count was last checked (August 15, 2026 — `adopt-workflow-folder`,
 `session-status` and `source-repo-guard-lib`, each registered but never listed), and re-measuring on
 August 26 found the header, the destination split and the row list all wrong at once, the split not even
-naming `team-shopify` as a destination. The numbers are gone from this page for that reason; the missing rows
-are tracked separately, because writing each one needs a description and a Skill answer rather than a figure.
+naming `team-shopify` as a destination. `session-status` has since gone the other way: it was removed
+along with `/lock` and `/handover`
+([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), so its row went with it.
+The numbers are gone from this page for that reason; the missing rows are tracked separately, because
+writing each one needs a description and a Skill answer rather than a figure.
 
 Not every script here is reached through a skill, and the **Skill** cell says so rather than linking one, so
 an absent link is a fact rather than an oversight.
@@ -55,7 +58,6 @@ an absent link is a fact rather than an oversight.
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-config`](../skills/adopt-config/SKILL.md) |
 | `task/adopt-workflow-folder.ps1` | scaffolds `contributing-davekjohn/` — the folder docs, the releases root and the branch dossier | [`adopt-workflow-folder`](../skills/adopt-workflow-folder/SKILL.md) |
-| `task/session-status.ps1` | reports the locked topic and the repo's own answer beside it | [`lock`](../skills/lock/SKILL.md) · [`handover`](../skills/handover/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
 | `release/verify-resolved-issues.ps1` | checks that a merged PR closed what it declared | [`ship-pr`](../skills/ship-pr/SKILL.md) |

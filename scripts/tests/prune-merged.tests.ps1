@@ -54,10 +54,11 @@ function Get-FlatOutput {
 
         Joined with '' rather than a space because the wrap is a HARD break at a column, so the halves
         reconstruct exactly ('dirt' + 'y working tree'); a space between them would match nothing.
-        park-branch.tests.ps1, shared-scripts.tests.ps1, new-branch.tests.ps1,
-        find-specialist-mentions.tests.ps1 and session-status.tests.ps1 carry the older copy of this
-        helper. They are green, so they are deliberately left alone rather than repaired pre-emptively --
-        the risk is named in this release's entry.
+        park-branch.tests.ps1, shared-scripts.tests.ps1, new-branch.tests.ps1 and
+        find-specialist-mentions.tests.ps1 carry the older copy of this helper (session-status.tests.ps1
+        did too, until #957 removed it with the script it covered). They are green, so they are
+        deliberately left alone rather than repaired pre-emptively -- the risk is named in this
+        release's entry.
     #>
     param($Captured)
     return (($Captured | ForEach-Object { [string]$_ }) -join '')

@@ -100,10 +100,10 @@ behind it:
 git log -1 --pretty=%B origin/<branch>
 ```
 
-`session-status.ps1` prints it under each parked branch too, so `/lock` and `/handover` surface it without
-a checkout, and it says so plainly where there is none. **The two traps are independent and both are
-cheap:** the check above asks whether the plan has been overtaken; this one asks whether it was ever
-carried out. A plan can pass either and fail the other.
+That command is the only way to read it: a reporter used to print the note under each parked branch
+automatically, and it went with `/lock` and `/handover` on August 27, 2026. **The two traps are
+independent and both are cheap:** the check above asks whether the plan has been overtaken; this one asks
+whether it was ever carried out. A plan can pass either and fail the other.
 
 **Deleting the remote branch afterwards is deliberately a manual act** in the repo this was measured in —
 a parked branch is by definition *not* merged, so its loss is unrecoverable, which is exactly the wrong

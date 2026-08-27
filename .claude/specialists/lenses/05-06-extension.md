@@ -653,9 +653,9 @@ rule that every note root names its **reader** — or, since #914 renamed `devel
 what the document **is**: `changelog/` the changelog for that version, `github/` the
 Release page, `audience/` whoever this repo publishes to. `notes/` named the *form* — the same mistake
 `highlights/` made, fixed in that sibling two days earlier and missed in this one. **The shared default
-stays `releases/notes`** in `cut-release.ps1`, `session-status.ps1` and the contract record: an unstated
-seam has to keep meaning what it meant yesterday, and a consumer receives these scripts through a plugin
-update rather than by choosing to.
+stays `releases/notes`** in `cut-release.ps1`, `build-release-notes-page.ps1` and the contract record: an
+unstated seam has to keep meaning what it meant yesterday, and a consumer receives these scripts through
+a plugin update rather than by choosing to.
 
 **AND `consumer/` + `internal/` WERE MERGED INTO `audience/` TWO HOURS LATER, WHICH IS WHY THAT MOVEMENT
 WAS NOT FINISHED** (Dave, August 12, 2026). This paragraph said they *stay as frozen archives* — and that

@@ -5285,8 +5285,8 @@ function Format-DevelopmentCycle {
         # DEPLOY section has to resolve from.
         #
         # A PARAMETER RATHER THAN A SEAM READ IN HERE, deliberately (inbound #967). Every other reader of
-        # Get-ChangelogPath in this workflow -- cut-release, fold-changelog-entry, adopt-workflow-folder,
-        # session-status -- resolves it in the SCRIPT and passes the answer in, because the default needs a
+        # Get-ChangelogPath in this workflow -- cut-release, fold-changelog-entry and
+        # adopt-workflow-folder -- resolves it in the SCRIPT and passes the answer in, because the default needs a
         # repo root and a lib that goes looking for one is a lib that can find the wrong tree. new-branch
         # does the same; the default keeps every other caller, the suites included, on today's wording.
         [string]$LinkDestDirRel = ''

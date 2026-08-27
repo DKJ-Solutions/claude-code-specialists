@@ -344,8 +344,9 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   CREATE steps naming edits to three agent defs, three manuals and two lenses, and a diff against `main`
   consisting of the cycle document alone. The work was uncommitted on the other device; every commit on
   the branch was `davekokbwj` while this checkout is `DaveKJohn`, which is the tell to look for when the
-  numbers and the ticks disagree. `session-status.ps1` prints the note under each parked branch, so
-  `/lock` and `/handover` surface it without a checkout.
+  numbers and the ticks disagree. Read the note with `git log -1 --pretty=%B origin/<branch>`: the reporter
+  that used to print it under each parked branch went with `/lock` and `/handover` on August 27, 2026
+  ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957)).
 - **Working in parallel from multiple machines** (lesson of July 16, 2026, when PR #46 and #47
   crossed each other): merging different branches in parallel is safe — the lint gate and CI protect
   `main` independently of which machine merges. Two rules keep it that way: **never the same branch

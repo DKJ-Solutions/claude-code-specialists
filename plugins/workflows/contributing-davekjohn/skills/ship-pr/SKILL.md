@@ -169,7 +169,7 @@ keyboard:
 
 **The wider rule this belongs to still stands: these scripts assume one working tree per session.** The gates
 no longer depend on it, but step 5 does — it checks out the main branch and folds from there, whichever branch
-the session had moved to. There is no lock; `/lock` is a note for the next session, not a claim on a checkout.
+the session had moved to. Nothing in this workflow locks a checkout — no script claims one, and none ever did.
 Use a second clone or a git worktree if two things really do run at once.
 
 ## Why step 3 polls before it watches

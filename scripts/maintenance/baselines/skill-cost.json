@@ -49,16 +49,6 @@
                                               "OnInvoke":  6000,
                                               "Version":  "4.17.0"
                                           },
-    "contributing-davekjohn/handover":  {
-                                        "AlwaysOn":  180,
-                                        "OnInvoke":  2600,
-                                        "Version":  "4.17.0"
-                                    },
-    "contributing-davekjohn/lock":  {
-                                    "AlwaysOn":  200,
-                                    "OnInvoke":  2200,
-                                    "Version":  "4.17.0"
-                                },
     "contributing-davekjohn/new-branch":  {
                                           "AlwaysOn":  170,
                                           "OnInvoke":  7500,

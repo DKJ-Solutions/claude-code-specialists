@@ -13,8 +13,9 @@
     the first supported more than one name for a renamed seam -- and fold-changelog-entry.ps1, open-pr.ps1
     and session-status.ps1 each probed inline with `Get-Command Get-X -ErrorAction SilentlyContinue`
     instead of calling either copy. The changelog seam this branch adds is read at three of those sites
-    (cut-release.ps1, fold-changelog-entry.ps1, session-status.ps1), so it is the one they read through
-    rather than adding a third idiom for one seam.
+    (cut-release.ps1, fold-changelog-entry.ps1 and session-status.ps1 -- the last of which #957 removed
+    with /lock and /handover), so it is the one they read through rather than adding a third idiom for one
+    seam.
 
     ARRAY-CAPABLE ON PURPOSE, kept from cut-release.ps1's copy rather than new-internal-note.ps1's
     single-name one: $Name takes MORE THAN ONE NAME where a seam has been renamed, tried in order, so the

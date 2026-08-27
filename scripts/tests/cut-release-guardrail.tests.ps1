@@ -365,13 +365,15 @@ Assert-True ($versionCell.Success -and $versionCell.Value -match 'Get-RelativeLi
 # the same trap the seam-default count guards.
 Assert-True ($cutReleaseCode -match '\$rowTargetRel\s*=.*\$noteRootRelPath') `
     'and the row target is derived from the seam variable, so repointing the root moves the row with it'
-# A SEAM THAT REACHES ONLY THE WRITER IS THE FAILURE THIS ONE HAD TO AVOID: session-status.ps1 looks for
-# the newest note, so a repo that repointed the root would have it written to the new place and looked
-# for in the old, reported as "no release note was found". Pinned here rather than only in that script's
-# own suite, because the pair is what makes the seam true -- and nothing else compares the two files.
-$sessionStatusPath = Join-Path $RepoRoot 'scripts\task\session-status.ps1'
-$sessionStatusText = [System.IO.File]::ReadAllText($sessionStatusPath, [System.Text.Encoding]::UTF8)
-Assert-True ($sessionStatusText -match 'Get-ReleaseNoteRoot') 'the reader of those notes reads the same seam as the writer'
+# A SEAM THAT REACHES ONLY THE WRITER IS THE FAILURE THIS ONE HAD TO AVOID: build-release-notes-page.ps1
+# reads those notes back, so a repo that repointed the root would have them written to the new place and
+# looked for in the old, reported as "no release note was found". Pinned here rather than only in that
+# script's own suite, because the pair is what makes the seam true -- and nothing else compares the two
+# files. THE READER WAS session-status.ps1 UNTIL #957 removed it with /lock and /handover; what the pin
+# needs is a reader, not that particular one.
+$notesPagePath = Join-Path $RepoRoot 'scripts\release\build-release-notes-page.ps1'
+$notesPageText = [System.IO.File]::ReadAllText($notesPagePath, [System.Text.Encoding]::UTF8)
+Assert-True ($notesPageText -match 'Get-ReleaseNoteRoot') 'the reader of those notes reads the same seam as the writer'
 
 # The seam has to reach the message that fires when the history file is MISSING, which is the one moment
 # the reader is about to go looking for the path it names. It was the single literal left among three

@@ -589,7 +589,7 @@ the Stop hook `cycle-autopark`
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
-`cut-release`, `adopt-config`, `adopt-workflow-folder`, `lock`, `handover`,
+`cut-release`, `adopt-config`, `adopt-workflow-folder`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `prune-merged`,
 `measure-skill`, `worktree-lane`, `orchestrator`)<!-- /skills:all -->
 remain available there.
@@ -674,22 +674,27 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
 `start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`,
-`lock`, `handover`, `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
+`release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
 `prune-merged`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
 **mechanism** (branch, PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
-theme, the standing before and after a context clear, the reading copy of the release notes, reaping the local branches a merge left behind, pricing
+theme, the reading copy of the release notes, reaping the local branches a merge left behind, pricing
 what a skill costs the sessions that carry it, and giving a branch its own worktree so another one can
-ship).
-`lock` and `handover` are the first pair to wrap **one** script
-between them — they run the same reporter and differ only in what they do with the answer, which is why
-the shared-scripts registry names a script's documenting page rather than its callers. `cut-release`
-and `orchestrator`<!-- /skills:all --> are the deliberate exceptions:
+ship). `cut-release` and `orchestrator`<!-- /skills:all --> are the deliberate exceptions:
 a checklist with no script of its own (see below), and a skill that must not have one — `orchestrator`
 reads a persona file into the conversation, and the environment it exists for is precisely the one
 where `powershell` is absent. Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
 also means we currently use only one half of what Agent Skills can carry.
+
+**One shape used to be illustrated here and no longer is: two skills sharing one script.** `lock` and
+`handover` were the only such pair — the same reporter, differing only in what each did with the answer
+— and they are the reason the shared-scripts registry names a script's *documenting page* rather than
+its callers. Both were removed on August 27, 2026
+([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), along with the reporter
+behind them. The registry field is unchanged and still answers that question; what it has lost is its
+worked example, so the relationship it was built for now runs only in the other direction —
+`ship-pr` and `cut-release` each name two scripts.
 
 The unused half is a noted opportunity, not an open task: of the three progressive-disclosure levels
 described in [Where this runs](#where-this-runs-chat-cowork-and-claude-code) above, none of our

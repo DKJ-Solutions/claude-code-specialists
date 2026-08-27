@@ -2502,8 +2502,8 @@ $ctrChecked = 0
 # check named 'releases\notes' as a literal, so the day Get-ReleaseNoteRoot moved to 'releases/audience' the
 # gate would have found no live tree, checked the archive alone, and reported a coverage count that still
 # looked healthy -- a gate going quiet with nothing erroring, which is the failure class this repo keeps
-# paying for. session-status.ps1 states the same lesson two files over about the reader-versus-writer half
-# of this very seam; a GATE keyed on a hardcoded root is the third reader nobody thought of.
+# paying for. script-contract-lib.ps1 states the same lesson at this very seam's record, about its
+# reader-versus-writer half; a GATE keyed on a hardcoded root is the third reader nobody thought of.
 #
 # ALL OF THEM ARE READ, NOT JUST THE CURRENT ONE. The seam's value, the pre-rename 'releases\notes' and the
 # archive are walked together and deduplicated, so a repo mid-migration -- or one that never renamed -- has

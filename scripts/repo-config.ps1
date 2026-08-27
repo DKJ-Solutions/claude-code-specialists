@@ -511,9 +511,9 @@ function Get-ReleaseInternalNotesRoot {
 # root that has to agree with Get-ReleaseAudienceTier: the tier says which reader, so the directory should
 # not say something orthogonal to it.
 #
-# THE SHARED DEFAULT IS DELIBERATELY *NOT* MOVED WITH IT. cut-release.ps1 and session-status.ps1 still fall
-# back to 'releases/notes', and script-contract-lib still records that as the Default, because an unstated
-# seam has to keep meaning what it meant yesterday. A consumer who never answered this knob has their
+# THE SHARED DEFAULT IS DELIBERATELY *NOT* MOVED WITH IT. cut-release.ps1 and build-release-notes-page.ps1
+# still fall back to 'releases/notes', and script-contract-lib still records that as the Default, because
+# an unstated seam has to keep meaning what it meant yesterday. A consumer who never answered this knob has their
 # documents in releases/notes/ right now and receives these scripts through a plugin update rather than by
 # choosing to -- moving the fallback would have the cut write to a root nobody has and the reader look in a
 # root nobody filled, reported as "no release note was found", which reads as a repo that has not cut one.
