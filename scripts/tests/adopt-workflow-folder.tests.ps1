@@ -122,7 +122,12 @@ try {
     # empty forever. The page now points at the seam's answer instead.
     $relText = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\releases\README.md'), [System.Text.Encoding]::UTF8)
     Assert-True ($relText -notmatch '\| Version \| Date \| Type \| Title \|') '-Apply: the folder page carries NO history table (the list is not here)'
-    Assert-Match 'releases/README\.md' $relText '-Apply: it names where the list actually lives instead'
+    # MATCHED ON THE LIST'S OWN PATH, not on 'releases/README.md'. That was the pattern until
+# August 27, 2026, and it was passing on the wrong sentence: the scaffolded page names the seam's answer
+# in one place and mentioned 'releases/README.md' in another, as a comparison with the source repo's
+# layout, so removing the comparison turned this assert red while the thing it checks was untouched. The
+# list's filename is what the assert is about.
+Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list actually lives instead'
     # And the closing block names the two seams only this repo can answer.
     Assert-Match 'Get-ReleaseNoteRoot' $r2.Out '-Apply: the next-steps block names Get-ReleaseNoteRoot'
     Assert-Match 'Get-ReleaseHistoryPath' $r2.Out '-Apply: and Get-ReleaseHistoryPath'
