@@ -274,22 +274,40 @@ and the score under each tier the file carries.
 heading for four days. It is the date the change *landed*, and this is the line that says *what* landed.
 Neither the number nor the date exists while you are writing; the fold writes both.
 
-**A relative link in this section resolves from the REPO ROOT, not from this directory.** The fold copies
-this text verbatim into `CHANGELOG.md` at the root, one directory up — so the link has to be written for
-where it *lands*, which means it looks wrong in the file you are editing and only becomes right after it
-moves:
+**A relative link in this section resolves from wherever your `CHANGELOG.md` sits — not, in general, from
+this directory.** The fold copies this text verbatim into that file, so the link has to be written for where
+it *lands* rather than for where you are typing it.
+
+**Which directory that is, is one seam, and the shipped default puts it beside this document.**
+`Get-ChangelogPath` answers it; left unset, a repo that publishes no plugin marketplace gets
+`contributing-davekjohn/CHANGELOG.md` — the same directory this file is in, where the link that already reads
+correctly in front of you *is* the correct one. A repo whose changelog is at the root gets the opposite, and
+there the correct form looks wrong until it moves:
 
 ```markdown
-See [the lib](scripts/lib/release-lib.ps1).       <- correct: resolves at the destination
-See [the lib](../scripts/lib/release-lib.ps1).    <- resolves HERE, dead once it lands
+See [the lib](scripts/lib/release-lib.ps1).       <- correct where the changelog is at the ROOT
+See [the lib](../scripts/lib/release-lib.ps1).    <- correct where it sits BESIDE this document
 ```
 
-The instinct produces the second form, and until August 21, 2026 nothing said otherwise: a consumer merged
-two `../../scripts/...` links that landed at the root pointing outside the repo, with every gate green
-(inbound [#806](https://github.com/DaveKJohn/claude-code-specialists/issues/806)). `open-pr`'s **link gate**
-refuses it now and prints the root-relative form, so the correction is one edit rather than a guess.
-**Write the whole document that way**, plan included: the head carries no links in the scaffold, and one
-rule for one file is the only version anybody can apply while writing.
+**You do not have to work out which one you are.** The guidance block at the top of your own
+`contributing-davekjohn/development-cycle.md` states your repo's answer in one sentence, composed by
+`new-branch` from the same seam `open-pr`'s link gate resolves against — so the file you are typing in and
+the gate that refuses cannot disagree about the base.
+
+The instinct produces whichever form reads correctly in front of you, and until August 21, 2026 nothing said
+otherwise: a consumer merged two `../../scripts/...` links that landed at the root pointing outside the repo,
+with every gate green (inbound
+[#806](https://github.com/DaveKJohn/claude-code-specialists/issues/806)). `open-pr`'s **link gate** refuses
+it now and prints the form the destination needs, so the correction is one edit rather than a guess.
+
+**That repair then assumed the root for another two weeks**, which is inbound
+[#967](https://github.com/DaveKJohn/claude-code-specialists/issues/967): once the changelog isolated by
+default, the gate demanded the dead form and refused the live one in exactly the repos it had been shipped
+to. Both halves are the same lesson twice — the base is where the text lands, and where that is is a fact
+about your repo rather than about the form.
+
+**Write the whole document by whichever rule your answer gives**, plan included: the head carries no links in
+the scaffold, and one rule for one file is the only version anybody can apply while writing.
 
 **The PR title is the first line of the `Pull Request` section** (Dave, August 7, 2026;
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)). `open-pr` composes the PR title
@@ -495,8 +513,10 @@ this is exactly the file where out-of-band changes are routine.
 1. **The DEPLOY section holds the entry block and nothing around it** — no preamble, no warning. That is
    what makes it pasteable into `CHANGELOG.md` in one go, which is its whole reason for existing. It opens
    with the branch, and that is what lands in the changelog.
-2. **Links are written root-relative**, as if the file were already in the repo root — because after the
-   fold its DEPLOY section is. Your lint gate, where you have one, checks them from there.
+2. **Links are written for where the DEPLOY section LANDS** — the directory your `CHANGELOG.md` sits in,
+   which is beside this document on the shipped default and the repo root wherever `Get-ChangelogPath` says
+   so. The guidance block in your own cycle document names your answer; your lint gate, where you have one,
+   checks them from there.
 3. **Every step is resolved before the PR.** `open-pr.ps1` and `ship-pr.ps1` both refuse while anything
    is unresolved. Three marks:
 

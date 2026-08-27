@@ -27,6 +27,10 @@ $RepoRoot        = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..'))
 $LibSrc          = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $NewBranchSrc = Join-Path $RepoRoot 'scripts\task\new-branch.ps1'
 $BranchInfoSrc   = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
+# new-branch reads the changelog seam through this since inbound #967, to state the right link base in the
+# guidance it writes. In a real consumer it arrives with the plugin, beside the scripts; the fixture below
+# is a hand-built stand-in for that tree, so it has to be copied in like the other two.
+$SeamLibSrc      = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 $OpenPrSrc       = Join-Path $RepoRoot 'scripts\release\open-pr.ps1'
 
 $script:pass = 0
@@ -154,6 +158,7 @@ New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\lib') -Force | O
 Copy-Item -LiteralPath $NewBranchSrc -Destination (Join-Path $fixture 'scripts\task\new-branch.ps1') -Force
 Copy-Item -LiteralPath $BranchInfoSrc -Destination (Join-Path $fixture 'scripts\lib\branch-info.ps1') -Force
 Copy-Item -LiteralPath $LibSrc -Destination (Join-Path $fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
+Copy-Item -LiteralPath $SeamLibSrc -Destination (Join-Path $fixture 'scripts\lib\seam-lib.ps1') -Force
 
 $prevEap = $ErrorActionPreference
 try {
@@ -221,7 +226,13 @@ Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixture 'contributing-dave
 # of the blocks the report named rather than on "some comment exists": a document that kept the headings and
 # lost the hints would pass a laxer test.
 Assert-True ($docText -match 'ABOVE the Score line') 'the branch document carries the field guidance itself'
-Assert-True ($docText -match 'FROM THE REPO ROOT') 'including the link convention, which cannot be derived from the file in front of you'
+# AND THIS FIXTURE IS EXACTLY THE REPO #967 WAS ABOUT, which is why the assert says THIS DIRECTORY rather
+# than THE REPO ROOT. It has no .claude-plugin/marketplace.json, so it is a consumer: Get-DefaultChangelogPath
+# puts its CHANGELOG.md inside the workflow folder, the same directory the cycle document sits in. The
+# sentence this file carried until then told that author to write the one link form the fold would break --
+# and it read as correct here for weeks, because the assert only ever asked whether SOME base was named.
+Assert-True ($docText -match 'FROM THIS DIRECTORY') 'including the link convention, which cannot be derived from the file in front of you -- and which names this consumer''s own destination'
+Assert-True ($docText -notmatch 'FROM THE REPO ROOT') 'and it does NOT name the root, which is what it wrongly named in every consumer before inbound #967'
 
 # A RERUN CHANGES NOTHING, which is what idempotency means once there is no reference copy to refresh. The
 # author's own document must survive it untouched -- byte for byte, because a rerun that "helpfully"
@@ -1911,10 +1922,14 @@ Assert-Equal $null (Get-EntryAudienceTier) 'the seam is removed again, so nothin
 
 Write-Host ""
 Write-Host "Get-EntryLinkTargets / Get-EntryLinkFindings -- the entry's links resolve at the DESTINATION (inbound #806)" -ForegroundColor Cyan
-# The entry is written two directories down and folded verbatim into CHANGELOG.md at the repo root, so a
-# relative link in it has to be root-relative -- which means it looks wrong in the file being edited and
-# only becomes right after it moves. A consumer merged two '../../scripts/...' links that landed at the
-# root pointing outside the repo, with every gate green.
+# The entry is folded verbatim into the changelog, so a relative link in it has to resolve from THAT file's
+# directory -- which, where the two differ, means it looks wrong in the file being edited and only becomes
+# right after it moves. A consumer merged two '../../scripts/...' links that landed at the root pointing
+# outside the repo, with every gate green.
+# WHICH DIRECTORY IT IS, IS A SEAM (inbound #967, August 27, 2026). It was the repo root in every repo until
+# #914 made Get-ChangelogPath isolate-by-default, and the fixtures below cover both answers: the root, which
+# is this repo's own, and the workflow folder, which is every consumer's default and is also the directory
+# the entry itself sits in -- so there the correct link is the one that already reads correctly in the file.
 # ONE '../' SINCE AUGUST 23, 2026, not two: the document sits directly in contributing-davekjohn/ rather than in
 # a branch/ subdirectory of it, so the wrong-but-resolving form an author naturally writes is one level
 # shallower. The depth comes from the seam (Get-BranchFilePaths.Directory), which is what the suggester
@@ -1969,11 +1984,102 @@ Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText '[ok](CHANGELOG.md) and [ok2]
 # the rules with a SILENT failure mode were hoisted into the visible block above the phases. Asserted
 # against that block by name rather than against 'some guidance somewhere', so a future move has to come
 # back through this line.
-Assert-True ([string]((Get-BranchFileWording).StepsGuidance -join ' ') -match 'FROM THE REPO ROOT') 'the visible block states the root-relative convention'
+# A TOKEN IN THE WORDING, RESOLVED AT RENDER (inbound #967). The sentence used to be two typed lines saying
+# 'FROM THE REPO ROOT', which stopped being true for consumers when the changelog isolated -- so the block
+# carries '{1}' and Format-EntryLinkGuidance fills it from the destination that actually applies. Asserted in
+# both halves, because either one alone passes while the feature is broken: a token nobody resolves renders
+# '{1}' into every branch document, and a resolver with no token in the block silently states nothing at all.
+Assert-True ([string]((Get-BranchFileWording).StepsGuidance -join ' ') -match '\{1\}') 'the visible block carries the link token rather than a typed base'
+Assert-True ([string](@(Format-EntryLinkGuidance -Lines @((Get-BranchFileWording).StepsGuidance) -DestDirRel '') -join ' ') -match 'FROM THE REPO ROOT') 'and it resolves to the root-relative convention where the changelog is at the root'
 # AND IT REACHES THE FILE A BRANCH ACTUALLY GETS, which is where it did NOT reach until August 23, 2026:
 # the guidance rendered into branch/templates/ and the working file was bare. That is what inbound #810
 # measured, and this is the assert that keeps it repaired.
 Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match 'FROM THE REPO ROOT') 'and it reaches the document a branch is handed, not a reference beside it'
+
+Write-Host "Get-EntryLinkFindings -DestDirRel -- the base follows the CHANGELOG, not the root (inbound #967)" -ForegroundColor Cyan
+# A BUILT TREE RATHER THAN THIS REPO'S OWN, and the reason is a lesson from writing these asserts. The
+# section above resolves against the live checkout, which is fine while it only asks about paths that have
+# been there for months -- and it silently answers the wrong question the moment a fixture file exists at
+# BOTH bases. The first draft used CONTRIBUTING.md, which sits at the root AND in the workflow folder here,
+# so the root case reported nothing and read as a broken repair rather than a badly chosen fixture. This
+# tree states exactly which file is where, and it does not move when the repo's layout does.
+$linkFixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-link-dest-$PID"
+if (Test-Path -LiteralPath $linkFixture) { Remove-Item -Recurse -Force -LiteralPath $linkFixture }
+$folderRel = (Get-BranchFilePaths).Directory
+New-Item -ItemType Directory -Path (Join-Path $linkFixture $folderRel) -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $linkFixture 'scripts') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $linkFixture 'releases') -Force | Out-Null
+# beside/ IS THE POINT OF THE THIRD FILE: a name that exists in the folder and NOT at the root, which is
+# what makes the two destinations give different answers for one identical link.
+$linkFixtureEnc = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText((Join-Path $linkFixture "$folderRel\beside.md"), "x`n", $linkFixtureEnc)
+[System.IO.File]::WriteAllText((Join-Path $linkFixture 'scripts\x.ps1'), "x`n", $linkFixtureEnc)
+[System.IO.File]::WriteAllText((Join-Path $linkFixture 'CHANGELOG.md'), "x`n", $linkFixtureEnc)
+try {
+    # THE REVERSAL, IN ONE PAIR. Get-DefaultChangelogPath puts a consumer's CHANGELOG.md in the workflow
+    # folder -- the same directory the cycle document sits in -- so on the shipped defaults the root base
+    # refused the link form that is correct after the fold and demanded the one that is dead. Both asserts
+    # take the same text and the same tree; only the destination differs, which is the whole bug.
+    $sameDirLink = '[a neighbour](beside.md)'
+    $fromRoot = @(Get-EntryLinkFindings -EntryText $sameDirLink -RepoRoot $linkFixture -DestDirRel '')
+    Assert-Equal 1 $fromRoot.Count 'with the changelog at the root, a link written as it reads in the entry file is reported'
+    Assert-Equal "$folderRel/beside.md" $fromRoot[0].Suggested 'and the root-relative form is what it is told to write -- #806, unchanged'
+    Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText $sameDirLink -RepoRoot $linkFixture -DestDirRel $folderRel)).Count 'with the changelog in that same directory the identical link PASSES -- there is nothing for the fold to break'
+
+    # AND THE OTHER WAY ROUND, which is the finding a real consumer meets: they followed the old guidance,
+    # wrote the link root-relative, and it is dead once the text sits in the folder. It must not merely be
+    # refused -- the suggestion has to name the '../' form, or the one author who did as they were told gets
+    # the only finding with no way out of it.
+    $rootStyleLink = '[the script](scripts/x.ps1)'
+    $fromFolder = @(Get-EntryLinkFindings -EntryText $rootStyleLink -RepoRoot $linkFixture -DestDirRel $folderRel)
+    Assert-Equal 1 $fromFolder.Count 'a root-relative link is dead at a destination inside the folder, and is reported there'
+    Assert-Equal '../scripts/x.ps1' $fromFolder[0].Suggested 'and the suggestion names the form that destination needs, computed from the repo root as the second candidate base'
+    Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText $rootStyleLink -RepoRoot $linkFixture -DestDirRel '')).Count 'while the same link passes for a repo whose changelog is at the root'
+
+    # A TYPO IS STILL A TYPO AT EITHER DESTINATION, and gets no guess at either.
+    $destTypo = @(Get-EntryLinkFindings -EntryText '[x](scripts/no-such-file.ps1)' -RepoRoot $linkFixture -DestDirRel $folderRel)
+    Assert-Equal 1 $destTypo.Count 'a path that resolves from neither base is reported at an isolated destination too'
+    Assert-Equal '' $destTypo[0].Suggested 'and still gets no suggestion -- there is nothing to compute one from'
+
+    # THE DEFAULT IS THE ROOT, which is what keeps every other caller -- the suites included -- on the
+    # behaviour #806 shipped. A parameter whose omission changed the answer would have made this a migration.
+    Assert-Equal 1 (@(Get-EntryLinkFindings -EntryText $sameDirLink -RepoRoot $linkFixture)).Count 'omitting -DestDirRel is the repo root, exactly as before the parameter existed'
+
+    Write-Host "Get-PathRelativeToDirectory -- the suggestion's form, including the case a substring could not reach" -ForegroundColor Cyan
+    Assert-Equal 'scripts/x.ps1' `
+        (Get-PathRelativeToDirectory -FullPath (Join-Path $linkFixture 'scripts\x.ps1') -Directory $linkFixture) `
+        'a target UNDER the directory is its tail -- the only case the substring this replaced could answer'
+    Assert-Equal '../scripts/x.ps1' `
+        (Get-PathRelativeToDirectory -FullPath (Join-Path $linkFixture 'scripts\x.ps1') -Directory (Join-Path $linkFixture $folderRel)) `
+        'a target BESIDE it needs a ../, which is the case that silently produced nothing before'
+    Assert-Equal 'beside.md' `
+        (Get-PathRelativeToDirectory -FullPath (Join-Path $linkFixture "$folderRel\beside.md") -Directory (Join-Path $linkFixture $folderRel)) `
+        'a target IN it is the bare filename'
+} finally {
+    Remove-Item -Recurse -Force -LiteralPath $linkFixture -ErrorAction SilentlyContinue
+}
+
+# NO SHARED SEGMENT MEANS NO RELATIVE FORM AT ALL, and '' is the same answer the caller gives for a target it
+# cannot name a form for -- not an exception, because a suggestion is a courtesy and a throw here would take
+# down a gate over one unreachable path.
+Assert-Equal '' (Get-PathRelativeToDirectory -FullPath 'Q:\elsewhere\x.md' -Directory (Join-Path $repoRootForLinks $folderRel)) `
+    'another drive has no relative form, and that is reported as no suggestion rather than as an error'
+
+Write-Host "Format-EntryLinkGuidance -- the sentence a branch document is handed states the base that applies" -ForegroundColor Cyan
+$tokenBlock = @('> intro', '> {1}', '> outro')
+$rootLines = @(Format-EntryLinkGuidance -Lines $tokenBlock -DestDirRel '')
+Assert-Equal 4 $rootLines.Count 'the root sentence is two fragments wide, so the token line is emitted twice'
+Assert-True ([string]($rootLines -join ' ') -match 'FROM THE REPO ROOT, not from this directory') 'and it is word for word what the block said before the token existed'
+foreach ($line in $rootLines) { Assert-True ([bool]($line -match '^> ')) "every produced line keeps the blockquote prefix: '$line'" }
+$sameLines = @(Format-EntryLinkGuidance -Lines $tokenBlock -DestDirRel $folderRel -EntryDirRel $folderRel)
+Assert-True ([string]($sameLines -join ' ') -match 'FROM THIS DIRECTORY') 'a changelog in the entry''s own directory is told plainly, since the old wording said the opposite'
+Assert-True ([string]($sameLines -join ' ') -notmatch 'never `\.\./') 'and the "never ../" advice is gone there -- it was the wrong instruction, not a shorter one'
+$thirdLines = @(Format-EntryLinkGuidance -Lines $tokenBlock -DestDirRel 'releases' -EntryDirRel $folderRel)
+Assert-True ([string]($thirdLines -join ' ') -match 'FROM `releases/`') 'a destination that is neither names itself'
+# THE OVERRIDE CONTRACT, same as its '{0}' sibling: a repo that replaced the wording with its own prose gets
+# exactly its own prose, and no token to fill means nothing is added or removed.
+Assert-Equal 2 (@(Format-EntryLinkGuidance -Lines @('> our own words', '> in two lines') -DestDirRel $folderRel)).Count 'a block carrying no token comes back untouched'
+Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260827-000000' -LinkDestDirRel $folderRel) -join "`n") -match 'FROM THIS DIRECTORY') 'and the document a consumer''s branch is handed carries the base that repo actually folds into'
 
 # #915 -- EVERY GUIDANCE ELEMENT IS A BLOCKQUOTE LINE, and this assert exists because nothing ever counted
 # the array. In PowerShell ',' binds TIGHTER than '+', so an element written as 'a' + $H + 'b' inside the

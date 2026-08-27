@@ -35,6 +35,9 @@ $BranchInfoSrc     = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $NativeCaptureSrc  = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $EntryScaffoldSrc  = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $ParkLibSrc        = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
+# As in new-branch.tests.ps1: this fixture runs new-branch, which reads the changelog seam through this lib
+# since inbound #967.
+$SeamLibSrc        = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -102,6 +105,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')  -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
+    Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')            -Force
 
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }

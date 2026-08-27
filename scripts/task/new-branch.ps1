@@ -133,6 +133,12 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 }
 . $branchInfoPath
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+# AND THE SEAM READER (inbound #967). The guidance this script writes into the document states WHERE a
+# relative link in the DEPLOY section has to resolve from, and that is the changelog's directory -- a seam,
+# not the repo root, since #914 made it isolate-by-default. Resolved in the script and passed in, the way
+# cut-release, fold-changelog-entry, adopt-workflow-folder and session-status all read it: the computed
+# default needs a repo root, and a lib that goes looking for one can find the wrong tree.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
 # The repo-owned fallback type (#410) -- OPTIONAL, unlike branch-info.ps1 above. repo-config.ps1 may
 # be absent (a repo that never needed it) or may fail to load (a syntax error in someone's edit);
@@ -436,8 +442,15 @@ if ($cycleTaken) {
         # entry's date is the fold's to add, from the PR's own merge timestamp, together with the PR number.
         # The CREATION stamp does belong here: it is the document's own heading, and this document is created
         # with the branch and reset with the merge.
+        # THE LINK BASE IS THIS REPO'S OWN (inbound #967), not a constant. In the source repo it resolves to
+        # the root and the sentence is word for word what it always said; in a consumer on the shipped
+        # defaults it resolves to the workflow folder -- the same directory this document is in -- where the
+        # old wording told the author to write the one link form the fold would break.
+        $linkDestDirRel = ((Split-Path (Get-SeamValue -Name 'Get-ChangelogPath' `
+            -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)) -Parent) -replace '\\', '/').Trim('/')
         $cycleText = ((Format-DevelopmentCycle -Branch $branch -Intent $Intent -Id $branchId `
-            -Description $description -Type $branchType -Body $body) -join "`n") + "`n"
+            -Description $description -Type $branchType -Body $body `
+            -LinkDestDirRel $linkDestDirRel) -join "`n") + "`n"
         [System.IO.File]::WriteAllText($cyclePath, $cycleText, $Utf8NoBom)
         $branchFileWritten = $true
         # WHOSE FILE THIS WAS IS NAMED IN EVERY OUTCOME, and that is the reported defect's actual repair. A

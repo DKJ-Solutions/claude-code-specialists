@@ -303,6 +303,10 @@ $info = Get-BranchInfo -Branch $branch
 # Dot-sourced HERE rather than inside the scaffold gate below, because resolving the entry's path now
 # needs the lib too. One load, at the first point anything requires it.
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+# AND THE SEAM READER, for the link gate's base (inbound #967). $PSScriptRoot-relative like the lib above:
+# this is workflow machinery that travels with the script, not a repo answer -- the repo's answer is the
+# optional Get-ChangelogPath in its own repo-config.ps1, which is already loaded.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
 # THE ENTRY LIVES IN branch/ SINCE THE SPLIT (Dave, August 6, 2026), with the root <SafeName>.md still
 # accepted as the fallback. Both exist in the wild simultaneously: a branch created before the split
@@ -689,10 +693,30 @@ Correct the table and run again.
         }
     }
 
-    # Link gate: the entry's relative links have to resolve from the REPO ROOT, because that is where its
-    # text lands (inbound #806). The entry is written two directories down and folded verbatim into
-    # CHANGELOG.md at the root, so a link that is right in the file being typed in is dead the moment it
-    # moves -- and the natural instinct produces exactly that form.
+    # Link gate: the entry's relative links have to resolve from WHERE ITS TEXT LANDS (inbound #806) --
+    # the directory of the changelog the fold writes into. The entry is folded verbatim into that file, so
+    # where the two directories differ a link that is right in the file being typed in is dead the moment
+    # it moves, and the natural instinct produces exactly that form.
+    #
+    # THE BASE IS THE SEAM'S ANSWER AND NOT THE REPO ROOT (inbound #967). #806's repair hard-coded the root,
+    # which was true of every repo then and stopped being true when #914 made Get-ChangelogPath
+    # isolate-by-default: a consumer's CHANGELOG.md sits in the workflow folder now -- the SAME directory the
+    # entry is written in -- so this gate refused the link form that is correct after the fold and demanded
+    # the one that is dead. Met in BWJ-ecommerce/xoxowildhearts, whose own doc lint measures from the folder,
+    # so its two gates disagreed and its entries avoided relative markdown links entirely.
+    #
+    # READ THE SAME WAY THE FOLD READS IT, which is the only thing that makes this gate's answer true:
+    # Get-SeamValue over the repo's own optional Get-ChangelogPath, with Get-DefaultChangelogPath as the
+    # computed default. Any other derivation would be a second definition of the destination, free to
+    # disagree with the one script that actually writes there.
+    #
+    # AND WITHOUT Assert-WorkflowIsolatedSeamPath, deliberately, which the fold and the cut both call right
+    # after this read. That assert REFUSES, and its subject is provenance rather than links -- adding it here
+    # would gate every PR in every consumer on a question about a file this script neither reads nor writes.
+    # The fold still asks it at the point it matters, so nothing is skipped; what is declined is a new
+    # refusal arriving on the PR path under the heading of a link repair.
+    $changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+    $destDirRel = ((Split-Path $changelogRel -Parent) -replace '\\', '/').Trim('/')
     #
     # HERE RATHER THAN IN THE FOLD, which is where #806 asked for it, and the reason is the fold's own
     # doctrine on the same kind of fault: a defect decidable BEFORE the merge is refused while the branch is
@@ -705,22 +729,42 @@ Correct the table and run again.
     # NOT -Force-able, for the same reason as the impact gate above: -Force exists for text somebody
     # legitimately wrote, and there is no legitimate dead link. Getting past this is a one-line edit the
     # message spells out, not a judgement call -- which is what makes the absence of an escape valve fair.
-    $linkFindings = @(Get-EntryLinkFindings -EntryText $entryText -RepoRoot $repoRoot)
+    $linkFindings = @(Get-EntryLinkFindings -EntryText $entryText -RepoRoot $repoRoot -DestDirRel $destDirRel)
     if ($linkFindings.Count -gt 0) {
         $detail = ($linkFindings | ForEach-Object {
             if ($_.Suggested) { "  $($_.Target)  ->  write it as: $($_.Suggested)" }
             else { "  $($_.Target)  (resolves from nowhere -- check the path)" }
         }) -join "`n"
+        # THE MESSAGE NAMES THE TWO DIRECTORIES IT ACTUALLY COMPARED, rather than restating the convention.
+        # It used to say 'the repo root' and 'contributing-davekjohn/branch/', and both went wrong in their
+        # own way: the first was the seam's old default (inbound #967) and the second was where the entry
+        # sat before it became a section of the cycle document -- so on the shipped defaults this refusal
+        # named two paths, neither of which was in play.
+        $entryDirRel = ((Get-BranchFilePaths).Directory -replace '\\', '/').Trim('/')
+        $destShown  = if ($destDirRel)  { "$destDirRel/" }  else { 'the repo root' }
+        $entryShown = if ($entryDirRel) { "$entryDirRel/" } else { 'the repo root' }
+        # SAME DIRECTORY IS A DIFFERENT SENTENCE, because there the advice is not 'drop the ../' -- a link
+        # that reads correctly in front of the author already resolves at the destination and produces no
+        # finding at all. Everything listed above is then a plain typo, and saying otherwise would send
+        # somebody hunting a base mismatch that cannot exist.
+        $why = if ($destDirRel -eq $entryDirRel) {
+            @"
+The entry's text is copied VERBATIM into $changelogRel, which sits in $destShown - the same directory as the
+file you are editing. So each path is written exactly as it reads here, and a link listed above resolves from
+neither that directory nor the repo root: it is a typo rather than the wrong base.
+"@
+        } else {
+            @"
+The entry's text is copied VERBATIM into $changelogRel, so its relative links have to resolve FROM
+$destShown - not from $entryShown, where the file you are editing sits. A link that looks right in front of
+you is the failure this catches, so do not add another '../': write each path as it reads from $destShown.
+"@
+        }
         Write-Error @"
 link gate: $(Split-Path $entryPath -Leaf) carries relative link(s) that will be dead once the entry is folded - nothing pushed, no PR opened.
 
 $detail
-
-The entry's text is copied VERBATIM into CHANGELOG.md at the repo root, so its relative links have to
-resolve FROM THE ROOT - not from contributing-davekjohn/branch/, where the file you are editing sits. A link
-that looks right in front of you is the failure this catches, so do not add another '../': drop the '../'
-prefixes instead and write the path as it reads from the root.
-
+$why
 Correct the link(s) and run again.
 "@
         exit 1
