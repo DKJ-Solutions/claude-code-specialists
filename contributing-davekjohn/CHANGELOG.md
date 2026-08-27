@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/record-count-assert-counts-what-it-claims-v1` · 20260827-201934
+
+The contract drift guard's record-count assert enforced a floor of **29** and explained it as *"the
+twenty-eight below plus the dedicated Get-LiveStage block"*. Neither number was real: the lib holds 36
+records and the table below the assert holds 23, so the arithmetic described neither set. It is
+`Assert-Equal 36` now, against the lib, and the message says so -- with the table's own count stated
+beside it rather than folded into the same sentence.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**The slack was the defect, not the prose.** Seven records of headroom meant a record could be deleted
+and the guard would say nothing -- measured, not argued: with `Get-ReleaseMajorMinMinors` removed the lib
+has 35 and `-ge 29` still passes. That contradicts what the table's own comments promise twice, that a
+retired record *"would have to change the count assert too, which is the conversation that should
+happen."* A floor cannot force a conversation in either direction; an equality does, and the message now
+says to change the number in the same commit and name which record moved.
+
+**The two numbers were never the same set, and the old sentence made them look like one.** The lib's
+records are what the check reads; `$expectedContract` is what this test pins by name. 36 and 23, with
+`Get-LiveStage` asserted separately after the loop -- so the test file names 24 of the 36 and the rest
+rest on the `Returns` assert alone. Stating that plainly is worth more than the count it replaces: it
+tells the next reader which records are actually guarded by name.
+
+**Score:** N/A
+
+#### Pull Request
+
+the contract record-count assert counts what it claims, and stops explaining a floor with arithmetic that never matched
+
+[PR #1008](https://github.com/DaveKJohn/claude-code-specialists/pull/1008)
+
+---
+
 ### DEPLOY: `fix/placeholder-tolerance-keeps-its-own-history-v1` · 20260827-201804
 
 The list of PR-template placeholder lines `open-pr.ps1` recognises stops being a list of paths only a
