@@ -17,7 +17,7 @@
           releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is a
                                  second file beside it, not this one; see the closing advice)
           releases/audience/     where the cut drafts the hand-written note (kept by .gitkeep until then)
-          (development-cycle.md is NOT placed -- it lives only while a branch is open)
+          (development.md is NOT placed -- it lives only while a branch is open)
 
     AND ONE FILE OUTSIDE IT (inbound #789):
 
@@ -151,7 +151,7 @@ $folderReadme = @(
     '| here | what it holds |',
     '|---|---|',
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
-    '| `development-cycle.md` | the branch''s own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog |',
+    '| `development.md` | the branch''s own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog |',
     '| [`CHANGELOG.md`](CHANGELOG.md) | this folder''s own pending-changes list, isolated from any changelog you already keep at your repo root |',
     '| [`releases/`](releases/) | this repo''s release answers, the release LIST and the published audience notes |',
     '',
@@ -177,13 +177,13 @@ $folderContributing = @(
     'workflow''s own mechanics, and where they disagree this page wins. Keeping them apart is what makes an',
     'uninstall a folder you remove rather than an operating guide you untangle.',
     '',
-    'The contribution cycle itself -- a branch, its development cycle, the PR gates, the significance model --',
+    'The contribution cycle itself -- a branch, its development document, the PR gates, the significance model --',
     'is the plugin''s `CONTRIBUTING-portable.md`, which travels with `contributing-davekjohn` and is not',
     'restated here. This page holds only what the portable half leaves to each repo.',
     '',
     '## The rules a session needs in this folder',
     '',
-    '- `development-cycle.md` belongs to the **current branch**, and exists only while one is open.',
+    '- `development.md` belongs to the **current branch**, and exists only while one is open.',
     '  `new-branch` creates it, the fold removes it at the merge, so the trunk carries no copy -- if you',
     '  are looking at this folder and the file is not there, that is the trunk in its normal state.',
     '- **Four `##` headings and never a fifth** -- PLAN, CREATE, TEST, DEPLOY are its whole top level, and',
@@ -333,7 +333,7 @@ $targets = @(
     # git tracks no empty directory, and the audience root must exist before the first cut writes into
     # it -- the same reason this repo's own releases tree once carried an invisible empty folder.
     @{ Rel = 'contributing-davekjohn/releases/audience/.gitkeep'; Content = '' }
-    # NO development-cycle.md, AND THAT IS THE ADOPTION'S HALF OF THE LIFETIME RULE (Dave, August 23, 2026).
+    # NO development.md, AND THAT IS THE ADOPTION'S HALF OF THE LIFETIME RULE (Dave, August 23, 2026).
     # This placed the document in its reset state so a consumer's first look at the folder was also their
     # reference for what a branch gets. The document is branch-lifetime now -- new-branch creates it, the
     # fold removes it -- so placing one here would put a file on their trunk that their own first fold then

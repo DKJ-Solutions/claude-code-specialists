@@ -180,7 +180,7 @@ held against nothing at all, and an unprefixed name switches the check off for i
 | [`team-lifehub/`](plugins/teams/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
-| [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development cycle on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
+| [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -233,7 +233,7 @@ shared scripts call) in **`contributing-davekjohn`**; see the
 
 **And since August 26, 2026 one hook that acts rather than reports**, which is a real widening of that list
 and named as such: `cycle-autopark` (a **Stop** hook, in `contributing-davekjohn`) commits and pushes the
-branch's `development-cycle.md` to `origin` after every turn, until a PR publishes it
+branch's `development.md` to `origin` after every turn, until a PR publishes it
 ([#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900)). It writes to git, so it is not
 read-only — but it is still not a *guardrail*: it blocks nothing, refuses nothing, and exits 0 on every
 outcome. What earns it a place beside the three above is that it is repo-neutral and touches exactly one
@@ -291,7 +291,7 @@ The full picture, top-level folder by folder:
   [`CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) is the centre of it: the standard branch +
   PR workflow, which holds with no plugin installed, and this repo's answers to the workflow's seams on
   top of it. Beside it sit [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md), the open branch's
-  `development-cycle.md` while one is open, and `releases/` — what a cut *generated*
+  `development.md` while one is open, and `releases/` — what a cut *generated*
   (`changelog/<X>.x/<X.Y.Z>.md`, the complete note per version, and `github/<X>.x/<X.Y.Z>.md`, that
   version's GitHub Release body), the hand-written note per version under `audience/`, the dated list of
   every release ever cut in

@@ -186,15 +186,15 @@ try {
     $ErrorActionPreference = $prevEap
 }
 
-# ONE DOCUMENT, at a fixed path: contributing-davekjohn/development-cycle.md, not feat-round-trip-v1.md in the
+# ONE DOCUMENT, at a fixed path: contributing-davekjohn/development.md, not feat-round-trip-v1.md in the
 # root and not a pair under branch/. The path comes from the same lib the readers use.
 $writtenDoc = Join-Path $fixture ((Get-BranchFilePaths).File)
-Assert-True (Test-Path -LiteralPath $writtenDoc) 'the writer produced the development cycle in the fixture'
-# BOTH HALVES ANSWER SEPARATELY, which is the claim the merge has to keep. Split-DevelopmentCycle is what
+Assert-True (Test-Path -LiteralPath $writtenDoc) 'the writer produced the development document in the fixture'
+# BOTH HALVES ANSWER SEPARATELY, which is the claim the merge has to keep. Split-Development is what
 # every reader in the system uses to find the boundary, so asserting through it is asserting the contract
 # rather than a shape this test invented.
 $docText  = if (Test-Path -LiteralPath $writtenDoc) { [System.IO.File]::ReadAllText($writtenDoc, [System.Text.Encoding]::UTF8) } else { '' }
-$docSplit = Split-DevelopmentCycle -Text $docText
+$docSplit = Split-Development -Text $docText
 Assert-Equal $true $docSplit.Found 'the document carries a DEPLOY section, so the fold has a boundary to split on'
 Assert-Equal 'feat/round-trip-v1' (Get-BranchFileDeclaredBranch -Text $docText) 'the document names the branch it belongs to -- the fold reads this back to find the PR'
 Assert-True ($docSplit.Head -match '(?m)^- \[ \] ') 'the step half opens its list with an unticked item'
@@ -1203,7 +1203,7 @@ Assert-Equal 'still the scaffolded step' $stubFindings[0].Label 'and it is named
 
 # ...and an UNticked one is reported once, not twice -- it is open, which is the more actionable of the
 # two labels and the one that tells the author what to do.
-$freshScaffold = ((Format-DevelopmentCycle -Branch 'feat/fresh') -join "`n")
+$freshScaffold = ((Format-Development -Branch 'feat/fresh') -join "`n")
 
 # THE STEP LIST CARRIES THE PLAN AND NOTHING ELSE (Dave, August 7, 2026). Description, ID and type briefly
 # sat at the top of BOTH branch files so the pair would say whose it is; they were removed from this one,
@@ -1223,7 +1223,7 @@ Assert-Equal 'still open' $freshFindings[0].Label 'and the open label wins, beca
 
 # The reset state carries NO steps, so a branch made by hand rather than by new-branch is not refused --
 # the one-commit typo fix. Deliberate tolerance, asserted so it cannot be tightened by accident.
-Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycle -Branch '') -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
+Assert-Equal 0 @(Get-BranchProgressFindings -Text ((Format-Development -Branch '') -join "`n")).Count 'the reset state has nothing to resolve -- an absent plan is not a refusal'
 
 # --- The SDLC arc (#655) ------------------------------------------------------------------------------
 # THE PHASES ARE DRAWN ON TOP OF THE GATE, NEVER INTO IT. Get-BranchProgressFindings reads step marks, so a
@@ -1241,7 +1241,7 @@ Assert-Equal 3 $phases.Count 'three step phases are configured -- PLAN, CREATE, 
 # (August 19, 2026). A test that hardcodes the shape it is measuring reports a deliberate change as a
 # defect, which is exactly the noise that gets a suite skipped.
 $cycleSec = '#{' + (Get-BranchCycleSectionLevel) + '}'
-Assert-True (((Format-DevelopmentCycle -Branch 'feat/arc-v1') -join "`n") -match "(?m)^$cycleSec\s+DEPLOY:") 'and the document carries DEPLOY as its fourth, written by the entry formatter'
+Assert-True (((Format-Development -Branch 'feat/arc-v1') -join "`n") -match "(?m)^$cycleSec\s+DEPLOY:") 'and the document carries DEPLOY as its fourth, written by the entry formatter'
 foreach ($phase in $phases) {
     Assert-True ($freshScaffold -match "(?m)^$cycleSec\s+$([regex]::Escape($phase))\s*$") "the scaffold carries a '$phase' heading"
 }
@@ -1270,7 +1270,7 @@ Assert-Equal (Get-EntryHeadingLevel) (Get-BranchCycleSectionLevel) 'and the DEPL
 # and pasted nothing into CHANGELOG.md, silently. Every consumer holding a branch when the plugin updates
 # under them is the same case, in bulk.
 $priorPair = @(
-    ('#' * ((Get-BranchCycleHeadingLevel) - 1)) + ' Development cycle: `feat/before-the-shift-v1` ' + (Get-EntryIdSeparator) + ' 20260825-120000'
+    ('#' * ((Get-BranchCycleHeadingLevel) - 1)) + ' Development: `feat/before-the-shift-v1` ' + (Get-EntryIdSeparator) + ' 20260825-120000'
     ''
     ('#' * ((Get-BranchCycleSectionLevel) - 1)) + ' PLAN'
     ''
@@ -1279,9 +1279,9 @@ $priorPair = @(
     'What it deploys.'
 ) -join "`n"
 Assert-Equal 'feat/before-the-shift-v1' (Get-BranchFileDeclaredBranch -Text $priorPair) 'a document at the PRE-SHIFT levels still names its branch -- the idempotency and fold-target test'
-$priorHalves = Split-DevelopmentCycle -Text $priorPair
+$priorHalves = Split-Development -Text $priorPair
 Assert-True (([string]$priorHalves.Entry) -match 'DEPLOY: `feat/before-the-shift-v1`') 'and its DEPLOY section is still found, so the fold after THIS branch merges has something to paste'
-Assert-True ((Get-DevelopmentCycleEntryPattern) -ne '') 'and the pattern that finds it spans both levels rather than pinning one'
+Assert-True ((Get-DevelopmentEntryPattern) -ne '') 'and the pattern that finds it spans both levels rather than pinning one'
 # DEPLOY CARRIES NO STEP, and this is the assert that records why (Dave, August 14, 2026; shown as a
 # heading since August 19). It is not a step but the RESULT -- the deployment entry beside this file, which
 # is the half that travels into CHANGELOG.md at the merge. A DEPLOY checkbox could only be unresolvable,
@@ -1303,10 +1303,10 @@ Assert-Equal 0 @(Get-BranchProgressFindings -Text $emptyPhases).Count 'a phase w
 # first line is somebody else's TODO gets copied in, which is the rule the retired template lived by. A
 # BRANCH's document does carry one open step, which is what gives the gate something to refuse; the two
 # are asserted against each other rather than separately.
-$phaseTemplate = ((Format-DevelopmentCycle -Branch '') -join "`n")
+$phaseTemplate = ((Format-Development -Branch '') -join "`n")
 Assert-True ($phaseTemplate -match "(?m)^$cycleSec\s+PLAN\s*`$") 'the reference copy carries the arc'
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $phaseTemplate).Count 'and still carries no step of its own'
-Assert-Equal 1 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycle -Branch 'x/y-v1') -join "`n")).Count 'while the file a branch gets carries exactly one, so the gate has something to refuse'
+Assert-Equal 1 @(Get-BranchProgressFindings -Text ((Format-Development -Branch 'x/y-v1') -join "`n")).Count 'while the file a branch gets carries exactly one, so the gate has something to refuse'
 
 # Fence-aware, like every reader of this format: this repo's own branch/README.md quotes all three marks
 # while teaching them, and a step list may legitimately do the same.
@@ -1353,8 +1353,8 @@ Assert-Equal 0 $tEmpty.Resolved 'and nothing resolved -- so a caller can tell it
 Assert-Equal 1 (Get-BranchProgressTally -Text $quoted).Total 'a step QUOTED inside a fence is not counted'
 $tallyCommented = "## Steps`n`n- [x] real`n`n<!--`n- [ ] an example in the guidance`n-->`n"
 Assert-Equal 1 (Get-BranchProgressTally -Text $tallyCommented).Total 'nor is one inside an HTML comment'
-$tallyProse = ((Format-DevelopmentCycle -Branch 'feat/tally-v1') -join "`n") + "`n`n- [ ] a checkbox in the entry's prose`n"
-Assert-Equal (Get-BranchProgressTally -Text ((Format-DevelopmentCycle -Branch 'feat/tally-v1') -join "`n")).Total `
+$tallyProse = ((Format-Development -Branch 'feat/tally-v1') -join "`n") + "`n`n- [ ] a checkbox in the entry's prose`n"
+Assert-Equal (Get-BranchProgressTally -Text ((Format-Development -Branch 'feat/tally-v1') -join "`n")).Total `
     (Get-BranchProgressTally -Text $tallyProse).Total 'and a checkbox BELOW the DEPLOY heading is prose, not a step'
 
 # A TICKED STUB IS A TICK HERE AND A FINDING THERE, and that difference is deliberate rather than a gap:
@@ -1367,16 +1367,23 @@ Assert-Equal 1 @(Get-BranchProgressFindings -Text ("## Steps`n`n- [x] " + (Get-B
 
 # --- one document, and every older name still read (Dave, August 23, 2026) -------------------------
 Write-Host ""
-Write-Host "one development cycle, and the old names are still read" -ForegroundColor Cyan
+Write-Host "one development document, and the old names are still read" -ForegroundColor Cyan
 
 $bfp = Get-BranchFilePaths
-Assert-True ($bfp.File.EndsWith('development-cycle.md')) 'the branch document is development-cycle.md'
+Assert-True ($bfp.File.EndsWith('development.md')) 'the branch document is development.md'
 Assert-Equal $bfp.File $bfp.Cycle 'and both halves answer the same path -- the names are kept so a gate can say WHICH half it read'
 Assert-Equal $bfp.File $bfp.Deployment 'the entry half too'
 Assert-True ($bfp.LegacyCycle.EndsWith('branch-cycle.md')) 'the pre-merge step list is still named'
 Assert-True ($bfp.LegacyDeployment.EndsWith('branch-deployment.md')) 'and so is the pre-merge entry'
 Assert-True ($bfp.OlderCycle.EndsWith('branch-progress.md')) 'and the name before that'
 Assert-True ($bfp.OlderDeployment.EndsWith('branch-changelog.md')) 'and its entry counterpart'
+# THE NEAREST PREDECESSOR (#963/#958, August 27, 2026), and the one most likely to be carrying somebody's
+# work right now: every branch open on the day of the rename has development-cycle.md and not
+# development.md. Asserted on the current folder, because that pair is the one that existed -- there was
+# never a workflow-davekjohn/development.md, the folder having been renamed the day before.
+Assert-True ($bfp.PriorNameFile.EndsWith('contributing-davekjohn/development-cycle.md')) 'the pre-#963 filename is still named, under the CURRENT folder'
+Assert-True ($bfp.PriorFolderFile.EndsWith('workflow-davekjohn/development-cycle.md')) 'and the pre-#886 folder still carries the pre-#963 filename, which is the pair that really existed'
+Assert-True (-not (@($bfp.PSObject.Properties.Value) -contains 'workflow-davekjohn/development.md')) 'and the pair that never existed is NOT in the table -- a name to read that nothing can have written'
 
 # THE DUAL-READ IS WHAT KEEPS A BRANCH IN FLIGHT WHOLE, so it is measured on a tree rather than asserted
 # about the strings: a repo holding only an old name must resolve to that name, or its entry is invisible
@@ -1395,10 +1402,35 @@ try {
     Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'nothing present: the resolver names the CURRENT one, so a writer creates that'
     [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')), "# ``feat/in-flight`` cycle`n")
     Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'only the old name present, and it names a branch: the resolver finds it, so a branch in flight is not stranded'
-    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development cycle: ``main``$([char]0x00B7)`n")
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development: ``main``$([char]0x00B7)`n")
     Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both present and the NEW one is the trunk reset: the old one still wins, because it is the one holding work'
-    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development cycle: ``feat/mine``$([char]0x00B7)`n")
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development: ``feat/mine``$([char]0x00B7)`n")
     Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both naming a branch: the current name wins'
+
+    # --- THE PRE-#963 FILENAME, MEASURED ON A TREE (August 27, 2026) --------------------------------
+    # This is the case the rename itself had to survive, and the branch that performed it WAS the case:
+    # its own document was scaffolded as development-cycle.md before the writer moved, so if this arm is
+    # wrong the rename cannot ship -- its entry would be invisible to its own fold.
+    Remove-Item -LiteralPath (Join-Path $resolveFx ($bfp.File -replace '/', '\')) -Force
+    Remove-Item -LiteralPath (Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')) -Force
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.PriorNameFile -replace '/', '\')), "# Development cycle: ``feat/mid-rename``$([char]0x00B7)`n")
+    foreach ($kind in @('File', 'Cycle', 'Deployment')) {
+        Assert-Equal $bfp.PriorNameFile (Resolve-BranchFilePath -Kind $kind -RepoRoot $resolveFx) `
+            "only the pre-#963 name present: -Kind $kind finds it, so a branch open across the rename is not stranded"
+    }
+    # AND IT LOSES TO A CURRENT FILE THAT CLAIMS THE BRANCH, while beating one that is only a trunk reset --
+    # the same precedence the folder rename already had, asserted for this rename rather than assumed.
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development: ``main``$([char]0x00B7)`n")
+    Assert-Equal $bfp.PriorNameFile (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'new name present but only a trunk reset: the pre-#963 name still wins, because it holds the work'
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development: ``feat/mine``$([char]0x00B7)`n")
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both naming a branch: the current name wins over the pre-#963 one too'
+    # AND THE OLDER PAIR STILL OUTRANKS NOTHING IT SHOULD: with the branch/ step list back and naming this
+    # branch, the CURRENT name keeps winning -- the prior-name row was inserted in front of branch/, not
+    # in front of today's file.
+    [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')), "# ``feat/in-flight`` cycle`n")
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'all three present and all naming a branch: today the writer would create the current name, so it wins'
+    Remove-Item -LiteralPath (Join-Path $resolveFx ($bfp.PriorNameFile -replace '/', '\')) -Force
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'and removing the pre-#963 file changes nothing while today s file claims the branch'
 
     # --- -Reader: the same rule, against a tree the caller is not standing in (issue #970) ----------
     #
@@ -1427,7 +1459,7 @@ try {
     # ONE READ PER CANDIDATE. Both loops ask the same question, and on this arm one question is a child
     # process rather than a Test-Path -- so the memo is what keeps a resolve from spawning git twice per
     # name. Asserted on the name that the first loop rejects and the second loop reconsiders.
-    $readerTree = @{ $bfp.File = "# Development cycle: ``main```n" }
+    $readerTree = @{ $bfp.File = "# Development: ``main```n" }
     $readerCalls = @{}
     Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -Reader $treeReader) 'nothing in that tree CLAIMS the branch: the resolver falls back to a name that at least exists'
     Assert-Equal 1 $readerCalls[$bfp.File] 'and it read that candidate once, though both loops asked for it'
@@ -1451,15 +1483,15 @@ try {
 # THE TWO STAMPS SIT AT THE TWO ENDS OF THE BRANCH'S LIFE. The creation stamp is the cycle file's, written
 # by the scaffolder; the landing stamp is the entry's, written by the fold. Neither may appear in the
 # other's document -- that is the whole reason the ID moved out of the entry heading.
-$stampedCycle = ((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260819-171500') -join "`n")
-Assert-True ((($stampedCycle -split "`n")[0]) -match ('^#{' + (Get-BranchCycleHeadingLevel) + '} Development cycle: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the document heading carries its title, the branch and the creation stamp'
+$stampedCycle = ((Format-Development -Branch 'feat/x-v1' -Id '20260819-171500') -join "`n")
+Assert-True ((($stampedCycle -split "`n")[0]) -match ('^#{' + (Get-BranchCycleHeadingLevel) + '} Development: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the document heading carries its title, the branch and the creation stamp'
 $bareEntry = ((Format-EntryBlock -Branch 'feat/x-v1' -Description 'A title' -Type 'Enhancement') -join "`n")
 Assert-True (-not ($bareEntry -match '\d{8}-\d{6}')) 'and a freshly scaffolded entry carries no stamp anywhere -- the fold has not run'
 
 # THE REFERENCE COPY SHOWS BOTH STAMPS AS PLACEHOLDERS, which is what separates it from a branch's file now
 # that the guidance is unconditional: it is the only difference left, and it is the honest one -- neither
 # moment exists for the trunk.
-$templateCycle = ((Format-DevelopmentCycle -Branch '') -join "`n")
+$templateCycle = ((Format-Development -Branch '') -join "`n")
 Assert-True ($templateCycle.Contains((Get-EntryIdTemplatePlaceholder))) 'the reference copy shows the creation stamp as a placeholder'
 Assert-True ($templateCycle.Contains((Get-EntryMergeStampTemplatePlaceholder))) 'and the landing stamp as one'
 
@@ -1566,7 +1598,7 @@ Assert-True (Test-EntryDeclaresShape -EntryText $preDossier) 'a pre-dossier entr
 # Their only way out was forking new-branch.ps1, the duplication #410 had just removed.
 Write-Host ""
 Write-Host "the trunk warning: its lead is wording, not formatter output" -ForegroundColor Cyan
-$defaultReset = (Format-DevelopmentCycle -Branch '') -join "`n"
+$defaultReset = (Format-Development -Branch '') -join "`n"
 Assert-True ($defaultReset -match '(?m)^> \*\*You are on `main`\.\*\* Do not work in this file yet') 'default: the lead is unchanged, on one line with the first warning line'
 
 # The override, injected the way the seam is reached in a real repo: repo-config.ps1 defines the function
@@ -1578,7 +1610,7 @@ function Get-BranchFileWordingOverrides {
         TrunkWarning     = @('Schrijf hier nog niet -- maak eerst een branch.', 'De tweede regel.')
     }
 }
-$dutchReset = (Format-DevelopmentCycle -Branch '') -join "`n"
+$dutchReset = (Format-Development -Branch '') -join "`n"
 Assert-True ($dutchReset -match '(?m)^> LET OP: je zit op `main`\. Schrijf hier nog niet') 'override: the lead is the consumer''s sentence, with the trunk name in the position THEY chose'
 # SCOPED TO THE WARNING BLOCK, and the first version of this assert was not -- it read the whole document
 # for 'You are on' and went red on the reset prose ('the changelog entry of the branch you are on'), which
@@ -1595,7 +1627,7 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = 'Pas op {let op} op `{0}`:' } }
 $braceReset = ''
 $threw = $false
-try { $braceReset = (Format-DevelopmentCycle -Branch '') -join "`n" } catch { $threw = $true }
+try { $braceReset = (Format-Development -Branch '') -join "`n" } catch { $threw = $true }
 Assert-Equal $false $threw 'brace: a lead carrying a literal brace does not throw'
 Assert-True ($braceReset -match [regex]::Escape('Pas op {let op} op `main`:')) 'brace: the brace is passed through verbatim and the placeholder still resolves'
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
@@ -1607,12 +1639,12 @@ Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 # established it is not. The formatter's own guard against a dangling '> ' is therefore unreachable through
 # the seam and stays as a guard on the DEFAULT being non-empty, which is worth having either way.
 function Get-BranchFileWordingOverrides { return @{ TrunkWarningLead = '' } }
-$noLead = (Format-DevelopmentCycle -Branch '') -join "`n"
+$noLead = (Format-Development -Branch '') -join "`n"
 Assert-Equal $defaultReset $noLead 'empty lead: an empty override is ignored -- the default sentence stands, as for every other key'
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 # The default is back, so nothing below inherits an override. Asserted rather than assumed: a leaked
 # override would make every later assert read a document no repo produces.
-Assert-Equal $defaultReset ((Format-DevelopmentCycle -Branch '') -join "`n") 'teardown: the default reset is restored once the seam function is gone'
+Assert-Equal $defaultReset ((Format-Development -Branch '') -join "`n") 'teardown: the default reset is restored once the seam function is gone'
 
 # --- A BLANK-ONLY LIST OVERRIDE IS EMPTY TOO (#927) -----------------------------------------------
 # THE MEASURED DEFECT, and it is the fail-safe above asking the wrong question rather than a rule that was
@@ -1620,7 +1652,7 @@ Assert-Equal $defaultReset ((Format-DevelopmentCycle -Branch '') -join "`n") 'te
 # is why the state #927 reported, 'a consumer who empties the seam', turns out not to be reachable through
 # the seam at all. A list of BLANKS is: two empty strings make a two-element array, which is TRUTHY, so it
 # was honoured here and emptied AFTERWARDS, downstream, where every reader of a list filters blanks out.
-# Format-DevelopmentCycle was then left with no phase heading to write the scaffolded step under, wrote it
+# Format-Development was then left with no phase heading to write the scaffolded step under, wrote it
 # bare, and that lands it in the preamble region check-branch-entry.ps1's #899 check refuses -- so such a
 # repo's EVERY branch was blocked, with no way through but deleting the step the scaffolder wrote.
 Write-Host ""
@@ -1632,7 +1664,7 @@ Assert-Equal ($defaultArc -join '|') ($blankArc -join '|') 'blank-only StepPhase
 # AND THE DOCUMENT IS THE ASSERT THAT MATTERS, because the seam is only the first of the two halves. #899
 # reads the SHAPE, so this reads the shape too: nothing but guidance above the first phase heading. Written
 # with -Intent, since a parked branch is where a dropped note would cost the most.
-$blankDoc = (Format-DevelopmentCycle -Branch 'feat/blank-arc-v1' -Intent 'parked mid-flight.') -join "`n"
+$blankDoc = (Format-Development -Branch 'feat/blank-arc-v1' -Intent 'parked mid-flight.') -join "`n"
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 $arcTitleRx = '^#{1,' + (Get-BranchCycleHeadingLevel) + '}\s'
 $arcPhaseRx = '^#{' + (Get-BranchCycleSectionLevel) + '}\s+\S'
@@ -1653,26 +1685,26 @@ Assert-True ($blankDoc.Contains('parked mid-flight.')) 'and so is the parking in
 # would open: an arc from the defaults with FirstStepPhase still on a consumer's own name matches nothing,
 # and the step disappears without a word. A silent document is worse than a refused one.
 function Get-BranchFileWordingOverrides { return @{ StepPhases = @('', ''); FirstStepPhase = 'BOUWEN' } }
-$orphanDoc = (Format-DevelopmentCycle -Branch 'feat/orphan-step-v1') -join "`n"
+$orphanDoc = (Format-Development -Branch 'feat/orphan-step-v1') -join "`n"
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 Assert-True ($orphanDoc.Contains((Get-BranchProgressMarks).Open)) 'a FirstStepPhase naming no surviving phase still gets its step, under the default the arc fell back to'
 # THE SAME HOLE WITHOUT #927 ANYWHERE NEAR IT, which is what makes it a defect of its own rather than a
 # consequence: the arc is the untouched default and only this key is wrong. Before the membership anchor the
 # step was dropped here too, and nothing said so.
 function Get-BranchFileWordingOverrides { return @{ FirstStepPhase = 'CRAETE' } }
-$typoDoc = (Format-DevelopmentCycle -Branch 'feat/typo-phase-v1') -join "`n"
+$typoDoc = (Format-Development -Branch 'feat/typo-phase-v1') -join "`n"
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 Assert-True ($typoDoc.Contains((Get-BranchProgressMarks).Open)) 'a mistyped FirstStepPhase against the default arc still gets its step'
 # A REAL OVERRIDE IS UNTOUCHED BY ALL OF THIS, which is the seam's whole purpose and the thing a fail-safe
 # is most likely to break on its way past.
 function Get-BranchFileWordingOverrides { return @{ StepPhases = @('ONTWERP', 'BOUW', 'TEST'); FirstStepPhase = 'BOUW' } }
-$dutchArc = (Format-DevelopmentCycle -Branch 'feat/dutch-arc-v1') -join "`n"
+$dutchArc = (Format-Development -Branch 'feat/dutch-arc-v1') -join "`n"
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 foreach ($dutchPhase in @('ONTWERP', 'BOUW', 'TEST')) {
     Assert-True ($dutchArc -match "(?m)^#{$(Get-BranchCycleSectionLevel)}\s+$dutchPhase\s*$") "a renamed arc still writes its own '$dutchPhase' heading"
 }
 Assert-True ($dutchArc -notmatch '(?m)^#+\s+PLAN\s*$') 'and none of the English defaults leaks in beside them'
-Assert-Equal $defaultReset ((Format-DevelopmentCycle -Branch '') -join "`n") 'teardown: the default reset is restored once the seam functions are gone'
+Assert-Equal $defaultReset ((Format-Development -Branch '') -join "`n") 'teardown: the default reset is restored once the seam functions are gone'
 
 # --- ONE MERGE LOOP, NOT TWO (#941) ---------------------------------------------------------------
 # WHAT WAS PROMOTED AND WHY. Get-EntrySignificanceWording and Get-BranchFileWording each merged a
@@ -1719,7 +1751,7 @@ function Get-EntrySignificanceWordingOverrides { return [pscustomobject]@{ Uncom
 Assert-Equal 'HUN EIGEN ZIN' (Get-EntrySignificanceWording).Uncomment1 'significance seam: a pscustomobject override is honoured'
 Remove-Item -Path Function:\Get-EntrySignificanceWordingOverrides
 function Get-BranchFileWordingOverrides { return [pscustomobject]@{ TrunkWarningLead = 'PAS OP op `{0}`:' } }
-$objLead = (Format-DevelopmentCycle -Branch '') -join "`n"
+$objLead = (Format-Development -Branch '') -join "`n"
 Remove-Item -Path Function:\Get-BranchFileWordingOverrides
 Assert-True ($objLead -match '(?m)^> PAS OP op `main`:') 'branch-file seam: and so is one on the other side of the same helper'
 
@@ -1912,7 +1944,7 @@ Assert-Equal 0 ([regex]::Matches($audienceScaffold, 'continue to Tier').Count) '
 # inside the DEPLOY section may be a comment. The sentence itself was the one line naming WHO the audience
 # tier is -- in a tier-1 consumer the only such line anywhere -- so it was hoisted into the visible block and
 # the seam is read there instead. This assert follows it rather than being dropped with the block.
-Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match [regex]::Escape("For tier 2 audiences: $(Get-EntryAudienceDescription -Tier 2)")) 'the audience guidance names this repo tier and who that tier is'
+Assert-True (((Format-Development -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match [regex]::Escape("For tier 2 audiences: $(Get-EntryAudienceDescription -Tier 2)")) 'the audience guidance names this repo tier and who that tier is'
 Assert-True ($audienceScaffold -notmatch '\{0\}') 'and the placeholder is resolved, not shipped'
 # IT STILL RESOLVES TO A NUMBER, which is the half that would fail silently. A heading the parser cannot
 # place reads as "no tier above 0" -- a claim about the change, made by a heading nobody read.
@@ -2050,7 +2082,7 @@ Assert-True ([string](@(Format-EntryLinkGuidance -Lines @((Get-BranchFileWording
 # AND IT REACHES THE FILE A BRANCH ACTUALLY GETS, which is where it did NOT reach until August 23, 2026:
 # the guidance rendered into branch/templates/ and the working file was bare. That is what inbound #810
 # measured, and this is the assert that keeps it repaired.
-Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match 'FROM THE REPO ROOT') 'and it reaches the document a branch is handed, not a reference beside it'
+Assert-True (((Format-Development -Branch 'feat/x-v1' -Id '20260823-000000') -join "`n") -match 'FROM THE REPO ROOT') 'and it reaches the document a branch is handed, not a reference beside it'
 
 Write-Host "Get-EntryLinkFindings -DestDirRel -- the base follows the CHANGELOG, not the root (inbound #967)" -ForegroundColor Cyan
 # A BUILT TREE RATHER THAN THIS REPO'S OWN, and the reason is a lesson from writing these asserts. The
@@ -2135,7 +2167,7 @@ Assert-True ([string]($thirdLines -join ' ') -match 'FROM `releases/`') 'a desti
 # THE OVERRIDE CONTRACT, same as its '{0}' sibling: a repo that replaced the wording with its own prose gets
 # exactly its own prose, and no token to fill means nothing is added or removed.
 Assert-Equal 2 (@(Format-EntryLinkGuidance -Lines @('> our own words', '> in two lines') -DestDirRel $folderRel)).Count 'a block carrying no token comes back untouched'
-Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260827-000000' -LinkDestDirRel $folderRel) -join "`n") -match 'FROM THIS DIRECTORY') 'and the document a consumer''s branch is handed carries the base that repo actually folds into'
+Assert-True (((Format-Development -Branch 'feat/x-v1' -Id '20260827-000000' -LinkDestDirRel $folderRel) -join "`n") -match 'FROM THIS DIRECTORY') 'and the document a consumer''s branch is handed carries the base that repo actually folds into'
 
 # #915 -- EVERY GUIDANCE ELEMENT IS A BLOCKQUOTE LINE, and this assert exists because nothing ever counted
 # the array. In PowerShell ',' binds TIGHTER than '+', so an element written as 'a' + $H + 'b' inside the
@@ -2154,7 +2186,7 @@ Assert-Equal 0 $notQuoted.Count "every guidance element opens with '>' -- an ele
 # AND THE COMPOSED LEVEL REACHES THE DOCUMENT INLINE, which is the reader-facing half of the same defect: a
 # split element still renders, with the marker orphaned onto its own line where it reads as a heading.
 $phaseHashes = '#' * (Get-BranchCycleSectionLevel)
-Assert-True (((Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n") -match ('FOUR `' + $phaseHashes + '` HEADINGS')) 'and the level composed from the knob reaches the document on one line, not orphaned onto its own'
+Assert-True (((Format-Development -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n") -match ('FOUR `' + $phaseHashes + '` HEADINGS')) 'and the level composed from the knob reaches the document on one line, not orphaned onto its own'
 
 Write-Host ""
 Write-Host "Remove-EntryAudienceGuidance -- a no-tier repo drops the audience PARAGRAPH, not one line of it (#928)" -ForegroundColor Cyan
@@ -2199,7 +2231,7 @@ Assert-Equal 0 (@(Remove-EntryAudienceGuidance -Lines @())).Count 'and an empty 
 # unstated at this point in the suite -- Get-ReleaseAudienceTier was removed above -- so this renders the
 # real fallback rather than a simulated one.
 Assert-Equal $null (Get-EntryAudienceTier) 'the no-tier case is the one being rendered here'
-$noTierDoc = (Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n"
+$noTierDoc = (Format-Development -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n"
 Assert-True ($noTierDoc -notmatch '\{0\}') 'no dangling placeholder reaches the document'
 foreach ($line in $dropped) {
     $needle = [regex]::Escape(($line -replace '^\s*>\s*', '').Trim())
@@ -2208,7 +2240,7 @@ foreach ($line in $dropped) {
 
 # THE TIER-STATED PATH IS UNCHANGED, so the repair cannot be mistaken for "drop it always".
 function Get-ReleaseAudienceTier { 2 }
-$tierDoc = (Format-DevelopmentCycle -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n"
+$tierDoc = (Format-Development -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n"
 Assert-True ($tierDoc -match 'For tier 2 audiences') 'a repo that STATES a tier still gets the sentence'
 Assert-True ($tierDoc -match [regex]::Escape(($sg[$pEnd] -replace '^\s*>\s*', '').Trim())) 'and the lines finishing that sentence come with it'
 Remove-Item function:Get-ReleaseAudienceTier

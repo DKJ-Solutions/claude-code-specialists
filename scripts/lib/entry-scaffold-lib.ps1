@@ -1036,7 +1036,7 @@ function Get-EntryTierSectionLabel {
 # deploy it describes, and the heading followed the reader.
 # REVERSED ON AUGUST 25, 2026 (Dave, issue #884), AFTER ONE DAY, AND THIS TIME THE REASON IS THE SECTION'S
 # WHOLE JOURNEY RATHER THAN ITS FIRST STOP. #865 optimised for the reader of the document the section opens.
-# But the section travels four times -- development-cycle.md -> the PR body -> CHANGELOG.md -> the developer
+# But the section travels four times -- development.md -> the PR body -> CHANGELOG.md -> the developer
 # release notes -- and #865's own comment named that tension itself, one word wide, and shipped anyway. Two
 # of those four readers are not looking at a PR, and the two that come last are the ones a release is read
 # from. #884 asks for one thing in all four places, so the wording follows the SECTION rather than any one
@@ -1346,7 +1346,7 @@ function Merge-WordingOverrides {
             is a third object and the one that got through -- two empty strings make a two-element array,
             which is TRUTHY -- so it passed the test and was emptied AFTERWARDS, downstream, where every
             reader of a list here filters the blanks out. StepPhases showed what that cost:
-            Format-DevelopmentCycle was left with no phase heading to write the scaffolded step under,
+            Format-Development was left with no phase heading to write the scaffolded step under,
             wrote it bare, and the step landed in the region check-branch-entry.ps1's #899 check calls the
             preamble -- so that consumer's EVERY branch was refused, with no way through but deleting the
             step the scaffolder had just written for them. The two sides of the seam disagreed about one
@@ -1968,7 +1968,7 @@ function Read-EntryTierSections {
         ((@($zeroNames) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')\s*$'
     # --- AND SINCE AUGUST 23, 2026 THE ENTRY'S OWN HEADING IS TIER 0'S SECTION ------------------------
     #
-    # The two branch files merged into one development cycle and the entry became its DEPLOY section, so the
+    # The two branch files merged into one development document and the entry became its DEPLOY section, so the
     # question that used to head tier 0 is gone: its text sits directly under '## `<branch>` DEPLOY'. There
     # is exactly one heading at the entry's own level inside one entry -- its own -- which is what makes this
     # pattern safe to add beside the named one rather than in place of it.
@@ -3876,7 +3876,7 @@ function Resolve-EntryType {
         # TWO SHAPES, ONE WRITTEN, and the guard above survives both. Today's heading leads with the title
         # and a colon -- '## DEPLOY: `feat/x-v1`' -- while every entry written before August 23, 2026 puts
         # the branch first and the title last. What keeps a STEP LIST from reading as an entry is unchanged:
-        # its own heading says 'Development cycle', which is not one of these titles, in either position.
+        # its own heading says 'Development', which is not one of these titles, in either position.
         $titleAlt = ((@($clTitles) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|')
         $branchRx = '(?:(?:' + $titleAlt + '):\s*`([^`/]+)/[^`]*`)|(?:`([^`/]+)/[^`]*`\s+(?:' + $titleAlt + ')\b)'
         if ($headingLine[0] -match $branchRx) {
@@ -3994,7 +3994,7 @@ function Format-EntryBlock {
     <#
         The whole entry as an array of LINES: the H2 DEPLOY heading, then its H3 sections in order.
 
-        IT IS A SECTION OF A DOCUMENT SINCE AUGUST 23, 2026, NOT A DOCUMENT. Format-DevelopmentCycle writes
+        IT IS A SECTION OF A DOCUMENT SINCE AUGUST 23, 2026, NOT A DOCUMENT. Format-Development writes
         the branch's plan and then calls this for its fourth phase -- so the entry is produced by one
         formatter and the file around it by another, which is what lets the fold take this block verbatim
         without holding a second definition of the entry format.
@@ -4232,7 +4232,7 @@ function Test-EntryDeclaresShape {
 # --- The entry's links, held against the destination its text lands at ---------------------------
 #
 # WHY THIS IS A QUESTION AT ALL. The entry is written as the DEPLOY section of
-# contributing-davekjohn/development-cycle.md, and the fold moves its text VERBATIM into the changelog. So a
+# contributing-davekjohn/development.md, and the fold moves its text VERBATIM into the changelog. So a
 # relative link in it has to resolve from the CHANGELOG's OWN directory rather than from the one the author
 # is typing in -- and where those two differ it looks wrong in front of them and only becomes right after it
 # moves. The natural instinct produces the broken form, and nothing said so: reported from a consumer as
@@ -4555,7 +4555,7 @@ function Get-EntryScaffoldFindings {
 # a branch is working through and the claim it will make were never on one screen.
 #
 # THE MERGE IS SAFE BECAUSE THE SEPARATION IS STRUCTURAL NOW. The entry is a NAMED SECTION carrying the
-# branch in its heading: Split-DevelopmentCycle is the one place that finds the boundary, the fold takes
+# branch in its heading: Split-Development is the one place that finds the boundary, the fold takes
 # that section, Get-BranchProgressFindings counts only above it, and Get-EntryScaffoldFindings reads only
 # inside it. Nothing is doing two jobs at once, so nothing has to be replaced before the PR.
 #
@@ -4592,7 +4592,17 @@ $script:BranchFileDefaults = [ordered]@{
     ChangelogTitle = 'DEPLOY'
     # CAPITALISED, because it now OPENS the heading rather than trailing after the branch name. 'DEPLOY'
     # stays uppercase for the same reason it was: it is a phase heading standing beside PLAN, CREATE and TEST.
-    ProgressTitle  = 'Development cycle'
+    #
+    # 'Development' SINCE AUGUST 27, 2026 (Dave, issues #963 and #958), where it was 'Development cycle'.
+    # The fourth rename of these two words and the smallest: shorter, and 'cycle' was doing no work the
+    # four phase headings underneath it were not already doing. The FILENAME MOVED WITH THE WORD again --
+    # Get-BranchFilePaths says which old ones are still read -- and the heading needs no reader change,
+    # because Get-BranchFileDeclaredBranch has matched anything up to the first backtick since August 23.
+    #
+    # #963 ASKED FOR TWO DIFFERENT WORDS and that is worth recording rather than smoothing over: its title
+    # said 'Development', its body said 'Developing'. Dave settled it on 'Development' the same day, which
+    # is also #958's word, so the file, the heading and the identifiers all say one thing.
+    ProgressTitle  = 'Development'
     # The word before the backticked branch name in the ENTRY's heading only -- '## Branch `feat/x`
     # changelog'. EMPTY SINCE THE RENAME (Dave, August 19, 2026): the lead word existed to stop
     # '## `feat/x` changelog' reading as a changelog OF that branch, and '## `feat/x` deployment' says
@@ -4614,7 +4624,7 @@ $script:BranchFileDefaults = [ordered]@{
     #
     # WHAT IT WAS ALSO USED FOR IS PARKING, and that keeps working: new-branch -Park passed its status text
     # here as -Intent. The intent now goes where a reader of a parked branch actually looks -- see
-    # Format-DevelopmentCycle, which writes it under the phase the first step lives in.
+    # Format-Development, which writes it under the phase the first step lives in.
     FirstStep      = 'TODO: the first step of this branch'
     # THE PHASES OF THE STEP LIST (Dave, August 14, 2026; issue #655). A branch moves through a
     # recognisable arc instead of an ad-hoc list. They are the file's own H2 sections since August 19,
@@ -4803,7 +4813,7 @@ function Get-BranchFilePaths {
         object.
 
         ONE FILE SINCE AUGUST 23, 2026 (Dave), WHERE THERE WERE TWO. 'workflow-davekjohn/branch/' held a
-        step list and an entry side by side; both are sections of 'contributing-davekjohn/development-cycle.md'
+        step list and an entry side by side; both are sections of 'contributing-davekjohn/development.md'
         now -- PLAN, CREATE and TEST carry the steps, and the fourth phase, '## `<branch>` DEPLOY', IS the
         entry that folds into CHANGELOG.md at the merge. The split had been correct about one thing and wrong
         about another: the two jobs genuinely are different, and putting them in two documents meant the
@@ -4851,17 +4861,31 @@ function Get-BranchFilePaths {
         answer, for the reason already written down: a consumer meets it through a plugin update, and a
         branch half-finished inside the old folder must not be stranded with its entry unfolded. So the old
         FOLDER joins the list of names that are read -- both its current document and its four legacy
-        filenames -- and nothing writes it again. Seven names read, one written.
+        filenames -- and nothing writes it again.
+
+        AND THE DOCUMENT RENAMED ON AUGUST 27, 2026 (Dave, #963/#958): 'development-cycle.md' ->
+        'development.md', following its own heading -- see ProgressTitle in $script:BranchFileDefaults.
+        Fifth rename, same answer, and by now the answer is the pattern rather than a decision each time:
+        the prior name joins the names that are READ and nothing writes it again. PriorNameFile is that
+        entry. Eight names read, one written.
+
+        WHY THERE IS NO 'workflow-davekjohn/development.md' IN THIS TABLE, since its absence looks like an
+        omission next to the five PriorFolder* rows: that pair never existed. The folder was renamed on
+        August 26 and the document on August 27, so no branch was ever open on the new filename inside the
+        old folder. A row for it would be a name to read that nothing can ever have written.
     #>
     return [pscustomobject]@{
         Directory        = 'contributing-davekjohn'
-        File             = 'contributing-davekjohn/development-cycle.md'
+        File             = 'contributing-davekjohn/development.md'
         # Cycle and Deployment both answer the same path now, deliberately, so every caller that asks for
         # one of the two halves keeps working and gets the one document. They are kept as names rather than
         # collapsed into File alone because they still mean different THINGS -- the step list and the entry
         # -- and a gate reading the step list wants to say so where it prints a path.
-        Cycle            = 'contributing-davekjohn/development-cycle.md'
-        Deployment       = 'contributing-davekjohn/development-cycle.md'
+        Cycle            = 'contributing-davekjohn/development.md'
+        Deployment       = 'contributing-davekjohn/development.md'
+        # The pre-#963 filename, read and never written. A branch open right now carries it -- including
+        # the branch that performed this rename, which is what proved the dual-read still works.
+        PriorNameFile    = 'contributing-davekjohn/development-cycle.md'
         LegacyCycle      = 'contributing-davekjohn/branch/branch-cycle.md'
         LegacyDeployment = 'contributing-davekjohn/branch/branch-deployment.md'
         OlderCycle       = 'contributing-davekjohn/branch/branch-progress.md'
@@ -4890,7 +4914,7 @@ function Resolve-BranchFilePath {
 
         EXISTENCE IS NOT THE TEST, AND THE REASON OUTLIVED THE THING THAT CAUSED IT (August 23, 2026).
         Every rename before this one could resolve on Test-Path, because the new name did not exist until
-        something wrote it. development-cycle.md broke that: it landed on the trunk in its reset state, so
+        something wrote it. development.md broke that: it landed on the trunk in its reset state, so
         the moment a branch in flight merged the trunk it HAD the new file -- empty -- beside the pair that
         held its real work. Resolving on existence would hand every one of those branches an empty document
         and call their entry missing, which is precisely the stranded half-finished branch the dual-read
@@ -4955,6 +4979,10 @@ function Resolve-BranchFilePath {
     $legacyKind = if ($Kind -eq 'File') { 'Cycle' } else { $Kind }
     $candidates = @(
         $current,
+        # THE PRE-#963 FILENAME, immediately after today's and before the branch/ pair, because it is the
+        # nearest predecessor: every branch open on August 27, 2026 carries it. It answers every Kind for
+        # the same reason PriorFolderFile does -- it was one document too, not a half.
+        [string]$paths.PriorNameFile,
         [string]$paths."Legacy$legacyKind",
         [string]$paths."Older$legacyKind",
         # THE PRE-#886 FOLDER, LAST AND NEVER WRITTEN. Same three names one directory over, in the same
@@ -5060,7 +5088,7 @@ function Format-BranchFileHeadingLine {
         [string]$Lead = ''
     )
     # THE TITLE COMES FIRST, THEN A COLON, THEN THE BRANCH (Dave, August 23, 2026, by hand in the document
-    # that is this format's spec): '# Development cycle: `feat/x-v1`', '## DEPLOY: `feat/x-v1`'. It read
+    # that is this format's spec): '# Development: `feat/x-v1`', '## DEPLOY: `feat/x-v1`'. It read
     # '# `feat/x` cycle' until then -- the branch first and the title trailing after it.
     #
     # WHAT THE FLIP BUYS IS THE SCANNED LINE. Both headings are read at a glance in a list -- a diff, a
@@ -5143,14 +5171,14 @@ function Format-BranchFileHeader {
 # formatters opened a file the same way -- the two resets and the progress scaffold -- and the blank line
 # after the header was exactly the kind of detail that drifts between three copies.
 #
-# There is one formatter now. Format-DevelopmentCycle writes the only branch document there is, and the reset
+# There is one formatter now. Format-Development writes the only branch document there is, and the reset
 # state is that same function called with no branch, so there is nothing left for a shared opener to keep in
 # agreement with. Removed rather than left standing unread, which is this file's own rule about a helper
 # whose last caller has gone.
 
-# --- RETIRED, AUGUST 23, 2026: Format-DevelopmentCycleReset ---------------------------------------
+# --- RETIRED, AUGUST 23, 2026: Format-DevelopmentReset ---------------------------------------
 #
-# It was an alias for Format-DevelopmentCycle with no branch, and it had three callers that each meant
+# It was an alias for Format-Development with no branch, and it had three callers that each meant
 # "the empty state that lives on the trunk": the fold wrote it back after folding, adopt-workflow-folder
 # placed it, and this repo's lint held the trunk copy to it byte-for-byte.
 #
@@ -5162,7 +5190,7 @@ function Format-BranchFileHeader {
 # THE STATE IT PRODUCED IS NOT RETIRED WITH IT, and that distinction is the one worth keeping. A branch
 # created before this change still carries a trunk-declaring document, so Get-BranchFileDeclaredBranch
 # must go on recognising one and Resolve-BranchFilePath must go on skipping it. What went is the name and
-# its writers; a caller that needs such a document for a fixture calls Format-DevelopmentCycle -Branch ''.
+# its writers; a caller that needs such a document for a fixture calls Format-Development -Branch ''.
 
 function Get-BranchFilesRereadNote {
     <#
@@ -5228,9 +5256,9 @@ function Add-BranchProgressSection {
     $Lines.Add('')
 }
 
-function Format-DevelopmentCycle {
+function Format-Development {
     <#
-        contributing-davekjohn/development-cycle.md, whole: the branch's own name and creation stamp, the
+        contributing-davekjohn/development.md, whole: the branch's own name and creation stamp, the
         guidance that explains the marks and the arc, the three phases that carry the steps, and the DEPLOY
         section that IS the changelog entry.
 
@@ -5474,10 +5502,17 @@ function Get-BranchFileDeclaredBranch {
     # past 'Branch ' would answer '' for every scaffolded entry, which reads as "still in its reset state"
     # and hands the next run permission to overwrite a file somebody has been writing in.
     # ANYTHING UP TO THE FIRST BACKTICK, since August 23, 2026, because the heading now leads with its title
-    # and titles are more than one word: '# Development cycle: `feat/x-v1`'. The regex allowed exactly one
-    # optional word before the backtick, which read the one-word '## DEPLOY: `x`' and not the two-word H1 --
-    # and a predicate that cannot read the title line answers '' for every scaffolded document, which is
-    # exactly the state that hands the next run permission to overwrite somebody's work.
+    # and titles could be more than one word: '# Development cycle: `feat/x-v1`'. The regex allowed exactly
+    # one optional word before the backtick, which read the one-word '## DEPLOY: `x`' and not the two-word
+    # H1 -- and a predicate that cannot read the title line answers '' for every scaffolded document, which
+    # is exactly the state that hands the next run permission to overwrite somebody's work.
+    #
+    # THAT EXAMPLE IS HISTORICAL SINCE AUGUST 27, 2026 AND THE WIDTH STAYS, which is the part worth writing
+    # down. #963 renamed the title to the one-word 'Development', so today's heading would fit the old
+    # one-word regex again -- and narrowing it back would be the same mistake in the other direction: the
+    # title is a WORDING SEAM (BranchFileWording), a repo may set it to anything, and every branch open
+    # across four days of renames still carries a two-word one. The rule is that the title's length is not
+    # this predicate's business, and a rename that happens to shorten it does not make it so.
     #
     # EVERY LEVEL AND EVERY SHAPE, because this is the idempotency test and getting it wrong is the expensive
     # direction rather than the loud one. It reads '# `feat/x` cycle' (branch first, until August 23),
@@ -5531,7 +5566,7 @@ function Get-BranchProgressStepLines {
             sections of one document now, so a checkbox written into the entry's PROSE would otherwise
             hold up the PR -- and it cannot be resolved, because it is a sentence rather than a step. An
             entry legitimately describes work in that shape ("- [ ] not done yet" appears in this repo's
-            own guidance). A legacy cycle file has no DEPLOY section, so Split-DevelopmentCycle hands
+            own guidance). A legacy cycle file has no DEPLOY section, so Split-Development hands
             back the whole text and such a branch is read exactly as it always was.
           * FENCE-AWARE, like every reader of this format: a step list may quote the convention it
             follows -- this repo's own README does -- and a guard that cannot tell a quote from a real
@@ -5551,7 +5586,7 @@ function Get-BranchProgressStepLines {
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
-    $head = (Split-DevelopmentCycle -Text $Text).Head
+    $head = (Split-Development -Text $Text).Head
     $body = Remove-EntryHtmlComments -EntryText (Get-EntryTextOutsideFences -EntryText $head)
     return @(($body -split '\r?\n') | ForEach-Object { $_.TrimStart() })
 }
@@ -5636,9 +5671,9 @@ function Get-BranchProgressFindings {
     return $findings
 }
 
-function Get-DevelopmentCycleEntryPattern {
+function Get-DevelopmentEntryPattern {
     <#
-        The regex matching the DEPLOY heading -- the line where the development cycle stops being the
+        The regex matching the DEPLOY heading -- the line where the development document stops being the
         branch's plan and starts being the entry that folds into CHANGELOG.md.
 
         IT IS NOT ENOUGH TO MATCH THE LEVEL, which is why this is a function rather than a constant. PLAN,
@@ -5674,9 +5709,9 @@ function Get-DevelopmentCycleEntryPattern {
     return '(?:' + $current + ')|(?:' + $legacy + ')'
 }
 
-function Split-DevelopmentCycle {
+function Split-Development {
     <#
-        The development cycle document in its two halves: Head -- the title, the guidance and the phases
+        The development document in its two halves: Head -- the title, the guidance and the phases
         that carry the steps -- and Entry, the DEPLOY section from its heading to the end of the file.
 
         ONE SPLITTER FOR THE THREE READERS THAT NEED IT, and having one is the whole point. The fold takes
@@ -5696,7 +5731,7 @@ function Split-DevelopmentCycle {
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
-    $rx = Get-DevelopmentCycleEntryPattern
+    $rx = Get-DevelopmentEntryPattern
     $lines = @($Text -split '\r?\n')
     $fenced = @(Get-FencedLineFlags -Lines $lines)
     $at = -1
@@ -5716,7 +5751,7 @@ function Split-DevelopmentCycle {
     return [pscustomobject]@{ Head = $head; Entry = $entry.TrimEnd(); Found = $true; Index = $at }
 }
 
-function Get-DevelopmentCycleEntryText {
+function Get-DevelopmentEntryText {
     <#
         The ENTRY out of a branch document -- the DEPLOY section where the document has one, and the whole
         text where it does not.
@@ -5733,14 +5768,14 @@ function Get-DevelopmentCycleEntryText {
         that open a BRANCH document call this once, where the file is read.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
-    $split = Split-DevelopmentCycle -Text $Text
+    $split = Split-Development -Text $Text
     if ($split.Found) { return [string]$split.Entry }
     return $Text
 }
 
 function Test-BranchChangelogIsFilled {
     <#
-        Pure: does the development cycle file hold a branch's work, or is it still (back) in the reset state
+        Pure: does the development file hold a branch's work, or is it still (back) in the reset state
         the trunk carries? True means this document belongs to a branch.
 
         THE TEST IS THE BRANCH NAME, NOT THE HEADING LEVEL, since August 23, 2026 -- and the change was

@@ -50,7 +50,7 @@
 
 .PARAMETER Intent
     (Optional) the direction of the branch -- what still needs to happen and where you left off.
-    Recorded in development-cycle.md as the opening paragraph of its FIRST PHASE (PLAN), without a heading
+    Recorded in development.md as the opening paragraph of its FIRST PHASE (PLAN), without a heading
     of its own; typically given together with -Park when parking a branch for later / another device (#162).
     It deliberately does not touch the DEPLOY section: an intent is a status, and that section's text folds
     verbatim into CHANGELOG.md.
@@ -165,7 +165,7 @@ if (Test-Path -LiteralPath $configPath) {
             $v = Get-EntryFallbackType; if ($v) { $stubFallbackType = $v }
         }
     } catch {
-        Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- writing the development cycle with the built-in default wording."
+        Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- writing the development document with the built-in default wording."
     }
 }
 
@@ -299,7 +299,7 @@ if (-not $branchType) {
 # hypothetical in a repo whose whole workflow is "notice it once, script it the second time".
 $branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 
-# THE BRANCH'S WORKING DOCUMENT LIVES AT contributing-davekjohn/development-cycle.md, NOT IN THE REPO ROOT
+# THE BRANCH'S WORKING DOCUMENT LIVES AT contributing-davekjohn/development.md, NOT IN THE REPO ROOT
 # UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder August 14,
 # 2026; merged from two files into one on August 23, 2026).
 # One fixed path, and git's own per-branch tracking is what keeps two branches from colliding on it --
@@ -404,7 +404,7 @@ function Test-BranchFileIsDirty {
 # end the whole run and a park would silently not happen. Saying so and falling through is what it always
 # meant.
 if ($cycleTaken) {
-    Write-Host "Development cycle already written for '$branch' - nothing done." -ForegroundColor Yellow
+    Write-Host "Development already written for '$branch' - nothing done." -ForegroundColor Yellow
     $branchFileWritten = $false
 } else {
     # -Intent IS THE PARKING NOTE AND IT DOES NOT LAND IN THE ENTRY (Dave, August 6, 2026). It is a status,
@@ -434,7 +434,7 @@ if ($cycleTaken) {
     $cycleForeign = ($cycleOwner -and $cycleOwner -ne $trunk -and -not $cycleTaken)
 
     if ($cycleForeign -and (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $cycleRel)) {
-        Write-Warning "Kept: $cycleRel -- it holds UNCOMMITTED work belonging to '$cycleOwner', which exists nowhere else. This branch has no development cycle of its own yet: commit or discard that work, then rerun this script."
+        Write-Warning "Kept: $cycleRel -- it holds UNCOMMITTED work belonging to '$cycleOwner', which exists nowhere else. This branch has no development document of its own yet: commit or discard that work, then rerun this script."
         $branchFileWritten = $false
     } else {
         # NO DATE IN THE ENTRY, DELIBERATELY (Dave, August 5, 2026). This runs when the BRANCH is created, so
@@ -448,7 +448,7 @@ if ($cycleTaken) {
         # old wording told the author to write the one link form the fold would break.
         $linkDestDirRel = ((Split-Path (Get-SeamValue -Name 'Get-ChangelogPath' `
             -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)) -Parent) -replace '\\', '/').Trim('/')
-        $cycleText = ((Format-DevelopmentCycle -Branch $branch -Intent $Intent -Id $branchId `
+        $cycleText = ((Format-Development -Branch $branch -Intent $Intent -Id $branchId `
             -Description $description -Type $branchType -Body $body `
             -LinkDestDirRel $linkDestDirRel) -join "`n") + "`n"
         [System.IO.File]::WriteAllText($cyclePath, $cycleText, $Utf8NoBom)
@@ -457,7 +457,7 @@ if ($cycleTaken) {
         # foreign owner is the one state the old test could not distinguish from its own, so it is the one
         # state the output has to say out loud.
         if ($cycleForeign) {
-            Write-Host "Replaced: $cycleRel (it held the development cycle of '$cycleOwner', committed on that branch)" -ForegroundColor Yellow
+            Write-Host "Replaced: $cycleRel (it held the development document of '$cycleOwner', committed on that branch)" -ForegroundColor Yellow
         } else {
             Write-Host "Created: $cycleRel" -ForegroundColor Green
         }
@@ -487,7 +487,7 @@ if ($cycleTaken) {
 }
 
 # THE CREATION PUSH: make the freshly created branch reachable from another device by committing its
-# development cycle (the plan, the intent and the entry, in one document) and pushing it -- NO PR. Push != PR:
+# development document (the plan, the intent and the entry, in one file) and pushing it -- NO PR. Push != PR:
 # the PR rule stays intact and separate. git writes progress to stderr,
 # which under EAP=Stop would die as a terminating NativeCommandError before the exit-code check even on
 # exit 0 (the #107 pitfall) -- so every git call goes through the shared Invoke-NativeCapture

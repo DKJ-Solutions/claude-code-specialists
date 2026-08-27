@@ -1,6 +1,6 @@
-# `development-cycle.md` — the portable half
+# `development.md` — the portable half
 
-Everything a branch needs to carry lives in **one file**: `contributing-davekjohn/development-cycle.md`,
+Everything a branch needs to carry lives in **one file**: `contributing-davekjohn/development.md`,
 inside the workflow's own root folder, where everything portable gathers. It has two halves with two
 different readers, and they are sections of one document rather than two files:
 
@@ -40,7 +40,7 @@ adopt it; this page reaches you with every plugin update.
 ## The heading
 
 ```markdown
-# Development cycle: `feat/thing-v1` · 20260823-101500
+# Development: `feat/thing-v1` · 20260823-101500
 ```
 
 The **title comes first, then a colon, then the branch** (Dave, August 23, 2026). Both this heading and the
@@ -139,7 +139,7 @@ TEST were both empty.
 
 **TEST is where the branch verifies ITSELF, and that is the phase's whole job.** Give Claude a check it
 can run — a suite, a gate, a build, a rendered result to compare — and the session changes character: it
-becomes one you can walk away from instead of one you have to watch. The development cycle names *when* and
+becomes one you can walk away from instead of one you have to watch. The development document names *when* and
 *where* that happens, because a check with no place in the arc gets run when someone remembers to. **A
 branch reaches DEPLOY once it has verified itself here**, and TEST is the phase that says what was run and
 what came back.
@@ -198,7 +198,7 @@ or by prefixing one prompt with `/plan`; a whole session can start there with
 a deliberate act rather than a drift.
 
 **The order matters, and getting it wrong stalls step one on its own scaffold.** `new-branch` *writes a
-file* — the development cycle document — so it cannot run while plan mode is still blocking edits. The
+file* — the development document — so it cannot run while plan mode is still blocking edits. The
 sequence is therefore:
 
 1. **Explore in plan mode.** Read the code, the docs and the history that bear on the assignment. Answer
@@ -226,7 +226,7 @@ something Claude's own output demonstrates, and for a branch that is the gate ou
 depend on:
 
 ```text
-/goal every step above the DEPLOY heading in contributing-davekjohn/development-cycle.md is resolved
+/goal every step above the DEPLOY heading in contributing-davekjohn/development.md is resolved
 and open-pr reports the lint and test gates green, or stop after 20 turns
 ```
 
@@ -290,7 +290,7 @@ See [the lib](../scripts/lib/release-lib.ps1).    <- correct where it sits BESID
 ```
 
 **You do not have to work out which one you are.** The guidance block at the top of your own
-`contributing-davekjohn/development-cycle.md` states your repo's answer in one sentence, composed by
+`contributing-davekjohn/development.md` states your repo's answer in one sentence, composed by
 `new-branch` from the same seam `open-pr`'s link gate resolves against — so the file you are typing in and
 the gate that refuses cannot disagree about the base.
 
@@ -426,7 +426,7 @@ parking note — and the gate goes quiet.
 
 ## Why the name is fixed
 
-`development-cycle.md` is the same on every branch, which looks like it should collide the moment two
+`development.md` is the same on every branch, which looks like it should collide the moment two
 branches exist. It cannot: **git already tracks this file per branch**, so each branch carries its own
 version of the same path and a checkout swaps them. The per-branch filename this replaced was solving a
 problem version control had already solved, and it cost a repo root that filled up with other people's
@@ -629,7 +629,7 @@ not evidence that it is — see the `park` skill for what to check and why.
 
 ### The park commit says what is behind the plan — read it before you rebuild anything
 
-Automatic parking publishes the development cycle **and nothing else**, which is the bound that keeps it
+Automatic parking publishes the development document **and nothing else**, which is the bound that keeps it
 from pushing work nobody asked to publish. It has one perverse consequence, measured on August 27, 2026
 (issue #960): a branch whose work sits uncommitted in *another* machine's working copy arrives on origin as
 a document reading `- [x]` eight times over, with no commit behind a single tick. From origin, **ticked and

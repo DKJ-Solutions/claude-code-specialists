@@ -8,7 +8,7 @@
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/branch-entry-gate.tests.ps1
     THE ENTRY STATES COME FROM THE REAL FORMATTERS, NEVER FROM A LITERAL IN THIS FILE. Format-EntryBlock
-    with empty fields IS the scaffolded state, and Format-DevelopmentCycle with no branch IS the empty,
+    with empty fields IS the scaffolded state, and Format-Development with no branch IS the empty,
     trunk-declaring state a repo updating from an older plugin still has on its trunk -- so a change to
     either shape reaches these cases automatically. A fixture written by hand would be a third
     definition of the format, in the file whose whole job is to prove there are not two -- and it would go
@@ -87,7 +87,7 @@ try {
     Write-Host 'the exemptions'
 
     $c = New-Consumer -Label 'exempt'
-    Set-Entry -Dir $c -Lines (Format-DevelopmentCycle -Branch '')
+    Set-Entry -Dir $c -Lines (Format-Development -Branch '')
 
     $r = Invoke-Gate -Dir $c -Branch 'sync/live-2026-08-20'
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'exempt prefix') 'exempt/default: a sync branch owes no entry, even with the entry in its reset state'
@@ -101,7 +101,7 @@ try {
 
     # The seam narrows and widens it, and the source declares no exemption of its own.
     $c2 = New-Consumer -Label 'seam' -RepoConfig "function Get-EntryGateExemptPrefixes { return @('mirror','vendor') }"
-    Set-Entry -Dir $c2 -Lines (Format-DevelopmentCycle -Branch '')
+    Set-Entry -Dir $c2 -Lines (Format-Development -Branch '')
     $r = Invoke-Gate -Dir $c2 -Branch 'mirror/upstream'
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'exempt prefix') 'exempt/seam: the seam answer replaces the default'
     $r = Invoke-Gate -Dir $c2 -Branch 'sync/live-2026-08-20'
@@ -116,7 +116,7 @@ try {
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'does not exist') 'missing: no entry file at all refuses, and names new-branch'
 
     $reset = New-Consumer -Label 'reset'
-    Set-Entry -Dir $reset -Lines (Format-DevelopmentCycle -Branch '')
+    Set-Entry -Dir $reset -Lines (Format-Development -Branch '')
     $r = Invoke-Gate -Dir $reset -Branch 'feat/thing'
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'reset state') 'reset: the state the fold leaves behind is not an entry'
 
@@ -210,7 +210,7 @@ try {
     # preamble's SHAPE is the subject of #899, and a scenario that hid it behind a formatter call would
     # read as though the region were incidental.
     $shapeHead = @(
-        '# Development cycle: `feat/thing`',
+        '# Development: `feat/thing`',
         '',
         '> **How this file is read.** A step is `- [ ]` until it is resolved.',
         '> The four phases are below, and this block is the same in every branch document.',
@@ -280,7 +280,7 @@ try {
     #    a byte check would have refused their correct document.
     $preTranslated = New-Consumer -Label 'pre-translated'
     Set-Entry -Dir $preTranslated -Lines (@(
-        '# Development cycle: `feat/thing` ' + [char]0x00B7 + ' 20260826-120000',
+        '# Development: `feat/thing` ' + [char]0x00B7 + ' 20260826-120000',
         '',
         '> **Zo wordt dit bestand gelezen.** Een stap is `- [ ]` tot hij is afgehandeld.',
         '> De vier fasen staan hieronder.',
@@ -293,7 +293,7 @@ try {
     # 8. #915 -- THE REAL SCAFFOLDED PREAMBLE, which is the one shape none of the seven above ever fed this
     #    gate. Scenarios 1-7 spell their head out by hand (with reason: the region's SHAPE is the subject of
     #    #899, and a formatter call would have read as though it were incidental) -- but that hand-written
-    #    head is also why a generator writing a BROKEN preamble shipped green. Format-DevelopmentCycle
+    #    head is also why a generator writing a BROKEN preamble shipped green. Format-Development
     #    composed the heading levels from the knobs with '+' inside a ',' array literal, so ',' bound first
     #    and dropped four bare '###'/'####' lines into the guidance; this gate read them as branch content
     #    and refused every document new-branch wrote, here and in every consumer taking the plugin.
@@ -303,7 +303,7 @@ try {
     #    up to the first phase heading rather than by a line count, so the guidance may grow without this
     #    scenario going stale.
     $scaffoldPreamble = @()
-    foreach ($cycleLine in (Format-DevelopmentCycle -Branch 'feat/thing' -Id '20260826-000000')) {
+    foreach ($cycleLine in (Format-Development -Branch 'feat/thing' -Id '20260826-000000')) {
         if ($cycleLine -match ('^#{' + (Get-BranchCycleSectionLevel) + '}\s+\S')) { break }
         $scaffoldPreamble += $cycleLine
     }
@@ -362,7 +362,7 @@ try {
     #    The entry half is replaced with the written one, because the entry check runs first and a
     #    scaffolded entry would mask whatever the shape check has to say.
     $intentText = 'Skeleton + routing done; next: wire the API client.'
-    $cycleWithIntent = @(Format-DevelopmentCycle -Branch 'feat/thing' -Id '20260826-000000' -Intent $intentText)
+    $cycleWithIntent = @(Format-Development -Branch 'feat/thing' -Id '20260826-000000' -Intent $intentText)
     $entryHeadRx = '^#{1,6}\s+DEPLOY\b'
     $cycleHead = @()
     foreach ($cycleLine in $cycleWithIntent) {

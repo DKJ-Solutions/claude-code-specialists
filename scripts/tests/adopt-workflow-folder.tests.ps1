@@ -132,7 +132,7 @@ try {
     # folder was also their reference. The document exists only while a branch is open now, so placing one
     # would hand them a file their own first fold deletes -- the only entry in this list that is not
     # permanently theirs.
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\development-cycle.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\development.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\branch'))) '-Apply: and no branch/ directory is placed any more'
     # THE FOLDER PAGE MUST NOT CARRY A HISTORY TABLE, and this assert is the regression guard on inbound
     # #786. It did until August 20, 2026: the page was scaffolded with a '## Release history' heading, a

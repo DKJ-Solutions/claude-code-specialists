@@ -1,6 +1,6 @@
 # The contribution cycle — the portable half
 
-This is the cycle the `contributing-davekjohn` scripts run: a branch, its `contributing-davekjohn/development-cycle.md`, a Pull
+This is the cycle the `contributing-davekjohn` scripts run: a branch, its `contributing-davekjohn/development.md`, a Pull
 Request that has to get past its gates, a merge, and a fold. **It is written to be read in any repo that
 enables this plugin**, which is why it names the *seam* wherever a repo owns the answer, rather than stating
 one repo's answer as the rule.
@@ -34,7 +34,7 @@ second source; [`scripts/README.md`](scripts/README.md) says why that is the one
 Creating the branch writes its working document, so **a branch is never entry-less**. It has two halves
 with two different readers:
 
-| half of `contributing-davekjohn/development-cycle.md` | subject | lifetime |
+| half of `contributing-davekjohn/development.md` | subject | lifetime |
 |---|---|---|
 | `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | removed at the merge; never folded |
 | `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
@@ -331,7 +331,7 @@ recommendation.** On August 27, 2026 it deleted its root `CONTRIBUTING.md` and k
 `CLAUDE.md`, on the grounds that an always-on document already stated the same three rules — never
 directly on the trunk, a branch + PR, the required CI check — and a second copy is a thing to keep in
 sync rather than a safety net. **Nothing in this workflow depends on that choice**: every gate reads your
-branch's own `development-cycle.md`, never a contributing page, so both answers work.
+branch's own `development.md`, never a contributing page, so both answers work.
 
 **The recommendation is still the root page, for two reasons that have nothing to do with the gates.**
 GitHub links a root `CONTRIBUTING.md` from the new-issue and new-pull-request pages and from the

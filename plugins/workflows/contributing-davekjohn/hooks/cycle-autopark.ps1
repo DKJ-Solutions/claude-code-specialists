@@ -6,7 +6,7 @@
 .DESCRIPTION
     WHY A HOOK AND NOT A SKILL (issue #900). What another device needs from a branch in flight is the
     PLAN, which phase is running and where the last session stopped, and all three live in
-    development-cycle.md. Keeping that document current on the remote is not a thing anybody remembers
+    development.md. Keeping that document current on the remote is not a thing anybody remembers
     to do: `park` and `new-branch -Park` between them produced SIX commits in the whole history, while
     the median merged branch sat invisible on origin for 22 minutes and the worst for 365. By this
     repo's own rule -- what has to happen without anyone asking for it is a hook, what somebody invokes

@@ -1,8 +1,8 @@
 ---
 name: new-branch
 description: >-
-  Create (or idempotently resume) a git branch AND its development cycle document --
-  contributing-davekjohn/development-cycle.md, the branch's plan and the DEPLOY section that becomes its
+  Create (or idempotently resume) a git branch AND its development document --
+  contributing-davekjohn/development.md, the branch's plan and the DEPLOY section that becomes its
   changelog entry -- in one move, via the shared, centralized new-branch script from the plugin
   (single source of truth, issue #81), so a consumer does not have to duplicate this script locally.
   Use this whenever a new piece of work starts: a branch is never entry-less -- creating it brings that
@@ -37,7 +37,7 @@ The script:
    the remote, so a second cycle on the same subject becomes `-v2` rather than colliding.
 2. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
    running it again on the same branch simply resumes it instead of failing.
-3. Immediately writes that branch's **`contributing-davekjohn/development-cycle.md`** -- so the branch and its
+3. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
    document come into existence in a single step. Idempotent: a document that already belongs to this
    branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
    unless it holds uncommitted work, which is kept and reported instead.
@@ -77,8 +77,8 @@ route moved to a page the model is allowed to read.
 ## The document, and its two halves
 
 ```text
-contributing-davekjohn/development-cycle.md
-  # Development cycle: `feat/x-v1` * <creation stamp>
+contributing-davekjohn/development.md
+  # Development: `feat/x-v1` * <creation stamp>
   ## PLAN / ## CREATE / ## TEST      what still MUST HAPPEN -- the step list, gated before the PR
   ## DEPLOY: `feat/x-v1`            what the change DOES   -- folded verbatim into CHANGELOG.md
 ```

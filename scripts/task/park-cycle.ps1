@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Push this branch's development cycle to origin -- unless a PR has already published it. The
+    Push this branch's development document to origin -- unless a PR has already published it. The
     automatic half of parking: one document, no PR, no live action, and silent when there is nothing
     to do.
 
@@ -20,7 +20,7 @@
     takes.
 
     THE TRAP THAT SHAPES EVERY BOUND BELOW: THE DEPLOY LOCK (#884). ship-pr refuses the merge once
-    development-cycle.md has diverged from what the PR published. A pusher that kept running after
+    development.md has diverged from what the PR published. A pusher that kept running after
     open-pr would therefore not be a convenience -- it would block every merge in the repo,
     structurally, and the failure would read as the lock misbehaving rather than as this script. Hence
     the PR check below, and hence its fail-safe direction: when the answer cannot be established, this

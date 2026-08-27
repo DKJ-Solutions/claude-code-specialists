@@ -424,7 +424,7 @@ it was coming.
   warn**, not a refusal, and the entry's type falls back to whatever `Get-EntryFallbackType` says.
 
 **The branch's own file moved out of your repo root.** A branch used to carry `<branch-name>.md` beside
-your `README.md`; it now carries one `contributing-davekjohn/development-cycle.md`, which holds both jobs as
+your `README.md`; it now carries one `contributing-davekjohn/development.md`, which holds both jobs as
 sections — `## PLAN` / `## CREATE` / `## TEST` for what still has to happen, and
 `` ## DEPLOY: `<branch>` `` for what the change does. It was a pair under `contributing-davekjohn/branch/`
 between August 6 and August 23, 2026, with reference copies under `branch/templates/`; both are gone, and

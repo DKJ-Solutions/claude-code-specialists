@@ -720,7 +720,7 @@ $bfPaths = Get-BranchFilePaths
 New-Item -ItemType Directory -Path (Join-Path $dirBF $bfPaths.Directory) -Force | Out-Null
 $bfRows = @([pscustomobject]@{ Tier = 1; Score = 4; Why = 'the split' })
 [System.IO.File]::WriteAllText((Join-Path $dirBF $bfPaths.File),
-    ((Format-DevelopmentCycle -Branch 'feat/branch-folder-v1' -Id '20260823-090000' `
+    ((Format-Development -Branch 'feat/branch-folder-v1' -Id '20260823-090000' `
         -Description 'Written in the branch folder' -Type 'feat' -ImpactRows $bfRows) -join "`n") + "`n", $Utf8NoBom)
 
 $rBF = Invoke-Fold -Dir $dirBF
@@ -743,9 +743,9 @@ Write-Host "A RESET branch-deployment.md is not an entry, and is not folded" -Fo
 $dirBR = New-FoldFixture -Label 'branchreset'
 New-Item -ItemType Directory -Path (Join-Path $dirBR $bfPaths.Directory) -Force | Out-Null
 [System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Deployment),
-    ((Format-DevelopmentCycle -Branch '') -join "`n") + "`n", $Utf8NoBom)
+    ((Format-Development -Branch '') -join "`n") + "`n", $Utf8NoBom)
 [System.IO.File]::WriteAllText((Join-Path $dirBR $bfPaths.Cycle),
-    ((Format-DevelopmentCycle -Branch '') -join "`n") + "`n", $Utf8NoBom)
+    ((Format-Development -Branch '') -join "`n") + "`n", $Utf8NoBom)
 $clBR0 = Get-Changelog -Dir $dirBR
 $rBR = Invoke-Fold -Dir $dirBR
 Assert-True ($rBR.ExitCode -eq 0) 'reset pair: exits 0 -- nothing to fold is not an error'
@@ -760,7 +760,7 @@ $dirBC = New-FoldFixture -Label 'branchcommit'
 New-Item -ItemType Directory -Path (Join-Path $dirBC $bfPaths.Directory) -Force | Out-Null
 New-EntryFile -Dir $dirBC -Name $bfPaths.Deployment -Title 'Committed from the branch folder' -Rows '| 1 | 2 | commit scope |'
 [System.IO.File]::WriteAllText((Join-Path $dirBC $bfPaths.Cycle),
-    ((Format-DevelopmentCycle -Branch 'feat/commit-scope') -join "`n") + "`n", $Utf8NoBom)
+    ((Format-Development -Branch 'feat/commit-scope') -join "`n") + "`n", $Utf8NoBom)
 Initialize-FoldGitRepo -Dir $dirBC
 # An unrelated staged file, to prove the enforced scope did not widen along with the path change.
 [System.IO.File]::WriteAllText((Join-Path $dirBC 'stray.txt'), "unrelated`n", $Utf8NoBom)

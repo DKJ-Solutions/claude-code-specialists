@@ -285,7 +285,7 @@ The constitution above, concretely implemented here:
 - **Four more gates arrive with the workflow plugin**, and all of them read the branch's own document.
   Three run locally: the **scaffold gate** refuses to push an entry still carrying the wording
   `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
-  `contributing-davekjohn/development-cycle.md` has an unresolved step above its DEPLOY heading, and the
+  `contributing-davekjohn/development.md` has an unresolved step above its DEPLOY heading, and the
   **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
   at the moment the PR opens, because that is what the review approved and what the fold folds. The fourth
   runs in **CI** (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the
@@ -299,13 +299,22 @@ The constitution above, concretely implemented here:
   and that is why they are the three (Dave, August 23, 2026):
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
      folds the entry into `contributing-davekjohn/CHANGELOG.md` and clears it, and with `-Commit`/`-Push`
-     makes that commit itself. **Bounded to two paths** — that changelog and
-     `contributing-davekjohn/development-cycle.md`, which the same run **removes** — and the commit names
-     them, so nothing else in the tree can ride along. It was three until August 23, 2026, when the
+     makes that commit itself. **Bounded to two paths** — that changelog and the branch's development
+     document, which the same run **removes** — and the commit names them, so nothing else in the tree
+     can ride along. It was three until August 23, 2026, when the
      entry and the step list became sections of one document: the bound narrowed with the tree rather
      than being relaxed. Later that day the second path stopped being a rewrite and became a deletion —
      the document exists only while a branch is open — which narrows what the exception does without
      changing what it may touch. Committing stays opt-in, because it is this exception being used.
+
+     **The second path is named by its resolver rather than spelled out here, and that is the fix for a
+     gap this rename opened** (August 27, 2026, #963/#958). The bound used to quote the filename, and the
+     document has now been renamed four times — so on the day of each rename every branch already open
+     carried a name the bound did not list, which put its own fold outside the exception it runs under.
+     `Resolve-BranchFilePath` is the one place that knows which of the eight recognised names holds this
+     branch's work, and the commit prints the path it actually touched. So the bound is still exactly two
+     paths and still checkable after the fact — it is simply no longer a spelling that goes stale under
+     the tooling it governs. Today's writer is `contributing-davekjohn/development.md`.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `contributing-davekjohn/releases/`,
      **empties the changelog down to its intro**, commits that on `main`, and tags `vX.Y.Z`.

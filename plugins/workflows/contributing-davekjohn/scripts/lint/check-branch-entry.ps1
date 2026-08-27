@@ -31,7 +31,7 @@
     will say, so the author learns it here rather than at the cut, and merges anyway.
 
     THE DEPLOY LOCK, AND IT IS WHY THIS SCRIPT NOW READS A PR BODY AT ALL (Dave, issue #884,
-    August 25, 2026). The DEPLOY section travels four times -- development-cycle.md, the PR body,
+    August 25, 2026). The DEPLOY section travels four times -- development.md, the PR body,
     CHANGELOG.md, the release notes -- and is fixed at the moment the PR opens, because that is what the
     review approved and what the fold takes. ship-pr refuses the merge on divergence, and ship-pr is
     local, which is this gate's whole reason for existing. It ADDS NO RULE HERE EITHER: the comparison is
@@ -199,12 +199,12 @@ if (-not (Test-Path -LiteralPath $entryPath)) {
     exit 1
 }
 
-# THE DEPLOY SECTION, NOT THE WHOLE DOCUMENT. The entry is a section of development-cycle.md since
+# THE DEPLOY SECTION, NOT THE WHOLE DOCUMENT. The entry is a section of development.md since
 # August 23, 2026, and every reader below is entry-shaped -- handed the plan as well, the scaffold check
-# would accuse the step list of being an unfinished entry. Get-DevelopmentCycleEntryText hands back the
+# would accuse the step list of being an unfinished entry. Get-DevelopmentEntryText hands back the
 # whole text for a legacy file that IS an entry, so a branch created before the merge is read as it was.
 $fileText  = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
-$entryText = Get-DevelopmentCycleEntryText -Text $fileText
+$entryText = Get-DevelopmentEntryText -Text $fileText
 
 # "IS THIS THE RESET STATE" IS A QUESTION ABOUT THE DOCUMENT, NOT ABOUT THE SECTION -- and asking it of the
 # section is a measured defect rather than a hypothetical. A reset document's DEPLOY section opens with a
@@ -259,11 +259,11 @@ Write-Host "[OK] '$entryRel' carries a written entry."
 # finds one branch's status inside it learns to distrust the whole region, including the rules that do
 # apply everywhere.
 #
-# NEITHER RE-DERIVES WHERE THE ENTRY BEGINS. Split-DevelopmentCycle is the one splitter three readers
+# NEITHER RE-DERIVES WHERE THE ENTRY BEGINS. Split-Development is the one splitter three readers
 # already share, and it is fence-aware because a document explaining this format quotes its own headings.
 # A second parser here is exactly the drift entry-scaffold-lib.ps1 exists to prevent.
 $shapeFindings = @()
-$cycleHalves = Split-DevelopmentCycle -Text $fileText
+$cycleHalves = Split-Development -Text $fileText
 $headText = [string]$cycleHalves.Head
 
 # Fence tracking, so a quoted heading is illustration rather than a phase. Same rule check 4 of the lint gate

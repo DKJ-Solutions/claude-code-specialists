@@ -447,7 +447,7 @@ try {
     # be measuring the plan: the first line would be the document's title, and the type would read off a
     # heading that deliberately is not a changelog heading.
     $docText1  = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
-    $docSplit1 = Split-DevelopmentCycle -Text $docText1
+    $docSplit1 = Split-Development -Text $docText1
     Assert-Equal $true $docSplit1.Found 'the document carries a DEPLOY section for the fold to split on'
     $entryText1 = [string]$docSplit1.Entry
     Assert-True ($docText1 -match [regex]::Escape('First title')) 'the document contains the given title'
@@ -558,7 +558,7 @@ try {
     Assert-True (Test-Path -LiteralPath $entryPathE) 'entry file still created (fallback type)'
     # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
     # reader is handed that rather than the whole file.
-    $entryTextE = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPathE, [System.Text.Encoding]::UTF8))
+    $entryTextE = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPathE, [System.Text.Encoding]::UTF8))
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextE -Type 'Chore') 'entry falls back to branch type Chore, in its own section'
 
     # --- (f) Regression: a malicious -Title (quotes + backslashes) must no longer break the argv
@@ -581,7 +581,7 @@ try {
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
     # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
     # reader is handed that rather than the whole file.
-    $entryTextF = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8))
+    $entryTextF = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPathF, [System.Text.Encoding]::UTF8))
     # THE PAYLOAD LANDS IN THE TITLE SECTION SINCE THE DOSSIER FORM -- the title given to new-branch is a
     # section now, not the heading. The assert follows it there and keeps its shape: an EXACT compare of the
     # whole section answer, which proves nothing was appended or lost at a broken argv boundary. A prefix
@@ -628,7 +628,7 @@ try {
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
     # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
     # reader is handed that rather than the whole file.
-    $entryTextH = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8))
+    $entryTextH = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPathH, [System.Text.Encoding]::UTF8))
     Assert-True (-not ($entryTextH -match [regex]::Escape($intentText))) '-Intent: the intent does NOT land in the entry -- that text would fold into CHANGELOG.md verbatim'
     # THE TIER REASONS ARE THE BODY NOW, so "left empty" is measured as "no reason written under any tier"
     # rather than as an empty section: the section holds the headings the author still has to answer.
@@ -809,7 +809,7 @@ Set-Location '$fixtureK'
 . '$fixtureK\scripts\repo-config.ps1'
 . '$fixtureK\scripts\lib\branch-info.ps1'
 . '$fixtureK\scripts\lib\entry-scaffold-lib.ps1'
-`$t = Resolve-EntryType -EntryText (Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText('$entryPathK', [System.Text.Encoding]::UTF8)))
+`$t = Resolve-EntryType -EntryText (Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText('$entryPathK', [System.Text.Encoding]::UTF8)))
 Write-Output `$t.Type
 "@
     $typeK = ([string](@($typeProbe | Where-Object { $_ })[0])).Trim()
@@ -840,7 +840,7 @@ Write-Output `$t.Type
     # structure: the built-in section headings are there, which is what proves the built-in defaults were
     # used rather than nothing.
     Assert-True ($entryTextL -match ('(?m)^' + [regex]::Escape((Get-EntrySectionHeading -Key 'What')) + '$')) 'broken repo-config: falls back to the built-in section wording'
-    Assert-True (Test-EntryDeclaresType -EntryText (Get-DevelopmentCycleEntryText -Text $entryTextL) -Type 'Feat') 'broken repo-config: and the branch type is still stated'
+    Assert-True (Test-EntryDeclaresType -EntryText (Get-DevelopmentEntryText -Text $entryTextL) -Type 'Feat') 'broken repo-config: and the branch type is still stated'
     Assert-True (Test-Phrase -Text $rL.Out -Phrase 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
 
     # --- (m) A BRANCH STACKED ON AN UNFOLDED ONE (inbound #615) ------------------------------------
@@ -908,7 +908,7 @@ Write-Output `$t.Type
     # Scoped exactly as -Park was: the document and nothing else. The same pathspec discipline, now
     # running unasked, which is precisely why it must not widen.
     $filesO = Get-HeadCommitFiles -Dir $fixtureO
-    Assert-True ($filesO -contains (Get-BranchFilePaths).Cycle) 'default push: the commit carries the development cycle'
+    Assert-True ($filesO -contains (Get-BranchFilePaths).Cycle) 'default push: the commit carries the development document'
     Assert-Equal 1 $filesO.Count 'default push: and carries nothing else -- one document, not a sweep'
 
     # --- (p) -NoPush: the escape valve, with an origin sitting right there ---------------------------

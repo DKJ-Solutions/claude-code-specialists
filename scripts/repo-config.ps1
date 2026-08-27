@@ -276,7 +276,7 @@ function Get-MojibakePaths {
     # verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode caught anywhere
     # later has already been copied twice.
     # -Recurse covers the folder's other pages -- the release notes under releases/audience/ and, in a
-    # consumer, the scaffolded docs. It also covered branch/templates/ until the merged development cycle
+    # consumer, the scaffolded docs. It also covered branch/templates/ until the merged development document
     # retired that directory on August 23, 2026.
     # BOTH NAMES ARE SCANNED, and the reason is what this check is for: a repo mid-rename has prose in
     # whichever folder it still uses, and a mojibake check that silently skips the folder a consumer
