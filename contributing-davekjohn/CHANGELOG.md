@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/claim-the-issue-before-you-work-it-v1` · 20260827-174131
+
+A session that picks up an issue now claims it first, by assigning it to the account it is logged in as,
+and reads the claim before choosing -- an issue that already carries an assignee is somebody's. Dave runs
+this repo from two machines under one GitHub account, so the tracker is the only thing the two sessions
+share: neither sees the other's branch or intent, and an unassigned issue is indistinguishable from an
+untouched one. That is how the same issue gets repaired twice and found out at the merge.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The rule states what the claim does not prove, which is the half that would otherwise be learned the
+hard way.** Where both sessions run under one account the assignee names the account and never the
+machine -- so a claim is a binary *taken*, not a lock, and a claim with no branch and no recent activity
+is a question for the owner rather than a closed door. Without that sentence the first stale assignment
+teaches a session to treat the marker as authoritative and leave real work parked.
+
+**It sits in the persona, not on the workflow page, because the trigger is intake.** Claiming is not a
+branch mechanic a consumer opts into with Dave's method; it is what an orchestrator does the moment it
+chooses what to work on. So any consumer whose repo has a tracker and more than one worker gets it, and
+gets it before the choice rather than after.
+
+**Score:** 2
+
+#### Pull Request
+
+Claiming an issue on pickup, so a second machine can see it is taken
+
+Plugins: team-alpha
+
+[PR #993](https://github.com/DaveKJohn/claude-code-specialists/pull/993)
+
+---
+
 ### DEPLOY: `docs/portable-contributing-floor-v1` · 20260827-164539
 
 Payload only: the portable contributing page and the folder scaffolder. Nothing about this repo's own
