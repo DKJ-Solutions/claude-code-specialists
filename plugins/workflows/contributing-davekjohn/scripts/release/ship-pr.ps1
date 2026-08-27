@@ -301,22 +301,24 @@ Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 # still cannot move before the check is green, so what changes is who holds the session open, not the wait:
 # background this run and the ~12 minutes cost nothing.
 #
-# THE CONDITION IS PRINTED BESIDE THE INVITATION, because the invitation on its own is unsafe. Step 5 runs
-# `git checkout main` in THIS tree, so a session that backgrounds the ship and then starts the next piece of
-# work in the same checkout has HEAD pulled out from under it mid-branch. The lane is the answer measured on
-# August 23, 2026 -- the worktree is where you build, the primary checkout is where you ship -- and it is
-# named here rather than left to the docs, because this is the one moment the reader is about to need it.
+# THE LANE IS PRINTED BESIDE THE INVITATION, AND IT IS NOW ADVICE RATHER THAN A CONDITION. It was a
+# condition when this was written: step 5 ran `git checkout main` in THIS tree, so a session that
+# backgrounded the ship and then started the next piece of work in the same checkout had HEAD pulled out
+# from under it mid-branch. Issue #972 measured that and step 5 now reads HEAD before it moves anything, so
+# the hazard is gone -- what is left is the reason the lane was the right answer anyway, measured on
+# August 23, 2026: the worktree is where you build, the primary checkout is where you ship. Named here
+# rather than left to the docs, because this is the one moment the reader is about to need it.
 #
 # A LINE AND NOT A MECHANISM, deliberately. Three shapes were on the table and this is the smallest: a
 # green-and-unmerged reporter would re-add half of what #984 had deliberately removed five minutes before
 # #985 was filed, and a detached watcher would merge and fold onto the trunk with nobody reading the output.
-# Nothing else in this script changes -- the gates at step 4 already read refs/heads/<branch> for exactly
-# this shape (#970), so the hand-off needed permission and a reminder rather than machinery.
+# The gates at step 4 already read refs/heads/<branch> for exactly this shape (#970), so the hand-off needed
+# permission and a reminder rather than machinery -- and #972 then closed the one place that still wrote.
 $waitBegan = Get-Date
 Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor Cyan
 Write-Host "  Nothing here needs the session -- background this run and the wait costs nothing." -ForegroundColor DarkGray
-Write-Host "  Step 5 checks out main in THIS tree, so the next piece of work opens a lane" -ForegroundColor DarkGray
-Write-Host "  (scripts\task\worktree-lane.ps1 -Name <name>) -- or the session stops here." -ForegroundColor DarkGray
+Write-Host "  Step 5 leaves this checkout where it is, so nothing is pulled out from under you (#972)." -ForegroundColor DarkGray
+Write-Host "  The next piece of work still belongs in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
 $maxWaitSec = 180
 $waited = 0
 while ($true) {
@@ -576,9 +578,125 @@ if ($merge.ExitCode -ne 0) { Write-Error "Merge of PR #$pr failed."; exit 1 }
 Write-Host "ship-pr: PR #$pr merged (--$mergeMethod)." -ForegroundColor Green
 
 # --- Step 5: main + fold + commit + push ---------------------------------------------------------
-$co = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', 'main')
-$co.Output | ForEach-Object { Write-Host $_ }
-if ($co.ExitCode -ne 0) { Write-Error "git checkout main failed."; exit 1 }
+#
+# WHERE HEAD IS, READ BEFORE ANYTHING MOVES (Dave, issue #972, August 27, 2026). This step used to run
+# `git checkout main` unconditionally one line after the merge, on the reasoning that HEAD is still on the
+# shipping branch by now. That holds for a foreground run and fails for the shape this script INVITES:
+# step 3 tells the reader to background the wait, and a session that then works in the same checkout has
+# moved HEAD while CI ran. Measured on git 2.54.0.windows.1, that unconditional line has exactly two
+# outcomes and both are defects:
+#
+#   - THE SESSION'S UNCOMMITTED EDIT COLLIDES with main -> `git checkout main` exits 1 with "Your local
+#     changes to the following files would be overwritten by checkout", HEAD stays put, and this script
+#     exits between the merge and the fold. That is precisely the state the comment further down calls
+#     the one nothing reports: the PR merged, the branch document still in the tree, every gate green
+#     until a release trips over it.
+#   - IT DOES NOT COLLIDE -> exit 0, HEAD moves to main, AND THE UNCOMMITTED WORK TRAVELS WITH IT. The
+#     session is then editing on the trunk with its own work already sitting there, which is the trap
+#     Chris's lens measured on August 10, 2026 with a background task pulling the rug rather than a
+#     previous chain having left you there.
+#
+# SO THE TREE THE FOLD RUNS IN IS CHOSEN RATHER THAN ASSUMED. HEAD still on the shipping branch -- the
+# foreground run, and the lane discipline the ship-pr skill page made the default -- or already on main:
+# nothing about this step changes, down to the command it runs. HEAD anywhere else (another branch, or
+# detached, which reads as 'HEAD'): the session moved, its checkout is not this script's to touch, and
+# the fold runs in a throwaway worktree instead.
+#
+# THE WORKTREE HAS main CHECKED OUT RATHER THAN BEING DETACHED, AND THAT IS FORCED BY TWO MEASUREMENTS.
+# Detached, fold-changelog-entry.ps1's `git push` fails with "fatal: You are not currently on a branch"
+# (exit 128) and would need a HEAD:main push written into a script this change has no business touching.
+# Attached, git refuses the add outright once the primary holds main -- which is why HEAD -eq 'main' folds
+# in place above rather than reaching for a worktree it provably cannot have.
+#
+# IT IS NOT THE ALTERNATIVE worktree-lane.ps1 DECLINED, and that has to be said here because that script
+# says the opposite in as many words. Its declined shape was "fold via whichever worktree HOLDS main", to
+# spare a lane its two hand-back commands: a convenience, weighed against "a change to the single line
+# that produces the state nothing reports", and rightly declined on that trade. This one adds a tree of
+# its own instead of borrowing a lane's, fires only where that single line was ALREADY producing that
+# state, and buys correctness rather than two commands. The decline stands; it is about the other thing.
+#
+# OUTSIDE THE REPO, for worktree-lane.ps1's own measured reason: a worktree inside the tree is walked by
+# the lint gate's link scan and by the test suites, which then report a second copy of the whole repo as
+# findings. A ship is not linting, but a folder left behind by a crashed run outlives the run, and the
+# next gate is what would meet it.
+# THE TAKE-DOWN IS A FUNCTION BECAUSE THREE EXIT PATHS OWE IT, not because it reads better. A failed
+# fetch, a failed ff-only merge and the fold itself all leave this step, and an `exit 1` that skips the
+# removal leaves a worktree holding main -- so the NEXT ship's `git checkout main` fails on a directory
+# nobody remembers creating. Declared before the paths that call it, which is what PowerShell requires.
+function Remove-ShipFoldWorktree {
+    param([string]$Path)
+    if (-not $Path) { return }
+    $rm = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'remove', $Path)
+    if ($rm.ExitCode -eq 0) { return }
+    # A NON-ZERO EXIT HERE DOES NOT MEAN NOTHING HAPPENED -- worktree-lane.ps1 measured that on the
+    # Permission-denied case: git had already emptied the tree AND deregistered the worktree, and failed
+    # only on deleting the now-empty directory. Reporting "still registered" there would send someone
+    # hunting a worktree that is, for every purpose that matters, already gone. So ask git what it thinks
+    # now instead of inferring from the exit code.
+    $rm.Output | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
+    $list = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
+    $wanted = $Path.Replace('/', '\').TrimEnd('\')
+    $stillRegistered = $false
+    if ($list.ExitCode -eq 0) {
+        $stillRegistered = [bool](@($list.Output |
+            Where-Object { $_ -match '^worktree\s+(.+)$' } |
+            ForEach-Object { ($_ -replace '^worktree\s+', '').Trim().Replace('/', '\').TrimEnd('\') } |
+            Where-Object { $_ -ieq $wanted }))
+    }
+    if ($stillRegistered) {
+        Write-Host "ship-pr: the fold worktree is STILL REGISTERED and still holds main -- the next ship will fail on it." -ForegroundColor Red
+        Write-Host "  Remove it: git worktree remove $Path" -ForegroundColor Red
+    } else {
+        Write-Host "ship-pr: the fold worktree is deregistered; only an empty folder is left behind: $Path" -ForegroundColor DarkYellow
+    }
+}
+
+$foldTree = $null
+$headRead = Invoke-NativeCapture -FilePath 'git' -Arguments @('rev-parse', '--abbrev-ref', 'HEAD')
+$headLine = @($headRead.Output | Where-Object { $_ -and "$_".Trim() }) | Select-Object -First 1
+# AN UNREADABLE HEAD TAKES THE WORKTREE ROUTE, deliberately. It is the arm that leaves somebody else's
+# checkout alone, so being wrong about it costs a temporary directory, while being wrong the other way
+# costs the two outcomes above.
+$headNow = if ($headRead.ExitCode -eq 0 -and $headLine) { "$headLine".Trim() } else { '' }
+
+if ($headNow -eq $branch -or $headNow -eq 'main') {
+    $co = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', 'main')
+    $co.Output | ForEach-Object { Write-Host $_ }
+    if ($co.ExitCode -ne 0) { Write-Error "git checkout main failed."; exit 1 }
+} else {
+    $foldTree = Join-Path ([System.IO.Path]::GetTempPath()) "ship-pr-fold-$pr-$PID"
+    Write-Host "ship-pr: HEAD is on '$headNow', not '$branch' -- this checkout moved while CI ran." -ForegroundColor Yellow
+    Write-Host "  Folding in a throwaway worktree instead, so nothing here is touched: $foldTree" -ForegroundColor Yellow
+    $wtAdd = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'add', $foldTree, 'main')
+    $wtAdd.Output | ForEach-Object { Write-Host $_ }
+    if ($wtAdd.ExitCode -ne 0) {
+        $foldScript = Join-Path $PSScriptRoot 'fold-changelog-entry.ps1'
+        Write-Error @"
+PR #$pr IS MERGED but NOT folded -- no worktree on main could be added at $foldTree.
+
+git's own reason is above. The usual one is that another worktree already has main checked out
+("fatal: 'main' is already used by worktree at ..."), and this script will not take it away from one.
+
+The PR is merged, the branch document is still in the tree, and every gate stays green until a
+release trips over it. Fold by hand from any tree standing on an up-to-date main:
+
+  git checkout main; git fetch --prune origin; git merge --ff-only origin/main
+  & "$foldScript" -Branch $branch -Push
+"@
+        exit 1
+    }
+    # GIT'S OWN SPELLING OF THE PATH, not the one composed above. GetTempPath() can hand back an 8.3 short
+    # name (%TEMP% under a service account is what does it) while `git worktree list` reports the long one,
+    # and the two would then never compare equal -- so the take-down would report a worktree as still
+    # registered when git had in fact removed it. Resolved while the directory certainly exists, which is
+    # exactly the moment the take-down no longer can.
+    $resolved = Resolve-Path -LiteralPath $foldTree -ErrorAction SilentlyContinue
+    if ($resolved) { $foldTree = $resolved.ProviderPath }
+}
+# The tree the rest of this step works in: this checkout, or the throwaway worktree. `-C` on every call
+# rather than two copies of the same three commands -- with $foldRoot equal to $repoRoot, which is where
+# this script already stands, it is a no-op and the in-place path runs exactly what it ran before.
+$foldRoot = if ($foldTree) { $foldTree } else { $repoRoot }
 
 # Fetch + an EXPLICIT ff-only merge of origin/main, not a bare `git pull --ff-only` (lesson of
 # July 29, 2026, PR #257). The bare pull aborted with "Cannot fast-forward to multiple branches" on a
@@ -588,13 +706,13 @@ if ($co.ExitCode -ne 0) { Write-Error "git checkout main failed."; exit 1 }
 # than one ref to merge; naming origin/main explicitly hands it exactly one, so this step cannot reach
 # that failure mode, whereas a bare pull depends on whatever FETCH_HEAD happens to hold. Why the pull
 # got more than one ref was deliberately not guessed at -- see Derek's lens for that reasoning.
-$fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', '--prune', 'origin')
+$fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $foldRoot, 'fetch', '--prune', 'origin')
 $fetch.Output | ForEach-Object { Write-Host $_ }
-if ($fetch.ExitCode -ne 0) { Write-Error "git fetch of origin failed."; exit 1 }
+if ($fetch.ExitCode -ne 0) { Remove-ShipFoldWorktree -Path $foldTree; Write-Error "git fetch of origin failed."; exit 1 }
 
-$ff = Invoke-NativeCapture -FilePath 'git' -Arguments @('merge', '--ff-only', 'origin/main')
+$ff = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $foldRoot, 'merge', '--ff-only', 'origin/main')
 $ff.Output | ForEach-Object { Write-Host $_ }
-if ($ff.ExitCode -ne 0) { Write-Error "git merge --ff-only of origin/main failed."; exit 1 }
+if ($ff.ExitCode -ne 0) { Remove-ShipFoldWorktree -Path $foldTree; Write-Error "git merge --ff-only of origin/main failed."; exit 1 }
 
 # The fold, its commit AND its push are all fold-changelog-entry.ps1's job (-Push implies -Commit).
 # This used to be a fold followed by `git add -A` + commit + push right here, and that was a real
@@ -639,8 +757,24 @@ if ($ff.ExitCode -ne 0) { Write-Error "git merge --ff-only of origin/main failed
 # enforces, and the typed merge subject above already makes the pair scannable. A repo on squash that wants
 # the readable arc should switch to merge on its own merits and accept the trailing fold commit.
 Write-Host "ship-pr: folding the changelog entry..." -ForegroundColor Cyan
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'fold-changelog-entry.ps1') -Branch $branch -Push
-if ($LASTEXITCODE -ne 0) { Write-Error "fold-changelog-entry failed -- the fold is NOT committed or NOT pushed. Its own output above says which; do not re-run the fold if it already removed the entry file."; exit 1 }
+# -RepoRoot ONLY on the worktree arm. The flag has been there since #101 and its own param comment names
+# this exact caller -- "a consumer that runs the fold from a temporary/detached worktree (e.g. a
+# ship-pr.ps1 that checks out main elsewhere)" -- so the fold script needed no change for this. It is not
+# passed on the in-place arm even though it would resolve to the same directory: that arm is meant to run
+# what it always ran, and "unchanged behavior below" is what the fold script promises when it is omitted.
+$foldArgs = @(
+    '-NoProfile', '-ExecutionPolicy', 'Bypass',
+    '-File', (Join-Path $PSScriptRoot 'fold-changelog-entry.ps1'),
+    '-Branch', $branch, '-Push')
+if ($foldTree) { $foldArgs += @('-RepoRoot', $foldTree) }
+& powershell @foldArgs
+$foldExit = $LASTEXITCODE
+
+# AND IT COMES DOWN WHETHER THE FOLD SUCCEEDED OR NOT, before the exit code is judged -- the last of the
+# three paths the function above exists for.
+Remove-ShipFoldWorktree -Path $foldTree
+
+if ($foldExit -ne 0) { Write-Error "fold-changelog-entry failed -- the fold is NOT committed or NOT pushed. Its own output above says which; do not re-run the fold if it already removed the entry file."; exit 1 }
 
 # --- Step 6: the issues the PR declared it closes are actually closed -----------------------------
 # Its own script, so this state-MUTATING logic (it comments and closes) is testable against a fake gh

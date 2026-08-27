@@ -76,6 +76,14 @@
     against a change to the single line that produces the state nothing reports. Declined on that
     trade, deliberately, not overlooked.
 
+    THAT DECLINE STILL STANDS, AND ship-pr.ps1's STEP 5 NOW HAS A WORKTREE ARM ANYWAY -- the two are
+    about different things, which is worth saying here because this paragraph reads as though they are
+    not. Declined above: fold via whichever worktree ALREADY HOLDS main, to spare a lane its two
+    hand-back commands. Added there (Dave, issue #972): a THROWAWAY worktree of its own, entered only
+    when HEAD has moved off the shipping branch, because that single line was measured producing the
+    state nothing reports rather than merely risking it. A lane still hands its branch back to the
+    primary to ship it; nothing in this script changed.
+
     WHAT THIS SCRIPT DOES NOT DO:
       - It opens no PR, merges nothing and folds nothing. A lane is a place to work, and shipping
         stays exactly where it was.

@@ -305,9 +305,13 @@ function Invoke-Git {
 }
 
 function Invoke-Fold {
-    param([Parameter(Mandatory = $true)][string]$Dir, [string]$Branch, [string[]]$ExtraArgs = @())
+    # -Root: the tree the fold WRITES to, when that is not the tree its script was copied into. ship-pr.ps1
+    # runs the PRIMARY checkout's copy against a throwaway worktree in exactly this shape (issue #972), so
+    # the two are deliberately separable here instead of always naming the same directory.
+    param([Parameter(Mandatory = $true)][string]$Dir, [string]$Branch, [string[]]$ExtraArgs = @(), [string]$Root)
     $scriptPath = Join-Path $Dir 'scripts\release\fold-changelog-entry.ps1'
-    $callArgs = @('-RepoRoot', $Dir)
+    $callArgs = @('-RepoRoot', $(if ($Root) { $Root } else { $Dir }))
+
     if ($PSBoundParameters.ContainsKey('Branch')) { $callArgs += @('-Branch', $Branch) }
     $callArgs += $ExtraArgs
     $prevPd  = $env:CLAUDE_PROJECT_DIR
@@ -898,6 +902,77 @@ $rPFQ = Invoke-Fold -Dir $dirPFQ -Branch 'feat/allowed'
 Assert-Equal 0 $rPFQ.ExitCode                                                   'fenced: the fold runs'
 Assert-True ((Get-Changelog -Dir $dirPFQ) -match 'Lands normally')              'fenced: and the entry lands'
 Assert-True ((Get-Changelog -Dir $dirPFQ) -match '(?m)^## Pull Requests\s*$')   'fenced: the quoted heading is still there, untouched inside its fence'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "-RepoRoot on a git WORKTREE folds and pushes, and the primary checkout is untouched" -ForegroundColor Cyan
+#      THE MECHANISM ship-pr.ps1's STEP 5 REACHES FOR WHEN THE SESSION'S CHECKOUT HAS MOVED (Dave, issue
+#      #972, August 27, 2026). That step used to run `git checkout main` unconditionally one line after the
+#      merge. Measured on git 2.54.0.windows.1, that has exactly two outcomes on a backgrounded ship: it
+#      REFUSES when the session's uncommitted edit collides ("Your local changes ... would be overwritten"),
+#      leaving the PR merged and unfolded; or it SUCCEEDS and drags HEAD -- and the uncommitted work with it
+#      -- onto the trunk. Step 5 now reads HEAD first and folds in a throwaway worktree when it has moved.
+#      This case is that claim end to end: the REAL fold script, run from the primary's copy exactly as
+#      ship-pr runs it, against a worktree on main, with the primary parked on another branch holding an
+#      uncommitted edit.
+#
+#      -Push IS PART OF THE CLAIM RATHER THAN DECORATION. The detached-worktree alternative was rejected on
+#      a measurement: from a detached HEAD the fold's bare `git push` dies with "fatal: You are not
+#      currently on a branch" (exit 128), and repairing that would mean writing a HEAD:main push into a
+#      script #972 has no business touching. Pushing here is what proves the worktree has main properly
+#      checked out rather than merely pointing at its commit.
+$dirWT = New-FoldFixture -Label 'worktree'
+New-EntryFile -Dir $dirWT -Name 'fix-folds-from-a-worktree.md' -Title 'Folds from a worktree'
+Initialize-FoldGitRepo -Dir $dirWT
+# -M main regardless of the machine's init.defaultBranch: every assertion below names main, and a fixture
+# that happened to init as 'master' would fail on the branch name rather than on the behaviour.
+Invoke-Git -Dir $dirWT -GitArgs @('branch', '-M', 'main')                          | Out-Null
+$bareWT = "$dirWT.git"
+if (Test-Path -LiteralPath $bareWT) { Remove-Item -Recurse -Force -LiteralPath $bareWT }
+$script:fixtures += $bareWT
+Invoke-Git -Dir $dirWT -GitArgs @('init', '--bare', '--quiet', $bareWT)            | Out-Null
+Invoke-Git -Dir $dirWT -GitArgs @('remote', 'add', 'origin', $bareWT)              | Out-Null
+Invoke-Git -Dir $dirWT -GitArgs @('push', '--quiet', '-u', 'origin', 'main')       | Out-Null
+
+# The #972 window, reproduced: the primary moves to the next piece of work and carries an uncommitted edit
+# to a TRACKED file, which is the half that makes the old `git checkout main` either refuse or steal it.
+Invoke-Git -Dir $dirWT -GitArgs @('checkout', '--quiet', '-b', 'feat/next-thing')  | Out-Null
+$wipPath = Join-Path $dirWT 'WIP.md'
+[System.IO.File]::WriteAllText($wipPath, "committed on the branch`n", $Utf8NoBom)
+Invoke-Git -Dir $dirWT -GitArgs @('add', 'WIP.md')                                 | Out-Null
+Invoke-Git -Dir $dirWT -GitArgs @('commit', '--quiet', '-m', 'branch work')        | Out-Null
+$wipText = "UNCOMMITTED, and it has to survive the fold`n"
+[System.IO.File]::WriteAllText($wipPath, $wipText, $Utf8NoBom)
+
+$wtTree = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-worktree-tree"
+if (Test-Path -LiteralPath $wtTree) { Remove-Item -Recurse -Force -LiteralPath $wtTree }
+$script:fixtures += $wtTree
+Invoke-Git -Dir $dirWT -GitArgs @('worktree', 'add', $wtTree, 'main')              | Out-Null
+Assert-True (Test-Path -LiteralPath (Join-Path $wtTree 'CHANGELOG.md')) `
+    'worktree: (fixture) a tree with main checked out stands beside the primary'
+
+$rWT = Invoke-Fold -Dir $dirWT -Branch 'fix/folds-from-a-worktree' -Root $wtTree -ExtraArgs @('-Push')
+Assert-Equal 0 $rWT.ExitCode                                                       'worktree: the fold exits 0'
+$wtChangelog = [System.IO.File]::ReadAllText((Join-Path $wtTree 'CHANGELOG.md'))
+Assert-True ($wtChangelog -match 'Folds from a worktree')                          'worktree: the entry landed in the worktree CHANGELOG.md'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $wtTree 'fix-folds-from-a-worktree.md'))) `
+    'worktree: and the entry file is gone from the worktree'
+$subjectWT = ((Invoke-Git -Dir $wtTree -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
+Assert-True ($subjectWT -match '^fold: fix/folds-from-a-worktree changelog') `
+    'worktree: the fold commit is on main and typed as a fold'
+$remoteWT = ((Invoke-Git -Dir $wtTree -GitArgs @('log', '-1', '--pretty=%s', 'origin/main')) -join '').Trim()
+Assert-Equal $subjectWT $remoteWT `
+    'worktree: -Push reached origin/main -- the bare push works from an ATTACHED worktree'
+
+#      THE TWO ASSERTS THE WHOLE CHANGE EXISTS FOR. Everything above would also pass for a fold that had
+#      quietly checked the primary out to main first, which is precisely the defect.
+Assert-Equal 'feat/next-thing' (((Invoke-Git -Dir $dirWT -GitArgs @('rev-parse', '--abbrev-ref', 'HEAD')) -join '').Trim()) `
+    'worktree: the PRIMARY HEAD never moved'
+Assert-Equal $wipText ([System.IO.File]::ReadAllText($wipPath)) `
+    'worktree: and its uncommitted edit survived byte for byte'
+
+Invoke-Git -Dir $dirWT -GitArgs @('worktree', 'remove', $wtTree)                   | Out-Null
+$wtCount = @((Invoke-Git -Dir $dirWT -GitArgs @('worktree', 'list', '--porcelain')) | Where-Object { $_ -match '^worktree\s+' }).Count
+Assert-Equal 1 $wtCount                                                            'worktree: it comes back down, leaving only the primary registered'
 
 # ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

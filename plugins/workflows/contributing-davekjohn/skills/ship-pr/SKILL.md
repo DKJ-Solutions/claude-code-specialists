@@ -167,11 +167,10 @@ keyboard:
 - **`refs/heads/<branch>` is what step 1 pushed**, on every path through this script — a fresh PR and a resumed
   one alike — so there is nothing extra to do to keep the two in step.
 
-**The wider rule this belongs to still stands: these scripts assume one working tree per session.** The gates
-no longer depend on it, but step 5 does — it checks out the main branch and folds from there, whichever branch
-the session had moved to. Nothing in this workflow locks a checkout — no script claims one, and none ever did.
-Use a second clone or a git worktree if two things really do run at once — which is exactly what the
-section below turns from an option into the default.
+**The wider rule this belongs to has since been closed at its last open point.** These scripts assumed one
+working tree per session; the gates stopped depending on it here, and step 5 stopped depending on it in
+[#972](https://github.com/DaveKJohn/claude-code-specialists/issues/972). Nothing in this workflow locks a
+checkout — no script claims one, and none ever did. What changed is that no script silently moves one either.
 
 ## The wait runs in the background, and that is the default
 
@@ -184,17 +183,28 @@ the CI leg has a median of **8m 01s**, which at 73 merged PRs in a week is **9h 
 spent watching a second opinion. Dave, [issue #985](https://github.com/DaveKJohn/claude-code-specialists/issues/985):
 *"dit kan gewoon gerust in de achtergrond verder draaien"*.
 
-**One condition comes with it, and it is not optional.** Step 5 runs `git checkout main` in the tree the
-script was started from. So the session's next move is one of exactly two things:
+**One habit comes with it, and it is no longer a condition.** So the session's next move is one of two
+things:
 
 - **open the next branch as a lane** — `worktree-lane.ps1 -Name <name>`, the
   [`worktree-lane` skill](../worktree-lane/SKILL.md); or
 - **stop.** A close-out that says *"PR #N opened, shipping in the background"* is a finished assignment,
   not an open point — nothing about an in-flight ship needs answering before the session can be closed.
 
-Anything else in the primary checkout gets `HEAD` pulled out from under it mid-branch. That is the same
-one-tree-per-session rule as above, read forwards instead of backwards: the gates were hardened for this
-window, step 5 was not.
+**Working in the primary anyway used to cost you your checkout, and no longer does.** Step 5 ran
+`git checkout main` in the tree the script was started from, unconditionally, one line after the merge.
+Measured on git 2.54.0.windows.1 for
+[#972](https://github.com/DaveKJohn/claude-code-specialists/issues/972), that had exactly two outcomes:
+
+| the tree when the merge lands | `git checkout main` |
+|---|---|
+| an uncommitted edit that collides with the trunk | **exit 1** — `"Your local changes ... would be overwritten by checkout"`. The run stops between the merge and the fold: PR merged, branch document still in the tree, every gate green until a release trips over it |
+| an uncommitted edit that does not collide | **exit 0** — `HEAD` moves to the trunk **and the uncommitted work travels with it**, so the session carries on editing on `main` with its own work already sitting there |
+
+Step 5 now reads `HEAD` first. Still on the shipping branch, or already on the trunk: it runs exactly what
+it always ran. Anywhere else: it leaves your checkout alone and folds in a throwaway `git worktree` on the
+trunk instead, then takes it down again. The lane is still the better move — it is where you build, and it
+keeps one tree doing one thing — but forgetting it now costs a temporary directory rather than your work.
 
 **What this deliberately is not.** Two larger shapes were named and declined when the default was written
 down. A *green-and-unmerged reporter* at session start would re-add half of a status reporter the source
