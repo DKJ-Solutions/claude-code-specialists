@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/adopt-act-on-this-skills-v1` · 20260827-110818
+
+Two built-in skills that look like a pair are split along the line that actually separates them:
+`code-review` **reports**, `simplify` **applies**. The reporting skill was wired into two reviewers with
+its flags unmentioned, and the applying skill was mentioned nowhere in the repo at all — so this closes
+both halves at once. Victor #19 and Edith #17 are now told that `--fix` and `--comment` sit outside their
+boundary rather than inside their tooling; Cody #13 gains `simplify` as the author's tidy pass before the
+handover; and Chris's routing plus Sylvester's lens name Sylvester the author who runs it here, because
+in this repo the code is `scripts/**`.
+
+For somebody maintaining this repo that is two concrete answers where there were none: a review never
+reaches for either flag, and "tidy this up" routes to the author rather than to the reviewer. Nothing
+already written stops working, which is what keeps this at 3 — it is noticed the moment somebody runs a
+review or finishes a script, not before.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo receives the portable half through the next release, and only one third of it is
+observable there: **Cody hands over tidied code where he previously handed over untidied code.** The other
+two thirds prevent a failure rather than deliver a feature, and the rubric asks for that failure to be
+named — a reviewer who reaches for `code-review --fix` has silently applied his own findings, which is the
+exact act his boundary forbids, and one who reaches for `--comment` has written on a PR that belongs to
+the git role. Neither had anything telling them so.
+
+Sylvester's half deliberately does not travel. His shipped scope is the harness; `scripts/**` is this
+repo's own extension to it, so naming him the script author in the portable layer would have claimed that
+authorship in consumers that never granted it.
+
+**Score:** 2
+
+#### Pull Request
+
+Adopt the two 'Act on this' built-in skills into the specialists chain
+
+Plugins: team-alpha
+
+[PR #964](https://github.com/DaveKJohn/claude-code-specialists/pull/964)
+
+---
+
 ### DEPLOY: `fix/fold-legacy-entry-level-v1` · 20260827-104841
 
 The fold brought a legacy entry to the current heading level by rewriting its first line, and it found that
