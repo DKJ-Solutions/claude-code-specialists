@@ -14,7 +14,7 @@
     findings sat OPEN while the changelog said they were done. The instance was cleaned up by hand;
     this lib is the class being closed (Dave's standing rule: build the gate, not just the fixes).
 
-    The second group (Get-CheckWaitReport and its two helpers) arrived for the same reason from the
+    The second group (Get-CheckWaitReport and its three helpers) arrived for the same reason from the
     other end: ship-pr.ps1 drives `gh pr checks --watch` against a live remote, and issue #831 asked
     for the wait to SAY which check governed it. The query cannot be tested and the selection can, so
     the selection lives here -- see that function's own header for the measurement behind it.
@@ -494,22 +494,70 @@ function ConvertTo-CheckTimestamp {
         Parsed with InvariantCulture and AdjustToUniversal, so two checks are compared on the same clock
         regardless of the machine's locale. Returns $null rather than throwing: an unreadable timestamp
         means this record cannot take part in the ordering, which the caller handles.
+
+        THE ZERO TIME IS UNREADABLE, and it is the third shape rather than a corner case. `gh pr checks
+        --json completedAt` serialises a check that has NOT FINISHED YET as `0001-01-01T00:00:00Z` -- not
+        as null, not as an empty string. Both branches below turn that into a real [datetime], which is
+        not $null, so the caller's own "$null -eq $done" guard did not fire and the arithmetic after it
+        ran against the floor of the type. Measured as issue #977 in a consumer repo: the [int] cast in
+        Get-CheckWaitReport overflowed on -63,923,427,029 seconds and killed a ship-pr run AFTER it had
+        printed `CI green.` and BEFORE the merge -- the PR unmerged, the entry unfolded, every check
+        green. The wait step is the one place in the script that is guaranteed to be racing GitHub, so
+        any check that registers while --watch is returning is in that window.
+
+        Tested on the YEAR rather than on equality with [datetime]::MinValue, because the two are not the
+        same test. A MinValue of Kind Unspecified sent through ToUniversalTime lands NEAR the floor and
+        not on it -- clamped back to MinValue where the machine's offset is positive, shifted UP by the
+        offset where it is negative -- so an equality test would hold in Amsterdam and miss in New York.
+        No CI check ran in year 1.
     #>
     param($Value)
 
     if ($null -eq $Value) { return $null }
-    if ($Value -is [datetime]) { return $Value.ToUniversalTime() }
 
-    $text = [string]$Value
-    if (-not $text.Trim()) { return $null }
-    try {
-        return [datetime]::Parse(
-            $text,
-            [System.Globalization.CultureInfo]::InvariantCulture,
-            [System.Globalization.DateTimeStyles]::AdjustToUniversal)
-    } catch {
-        return $null
+    $stamp = $null
+    if ($Value -is [datetime]) {
+        $stamp = $Value.ToUniversalTime()
+    } else {
+        $text = [string]$Value
+        if (-not $text.Trim()) { return $null }
+        try {
+            $stamp = [datetime]::Parse(
+                $text,
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [System.Globalization.DateTimeStyles]::AdjustToUniversal)
+        } catch {
+            return $null
+        }
     }
+
+    if ($stamp.Year -le 1) { return $null }
+    return $stamp
+}
+
+function ConvertTo-CheckSeconds {
+    <#
+    .SYNOPSIS
+        A [timespan] between two check timestamps as a whole number of seconds an [int] can hold, or -1
+        when it cannot -- the value Get-CheckWaitReport and Format-CheckDuration both read as unmeasured.
+
+    .DESCRIPTION
+        ROUND FIRST, RANGE-CHECK, CAST LAST. Exists because the reverse order was written twice, at both
+        arithmetic sites in Get-CheckWaitReport, and `[int][math]::Round(...)` throws on an out-of-range
+        double before any guard on the next line can look at it -- so the sanity check that WAS there
+        ("if ($ran -lt 0) { $ran = -1 }") was unreachable by construction (issue #977).
+
+        ConvertTo-CheckTimestamp above closes the door that defect actually came through, and this closes
+        the class: a payload carrying a readable but absurd timestamp (a far-future completedAt) is still
+        a span no [int] holds, from the same untrusted field, and it would reach the same cast. Returning
+        -1 keeps the failure in the vocabulary the callers already speak, so a duration this cannot
+        render is simply left out of the line instead of aborting the run that was printing it.
+    #>
+    param([timespan]$Span)
+
+    $seconds = [math]::Round($Span.TotalSeconds)
+    if ($seconds -lt 0 -or $seconds -gt [int]::MaxValue) { return -1 }
+    return [int]$seconds
 }
 
 function Get-CheckWaitReport {
@@ -572,10 +620,7 @@ function Get-CheckWaitReport {
 
         $ran = -1
         $began = ConvertTo-CheckTimestamp -Value $r.startedAt
-        if ($null -ne $began) {
-            $ran = [int][math]::Round(($done - $began).TotalSeconds)
-            if ($ran -lt 0) { $ran = -1 }
-        }
+        if ($null -ne $began) { $ran = ConvertTo-CheckSeconds -Span ($done - $began) }
         $finished += [pscustomobject]@{ Name = [string]$r.name; Completed = $done; Ran = $ran }
     }
     if ($finished.Count -eq 0) { return $null }
@@ -624,7 +669,7 @@ function Get-CheckWaitReport {
             Where-Object { $required -contains $_.Name } |
             Sort-Object -Property Completed -Descending)
         if ($lastRequired.Count -gt 0) {
-            $excess = [int][math]::Round(($governing.Completed - $lastRequired[0].Completed).TotalSeconds)
+            $excess = ConvertTo-CheckSeconds -Span ($governing.Completed - $lastRequired[0].Completed)
             if ($excess -gt 0) {
                 $parts += "$(Format-CheckDuration -Seconds $excess) after the last required check ('$($lastRequired[0].Name)')"
             }
