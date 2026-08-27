@@ -536,8 +536,15 @@ function Get-ReleasePluginTier {
 # would have made the list describe a root that no longer exists, and it would have SILENCED the one
 # signal worth having: a QUICKSTART.md reappearing in the root now means somebody moved it back by
 # accident, and cut-release should say so rather than wave it through.
+# AND CONTRIBUTING.md IS OFF IT TOO, AUGUST 27, 2026 (Dave), for the same reason and by a fourth route:
+# it did not move, it was DELETED. The root page stated the same floor CLAUDE.md states -- never directly
+# on main, branch + PR, the required CI check -- while loading on no session of its own, so the layering
+# it was built for now runs CLAUDE.md -> contributing-davekjohn/CONTRIBUTING.md with nothing in between.
+# THE SCRIPT'S OWN FALLBACK STILL LISTS IT AND MUST: that list serves a consumer who declares no answer
+# here, and a consumer keeps its root CONTRIBUTING.md. This function is this repo's answer, not theirs --
+# the contract marks it 'decide' precisely so adopt-config never copies it into anybody's seam.
 $script:ReservedRootMd = @(
-    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md',
+    'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'SECURITY.md',
     # INSTALL.md and UNINSTALL.md moved here from plugins/ on August 14, 2026 (inbound #664). They are
     # install plumbing, not plugin payload, so the folder boundary is what keeps them out of the set
     # published to a business marketplace -- the same reason connectors/ sits at the root. Listing them

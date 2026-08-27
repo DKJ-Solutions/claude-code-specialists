@@ -7,7 +7,7 @@ set of answers** to them.
 
 | here | what it holds | portable half |
 |---|---|---|
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **the centre of this folder** — the workflow's contributing layer AND the working rules a session needs here, merged into one page on August 26, 2026 (#886). It wins over both the [root CONTRIBUTING.md](../CONTRIBUTING.md) and the [root CLAUDE.md](../CLAUDE.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md) |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **the centre of this folder** — the workflow's contributing layer AND the working rules a session needs here, merged into one page on August 26, 2026 (#886). It wins over the [root CLAUDE.md](../CLAUDE.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md) |
 | `development-cycle.md` | the branch's own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-portable.md`](../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md) |
 | [`releases/`](releases/) | the release history and the published audience notes | [`RELEASES-portable.md`](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md) |
 

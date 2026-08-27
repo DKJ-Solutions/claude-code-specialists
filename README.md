@@ -24,7 +24,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
-| **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the standard branch + PR workflow, which holds with no plugin installed; the entry, the fold and the cut are the layer on top, in [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) |
+| **contribute a change** | [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) — the branch, the entry, the fold and the cut, arranged as the steps work moves through. The branch + PR rule underneath it holds with no plugin installed and is stated in [`CLAUDE.md`](CLAUDE.md) |
 | see **the version history** | [`releases/README.md`](releases/README.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
@@ -300,7 +300,7 @@ The full picture, top-level folder by folder:
   body import, the lens import and the roster), `specialists/lenses/` (this repo's own repo lenses),
   the Specialists handbook `specialists/README.md` next to them, `rules/` (path-scoped rules), and
   `settings.json` (harness config; see [Consumption](#consumption)).
-- **The root documents** — this `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `CONTRIBUTING.md` and
+- **The root documents** — this `README.md`, `CLAUDE.md`, `CHANGELOG.md` and
   `SECURITY.md`, plus the two consumer-facing procedures [`INSTALL.md`](INSTALL.md) and
   [`UNINSTALL.md`](UNINSTALL.md) — those sat a level down beside the plugins until
   [#664](https://github.com/DaveKJohn/claude-code-specialists/issues/664) moved them here, which is
@@ -309,7 +309,7 @@ The full picture, top-level folder by folder:
   **`.github/`** (`pull_request_template.md`, the issue templates + three workflows: `workflows/ci.yml`,
   the CI gate that runs the lint + test suites on every PR and push to `main`, plus
   `workflows/claude.yml` and `workflows/claude-code-review.yml`, which answer an `@claude` mention and
-  review each PR. Only `ci.yml`'s job blocks a merge; see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
+  review each PR. Only `ci.yml`'s job blocks a merge; see [`CLAUDE.md`](CLAUDE.md)).
 
 ## Consumption
 
@@ -1247,12 +1247,27 @@ its own marketplace. See [One product, one repository](#one-product-one-reposito
 ## Contributing
 
 Changes to this repo go through a branch + Pull Request to `main`, and that much holds whether or not
-any plugin is installed — it is [`CONTRIBUTING.md`](CONTRIBUTING.md), the standard workflow, three
-rules long. **The branch dossier, the changelog entry that folds at the merge, the significance model
-and the release cut are the `contributing-davekjohn` layer on top**, and they are described in
+any plugin is installed — it is in [`CLAUDE.md`](CLAUDE.md), which every session loads. **The branch
+dossier, the changelog entry that folds at the merge, the significance model and the release cut are the
+`contributing-davekjohn` layer on top**, and they are described in
 [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) — this repo's answers — over
 [`CONTRIBUTING-portable.md`](plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md), the half
 that travels with the plugin. Where the two disagree, the plugin's page wins.
+
+**There is no root `CONTRIBUTING.md` here, and that is this repo's own answer rather than the
+workflow's** (Dave, August 27, 2026). One existed from August 14 as the plugin-independent floor, and
+what retired it is that `CLAUDE.md` states that same floor — the trunk rule, the required
+`lint-en-tests` check, the three valid branch prefixes — on the path every session already reads. A
+second copy of three rules is a thing to keep in sync, not a safety net, and the layering argument it
+was built on survives without it: the always-on document holds what is true regardless, the folder page
+adds what the workflow brings, and the folder page still wins on conflict.
+
+**A consuming repo is a different case and keeps its own root page.** `adopt-workflow-folder` still
+scaffolds a folder layer that sits on top of one, and
+[`CONTRIBUTING-portable.md`](plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md) still
+recommends the two-layer shape — because [the plugin serves the consumer's
+repo](#the-plugin-serves-the-consumers-repo), so housekeeping done here is never a norm anybody
+downstream inherits.
 
 The governance is in [`CLAUDE.md`](CLAUDE.md): the safety rules, the three direct-on-`main` exceptions
 and their bounds, and this repo's own gates. **The roster and the routing are not there** — they sit

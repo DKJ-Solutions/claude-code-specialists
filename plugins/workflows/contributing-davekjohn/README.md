@@ -22,8 +22,13 @@ and none of them is advisory.
 file.** That is the page to read — and the page to point your own contributors at — because it names the
 seam wherever your repo owns the answer instead of asserting one repo's answer as the rule. Pair it with a
 `## Specific to this repo` section in your own root `CONTRIBUTING.md` holding your values; the source repo's
-[own answers](https://github.com/DaveKJohn/claude-code-specialists/blob/main/CONTRIBUTING.md) are a worked
-example of that half.
+[own answers](https://github.com/DaveKJohn/claude-code-specialists/blob/main/contributing-davekjohn/CONTRIBUTING.md)
+are a worked example of that half.
+
+**One difference to know before you copy the source's shape: it has no root `CONTRIBUTING.md` at all**
+(August 27, 2026). It keeps that floor in its `CLAUDE.md` and its answers in the folder page linked
+above. That is one repo's housekeeping rather than the model — `CONTRIBUTING-portable.md` still
+recommends the root page, and says why.
 
 **And if your work arrives from somebody else's tracker, the cycle starts earlier than `new-branch`.**
 [`TICKETWORK-portable.md`](TICKETWORK-portable.md) covers that layer: how to tell a request that cannot be

@@ -235,11 +235,24 @@ gates on the branch dossier, how those three exceptions actually run, the measur
 
 **That folder used to carry two pages and now carries one** (August 26, 2026,
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)): a `CONTRIBUTING.md` layering over
-the root [`CONTRIBUTING.md`](CONTRIBUTING.md) since August 14, 2026 (Dave), and a `CLAUDE.md` layering over
+the root `CONTRIBUTING.md` since August 14, 2026 (Dave), and a `CLAUDE.md` layering over
 this file since August 19. They said the same thing about their own layering twice, so they merged into the
-one page linked above — which now layers over **both** root documents. The reason the layer exists at all is
-unchanged and is the one the two moves before it give: this file loads on **every** session, the folder page
-only when a session touches that folder.
+one page linked above. The reason the layer exists at all is unchanged and is the one the two moves before
+it give: this file loads on **every** session, the folder page only when a session touches that folder.
+
+**And the root document it layers over is now this one alone** (Dave, August 27, 2026). The root
+`CONTRIBUTING.md` was deleted: the floor it held — never directly on `main`, a branch + PR, the required
+CI check — is stated in this section, on the path every session already loads, so the page was a second
+copy of three rules whose first copy is above. **The layering argument is untouched by that** and is why
+the deletion is safe rather than a hole: what the root holds is what is true regardless of any plugin,
+and that is this file. Nothing moved down into the folder page.
+
+**It is this repo's answer and not the workflow's, and that distinction is load-bearing.**
+`adopt-workflow-folder` still scaffolds a folder page that sits on top of a consumer's own root
+`CONTRIBUTING.md`, and `CONTRIBUTING-portable.md` still recommends the two-layer shape, because
+[the plugin serves the consumer's repo](README.md#the-plugin-serves-the-consumers-repo). A consumer
+inherits the shape — a floor plus a workflow layer — never this repo's housekeeping of which file holds
+the floor.
 
 The constitution above, concretely implemented here:
 

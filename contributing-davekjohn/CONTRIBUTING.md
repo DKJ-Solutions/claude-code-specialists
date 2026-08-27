@@ -6,13 +6,19 @@ a `CLAUDE.md` holding the workflow's mechanics — and they merged on August 26,
 contributing-davekjohn folder has no use as well. I want to merge that file with CONTRIBUTING as one
 complete CONTRIBUTING file. Because that should be the center of this folder."*
 
-**It sits on top of two root pages, and wins over both on conflict** (Dave, August 14, 2026): the repo's own
-[`CONTRIBUTING.md`](../CONTRIBUTING.md) and its [`CLAUDE.md`](../CLAUDE.md). Those two describe what holds
+**It sits on top of one root page, and wins over it on conflict** (Dave, August 14, 2026; narrowed to one
+page on August 27): the repo's own [`CLAUDE.md`](../CLAUDE.md). That page describes what holds
 here whether or not this plugin is installed — never directly on `main`, branch + PR, CI green, and the three
 direct-on-`main` exceptions with their bounds. This page carries what the **workflow** adds: the four gates,
 how those three exceptions actually run, and the measurements behind them.
 
-The split is worth what it costs for the reason the root pages give: the root loads on **every** session,
+It was two root pages until August 27, 2026, when the root `CONTRIBUTING.md` was deleted (Dave). It stated
+the same floor `CLAUDE.md` states while loading on no session of its own, so what went was a duplicate
+rather than a layer. **A consuming repo still has both root pages, and the scaffolded version of this page
+still says so** — the deletion is this repo's answer to where its own floor lives, not a change to the
+workflow.
+
+The split is worth what it costs for the reason the root page gives: the root loads on **every** session,
 this page only when a session touches this folder. A rule that bites only while the workflow is in play does
 not belong on the always-on path.
 
