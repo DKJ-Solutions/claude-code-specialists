@@ -120,16 +120,46 @@ foreach ($rel in @('.claude\settings.json', '.claude\settings.local.json')) {
     }
 }
 
+# THE ADVICE IS GATED ON THE SEAM, AND THAT IS THE WHOLE POINT OF THIS BLOCK (inbound #994, August 27,
+# 2026). It used to be one unconditional message calling the shipped guard "the superset", on the
+# reasoning that it matches Bash|PowerShell where a hand-written one usually matches Bash only. That
+# reasoning is about the MATCHER; the id rule is about the RULES, and this file's own header states the
+# consequence: a repo that never answered Get-ShopifyLiveThemeId has a shipped guard that does not
+# recognise a push aimed at live BY ID. A hand-written guard that matches Bash only and DOES know the
+# live id therefore covers a case the shipped one does not -- the two are complementary there, not
+# superset and subset. Telling that repo to remove its own guard, on a line calling removal "a safety
+# improvement", opens the push-at-the-live-id vector, and it fails silently: the hook keeps running,
+# everything keeps working, and only a push naming live by its number starts getting through.
+#
+# NOT A HYPOTHETICAL ORDERING. The consumer that filed this had answered the seam FIRST and re-measured
+# the superset before removing its local guard. The ordering was deliberate there; nothing in this
+# message asked for it.
 if ($dupes.Count -gt 0) {
     $where = (($dupes | Sort-Object -Unique) -join ' and ')
-    Write-Host ("[ERROR] team-shopify: a second live-theme guard is registered in $where, so two " +
+    $common = ("[ERROR] team-shopify: a second live-theme guard is registered in $where, so two " +
         "PreToolUse hooks run one job on every command. The plugin registers its own through its own " +
-        "hooks.json -- yours is the extra one. The shipped guard is the superset (it matches " +
-        "Bash|PowerShell where a hand-written one usually matches Bash only), so converging is a " +
-        "safety improvement rather than housekeeping: remove your PreToolUse entry and your own " +
-        "script, and keep your test suite pointed at the shipped copy. Your existing authorisation " +
-        "marker keeps working -- any marker ending in 'LIVE-PUSH-AUTHORIZED' is accepted. See " +
-        "'Converging off a hand-written guard' in the team-shopify README.")
+        "hooks.json -- yours is the extra one. ")
+    if ($liveId) {
+        Write-Host ($common +
+            "This repo has answered Get-ShopifyLiveThemeId, so the shipped guard is the superset (it " +
+            "matches Bash|PowerShell where a hand-written one usually matches Bash only, and all three " +
+            "of its rules are armed), and converging is a safety improvement rather than housekeeping: " +
+            "remove your PreToolUse entry and your own script, and keep your test suite pointed at the " +
+            "shipped copy. Your existing authorisation marker keeps working -- any marker ending in " +
+            "'LIVE-PUSH-AUTHORIZED' is accepted. See 'Converging off a hand-written guard' in the " +
+            "team-shopify README.")
+    } else {
+        Write-Host ($common +
+            "ANSWER Get-ShopifyLiveThemeId BEFORE YOU CONVERGE, and read the line above this one. Until " +
+            "this repo says which theme is live, the shipped guard does not recognise a push aimed at " +
+            "live BY ID -- so if your own guard does know the id, it is covering a case the shipped one " +
+            "is not, and removing it now would open that vector silently rather than tidy up a " +
+            "duplicate. Answer the seam, confirm the shipped guard blocks a push at the live id, and " +
+            "then converge: remove your PreToolUse entry and your own script, keeping your test suite " +
+            "pointed at the shipped copy. Your existing authorisation marker keeps working -- any " +
+            "marker ending in 'LIVE-PUSH-AUTHORIZED' is accepted. See 'Converging off a hand-written " +
+            "guard' in the team-shopify README.")
+    }
 }
 
 exit 0

@@ -200,6 +200,14 @@ twice and nothing looks broken. What made it invisible in practice is worth know
 
 The floor session check now says so once per session. The route off it:
 
+**0. Answer `Get-ShopifyLiveThemeId` first, if you have not.** This step is numbered zero because it
+comes before the other three, and it is the one that makes the rest safe. The shipped guard's third rule
+has two triggers, and only `--allow-live` is self-declaring: a push aimed at live **by id** is
+recognised only where the repo has said which id that is. So in a repo that has not answered the seam,
+the shipped guard is *not* a superset of a hand-written one that does know the id — the two are
+complementary, and converging first would remove the only cover that case has. The floor session check
+says which of the two situations you are in.
+
 1. **Remove your own `PreToolUse` entry** from `.claude/settings.json`, and then your own script. The
    plugin's guard needs no registration from you — enabling `team-shopify` is the registration.
 2. **Keep your test suite**, pointed at the shipped copy. It is the part of a hand-written guard that
@@ -210,10 +218,16 @@ The floor session check now says so once per session. The route off it:
    Confirm that before you delete anything; set `Get-ShopifyLivePushMarker` only if you want to narrow
    to your spelling alone.
 
-**Converging is a safety improvement, not housekeeping**, which is why it is written down rather than
-tolerated: the shipped guard matches `Bash|PowerShell` where a hand-written one typically matches `Bash`
-only, and it carries the false-positive lesson below that the first hand-written version had to learn on
-its own. It is a superset in what it catches.
+**Converging is a safety improvement, not housekeeping, ONCE THE SEAM IS ANSWERED** — which is why it is
+written down rather than tolerated: the shipped guard matches `Bash|PowerShell` where a hand-written one
+typically matches `Bash` only, and it carries the false-positive lesson below that the first hand-written
+version had to learn on its own. It is a superset in what it catches.
+
+**That sentence used to carry no condition** (inbound #994, August 27, 2026), and the reason it needed
+one is worth keeping: the superset argument is about the **matcher**, and the id trigger is about the
+**rules**. A guard can be narrower in the first and wider in the second at the same time, which is
+exactly the state an unanswered seam produces. The failure direction is silent — the hook keeps
+running, everything keeps working, and only a push naming live by its number starts getting through.
 
 The removal stays **your** keystroke. `adopt-shopify-floor` will not do it: taking a `PreToolUse` entry
 out of somebody's settings is a deletion, and a consumer who ends up with *no* guard because a script
