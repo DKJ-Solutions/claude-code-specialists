@@ -19,12 +19,17 @@
         plugins/                          the plugin folders the filtered manifest points at, plus
                                           teams/agent-shared/ (the source of the generated shared
                                           blocks) and the README/ADOPTION pages
-        README.md, LICENSE, CHANGELOG.md  context for whoever opens the business repo
+        README.md, LICENSE                context for whoever opens the business repo
+        contributing-davekjohn/CHANGELOG.md   the changelog, at the path it has had since August 27, 2026
         .github/ISSUE_TEMPLATE/           the inbound path the docs link to
         .gitignore, .gitattributes        so a clone behaves the same
 
-    WHAT DOES NOT. scripts/, .claude/, connectors/, releases/, contributing-davekjohn/, CLAUDE.md,
-    CONTRIBUTING.md, SECURITY.md. That is the maintainer's half of this repo and Claude never reads
+    WHAT DOES NOT. scripts/, .claude/, connectors/, CLAUDE.md, SECURITY.md, and the whole of
+    contributing-davekjohn/ EXCEPT its CHANGELOG.md -- which is named as its own published path above
+    rather than travelling with the folder. That is one file out of a maintainer's folder, and it is
+    there because the changelog is context for whoever opens the business repo wherever this repo
+    happens to keep it (August 27, 2026: it moved into that folder together with CONTRIBUTING.md and
+    the release history, none of which travel). That is the maintainer's half of this repo and Claude never reads
     it from the marketplace. Keeping it out is what makes the published repo ~150 files instead of
     ~370, and it is also the reason the published repo can be private without giving colleagues
     anything to be confused by.
@@ -165,7 +170,7 @@ $PublishedPaths = @(
     'plugins'
     'README.md'
     'LICENSE'
-    'CHANGELOG.md'
+    'contributing-davekjohn/CHANGELOG.md'
     '.github/ISSUE_TEMPLATE'
     '.gitignore'
     '.gitattributes'

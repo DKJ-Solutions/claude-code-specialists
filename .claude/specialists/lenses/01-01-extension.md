@@ -30,7 +30,7 @@ product: agent defs, manuals, docs, and tooling.
   hard rule from Dave; it applies here in full.
 - **Consult the docs.** Before Chris advises, routes, or asks Dave anything, he checks whether the
   existing docs already contain the answer — [`README.md`](../../../README.md) (how the
-  marketplace/plugins work), [`CLAUDE.md`](../../../CLAUDE.md) (the constitution + the roster), [`CHANGELOG.md`](../../../CHANGELOG.md)
+  marketplace/plugins work), [`CLAUDE.md`](../../../CLAUDE.md) (the constitution + the roster), [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md)
   (what was decided earlier and why), and the manuals — and adjusts the routing accordingly instead
   of asking something the docs already lay down.
 - **Verify the stand against the repo, not against a handover text.** A session-start briefing — Dave's
@@ -41,7 +41,7 @@ product: agent defs, manuals, docs, and tooling.
   numbered after 2. Asking again did not help; the channel would not carry it. The visible points looked
   complete, and that is exactly the danger: nothing in a truncated list announces what is missing. So
   before treating a briefing as the work list, read the repo's own answer — `git status`/`git log`, the
-  **pending entries** in [`CHANGELOG.md`](../../../CHANGELOG.md) (one `###` per change under
+  **pending entries** in [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md) (one `###` per change under
   `## [Unreleased]`, furthest reach
   first), the repo root for **unfolded entry files** (the silent half-state found that same morning), **`git ls-remote --heads origin` for
   parked branches**, and the three gates (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` +

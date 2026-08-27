@@ -103,12 +103,12 @@ and safe hook construction.
   INSTALL.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
-## Eight PowerShell traps that produce well-formed wrong output
+## Nine PowerShell traps that produce well-formed wrong output
 
-All eight were measured in this system, not read about, and they share the property that makes them
+All nine were measured in this system, not read about, and they share the property that makes them
 expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
 something other than what the author meant. None is caught by a linter, so each is worth an assert.
-Seven are PowerShell's own; the eighth is the same class one layer out, in the tooling you reach for
+Eight are PowerShell's own; the last is the same class one layer out, in the tooling you reach for
 to repair a PowerShell file.
 
 - **`[ordered]@{ 2 = '...' }`'s indexer takes a positional index as well as a key.** For an integer the
@@ -190,12 +190,26 @@ to repair a PowerShell file.
   wins. `.GetNewClosure()` is not the fix here: it puts the block in a new dynamic module whose scope chain
   reaches the global scope rather than the dot-sourced lib's, so a body calling a sibling lib function stops
   resolving it. Trading a silent wrong value for a `CommandNotFoundException` is a trade, not a repair.
+- **Dot-sourcing shares one script scope, so a config lib's backing variable and a caller's local of the
+  same name are the same variable.** `$script:` resolves to the scope the function was *defined* in, and
+  dot-sourcing makes that the caller's — so a lib holding `$script:ChangelogPath` behind a
+  `Get-ChangelogPath`, dot-sourced by a script that then writes `$changelogPath = <something local>`, has
+  had its seam silently repointed. Names are case-insensitive, so the two do not even have to look alike.
+  Measured on a test suite that dot-sourced the repo config and assigned a local of that name three lines
+  after reading the seam: the next call returned the test's own absolute path instead of the repo-relative
+  answer. **It failed visibly only because a later assert used the value** — a caller that merely *reads*
+  the seam after such an assignment gets a wrong answer with nothing to notice. **The remedy is on the
+  caller's side: do not name a local after a function you are calling.** The lib cannot save you, and a
+  config lib whose variables are named `$script:<what the getter returns>` is right to keep that
+  convention — one variable renamed for safety while its neighbours keep the pattern reads as a mistake
+  and teaches nothing. There is no scoping operator that fixes it either, which is why it is a naming rule
+  rather than a mechanism.
 - **A `sed` substitution meant to write a code-point escape can silently write the wrong literal instead.**
   GNU `sed`'s replacement syntax treats `\u` as "uppercase the next character," not as a code-point escape —
   so `sed -i 's/\[-–—,\]/[-\u2013\u2014,]/'` consumed the backslash before each escape and wrote the literal
   `[-20132014,]` into the `.ps1` file: a character class of the hyphen, the digits 0 through 4, and a
   comma — valid PowerShell, valid regex, completely wrong answer. Measured on GNU sed 4.9, reproduced
-  exactly. What makes this belong beside the six traps above rather than merely near them: the very check
+  exactly. What makes this belong beside the traps above rather than merely near them: the very check
   that catches this class of mistake **in the source** — the script-layer ASCII gate — cannot catch it
   **here**, because the mangled output is itself pure ASCII. The defect was in the tool performing the
   repair the gate asks for, not in anything the gate reads afterward. **Compose the character from

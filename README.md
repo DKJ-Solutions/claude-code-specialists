@@ -24,8 +24,8 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
-| **contribute a change** | [CONTRIBUTING.md](CONTRIBUTING.md) — the standard branch + PR workflow, which holds with no plugin installed; the entry, the fold and the cut are the layer on top, in [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) |
-| see **the version history** | [`releases/README.md`](releases/README.md) |
+| **contribute a change** | [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) — one page: the standard branch + PR workflow, which holds with no plugin installed, and the entry, the fold and the cut layered on top of it |
+| see **the version history** | [`releases/history.md`](contributing-davekjohn/releases/history.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
 architecture record as much as the landing page. **[INSTALL.md](INSTALL.md) holds both
@@ -286,21 +286,25 @@ The full picture, top-level folder by folder:
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `team-alpha`, the
   branch/release workflow in `contributing-davekjohn` — see its own
   [README](plugins/workflows/contributing-davekjohn/scripts/README.md).
-- **`releases/`** — what a cut *generated*: `development/<X>.x/<X.Y.Z>.md` (the complete note per
-  version) and `github/<X>.x/<X.Y.Z>.md` (that version's GitHub Release body), described in
-  [`releases/README.md`](releases/README.md) — **which also carries the dated list of every release
-  ever cut**, and holds with no plugin installed. That is where the `## Releases` section of
-  `CHANGELOG.md` points. One layer up, in
-  [`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md), sit the things the
-  *workflow* owns: this repo's seam answers, its local decisions, and the hand-written note per version
-  under `audience/`. The cutting process itself travels with the plugin as
+- **`contributing-davekjohn/`** — the workflow's own root folder, and since August 27, 2026 the home of
+  every document the contribution cycle produces or governs. Its
+  [`CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) is the centre of it: the standard branch +
+  PR workflow, which holds with no plugin installed, and this repo's answers to the workflow's seams on
+  top of it. Beside it sit [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md), the open branch's
+  `development-cycle.md` while one is open, and `releases/` — what a cut *generated*
+  (`changelog/<X>.x/<X.Y.Z>.md`, the complete note per version, and `github/<X>.x/<X.Y.Z>.md`, that
+  version's GitHub Release body), the hand-written note per version under `audience/`, the dated list of
+  every release ever cut in
+  [`releases/history.md`](contributing-davekjohn/releases/history.md), and this repo's seam answers in
+  [`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md). The cutting process itself travels
+  with the plugin as
   [`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md).
 - **`.claude/`** — the repo layer, on the seam described under
   [The seam, specified](#the-seam-specified): `specialists/SPECIALISTS.md` (the inclusion carrying the
   body import, the lens import and the roster), `specialists/lenses/` (this repo's own repo lenses),
   the Specialists handbook `specialists/README.md` next to them, `rules/` (path-scoped rules), and
   `settings.json` (harness config; see [Consumption](#consumption)).
-- **The root documents** — this `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `CONTRIBUTING.md` and
+- **The root documents** — this `README.md`, `CLAUDE.md` and
   `SECURITY.md`, plus the two consumer-facing procedures [`INSTALL.md`](INSTALL.md) and
   [`UNINSTALL.md`](UNINSTALL.md) — those sat a level down beside the plugins until
   [#664](https://github.com/DaveKJohn/claude-code-specialists/issues/664) moved them here, which is
@@ -309,7 +313,7 @@ The full picture, top-level folder by folder:
   **`.github/`** (`pull_request_template.md`, the issue templates + three workflows: `workflows/ci.yml`,
   the CI gate that runs the lint + test suites on every PR and push to `main`, plus
   `workflows/claude.yml` and `workflows/claude-code-review.yml`, which answer an `@claude` mention and
-  review each PR. Only `ci.yml`'s job blocks a merge; see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
+  review each PR. Only `ci.yml`'s job blocks a merge; see [`CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md)).
 
 ## Consumption
 
@@ -333,7 +337,7 @@ beyond any one consumer:
 whose `version` is the release it belongs to, bumped in lockstep across every plugin. Because
 `claude plugin update` pins the cache to a specific version (see [Versioning](#versioning)), the
 cached `version` is *exactly* the installed release. The full history of that release lives in this
-repo's [`CHANGELOG.md`](CHANGELOG.md) and [`releases/`](releases/) — and a consumer has both, because
+repo's [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md) and [`contributing-davekjohn/releases/`](contributing-davekjohn/releases/) — and a consumer has both, because
 the marketplace source is a git clone of the whole repository at
 `~/.claude/plugins/marketplaces/<marketplace>/`, not a per-plugin extract.
 
@@ -375,7 +379,7 @@ bumped — a merge without a release stays invisible to consumers, and a shared 
 therefore always lands here first, never the other way around. The full mechanics — cutting a
 release, the three release documents, the lint guardrails — are in
 [`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md#cutting-a-release),
-with this repo's release list in [`releases/README.md`](releases/README.md) and its own answers to the
+with this repo's release list in [`releases/history.md`](contributing-davekjohn/releases/history.md) and its own answers to the
 workflow in
 [`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md).
 
@@ -733,8 +737,8 @@ Read the `version` in your cached `<plugin>/.claude-plugin/plugin.json`. It trav
 cache, so once `claude plugin update` has pinned your install to a version, that number is exactly the
 release you are on. Every plugin bumps in lockstep, so any one of them answers the question.
 
-For **what changed** in that release, read [`CHANGELOG.md`](CHANGELOG.md) and
-[`releases/`](releases/) in the marketplace clone you already have —
+For **what changed** in that release, read [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md) and
+[`contributing-davekjohn/releases/`](contributing-davekjohn/releases/) in the marketplace clone you already have —
 `~/.claude/plugins/marketplaces/claude-code-specialists/`. See [Consumption](#consumption) above for
 the mechanics.
 
@@ -1247,10 +1251,11 @@ its own marketplace. See [One product, one repository](#one-product-one-reposito
 ## Contributing
 
 Changes to this repo go through a branch + Pull Request to `main`, and that much holds whether or not
-any plugin is installed — it is [`CONTRIBUTING.md`](CONTRIBUTING.md), the standard workflow, three
-rules long. **The branch dossier, the changelog entry that folds at the merge, the significance model
-and the release cut are the `contributing-davekjohn` layer on top**, and they are described in
-[`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) — this repo's answers — over
+any plugin is installed — it is the **standard workflow**, three rules long, and since August 27, 2026 it
+opens [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) rather than a page
+of its own at the root. **The branch dossier, the changelog entry that folds at the merge, the significance
+model and the release cut are the `contributing-davekjohn` layer on top**, and they are described further
+down that same page — this repo's answers — over
 [`CONTRIBUTING-portable.md`](plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md), the half
 that travels with the plugin. Where the two disagree, the plugin's page wins.
 
@@ -1269,7 +1274,7 @@ which is what [The seam, specified](#the-seam-specified) is for.
   commands.
 - **Disconnecting it again?** [UNINSTALL.md](UNINSTALL.md) is its mirror — the repo teardown and the
   machine-side removal, in the order they have to happen.
-- **Releases** — the full version history is in [`releases/README.md`](releases/README.md); the
+- **Releases** — the full version history is in [`releases/history.md`](contributing-davekjohn/releases/history.md); the
   cutting-a-release mechanics travel with the workflow plugin as
   [`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md), with this repo's
   answers to it in

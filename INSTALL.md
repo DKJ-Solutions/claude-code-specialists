@@ -510,7 +510,7 @@ of their own who wants to work with the specialists team. Everything below is th
 the deeper explanation sits behind the links and is deliberately not repeated here.
 
 **Why the procedure is what it is** — which step was added when, and what was measured to justify it —
-is not on this page. It lives in the release record: [`releases/README.md`](releases/README.md)
+is not on this page. It lives in the release record: [`releases/history.md`](contributing-davekjohn/releases/history.md)
 indexes every version with the changes behind it. This page tells you what to do; that one tells you
 why it changed.
 
@@ -998,7 +998,7 @@ in place. Earlier releases said *"Plugin `specialists` is not installed at scope
 and easy to misread as "not installed at all". Whatever the phrasing, the failure means the command
 looked in the wrong scope. Do not answer it by re-running the install either: a scopeless install adds
 a **second, machine-wide record** beside the project one. For **what changed**, read
-[`CHANGELOG.md`](CHANGELOG.md) and [`releases/`](releases/README.md) — and you already have both,
+[`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md) and [`releases/`](contributing-davekjohn/releases/history.md) — and you already have both,
 because your marketplace source is a git clone of the whole repository at
 `~/.claude/plugins/marketplaces/claude-code-specialists/`, not a per-plugin extract.
 
