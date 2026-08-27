@@ -32,6 +32,52 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/register-follows-the-four-migrated-consumers-v1` · 20260827-205650
+
+The consumer register catches up with reality. `connectors/*.json` records what each consumer HAS, and
+per `connectors/README.md` a renamed plugin id is written here only **after** that consumer has
+migrated. All four had, and the register had not: `djcylow-react`, `smartwatchbanden` and
+`xoxowildhearts` still named `workflow-davekjohn@` after
+[#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) retired it, and `life-hub` still
+named `specialists@` and `specialists-lifehub@`, retired in the August 3 reorg -- while its enabled
+`contributing-davekjohn@` was not registered at all. Every field was measured against the consumer's own
+live `.claude/settings.json` through the GitHub API rather than taken from the report.
+
+Why a stale id is not cosmetic: `check-connectors.ps1` loops over the plugins a manifest lists and, on
+an id the marketplace no longer declares, reports `[INFO]` and **skips that plugin's whole block**. So a
+registered-but-unresolvable id switches off the version check, the enabled check and the extension
+check for that plugin -- the same blind spot `xoxowildhearts.json`'s notes documented on August 21,
+which had been measured as emptied and was re-opened five days later by a different route: not an
+unregistered plugin this time, but a registered one under a name that no longer resolves.
+
+Nothing new was built, and the TEST section says why in full: the id-vs-marketplace comparison the issue
+asks for already exists, and its `[INFO]`-rather-than-`[ERROR]` treatment is a documented decision with
+a test pinning it. Correcting the register also exposed a local `../life-hub` checkout 427 commits
+behind, which the wrong id had been hiding for 24 days -- fast-forwarded, and the check is green.
+
+For this repo the durable half is the shape rather than the four files: a register entry that is wrong
+in a way the tooling deliberately tolerates silently disables every check downstream of it. The
+`[INFO]` is right and stays; what has to stay current is the data.
+
+Closes [#978](https://github.com/DaveKJohn/claude-code-specialists/issues/978).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. `connectors/` is this repo's own consumer register -- not plugin payload, and deliberately kept out
+of the plugin cache. No consumer receives it or is changed by it.
+
+**Score:** N/A
+
+#### Pull Request
+
+The connector register catches up with four consumers that have all migrated
+
+[PR #1011](https://github.com/DaveKJohn/claude-code-specialists/pull/1011)
+
+---
+
 ### DEPLOY: `fix/readoption-warns-for-the-two-note-roots-v1` · 20260827-203637
 
 Re-adopting the workflow folder now tells you about the two generated note roots that moved, which was
