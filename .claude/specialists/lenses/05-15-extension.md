@@ -234,6 +234,21 @@ infrastructure.
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with
   [Tessa #16](06-16-extension.md).
 
+#### And therefore: here Sylvester is the author who runs `simplify`
+
+The **`simplify`** skill applies quality fixes — reuse, simplification, efficiency — and applying is the
+**author's** act, never the reviewer's: [Victor #19](06-19-extension.md) may report those same findings
+and is forbidden from applying them, which is why the portable layer gives the skill to
+[Cody #13](../../../plugins/teams/team-alpha/manuals/04-13-manual.md) rather than to a reviewer. Here
+the code is `scripts/**` and **those are Sylvester's**, so here he is that author: he runs the tidy pass
+over what he changed before the diff goes to review, and never over somebody else's change.
+
+**Why this line exists in his lens and not only in Chris's** — Sylvester does not read Chris's lens, so a
+routing line alone would name an owner who is never told. And why it is not in his *portable* playbook:
+his shipped scope is the **harness** (`.claude/`, settings, hooks, MCP, skills, marketplaces), while
+`scripts/**` is an extension this lens gives him. Writing the skill into his agent def would claim script
+authorship for him in consumers that never granted it.
+
 ### Repo-specific rules
 
 - **NEVER ROUND-TRIP A MARKDOWN FILE THROUGH POWERSHELL TO EDIT IT — USE THE EDITOR'S OWN EDIT.**

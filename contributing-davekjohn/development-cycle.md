@@ -132,7 +132,7 @@ that is Ravi's alarm and a separate branch — not a copy-paste here.
 
 - [x] Re-verify both counts above on this branch before writing anything — the assessment is five days old. 0 and 11 both confirmed; the split behind the 11 was wrong and is corrected above (four hits are the filename `claude-code-review.yml`, not the skill)
 - [x] Victor #19: name `--fix` and `--comment` as out of bounds, in the agent def and the manual
-- [x] Edith #17: bound `--fix` the same way — she also delivers findings and does not correct the text
+- [x] Edith #17: bound `--fix` the same way — she also delivers findings and does not correct the text. **Widened to `--comment` as well, deliberately**: "the same way" is Victor's way, and his covers both. She carries the same shared `no-commit-push-pr` block he does, so the PR reasoning applies to her word for word — bounding one flag and not the other would have left exactly the inconsistency her craft exists to catch. Worded from her side, not pasted from his
 - [~] Sylvester #15 in the **portable** layer: dropped, and the reason is the finding above — his shipped scope is the harness, not `scripts/**`, so this would have claimed script authorship for him in every consumer. Replaced by the next two lines
 - [x] Cody #13: add `simplify` at the author's moment, in the agent def (working method 4) and the manual (hard rules)
 - [x] Sylvester #15 in the **lens**: name him the local author who runs the tidy pass, because he never reads Chris's lens
@@ -144,16 +144,40 @@ that is Ravi's alarm and a separate branch — not a copy-paste here.
 - [x] Confirm the pairing sentence is NOT verbatim in ≥2 agent defs — if it is, it is a shared block and Ravi's call, not a paste
 - [x] Confirm no shared block was touched: the `<!-- BEGIN shared: -->` regions must still equal `agent-shared/` (lint check 7)
 - [x] `check-plugin-integrity.ps1` green (manifests, frontmatter, dead links, install-line flags)
-- [ ] All suites green (`scripts/tests/*.tests.ps1`)
+- [x] All suites green (`scripts/tests/*.tests.ps1`) — **53 suites, 5,352 asserts, 0 failures, 58s**, measured with `Invoke-TestSuiteGate`, the runner CI itself calls. Worth recording how it was NOT measured: a hand-rolled `ForEach-Object { & $_.FullName; $LASTEXITCODE }` loop reported `sync-rules.tests.ps1` as `-1` while that suite printed `OK: all 61 asserts passed` — `&`-invoking a .ps1 that never calls `exit` leaves `$LASTEXITCODE` at whatever the previous native command left, so the loop invented a failure the gate does not have. Ask the gate, not a loop
 - [x] Read the diff back against the three moves above: nothing touched outside the three agent defs, three manuals and two lenses
 
 ### DEPLOY: `feat/adopt-act-on-this-skills-v1`
 
-**Score:**
+Two built-in skills that look like a pair are split along the line that actually separates them:
+`code-review` **reports**, `simplify` **applies**. The reporting skill was wired into two reviewers with
+its flags unmentioned, and the applying skill was mentioned nowhere in the repo at all — so this closes
+both halves at once. Victor #19 and Edith #17 are now told that `--fix` and `--comment` sit outside their
+boundary rather than inside their tooling; Cody #13 gains `simplify` as the author's tidy pass before the
+handover; and Chris's routing plus Sylvester's lens name Sylvester the author who runs it here, because
+in this repo the code is `scripts/**`.
+
+For somebody maintaining this repo that is two concrete answers where there were none: a review never
+reaches for either flag, and "tidy this up" routes to the author rather than to the reviewer. Nothing
+already written stops working, which is what keeps this at 3 — it is noticed the moment somebody runs a
+review or finishes a script, not before.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+A consuming repo receives the portable half through the next release, and only one third of it is
+observable there: **Cody hands over tidied code where he previously handed over untidied code.** The other
+two thirds prevent a failure rather than deliver a feature, and the rubric asks for that failure to be
+named — a reviewer who reaches for `code-review --fix` has silently applied his own findings, which is the
+exact act his boundary forbids, and one who reaches for `--comment` has written on a PR that belongs to
+the git role. Neither had anything telling them so.
+
+Sylvester's half deliberately does not travel. His shipped scope is the harness; `scripts/**` is this
+repo's own extension to it, so naming him the script author in the portable layer would have claimed that
+authorship in consumers that never granted it.
+
+**Score:** 2
 
 #### Pull Request
 
