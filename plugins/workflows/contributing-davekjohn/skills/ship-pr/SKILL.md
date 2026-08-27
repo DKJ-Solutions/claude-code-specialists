@@ -81,7 +81,7 @@ The six steps, stopping on the first failure:
    `ship-pr` run that reports no PR number and then fails at the merge with an unhelpful gh error.
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
 4. **Merge** (`gh pr merge`), but first the **step-list gate again**: the phases above the DEPLOY heading in
-   `contributing-davekjohn/development-cycle.md` must
+   `contributing-davekjohn/development.md` must
    have nothing unresolved left in them, or the merge does not happen. Not belt-and-braces — the rule is
    about the *merge*, and step 1's copy of it lives in `open-pr.ps1`, which has a `-Force`. A PR opened
    through that valve, by hand on github.com, or days ago and resumed here would otherwise land with an
@@ -132,7 +132,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" 
 
 ## The two merge gates read the branch's COMMIT, and why they used to read the tree
 
-Both gates in step 4 read `contributing-davekjohn/development-cycle.md` as **`refs/heads/<branch>` has it** —
+Both gates in step 4 read `contributing-davekjohn/development.md` as **`refs/heads/<branch>` has it** —
 the commit, not the file on disk. Which is the document the merge is about to merge, so it is the document the
 gates judge.
 

@@ -9,7 +9,7 @@ set of answers** to them.
 |---|---|---|
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **the centre of this folder** — the standard branch + PR workflow, the workflow's contributing layer AND the working rules a session needs here, on one page. Two of those three merged on August 26, 2026 (#886) and the standard workflow arrived from the root on August 27. It wins over the [root CLAUDE.md](../CLAUDE.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md) |
 | [`CHANGELOG.md`](CHANGELOG.md) | what is pending for the next release: one `##` entry per merged branch, folded in at the merge and emptied by a cut. Here since August 27, 2026, stated in `Get-ChangelogPath` | *(the format travels in [`DEVELOPMENT-portable.md`](../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md))* |
-| `development-cycle.md` | the branch's own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-portable.md`](../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md) |
+| `development.md` | the branch's own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-portable.md`](../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md) |
 | [`releases/`](releases/) | the dated list of every release ever cut ([`history.md`](releases/history.md), here since August 27, 2026), the published audience notes, the generated changelog and GitHub-Release trees, and this repo's seam answers in its own [`README.md`](releases/README.md) | [`RELEASES-portable.md`](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md) |
 
 In this repo the portable pages resolve as relative links because this is the plugin's **source**; in a
@@ -47,7 +47,7 @@ August 26, 2026 (Dave), when that page was reduced to its four `##` steps and no
 | the type an unknown prefix falls back to | `Chore` | `Get-EntryFallbackType` |
 | your audience tier | **2** — a service, not a product | `Get-ReleaseAudienceTier` |
 | your entry's section headings | the English defaults — nothing is overridden | *(no override defined)* |
-| the wording inside the development cycle | the English defaults | `Get-BranchFileWordingOverrides` *(none)* |
+| the wording inside the development document | the English defaults | `Get-BranchFileWordingOverrides` *(none)* |
 | your significance rubric | the shared default, 1–5 | *(no override defined)* |
 | your permanent root docs | `CLAUDE` · `README` · `LICENSE` · `SECURITY` · `INSTALL` · `UNINSTALL` — `CHANGELOG` and `CONTRIBUTING` came off on August 27, 2026, having left the root | `Get-ReservedRootMd` |
 | where your changelog lives | `contributing-davekjohn/CHANGELOG.md` — the consumer default, which this repo adopted on August 27, 2026 | `Get-ChangelogPath` |

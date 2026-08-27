@@ -66,7 +66,7 @@ document title that is no longer an H1). Later the same day this page moved one 
 
 ## 1. NEW DEVELOPMENT TASK
 
-### 1.1. Create the branch and the empty `development-cycle.md`
+### 1.1. Create the branch and the empty `development.md`
 
 **Two steps, one command, and that is the point rather than a shortcut.** `new-branch` does both: a branch is
 never entry-less, so there is no moment at which the branch exists and its document does not. They are
@@ -219,7 +219,7 @@ the same rule the tier line gets, and the same rule the folder rename got in ste
 #### 2.2.2. the step-list gate, on the branch's own plan
 
 **Dave, August 6, 2026.** A branch reaches a PR when its own plan is finished, so `open-pr.ps1` refuses to
-push and `ship-pr.ps1` refuses to merge while the step half of `development-cycle.md` has an unresolved step.
+push and `ship-pr.ps1` refuses to merge while the step half of `development.md` has an unresolved step.
 **Both**, deliberately: the requirement Dave gave is about the *merge*, and `open-pr` has an escape valve — a
 PR opened through it, or by hand on github.com, would otherwise land with an unfinished plan.
 
@@ -422,12 +422,12 @@ Merge method: **`merge`** — a merge commit, not a squash (`Get-PrMergeMethod`)
 
 ### 2.5. Copy the last DEPLOY into `CHANGELOG.md` under `## [Unreleased]`, newest to oldest
 
-### 2.6. Delete `development-cycle.md`
+### 2.6. Delete `development.md`
 
 **2.5 and 2.6 are one command, and the first direct-on-`main` exception.**
 [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) folds the entry into `CHANGELOG.md`
 and clears it, and on request makes that commit itself — **bounded to `CHANGELOG.md` plus
-`development-cycle.md`**, which the same run removes. Since August 2, 2026 that bound is enforced rather than
+`development.md`**, which the same run removes. Since August 2, 2026 that bound is enforced rather than
 merely intended: the commit names its paths, so nothing else in the tree can ride along. Committing stays
 opt-in, because it is this exception being used.
 

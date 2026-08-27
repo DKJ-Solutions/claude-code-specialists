@@ -222,7 +222,7 @@ try {
     Invoke-FxGit -GitArgs @('init', '--quiet')
     Invoke-FxGit -GitArgs @('symbolic-ref', 'HEAD', 'refs/heads/main')
 
-    $committed = "# Development cycle: ``feat/shipping-v1``" + "`n`nA line with an $dash em-dash." + "`n"
+    $committed = "# Development: ``feat/shipping-v1``" + "`n`nA line with an $dash em-dash." + "`n"
     [System.IO.File]::WriteAllText((Join-Path $gitFx 'cycle.md'), $committed, $utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $gitFx 'empty.md'), '', $utf8NoBom)
     Invoke-FxGit -GitArgs @('add', 'cycle.md', 'empty.md')
@@ -246,7 +246,7 @@ try {
     # THE DIVERGENCE THAT IS THE WHOLE POINT. The working tree is overwritten and a second branch is
     # created and checked out -- the #970 shape exactly: the run is shipping feat/shipping-v1 while the
     # checkout has moved on. The read must still answer for the commit.
-    [System.IO.File]::WriteAllText((Join-Path $gitFx 'cycle.md'), "# Development cycle: ``main```n", $utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $gitFx 'cycle.md'), "# Development: ``main```n", $utf8NoBom)
     Invoke-FxGit -GitArgs @('checkout', '--quiet', '-b', 'feat/the-next-thing')
     Invoke-FxGit -GitArgs @('add', 'cycle.md')
     Invoke-FxGit -GitArgs @('commit', '--quiet', '-m', 'the branch created during the CI wait')

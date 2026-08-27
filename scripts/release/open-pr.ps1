@@ -19,7 +19,7 @@
 
     THE TITLE IS NOT TYPED HERE -- IT IS DERIVED (Dave, #506 + #505, August 7, 2026). A fresh PR is called
     '<branch type>: <the entry's Branch title>': the type off the branch prefix, the words out of
-    the DEPLOY section of development-cycle.md. So the sentence is written once, at `new-branch -Title`, and the PR, the
+    the DEPLOY section of development.md. So the sentence is written once, at `new-branch -Title`, and the PR, the
     changelog and the release documents cannot disagree about what the change is called -- nor can the title
     lose its type prefix, which the last five PRs before this change all had (#499-#503). Get-PrTitle
     composes it; -Title is still accepted and ignored, see that parameter.
@@ -41,7 +41,7 @@
     Auto-fill (if you do NOT supply -Body): the script fills in the template itself as much as
     possible, so the PR never lands on github.com as an empty form:
       1. The template's description placeholder is replaced by the changelog entry
-         (the DEPLOY section of development-cycle.md, an older branch/ pair, or the pre-split
+         (the DEPLOY section of development.md, an older branch/ pair, or the pre-split
          <SafeName>.md in the repo root), which always
          exists on the branch. So you never have to type anything twice. What goes in is the entry from
          its 'What does the change...' section onwards -- see Get-PrDescription for why the three
@@ -335,10 +335,10 @@ $entryDescription = ''
 $prTitle = ''
 if (Test-Path -LiteralPath $entryPath) {
     # THE ENTRY IS A SECTION OF THE BRANCH DOCUMENT, so the head is dropped here, once, at the read --
-    # Get-DevelopmentCycleEntryText. Every reader below is entry-shaped and would otherwise be handed the
+    # Get-DevelopmentEntryText. Every reader below is entry-shaped and would otherwise be handed the
     # plan as well: the description would come back as the guidance comment, and the scaffold gate would
     # accuse the step list of being an unfinished entry.
-    $entryText = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
+    $entryText = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
 
     # THE PR BODY IS THE ANSWER ONWARDS, NOT THE WHOLE DOSSIER (Dave, August 9, 2026). Get-PrDescription
     # drops what the PAGE around the body already says -- the Branch title (which is this PR's title, one
@@ -438,7 +438,7 @@ if ($Title) {
 $resolveList = @(ConvertTo-IssueNumberList -Value $Resolves)
 $resolveIssues = @()
 if (-not $NoResolves -or $resolveList.Count -gt 0) {
-    # What the branch itself mentions: the WHOLE development cycle (always present on a branch) plus a
+    # What the branch itself mentions: the WHOLE development document (always present on a branch) plus a
     # -Body the caller supplied, since either can carry the reference. Deliberately not narrowed to the
     # DEPLOY section the way the two gates are -- an issue named in a step is a mention of that issue, and
     # this is the one reader of this file whose subject is the branch rather than the entry.
@@ -554,10 +554,10 @@ Both are honest answers; the gate only refuses to guess.
 if (Test-Path -LiteralPath $entryPath) {
     # The DEPLOY section only, for the reason stated at the first read of this file above: the plan sitting
     # over it would be accused of being an unfinished entry.
-    $entryText = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
+    $entryText = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
     $scaffoldFindings = @(Get-EntryScaffoldFindings -EntryText $entryText -Wording (Get-EntryScaffoldWording))
     if ($scaffoldFindings.Count -gt 0) {
-        # Repo-relative, not the bare leaf. Every branch's document is called development-cycle.md, so a
+        # Repo-relative, not the bare leaf. Every branch's document is called development.md, so a
         # leaf-only name in the refusal tells the reader nothing about which file to open.
         $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
         $detail = ($scaffoldFindings | ForEach-Object { "  - $($_.Label): '$($_.Marker)'" }) -join "`n"

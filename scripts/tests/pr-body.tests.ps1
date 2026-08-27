@@ -738,15 +738,32 @@ foreach ($legacyFolderForm in @(
 }
 
 # AND THE RULE THE ABOVE IS AN INSTANCE OF, asserted structurally so the NEXT rename cannot pass by
-# substitution either. Every entry that names the workflow folder must be present in both folder names:
-# the list is append-only, so a form appearing under one name and not the other is a rewrite.
-$folderNamingForms = @($known | Where-Object { $_ -match 'workflow-davekjohn|contributing-davekjohn' })
-Assert-True ($folderNamingForms.Count -ge 8) 'every folder-naming placeholder exists under both folder names, not just the current one'
-foreach ($f in $folderNamingForms) {
-    $other = if ($f -match 'workflow-davekjohn') { $f -replace 'workflow-davekjohn', 'contributing-davekjohn' } else { $f -replace 'contributing-davekjohn', 'workflow-davekjohn' }
-    Assert-True ($known -contains $other) `
-        "and its counterpart under the other folder name is recognised too -- a rename appends, it never replaces: '$other'"
+# substitution either. The list is append-only, so a form that exists under the OLD folder name must
+# still exist under the new one: that is the direction #886 broke.
+#
+# ONE DIRECTION ONLY, AND THIS ASSERT LEARNED IT THE DAY AFTER IT WAS WRITTEN. It was symmetric for a
+# few hours -- every folder-naming form had to exist under BOTH names -- and #963/#958 broke it
+# immediately and correctly: renaming the document to development.md appends
+# 'contributing-davekjohn/development.md', and there is no 'workflow-davekjohn/development.md' to pair
+# it with, because the folder was renamed on August 26 and the document on August 27. That pair never
+# existed, so demanding it would force a name into the list that nothing can ever have written -- which
+# is a different way of making the list lie about history. The asymmetry IS the rule: old implies new,
+# never the reverse.
+$oldFolderForms = @($known | Where-Object { $_ -match 'workflow-davekjohn' })
+Assert-True ($oldFolderForms.Count -ge 4) 'the pre-#886 folder name still carries all four of its forms'
+foreach ($f in $oldFolderForms) {
+    $migrated = $f -replace 'workflow-davekjohn', 'contributing-davekjohn'
+    Assert-True ($known -contains $migrated) `
+        "and each has its counterpart under the current folder name -- a rename appends, it never replaces: '$migrated'"
 }
+
+# THE WRITTEN ONE IS THE LAST ONE, asserted here rather than trusted, because Get-PrTemplateCanonicalPlaceholder
+# takes it by position and every rename appends. A form added in the wrong place silently changes which
+# placeholder a fresh template is scaffolded with, and nothing else would notice.
+Assert-Equal $known[$known.Count - 1] (Get-PrTemplateCanonicalPlaceholder) `
+    'the canonical placeholder is the last entry, so an appended form did not land mid-list'
+Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'development\.md') `
+    'and it names the document by its current filename'
 
 $canonical = Get-PrTemplateCanonicalPlaceholder
 Assert-True ($known -contains $canonical) `
@@ -777,7 +794,7 @@ if (Test-Path -LiteralPath $refOnDisk) {
 
 
 # --- The local DEPLOY default and the real matcher must not drift apart ---------------------------
-# Get-PrDescription reads the DEPLOY heading through Get-DevelopmentCycleEntryPattern when the scaffold
+# Get-PrDescription reads the DEPLOY heading through Get-DevelopmentEntryPattern when the scaffold
 # lib is loaded, and through a local default when it is not -- which is the state this suite runs in, on
 # purpose. Two readers of one rule is how this repo's accumulation bugs start, so the two are held
 # against each other here rather than trusted to stay equal.
@@ -792,7 +809,7 @@ $defaultLegacy = Get-PrDescription -EntryText $legacyDeploy
 $defaultFenced = Get-PrDescription -EntryText $fencedDeploy
 
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
-Assert-True ($null -ne (Get-Command -Name Get-DevelopmentCycleEntryPattern -ErrorAction SilentlyContinue)) `
+Assert-True ($null -ne (Get-Command -Name Get-DevelopmentEntryPattern -ErrorAction SilentlyContinue)) `
     'the real matcher is reachable once the scaffold lib is loaded'
 Assert-Equal $defaultMerged (Get-PrDescription -EntryText $merged)       'the two readers agree on today DEPLOY shape'
 Assert-Equal $defaultLegacy (Get-PrDescription -EntryText $legacyDeploy) 'and on the previous one'

@@ -140,7 +140,7 @@ function New-Fixture {
 
 function New-CycleDocument {
     <#
-        Writes a development cycle at the path the shared resolver expects, declaring $Branch in its
+        Writes a development document at the path the shared resolver expects, declaring $Branch in its
         heading -- the shape Get-BranchFileDeclaredBranch reads. -Branch '' writes a reset document
         (no name at all), which is the state the trunk carries.
     #>
@@ -152,7 +152,7 @@ function New-CycleDocument {
     $rel = (Get-BranchFilePaths).Cycle
     $full = Join-Path $Dir ($rel -replace '/', '\')
     New-Item -ItemType Directory -Path (Split-Path -Parent $full) -Force | Out-Null
-    $heading = if ($Branch) { "## Development cycle: ``$Branch``" } else { '# Development cycle' }
+    $heading = if ($Branch) { "## Development: ``$Branch``" } else { '# Development' }
     [System.IO.File]::WriteAllText($full, "$heading`n`n$Body`n", (New-Object System.Text.UTF8Encoding $false))
     return $rel
 }
@@ -242,7 +242,7 @@ function Switch-ToBranch {
 
 try {
     # --- (a) THE HAPPY PATH: a dirty document, no PR -> committed and pushed, one file only ---------
-    Write-Host "park-cycle.ps1 -- pushes the development cycle when no PR exists" -ForegroundColor Cyan
+    Write-Host "park-cycle.ps1 -- pushes the development document when no PR exists" -ForegroundColor Cyan
     $fixA = New-Fixture -Label 'a' -GhAnswer 'none'
     Switch-ToBranch -Dir $fixA -Name 'feat/visible-v1'
     $relA = New-CycleDocument -Dir $fixA -Branch 'feat/visible-v1'
@@ -256,7 +256,7 @@ try {
     Assert-True ($rA.Out -match 'parked on origin') 'happy path: reports the document reached origin'
     Assert-Equal 2 (Get-CommitCount -Dir $fixA) 'happy path: exactly one park commit on top of the fixture commit'
     $filesA = Get-HeadFiles -Dir $fixA
-    Assert-True ($filesA -contains $relA) 'happy path: the commit carries the development cycle'
+    Assert-True ($filesA -contains $relA) 'happy path: the commit carries the development document'
     Assert-Equal 1 $filesA.Count 'happy path: and NOTHING else -- the unrelated dirty file stayed out'
     Assert-True (Test-RefOnRemote -Bare "$fixA.git" -Ref 'refs/heads/feat/visible-v1') 'happy path: the branch ref is on origin'
     $msgA = Get-CommitMessage -Dir $fixA
@@ -365,7 +365,7 @@ try {
     Assert-Equal 1 (Get-CommitCount -Dir $fixI) 'no origin: nothing committed'
 
     # --- (j) NO DOCUMENT AT ALL: nothing to park ------------------------------------------------
-    Write-Host "park-cycle.ps1 -- no development cycle on disk" -ForegroundColor Cyan
+    Write-Host "park-cycle.ps1 -- no development document on disk" -ForegroundColor Cyan
     $fixJ = New-Fixture -Label 'j' -GhAnswer 'none'
     Switch-ToBranch -Dir $fixJ -Name 'feat/no-document-v1'
 
@@ -411,7 +411,7 @@ try {
     Assert-Equal 0 $rL.Code 'trunk seam: exit 0'
     Assert-True (-not ($rL.Out -match 'on the trunk')) "trunk seam: 'main' is NOT treated as the trunk -- the seam was read"
     Assert-True ($rL.Out -match 'parked on origin') 'trunk seam: and the branch was parked'
-    Assert-True ((Get-HeadFiles -Dir $fixL) -contains $relL) 'trunk seam: the commit carries the development cycle'
+    Assert-True ((Get-HeadFiles -Dir $fixL) -contains $relL) 'trunk seam: the commit carries the development document'
 
     # --- (m) THE SHAPE #960 WAS MEASURED ON: a plan that reads as FINISHED with nothing behind it -----
     # THE ASSERT THIS WHOLE MECHANISM EXISTS FOR. The measured branch had eight resolved CREATE steps, a

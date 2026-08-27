@@ -34,7 +34,7 @@ for them the line above is the correct one.
 **No title is passed, and that is the change of August 7, 2026 ([#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)
 + [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)).** The PR is called
 `<branch type>: <the entry's Branch title>` — the type off the branch prefix, the words out of
-the DEPLOY section of `contributing-davekjohn/development-cycle.md`. So the sentence is written **once**, when the branch is created
+the DEPLOY section of `contributing-davekjohn/development.md`. So the sentence is written **once**, when the branch is created
 (`new-branch -Title`), and the PR, `CHANGELOG.md` and the release documents cannot disagree about what the
 change is called. It also cannot lose its type prefix, which the five PRs before this change all had.
 
@@ -204,7 +204,7 @@ the script that writes the scaffold read it from the same shared library, so the
 
 ## The link gate: do the entry's links survive the fold?
 
-The entry is the DEPLOY section of `contributing-davekjohn/development-cycle.md`, and the fold copies its text
+The entry is the DEPLOY section of `contributing-davekjohn/development.md`, and the fold copies its text
 **verbatim** into your `CHANGELOG.md`. So a relative link in it has to resolve from **that file's directory**,
 which is not necessarily the one you are typing in — and where the two differ, the correct link looks wrong
 until it moves.

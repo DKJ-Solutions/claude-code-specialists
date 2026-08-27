@@ -41,7 +41,7 @@ documents [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508
 count is now held by the lint against `Get-EntrySectionHeadings`, so this cannot silently drift again; the
 NAMES are not, and deliberately, for the reason that check's own comment records. **The shape itself is
 written once**, by the formatters in `scripts/lib/entry-scaffold-lib.ps1` — and the copy of
-`contributing-davekjohn/development-cycle.md` sitting on the trunk is what that produces, held to it by the
+`contributing-davekjohn/development.md` sitting on the trunk is what that produces, held to it by the
 lint. Read it there rather than trusting any prose, this paragraph included.
 
 **Two sections went in the same movement, and each for a measured reason.**
@@ -69,7 +69,7 @@ entries rather than off which section they sit in.
 
 #### How it works
 
-- **`contributing-davekjohn/development-cycle.md`** — written when the branch is created. One document with two
+- **`contributing-davekjohn/development.md`** — written when the branch is created. One document with two
   halves: `## PLAN` / `## CREATE` / `## TEST` carry the step list, and the fourth phase,
   `` ## DEPLOY: `<branch>` ``, IS the entry — **nothing around it**, so it pastes into `CHANGELOG.md` in one
   go. A **fixed** path, the same on every branch: git already tracks it per branch, so two branches in
@@ -135,7 +135,7 @@ itself.
 improvement, the entry comes into being **at the moment the branch is created** — no
 separate later scaffolding step: [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s
 `new-branch.ps1` checks out the branch and, in the same move, calls the shared
-`scripts/task/new-branch.ps1 -Title "…"` (which writes `contributing-davekjohn/development-cycle.md`, filling in
+`scripts/task/new-branch.ps1 -Title "…"` (which writes `contributing-davekjohn/development.md`, filling in
 the title, the branch name and the type from the prefix automatically) as a child step. A branch is never
 entry-less. Whoever builds on the
 branch (often [Tessa #16](06-16-extension.md) or [Sylvester #15](05-15-extension.md)) fills in the
@@ -143,7 +143,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
 
 #### Lifecycle
 
-1. **Branch** → `contributing-davekjohn/development-cycle.md` is written *at branch creation* (Derek's `new-branch.ps1`); you
+1. **Branch** → `contributing-davekjohn/development.md` is written *at branch creation* (Derek's `new-branch.ps1`); you
    fill in the description and keep the step list current while building. Never touch `CHANGELOG.md`.
 2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry travels
    along. Rendall runs `fold-changelog-entry.ps1 -Branch <name> -Push` on `main`: that folds, commits
@@ -157,7 +157,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
    **this** repo's direct-on-`main` exception, which is what the path-scoped commit exists to keep honest,
    and the branch part of the two-machine lesson sits with
    [Derek #05](05-05-extension.md#branch--repo-hygiene).
-   The fold also **resets `contributing-davekjohn/development-cycle.md`** to its empty state and names it in the
+   The fold also **resets `contributing-davekjohn/development.md`** to its empty state and names it in the
    same commit, so the trunk is ready for the next branch instead of showing the merged one's ticked-off
    steps. One write clears both halves, which is why the commit's scope is two paths rather than three.
 3. **More branches merged** → each brings its entry; each gets inserted at the position its own impact
@@ -441,7 +441,7 @@ red the moment the section was opened, which is what forced the second commit in
 pair land half-done.
 
 Guardrails: on a clean `main`, no unfolded entry — neither a pre-split file in the root nor a filled
-`contributing-davekjohn/development-cycle.md`, which is its own check because a filled one looks like the reset
+`contributing-davekjohn/development.md`, which is its own check because a filled one looks like the reset
 state at a glance until you read the branch name in its heading — lint gate green, and the tag must not
 exist yet. There is deliberately **no release branch and no `release` prefix** — the release
 does not touch the branch workflow. A shared agent-def change still lands here first, gets
@@ -962,7 +962,7 @@ the tier ladder and the release cut are one particular way of running a release,
 release management. Rendall's craft in such a repo is whatever *that* repo's release process is.
 
 - `scripts/task/new-branch.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
-  `contributing-davekjohn/development-cycle.md`. `-Intent` records where you left off / what is next **at the
+  `contributing-davekjohn/development.md`. `-Intent` records where you left off / what is next **at the
   top of that document**, not in the DEPLOY section (#162): an intent is a status, and that section's text
   folds verbatim into `CHANGELOG.md`. Idempotent, judged on what the document says it belongs to rather
   than on its existing — it exists on `main` by design. Shared/mirrored to the plugin

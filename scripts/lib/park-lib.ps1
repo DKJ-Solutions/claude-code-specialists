@@ -9,7 +9,7 @@
 
     Supplies Invoke-GitPark, which all three parking entry points call: park-branch.ps1 (an existing
     branch, mid-work, everything outstanding), new-branch.ps1 (a branch at creation) and park-cycle.ps1
-    (the development cycle, automatically, for the life of the branch). The first is invoked
+    (the development document, automatically, for the life of the branch). The first is invoked
     deliberately; the other two run on their own, and Test-GitOriginConfigured below is the one thing
     that distinguishes them -- see its own note.
 
@@ -116,7 +116,7 @@ function Get-GitParkBacking {
         $Paths, files UNCOMMITTED in this working copy besides $Paths, and a flag per figure saying
         whether it could be established at all.
 
-        THE PROBLEM THIS EXISTS FOR (issue #960). A park publishes the branch's development cycle and
+        THE PROBLEM THIS EXISTS FOR (issue #960). A park publishes the branch's development document and
         nothing else, by design -- bound 1 of park-cycle. On a branch whose work is uncommitted in
         ANOTHER device's working copy, that means origin carries a plan reading '[x] done' eight times
         over with no commit behind a single tick. From origin, 'ticked and committed' and 'ticked and

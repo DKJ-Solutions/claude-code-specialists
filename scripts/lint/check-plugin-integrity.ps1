@@ -1517,10 +1517,10 @@ function Test-IsDeclaredSectionHeading([string]$Line) {
 #
 # AND THE ENTRY IS A SECTION OF A DOCUMENT, NOT A DOCUMENT (August 23, 2026). Both branch files used to open
 # with an H2, so the structural test -- the only thing that tells an entry from a root doc -- said yes to the
-# step list too, and it had to be excluded by PATH. development-cycle.md opens with an H1, so that test now
+# step list too, and it had to be excluded by PATH. development.md opens with an H1, so that test now
 # says no to the WHOLE file, which would have quietly dropped every branch entry out of this check rather
 # than merely mis-reporting it. The exclusion is gone and the entry is read out of the document instead --
-# Split-DevelopmentCycle, the same boundary the fold and the two gates use.
+# Split-Development, the same boundary the fold and the two gates use.
 #
 # WITH ITS LINE OFFSET, because this check prints line numbers. A finding reported against the entry's own
 # first line, in a file where the entry starts forty lines down, is a finding the reader cannot find.
@@ -1545,7 +1545,7 @@ $branchDocPathForHeadings = Join-Path $RepoRoot ($branchDocForHeadings -replace 
 if (Test-Path -LiteralPath $branchDocPathForHeadings) {
     $bdText = [System.IO.File]::ReadAllText($branchDocPathForHeadings, [System.Text.Encoding]::UTF8)
     if (Test-BranchChangelogIsFilled -Text $bdText) {
-        $bdSplit = Split-DevelopmentCycle -Text $bdText
+        $bdSplit = Split-Development -Text $bdText
         $entryTextsForHeadings += [pscustomobject]@{
             Rel    = $branchDocForHeadings -replace '/', '\'
             Text   = $(if ($bdSplit.Found) { $bdSplit.Entry } else { $bdText })
@@ -1687,7 +1687,7 @@ Write-Coverage -Category 'entry-heading' -Checked $ehChecked `
     -Note $(if ($entryTextsForHeadings.Count -eq 0) { 'no unfolded entry in the branch document or the root, so only CHANGELOG.md was judged -- normal between merges' } else { "$($entryTextsForHeadings.Count) unfolded entry(ies) plus CHANGELOG.md" })
 # --- 13b. no branch document is left behind between branches -----------------------------------------------
 # THE CHECK WAS INVERTED ON AUGUST 23, 2026 (Dave), AND THE THING IT PROTECTS DID NOT CHANGE. It used to hold
-# the trunk's copy of development-cycle.md to the formatter byte-for-byte: a reference beside a scaffolder
+# the trunk's copy of development.md to the formatter byte-for-byte: a reference beside a scaffolder
 # that writes the same shape is TWO SOURCES OF ONE FORMAT, which this repo has paid for repeatedly -- the
 # scaffold wording, the fence readers, the tier sections. Before that it held two files under
 # branch/templates/ for the same reason.

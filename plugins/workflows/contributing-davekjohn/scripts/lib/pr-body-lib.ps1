@@ -42,7 +42,7 @@ function Get-EntryDescription {
         description short -- returning something plausible rather than failing, which is the worst shape.
 
         THIS IS A PRE-MERGED-FORMAT READER, AND ITS HEURISTIC IS WHY. The rule above holds only while the
-        entry's own heading IS an H3. In the merged development-cycle format the heading is an H2
+        entry's own heading IS an H3. In the merged development format the heading is an H2
         (`## DEPLOY: ...`), so the first '### ' line is a section INSIDE the body and this function returns
         the tail from there -- which is exactly the plausible-rather-than-failing shape the paragraph above
         warns about, arrived at from the other direction (inbound
@@ -94,10 +94,10 @@ function Get-PrDescription {
         exactly what a reviewer is deciding about.
 
         TWO SHAPES START THE ANSWER, and the second one is why this function no longer bails out when the
-        'What' section is missing. In the merged development-cycle format (August 23, 2026) the entry has
+        'What' section is missing. In the merged development format (August 23, 2026) the entry has
         no 'What' heading at all: its opening text -- the tier-0 body, the substance -- sits directly under
         the DEPLOY heading. So this reads that heading as the start, via
-        Get-DevelopmentCycleEntryPattern, which is the same matcher the fold and both gates use.
+        Get-DevelopmentEntryPattern, which is the same matcher the fold and both gates use.
 
         SO ON TODAY'S SHAPE THE RETURN IS THE SECTION ITSELF, HEADING INCLUDED AND NOTHING PROMOTED
         (Dave, issue #884, August 25, 2026). The DEPLOY section must be one thing in all four places it
@@ -163,7 +163,7 @@ function Get-PrDescription {
     $whatRx = if ($whatNames.Count -gt 0) { & $toPattern $whatNames } else { $null }
     $endRx  = if ($endNames.Count -gt 0) { & $toPattern $endNames } else { $null }
 
-    # The merged format's start line, from the one matcher that owns it -- Get-DevelopmentCycleEntryPattern,
+    # The merged format's start line, from the one matcher that owns it -- Get-DevelopmentEntryPattern,
     # the same one the fold and both gates use, so a repo that translated the title word is read by its own.
     #
     # Probed with Get-Command and backed by a local default, exactly as the heading names above are and for
@@ -171,8 +171,8 @@ function Get-PrDescription {
     # suite fail on a function it deliberately does not load. The default is not a second definition of the
     # rule -- it is the same two shapes with the same English words that lib ships, and a repo that renamed
     # the title reaches this code with the lib loaded, which is where its own answer comes from.
-    $deployRx = if (Get-Command -Name Get-DevelopmentCycleEntryPattern -ErrorAction SilentlyContinue) {
-        Get-DevelopmentCycleEntryPattern
+    $deployRx = if (Get-Command -Name Get-DevelopmentEntryPattern -ErrorAction SilentlyContinue) {
+        Get-DevelopmentEntryPattern
     } else {
         # Today's shape leads with the title and a colon; every entry written before August 23, 2026 puts
         # the branch first and the title last. Both are matched, and 'changelog' is in the list because
@@ -217,7 +217,7 @@ function Get-PrDescription {
     # are answered together here rather than as two independent flags.
     #
     # ON TODAY'S SHAPE the start line IS '## DEPLOY: `<branch>`', and it is included. #884's requirement is
-    # that the section is ONE THING in all four places it lands -- development-cycle.md, the PR body,
+    # that the section is ONE THING in all four places it lands -- development.md, the PR body,
     # CHANGELOG.md, the release notes -- and is locked once the PR opens. A copy that drops its own heading
     # and shifts every remaining one is not that thing: it is a rendering of it, and two renderings cannot
     # be compared without agreeing on the transform first. Carried verbatim, the PR body IS the section, so
@@ -597,7 +597,7 @@ function Test-DeployLock {
 
     .DESCRIPTION
         THE LOCK (Dave, issue #884, August 25, 2026). The DEPLOY section travels four times --
-        development-cycle.md -> the PR body -> CHANGELOG.md -> the developer release notes -- and it has to
+        development.md -> the PR body -> CHANGELOG.md -> the developer release notes -- and it has to
         be the same thing at every stop. So it is fixed at the moment the PR opens: after that the document
         may not diverge from what the PR published, because the PR is what reviewers approved and
         CHANGELOG.md is what the fold will take.
@@ -701,9 +701,10 @@ function Get-PrDescriptionPlaceholderDefaults {
         RECOGNISE ALL, WRITE ONE -- and deliberately no count here, because this list only grows and a
         tally of it goes stale silently. The last is what this family's template carries now (the entry path
         moved under the workflow's own folder on August 14, 2026, the file was renamed branch-deployment.md
-        on August 19, on August 23 it became the DEPLOY section of development-cycle.md, on August 25 that
-        section started travelling WITH its heading -- issue #884 -- and on August 26 the folder itself was
-        renamed workflow-davekjohn -> contributing-davekjohn, issue #886); the older
+        on August 19, on August 23 it became the DEPLOY section of development.md, on August 25 that
+        section started travelling WITH its heading -- issue #884 -- on August 26 the folder itself was
+        renamed workflow-davekjohn -> contributing-davekjohn, issue #886, and on August 27 the document
+        was renamed development.md -> development.md, issues #963/#958); the older
         strings stay because a consumer's PR template is THEIR file, and this script must not silently
         stop filling it in because the template it ships beside moved on. An unrecognised placeholder is
         a PR body with no description at all -- the outcome this list exists to prevent.
@@ -741,7 +742,8 @@ function Get-PrDescriptionPlaceholderDefaults {
         "<!-- Filled from contributing-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from contributing-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
-        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
     )
 }
 

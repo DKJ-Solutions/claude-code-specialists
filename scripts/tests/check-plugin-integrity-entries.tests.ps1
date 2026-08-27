@@ -92,14 +92,14 @@ try {
 
     # A DOCUMENT HOLDING A BRANCH'S WORK IS FINE, which is the ordinary state on any branch -- including the
     # branch this check is running on.
-    [System.IO.File]::WriteAllText($bdPath, (((Format-DevelopmentCycle -Branch 'feat/somebodys-work-v1' -Id '20260823-090000') -join "`n") + "`n"), $Utf8NoBom)
+    [System.IO.File]::WriteAllText($bdPath, (((Format-Development -Branch 'feat/somebodys-work-v1' -Id '20260823-090000') -join "`n") + "`n"), $Utf8NoBom)
     $r13bOnBranch = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-True (-not ($r13bOnBranch.Out -match '\[branch-template\].*names the trunk')) 'check 13b: a document holding a branch''s work is not a finding'
     Assert-True ($r13bOnBranch.Out -match "declaring 'feat/somebodys-work-v1'") 'check 13b: and the coverage line names whose work it is'
 
     # THE LEFTOVER. This is the exact file the old behaviour wrote on every fold, so this case is what the
     # inversion is FOR: what used to be the asserted-correct state is now the one error.
-    [System.IO.File]::WriteAllText($bdPath, (((Format-DevelopmentCycle -Branch '') -join "`n") + "`n"), $Utf8NoBom)
+    [System.IO.File]::WriteAllText($bdPath, (((Format-Development -Branch '') -join "`n") + "`n"), $Utf8NoBom)
     $r13bLeftover = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-Equal 1 $r13bLeftover.Code 'check 13b: a document declaring the trunk is an error'
     Assert-True ($r13bLeftover.Out -match 'names the trunk') 'check 13b: and the message says what is wrong with it'
@@ -108,7 +108,7 @@ try {
     # A DOCUMENT BELONGING TO NOBODY. Every reader of this file -- the fold, the two local gates, the CI gate
     # -- identifies a branch's work by the name in the heading, so one without a name is unreadable to all of
     # them. Reported rather than passed, because silence here is what a hand-created file would buy.
-    [System.IO.File]::WriteAllText($bdPath, "# Development cycle`n`nNo branch named anywhere.`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText($bdPath, "# Development`n`nNo branch named anywhere.`n", $Utf8NoBom)
     $r13bNameless = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-Equal 1 $r13bNameless.Code 'check 13b: a document declaring no branch at all is an error'
     Assert-True ($r13bNameless.Out -match 'declares no branch in its heading') 'check 13b: and it is reported as its own case, not as a trunk leftover'
@@ -125,7 +125,7 @@ try {
     $masterReset = & {
         . $fixCfg
         . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
-        ((Format-DevelopmentCycle -Branch '') -join "`n") + "`n"
+        ((Format-Development -Branch '') -join "`n") + "`n"
     }
     [System.IO.File]::WriteAllText($bdPath, $masterReset, $Utf8NoBom)
     $r13bMaster = Invoke-Integrity -FixtureRoot $Fixture -Full
@@ -134,7 +134,7 @@ try {
 
     # The mirror image on the same fixture: 'main' is an ordinary branch name in a repo whose trunk is
     # 'master', so the very shape that was an error two asserts ago must now be silent.
-    [System.IO.File]::WriteAllText($bdPath, (((Format-DevelopmentCycle -Branch 'main' -Id '20260823-090000') -join "`n") + "`n"), $Utf8NoBom)
+    [System.IO.File]::WriteAllText($bdPath, (((Format-Development -Branch 'main' -Id '20260823-090000') -join "`n") + "`n"), $Utf8NoBom)
     $r13bMainOnMaster = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-True (-not ($r13bMainOnMaster.Out -match '\[branch-template\].*names the trunk')) `
         'check 13b: and where the trunk is master, a document naming main is just a branch'

@@ -64,7 +64,7 @@
          thing the wait buys in the foreground is a second look at a result the local gate already gave.
          The one condition is printed with it, because the invitation alone is unsafe -- step 5 checks out
          the trunk in THIS tree, so the session's next move is a lane or nothing.
-      4. TWO GATES, THEN MERGE. The step-list gate refuses while development-cycle.md has an unresolved
+      4. TWO GATES, THEN MERGE. The step-list gate refuses while development.md has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
          review approved and what step 5 folds into CHANGELOG.md. Both are checked here rather than
@@ -511,7 +511,7 @@ if ($null -ne $shipCycleText) {
         } catch {
             $lockBody = ''
         }
-        $lockEntry = Get-DevelopmentCycleEntryText -Text $shipCycleText
+        $lockEntry = Get-DevelopmentEntryText -Text $shipCycleText
         $lock = Test-DeployLock -EntryText $lockEntry -PrBody $lockBody
         if ($lock.Applicable -and -not $lock.Locked) {
             $lockDrift = if ($lock.FirstDrift -eq $lock.Heading) {
@@ -738,7 +738,7 @@ if ($ff.ExitCode -ne 0) { Remove-ShipFoldWorktree -Path $foldTree; Write-Error "
 # IT IS DECLINED, AND THE DECIDING FACT WAS MEASURED RATHER THAN ARGUED. The pathspec above is not merely
 # weakened by that flow -- git refuses to express it at all:
 #
-#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md contributing-davekjohn/development-cycle.md
+#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md contributing-davekjohn/development.md
 #     fatal: cannot do a partial commit during a merge.
 #
 # The only commit git will make while MERGE_HEAD exists is a whole-index one, and in the same test it swept
