@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/review-quota-names-itself-v1` · 20260827-115413
+
+A red `claude-review` now says why it is red where a reader actually lands -- in the run's annotation
+list and on its summary page -- instead of only in the body of a diagnostic step's log. #913 put the
+reason in that log; this puts it in front of the person reading the PR.
+
+The reason it needed doing is that the log was not enough, measured rather than supposed. #966 was
+filed against a run whose log already read `api_error_status: 429` with
+`result: You've hit your session limit`, and concluded the cause was an expired OAuth token and the
+repair a rotated secret. Neither is true: the token authenticates, the account behind it is out of
+session quota, and there is nothing to rotate. The line a reader meets first was the action's own
+`Claude result reported subtype success with is_error:true`, which names nothing at all.
+
+Two things this deliberately does not do. **The check stays red on a 429** -- that means the PR got no
+review, which is exactly what #966 wanted not to be silent, and a green check would hide it better
+than an unreadable red one. **Quota consumption is untouched**: `CLAUDE_CODE_OAUTH_TOKEN` is a
+subscription credential, so the session window it draws on is the same one interactive use draws on,
+and a morning of heavy local work starves the review of every PR opened in that window. Whether the
+review earns its share of that window is a decision about what the dependency is worth, not a defect,
+and the workflow now states the mechanism so the next reader does not have to rediscover it.
+
+For somebody maintaining this repo the gain is one specific hour back: the next time this goes red,
+the summary page says `out of quota -- the review did not run` and nobody re-derives the credential
+hypothesis. It is a 3 rather than higher because it changes no gate, blocks no merge, and is noticed
+only on a failing run -- but this has now failed on four runs across two days, so that is not rare.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches that reader. `.github/workflows/` is this repo's own CI and ships in no plugin, so a
+consumer sees none of it -- not the workflow, not the diagnostic, not the annotation.
+
+**Score:** N/A
+
+#### Pull Request
+
+The 429 review failure names its own reason where a reader sees it
+
+[PR #968](https://github.com/DaveKJohn/claude-code-specialists/pull/968)
+
+---
+
 ### DEPLOY: `feat/adopt-act-on-this-skills-v1` · 20260827-110818
 
 Two built-in skills that look like a pair are split along the line that actually separates them:
