@@ -21,9 +21,17 @@ and none of them is advisory.
 **The cycle itself is written out in [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md), beside this
 file.** That is the page to read — and the page to point your own contributors at — because it names the
 seam wherever your repo owns the answer instead of asserting one repo's answer as the rule. Pair it with a
-`## Specific to this repo` section in your own root `CONTRIBUTING.md` holding your values; the source repo's
-[own answers](https://github.com/DaveKJohn/claude-code-specialists/blob/main/CONTRIBUTING.md) are a worked
-example of that half.
+`## Specific to this repo` section on whichever page carries your floor -- normally your root
+`CONTRIBUTING.md`, and see that page's closing section for when it is not -- holding your values; the source
+repo's
+[own answers](https://github.com/DaveKJohn/claude-code-specialists/blob/main/contributing-davekjohn/CONTRIBUTING.md)
+are a worked example of that half.
+
+**That link moved on August 27, 2026, and the old one is why this sentence is worth reading twice.** It
+pointed at the source's ROOT `CONTRIBUTING.md`, which #980 deleted -- so the worked example this page
+offered a consumer was a 404, while the sentence around it still told them to put their values in a root
+page unconditionally. The source keeps its floor in `contributing-davekjohn/CONTRIBUTING.md` now, and which
+file carries yours is your answer to make.
 
 **And if your work arrives from somebody else's tracker, the cycle starts earlier than `new-branch`.**
 [`TICKETWORK-portable.md`](TICKETWORK-portable.md) covers that layer: how to tell a request that cannot be

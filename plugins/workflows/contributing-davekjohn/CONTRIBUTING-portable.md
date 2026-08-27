@@ -340,3 +340,18 @@ repository sidebar, and it recognises that file only in the root, `.github/` or 
 for by name. Both matter most in a public repo with contributors who have installed nothing, which is
 precisely the reader the floor exists for. Keep the root page unless you can say why your repo is not
 that case.
+
+**If you do retire the root page, inventory it section by section BEFORE you delete it.** That is the
+step that makes the removal safe rather than merely tidy, and it is cheap: for each section, find where
+that rule is actually decided — your root `CLAUDE.md`, a seam lib, a gate, this page — and move anything
+that lives **nowhere else** before the file goes. Most of a drifting root page is restatement and moves
+nowhere; the danger is the minority that is not. Measured in one consumer on August 27, 2026: of seven
+sections, six were restatements of its root `CLAUDE.md` and three rules lived only on the page being
+deleted — one of them a **safety rule about pushing to the live theme**. Deleting the page without that
+pass would have dropped a live-push rule in silence, and no gate in that repo would have said a word,
+because no gate reads a contributing page. That is the whole reason this is an instruction rather than
+a suggestion: the failure is silent by construction.
+
+**And the drift that prompts the removal is itself the evidence for doing the pass.** The same page's
+gate list named three test suites on a day its root `CLAUDE.md` named ten. A page far enough out of date
+to be worth retiring is exactly the page whose contents you can no longer predict from memory.
