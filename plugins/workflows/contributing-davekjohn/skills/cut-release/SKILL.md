@@ -49,14 +49,45 @@ each command as you go — do not skip a step or reorder them from memory.
 
 ### Block 1 — cutting (always)
 
-**0a. Note the time before you start, and note it again when the Release is published.** One line, no
+**0a. Note the time before you start, and note it again when the last asset has landed.** One line, no
 tooling — but it has to be *before*, because a baseline cannot be captured afterwards. Put the end-to-end
 duration in the release document's organisational section, beside whatever else that release cost.
+
+**THE END POINT IS THE LAST ASSET, NOT THE PUBLISH** (inbound #988, August 27, 2026). This step used to
+say *"note it again when the Release is published"*, and step 5 publishes the Release and *then* uploads
+the attachments — deliberately, for the reason given below. So the clock this step defined stopped one
+action before the release finished, and said nothing about the gap, which meant two people following it
+on the same release wrote down two different totals. That is the failure this step exists to prevent: its
+whole premise is that the figure was measured rather than estimated, and a figure whose end point is
+ambiguous is not measured. Measured on the patch that reported it: the Release published 59s after the
+release commit and the last asset landed **5s after the publish**. Small — and that is the point. It is
+small there, on one attachment, and nothing said whether it counted.
+
+**AND ON A RELEASE TYPE THAT WRITES NO DOCUMENT, THE REQUIREMENT IS CONDITIONAL — say so rather than
+leaving the figure nowhere to go** (same report). Step 4 states that **a patch writes no document at
+all**, and `Get-ReleaseConsumerBumps` computes `('minor','major')` as its default — so in every repo
+that leaves that seam alone, the release type cut most often has no organisational section for this
+number to land in. The instruction does not fail loudly there; it simply has no object, and the figure
+evaporates into the closing chat report, which the paragraph below names as insufficient.
+
+Two honest answers, and NOT a third:
+
+- **your repo has somewhere durable that a release's cost belongs** — then name that place in your own
+  release-answers page and write it there, exactly as you would the document's organisational section.
+  This page does not name the file for you: where it goes is a fact about your tree, and a location
+  invented here would be wrong in most repos;
+- **your repo has nowhere** — then this step is genuinely conditional for a patch and you are not
+  holding an instruction with no target. Measure it anyway if it is interesting; nothing requires you to
+  file it.
+
+**The generated tier-0 note is NOT that place**, which is the third answer and the tempting one. It is
+generated every cut, so hand-written prose inside it is prose the next cut has no reason to preserve.
 
 **THE DOCUMENT CANNOT TIME ITS OWN PUBLICATION, so the instruction is split in two** (measured August 11,
 2026, on the first release that followed this step). The release note is frozen for its own commit at
 step 4, and the Release is published at step 5 — so at the moment you write the timing section, legs are
-still running *on the file you are writing*: its push, whatever CI that push starts, and the publish.
+still running *on the file you are writing*: its push, whatever CI that push starts, the publish, and
+the attachments that land after it.
 Asking for the total there asks for a number that does not exist yet, and the failure mode is obvious the
 moment it is named: whoever writes it fills the gap with an estimate, in a section whose whole purpose is
 that the figure was measured.
@@ -71,9 +102,11 @@ So write it in two passes, and expect the second one:
 
 **Do not "solve" this by publishing the Release earlier**, which is the first thing that suggests itself. It
 would put the publish before the attachments exist, which is what step 5's ordering is for; the tail of a
-release is cheap to measure twice and expensive to publish twice. And do not settle for the total living
-only in the closing report you give the requester: a chat message is not where the next person looks for
-what a release costs.
+release is cheap to measure twice and expensive to publish twice. And where a document IS written, do
+not settle for the total living only in the closing report you give the requester: a chat message is not
+where the next person looks for what a release costs. That clause is deliberate — on a release type that
+writes no document, per step 0a's conditional above, the chat report may be the only place there is, and
+saying so beats an absolute a reader cannot obey.
 
 **The measured instance:** at `v4.4.0` the frozen subtotal was 9m 42s of a run that came to **28m 03s**, so
 the three unmeasurable legs were **two thirds of the release**. A document carrying only the first pass is
