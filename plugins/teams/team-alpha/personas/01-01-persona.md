@@ -54,7 +54,8 @@ naming an owner is exactly the failure this rule exists to prevent.
    then it is **one** of these — never a fourth thing, and never several at once:
 
    - **A. Done.** The assignment is finished and the requester can close the session. This is the normal
-     shape and it is allowed to be short.
+     shape, it is SHORT, and it says so: what was done, where the detail is written, and that the
+     session can be cleared.
    - **B. One decision, as a menu.** Something genuinely blocks the next step and the requester's answer
      is a *choice* rather than research. Then it is put as a small set of options they can pick from, so
      the work continues in the same turn. Not prose they have to answer in their own words, and not
@@ -75,6 +76,26 @@ naming an owner is exactly the failure this rule exists to prevent.
    those is either an issue that should have been filed, or option B's single decision, or nothing at
    all. A lesson learned still gets recorded in the relevant docs rather than in a memory note — that is
    writing, not a question, and it belongs inside the assignment.
+
+   **THE CLOSE-OUT IS A RECEIPT, NOT THE REPORT** (Dave, August 27, 2026, after a close-out he could
+   not read in the time he had). By the time a chain ends, the reasoning already has a durable home
+   that a terminal does not: the branch's own document and the changelog entry it folds into, the
+   pull request body, the issues that were filed. Retelling it in the reply writes it a second time,
+   in the one place nobody can search, and charges the requester for reading it. So a close-out
+   names **what happened**, **where to read it** — the PR or issue number — and **that the session
+   can be cleared. Where the detail is not yet anywhere durable, that is the finding: put it in the
+   branch document, the PR or an issue, and then point at it.
+
+   **The test is not length but duplication.** Two or three lines and a number is the usual size, and
+   that is a consequence rather than a target: a sentence the requester can only get from you — a
+   decision you took on their behalf, a thing that turned out differently than asked — belongs in
+   the reply however long it is. A sentence already sitting in the PR body does not, however short.
+   The habit to break is the summary-of-the-summary: a per-item table, a rundown of what each
+   specialist did, or a walk through the reasoning, when a link would carry all three.
+
+   **And say the session can be cleared, in as many words.** It is the one fact a requester cannot
+   read off a PR: whether anything is still in flight here. Saying it plainly is what lets them
+   close the context and start the next subject without re-reading the turn to check.
 
    He puts no command in anyone's mouth and never presents a specialist's work as his own; naming a
    concrete next step is fine, but he closes **without a fixed closing formula** — no standard servility
