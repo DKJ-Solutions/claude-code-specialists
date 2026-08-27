@@ -6,15 +6,39 @@ a `CLAUDE.md` holding the workflow's mechanics — and they merged on August 26,
 contributing-davekjohn folder has no use as well. I want to merge that file with CONTRIBUTING as one
 complete CONTRIBUTING file. Because that should be the center of this folder."*
 
-**It sits on top of two root pages, and wins over both on conflict** (Dave, August 14, 2026): the repo's own
-[`CONTRIBUTING.md`](../CONTRIBUTING.md) and its [`CLAUDE.md`](../CLAUDE.md). Those two describe what holds
-here whether or not this plugin is installed — never directly on `main`, branch + PR, CI green, and the three
-direct-on-`main` exceptions with their bounds. This page carries what the **workflow** adds: the four gates,
-how those three exceptions actually run, and the measurements behind them.
+**It sits on top of the repo's [`CLAUDE.md`](../CLAUDE.md) and wins over it on conflict** (Dave,
+August 14, 2026). That page describes what holds here whether or not this plugin is installed — never
+directly on `main`, branch + PR, CI green, and the three direct-on-`main` exceptions with their bounds. This
+page carries what the **workflow** adds: the four gates, how those three exceptions actually run, and the
+measurements behind them.
 
-The split is worth what it costs for the reason the root pages give: the root loads on **every** session,
-this page only when a session touches this folder. A rule that bites only while the workflow is in play does
-not belong on the always-on path.
+The split is worth what it costs for the reason that page gives: the root loads on **every** session, this
+page only when a session touches this folder. A rule that bites only while the workflow is in play does not
+belong on the always-on path.
+
+**It layered over a second root page until August 27, 2026, and now carries that page's content instead**
+(Dave, in the same instruction that moved `CHANGELOG.md` and the release history into this folder). The
+repo's own `CONTRIBUTING.md` held the **standard workflow** — the three rules below — and it was kept at the
+root deliberately, so it would still mean something the day the plugin was absent. What that produced in
+practice was a reader handed from one page to another to learn how work reaches `main`. Everything the
+contribution cycle produces or governs now lives in this folder, this page included, so the standard workflow
+is simply stated here, first, ahead of anything the workflow adds to it:
+
+1. **Never commit directly to `main`.** Every change travels on a branch and reaches `main` through a
+   Pull Request.
+2. **CI must pass before the merge.** The `main` ruleset requires the `lint-en-tests` status check; a
+   merge attempted before it goes green returns `BLOCKED`.
+3. **One change per branch**, described in the PR, and the branch is deleted after the merge.
+
+**Those three still hold with no plugin installed**, which is what the root page existed to guarantee, and
+they are guaranteed by something better than a location: the `main` ruleset enforces rules 1 and 2 on the
+server, whoever is or is not running this workflow.
+
+**What the move costs, stated here rather than discovered later.** GitHub reads a contributing page from the
+repo root, `docs/` or `.github/` and from nowhere else, so the *Contributing guidelines* link it used to show
+above a new issue and a new Pull Request is gone. That link was a signpost, never a guard — the rules it
+pointed at are enforced by the ruleset and by CI — but a first-time contributor now arrives at
+[`README.md`](../README.md) and this folder rather than at a page GitHub put in front of them.
 
 **The cycle itself is described once, with the plugin**, naming the *seam* wherever a repo owns the answer
 instead of asserting one repo's answer as the rule:
@@ -387,7 +411,7 @@ cleared by this run, so leaving it out would produce a commit that clears half t
 cut before the two files merged, since one document is cleared in one move. See
 [Rendall #06](../.claude/specialists/lenses/05-06-extension.md#changelog).
 
-The pending entries, ranked furthest-reach-first, are in [`CHANGELOG.md`](../CHANGELOG.md).
+The pending entries, ranked furthest-reach-first, are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -457,7 +481,7 @@ both read sites read the old name too and a consumer who defined it acts on noth
 `cut-release.ps1` refuses to file a new major's row under the previous major's section and does not open the
 new section itself, and the live assert in
 [`release-lib.tests.ps1`](../scripts/tests/release-lib.tests.ps1) pins which major
-[`releases/README.md`](releases/README.md) targets — so cutting `v4.0.0` took `b2cea9c` (the `#### 4.x` heading
+[`releases/history.md`](releases/history.md) targets — so cutting `v4.0.0` took `b2cea9c` (the `#### 4.x` heading
 plus its empty table header) and `1d2d3ff` (that pin, with the reason written above it) before the cut would
 run at all. Both were made by hand, on `main`, while the exception on paper covered only the release commit
 itself.
@@ -506,9 +530,12 @@ that decided it.
 motion, so the written version lands in the following commit either way. And the gates still run — being off a
 branch skips `open-pr`, not the lint and the suites.
 
-**The `releases/README.md` in this folder is the living index** — the cut inserts its own row, so never add one
-by hand for a release a script will write. The list of releases actually cut is on
-[this repo's own release page](../releases/README.md#the-release-list).
+**The `releases/history.md` in this folder is the living index** — the cut inserts its own row, so never add
+one by hand for a release a script will write. Its
+[release list](releases/history.md#the-release-list) is what has actually been cut. Beside it,
+[`releases/README.md`](releases/README.md) is a different document: this repo's answers to the portable
+release page. They shared the name `README.md` until August 27, 2026, when the list moved into this folder
+and had to stop.
 
 **Everything under `releases/audience/` is a published record**: links may be repointed when a target moves,
 prose is never rewritten. **What that protects is a line that was TRUE when it was published** — going stale

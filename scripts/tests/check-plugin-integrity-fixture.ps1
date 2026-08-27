@@ -60,6 +60,11 @@ $PrBodyLibSrc = Join-Path $RepoRoot 'scripts\lib\pr-body-lib.ps1'
 # not carry does not make one check misbehave, it kills the script at the dot-source and every check
 # after it silently never runs.
 $MeasureContextSrc = Join-Path $RepoRoot 'scripts\lib\measure-context-lib.ps1'
+# seam-lib.ps1 -- added August 27, 2026, when checks 11, 19 and 20b stopped naming 'CHANGELOG.md' as a
+# literal and started reading Get-ChangelogPath the way the fold reads it. Exactly the failure the
+# paragraph above describes: without this copy the gate dies at that dot-source, before check 11, and four
+# suites report dozens of unrelated scenarios as broken.
+$SeamLibSrc = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 # Dot-sourced into the RUNNER as well as copied into the fixture: check 13b's scenarios build their
 # template files from Get-BranchTemplates, so the test and the check read the same definition. A fixture
 # written out by hand here would be the very second source of the format that check exists to prevent.
@@ -198,6 +203,7 @@ function New-IntegrityFixture {
     Copy-Item -Path $PluginTreeSrc -Destination (Join-Path $Fixture 'scripts\lib\plugin-tree-lib.ps1') -Force
     Copy-Item -Path $PrBodyLibSrc -Destination (Join-Path $Fixture 'scripts\lib\pr-body-lib.ps1') -Force
     Copy-Item -Path $MeasureContextSrc -Destination (Join-Path $Fixture 'scripts\lib\measure-context-lib.ps1') -Force
+    Copy-Item -Path $SeamLibSrc -Destination (Join-Path $Fixture 'scripts\lib\seam-lib.ps1') -Force
 
     # The reference PR template check 24 holds, written from the same function the check compares against
     # -- never typed out here, for the reason stated at the dot-source above.

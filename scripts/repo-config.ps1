@@ -263,7 +263,9 @@ function Get-MojibakePaths {
     <# Absolute paths of the files fix-mojibake.ps1 examines when called without -Path. #>
     param([Parameter(Mandatory = $true)][string]$RepoRoot)
 
-    # Every markdown file in the repo root: CHANGELOG.md and the root docs.
+    # Every markdown file in the repo root: README.md, CLAUDE.md and the rest of the root docs. It named
+    # CHANGELOG.md first until August 27, 2026, when that file moved into contributing-davekjohn/ and so
+    # arrives through the recurse below instead.
     $paths = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 
@@ -310,6 +312,12 @@ function Get-MojibakePaths {
     # changelog). They sit outside the language rule because they are history, but the two questions are
     # not the same: not translating an old note preserves what it said, while leaving mojibake in it
     # preserves a mis-decode nobody wrote.
+    #
+    # THIS REPO NO LONGER HAS THAT DIRECTORY (August 27, 2026): its notes sit under
+    # contributing-davekjohn/releases/ and arrive through the recurse above. The block stays, because the
+    # Test-Path is what makes it correct rather than stale -- a repo that still keeps notes at its root
+    # gets them scanned, and one that does not pays a single Test-Path. Removing it would narrow a
+    # consumer's coverage to buy nothing here.
     $releasesRoot = Join-Path $RepoRoot 'releases'
     if (Test-Path -LiteralPath $releasesRoot) {
         $paths += @(Get-ChildItem -LiteralPath $releasesRoot -Recurse -File -Filter '*.md' |
@@ -429,11 +437,60 @@ function Get-ReleaseNotesGrouping {
 # IS repo-specific content, so it is simply the last section of the slot. Merging them also removed four
 # cross-references the two pages needed to introduce each other, and left a consumer with one file to
 # mirror instead of two.
-$script:ReleaseHistoryPath = 'releases/README.md'
+# UNDER contributing-davekjohn/ SINCE AUGUST 27, 2026 (Dave), which REVERSES the August 19 answer
+# recorded three paragraphs up -- amended rather than silently flipped, so both readings stay legible.
+# That answer sent the list back to the repo root on one premise: an index of releases had no business
+# sitting in "a plugin folder that a teardown removes". THE PREMISE EXPIRED BEFORE THE ANSWER DID.
+# Issue #885 settled that contributing-davekjohn/ is PERMANENT -- no command in this plugin removes it and
+# no future teardown may, precisely because it holds a repo's own changelog and release history -- and
+# UNINSTALL.md's "what is left behind" list says so to every consumer. Once that is true the durability
+# worry is answered a different way, and the folder is the safer home rather than the riskier one. It is
+# also the answer the computed default has been giving every CONSUMER since #885; the source was the
+# holdout, on a reason that no longer holds.
+#
+# THE FILENAME CHANGES WITH THE MOVE, and that is not cosmetic: this folder's own 'releases/README.md' is
+# its seam-ANSWERS page. The list and the answers are two different documents that shared a filename only
+# because they sat at different directory levels. 'history.md' is the name Get-DefaultReleaseHistoryPath
+# already computes for a consumer, so the source stops being the one repo that names it differently.
+$script:ReleaseHistoryPath = 'contributing-davekjohn/releases/history.md'
 
 function Get-ReleaseHistoryPath {
     <# Repo-root-relative path to the file that lists every release this repo has cut. #>
     return $script:ReleaseHistoryPath
+}
+
+# --- Where this repo keeps its changelog (Dave, August 27, 2026) -----------------------------------
+#
+# THE SAME MOVE, ON THE SAME DAY AND FOR THE SAME REASON as the release history above -- read that record
+# first. Get-DefaultChangelogPath computes 'CHANGELOG.md' for a repo that publishes plugins, i.e. for the
+# workflow's SOURCE, and 'contributing-davekjohn/CHANGELOG.md' for everybody else. This repo is the source
+# and now answers the consumer's way, so the seam has to be stated rather than left to the default.
+#
+# NOT A CHANGE OF MIND ABOUT THE DEFAULT. The default is right about what a repo adopting this workflow
+# should get and says nothing about what THIS repo prefers; the seam exists for exactly this, a repo that
+# wants to differ from its computed answer. Nothing about a consumer changes here.
+#
+# WHAT IT COSTS. A relative link inside a changelog entry now resolves from contributing-davekjohn/ rather
+# than from the repo root, because that is where the fold pastes it. new-branch composes the branch
+# document's guidance from this very seam, so a writer is told the right thing without having to know it,
+# and check-plugin-integrity validates each entry's links against the same resolved location.
+$script:ChangelogPath = 'contributing-davekjohn/CHANGELOG.md'
+
+function Get-ChangelogPath {
+    <# Repo-root-relative path to the changelog the fold writes into and the cut empties. #>
+    return $script:ChangelogPath
+}
+
+# Where the generated internal note (tier 1) is written. Stated for one reason: without it
+# Get-DefaultReleaseInternalNotesRoot would answer 'releases/internal' here -- the source branch of that
+# default -- and recreate a root releases/ directory the August 27, 2026 move above just emptied. The
+# other two generated roots (changelog/, github/) need no statement: their defaults stopped branching on
+# the source at #914 and already point into this folder.
+$script:ReleaseInternalNotesRoot = 'contributing-davekjohn/releases/internal'
+
+function Get-ReleaseInternalNotesRoot {
+    <# Repo-root-relative directory the generated internal (tier 1) note is written into. #>
+    return $script:ReleaseInternalNotesRoot
 }
 
 # Where the hand-written release note goes -- the one document with a named section per reader, since the
@@ -474,9 +531,11 @@ function Get-ReleaseHistoryPath {
 # nothing is hardcoded any more, and once they are seams the question is no longer what THIS repo does
 # but what every repo's default should be -- and a tree nothing writes but a cut exists only because the
 # workflow does, exactly like the hand-written note that was already in the folder. So the three note
-# roots are siblings now, and releases/ holds nothing but the release LIST. What did NOT move is that
-# list (Get-ReleaseHistoryPath, above): a repo that has cut releases has a history whichever tooling cut
-# it. The history-table row and the note's link prefix are both computed from these seam values, which is
+# roots are siblings now, and releases/ holds nothing but the release LIST. THAT LIST FOLLOWED THEM ON
+# AUGUST 27, 2026 (Dave) and the root releases/ directory is gone -- this paragraph used to end by saying
+# it had not, on the reasoning that a repo that has cut releases has a history whichever tooling cut it.
+# That reasoning was about durability rather than ownership, and Get-ReleaseHistoryPath's own record above
+# is where it is answered. The history-table row and the note's link prefix are both computed from these seam values, which is
 # what makes each of these repointings a few lines rather than a dead-link generator.
 $script:ReleaseNoteRoot = 'contributing-davekjohn/releases/audience'
 
@@ -536,6 +595,16 @@ function Get-ReleasePluginTier {
 # would have made the list describe a root that no longer exists, and it would have SILENCED the one
 # signal worth having: a QUICKSTART.md reappearing in the root now means somebody moved it back by
 # accident, and cut-release should say so rather than wave it through.
+# CHANGELOG.md AND CONTRIBUTING.md STAY ON, THOUGH THEY LEFT THE ROOT ON AUGUST 27, 2026, and that is the
+# one place the paragraph above does NOT generalise. Taking them off was tried the same day, on its
+# reasoning -- an inert entry describes a root that no longer exists, and a CHANGELOG.md reappearing there
+# would be worth a word. It broke the cut, loudly and correctly: this list is read by the PORTABLE
+# cut-release to decide which root *.md files are permanent documents rather than unfolded entries, and a
+# repo that keeps its changelog at the root -- every fixture in cut-release-drive.tests.ps1, and any
+# consumer that answers the seam that way -- then has its own changelog reported as an entry somebody
+# forgot to fold, which refuses the release. So the list is about the NAME of a permanent document, not
+# about whether this particular repo currently has one at its root, and the two names belong on it as long
+# as any repo reading this file might.
 $script:ReservedRootMd = @(
     'CHANGELOG.md', 'CLAUDE.md', 'README.md', 'LICENSE.md', 'CONTRIBUTING.md', 'SECURITY.md',
     # INSTALL.md and UNINSTALL.md moved here from plugins/ on August 14, 2026 (inbound #664). They are

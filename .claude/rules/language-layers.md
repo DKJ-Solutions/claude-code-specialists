@@ -6,7 +6,7 @@ paths:
   - ".github/**"
   - "releases/**"
   - "contributing-davekjohn/releases/**"
-  - "CHANGELOG.md"
+  - "contributing-davekjohn/CHANGELOG.md"
   - ".gitignore"
 ---
 
@@ -125,7 +125,8 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
 - **History** — the archived per-release notes under `contributing-davekjohn/releases/changelog/*.md` (at
   `releases/development/*.md` until August 26, 2026, #914) are this repo's narrow
   exception to the norm and may remain in their original language (older ones are Dutch).
-  `CHANGELOG.md` and the release-history README (now `releases/README.md`) are themselves fully English (translated July 22, 2026,
+  `CHANGELOG.md` and the release history (both under `contributing-davekjohn/` since August 27, 2026 --
+  the changelog beside this folder's contributing page, the list as `releases/history.md`) are themselves fully English (translated July 22, 2026,
   Dave's decision), so the exception no longer covers them.
 
 Decision by Dave, July 20, 2026 (repo-wide English) — the decision that in turn prompted the

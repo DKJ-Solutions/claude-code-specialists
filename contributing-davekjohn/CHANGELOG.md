@@ -15,9 +15,9 @@ was — including the four written under `PR`, which are in the list below right
 before August 23, 2026 carry that first answer under a `###` question of its own with the second nested
 at `####` beneath it; entries before August 16 carry the longer set of headings that shape replaced, and
 every earlier shape is read exactly as it always was. Every release ever cut is listed in
-[`releases/README.md`](releases/README.md) — each with its date, type and title, and a link to what that
+[`releases/history.md`](releases/history.md) — each with its date, type and title, and a link to what that
 release was worth. How the mechanism works (entry files, the Significance sections, folding) is described in
-[`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md).
+[`contributing-davekjohn/CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Each change declares its own **reach**, and per audience how much it **weighs** there — one `##### Tier N`
 sub-section per tier where a repo writes them numbered, each closing with its score; here the audience tier

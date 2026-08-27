@@ -208,17 +208,23 @@ foreach ($rec in @($bp.records | Where-Object { $_.declared -and $_.text })) {
     }
 }
 
-# The source leaves nine contract functions at the built-in fallback: the two impact-table seams,
+# The source leaves seven contract functions at the built-in fallback: the two impact-table seams,
 # Get-TestCommands since inbound #644 (this repo's suites are all PowerShell), Get-EntryGateExemptPrefixes
 # since inbound #789 (this repo runs no mirror branches, so 'sync' being the default IS its answer), and
 # Get-ReleasePageMasthead since inbound #809 (this repo has no wordmark to put on its page) -- five, until
 # issue #885 added four more (Get-ChangelogPath, Get-ReleaseChangelogNotesRoot, Get-ReleaseGithubNotesRoot,
-# Get-ReleaseInternalNotesRoot), each with a computed default that already states this repo's own answer
+# Get-ReleaseInternalNotesRoot), each with a computed default that already stated this repo's own answer
 # without an explicit declaration (see each record's own AdoptWhy). Recorded as declared=false with no text
 # rather than dropped, because "this repo does not state it either" is an answer -- and the honest one to
 # hand a consumer.
+#
+# NINE UNTIL AUGUST 27, 2026, when this repo moved its changelog and its release history into
+# contributing-davekjohn/ and therefore had to STATE Get-ChangelogPath and Get-ReleaseInternalNotesRoot --
+# the first to differ from its own computed answer, the second because that one still branches on the
+# source and would have recreated the root releases/ directory the move had just emptied. The two roots
+# whose defaults stopped branching at #914 are still unstated, which is why it is seven and not five.
 $undeclared = @($bp.records | Where-Object { -not $_.declared })
-Assert-Equal 9 $undeclared.Count 'the nine functions the source itself leaves at the fallback are recorded, not dropped'
+Assert-Equal 7 $undeclared.Count 'the seven functions the source itself leaves at the fallback are recorded, not dropped'
 foreach ($rec in $undeclared) {
     Assert-Equal '' $rec.text "$($rec.function): an undeclared record carries no text to copy"
 }
@@ -290,7 +296,7 @@ $answers = & {
 } $repoConfig
 Assert-Equal 'someone/their-repo' $answers.RepoName 'the consumer keeps its own repo name'
 Assert-Equal '.claude/specialists/SPECIALISTS.md' $answers.RosterPath 'an adopted function answers'
-Assert-Equal 'releases/README.md' $answers.HistoryPath 'an adopted function answers (back at the shared default since August 19, 2026: a repo''s release HISTORY is the repo''s, not the workflow''s, so it does not live in a folder a teardown removes)'
+Assert-Equal 'contributing-davekjohn/releases/history.md' $answers.HistoryPath 'an adopted function answers (in the workflow folder since August 27, 2026, which reverses the August 19 answer: the durability worry that sent the list back to the repo root was answered by #885 making that folder permanent)'
 Assert-Equal 'Chore' $answers.Fallback 'an adopted function answers'
 Assert-True ($null -ne $answers.BodyHolder -and $answers.BodyHolder.Length -gt 0) 'a function that sits below the shared assignment block still answers (extraction bug 2)'
 

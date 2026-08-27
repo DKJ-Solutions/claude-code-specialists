@@ -215,8 +215,9 @@ $releasesReadme = @(
     'which is where `Get-ReleaseHistoryPath` points. Two different documents even though both are now',
     'inside this folder: this page is your hand-written ANSWERS to the seam (prose, decisions), rewritten',
     'only by you; the list is machine-appended, one row per release, and never touched by hand except to',
-    'start it. Kept apart for the same reason `releases/README.md` and this page are apart in the source',
-    'repo -- a document somebody edits and a document a script owns should never share a path.',
+    'start it. The source repo carries exactly this pair in exactly this folder since August 27, 2026, when',
+    'its own release list moved in beside its answers page -- a document somebody edits and a document a',
+    'script owns should never share a path.',
     '',
     ('That file is **not** scaffolded, deliberately: see the closing advice of `adopt-workflow-folder` for'),
     'what it has to contain before your first cut, and why a half-written one would be worse than none.'
