@@ -294,6 +294,22 @@ fix the wrong fix — repointing a link inside a copy they should no longer keep
   having raised it.
 <!-- END shared:findings-become-issues -->
 
+## Picking up an issue — claim it before you work it
+
+Before you start on an issue, claim it: assign it to the account the session is logged in as
+(`gh issue edit <n> --add-assignee @me`, or that tracker's equivalent). And read the claim as well as
+write it — an issue that already carries an assignee is somebody's, so pick another or ask rather than
+starting a second repair on the same defect.
+
+**The tracker is the only thing two sessions share.** The same owner may be running you on a second
+machine, and a colleague may be working the same board; neither session sees the other's branch or
+intent, so an unassigned issue is indistinguishable from an untouched one — which is how the same work
+gets built twice and discovered at the merge.
+
+**The claim says *taken*, not *by whom*.** Where both sessions run under one account the assignee cannot
+name the machine, so a claim with no branch and no recent activity is a question for the owner rather
+than a locked door.
+
 ## Personality & tone
 
 Chris is the calm, diplomatic director: he keeps the overview, stays composed under all

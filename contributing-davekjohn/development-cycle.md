@@ -33,23 +33,61 @@
 
 ### PLAN
 
-Issue #987: when a session picks an issue to work on, it assigns it to the logged-in GitHub account first, and checks for an existing assignee before picking. Rule goes in Chris's portable persona, outside the generated shared block.
+Issue #987: a session that picks an issue to work on claims it first, so a session on Dave's other
+machine cannot pick the same one. The rule fires at **intake**, which is why it lands in Chris's
+portable persona rather than on the workflow page: by the time a session reads a page about branches it
+has already chosen.
+
+#### Why not the generated shared block
+
+`findings-become-issues.md` is the tracker cluster and is carried by 30 agent defs and personas. It is
+about **filing**; this rule is about **choosing**, and only the orchestrator chooses. So the rule goes in
+Chris's own prose beside that block rather than inside it -- 30 copies of a rule that 29 of them never
+reach is exactly the always-on cost this repo measures for.
+
+#### Why no script and no lens
+
+Noticed once, so it is written down; automated the second time. And a consumer has nothing to differ on
+here -- `gh issue edit --add-assignee @me` is not this repo's own mechanism -- so the rule has no repo
+lens half.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Chris's portable persona (`../plugins/teams/team-alpha/personas/01-01-persona.md`) carries
+      `## Picking up an issue -- claim it before you work it`, placed after the `findings-become-issues`
+      shared block and before `## Personality & tone`.
 
 ### TEST
 
+- [x] The rule applied to itself: #987 was assigned to the logged-in account (`DaveKJohn`) before this
+      branch existed, and it is the only one of the 15 open issues carrying an assignee.
+- [x] `check-plugin-integrity.ps1` + every suite green via `open-pr.ps1`.
+
 ### DEPLOY: `feat/claim-the-issue-before-you-work-it-v1`
 
-**Score:**
+A session that picks up an issue now claims it first, by assigning it to the account it is logged in as,
+and reads the claim before choosing -- an issue that already carries an assignee is somebody's. Dave runs
+this repo from two machines under one GitHub account, so the tracker is the only thing the two sessions
+share: neither sees the other's branch or intent, and an unassigned issue is indistinguishable from an
+untouched one. That is how the same issue gets repaired twice and found out at the merge.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+**The rule states what the claim does not prove, which is the half that would otherwise be learned the
+hard way.** Where both sessions run under one account the assignee names the account and never the
+machine -- so a claim is a binary *taken*, not a lock, and a claim with no branch and no recent activity
+is a question for the owner rather than a closed door. Without that sentence the first stale assignment
+teaches a session to treat the marker as authoritative and leave real work parked.
+
+**It sits in the persona, not on the workflow page, because the trigger is intake.** Claiming is not a
+branch mechanic a consumer opts into with Dave's method; it is what an orchestrator does the moment it
+chooses what to work on. So any consumer whose repo has a tracker and more than one worker gets it, and
+gets it before the choice rather than after.
+
+**Score:** 2
 
 #### Pull Request
 
 Claiming an issue on pickup, so a second machine can see it is taken
-
