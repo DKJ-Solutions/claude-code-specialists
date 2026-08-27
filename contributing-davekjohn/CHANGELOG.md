@@ -32,6 +32,152 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/inbound-sixth-pattern-mirror-in-the-reporters-tree-v1` · 20260827-142712
+
+Triaging an inbound item now checks six things instead of five, and the sixth is **which tree the symptom
+is in**. Every earlier check holds the report against the tree you are standing in and quietly assumes
+the defect is there too; a reporter measuring from another repo can be right about the symptom, the
+reason, the line number and the 404, and wrong about whose file it is. The rule half lands in Chris's
+always-on body -- resolve the path in your own tree before accepting the attribution, and where it
+resolves to nothing the finding has neither collapsed nor been repaired -- and the measurement lands in
+the `triage-inbound` skill.
+
+The instance is [#954](https://github.com/DaveKJohn/claude-code-specialists/issues/954), closed
+August 27, 2026. It reported two dead `plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md`
+blob URLs above the horizontal rule in `releases/README.md`, verified 404 against the new path's 200.
+Every fact was true, and none of it was here: the tree returns **zero** live hits for that path, and that
+page has no horizontal rule at all. `94476de6` (August 13, inbound #646) moved the mirrored process half
+out of the file and into `RELEASES-portable.md`, taking both URLs with it; `8797f7a5` (August 26, #886)
+corrected the path in its new home. The links are in the reporter's
+`contributing-davekjohn/releases/README.md` -- a different path than the report names, whose own
+`releases/README.md` returns 404 -- at lines 196 and 289, above the rule at 336.
+
+**What made it invisible is the report's own justification**, which is the half worth distrusting: *"the
+content above the rule is a verbatim mirror of the source's page, so a local fix would just restart
+drift."* Sound reasoning from an identity the two trees had stopped sharing thirteen days earlier, ended
+by the very change that ended the mirroring. Being identical is a mirror's whole design, so its content
+can never tell you which side you are reading -- date it instead. Line 482 of their copy still describes
+`RELEASES-portable.md` as a proposal, which pins the mirror to before #646 landed. And a mirror retired
+upstream makes the proposed fix the wrong fix: repointing two URLs preserves a ~4,000-word hand-maintained
+copy of a process half that no longer exists, which is the exact cost #646 was filed to end.
+
+For somebody maintaining this repo the gain is one grep at intake and a closure that tells a reporter
+something they could not have worked out themselves. It is a 2 rather than higher because the check was
+already run in the triage that produced it -- what lands is the written form, and it is noticed on the next
+inbound rather than today.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Chris's body is loaded in every session of every repo that enables `team-alpha`, so this arrives on a
+plugin update whether or not anyone asked for it -- which is the reason its size was measured rather than
+estimated. The first draft cost **1,528 B**; what ships is **1,143 B**, about 285 tokens per session, and
+the trim took out the generic restatement rather than the tell.
+
+The check reaches a consumer in the direction they actually meet it. They do not receive inbound from
+consumers of their own, but they do receive reports -- from a session, a teammate, their own earlier
+notes -- about content they mirror from here, and the whole family of `*-portable.md` pages plus the
+above-the-rule half of the workflow folder's pages is mirrored content by design. #954 is what that looks
+like from the other side: a careful reporter, correct measurements, and an attribution built on a sharing
+relationship that had already been dissolved upstream. The paragraph that helps them most is the one
+saying a stale mirror can be dated from inside itself.
+
+**Score:** 2
+
+#### Pull Request
+
+the triage skill carries a sixth inbound pattern: the symptom is real and it is in the reporter's tree
+
+Plugins: team-alpha
+
+[PR #979](https://github.com/DaveKJohn/claude-code-specialists/pull/979)
+
+---
+
+### DEPLOY: `fix/park-names-what-backs-the-ticks-v1` · 20260827-132350
+
+Every automatic park commit now says what is behind the plan it publishes. `park-cycle` measures three
+figures before it commits -- how many of the document's steps are resolved, how many files are committed on
+the branch besides that document, how many are uncommitted in the working copy the park came from -- and
+writes them into the commit body as a `Backing:` line. Where the plan reads as **finished** with nothing
+behind it, an alarm paragraph says so in as many words and names the wrong move. `session-status` prints the
+note back under every parked branch, so `/lock` and `/handover` surface it without a checkout, and says
+plainly where there is none.
+
+The state it exists for was measured here on August 27, 2026
+([#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960)).
+`feat/adopt-act-on-this-skills-v1` sat on origin with three `park:` commits, eight resolved CREATE steps
+naming edits to three agent defs, three manuals and two lenses -- and a diff against `main` consisting of
+the cycle document alone, 161 insertions, one file. The edits were uncommitted in the other device's working
+copy, which no reader of origin can see. `#900` publishes the plan so a second device can read it, and on
+that branch it delivered the plan and inverted its purpose: from origin, *ticked and committed* and *ticked
+and uncommitted somewhere else* are the same document, and the more complete the ticks, the more convincing
+the wrong reading. A session picking it up in good faith either rebuilds eight changes that already exist,
+or opens a PR that merges 161 lines the fold then deletes.
+
+Four bounds decide the shape, and each of them was the alternative. **It is a note, never a gate** -- a park
+that refused because it disliked the plan would be worse than the misleading document, because then the plan
+would not reach the other machine at all. **Counts, never filenames** -- the uncommitted figure describes
+work nobody asked to publish, and listing those paths would defeat bound 1 (one document, never
+`git add -A`) one layer along. **The alarm fires on the finished shape only**: any resolved step with nothing
+committed would fire on nearly every early park, because a planning step ticked before a line of code exists
+is the ordinary case, and an alarm that fires on almost every park is one nobody reads by the time it
+matters. **And the measurement lives on the machine that holds the invisible work**, taken at the moment it
+becomes invisible -- nowhere else can take it, since from origin those files do not exist. That is also why
+the reader only echoes the line: a local recount would report 0 for a branch whose commit says 12, and the
+wrong number would be the confident one.
+
+The branch also repaired a defect it exposed rather than filing it, because it is one resolution in the block
+being edited: `session-status` was **listing the trunk as a parked branch**. It read the trunk from
+`refs/remotes/origin/HEAD` alone -- a ref a locally-initialised repo does not have -- and fell back to the
+literal `main`, so any repo whose trunk is named otherwise saw its own trunk in the one block that exists to
+show work that is *not* on the trunk. The suite's negative assert had been passing on a newline-removal
+artefact, with `master` and the next section's `Open` running together into one word so `\b` never matched.
+The trunk now comes from `git ls-remote --symref`, which asks the remote rather than a local ref and needs no
+seam, in the same call the branch list comes from.
+
+For somebody maintaining this repo the gain is that a parked branch can no longer lie about itself, and the
+cost is a handful of lines in a commit body nobody has to read. It is a 3 rather than higher because it
+changes no chain and blocks nothing -- but the state it describes has already cost one triage here, and the
+next reader of that branch would have paid for it in rebuilt work.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The same mechanism through a plugin update, and for a consumer the exposure is larger rather than equal: the
+two-device split this was measured on is the ordinary shape of working from a laptop and a desktop, and
+`park-cycle` runs on their Stop hook exactly as it does here. What arrives is `park-cycle.ps1`,
+`session-status.ps1` and both libs behind them, so nothing has to be configured -- `Get-GitParkBacking`,
+`Format-GitParkBacking` and `Get-GitParkBackingMarker` are available to any other script of theirs that has
+to judge whether a plan has work behind it, and `Get-BranchProgressTally` answers "how does this step list
+stand" for any caller that until now had only the gate's yes-or-no.
+
+The trunk repair reaches them harder than it reaches this repo, which is the part worth reading twice. This
+repo's trunk is `main` and its checkout was cloned, so `refs/remotes/origin/HEAD` exists and the defect never
+fired here. A consumer who ran `git init` and added a remote afterwards has no such ref, and one whose trunk
+is `master` -- or any name that is not `main` -- has been seeing their own trunk reported as a parked branch
+every time they ran `/lock` or `/handover`. That is the single most misleading line the block can print: it
+sends a reader looking for work on the one branch where the work has already landed.
+
+The `park` skill's pick-up section gains its second trap beside the one it already carried. The first asks
+whether a parked plan has been **overtaken** -- measured August 4, 2026, a plan superseded 1h43m after it was
+parked. This one asks whether it was ever **carried out**. The two are independent and both are one command;
+a plan can pass either and fail the other, and the skill now says so with the command that answers each.
+
+**Score:** 3
+
+#### Pull Request
+
+The park commit names what is behind the ticks
+
+Plugins: contributing-davekjohn
+
+[PR #976](https://github.com/DaveKJohn/claude-code-specialists/pull/976)
+
+---
+
 ### DEPLOY: `fix/entry-link-gate-follows-changelog-v1` · 20260827-131311
 
 `open-pr`'s link gate resolves the entry's relative links from the directory the fold actually writes into,

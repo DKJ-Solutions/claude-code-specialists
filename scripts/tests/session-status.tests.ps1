@@ -27,6 +27,11 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot    = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $ScriptSrc   = Join-Path $RepoRoot 'scripts\task\session-status.ps1'
 $EntryLibSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# park-lib supplies the ONE literal the parked-branches block looks for in a park commit (#960). Copied
+# into every fixture because that is where it really sits -- beside the script, here and in the plugin
+# mirror -- and read here rather than retyped, so a reworded marker fails at the source instead of
+# quietly matching nothing.
+$ParkLibSrc  = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 
 # THE FIXTURE ENTRIES ARE SPELLED BY THE FORMAT ITSELF, not by literals of it, and that is a repair rather
 # than a refinement. This suite pinned '#### Tier 0' in its fixture and 'tier 0 -> 4' in its assert while
@@ -34,6 +39,10 @@ $EntryLibSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # green over a reporter that had gone first partly and then completely blind. A green suite asserting a
 # retired shape is worse than no suite: it certifies the layer it is not looking at.
 . $EntryLibSrc
+# THE NOTE IN THE FIXTURE IS WRITTEN BY THE REAL FORMATTER, not by a literal of what it currently says.
+# The whole mechanism is one writer and one reader agreeing on a shape; a fixture that hand-typed the note
+# would keep passing after a rewording that had already stopped the two from meeting.
+. $ParkLibSrc
 $ScoreLabel = Get-EntryScoreLabel
 $NaLabel     = Get-EntryScoreNotApplicable
 
@@ -141,6 +150,10 @@ function New-Fixture {
         New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib') -Force | Out-Null
         Copy-Item $EntryLibSrc (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')
     }
+    # park-lib regardless of -NoEntryLib: the two switches would otherwise be one, and what -NoEntryLib
+    # pins is a consumer without the ENTRY FORMAT, not one without the park commit's shape.
+    New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib') -Force | Out-Null
+    Copy-Item $ParkLibSrc (Join-Path $dir 'scripts\lib\park-lib.ps1')
     if (-not $Bare) {
         # THE ENTRY CARRIES BOTH OF ITS TIERS, at DIFFERENT scores on purpose: one assert then proves the
         # reach is read and not merely the first score, which is the half the retired pattern dropped in
@@ -350,7 +363,71 @@ try {
     $ErrorActionPreference = $eap
     $r = Invoke-Status -Fixture $fx
     Assert-True ($r.Flat -match 'feat/parked-elsewhere') 'the parked branch is named'
-    Assert-True (-not ($r.Flat -match "Parked branches on origin.*$trunkName\b.*Open issues")) 'and the trunk is not listed as parked'
+    # ON THE BLOCK, NOT ON Flat, AND THAT IS THE REPAIR RATHER THAN A STYLE POINT. This assert was
+    # '-not (Flat -match "Parked branches on origin.*$trunkName\b.*Open issues")' and it passed for a
+    # reason that had nothing to do with its subject: Flat removes newlines WITHOUT inserting a space, so
+    # 'master' and the next section's 'Open' ran together into 'masterOpen' and \b never matched. The
+    # trunk WAS being listed -- this fixture is initialised locally and wired to a remote afterwards, so
+    # it has no refs/remotes/origin/HEAD, and the trunk fell back to the literal 'main' while the branch
+    # is called 'master'. Every consumer in that shape saw their own trunk reported as parked. Get-Block
+    # joins with a single space, so a name assert here means what it says.
+    $trunkBlock = Get-Block -Captured $r.Out -TitleLike 'Parked branches on origin'
+    Assert-True ($trunkBlock -match '(^|\s)feat/parked-elsewhere(\s|$)') 'the parked branch is in the block itself, not merely somewhere in the report'
+    Assert-True (-not ($trunkBlock -match ('(^|\s)' + [regex]::Escape($trunkName) + '(\s|$)'))) 'and the trunk is not listed as parked, even with no origin/HEAD to read it from'
+
+    Write-Host "And each parked branch is printed with what is behind its plan (#960)" -ForegroundColor Cyan
+    # THE READER HALF OF THE MECHANISM. park-cycle stamps the counts into the park commit on the device
+    # that holds the invisible work; this block echoes them. What is asserted is that the two literals
+    # meet -- the note the formatter writes is found by the marker the reporter looks for -- and that the
+    # ALARM survives the trip, since that is the half a good-faith pickup acts on.
+    #
+    # ON Get-Block RATHER THAN Flat: Flat removes newlines without inserting a space, so a phrase spanning
+    # two printed lines becomes one mid-word join. Get-Block joins the section's lines with a space, which
+    # is what the note is -- one wrapped paragraph.
+    $parkedNote = Format-GitParkBacking `
+        -Steps   ([pscustomobject]@{ Open = 0; Resolved = 8; Total = 8 }) `
+        -Backing ([pscustomobject]@{ Committed = 0; CommittedKnown = $true; Uncommitted = 12; UncommittedKnown = $true; Trunk = 'main' })
+    $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) ("sstat-parkmsg-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.txt')
+    [System.IO.File]::WriteAllText($msgFile, "park: feat/ticked-but-empty (the branch files only)`n`n$parkedNote", (New-Object System.Text.UTF8Encoding $false))
+
+    $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    Push-Location $fx
+    git checkout --quiet -b 'feat/ticked-but-empty' 2>&1 | Out-Null
+    Set-Utf8 (Join-Path $fx 'plan.txt') @('a plan and nothing behind it')
+    git add -A 2>&1 | Out-Null
+    # -F, not -m: the note is multi-line and carries parentheses and semicolons, and a quoting accident
+    # here would fail the test for a reason that is not the script's.
+    git commit --quiet -F $msgFile 2>&1 | Out-Null
+    git push --quiet -u origin 'feat/ticked-but-empty' 2>&1 | Out-Null
+    # A SECOND PARKED BRANCH WHOSE REMOTE-TRACKING REF IS GONE, which is every branch in a session that
+    # has not fetched -- the ordinary case on a second device, and the one where a blank line would read
+    # as "nothing is behind it" instead of "this was not read".
+    git checkout --quiet $trunkName 2>&1 | Out-Null
+    git checkout --quiet -b 'feat/never-fetched' 2>&1 | Out-Null
+    git push --quiet -u origin 'feat/never-fetched' 2>&1 | Out-Null
+    git update-ref -d 'refs/remotes/origin/feat/never-fetched' 2>&1 | Out-Null
+    git checkout --quiet $trunkName 2>&1 | Out-Null
+    Pop-Location
+    $ErrorActionPreference = $eap
+    Remove-Item -LiteralPath $msgFile -Force -ErrorAction SilentlyContinue
+
+    $r = Invoke-Status -Fixture $fx
+    $parkedBlock = Get-Block -Captured $r.Out -TitleLike 'Parked branches on origin'
+    Assert-True ($parkedBlock -match [regex]::Escape((Get-GitParkBackingMarker))) 'the backing note is printed back for a parked branch'
+    Assert-True ($parkedBlock -match '8 of 8 step\(s\) resolved') 'with the step count the writer measured'
+    Assert-True ($parkedBlock -match 'reads as FINISHED') 'and the alarm survives the trip -- the half a pickup acts on'
+    Assert-True ($parkedBlock -match 'Do NOT rebuild it') 'naming the wrong move rather than only reporting numbers'
+    Assert-True ($parkedBlock -match 'not fetched here') 'a branch whose remote ref was never fetched says so, rather than printing nothing'
+    Assert-True ($parkedBlock -match 'feat/never-fetched') 'and is still listed, because ls-remote sees it either way'
+    # NOTHING IS RE-MEASURED HERE, and this is the assert that pins it. The figures describe a working copy
+    # this device cannot see; a block that recounted them locally would report 0 uncommitted for a branch
+    # whose commit says 12, and the wrong number would be the confident one.
+    Assert-True ($parkedBlock -match '12 file\(s\) uncommitted') "the uncommitted count comes from the commit, not from this checkout's own tree"
+    # AND A BRANCH WHOSE LAST COMMIT CARRIES NO NOTE SAYS SO. 'feat/parked-elsewhere' from the case above
+    # is pushed with the fixture's own commit at its head, which is every branch parked by hand or before
+    # this note existed. Silence there would read as "nothing is wrong" where it means "nobody wrote it
+    # down" -- the #960 ambiguity itself, one layer up.
+    Assert-True ($parkedBlock -match 'no backing note in its last commit') 'a parked branch with no note in its last commit is stated, not left blank'
 
     Write-Host 'The tiers are read through the shared reader -- every shape, and none' -ForegroundColor Cyan
     # THE DEFECT THIS REPLACED, written out as the cases that would have caught it. The block carried its own
