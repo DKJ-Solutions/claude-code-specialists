@@ -700,12 +700,26 @@ function Get-PrDescriptionPlaceholderDefaults {
     .DESCRIPTION
         RECOGNISE ALL, WRITE ONE -- and deliberately no count here, because this list only grows and a
         tally of it goes stale silently. The last is what this family's template carries now (the entry path
-        moved under contributing-davekjohn/ on August 14, 2026, the file was renamed branch-deployment.md on
-        August 19, on August 23 it became the DEPLOY section of development-cycle.md, and on August 25 that
-        section started travelling WITH its heading -- issue #884); the older
+        moved under the workflow's own folder on August 14, 2026, the file was renamed branch-deployment.md
+        on August 19, on August 23 it became the DEPLOY section of development-cycle.md, on August 25 that
+        section started travelling WITH its heading -- issue #884 -- and on August 26 the folder itself was
+        renamed workflow-davekjohn -> contributing-davekjohn, issue #886); the older
         strings stay because a consumer's PR template is THEIR file, and this script must not silently
         stop filling it in because the template it ships beside moved on. An unrecognised placeholder is
         a PR body with no description at all -- the outcome this list exists to prevent.
+
+        WHICH IS WHY THE FOLDER RENAME APPEARS TWICE HERE RATHER THAN ONCE (issue #952, August 27, 2026).
+        The rename commit REWROTE the four strings that carried the folder name instead of appending to
+        them, which inverted the list's whole purpose: a consumer who has not migrated is by definition
+        still carrying 'workflow-davekjohn' in their template, so the four strings kept for them became
+        the four that no longer matched them, and the list tolerated only paths a migrated repo would
+        have -- the one case that needs no tolerance. Measured in smartwatchbanden on the 4.20.0 update,
+        before any migration: 0 matches. Append-only means append: a rename adds a form, it never
+        replaces one, and the pre-rename forms below are recovered verbatim from commit 8797f7a5^.
+
+        The four contributing-davekjohn/ forms for the RETIRED filenames are kept as well, even though no
+        template ever carried one -- those filenames were gone before the folder was renamed. Recognising
+        a string nobody carries costs nothing, and removing entries is the move this defect was made of.
         MOVED OUT OF open-pr.ps1 ON AUGUST 10, 2026, and the move is the point rather than tidiness
         (#573). While the list lived inline in the script, nothing else in the repo could read it -- so
         the reference template shipped with the plugin could not be held against it, and a reference
@@ -720,6 +734,10 @@ function Get-PrDescriptionPlaceholderDefaults {
         '<!-- Korte beschrijving van wat er verandert en waarom. -->',
         '<!-- Short description of what changes and why. -->',
         "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+        "<!-- Filled from workflow-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+        "<!-- Filled from workflow-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
+        "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
+        "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
         "<!-- Filled from contributing-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from contributing-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",

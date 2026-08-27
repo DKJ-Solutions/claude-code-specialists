@@ -719,6 +719,35 @@ Assert-True ($known -contains '<!-- Korte beschrijving van wat er verandert en w
 Assert-True ($known -contains '<!-- Short description of what changes and why. -->') `
     'the English legacy placeholder is still recognised'
 
+# THE PRE-RENAME FOLDER NAME, AND THIS IS THE ASSERT #952 WAS MISSING. The rename in #886 rewrote the
+# four strings carrying the folder name rather than appending to them, which inverted the list: an
+# UNMIGRATED consumer is by definition still carrying 'workflow-davekjohn' in their template, so the
+# strings kept for them were the four that stopped matching them. Measured in smartwatchbanden before
+# migration: 0 hits. Nothing asserted it -- the issue named branch-info.tests.ps1 as the suite that
+# caught it, and that suite has no placeholder assert at all; this file's asserts above cover only the
+# two pre-folder strings, which the rename did not touch. So the guarantee is stated per rename, on the
+# form actually shipped in a template, rather than on the list as a whole.
+foreach ($legacyFolderForm in @(
+    "<!-- Filled from workflow-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from workflow-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
+    "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
+)) {
+    Assert-True ($known -contains $legacyFolderForm) `
+        "the pre-#886 folder name is still recognised, so an unmigrated consumer's template is still filled in: '$legacyFolderForm'"
+}
+
+# AND THE RULE THE ABOVE IS AN INSTANCE OF, asserted structurally so the NEXT rename cannot pass by
+# substitution either. Every entry that names the workflow folder must be present in both folder names:
+# the list is append-only, so a form appearing under one name and not the other is a rewrite.
+$folderNamingForms = @($known | Where-Object { $_ -match 'workflow-davekjohn|contributing-davekjohn' })
+Assert-True ($folderNamingForms.Count -ge 8) 'every folder-naming placeholder exists under both folder names, not just the current one'
+foreach ($f in $folderNamingForms) {
+    $other = if ($f -match 'workflow-davekjohn') { $f -replace 'workflow-davekjohn', 'contributing-davekjohn' } else { $f -replace 'contributing-davekjohn', 'workflow-davekjohn' }
+    Assert-True ($known -contains $other) `
+        "and its counterpart under the other folder name is recognised too -- a rename appends, it never replaces: '$other'"
+}
+
 $canonical = Get-PrTemplateCanonicalPlaceholder
 Assert-True ($known -contains $canonical) `
     'the placeholder that gets WRITTEN is one of the ones that gets RECOGNISED'
