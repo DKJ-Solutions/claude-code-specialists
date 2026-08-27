@@ -175,6 +175,15 @@ The shipped gate reports the significance and merges anyway.
 [`skills/ship-pr/SKILL.md`](skills/ship-pr/SKILL.md) · `ship-pr.ps1` — open, wait for CI, merge and fold in
 one motion, using the merge method your `Get-PrMergeMethod` names.
 
+**Run it in the background.** The merge waits on the required status check whatever you do, so holding a
+session open for it buys a second look at a result the local gate already gave. Measured in the source repo
+on August 27, 2026: `lint-en-tests` at **11m48s** against the same suites locally at **292s**, and over 65
+blocking runs a median CI leg of **8m 01s** — 9h 45m a week at 73 merged PRs. **One condition comes with it:**
+step 5 checks out the trunk in the tree the script was started from, so the session's next move is either a
+lane ([`skills/worktree-lane/SKILL.md`](skills/worktree-lane/SKILL.md)) or nothing at all. Both halves, and
+the two larger shapes that were declined, are in the
+[`ship-pr` skill](skills/ship-pr/SKILL.md#the-wait-runs-in-the-background-and-that-is-the-default).
+
 **Whether a finished branch is allowed to run through that motion on its own, or has to wait for a person's
 word, is your repo's rule** — and one of the few things on this page that no seam can answer, because it is
 a governance decision rather than a configuration value. Write it in your own `CONTRIBUTING.md` or

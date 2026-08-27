@@ -385,6 +385,32 @@ merge attempted before it goes green returns `BLOCKED`. That job id is deliberat
 it would silently break the ruleset binding — every future PR would sit unmergeable, waiting on a check that no
 longer exists. See [`.claude/rules/language-layers.md`](../.claude/rules/language-layers.md).
 
+**And nobody sits through that check** (Dave, issue
+[#985](https://github.com/DaveKJohn/claude-code-specialists/issues/985), August 27, 2026). `ship-pr.ps1` is
+started as a **background** command and the session carries on: the merge cannot move before `lint-en-tests`
+is green whichever way the script is run, so the only thing a foreground wait buys is a second look at a
+result `open-pr`'s own gates gave minutes earlier. Measured on
+[PR #980](https://github.com/DaveKJohn/claude-code-specialists/pull/980) that same day — `lint-en-tests`
+**11m48s**, the same suites locally **292s** — and over 65 blocking runs a median CI leg of **8m 01s**, which
+at 73 merged PRs in a week is **9h 45m** of session time.
+
+**The condition is not optional, because step 5 checks out `main` in this tree.** So the next move after
+backgrounding a ship is either a **lane** —
+[`worktree-lane.ps1 -Name`](../plugins/workflows/contributing-davekjohn/skills/worktree-lane/SKILL.md), the
+worktree is where you build and the primary checkout is where you ship — or nothing at all. A close-out that
+reads *"PR #N opened, shipping in the background"* is a finished assignment, not an open point. Anything else
+started in the primary gets `HEAD` pulled out from under it mid-branch, which is the hazard the two gates in
+2.2.2 and 2.2.3 were hardened against and that step 5 was not.
+
+**Two larger shapes were declined when this was written down**, and #985 stays open as their home. A
+*green-and-unmerged reporter* at session start would have re-added half of the `session-status` reporter that
+[#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957) removed on purpose five minutes before
+#985 was filed. A *detached watcher* that merges when the check passes would put the merge and the fold — a
+commit landing directly on `main` under a named exception — behind a process nobody is reading.
+
+**Backgrounding says nothing while it runs, and that is normal.** The output is buffered, so an empty log and
+an idle `gh` child are not a stall. Judge progress from `git log` and `gh pr view`, never from the log file.
+
 **A second check appears on every PR and does not block.**
 [`.github/workflows/claude-code-review.yml`](../.github/workflows/claude-code-review.yml) runs an automated
 review over the diff and posts inline comments, under the job id `claude-review`. It is advisory: the ruleset
