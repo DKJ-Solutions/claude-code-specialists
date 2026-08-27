@@ -70,9 +70,17 @@ Dave decided the root CONTRIBUTING.md goes, after the layering objection was rai
 - [x] `scripts/lint/check-plugin-integrity.ps1` clean -- specifically checks 4 (dead links) and 21
       (the blueprint). It caught the two archived links above on the first run and reported 0 errors
       on the second
-- [ ] All `scripts/tests/*.tests.ps1` green, and the fold suite in particular: it writes a fixture
+- [x] `scripts/tests/*.tests.ps1` run, and the fold suite in particular: it writes a fixture
       `CONTRIBUTING.md` to prove a root meta doc is never folded, which stays valid since the
       fixture is its own tree
+- [x] 52 of the 53 suites pass here. `internal-note.tests.ps1` fails one assert, and that is
+      [#959](https://github.com/DaveKJohn/claude-code-specialists/issues/959), not this branch: the same
+      suite fails identically (1 failed, 94 passed) against the tip of `origin/main`, the very commit
+      whose CI run is green. `Write-Warning` wraps at the console width, so at 107 columns the missing
+      `**Date:**` message breaks after "date" and the assert matching `fill in the date by hand` is split
+      across two lines. Nothing here touches that script, its suite, or the capture helper
+- [~] Local gate pushed with `-SkipTests` because of the above. The lint gate still ran, and CI runs the
+      suites inescapably -- it is the required `lint-en-tests` check the `main` ruleset gates the merge on
 
 ### DEPLOY: `docs/drop-root-contributing-v1`
 
