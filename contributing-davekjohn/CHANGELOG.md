@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/the-close-out-is-a-receipt-not-the-report-v1` · 20260827-212527
+
+Chris's close-out is a receipt now, not a second report. Shape A said it was *"allowed to be short"* and
+nothing said where the detail belonged -- so a finished chain got retold in the terminal after it had
+already been written into the branch document, the PR body and the issues. It now names what happened,
+where to read it (the PR or issue number), and that the session can be cleared.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The test is duplication, not length, and that distinction is the whole rule.** A word budget would cut
+the one sentence a requester can only get from the session -- a decision taken on their behalf, or
+something that turned out differently than asked -- while leaving three tidy paragraphs that restate the
+PR. So the rule names the habit instead: no per-item table, no rundown of who did what, no walk through
+the reasoning, when a link carries all three. Two or three lines is the usual size as a consequence.
+
+**"You can clear the session" is stated in as many words, because it is the one fact no PR carries.**
+Whether anything is still in flight *here* cannot be read off GitHub, and without it the requester
+re-reads the turn to check before starting the next subject -- which is the cost the whole change is
+about.
+
+**Score:** 3
+
+#### Pull Request
+
+the close-out is a receipt: outcome, where the detail is, and that the session can be cleared
+
+Plugins: team-alpha
+
+Plugins: team-alpha
+
+[PR #1012](https://github.com/DaveKJohn/claude-code-specialists/pull/1012)
+
+---
+
 ### DEPLOY: `feat/the-branch-document-is-called-development-v1` · 20260827-212315
 
 The branch's working document is called **Development**. `contributing-davekjohn/development-cycle.md`
