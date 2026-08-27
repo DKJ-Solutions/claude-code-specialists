@@ -32,6 +32,58 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-source-test-means-what-its-name-says-v1` · 20260827-210632
+
+`Test-IsWorkflowSourceRepo` was `Test-Path .claude-plugin/marketplace.json`, which answers **does this
+repo publish plugins** rather than **is this repo the source of this workflow**. The two coincide only
+while this is the only repo with a marketplace manifest, and Dave's own one-product-one-repository rule
+guarantees they come apart: the next product gets its own repository *and* its own marketplace, and
+consumes this workflow like any other consumer. It reads the manifest now.
+
+Two things follow, and they are the substance. **The layout question stops asking the test at all**: the
+three computed defaults that still branched -- the changelog, the release history and the internal-note
+root -- now answer one string for every repo, the same move #914 made to the other two. And **the source
+exemption in `Assert-WorkflowIsolatedSeamPath` is gone**, because its stated reason was that a source's
+computed defaults ARE root files, which the collapse ends.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The guard now runs against the repo that maintains it.** `Assert-WorkflowIsolatedSeamPath` exists to
+catch a repo's own seam resolving somewhere it should not -- its own example is a typo'd
+`Get-ChangelogPath` pointing at `README.md` and the cut truncating a file it does not own -- and this
+repo was exempt from it outright. Measured before the exemption was removed rather than after: all five
+seams it covers resolve inside `contributing-davekjohn/` here, three stated and two computed. A
+plugin-publishing repo that really does keep a root file is still covered, by the pre-isolation lookup --
+recognised as a layout rather than waved through as an identity.
+
+**The report undercounted its own subject, and the recount changed the work.** #998 said four sites read
+the function; the one-file test is at **eleven**, asking **three** different questions. Two of them are
+right as they are, and the docstring now says so by name -- `Get-ReleasePluginTier` genuinely asks
+"publishes plugins", and `Assert-OwnCopy`'s own comment argues for it as a cheap necessary condition.
+Narrowing those would have been a change that looked like finishing the job and was wrong. Three more ask
+a third question entirely -- *is this repo a Shopify store* -- and are left alone with that recorded.
+
+**The concrete harm was a refusal, and it is fixed.** `adopt-workflow-folder` turned away any
+plugin-publishing repo with a message telling it that it *"arranges contributing-davekjohn/ by hand"*. A
+second product's repo does not; it needs that scaffold like any consumer. There is now a test proving it
+gets one.
+
+**Score:** 3
+
+#### Pull Request
+
+the source test means what its name says, and the layout defaults stop asking it
+
+Plugins: contributing-davekjohn
+
+Plugins: contributing-davekjohn
+
+[PR #1010](https://github.com/DaveKJohn/claude-code-specialists/pull/1010)
+
+---
+
 ### DEPLOY: `fix/register-follows-the-four-migrated-consumers-v1` · 20260827-205650
 
 The consumer register catches up with reality. `connectors/*.json` records what each consumer HAS, and
