@@ -32,6 +32,55 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/readoption-warns-for-the-two-note-roots-v1` · 20260827-203637
+
+Re-adopting the workflow folder now tells you about the two generated note roots that moved, which was
+the one relocation in that family with no warning behind it. `adopt-workflow-folder.ps1` has printed an
+explicit re-adoption note for `Get-ReleaseHistoryPath` and for the root `CHANGELOG.md` since #885
+isolated them -- "your next cut starts a NEW list here", "any entry pending there right now will NOT be
+picked up". [#914](https://github.com/DaveKJohn/claude-code-specialists/issues/914) did the same thing
+to `Get-ReleaseChangelogNotesRoot` and `Get-ReleaseGithubNotesRoot` on August 26 and nothing followed
+it: the scaffold text was updated, the migration-warning block was not, and `cut-release.ps1` only
+asserts the resolved paths. So an existing consumer's next cut would open two fresh trees inside the
+folder and leave the real history at the repo root, silently.
+
+The block now resolves both seams and names their answers on every run, and warns only where a
+pre-#914 tree is actually still sitting at the root -- with the file count, because the scale is what
+makes it legible, and with both honest ways out rather than a preference. The legacy paths are asked of
+`Get-PreIsolationSeamPath`, the same lookup the cut's own tolerance uses, so the two halves of one
+mechanism cannot drift apart again -- which is the shape of defect this family keeps producing.
+
+Filed as inbound [#955](https://github.com/DaveKJohn/claude-code-specialists/issues/955). Its exhibit
+had already been repaired by hand at the consumer by the time it was picked up; the gap it reported had
+not, and the TEST section above records both.
+
+For this repo the durable half is that the warning is derived rather than restated: the next seam to
+isolate gets its warning by being added to one lookup, not by somebody remembering this block exists.
+That is exactly what #914 did not get.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+If you still keep `releases/development/` or `releases/github/` at your repo root, re-running
+`adopt-workflow-folder` now says so -- which tree it found, how many notes are in it, and that your
+next cut writes somewhere else and leaves it behind. Between 4.20.0 and this version nothing told you:
+one consumer only caught it by going looking. Two ways out, both fine: `git mv` the tree onto the path
+the run prints, or define the seam in `scripts/repo-config.ps1` to keep pointing at your root tree.
+Nothing is moved for you and nothing is refused.
+
+**Score:** 4
+
+#### Pull Request
+
+Re-adoption warns about the two generated note roots #914 moved
+
+Plugins: contributing-davekjohn
+
+[PR #1009](https://github.com/DaveKJohn/claude-code-specialists/pull/1009)
+
+---
+
 ### DEPLOY: `fix/record-count-assert-counts-what-it-claims-v1` · 20260827-201934
 
 The contract drift guard's record-count assert enforced a floor of **29** and explained it as *"the
