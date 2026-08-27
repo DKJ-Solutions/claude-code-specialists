@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/placeholder-tolerance-keeps-its-own-history-v1` · 20260827-201804
+
+The list of PR-template placeholder lines `open-pr.ps1` recognises stops being a list of paths only a
+migrated repo could have. `Get-PrDescriptionPlaceholderDefaults` is documented append-only -- "RECOGNISE
+ALL, WRITE ONE" -- because a consumer's PR template is their file, and an unrecognised placeholder is a
+PR body with no description at all. The rename in [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)
+rewrote the four strings carrying the folder name instead of appending to them, which inverted the whole
+purpose: a consumer who has not migrated is by definition still carrying `workflow-davekjohn` in their
+template, so the four strings kept *for* them became the four that no longer matched them. Measured in
+`smartwatchbanden` on the 4.20.0 update and before any migration: 0 matches out of 7. The pre-rename
+forms are back beside the current ones, recovered from the rename commit's own parent so they are the
+strings that were really shipped rather than a reconstruction.
+
+Two things travel with it. The docstring's history line said the entry path moved under
+`contributing-davekjohn/` on August 14, 2026 -- the rename had rewritten the prose too, and on that date
+the folder was named `workflow-davekjohn`. The rename is now a dated step of its own, so the list's
+shape and its explanation agree again. And `pr-body.tests.ps1` gains the assert nobody had: the four
+forms by name, plus the structural rule behind them -- every entry naming the folder must exist under
+*both* folder names, because a form present under one and absent under the other is a rewrite. That
+second assert is what makes the next rename fail loudly instead of quietly, and it was verified by
+re-applying the defect.
+
+Closes [#952](https://github.com/DaveKJohn/claude-code-specialists/issues/952).
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+If your PR template still says `workflow-davekjohn/...`, `open-pr` fills in your PR description again.
+Between 4.20.0 and this version it did not: it warned and opened the PR with no description, because the
+strings kept for exactly your case had been rewritten to the new folder name. Nothing to migrate --
+adopting the new template remains optional, and both forms are recognised from here on.
+
+**Score:** 4
+
+#### Pull Request
+
+The PR-placeholder tolerance list keeps the folder name each string was written with
+
+Plugins: contributing-davekjohn
+
+[PR #1007](https://github.com/DaveKJohn/claude-code-specialists/pull/1007)
+
+---
+
 ### DEPLOY: `fix/test-capture-flattens-the-console-wrap-v1` · 20260827-200044
 
 Two test suites stop failing on the width of the console they happen to run in.
