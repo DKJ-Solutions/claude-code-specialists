@@ -6,7 +6,7 @@ paths:
   - ".github/**"
   - "releases/**"
   - "contributing-davekjohn/releases/**"
-  - "CHANGELOG.md"
+  - "contributing-davekjohn/CHANGELOG.md"
   - ".gitignore"
 ---
 
@@ -86,7 +86,7 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   Measured August 23, 2026: a GNU `sed` substitution meant to write those same two dash escapes hit `sed`'s
   own `\u` ("uppercase the next character") reading of the replacement and wrote the literal `[-20132014,]`
   instead — ASCII, and wrong. The mechanism is in
-  [the system-administration manual's trap section](../../plugins/teams/team-alpha/manuals/05-15-manual.md#eight-powershell-traps-that-produce-well-formed-wrong-output);
+  [the system-administration manual's trap section](../../plugins/teams/team-alpha/manuals/05-15-manual.md#nine-powershell-traps-that-produce-well-formed-wrong-output);
   the consequence here is the same as above — compose the escape with
   `'-' + [char]0x2013 + [char]0x2014` rather than a non-PowerShell substitution, and where such a tool must
   write one anyway, read the written line back by code point before trusting it.
@@ -125,7 +125,8 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
 - **History** — the archived per-release notes under `contributing-davekjohn/releases/changelog/*.md` (at
   `releases/development/*.md` until August 26, 2026, #914) are this repo's narrow
   exception to the norm and may remain in their original language (older ones are Dutch).
-  `CHANGELOG.md` and the release-history README (now `releases/README.md`) are themselves fully English (translated July 22, 2026,
+  `CHANGELOG.md` and the release history (both under `contributing-davekjohn/` since August 27, 2026 --
+  the changelog beside this folder's contributing page, the list as `releases/history.md`) are themselves fully English (translated July 22, 2026,
   Dave's decision), so the exception no longer covers them.
 
 Decision by Dave, July 20, 2026 (repo-wide English) — the decision that in turn prompted the

@@ -7,9 +7,10 @@ set of answers** to them.
 
 | here | what it holds | portable half |
 |---|---|---|
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **the centre of this folder** — the workflow's contributing layer AND the working rules a session needs here, merged into one page on August 26, 2026 (#886). It wins over both the [root CONTRIBUTING.md](../CONTRIBUTING.md) and the [root CLAUDE.md](../CLAUDE.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md) |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **the centre of this folder** — the standard branch + PR workflow, the workflow's contributing layer AND the working rules a session needs here, on one page. Two of those three merged on August 26, 2026 (#886) and the standard workflow arrived from the root on August 27. It wins over the [root CLAUDE.md](../CLAUDE.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md) |
+| [`CHANGELOG.md`](CHANGELOG.md) | what is pending for the next release: one `##` entry per merged branch, folded in at the merge and emptied by a cut. Here since August 27, 2026, stated in `Get-ChangelogPath` | *(the format travels in [`DEVELOPMENT-portable.md`](../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md))* |
 | `development-cycle.md` | the branch's own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-portable.md`](../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md) |
-| [`releases/`](releases/) | the release history and the published audience notes | [`RELEASES-portable.md`](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md) |
+| [`releases/`](releases/) | the dated list of every release ever cut ([`history.md`](releases/history.md), here since August 27, 2026), the published audience notes, the generated changelog and GitHub-Release trees, and this repo's seam answers in its own [`README.md`](releases/README.md) | [`RELEASES-portable.md`](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md) |
 
 In this repo the portable pages resolve as relative links because this is the plugin's **source**; in a
 consumer they live in the plugin install instead, which is why the consumer version of this page (the
@@ -19,6 +20,13 @@ One thing a consumer's folder has that this one deliberately does not: this page
 rather than scaffolded — the scaffold refuses a repo that publishes plugins. The generated
 `releases/changelog/` and `releases/github/` trees sat at this repo's root until August 26, 2026 and
 now sit here too, so on that point the two folders match (#914).
+
+**On August 27, 2026 the last three followed them** (Dave): `CHANGELOG.md`, the contributing page's own
+standard-workflow half, and the release list — which is now `releases/history.md` rather than a second
+`README.md`. So this folder is no longer *the workflow's belongings beside the repo's own*; it is every
+document the contribution cycle produces or governs, and the seam answers below say so rather than the
+computed defaults doing it silently. Nothing about a consumer changed: those defaults have pointed here
+since #885, and this repo was the one holdout.
 
 **This page also carries the folder's two index sections**, below the divider: the seam table — this repo's
 answer to every question the portable half leaves open — and the pointer list saying where the rest lives.
@@ -41,7 +49,10 @@ August 26, 2026 (Dave), when that page was reduced to its four `##` steps and no
 | your entry's section headings | the English defaults — nothing is overridden | *(no override defined)* |
 | the wording inside the development cycle | the English defaults | `Get-BranchFileWordingOverrides` *(none)* |
 | your significance rubric | the shared default, 1–5 | *(no override defined)* |
-| your permanent root docs | `CHANGELOG` · `CLAUDE` · `README` · `LICENSE` · `CONTRIBUTING` · `SECURITY` | `Get-ReservedRootMd` |
+| your permanent root docs | `CLAUDE` · `README` · `LICENSE` · `SECURITY` · `INSTALL` · `UNINSTALL` — `CHANGELOG` and `CONTRIBUTING` came off on August 27, 2026, having left the root | `Get-ReservedRootMd` |
+| where your changelog lives | `contributing-davekjohn/CHANGELOG.md` — the consumer default, which this repo adopted on August 27, 2026 | `Get-ChangelogPath` |
+| where the release list lives | `contributing-davekjohn/releases/history.md` | `Get-ReleaseHistoryPath` |
+| where the generated internal note goes | `contributing-davekjohn/releases/internal` | `Get-ReleaseInternalNotesRoot` |
 | your merge method | `merge` — a merge commit, not a squash | `Get-PrMergeMethod` |
 | whether you have a plugin tier | yes — the `Plugins:` line is derived | `Get-ReleasePluginTier` |
 | whether you have a separate live stage | **no** — which is what makes step 4 of [`CONTRIBUTING.md`](CONTRIBUTING.md) a no-op here | `Get-LiveStage` |

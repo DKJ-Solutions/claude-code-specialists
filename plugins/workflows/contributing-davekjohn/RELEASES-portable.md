@@ -166,12 +166,19 @@ answered that knob is not silently pointed at a directory they do not have.
 
 **All three of them live inside this workflow's own folder by default** (`contributing-davekjohn/releases/`),
 and the two generated ones joined `audience/` there in #914. The reasoning is worth stating because it is the
-line between these roots and the two files that stayed at the repo root: a repo's `CHANGELOG.md` and its
-release list exist whichever tooling cut them, so a repo that publishes plugins keeps those at its own root —
-while a tree nothing writes but a cut exists only *because* this workflow does. `Get-ReleaseChangelogNotesRoot`
-and `Get-ReleaseGithubNotesRoot` still answer it per repo; they simply no longer answer it differently for the
-workflow's source repo. If your notes already sit somewhere else, point the seam at the tree you have — that
-keeps one tree rather than starting a second beside it.
+line between these roots and the two files whose DEFAULT still branches: a repo's `CHANGELOG.md` and its
+release list exist whichever tooling cut them, so `Get-ChangelogPath` and `Get-ReleaseHistoryPath` answer the
+repo root for a repo that publishes plugins — while a tree nothing writes but a cut exists only *because*
+this workflow does. `Get-ReleaseChangelogNotesRoot` and `Get-ReleaseGithubNotesRoot` still answer it per
+repo; they simply no longer answer it differently for the workflow's source repo. If your notes already sit
+somewhere else, point the seam at the tree you have — that keeps one tree rather than starting a second
+beside it.
+
+**That branch is about the default, not about a rule** (August 27, 2026). It exists so a plugin source is not
+silently moved; a source that would rather have every one of these documents in one folder simply states the
+two seams, which is what the workflow's own source repo does. So read the paragraph above as *"unstated, these
+two answer the root for a plugin source"* rather than as *"a plugin source keeps them there"* — nothing in
+this workflow requires the second.
 
 **If your config defines `Get-ReleaseDevelopmentNotesRoot`, leave it — it still answers** (#947, August 26,
 2026). That was this seam's name until the directory rename caught up with it; both read sites try the new

@@ -187,8 +187,8 @@ under **"Guarding the language convention,"** so it travels to every consuming r
 `lint-en-tests`, the legacy markers, the archived release notes) — is in
 [`.claude/rules/language-layers.md`](.claude/rules/language-layers.md).** It is path-scoped to
 `scripts/**`, the plugin-carried `plugins/**/scripts/**` and `plugins/**/hooks/**`, `.github/**`,
-`releases/**` and `CHANGELOG.md`, so it loads when you touch one of those layers instead of in every
-session. Two things to know before moving anything else there: a
+`releases/**`, `contributing-davekjohn/releases/**` and `contributing-davekjohn/CHANGELOG.md`, so it
+loads when you touch one of those layers instead of in every session. Two things to know before moving anything else there: a
 `paths:`-scoped rule is **lost after a `/compact`** until a matching file is read again, and a rule
 *without* `paths:` loads unconditionally and therefore **saves nothing** — the scoping is the saving.
 So only content that is inert until you open a matching file belongs there. Decision by Dave,
@@ -197,7 +197,8 @@ July 20, 2026; sharpened July 21 and July 26, 2026.
 ### Structure — where everything lives
 
 The full repo layout (`.claude-plugin/`, `plugins/` incl. `teams/agent-shared/`, `connectors/` at the root,
-`scripts/`, `releases/`, `.claude/`, and the root docs + `.github/`) is described in
+`scripts/`, `contributing-davekjohn/` (the changelog, the contributing page and the release history since
+August 27, 2026), `.claude/`, and the root docs + `.github/`) is described in
 [README.md](README.md#repo-layout). Since August 3, 2026 the plugins sit **one** level down in
 `plugins/<plugin>/` instead of two in `claude-code-plugins/claude-specialists/<plugin>/`: that second
 level existed to hold several product families side by side, which the
@@ -235,11 +236,22 @@ gates on the branch dossier, how those three exceptions actually run, the measur
 
 **That folder used to carry two pages and now carries one** (August 26, 2026,
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)): a `CONTRIBUTING.md` layering over
-the root [`CONTRIBUTING.md`](CONTRIBUTING.md) since August 14, 2026 (Dave), and a `CLAUDE.md` layering over
+a root `CONTRIBUTING.md` since August 14, 2026 (Dave), and a `CLAUDE.md` layering over
 this file since August 19. They said the same thing about their own layering twice, so they merged into the
-one page linked above — which now layers over **both** root documents. The reason the layer exists at all is
+one page linked above. The reason the layer exists at all is
 unchanged and is the one the two moves before it give: this file loads on **every** session, the folder page
 only when a session touches that folder.
+
+**And there is no root `CONTRIBUTING.md` left to layer over** (Dave, August 27, 2026). It held the standard
+workflow — branch + PR, CI green, one change per branch — deliberately at the root so it would still mean
+something with no plugin installed, and the folder page has absorbed those three rules rather than pointing
+at them. So this file is now the only root document that page layers over, and **the guarantee the root page
+existed for is unchanged**: those three rules are enforced by the `main` ruleset and by CI, which do not care
+which folder states them. What is lost is GitHub's own *Contributing guidelines* link above a new issue or
+PR, GitHub reading that page from the root, `docs/` or `.github/` and nowhere else — a signpost rather than a
+guard, and the cost is written out on the page itself. The same instruction moved `CHANGELOG.md` and the
+release history into that folder; the reasoning for each sits at its own seam in
+[`scripts/repo-config.ps1`](scripts/repo-config.ps1).
 
 The constitution above, concretely implemented here:
 
@@ -286,8 +298,8 @@ The constitution above, concretely implemented here:
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
   and that is why they are the three (Dave, August 23, 2026):
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
-     folds the entry into `CHANGELOG.md` and clears it, and with `-Commit`/`-Push` makes that commit
-     itself. **Bounded to two paths** — `CHANGELOG.md` and
+     folds the entry into `contributing-davekjohn/CHANGELOG.md` and clears it, and with `-Commit`/`-Push`
+     makes that commit itself. **Bounded to two paths** — that changelog and
      `contributing-davekjohn/development-cycle.md`, which the same run **removes** — and the commit names
      them, so nothing else in the tree can ride along. It was three until August 23, 2026, when the
      entry and the step list became sections of one document: the bound narrowed with the tree rather
@@ -296,11 +308,11 @@ The constitution above, concretely implemented here:
      changing what it may touch. Committing stays opt-in, because it is this exception being used.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `contributing-davekjohn/releases/`,
-     **empties `CHANGELOG.md` down to its intro**, commits that on `main`, and tags `vX.Y.Z`.
+     **empties the changelog down to its intro**, commits that on `main`, and tags `vX.Y.Z`.
      Deliberately no branch/PR — just like the fold. **A major additionally needs two preparation
      commits ahead of it** (Dave, August 9, 2026), under this same exception and bounded just as
      narrowly: a **major** only, **two paths** only (the new `#### N.x` section in
-     [`releases/README.md`](releases/README.md) and the assert in
+     [`contributing-davekjohn/releases/history.md`](contributing-davekjohn/releases/history.md) and the assert in
      [`release-lib.tests.ps1`](scripts/tests/release-lib.tests.ps1) that pins which major it targets),
      and only once a cut has been **explicitly asked for**. Outside a cut, both files take the
      ordinary branch + PR route.

@@ -113,8 +113,20 @@ foreach ($retired in @('Get-ChangelogTierHeadings', 'Get-ChangelogHeading')) {
 # as an ENTRY by the flat parser (it matches '^## ' exactly as an entry heading does), so it would be
 # rendered into the release notes as a change with no content. Held against the file rather than assumed,
 # because that failure produces well-formed markdown and no error anywhere.
-$changelogPath = Join-Path $PSScriptRoot '..\..\CHANGELOG.md'
-$changelogText = Get-Content -LiteralPath $changelogPath -Raw -Encoding UTF8
+# READ THROUGH THE SEAM, not from the repo root. The literal '..\..\CHANGELOG.md' was correct until
+# August 27, 2026, when the file moved into contributing-davekjohn/ and Get-ChangelogPath started saying
+# so -- and a hardcoded path here would have failed loudly, which is the good outcome; asserting against
+# the seam is what keeps it from failing again the next time the answer moves.
+#
+# NAMED $changelogFile AND NOT $changelogPath, which is not a style choice. repo-config.ps1 is DOT-SOURCED
+# by this file, so its `$script:ChangelogPath` backing variable and a `$changelogPath` written here are the
+# SAME variable -- PowerShell variable names are case-insensitive and dot-sourcing shares one script scope.
+# Assigning it here silently repointed the seam mid-file, and the next Get-ChangelogPath call returned this
+# script's absolute path instead of the repo-relative one. It failed visibly here only because a later
+# assert used the value; a test that merely READ the seam after such an assignment would have gone green on
+# a wrong answer. The same trap is open to every consumer that dot-sources repo-config.
+$changelogFile = Join-Path $PSScriptRoot ('..\..\' + ((Get-ChangelogPath) -replace '/', '\'))
+$changelogText = Get-Content -LiteralPath $changelogFile -Raw -Encoding UTF8
 foreach ($gone in @('Pull Requests', 'Latest Release', 'Releases')) {
     $found = @([regex]::Matches($changelogText, '(?m)^##\s+(Tier \d+ - )?' + [regex]::Escape($gone) + '\s*$')).Count
     Assert-Equal 0 $found "CHANGELOG.md carries no '## $gone' section any more -- a leftover would parse as an empty entry"
@@ -172,10 +184,16 @@ $mjPaths = @(Get-MojibakePaths -RepoRoot $repoRootForPaths)
 Assert-True ($mjPaths.Count -gt 0) 'Get-MojibakePaths returns a non-empty set'
 Assert-True (($mjPaths | Where-Object { $_ -notmatch '\.md$' }).Count -eq 0) 'Get-MojibakePaths returns only .md files'
 Assert-True (($mjPaths | Where-Object { -not (Test-Path -LiteralPath $_) }).Count -eq 0) 'Get-MojibakePaths returns only paths that exist'
-foreach ($mustHave in @('CHANGELOG.md', 'README.md', 'CLAUDE.md')) {
+foreach ($mustHave in @('README.md', 'CLAUDE.md')) {
     $want = Join-Path $repoRootForPaths $mustHave
     Assert-True ($mjPaths -contains $want) "Get-MojibakePaths includes the root $mustHave"
 }
+# THE CHANGELOG IS ASSERTED THROUGH THE SEAM, and it stopped being a root document on August 27, 2026.
+# It is named separately rather than dropped from the list: it is the single highest-value file in this
+# set -- its text is pasted into a release note and from there into a published document -- so what has
+# to hold is that the set reaches it WHEREVER the repo keeps it, which is what the seam answers.
+$wantChangelog = Join-Path $repoRootForPaths ((Get-ChangelogPath) -replace '/', '\')
+Assert-True ($mjPaths -contains $wantChangelog) 'Get-MojibakePaths includes the changelog Get-ChangelogPath names'
 # The two directories that made the old hardcoded list workshop-shaped, and the reason it had to move
 # behind the seam: a consumer has neither, and the tool silently examined almost nothing there.
 Assert-True (($mjPaths | Where-Object { $_ -match '\\plugins\\' }).Count -gt 0) 'Get-MojibakePaths reaches the per-plugin CHANGELOG.md/RELEASE.md files'

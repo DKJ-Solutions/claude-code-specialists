@@ -48,7 +48,7 @@ lint. Read it there rather than trusting any prose, this paragraph included.
 
 - **`## Latest Release`.** It used to accumulate a block per release and had reached **434 of 1,062 lines**
   across 72 blocks that each said no more than "see the notes", while
-  [`releases/README.md`](../../../releases/README.md) already listed all 72 with a date, a type and a
+  [`releases/history.md`](../../../contributing-davekjohn/releases/history.md) already listed all 72 with a date, a type and a
   descriptive title — the same coverage, verified in both directions, and richer per row. `'latest'` mode cut
   it to one block; this removes the last one. The intro's one-line pointer to that page is what answers
   "which version is current" now, and being hand-written prose it cannot go stale at a cut that no longer
@@ -230,11 +230,15 @@ at the repo root now holds nothing but the release list:
   justification lives. Repo-root-relative links in the entry bodies are rewritten with a prefix the cut
   DERIVES from the note's own depth — `../../../../` at this root since #914, and never a constant
   again — so they resolve from that deeper location.
-And beside them, at the repo root rather than in the folder:
-- **`releases/README.md`** — an overview table of all versions (newest at the top). It stayed behind at
-  #914 deliberately: a repo that has cut releases has a history whichever tooling cut it.
+And beside them, in the same folder since August 27, 2026:
+- **`releases/history.md`** — an overview table of all versions (newest at the top). It stayed at the repo
+  root at #914, deliberately, on the reasoning that a repo which has cut releases has a history whichever
+  tooling cut it. Dave moved it here on August 27, 2026 together with `CHANGELOG.md` and the contributing
+  page: that reasoning was about **durability**, and #885 had already answered it a different way by making
+  this folder permanent. It took a new name because `releases/README.md` in the same folder is the
+  seam-answers page.
 - In `CHANGELOG.md` the cut writes **nothing at all** — it empties the document down to its intro. The
-  internal note's only inbound link is therefore the **Version cell of the `releases/README.md` row**,
+  internal note's only inbound link is therefore the **Version cell of the `releases/history.md` row**,
   written by `new-internal-note.ps1`. That the cut cannot write it is unchanged and is the reason the step is
   separate: the note does not exist while the cut runs, and linking to it then would put a dead relative link
   inside an immutable tag. The cell was chosen over a fourth column because the table's shape is matched by
@@ -365,7 +369,7 @@ and nothing about being post-tag causing friction.
 
 **Worth knowing why any of this is written down at all:** until August 4, 2026 the route was an
 *assumption* presented as a rule in `CLAUDE.md`,
-[`releases/README.md`](../../../releases/README.md) and the `cut-release` skill — asked twice, unanswered,
+[`releases/history.md`](../../../contributing-davekjohn/releases/history.md) and the `cut-release` skill — asked twice, unanswered,
 and written in anyway. This lens, the one place Rendall would actually look, was the one that never said it.
 
 **Rendall notes the clock before he starts.** Step 0a of the
@@ -423,7 +427,7 @@ on `main`, ahead of the release commit** (deliberately unnumbered here, so they 
 the list above — they run before its first one):
 
 - add `#### <X>.x` plus its empty table header above the current top section in
-  [`releases/README.md`](../../../releases/README.md) — the refusal prints the exact heading at the
+  [`releases/history.md`](../../../contributing-davekjohn/releases/history.md) — the refusal prints the exact heading at the
   level the document uses, so follow what it prints rather than what this page says;
 - repoint the live assert in [`release-lib.tests.ps1`](../../../scripts/tests/release-lib.tests.ps1)
   at the new major, **with a reason written above it** — the file asks for that in as many words.
@@ -516,7 +520,7 @@ back to what this repo already did.
 `## Latest Release` block naming the version, the date, the type and a pointer to the notes. Measured
 before removing it: that accumulating section had grown to **434 of the changelog's 1,062 lines**
 across 72 blocks that each said no more than "see the notes", while
-[`releases/README.md`](../../../releases/README.md) already listed every one of those 72 versions with a date,
+[`releases/history.md`](../../../contributing-davekjohn/releases/history.md) already listed every one of those 72 versions with a date,
 a type and a descriptive title — the same coverage, verified in both directions, and richer per row.
 So the intro carries a one-line pointer to that page and the cut leaves the document at its intro.
 One consequence worth knowing: the hand-written note's only inbound link is the **Version cell** of

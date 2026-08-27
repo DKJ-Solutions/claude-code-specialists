@@ -451,11 +451,11 @@ only while it says when each one was opened.
    | `bootstrap-drift.tests.ps1` | reads the real `01-01-persona.md` for a retired heading, and asserts the real `specialists-init/SKILL.md` names every persona id on disk |
    | `cut-release-guardrail.tests.ps1` | `git ls-files -- '*.md'` — the real tracked-markdown list — held against `cut-release.ps1`'s reserved-root allowlist, so a new root `.md` file can fail it |
    | `pr-body.tests.ps1` | the real `.github/pull_request_template.md` and the shipped reference template held byte for byte |
-   | `repo-config.tests.ps1` | the real root `CHANGELOG.md` for retired section headings, and `Get-MojibakePaths` against the real repo root |
+   | `repo-config.tests.ps1` | the real `CHANGELOG.md` via `Get-ChangelogPath` for retired section headings, and `Get-MojibakePaths` against the real repo root |
    | `teardown-protocol.tests.ps1` | extracts a `Where-Object` from the real `specialists-teardown/SKILL.md` and executes it — its own docstring says outright that rewriting the doc turns the suite red |
    | `script-contract.tests.ps1` | the real `cut-release/SKILL.md`, asserting its text contains `Get-LiveStage` |
    | `shared-scripts.tests.ps1` | copies the real `.github/pull_request_template.md` into a fixture and asserts every comment line was substituted and no checkbox survives |
-   | `release-lib.tests.ps1` | the real `releases/README.md` via `Get-ReleaseHistoryPath`, asserting the overview targets major `'4'` — the live pin `CLAUDE.md` already records |
+   | `release-lib.tests.ps1` | the real release list via `Get-ReleaseHistoryPath` -- `contributing-davekjohn/releases/history.md` since August 27, 2026 -- asserting the overview targets major `'4'` — the live pin `CLAUDE.md` already records |
 
    **Two findings worth keeping beside the number.** First, the counter-intuitive result is the one that
    most needed checking, and it held: `check-plugin-integrity.tests.ps1` — the lint-gate suite, which
@@ -463,7 +463,7 @@ only while it says when each one was opened.
    one of those documents is written by the test into its own fixture; its only use of the real repo root is
    to copy `.ps1` libraries in. The obvious guess (the lint-gate suite must be one of the ones that reads
    real docs) pointed at the wrong nine. Second, `release-lib.tests.ps1`'s major pin and the stale tier table
-   in `releases/README.md` sit in the same file but different parts — the pin reads the `#### 4.x` heading
+   in that same list sit in one file but different parts — the pin reads the `#### 4.x` heading
    and the table under it, not the tier table — so repairing that table would not trip the assert. Worth
    stating for whoever opens that repair.
 

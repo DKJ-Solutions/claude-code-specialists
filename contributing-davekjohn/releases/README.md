@@ -9,15 +9,25 @@ the release documents, and how one is cut. **That process is not this repo's own
 Read that first. **This page is this repo's set of answers to it**: the seam values in force here, the
 local decisions, and the measured instances behind the portable rules.
 
-**What this repo's releases *are* is not on this page — that is the root's**, at
-📄 **[`releases/README.md`](../../releases/README.md)**: the dated list of every version ever cut, the
-complete per-version notes in `development/`, and the GitHub Release bodies in `github/`. The release
-block in [`CHANGELOG.md`](../../CHANGELOG.md) points there for everything but the current version.
+**What this repo's releases *are* is not on this page — it is on its sibling**, at
+📄 **[`releases/history.md`](history.md)**: the dated list of every version ever cut, beside the
+complete per-version notes in `changelog/` and the GitHub Release bodies in `github/`. The release
+block in [`CHANGELOG.md`](../CHANGELOG.md) points there for everything but the current version.
 
-**Why the list is there and the `audience/` notes are here** (Dave, August 19, 2026) — the test is
+**That list sat at the repo root until August 27, 2026, and this page is where its move is recorded**
+(Dave). It came here under a new name, `history.md`, because this page is already `releases/README.md` —
+the list and the answers are two different documents that shared a filename only while they sat at
+different directory levels. The paragraph below is the reasoning that kept it at the root, left standing
+rather than deleted, because the half of it that still holds is what makes the move safe.
+
+**Why the list was there and the `audience/` notes were here** (Dave, August 19, 2026) — the test is
 whether the thing survives this folder being deleted. A repo that has cut releases has a **history**
 whichever tooling cut it, so the list is the repo's and an index of files in `releases/` had no business
-sitting in a folder a teardown removes. A per-reader **note** is the opposite: it exists only because the
+sitting in a folder a teardown removes. **The first half of that still holds and the second no longer
+does**: the list is indeed the repo's own, and issue #885 settled that this folder is **permanent** — no
+command in the workflow plugin removes it, and no future teardown may, precisely because it holds a repo's
+changelog and release history. There is no teardown for the list to not survive, so the durability worry is
+answered rather than overruled. A per-reader **note** is the opposite: it exists only because the
 tier model does, so it is the workflow's and stays. Both moved here together on August 14; only the list
 moved back.
 
@@ -42,8 +52,12 @@ measurement lives.
 > `adopt-workflow-folder` skill scaffolds it) holds only what this section holds: a pointer to the
 > portable page, your seam values and your local decisions.
 >
-> **Your release list does not go on this page — it goes at your repo root**, in `releases/README.md`,
-> which is where `Get-ReleaseHistoryPath` already points if you leave it alone (August 19, 2026). It
+> **Your release list does not go on this page — it goes beside it**, in
+> `contributing-davekjohn/releases/history.md`, which is where `Get-ReleaseHistoryPath` already points if you
+> leave it alone (issue #885). The two are separate documents at the same address, which is exactly why the
+> list is not called `README.md`. If you have been cutting releases into a `releases/README.md` at your repo
+> root, that is a **layout rather than a mistake** — repoint the seam at it and keep one list, or leave the
+> default and accept that your history splits at the point the default starts applying. It
 > needs a `<n>.x` section and a table header before your first cut, or the row inserter has nowhere to
 > file a row; start it **empty** rather than carrying these versions, dates and PR references across.
 > If your page today still carries a hand-copied mirror of the process above a horizontal rule, delete
@@ -62,10 +76,12 @@ hand-written note's *For consumers* section is written for them. A repo that del
 commissioner answers `1` and never writes that section.
 
 Every release document groups **per major** (`3.x`) — the consumer this model came from folders per minor.
-`Get-ReleaseHistoryPath` answers the **shared default**, [`releases/README.md`](../../releases/README.md),
-because that is where the release list lives — this repo's own history, which outlives the workflow that
-cut it. It pointed at this page between August 14 and August 19, 2026, when the hand-kept release pages
-moved into the workflow folder and the list came along; the list moved back, the audience notes did not.
+`Get-ReleaseHistoryPath` answers [`releases/history.md`](history.md) in this folder — since
+August 27, 2026, which is also the answer its computed default has been giving every **consumer** since
+issue #885, so the source stopped being the one repo answering it differently. It pointed at this page's
+folder once before, between August 14 and August 19, 2026, when the hand-kept release pages moved here and
+the list came along; then the list moved back to the root and the audience notes did not. This is that
+first move made again on a premise that now holds — see the reversal recorded near the top of this page.
 Since the hand-written note merged into one document (August 10, 2026), `cut-release.ps1` drafts that
 note itself before it writes this page's **Version cell**, so the cell points straight at it — the hand-written
 note where the bump wrote one, the development notes on a patch — with nothing repointing it afterwards.

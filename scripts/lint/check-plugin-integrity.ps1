@@ -1245,9 +1245,37 @@ $lcScopeRegex   = [regex]'--scope\s+project'
 $lcScopeUninstallRegex = [regex]'--scope\s+(?:project|local)'
 $lcRefreshRegex = [regex]'claude\s+plugin\s+marketplace\s+update|staying-up-to-date'
 
+# WHERE THIS REPO'S CHANGELOG ACTUALLY LIVES, resolved once for the three checks below that need to name
+# it: this lifecycle-command exclusion, the entry-heading pass (check 19) and the shape-claim pass
+# (check 20b). All three said the literal 'CHANGELOG.md' until August 27, 2026, when the file moved into
+# contributing-davekjohn/ and this repo answered Get-ChangelogPath to say so. A gate that keeps naming the
+# old path does not fail loudly -- it silently judges a file that is not there, which is the quietest way
+# for a check to stop checking.
+#
+# DOT-SOURCED IN A SCRIPTBLOCK, the idiom check 16 established and for its reason: repo-config is not
+# loaded in this process anywhere else, and pulling two dozen repo functions into the whole lint to serve
+# three checks is how a gate acquires a dependency nobody meant to give it.
+#
+# READ THE SAME WAY THE FOLD READS IT -- Get-SeamValue over Get-DefaultChangelogPath -- rather than with a
+# literal fallback of its own. A gate whose idea of "the changelog" can differ from the fold's is a gate
+# that passes a document nobody writes and never sees the one that is written.
+#
+# THIS ADDS seam-lib.ps1 TO THE GATE'S DEPENDENCIES, which the lint fixture has to copy alongside the
+# other libs. That is stated here because the failure is loud but misleading: the dot-source fails inside
+# the fixture's own copy of this script, the gate dies before check 11, and four suites report several
+# dozen unrelated scenarios as broken -- the same shape the fixture's marketplace list has twice paid for.
+$changelogRel = & {
+    $clCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
+    if (Test-Path -LiteralPath $clCfg) { . $clCfg }
+    . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+    Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $RepoRoot)
+}
+$changelogRelWin = $changelogRel -replace '/', '\'
+$changelogFull   = Join-Path $RepoRoot $changelogRelWin
+
 $lifecycleFiles = @($linkFiles | Where-Object {
     $rel = $_.Substring($RepoRoot.Length).TrimStart('\', '/')
-    if ($rel -eq 'CHANGELOG.md') { return $false }
+    if ($rel -eq $changelogRelWin) { return $false }
     if ($rel -match '\\CHANGELOG\.md$') { return $false }
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
@@ -1541,7 +1569,7 @@ foreach ($ef in $entryTextsForHeadings) {
     }
 }
 
-$clForHeadings = Join-Path $RepoRoot 'CHANGELOG.md'
+$clForHeadings = $changelogFull
 if (Test-Path -LiteralPath $clForHeadings) {
     $clMasked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($clForHeadings, [System.Text.Encoding]::UTF8))
     $clLines = $clMasked -split "`r?`n"
@@ -2177,7 +2205,7 @@ function Test-EntryShapeClaims {
 
 $scFiles = @($linkFiles | Where-Object {
     $rel = $_.Substring($RepoRoot.Length).TrimStart('\', '/')
-    if ($rel -eq 'CHANGELOG.md') { return $false }
+    if ($rel -eq $changelogRelWin) { return $false }
     if ($rel -match '\\CHANGELOG\.md$') { return $false }
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
@@ -2215,7 +2243,7 @@ foreach ($sf in ($scFiles | Sort-Object -Unique)) {
 # alone in. Split-Changelog throws there, deliberately (a cut with no entries describes nothing), which is
 # why the boundary is derived here rather than borrowed from it -- a gate that threw in a legitimate state
 # would take the whole lint down with it.
-$scChangelog = Join-Path $RepoRoot 'CHANGELOG.md'
+$scChangelog = $changelogFull
 if (Test-Path -LiteralPath $scChangelog) {
     $scClLines = (Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($scChangelog, [System.Text.Encoding]::UTF8))) -split "`r?`n"
     $scHeadEnd = $scClLines.Count
@@ -2223,7 +2251,7 @@ if (Test-Path -LiteralPath $scChangelog) {
         if ($scClLines[$i] -match ('^#{' + $ehEntryLevel + '}\s')) { $scHeadEnd = $i; break }
     }
     $scHeadText = if ($scHeadEnd -gt 0) { (@($scClLines[0..($scHeadEnd - 1)])) -join "`n" } else { '' }
-    $scChecked += Test-EntryShapeClaims -Rel 'CHANGELOG.md' -Rx $scHeadClaimRx -Text $scHeadText
+    $scChecked += Test-EntryShapeClaims -Rel $changelogRel -Rx $scHeadClaimRx -Text $scHeadText
 }
 
 Write-Coverage -Category 'entry-shape' -Checked $scChecked `

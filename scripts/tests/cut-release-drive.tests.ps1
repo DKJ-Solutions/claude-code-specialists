@@ -125,6 +125,24 @@ function New-CutFixture {
         Write-Utf8 $cfgPath $patched
     }
 
+    # THE SECOND DEPARTURE, and unconditional (August 27, 2026). This repo moved its changelog, its release
+    # list and its internal-note root into contributing-davekjohn/ and now STATES all three seams, so a
+    # verbatim copy carries those answers into a fixture whose whole layout -- and every path this suite
+    # asserts on -- is the root one. Patched by the same targeted replacement as the tier above, and for the
+    # same reason: every OTHER answer stays grounded in the real file. What this suite tests is the CUT, not
+    # where a repo keeps its documents; the seams' own defaults are covered by seam-lib.tests.ps1.
+    $relocPath = Join-Path $root 'scripts\repo-config.ps1'
+    $reloc = Get-Content -LiteralPath $relocPath -Raw
+    foreach ($seam in @(
+        @{ Var = 'ChangelogPath';            Root = 'CHANGELOG.md' },
+        @{ Var = 'ReleaseHistoryPath';       Root = 'releases/README.md' },
+        @{ Var = 'ReleaseInternalNotesRoot'; Root = 'releases/internal' })) {
+        $before = $reloc
+        $reloc = $reloc -replace ("(?m)^\`$script:" + $seam.Var + "\s*=.*$"), ("`$script:" + $seam.Var + " = '" + $seam.Root + "'")
+        if ($reloc -eq $before) { throw "fixture: could not repoint $($seam.Var) to the root -- the seam literal in repo-config.ps1 changed shape." }
+    }
+    Write-Utf8 $relocPath $reloc
+
     Write-Utf8 (Join-Path $root '.claude-plugin\marketplace.json') @"
 {
   "name": "claude-code-specialists",
