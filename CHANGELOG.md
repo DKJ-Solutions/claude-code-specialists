@@ -32,6 +32,70 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-gates-read-pr-commit-v1` · 20260827-123549
+
+`ship-pr`'s two gates before the merge -- the step-list gate and the DEPLOY lock -- now read the branch's
+own commit, `refs/heads/<branch>`, instead of the file on disk. They read the checkout until now, on a
+reasoning the script stated out loud: *"HEAD is still on the branch at this point -- step 5 is what moves to
+main."* That is true of a foreground run and false of the shape this script invites, because it waits on CI.
+
+The reason it needed doing is measured twice, and the second instance is what turned a written-down trap
+into a defect. On August 20, 2026 two sessions shared one checkout. On August 27, 2026 it needed no second
+session at all: one session backgrounded the ship and started the next piece of work while `lint-en-tests`
+ran for 10m57s, and the gate refused PR #969 over `- [ ] TODO: the first step of this branch` -- the verbatim
+scaffold TODO of a branch created *during* the wait, while PR #969's own document had no open step at all.
+Both refusals were safe, and that is what made them easy to leave alone. **The same assumption fails the
+other way in silence**: the shipping PR carries an unresolved step, the checkout has since moved to a branch
+whose steps are all ticked, and the gate passes on somebody else's document and merges. A gate with no
+`-Force`, satisfied by a file the PR does not contain, reports the requirement as met while nothing checked
+it -- and the DEPLOY lock is the worse half of the pair, because the section it guards is what step 5 folds
+verbatim into `CHANGELOG.md`.
+
+Two things this deliberately does not do. **It does not refuse when `HEAD` has moved**, which was the other
+shape on the table: the report itself names a backgrounded ship beside the next piece of work as the ordinary
+shape of that window, so that guard would break the ordinary case in order to protect it -- and nothing
+downstream needs the checkout to have stayed put, because step 5 checks out the trunk and folds from there
+whichever branch it was standing on. **And it does not touch `open-pr`'s copy of the gate**, whose window is
+the moment between reading and pushing rather than eleven minutes of CI; where an uncommitted tick gets past
+it, the merge gate now catches it, which is the layering working rather than a hole.
+
+For somebody maintaining this repo the gain is a merge gate that cannot be answered by the wrong file, plus
+one behaviour worth knowing at the keyboard: a step ticked in the editor and never committed no longer gets
+past it. Both messages have always said *"commit, and re-run"*, so the gate has caught up with what it asks.
+It is a 3 rather than higher because it changes no chain and blocks nothing that was landing before -- but the
+confusing half has now fired twice in eight days, and the silent half is on the merge path.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The same repair, through a plugin update, and the exposure is identical: `ship-pr` waits on their CI too, and
+a consumer with a long-running required check has the same eleven-minute window in which a session can start
+the next branch. What arrives is `ship-pr.ps1` plus both libs it reads the commit through, so nothing has to
+be configured -- and `Get-GitFileTextAtRef` is available to any other script of theirs that has to judge a
+commit rather than a checkout.
+
+The `ship-pr` skill page changes its claim rather than gaining a note: its section used to be titled *"The
+step-list gate reads the WORKING TREE, and one thing breaks that"* and told the reader to compare
+`git rev-parse --abbrev-ref HEAD` against the PR's head ref by hand when a refusal named a step they did not
+recognise. That advice is now obsolete, and a page that keeps it would send someone hunting a mismatch the
+script no longer has. The portable contributing page names the second read at the merge in the same movement.
+
+A 3 there for the same reason as above, and no higher: nothing they have written stops working, and no
+migration is asked of them.
+
+**Score:** 3
+
+#### Pull Request
+
+The merge gates read the shipping branch's own commit, not the working tree
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #973](https://github.com/DaveKJohn/claude-code-specialists/pull/973)
+
+---
+
 ### DEPLOY: `fix/seam-isolation-legacy-root-v1` · 20260827-121838
 
 `Assert-WorkflowIsolatedSeamPath` could not tell a typo from a layout, and treated both as a typo. It
