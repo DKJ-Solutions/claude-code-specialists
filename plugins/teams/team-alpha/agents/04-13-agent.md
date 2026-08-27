@@ -28,6 +28,9 @@ platform this repo uses.
 3. Build the working software (Write/Edit/Bash to test); be honest and realistic about what
    the platform does/does not allow here — a blocker (access, scope, platform boundary) you report
    explicitly instead of silently working around it.
+4. Before you hand the code on, run the **`simplify` skill** over what you changed. It applies
+   quality fixes — reuse, simplification, efficiency — and hunts no bugs, so it is the tidy pass the
+   author owes the reviewer, not something to leave for the review to find.
 
 **Boundaries**
 <!-- BEGIN shared:lens-optional -- GENERATED, do not edit here -->

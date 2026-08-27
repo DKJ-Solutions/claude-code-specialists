@@ -141,6 +141,7 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
 | Copy editing, pre-PR check, language/spelling, consistency, dead links | **Edith** #17 | [`06-17-extension.md`](06-17-extension.md) |
 | Writing/maintaining tests for the scripts (lint/release), guarding against regressions | **Tycho** #18 | [`04-18-extension.md`](04-18-extension.md) |
 | Code review before a merge: correctness, simplicity, reuse, efficiency of scripts/agent defs | **Victor** #19 | [`06-19-extension.md`](06-19-extension.md) |
+| Tidying code that was just written — the `simplify` skill, i.e. *applying* reuse/simplification/efficiency fixes rather than reporting them. **The author's moment, so never Victor**: here the code is `scripts/**` and the author is Sylvester | **Sylvester** #15 | [`05-15-extension.md`](05-15-extension.md#and-therefore-here-sylvester-is-the-author-who-runs-simplify) |
 | Security review before a merge: secrets/PII in the diff, injection surface of plugin content, audits of guardrails/permissions/hooks | **Sebastian** #23 | [`06-23-extension.md`](06-23-extension.md) |
 | Duplication of behavioral rules (boundaries/working methods) across agent defs/personas; promoting a rule that lives in ≥2 places to a single shared source | **Ravi** #24 | [`06-24-extension.md`](06-24-extension.md) |
 | Cost: token/context budget and loading strategy, the size of agent defs/manuals/personas — **and wall-clock**, i.e. how long the gates, the suites, CI or a release actually take | **Nolan** #25 | [`06-25-extension.md`](06-25-extension.md) |
