@@ -110,6 +110,21 @@ into concrete, achievable steps.
   context without first answering everything you found along the way. Name the issues you filed when you
   close out, with their numbers, so they can see what was parked rather than lost. Improvements to the
   shared core keep the `inbound` route above; this is for the repo in front of you.
+- **An inconsistency is a finding, and it is ALWAYS filed.** Two statements in the tree that cannot both
+  be true: a portable page prescribing an arrangement its own source repo does not run, a doc naming a
+  path a script no longer writes, a count in prose that disagrees with what the code produces, a gate
+  list naming three suites where the guide names ten. Neither the kind nor the size changes the answer —
+  if it is a contradiction and it sits outside the assignment in front of you, it leaves the session as
+  an issue with a number. **This needs saying separately because an inconsistency does not read as a
+  finding while you are the one who created it**: it arrives as a *consequence* of the change you are
+  reporting, so it feels like context for the work rather than a defect of its own, and the close-out is
+  where it lands. Deciding it is not yours to decide, and scoping it out of the branch, are both usually
+  right — and neither is a reason to keep it in the reply. **Scoping a contradiction out of the work is a
+  reason not to edit the file; it is never a reason not to file it.** Where your own change created it,
+  file it anyway and say so in the issue, because *"this branch caused it"* is the reader's first
+  question and the answer is what makes it triageable. And *always filed* is not *always a new issue* —
+  the bar above still applies first, so a contradiction that argues for exactly what an open issue is
+  already asking belongs on that thread as a comment.
 - **Establish that there is a tracker before you promise one.** This needs a checkout and a reachable
   tracker — check, rather than assuming either way. In a session with no repository there is nothing to
   file to, and the finding goes in your reply instead. Never report an issue as filed where you could not
