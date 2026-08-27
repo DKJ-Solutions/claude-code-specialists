@@ -192,6 +192,23 @@ function Invoke-ParkCycle {
     }
 }
 
+function Get-CommitMessage {
+    <#
+        The last commit's full message with every run of whitespace collapsed to one space.
+
+        THE COLLAPSE IS NOT COSMETIC. The backing note is WRAPPED for commit-body width, so where the
+        line break falls is park-lib's decision about rendering rather than a fact about the note -- and
+        a phrase assert pinned across it goes red the moment a clause is reworded by a word. Same
+        reasoning as Get-FlatOutput above, one layer along.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Dir)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        return ((((& git -C $Dir log -1 --pretty=%B) | Out-String) -replace '\s+', ' ').Trim())
+    } finally { $ErrorActionPreference = $prevEap }
+}
+
 function Get-CommitCount {
     param([Parameter(Mandatory = $true)][string]$Dir)
     $prevEap = $ErrorActionPreference
@@ -242,8 +259,18 @@ try {
     Assert-True ($filesA -contains $relA) 'happy path: the commit carries the development cycle'
     Assert-Equal 1 $filesA.Count 'happy path: and NOTHING else -- the unrelated dirty file stayed out'
     Assert-True (Test-RefOnRemote -Bare "$fixA.git" -Ref 'refs/heads/feat/visible-v1') 'happy path: the branch ref is on origin'
-    $msgA = ((& git -C $fixA log -1 --pretty=%B) | Out-String)
+    $msgA = Get-CommitMessage -Dir $fixA
     Assert-True ($msgA -match [regex]::Escape((Get-GitParkScopes)['BranchFiles'])) 'happy path: the commit names the branch-files scope it committed'
+    # THE BACKING NOTE (#960), on the ordinary park: it is always stamped, so its ABSENCE cannot be read
+    # as "this park was fine". fixA's document carries no steps and one unrelated dirty file.
+    Assert-True ($msgA -match [regex]::Escape((Get-GitParkBackingMarker))) 'happy path: the commit body carries the backing note'
+    Assert-True ($msgA -match 'no steps written yet') 'happy path: and says the plan has no steps yet rather than reporting zero of zero done'
+    Assert-True ($msgA -match '1 file\(s\) uncommitted') 'happy path: it counts the unrelated dirty file as unpublished work'
+    Assert-True (-not ($msgA -match 'stray')) 'happy path: COUNTS, NEVER FILENAMES -- the unrelated path is not named in a public commit'
+    Assert-True (-not ($msgA -match 'reads as FINISHED')) 'happy path: and no alarm on a plan that never claimed to be finished'
+    # The note is BODY, not subject: a `git log --oneline` of a branch stays readable.
+    $subjA = ((& git -C $fixA log -1 --pretty=%s) | Out-String).Trim()
+    Assert-True (-not ($subjA -match [regex]::Escape((Get-GitParkBackingMarker)))) 'happy path: the note stays out of the subject line'
 
     # --- (b) IDEMPOTENT: a second run has nothing to do, and says so ------------------------------
     Write-Host "park-cycle.ps1 -- a second run does nothing" -ForegroundColor Cyan
@@ -385,6 +412,50 @@ try {
     Assert-True (-not ($rL.Out -match 'on the trunk')) "trunk seam: 'main' is NOT treated as the trunk -- the seam was read"
     Assert-True ($rL.Out -match 'parked on origin') 'trunk seam: and the branch was parked'
     Assert-True ((Get-HeadFiles -Dir $fixL) -contains $relL) 'trunk seam: the commit carries the development cycle'
+
+    # --- (m) THE SHAPE #960 WAS MEASURED ON: a plan that reads as FINISHED with nothing behind it -----
+    # THE ASSERT THIS WHOLE MECHANISM EXISTS FOR. The measured branch had eight resolved CREATE steps, a
+    # diff against the trunk consisting of the cycle document alone, and the work uncommitted in another
+    # device's working copy. From origin that is indistinguishable from a finished branch, and the more
+    # complete the ticks the more convincing the wrong reading -- a session picking it up either rebuilds
+    # work that already exists or opens a PR that merges the document alone.
+    Write-Host "park-cycle.ps1 -- a plan that reads as finished with nothing behind it says so" -ForegroundColor Cyan
+    $fixM = New-Fixture -Label 'm' -GhAnswer 'none'
+    Switch-ToBranch -Dir $fixM -Name 'feat/ticked-but-empty-v1'
+    $null = New-CycleDocument -Dir $fixM -Branch 'feat/ticked-but-empty-v1' `
+        -Body "### CREATE`n`n- [x] wrote the reader`n- [x] wrote the writer`n"
+    # The work, uncommitted -- which is what the other device's checkout looked like.
+    [System.IO.File]::WriteAllText((Join-Path $fixM 'reader.ps1'), "# work`n", (New-Object System.Text.UTF8Encoding $false))
+    [System.IO.File]::WriteAllText((Join-Path $fixM 'writer.ps1'), "# work`n", (New-Object System.Text.UTF8Encoding $false))
+
+    $rM = Invoke-ParkCycle -Dir $fixM
+    Assert-Equal 0 $rM.Code 'finished plan: exit 0 -- the note is a note, never a gate'
+    Assert-True ($rM.Out -match 'parked on origin') 'finished plan: and the park still happened, which is the point of it not being a gate'
+    $msgM = Get-CommitMessage -Dir $fixM
+    Assert-True ($msgM -match '2 of 2 step\(s\) resolved') 'finished plan: the note counts the resolved steps'
+    Assert-True ($msgM -match 'nothing else committed on this branch') 'finished plan: and says nothing else is committed'
+    Assert-True ($msgM -match 'reads as FINISHED') 'finished plan: the alarm fires -- this is the state that misleads a reader'
+    Assert-True ($msgM -match 'not missing') 'finished plan: and it says the work is uncommitted elsewhere rather than gone'
+    Assert-True ($msgM -match 'Do NOT rebuild it') 'finished plan: naming the wrong move a good-faith pickup would make'
+    Assert-True (-not ($msgM -match 'reader\.ps1')) 'finished plan: still counts only -- the uncommitted paths are not published'
+    Assert-Equal 1 (Get-HeadFiles -Dir $fixM).Count 'finished plan: and bound 1 holds -- the commit is the document alone'
+
+    # --- (n) A HALF-DONE PLAN GETS THE NUMBERS AND NO ALARM ------------------------------------------
+    # THE ASSERT THAT KEEPS THE ALARM WORTH READING. 'Any resolved step with nothing committed' would fire
+    # on nearly every early park -- a planning step ticked before a line of code exists is the ordinary
+    # case -- and an alarm that fires on almost every park is one nobody reads by the time it matters.
+    Write-Host "park-cycle.ps1 -- a half-done plan gets the numbers, not the alarm" -ForegroundColor Cyan
+    $fixN = New-Fixture -Label 'n' -GhAnswer 'none'
+    Switch-ToBranch -Dir $fixN -Name 'feat/half-done-v1'
+    $null = New-CycleDocument -Dir $fixN -Branch 'feat/half-done-v1' `
+        -Body "### CREATE`n`n- [x] read the code`n- [ ] change it`n"
+
+    $rN = Invoke-ParkCycle -Dir $fixN
+    Assert-Equal 0 $rN.Code 'half-done plan: exit 0'
+    $msgN = Get-CommitMessage -Dir $fixN
+    Assert-True ($msgN -match '1 of 2 step\(s\) resolved') 'half-done plan: the numbers are still there'
+    Assert-True (-not ($msgN -match 'reads as FINISHED')) 'half-done plan: and the alarm stays silent, because one step is still open'
+    Assert-True ($msgN -match 'nothing uncommitted') 'half-done plan: a clean working copy is stated rather than left blank'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

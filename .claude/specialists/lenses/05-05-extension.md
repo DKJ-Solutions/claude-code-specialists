@@ -333,6 +333,19 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   overtaken by `d151b6e` at 18:32 the same day. Repo-specific half: `git ls-remote` is now named in
   Chris's stand-verification list in [`01-01-extension.md`](01-01-extension.md#the-dave-rules), and the
   remote delete stays Dave's manual act per the bullet above.
+- **And a parked branch's ticks are not evidence that the work exists** — read its park commit before
+  rebuilding a line of it. The mechanism is portable and lives in
+  [`DEVELOPMENT-portable.md`](../../../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md):
+  every automatic park stamps a `Backing:` line saying how many steps are resolved, how much is committed
+  on the branch besides the document, and how much is uncommitted in the working copy the park came from
+  -- plus an explicit alarm where the plan reads as finished with nothing behind it. Repo-specific half:
+  this is the shape [#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960) was measured
+  on here, `feat/adopt-act-on-this-skills-v1` (August 27, 2026) -- three `park:` commits, eight resolved
+  CREATE steps naming edits to three agent defs, three manuals and two lenses, and a diff against `main`
+  consisting of the cycle document alone. The work was uncommitted on the other device; every commit on
+  the branch was `davekokbwj` while this checkout is `DaveKJohn`, which is the tell to look for when the
+  numbers and the ticks disagree. `session-status.ps1` prints the note under each parked branch, so
+  `/lock` and `/handover` surface it without a checkout.
 - **Working in parallel from multiple machines** (lesson of July 16, 2026, when PR #46 and #47
   crossed each other): merging different branches in parallel is safe — the lint gate and CI protect
   `main` independently of which machine merges. Two rules keep it that way: **never the same branch

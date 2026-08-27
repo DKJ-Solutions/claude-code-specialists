@@ -606,3 +606,45 @@ afterwards nothing told you which half of your work had reached origin.
 
 Before picking a parked branch back up, measure its plan against `main`. A plan that reads as current is
 not evidence that it is — see the `park` skill for what to check and why.
+
+### The park commit says what is behind the plan — read it before you rebuild anything
+
+Automatic parking publishes the development cycle **and nothing else**, which is the bound that keeps it
+from pushing work nobody asked to publish. It has one perverse consequence, measured on August 27, 2026
+(issue #960): a branch whose work sits uncommitted in *another* machine's working copy arrives on origin as
+a document reading `- [x]` eight times over, with no commit behind a single tick. From origin, **ticked and
+committed** and **ticked and uncommitted somewhere else** are the same document — and the more complete the
+ticks, the more convincing the wrong reading. A session picking that branch up in good faith either
+rebuilds work that already exists, or opens a PR that merges 161 lines the fold then deletes.
+
+So every automatic park commit carries a `Backing:` line in its body:
+
+```text
+park: feat/adopt-something-v1 (the branch files only)
+
+Backing: 8 of 8 step(s) resolved; nothing else committed on this branch; 12
+file(s) uncommitted in the working copy this park came from.
+This plan reads as FINISHED and no work behind it is on origin. That work is
+uncommitted in the working copy this park came from -- it is not missing. Do
+NOT rebuild it, and do not open a PR that would merge this document alone: ask
+that checkout to commit and push first.
+```
+
+Four things about it are deliberate:
+
+- **It is a note, never a gate.** A park that refused because it disliked the shape of the plan would be
+  worse than the misleading document, because then the plan would not reach the other machine at all.
+- **Counts, never filenames.** The uncommitted figure describes work nobody asked to publish; listing
+  those paths would leak the shape of unrelated work onto a public branch.
+- **The alarm paragraph fires only on the finished shape** — no step open, at least one resolved, nothing
+  else committed. "Any resolved step with no commit behind it" would fire on nearly every early park,
+  because a planning step ticked before a line of code exists is the ordinary case, and an alarm that
+  fires on almost every park is one nobody reads by the time it matters.
+- **It is measured on the machine that holds the invisible work**, at the one moment it becomes invisible.
+  Nowhere else can take that measurement: from origin those files do not exist.
+
+`session-status.ps1` — so `/lock` and `/handover` — prints the note back under every parked branch, and
+says so plainly where there is none (a branch parked by hand, or one whose last commit is `new-branch`'s
+push at creation, which stamps no note because at creation there is nothing behind the plan yet). It
+**echoes** the line rather than recounting: the figures describe a working copy the reading machine cannot
+see, so a local recount could only be confidently wrong.

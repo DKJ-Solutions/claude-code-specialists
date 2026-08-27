@@ -38,6 +38,15 @@
          handful of small commits per branch, and the recognisable `park:` subject Invoke-GitPark
          already writes is the mitigation.
 
+    AND THE COMMIT SAYS WHAT IS BEHIND THE PLAN (issue #960). Publishing the plan and nothing else is
+    what bound 1 is for, and it has one perverse outcome: a branch whose work is uncommitted in another
+    device's working copy arrives on origin as a document claiming the work is done, with no commit behind
+    a single tick. So every park commit carries a `Backing:` line -- how many steps are resolved, how many
+    files are committed on this branch besides this document, how many are uncommitted here -- and, when
+    the plan reads as FINISHED with nothing behind it, a paragraph saying so in as many words.
+    session-status prints it back for every parked branch. COUNTS, NEVER FILENAMES: the uncommitted figure
+    describes work nobody asked to publish. It is a note and never a gate -- see the block at the call.
+
     NO SOURCE-REPO GUARD, and that is the documented precedent rather than an omission. A hook invokes
     this from '${CLAUDE_PLUGIN_ROOT}/scripts/task/', by design, against the current repo -- so a
     refusal would fire on every turn in the repo that maintains it, exactly as source-repo-guard-lib's
@@ -169,7 +178,8 @@ if (-not (Test-Path -LiteralPath $cyclePath -PathType Leaf)) {
 # AND THE DOCUMENT MUST BE THIS BRANCH'S. Resolve-BranchFilePath falls back to a path that merely
 # EXISTS when nothing claims the branch, which on a branch created outside new-branch is the reset
 # document. Pushing that would put the trunk's own empty state on the branch under a `park:` subject.
-$declared = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($cyclePath, [System.Text.Encoding]::UTF8))
+$cycleText = [System.IO.File]::ReadAllText($cyclePath, [System.Text.Encoding]::UTF8)
+$declared = Get-BranchFileDeclaredBranch -Text $cycleText
 if (-not $declared -or $declared -eq $trunk) {
     Write-CycleParkNote "'$cycleRel' is in its reset state -- it belongs to no branch, so there is nothing to hand over."
     exit 0
@@ -233,11 +243,32 @@ if ($null -ne $prRecord) {
     exit 0
 }
 
+# WHAT IS BEHIND THE TICKS (#960), MEASURED HERE BECAUSE NOWHERE ELSE CAN. This script publishes the
+# plan and nothing else -- bound 1 -- so on a branch whose work sits uncommitted in ANOTHER device's
+# working copy it puts a document reading '[x] done' on origin with no commit behind a single tick. From
+# origin those two states are the same document, and the more complete the ticks the more convincing the
+# wrong reading: a session picking it up in good faith rebuilds work that already exists, or opens a PR
+# that merges the plan alone. This is the device that HOLDS the invisible work, at the one moment it
+# becomes invisible, so it is the only place the fact is both known and true.
+#
+# THE MEASUREMENT DOES NOT GET A VOTE ON THE PUSH. It is a note, not a gate: a park that refused because
+# it disliked the shape of the plan would be the one thing worse than the misleading document, since the
+# plan would then not reach the other device at all. Hence the try -- an unreadable document or an odd
+# git state costs the note, never the park.
+$backingNote = ''
+try {
+    $backingNote = Format-GitParkBacking `
+        -Steps (Get-BranchProgressTally -Text $cycleText) `
+        -Backing (Get-GitParkBacking -RepoRoot $root -Trunk $trunk -Paths @($cycleRel))
+} catch {
+    Write-CycleParkNote "could not measure what is behind the plan -- parking without that note." 'DarkYellow'
+}
+
 # THE STAGE-COMMIT-PUSH ITSELF LIVES IN park-lib.ps1 (#507), the one implementation the two deliberate
 # parking entry points already share. This is the third caller and it adds no steps of its own: the
 # scope picks both the pathspec and the words, so the log says `park: <branch> (the branch files only)`
 # for this the same as for new-branch's push at creation.
-$ok = Invoke-GitPark -RepoRoot $root -Branch $branch -Scope 'BranchFiles' -Paths @($cycleRel)
+$ok = Invoke-GitPark -RepoRoot $root -Branch $branch -Scope 'BranchFiles' -Paths @($cycleRel) -BodyNote $backingNote
 if (-not $ok) {
     # Reported, never fatal -- see the always-exits-0 paragraph. A failed push here is usually the
     # divergence case the no-fetch note above describes, and it is worth a visible line.

@@ -82,6 +82,29 @@ git log --oneline -- <the files the plan renames or creates>
 plus the state of any issues the plan claims to close. In the measured case that was two commands, and it
 turned a day of planned work into a one-line branch deletion.
 
+**A second trap sits the other way round: the plan may be current and the work may not exist.** Measured
+in the source repo on August 27, 2026
+([#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960)). A branch carried three `park:`
+commits, eight resolved CREATE steps naming edits to three agent defs, three manuals and two lenses — and
+its **entire** diff against the main branch was the cycle document, 161 insertions, one file. None of the
+named edits were on the branch; none were on the main branch either. They were uncommitted in the other
+device's working copy, which no reader of `origin` can see. A session picking that up in good faith either
+rebuilds eight changes that already exist, or opens a PR that merges 161 lines the fold then deletes.
+
+So **read the park commit before rebuilding anything.** Every automatic park stamps a `Backing:` line into
+its body — steps resolved, files committed on the branch besides the document, files uncommitted in the
+working copy the park came from — plus an explicit alarm where the plan reads as **finished** with nothing
+behind it:
+
+```powershell
+git log -1 --pretty=%B origin/<branch>
+```
+
+`session-status.ps1` prints it under each parked branch too, so `/lock` and `/handover` surface it without
+a checkout, and it says so plainly where there is none. **The two traps are independent and both are
+cheap:** the check above asks whether the plan has been overtaken; this one asks whether it was ever
+carried out. A plan can pass either and fail the other.
+
 **Deleting the remote branch afterwards is deliberately a manual act** in the repo this was measured in —
 a parked branch is by definition *not* merged, so its loss is unrecoverable, which is exactly the wrong
 thing to automate. Check your own repo's governance before reaching for `git push origin --delete`.
@@ -110,6 +133,10 @@ document has diverged from what the PR published, so a pusher that kept running 
 **every merge in the repo** -- and the failure would read as the lock misbehaving rather than as the
 pusher. Same reason its fail-safe runs in that direction: when `gh` cannot say whether a PR exists, it does
 **not** push. Being one turn stale is a nuisance; an unmergeable branch is a defect.
+
+**Its commit body carries the `Backing:` note** described under *Picking a parked branch back up* above --
+what is actually behind the plan it is publishing, measured on the machine that holds the work. A note, not
+a gate: it never changes whether the park happens.
 
 It is silent unless it does something, and it never fails a turn -- it exits 0 on every outcome, including
 the ones it refuses on. Two parameters, both for callers rather than for you:

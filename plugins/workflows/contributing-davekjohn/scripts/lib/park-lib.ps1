@@ -36,6 +36,11 @@
     again ("if a second gate helper ever appears, move both out together"). A park is not a gate, and its
     cost here is one registry entry and one mirror -- no contract row, since nothing in it is repo-owned.
 
+    AND SINCE #960 IT ALSO OWNS WHAT THE COMMIT SAYS IS BEHIND THE PLAN. Get-GitParkBacking measures it,
+    Format-GitParkBacking words it, Get-GitParkBackingMarker names the one literal the reader looks for.
+    They sit here for the reason the scope map does: the park commit's body is this file's format, so a
+    caller cannot stamp a fact in a shape the reader cannot find.
+
     Self-contained apart from the shared native-capture helper: git only, no repo-owned config, so a
     consumer needs no scaffold for it.
 
@@ -85,6 +90,212 @@ function Test-GitOriginConfigured {
     return @(($res.Output | Out-String) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -eq 'origin' }).Count -gt 0
 }
 
+# THE FIRST WORD OF THE BACKING NOTE, and the ONE literal both sides of it share. park-cycle writes the
+# note into the commit body; session-status finds it again in a parked branch's last commit and prints it
+# back. A second copy of this word is the drift shape where the writer stamps a fact the reader never
+# finds -- and the failure would be silent on both sides: a commit that says everything, a report that
+# says nothing.
+$script:GitParkBackingMarker = 'Backing:'
+
+function Get-GitParkBackingMarker {
+    <# The lead word of the backing note. Everything from that line to the next blank line is the note. #>
+    return $script:GitParkBackingMarker
+}
+
+function Get-GitParkBacking {
+    <#
+        What is actually behind this branch's plan, as an object: files COMMITTED on the branch besides
+        $Paths, files UNCOMMITTED in this working copy besides $Paths, and a flag per figure saying
+        whether it could be established at all.
+
+        THE PROBLEM THIS EXISTS FOR (issue #960). A park publishes the branch's development cycle and
+        nothing else, by design -- bound 1 of park-cycle. On a branch whose work is uncommitted in
+        ANOTHER device's working copy, that means origin carries a plan reading '[x] done' eight times
+        over with no commit behind a single tick. From origin, 'ticked and committed' and 'ticked and
+        uncommitted elsewhere' are the same document. A session picking it up in good faith either
+        rebuilds eight changes that already exist somewhere, or opens a PR that merges 161 lines the fold
+        then deletes, delivering nothing.
+
+        SO IT IS MEASURED HERE AND NOWHERE ELSE, on the device that HOLDS the uncommitted work at the
+        moment it becomes invisible. No other reader can take this measurement: from origin the files do
+        not exist, and by the time somebody wonders, the session that had them is over.
+
+        COUNTS ONLY, NEVER FILENAMES, and that is a bound rather than brevity. The uncommitted figure
+        describes work nobody asked to publish; a park commit listing those paths would leak the shape of
+        unrelated work onto a public branch, which is bound 1 defeated one layer along.
+
+        THE TRUNK REF IS VERIFIED BEFORE IT IS COMPARED AGAINST, and an absent one reports UNKNOWN rather
+        than zero. Zero is an answer -- 'nothing else is committed', the alarming one -- and handing it
+        back for 'this checkout has no ref by that name' would raise the alarm on a repo that is merely
+        configured differently.
+
+        core.quotePath IS FORCED ON, and it is the language rule about reading a native command's output
+        rather than a preference: the paths here are COMPARED against $Paths, and PowerShell 5.1 decodes
+        a child's stdout with whatever console code page the run inherited. Quoting holds the wire to
+        ASCII, where every candidate code page agrees, so a filename with an accent cannot decode into
+        something that accidentally matches -- or fails to match -- the path being excluded. A repo may
+        set core.quotepath in its own config, hence -c rather than trusting the default.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$Trunk,
+        [string[]]$Paths = @()
+    )
+
+    # Forward slashes both sides: git reports them, a caller may hand back either.
+    $skip = @{}
+    foreach ($p in $Paths) { if ($p) { $skip[([string]$p -replace '\\', '/')] = $true } }
+
+    $committed = 0
+    $committedKnown = $false
+    $refRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', $Trunk) -DiscardStderr
+    if ($refRes.ExitCode -eq 0) {
+        # THREE DOTS: the branch against its MERGE BASE with the trunk, not against the trunk's tip -- so
+        # a trunk that has moved on since the branch was cut does not report its own commits as this
+        # branch's work.
+        $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-c', 'core.quotePath=true', '-C', $RepoRoot, 'diff', '--name-only', "$Trunk...HEAD")
+        if ($diffRes.ExitCode -eq 0) {
+            $committedKnown = $true
+            $committed = @(($diffRes.Output | Out-String) -split '\r?\n' |
+                ForEach-Object { $_.Trim().Trim('"') } |
+                Where-Object { $_ -and -not $skip.ContainsKey($_) }).Count
+        }
+    }
+
+    $uncommitted = 0
+    $uncommittedKnown = $false
+    # --untracked-files=all, AND THE DEFAULT WAS MEASURABLY WRONG HERE. git's default collapses an
+    # untracked DIRECTORY to a single entry naming the directory -- '?? contributing-davekjohn/' -- so on
+    # the very first park of a branch, where the cycle document's folder is itself new, the one path this
+    # function is asked to EXCLUDE never appears and its parent is counted as unpublished work instead.
+    # Caught by the suite on the ordinary happy path: 2 uncommitted files reported where there was 1.
+    # A per-file listing also reads better ('12 file(s)' means twelve files), and it respects .gitignore,
+    # so the untracked-build-directory case the collapse protects against is normally ignored anyway.
+    $stRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-c', 'core.quotePath=true', '-C', $RepoRoot, 'status', '--porcelain', '--untracked-files=all')
+    if ($stRes.ExitCode -eq 0) {
+        $uncommittedKnown = $true
+        foreach ($line in (($stRes.Output | Out-String) -split '\r?\n')) {
+            if ($line.Length -lt 4) { continue }
+            $path = $line.Substring(3).Trim()
+            # A rename reads 'old -> new'; the new path is the one that exists on disk.
+            $arrow = $path.IndexOf(' -> ')
+            if ($arrow -ge 0) { $path = $path.Substring($arrow + 4) }
+            $path = $path.Trim().Trim('"')
+            if (-not $path) { continue }
+            if ($skip.ContainsKey(($path -replace '\\', '/'))) { continue }
+            $uncommitted++
+        }
+    }
+
+    return [pscustomobject]@{
+        Committed        = $committed
+        CommittedKnown   = $committedKnown
+        Uncommitted      = $uncommitted
+        UncommittedKnown = $uncommittedKnown
+        Trunk            = $Trunk
+    }
+}
+
+function Split-GitParkBackingLines {
+    <#
+        Word-wraps one sentence to commit-body width, as an array of lines. No hanging indent, no
+        hyphenation, and a word longer than the width gets its own line rather than being broken -- a
+        broken path or branch name is worse than a long line.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
+        # 72, THE COMMIT-BODY CONVENTION, AND IT IS LOAD-BEARING FOR THE READER TOO. session-status prints
+        # this note indented six spaces inside its parked-branches block; at 78 the result is 84 columns,
+        # which an 80-column console reflows -- and a reflowed note breaks mid-word, since the indent is
+        # not repeated. 72 + 6 fits, so the line a reader sees is the line this function wrote.
+        [int]$Width = 72
+    )
+    $out = @()
+    $current = ''
+    foreach ($word in ($Text -split '\s+' | Where-Object { $_ })) {
+        if (-not $current) { $current = $word }
+        elseif (($current.Length + 1 + $word.Length) -le $Width) { $current = "$current $word" }
+        else { $out += $current; $current = $word }
+    }
+    if ($current) { $out += $current }
+    return $out
+}
+
+function Format-GitParkBacking {
+    <#
+        The backing note as commit-body text: one 'Backing:' sentence always, plus an alarm paragraph
+        when -- and only when -- the plan reads as FINISHED with nothing behind it.
+
+        WHY THE ALARM IS THAT NARROW. 'Any resolved step with no commit behind it' would fire on nearly
+        every early park: a planning step ticked before a line of code exists is the ordinary case, and a
+        warning that fires on almost every park is one nobody reads by the time it matters. Open == 0 and
+        Resolved > 0 is the shape #960 was measured on -- a plan that CLAIMS to be complete -- and it is
+        rare. Every other case still gets the numbers, which is what a reader needs to judge it.
+
+        -Steps IS DUCK-TYPED ON PURPOSE: any object carrying Open, Resolved and Total. This lib is
+        self-contained apart from the shared native-capture helper, and Get-BranchProgressTally lives in
+        entry-scaffold-lib -- which knows the document format, and which a park has no other reason to
+        load. The caller that already has both hands one to the other.
+
+        AN UNMEASURED FIGURE SAYS SO. 'not measured' and '0' are different claims, and printing the
+        second for the first is how a report gets trusted for something it never established.
+    #>
+    param(
+        [Parameter(Mandatory)]$Steps,
+        [Parameter(Mandatory)]$Backing
+    )
+
+    $total    = [int]$Steps.Total
+    $open     = [int]$Steps.Open
+    $resolved = [int]$Steps.Resolved
+
+    $stepClause = if ($total -eq 0) {
+        'no steps written yet'
+    } else {
+        "$resolved of $total step(s) resolved"
+    }
+    $committedClause = if (-not $Backing.CommittedKnown) {
+        "what else is committed: not measured (no '$($Backing.Trunk)' ref in this checkout)"
+    } elseif ([int]$Backing.Committed -eq 0) {
+        'nothing else committed on this branch'
+    } else {
+        "$([int]$Backing.Committed) file(s) committed besides this document"
+    }
+    $uncommittedClause = if (-not $Backing.UncommittedKnown) {
+        'uncommitted work here: not measured'
+    } elseif ([int]$Backing.Uncommitted -eq 0) {
+        'nothing uncommitted in the working copy this park came from'
+    } else {
+        "$([int]$Backing.Uncommitted) file(s) uncommitted in the working copy this park came from"
+    }
+
+    # WRAPPED, because this is a commit body and a git log renders it as written. Unwrapped it ran to 143
+    # characters in the case it was measured on, which every `git log` view truncates or reflows -- and
+    # the clause most likely to fall off the end is the last one, the uncommitted count that carries the
+    # whole point. No hanging indent: session-status takes the note from its marker to the next BLANK
+    # line, so an indented continuation would print with the indent doubled and read as a quote.
+    $lines = @(Split-GitParkBackingLines -Text "$($script:GitParkBackingMarker) $stepClause; $committedClause; $uncommittedClause.")
+
+    $finished = ($total -gt 0 -and $open -eq 0 -and $resolved -gt 0 -and
+                 $Backing.CommittedKnown -and [int]$Backing.Committed -eq 0)
+    if ($finished) {
+        $alarm = 'This plan reads as FINISHED and no work behind it is on origin. '
+        $alarm += if ($Backing.UncommittedKnown -and [int]$Backing.Uncommitted -gt 0) {
+            'That work is uncommitted in the working copy this park came from -- it is not missing. ' +
+            'Do NOT rebuild it, and do not open a PR that would merge this document alone: ask that ' +
+            'checkout to commit and push first.'
+        } else {
+            'And nothing is uncommitted here either, so the work this plan describes is not in this ' +
+            'checkout at all. Establish where it is before rebuilding any of it.'
+        }
+        # WRAPPED THE SAME WAY AS THE LINE ABOVE, through the same helper, so the width is one decision.
+        # It is one paragraph with the marker line, deliberately: session-status stops at the first blank
+        # line, and an alarm in a paragraph of its own would be the half that gets dropped.
+        $lines += Split-GitParkBackingLines -Text $alarm
+    }
+    return ($lines -join "`n")
+}
+
 function Invoke-GitPark {
     <#
         Parks $Branch: stages what $Scope says, commits it when there is something staged, and pushes with
@@ -98,13 +309,21 @@ function Invoke-GitPark {
 
         THE PATHSPEC IS NAMED, NOT SWEPT, in the BranchFiles scope -- so anything the caller had already
         staged for their own next commit stays staged and uncommitted rather than riding along.
+
+        -Intent AND -BodyNote ARE BOTH COMMIT BODY AND ARE DELIBERATELY TWO PARAMETERS. -Intent is a
+        person's parking note: where they left off, in their words. -BodyNote is a fact the script
+        measured -- today the backing note above (#960). Folding the second through the first would make
+        the log unable to say which half a human wrote, which is the same class of defect this whole lib
+        was extracted to end: one field describing two different things. Intent first where both are
+        given, because a reader's own words outrank a generated line.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
         [Parameter(Mandatory)][string]$Branch,
         [ValidateSet('Everything', 'BranchFiles')][string]$Scope = 'Everything',
         [string[]]$Paths = @(),
-        [string]$Intent = ''
+        [string]$Intent = '',
+        [string]$BodyNote = ''
     )
 
     $pathArgs = @()
@@ -138,6 +357,7 @@ function Invoke-GitPark {
     if ($diffRes.ExitCode -ne 0) {
         $msg = "park: $Branch ($($script:GitParkScopes[$Scope]))"
         if ($Intent.Trim()) { $msg = "$msg`n`n$($Intent.Trim())" }
+        if ($BodyNote.Trim()) { $msg = "$msg`n`n$($BodyNote.Trim())" }
         $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "git-park-msg-$PID.txt"
         [System.IO.File]::WriteAllText($msgFile, $msg, (New-Object System.Text.UTF8Encoding $false))
         try {

@@ -1302,6 +1302,58 @@ Assert-Equal 1 @(Get-BranchProgressFindings -Text ((Format-DevelopmentCycle -Bra
 $quoted = "## Steps`n`n- [x] documented the marks`n`n" + '```text' + "`n- [ ] not done yet`n" + '```' + "`n"
 Assert-Equal 0 @(Get-BranchProgressFindings -Text $quoted).Count 'an open step QUOTED inside a fence is not an open step'
 
+# --- Get-BranchProgressTally (#960): the counting half of the same question --------------------------
+# WHY IT IS ASSERTED AGAINST THE FINDINGS READER RATHER THAN ALONE. Both read the same prepared lines
+# through Get-BranchProgressStepLines, and the failure worth catching is not a wrong number but the two
+# DISAGREEING -- a gate refusing a step the report never counted, or a report calling a plan finished
+# that the gate holds open. So each fixture below is measured both ways.
+Write-Host ""
+Write-Host "Get-BranchProgressTally (what the park commit's backing note counts)" -ForegroundColor Cyan
+
+$tallyMixed = "## Steps`n`n- [x] built it`n- [~] second reader -- dropped: one was enough`n- [ ] write the tests`n"
+$tMixed = Get-BranchProgressTally -Text $tallyMixed
+Assert-Equal 1 $tMixed.Open     'one open step is counted open'
+Assert-Equal 1 $tMixed.Done     'the ticked step is counted done'
+Assert-Equal 1 $tMixed.Dropped  'and the dropped step is counted dropped rather than folded into done'
+Assert-Equal 2 $tMixed.Resolved 'Resolved is done + dropped -- the two marks the gate lets through'
+Assert-Equal 3 $tMixed.Total    'and Total is all three'
+Assert-Equal $tMixed.Open @(Get-BranchProgressFindings -Text $tallyMixed | Where-Object { $_.Label -eq 'still open' }).Count `
+    'the tally and the gate agree on how many steps are open'
+
+# THE SHAPE #960 WAS MEASURED ON: every step resolved. Open == 0 with Resolved > 0 is what the note's
+# alarm fires on, so it has to be distinguishable from a document with no steps at all.
+$tallyFinished = "## Steps`n`n- [x] one`n- [x] two`n"
+$tFin = Get-BranchProgressTally -Text $tallyFinished
+Assert-Equal 0 $tFin.Open     'a finished list has nothing open'
+Assert-Equal 2 $tFin.Resolved 'and two resolved'
+Assert-Equal 0 @(Get-BranchProgressFindings -Text $tallyFinished).Count 'which is exactly what the gate lets through'
+
+# AND THE SHAPE IT MUST NOT BE CONFUSED WITH. Total 0 is 'no plan written yet', which reads as finished
+# on any test that only asks whether anything is open -- and would have the note announce an alarm about
+# a document nobody has filled in.
+$tEmpty = Get-BranchProgressTally -Text "### PLAN`n`n### CREATE`n`n### TEST`n"
+Assert-Equal 0 $tEmpty.Total    'a document with no steps has Total 0'
+Assert-Equal 0 $tEmpty.Resolved 'and nothing resolved -- so a caller can tell it apart from a finished plan'
+
+# THE THREE PREPARATION RULES, ASSERTED ON THE TALLY TOO. They live in Get-BranchProgressStepLines now,
+# and the reason to re-assert them here is that this reader is the one whose numbers a person reads: a
+# quoted or commented example counted as a step would report a plan as bigger than it is, and a checkbox
+# in the entry's prose would report it as unfinished forever.
+Assert-Equal 1 (Get-BranchProgressTally -Text $quoted).Total 'a step QUOTED inside a fence is not counted'
+$tallyCommented = "## Steps`n`n- [x] real`n`n<!--`n- [ ] an example in the guidance`n-->`n"
+Assert-Equal 1 (Get-BranchProgressTally -Text $tallyCommented).Total 'nor is one inside an HTML comment'
+$tallyProse = ((Format-DevelopmentCycle -Branch 'feat/tally-v1') -join "`n") + "`n`n- [ ] a checkbox in the entry's prose`n"
+Assert-Equal (Get-BranchProgressTally -Text ((Format-DevelopmentCycle -Branch 'feat/tally-v1') -join "`n")).Total `
+    (Get-BranchProgressTally -Text $tallyProse).Total 'and a checkbox BELOW the DEPLOY heading is prose, not a step'
+
+# A TICKED STUB IS A TICK HERE AND A FINDING THERE, and that difference is deliberate rather than a gap:
+# the gate refuses a plan that was never written, the note has to be able to DESCRIBE one. Asserted so
+# nobody "fixes" the tally into agreeing with the gate and silently loses the shape it exists to report.
+$tStub = Get-BranchProgressTally -Text ("## Steps`n`n- [x] " + (Get-BranchFileWording).FirstStep + "`n")
+Assert-Equal 1 $tStub.Resolved 'a ticked scaffold placeholder counts as resolved in the tally'
+Assert-Equal 1 @(Get-BranchProgressFindings -Text ("## Steps`n`n- [x] " + (Get-BranchFileWording).FirstStep + "`n")).Count `
+    'while the gate still refuses it -- both readings are correct for their own caller'
+
 # --- one document, and every older name still read (Dave, August 23, 2026) -------------------------
 Write-Host ""
 Write-Host "one development cycle, and the old names are still read" -ForegroundColor Cyan
