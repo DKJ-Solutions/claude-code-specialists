@@ -195,6 +195,58 @@ function Invoke-NativeCaptureUtf8 {
     }
 }
 
+function Get-GitFileTextAtRef {
+    <#
+        The text of ONE file as a given git ref has it -- the commit's blob, not the working copy -- or
+        $null when that ref does not carry the path at all.
+
+        WHY THIS EXISTS AT ALL (issue #970, August 27, 2026). A gate that runs before a merge has to judge
+        the document the MERGE will merge, and the working tree is not that document: ship-pr.ps1 waits on
+        CI -- 10m57s on the run that produced the report -- and a session that backgrounds the ship and
+        starts the next piece of work has moved the checkout while it waits. Reading a commit instead of a
+        checkout is the whole repair, and it is one call so that every caller makes the same three decisions
+        the same way.
+
+        DECISION ONE: -Utf8, AND IT IS LOAD-BEARING. git's stdout here is DATA rather than progress, and
+        5.1 decodes a native child with [Console]::OutputEncoding -- so on cp850 an em dash in the document
+        arrives as three characters, and the DEPLOY lock then compares that against a PR body read with an
+        explicit UTF-8 decode. See Invoke-NativeCapture's docstring for the measurement, and
+        .claude/rules/language-layers.md for the rule.
+
+        DECISION TWO: -DiscardStderr, so git's own 'fatal: path ... does not exist' line can never arrive
+        INSIDE the returned document. A missing path is signalled by $null, which is what the exit code
+        already said; a caller must never have to recognise it in the text.
+
+        DECISION THREE: ABSENT AND EMPTY ARE DIFFERENT ANSWERS. A ref that has the path but holds an empty
+        file returns '', which is falsy in PowerShell -- so every caller tests $null explicitly. A gate that
+        conflates them treats a file it could not find as a file with nothing in it, which is exactly the
+        silence this repair exists to remove.
+
+        -Path takes repo-relative FORWARD slashes, which is what Get-BranchFilePaths hands out; a
+        backslash path is converted rather than refused, because Join-Path output is the likeliest input.
+        -RepoRoot is optional and becomes `git -C`, so a caller does not have to Set-Location first.
+
+        The ref is passed as given. Prefer a full 'refs/heads/<branch>' over a bare branch name: `git show`
+        resolves its left half as a rev, and a name that also names a directory is otherwise ambiguous.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Ref,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$RepoRoot
+    )
+
+    $rel = $Path -replace '\\', '/'
+    $gitArgs = @()
+    if ($RepoRoot) { $gitArgs += @('-C', $RepoRoot) }
+    $gitArgs += @('show', "${Ref}:${rel}")
+
+    $show = Invoke-NativeCapture -Utf8 -DiscardStderr -FilePath 'git' -Arguments $gitArgs
+    if ($show.ExitCode -ne 0) { return $null }
+    # Lines back to one string: the -Utf8 arm hands back an array and drops the single trailing newline.
+    # Every reader of this document splits on newlines again, so the terminator is not reconstructed.
+    return ((@($show.Output) | ForEach-Object { "$_" }) -join "`n")
+}
+
 function Invoke-TestSuiteGate {
     <#
         Runs every *.tests.ps1 in $TestsDir as a child process and returns $true when they all passed.

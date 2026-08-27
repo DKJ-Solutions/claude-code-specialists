@@ -103,12 +103,12 @@ and safe hook construction.
   INSTALL.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
 
-## Seven PowerShell traps that produce well-formed wrong output
+## Eight PowerShell traps that produce well-formed wrong output
 
-All seven were measured in this system, not read about, and they share the property that makes them
+All eight were measured in this system, not read about, and they share the property that makes them
 expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
 something other than what the author meant. None is caught by a linter, so each is worth an assert.
-Six are PowerShell's own; the seventh is the same class one layer out, in the tooling you reach for
+Seven are PowerShell's own; the eighth is the same class one layer out, in the tooling you reach for
 to repair a PowerShell file.
 
 - **`[ordered]@{ 2 = '...' }`'s indexer takes a positional index as well as a key.** For an integer the
@@ -176,6 +176,20 @@ to repair a PowerShell file.
   that works reads as broken when the check judging it was reading the wrong process. Read bash's
   `${PIPESTATUS[0]}`, or do not pipe the thing whose exit code you are about to judge. One rule in two
   languages: the exit code you read is not the exit code you meant.
+- **A scriptblock you pass into a function reads *that function's* variables, not the ones you wrote it
+  beside.** PowerShell resolves a plain scriptblock's variables **dynamically, at the point it is invoked**,
+  and names are case-insensitive — so a callback whose body says `$repoRoot` finds the callee's own
+  `$RepoRoot` parameter and never sees yours. The damage is worst where that parameter is *declared but
+  unbound*, which is exactly what a parameter set produces: on the arm that does not take `-RepoRoot`, the
+  parameter still exists and is **empty**. Measured while giving a resolver a `-Reader` callback: a block
+  reading `$repoRoot` came back `[]` inside the function and `[C:\the\real\root]` the moment the same value
+  was captured under a name the callee did not have. Nothing errors, and an empty path is often *silently
+  tolerated* one layer down — `git -C ''` is skipped rather than refused, so the call succeeds against
+  whatever directory the process happened to be standing in. **Give a callback's captured variables a name
+  no callee will have** — a prefix from the calling script is enough — and never assume the caller's scope
+  wins. `.GetNewClosure()` is not the fix here: it puts the block in a new dynamic module whose scope chain
+  reaches the global scope rather than the dot-sourced lib's, so a body calling a sibling lib function stops
+  resolving it. Trading a silent wrong value for a `CommandNotFoundException` is a trade, not a repair.
 - **A `sed` substitution meant to write a code-point escape can silently write the wrong literal instead.**
   GNU `sed`'s replacement syntax treats `\u` as "uppercase the next character," not as a code-point escape —
   so `sed -i 's/\[-–—,\]/[-\u2013\u2014,]/'` consumed the backslash before each escape and wrote the literal

@@ -65,6 +65,9 @@
          inherited from step 1: open-pr has a -Force and a PR opened on github.com ran neither. Neither
          has a -Force of its own. A PR body that cannot be READ is not a finding -- that says something
          about the token, not about the section.
+         BOTH JUDGE refs/heads/<branch>, NOT THE WORKING TREE (issue #970): this script waits on CI, and a
+         session that backgrounds the ship and starts the next piece of work has moved the checkout by the
+         time the gates look. The branch's own commit is what the merge merges.
          Then: gh pr merge <pr> --<method>, from Get-PrMergeMethod ('merge' by default), with the
          merge commit's subject set to 'merge: <branch> (#NN)' so every line in the graph starts with
          a type. No --admin: the CI gate is never bypassed.
@@ -188,14 +191,15 @@ if (-not (Test-Path -LiteralPath $configPath)) {
     exit 1
 }
 
-# Repo name from the local repo-config (single source), and the shared native-capture helper (#114).
+# Repo name from the local repo-config (single source), and the shared native-capture helper (#114) --
+# which also carries Get-GitFileTextAtRef, the read the two step-4 gates judge the branch's commit with.
 . $configPath
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 # For Get-ExistingPrRecord in step 2. $PSScriptRoot-relative, not $repoRoot: like native-capture-lib
 # this one is not repo-owned -- it travels with the same plugin/mirror payload as this script.
 . (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
-# For the step-list gate before the merge in step 4 (Get-BranchFilePaths / Get-BranchProgressFindings).
-# Same plugin-payload sibling, same reasoning as the two above.
+# For the step-list gate before the merge in step 4 (Resolve-BranchFilePath, which the gate hands its own
+# -Reader, and Get-BranchProgressFindings). Same plugin-payload sibling, same reasoning as the two above.
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 # For the DEPLOY lock before the merge in step 4 (Test-DeployLock, and the Get-PrDescription it calls).
 # Loaded AFTER entry-scaffold-lib on purpose: Get-PrDescription probes for the section-heading seams with
@@ -378,17 +382,62 @@ if ($waitReport) {
 # unfinished plan: exactly what the requirement asks to be impossible. Checked here rather than passed
 # down from step 1, because the working copy may have changed since.
 #
-# Read from the branch's own checkout, which is where HEAD still is at this point -- step 5 is what moves
-# to main. An absent list is no finding, the same tolerance open-pr.ps1 applies and for the same reason.
-$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
-$shipProgressPath = Join-Path $repoRoot $shipProgressRel
-if (Test-Path -LiteralPath $shipProgressPath) {
-    $shipSteps = @(Get-BranchProgressFindings -Text ([System.IO.File]::ReadAllText($shipProgressPath, [System.Text.Encoding]::UTF8)))
+# READ FROM THE SHIPPING BRANCH'S OWN COMMIT, NOT FROM THE WORKING TREE (issue #970, August 27, 2026).
+# Both gates below used to read $repoRoot's copy, on the reasoning that "HEAD is still on the branch at this
+# point -- step 5 is what moves to main". That holds for a foreground run and fails for the shape this
+# script invites: it waits on CI -- 10m57s on the run that produced the report -- and a session that
+# backgrounds the ship and starts the next piece of work has moved the checkout while it waits. Measured
+# then: this gate refused PR #969 over "- [ ] TODO: the first step of this branch", the verbatim scaffold
+# TODO of a branch created during the wait, while PR #969's own document had no open step at all.
+#
+# THAT INSTANCE FAILED SAFE AND THE INVERSE IS WHY IT IS REPAIRED. Reverse the two documents -- the shipping
+# PR carries an unresolved step, the checkout has since moved to a branch whose steps are all ticked -- and
+# the gate PASSES on someone else's document and merges. A gate with no -Force satisfied by a file the PR
+# does not contain is worse than no gate: it reports the requirement as met while nothing checked it.
+#
+# refs/heads/$branch, AND IT IS PROVABLY WHAT THE MERGE MERGES. $branch is HEAD as read at the top of this
+# run, and step 1's open-pr.ps1 pushes that branch before this point on every path through here -- a fresh
+# PR and a resumed one alike -- so the local tip and the PR's head commit are the same commit. A gh read of
+# headRefOid would say the same thing over the network, in a gate that must not refuse because a token
+# expired. The full ref name rather than the bare branch: `git show` resolves its left half as a rev, and a
+# name that also names a directory is otherwise ambiguous.
+#
+# NOT "REFUSE WHEN HEAD HAS MOVED", the other shape on the table. The report names a backgrounded ship
+# beside the next piece of work as the ordinary shape of that window, so refusing on it would break the
+# ordinary case in order to protect it. Nothing downstream needs the checkout to have stayed put either:
+# step 5 checks out main and folds from there, whichever branch it was standing on.
+#
+# THE READ ALSO CLOSES A SECOND HOLE, unreported and smaller: a step ticked in the editor and never
+# committed used to satisfy this gate while the PR still carried it unresolved. Both messages below already
+# say "commit, and re-run", so this is the gate catching up with what it asks for.
+#
+# THE PATH IS RESOLVED THROUGH THE SAME READER, which is the half that is easy to get wrong.
+# Resolve-BranchFilePath chooses between seven candidate names by READING each one, so resolving against the
+# working tree and then reading the answer out of the commit would keep the very mismatch this repairs --
+# and it would fail silently: the resolver names a path this branch does not carry, the read comes back
+# $null, and the gate reads that as "no document". An absent document is still no finding, the same
+# tolerance open-pr.ps1 applies and for the same reason.
+#
+# AND THE READER'S OWN VARIABLES CARRY THIS SCRIPT'S PREFIX, WHICH IS NOT COSMETIC. A plain scriptblock
+# resolves its variables DYNAMICALLY at the point it is invoked -- inside Resolve-BranchFilePath -- so any
+# name it uses that the resolver also has as a local resolves to the RESOLVER's, and PowerShell names are
+# case-insensitive. `$repoRoot` inside this block would therefore be the resolver's own unbound $RepoRoot
+# parameter: empty, silently, on the very arm that does not take it. $shipCycleRoot collides with nothing.
+$shipCycleRef  = "refs/heads/$branch"
+$shipCycleRoot = $repoRoot
+$shipCycleRead = {
+    param([string]$Rel)
+    Get-GitFileTextAtRef -Ref $shipCycleRef -Path $Rel -RepoRoot $shipCycleRoot
+}
+$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead
+$shipCycleText    = & $shipCycleRead $shipProgressRel
+if ($null -ne $shipCycleText) {
+    $shipSteps = @(Get-BranchProgressFindings -Text $shipCycleText)
     if ($shipSteps.Count -gt 0) {
         $shipMarks  = Get-BranchProgressMarks
         $shipDetail = ($shipSteps | ForEach-Object { "  - $($_.Label): $($_.Line)" }) -join "`n"
         Write-Error @"
-step-list gate: $shipProgressRel still has unresolved steps - PR #$pr is NOT merged.
+step-list gate: $shipProgressRel at $shipCycleRef still has unresolved steps - PR #$pr is NOT merged.
 
 $shipDetail
 
@@ -411,12 +460,15 @@ passed, so a re-run picks up from here. There is no -Force for this gate.
 # here. It is also the only point both escape routes pass through -- open-pr has a -Force, and a PR opened
 # by hand on github.com never ran it at all.
 #
-# READ FROM THE BRANCH'S OWN CHECKOUT, where HEAD still is at this point -- step 5 is what moves to main.
+# READ FROM THE SHIPPING BRANCH'S OWN COMMIT -- the same $shipCycleText the step-list gate above judged,
+# for the reasons written out there (issue #970). This side of the comparison matters even more than that
+# one: the document is what step 5 folds verbatim into CHANGELOG.md, so a lock satisfied by a stray
+# checkout's document would be approving the fold of a section it never read.
 # An unreadable body is NOT a finding: gh failing here says something about the network or the token, not
 # about the section, and a gate that refuses a merge over that would be refusing on no evidence. The
 # comparison itself is Test-DeployLock in pr-body-lib, the same function the CI gate calls, so "diverged"
 # has one definition rather than two.
-if (Test-Path -LiteralPath $shipProgressPath) {
+if ($null -ne $shipCycleText) {
     # -Utf8 IS LOAD-BEARING HERE (issue #907): the other side of this comparison is read with an
     # explicit UTF-8 decode one line below, and without it this side would be decoded with the console
     # code page instead -- so on cp850 an em-dash in the section came back as three characters and the
@@ -430,7 +482,7 @@ if (Test-Path -LiteralPath $shipProgressPath) {
         } catch {
             $lockBody = ''
         }
-        $lockEntry = Get-DevelopmentCycleEntryText -Text ([System.IO.File]::ReadAllText($shipProgressPath, [System.Text.Encoding]::UTF8))
+        $lockEntry = Get-DevelopmentCycleEntryText -Text $shipCycleText
         $lock = Test-DeployLock -EntryText $lockEntry -PrBody $lockBody
         if ($lock.Applicable -and -not $lock.Locked) {
             $lockDrift = if ($lock.FirstDrift -eq $lock.Heading) {
@@ -439,7 +491,7 @@ if (Test-Path -LiteralPath $shipProgressPath) {
                 "the first line the body does not have is:`n    $($lock.FirstDrift)"
             }
             Write-Error @"
-DEPLOY lock: $shipProgressRel has changed since PR #$pr was opened - it is NOT merged.
+DEPLOY lock: $shipProgressRel at $shipCycleRef has changed since PR #$pr was opened - it is NOT merged.
 
 $lockDrift
 

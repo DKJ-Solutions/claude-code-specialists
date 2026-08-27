@@ -206,6 +206,28 @@ needed is to tick it, which teaches people to report work they did not do — an
 is worse than no gate. **A branch with no step list at all is not refused**: that is the one-commit typo fix,
 and refusing it would make the mechanism ceremony.
 
+**At the merge, this gate and the DEPLOY lock below read the branch's own commit — `refs/heads/<branch>` — and
+not the checkout** (issue [#970](https://github.com/DaveKJohn/claude-code-specialists/issues/970),
+August 27, 2026). `ship-pr` waits on CI, 10m57s on the run that measured this, and a session that backgrounds
+the ship and starts the next piece of work has moved `HEAD` by the time the gates look. Measured then: the gate
+refused PR #969 over `- [ ] TODO: the first step of this branch`, the scaffold TODO of a branch created *during*
+the wait, while the PR's own document had no open step at all. **That instance failed safe and the inverse is
+why it was repaired**: reverse the two documents — the shipping PR carries an unresolved step, the checkout has
+since moved to a branch whose steps are all ticked — and the gate passes on somebody else's document and merges.
+A gate with no `-Force`, satisfied by a file the PR does not contain, reports the requirement as met while
+nothing checked it.
+
+**The remedy is a different read, not a new refusal.** The other shape on the table was to refuse once `HEAD`
+has moved since the run started, and it was declined: a backgrounded ship beside the next piece of work is the
+ordinary shape of that window, so that guard would break the ordinary case in order to protect it. The commit
+is also *provably* what merges — step 1 pushes the branch on every path through the script, a fresh PR and a
+resumed one alike — and it needs no network, which matters in a gate that must not refuse because a token
+expired. **The path is resolved against that same commit**, not merely read out of it: `Resolve-BranchFilePath`
+chooses between the candidate names by reading each one, and resolving against the checkout would fail in the
+silent direction — a name the branch does not carry reads as *no document at all*. One consequence worth
+knowing: **a step ticked in the editor and not committed no longer satisfies the merge gate**, which is what
+its own message has always asked for.
+
 #### 2.2.3. the DEPLOY lock, on the section the PR published
 
 **Dave, issue [#884](https://github.com/DaveKJohn/claude-code-specialists/issues/884), August 25, 2026.** The
@@ -231,6 +253,10 @@ sense. The heading travels now, which reverses the August 9, 2026 promotion **on
 legacy path keeps promoting, because there the H2 genuinely stays behind. The reasoning sits at both branches
 in `pr-body-lib.ps1`. **An unreadable body is not a finding** — `gh` failing says something about the token or
 the network, not about the section, and a gate that refused on that would be refusing on no evidence.
+
+**Which copy of the document it compares is the paragraph at the end of 2.2.2**, and it matters more here than
+there: this section is what step 5 folds verbatim into `CHANGELOG.md`, so a lock satisfied by a stray checkout's
+document would be approving the fold of a section it never read.
 
 #### 2.2.4. the CI gate, because the three above are local
 

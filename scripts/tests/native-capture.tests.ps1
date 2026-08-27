@@ -194,6 +194,78 @@ try {
     Assert-True $lockBad.Applicable     'the lock still applies -- the heading is ASCII and survived the mis-decode'
     Assert-True (-not $lockBad.Locked)  'a mis-decoded body does NOT lock, which is why #907 refused a correct PR'
     Assert-True ($lockBad.FirstDrift -like "*$dash*") 'and the line it names is the one carrying the em-dash'
+
+    # ---------------------------------------------------------------------------------------------
+    Write-Host 'Get-GitFileTextAtRef -- a COMMIT is not a checkout (issue #970)' -ForegroundColor Cyan
+
+    # A REAL REPOSITORY RATHER THAN A MOCK, because every property under test is git's: which bytes a
+    # blob holds, what `git show` does with a path a ref does not carry, and how its stderr behaves. A
+    # fake that answered those would only pin what this suite already believes.
+    #
+    # A LOCAL FIXTURE RATHER THAN THIS REPO'S OWN HISTORY, deliberately: the divergence asserts below
+    # need the working tree to differ from the commit and a second branch to exist, and arranging that
+    # in the checkout the suite is running from would be editing the tree under the gate.
+    $gitFx = Join-Path $sandbox 'ref-read'
+    New-Item -ItemType Directory -Path $gitFx -Force | Out-Null
+    function Invoke-FxGit {
+        param([string[]]$GitArgs)
+        # -c over `git config`: the fixture needs an identity to commit and nothing should depend on
+        # whatever the machine running the gate has set globally.
+        $r = Invoke-NativeCapture -FilePath 'git' -Arguments (@(
+            '-C', $gitFx, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid',
+            '-c', 'commit.gpgsign=false') + $GitArgs)
+        if ($r.ExitCode -ne 0) { throw "fixture git failed: $($GitArgs -join ' ')`n$($r.Output -join "`n")" }
+    }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    # symbolic-ref rather than `init --initial-branch=main`: the flag is git 2.28 and later, and this
+    # points the unborn HEAD at the same place on every version.
+    Invoke-FxGit -GitArgs @('init', '--quiet')
+    Invoke-FxGit -GitArgs @('symbolic-ref', 'HEAD', 'refs/heads/main')
+
+    $committed = "# Development cycle: ``feat/shipping-v1``" + "`n`nA line with an $dash em-dash." + "`n"
+    [System.IO.File]::WriteAllText((Join-Path $gitFx 'cycle.md'), $committed, $utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $gitFx 'empty.md'), '', $utf8NoBom)
+    Invoke-FxGit -GitArgs @('add', 'cycle.md', 'empty.md')
+    Invoke-FxGit -GitArgs @('commit', '--quiet', '-m', 'the shipping commit')
+
+    Assert-Equal $committed.TrimEnd("`n") (Get-GitFileTextAtRef -Ref 'refs/heads/main' -Path 'cycle.md' -RepoRoot $gitFx) 'the ref hands back the committed text'
+    Assert-True ((Get-GitFileTextAtRef -Ref 'refs/heads/main' -Path 'cycle.md' -RepoRoot $gitFx).Contains($dash)) 'and its em-dash survives, so a DEPLOY-lock comparison is not comparing a mis-decode'
+    # ABSENT AND EMPTY ARE DIFFERENT ANSWERS, and this is the assert the resolver's fallback rests on:
+    # both are falsy in PowerShell, so a caller that tested truthiness would read an empty document as
+    # a missing one -- which is the silent-skip direction #970 is about.
+    $absent = Get-GitFileTextAtRef -Ref 'refs/heads/main' -Path 'no/such/file.md' -RepoRoot $gitFx
+    Assert-True ($null -eq $absent) 'a path the ref does not carry comes back as $null'
+    $blank = Get-GitFileTextAtRef -Ref 'refs/heads/main' -Path 'empty.md' -RepoRoot $gitFx
+    Assert-True ($null -ne $blank) 'an EMPTY committed file is not absent'
+    Assert-Equal '' $blank 'it is the empty string -- so absent and empty cannot be confused'
+
+    # git writes 'fatal: path ... does not exist' to stderr for the missing path above. -DiscardStderr
+    # is what keeps that out of the returned document; without it a caller would have to RECOGNISE it.
+    Assert-True (-not ([string]$absent).Contains('fatal')) "git's own error line never arrives inside the document"
+
+    # THE DIVERGENCE THAT IS THE WHOLE POINT. The working tree is overwritten and a second branch is
+    # created and checked out -- the #970 shape exactly: the run is shipping feat/shipping-v1 while the
+    # checkout has moved on. The read must still answer for the commit.
+    [System.IO.File]::WriteAllText((Join-Path $gitFx 'cycle.md'), "# Development cycle: ``main```n", $utf8NoBom)
+    Invoke-FxGit -GitArgs @('checkout', '--quiet', '-b', 'feat/the-next-thing')
+    Invoke-FxGit -GitArgs @('add', 'cycle.md')
+    Invoke-FxGit -GitArgs @('commit', '--quiet', '-m', 'the branch created during the CI wait')
+
+    Assert-Equal $committed.TrimEnd("`n") (Get-GitFileTextAtRef -Ref 'refs/heads/main' -Path 'cycle.md' -RepoRoot $gitFx) 'the shipping ref still answers its own commit after the checkout moved'
+    Assert-True ((Get-GitFileTextAtRef -Ref 'refs/heads/feat/the-next-thing' -Path 'cycle.md' -RepoRoot $gitFx) -notlike "*shipping*") 'and the other branch is a different answer -- which is what the working tree would have given'
+
+    # A SLASH IN THE BRANCH NAME IS THE ORDINARY CASE HERE, so the ref form is asserted rather than
+    # assumed: 'refs/heads/feat/the-next-thing' resolves, and that is why callers pass the full name.
+    Assert-True ($null -ne (Get-GitFileTextAtRef -Ref 'refs/heads/feat/the-next-thing' -Path 'cycle.md' -RepoRoot $gitFx)) 'a prefixed branch name resolves as a ref'
+
+    # Join-Path output is the likeliest input a caller has lying around, so a backslash path is
+    # converted rather than refused.
+    Assert-Equal $committed.TrimEnd("`n") (Get-GitFileTextAtRef -Ref 'refs/heads/main' -Path 'cycle.md' -RepoRoot $gitFx) 'a forward-slash path reads'
+    New-Item -ItemType Directory -Path (Join-Path $gitFx 'sub') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $gitFx 'sub\nested.md'), "nested`n", $utf8NoBom)
+    Invoke-FxGit -GitArgs @('add', 'sub/nested.md')
+    Invoke-FxGit -GitArgs @('commit', '--quiet', '-m', 'a nested path')
+    Assert-Equal 'nested' (Get-GitFileTextAtRef -Ref 'HEAD' -Path 'sub\nested.md' -RepoRoot $gitFx) 'and so does the same path written with backslashes'
 } finally {
     if (Test-Path -LiteralPath $sandbox) { Remove-Item -Recurse -Force -LiteralPath $sandbox -ErrorAction SilentlyContinue }
 }

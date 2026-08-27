@@ -85,11 +85,12 @@ The six steps, stopping on the first failure:
    have nothing unresolved left in them, or the merge does not happen. Not belt-and-braces — the rule is
    about the *merge*, and step 1's copy of it lives in `open-pr.ps1`, which has a `-Force`. A PR opened
    through that valve, by hand on github.com, or days ago and resumed here would otherwise land with an
-   unfinished plan. Checked against the working copy at this moment rather than trusted from step 1, and
-   there is no `-Force` for it: `- [~] dropped -- <why>` is the way past a step that should not be done.
+   unfinished plan. Checked here rather than trusted from step 1, against `refs/heads/<branch>` rather than the
+   working copy, and there is no `-Force` for it: `- [~] dropped -- <why>` is the way past a step that should
+   not be done.
    The three marks are in the `open-pr` skill and in [`DEVELOPMENT-portable.md`](../../DEVELOPMENT-portable.md).
-   See [The merge method is repo policy](#the-merge-method-is-repo-policy), and the assumption that gate
-   rests on, below.
+   See [The merge method is repo policy](#the-merge-method-is-repo-policy), and
+   [which copy of the document both gates read](#the-two-merge-gates-read-the-branchs-commit-and-why-they-used-to-read-the-tree).
 5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,
    which folds the entry, commits it and pushes it. See
    [Why the fold is delegated](#why-the-fold-is-delegated-rather-than-inlined).
@@ -129,36 +130,47 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" 
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/ship-pr.ps1" -NoResolves -NoMerge
 ```
 
-## The step-list gate reads the WORKING TREE, and one thing breaks that
+## The two merge gates read the branch's COMMIT, and why they used to read the tree
 
-The gate opens `contributing-davekjohn/development-cycle.md` **on disk**, and the script says why in its own
-comment: *"Read from the branch's own checkout, which is where HEAD still is at this point -- step 5 is
-what moves to main."* That is correct for the whole life of an ordinary run, and it is an **assumption
-rather than a check**: nothing compares the branch you are standing on against the branch whose PR is
-being merged.
+Both gates in step 4 read `contributing-davekjohn/development-cycle.md` as **`refs/heads/<branch>` has it** —
+the commit, not the file on disk. Which is the document the merge is about to merge, so it is the document the
+gates judge.
 
-**Measured on August 20, 2026, in the repo these scripts are maintained in.** Two sessions were working in
-one checkout. One had `ship-pr` waiting on CI for its own PR; the other created a branch and started
-editing, which moved `HEAD`. When CI went green, the gate read the *other* branch's freshly scaffolded
-step list, found `- [ ] TODO: the first step of this branch`, and refused the merge — naming a step that
-belonged to nobody's work on that PR. The PR's own list was complete and committed.
+**They read the checkout until August 27, 2026, and the script's comment explained why:** *"Read from the
+branch's own checkout, which is where HEAD still is at this point -- step 5 is what moves to main."* True of
+an ordinary foreground run, and an **assumption rather than a check** — nothing compared the branch you were
+standing on against the branch whose PR was merging.
 
-**Nothing was damaged, and that is the part to notice rather than to be reassured by.** The refusal was
-safe: CI stayed green, the branch stayed pushed, and re-running from the right branch picked up where it
-left off, exactly as the message says. The same assumption fails the other way too — a tree standing on a
-*finished* branch would let an unfinished one through — and that direction is silent.
+**It broke twice, in two different shapes.** On **August 20, 2026** two sessions shared one checkout: one had
+`ship-pr` waiting on CI, the other created a branch and moved `HEAD`. On **August 27, 2026** it needed no
+second session at all (issue [#970](https://github.com/DaveKJohn/claude-code-specialists/issues/970)) — one
+session backgrounded the ship, started the next piece of work while CI ran for 10m57s, and the gate read the
+new branch's freshly scaffolded list. Both times it refused over
+`- [ ] TODO: the first step of this branch`, a step belonging to nobody's work on that PR, while the PR's own
+list was complete and committed.
 
-**Recognising it costs one line.** If a `ship-pr` run refuses on a step you do not recognise, check
-`git rev-parse --abbrev-ref HEAD` against the PR's head ref before looking for the step. A guard is
-possible — refuse when the two differ — but it is a change on the merge path, and one benign instance is
-not the evidence for making that change. It is written down here instead, which is what the trap actually
-needed.
+**Neither instance damaged anything, and that is what made the second one the evidence.** The refusals were
+safe and re-running from the right branch picked up where it left off. But the assumption fails the other way
+too — a tree standing on a *finished* branch lets an unfinished one through — and **that direction is silent**:
+a gate with no `-Force`, satisfied by a file the PR does not contain, reports the requirement as met while
+nothing checked it. One benign instance was written down rather than repaired; two, the second of them needing
+only the script's own ordinary usage, are a defect.
 
-**The wider rule this belongs to: these scripts assume one working tree per session.** `open-pr`,
-`ship-pr` and the fold all read and move `HEAD`, and none of them claims the tree. There is no lock —
-`/lock` is a note for the next session, not a claim on a checkout. So a second session, or a second
-terminal, in the same folder is outside what any of them can see. Use a second clone or a git worktree if
-two things really do run at once.
+**The repair is the read, not a new refusal.** Refusing once `HEAD` has moved was the other shape on the table
+and was declined: backgrounding a ship and starting the next thing is the ordinary shape of that window, so the
+guard would break the ordinary case in order to protect it. The commit needs no network either, which matters
+in a gate that must not refuse because a token expired. Two things follow that are worth knowing at the
+keyboard:
+
+- **A step ticked in the editor and never committed no longer gets past the merge gate.** It used to. Both
+  messages have always said *"commit, and re-run"*.
+- **`refs/heads/<branch>` is what step 1 pushed**, on every path through this script — a fresh PR and a resumed
+  one alike — so there is nothing extra to do to keep the two in step.
+
+**The wider rule this belongs to still stands: these scripts assume one working tree per session.** The gates
+no longer depend on it, but step 5 does — it checks out the main branch and folds from there, whichever branch
+the session had moved to. There is no lock; `/lock` is a note for the next session, not a claim on a checkout.
+Use a second clone or a git worktree if two things really do run at once.
 
 ## Why step 3 polls before it watches
 
