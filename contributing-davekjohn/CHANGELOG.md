@@ -32,6 +32,50 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/an-inconsistency-is-a-kind-of-finding-v1` · 20260827-190508
+
+The filing rule now names an **inconsistency** as a kind of finding, and says it is always filed. The
+rule was already stated in terms of findings -- a bug, a stale doc, a decision that is not yours -- and
+that list did not catch the case Dave was reacting to: two statements in the tree that cannot both be
+true, noticed by the session that created the second one. The measured instance is PR #980, where the
+branch retired the source's root `CONTRIBUTING.md` and left the portable page prescribing a two-page
+arrangement the source no longer runs. The session saw it, reasoned about it correctly, decided
+(rightly) that changing it was not this branch's call -- and then handed it to Dave as prose in the
+close-out, which is the one thing the filing rule exists to prevent. The bullet supplies the missing
+third half: **scoping a contradiction out of the work is a reason not to edit the file; it is never a
+reason not to file it.**
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**It is written where it can actually be edited, which is not where the issue pointed.** #981 asks for
+the bullet in Chris's persona body. That block is generated and carries a `do not edit here` marker; the
+source is `plugins/teams/agent-shared/findings-become-issues.md`, and the build fans it out to **30**
+carriers -- 19 in `team-alpha`, and 11 more across `team-ecomm`, `team-lifehub` and `team-shopify`. The
+wider reach is correct rather than incidental: a filing rule belongs to every specialist who can find
+something, not to the orchestrator alone.
+
+**The cost is measured and stated, because this one is paid every session.** Chris's persona is on the
+always-on path, so the bullet is **+1,506 B, roughly 482 tokens per session** -- the other 29 carriers
+load on demand and cost nothing until read. Worth it for a rule whose failure mode is a contradiction
+leaving the session as something the owner has to answer, but the number belongs in the record rather
+than in somebody's estimate later.
+
+**Score:** 3
+
+#### Pull Request
+
+the filing rule names an inconsistency as a kind of finding
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+[PR #1002](https://github.com/DaveKJohn/claude-code-specialists/pull/1002)
+
+---
+
 ### DEPLOY: `fix/release-history-default-stops-branching-on-source-v1` · 20260827-185053
 
 Four statements in `scripts/lib/seam-lib.ps1` rested on one premise -- *the workflow's source keeps its
