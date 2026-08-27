@@ -5520,6 +5520,79 @@ function Get-BranchProgressMarks {
     return [pscustomobject]$script:BranchProgressMarks
 }
 
+function Get-BranchProgressStepLines {
+    <#
+        Pure: the lines of a branch document that MAY carry a step, left-trimmed, prepared once.
+
+        THE PREPARATION IS THE SUBJECT, not a convenience. "What counts as a step" is three rules, and
+        every one of them was learned from a false accusation:
+
+          * ABOVE THE DEPLOY HEADING, AND ONLY THERE (August 23, 2026). The step list and the entry are
+            sections of one document now, so a checkbox written into the entry's PROSE would otherwise
+            hold up the PR -- and it cannot be resolved, because it is a sentence rather than a step. An
+            entry legitimately describes work in that shape ("- [ ] not done yet" appears in this repo's
+            own guidance). A legacy cycle file has no DEPLOY section, so Split-DevelopmentCycle hands
+            back the whole text and such a branch is read exactly as it always was.
+          * FENCE-AWARE, like every reader of this format: a step list may quote the convention it
+            follows -- this repo's own README does -- and a guard that cannot tell a quote from a real
+            step gets switched off by the first person it accuses wrongly.
+          * COMMENT-AWARE, and this is the sharper case. The Steps section's own guidance shows all three
+            marks as examples, '- [ ] not done yet' among them, inside an HTML comment. Reading those as
+            steps meant a freshly scaffolded list reported FOUR open steps: its own real one plus three
+            the form was using to explain itself. Worse than noise, because the three cannot be resolved
+            -- they come back with the next scaffold, so the only way past the gate is to delete the
+            instructions.
+
+        OWNED HERE RATHER THAN IN THE TWO READERS, and it used to live inside Get-BranchProgressFindings
+        alone. Get-BranchProgressTally (#960) is the second reader, and a second copy of these three
+        rules is the shape where a gate and a report disagree about what a plan says -- the gate refusing
+        a step the report never counted, or the report calling a plan finished that the gate holds open.
+        One preparation, two questions asked of it.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    $head = (Split-DevelopmentCycle -Text $Text).Head
+    $body = Remove-EntryHtmlComments -EntryText (Get-EntryTextOutsideFences -EntryText $head)
+    return @(($body -split '\r?\n') | ForEach-Object { $_.TrimStart() })
+}
+
+function Get-BranchProgressTally {
+    <#
+        Pure: how the step list stands, as an object -- Open, Done, Dropped, Resolved (Done + Dropped)
+        and Total. The counting half of the same question Get-BranchProgressFindings asks as a verdict,
+        over the same prepared lines.
+
+        WHY A COUNT AND NOT JUST THE VERDICT (issue #960). The gate needs one bit -- is anything still
+        open -- and a REPORT needs the shape: 'seven of eight resolved' is what tells a reader on another
+        device whether the plan in front of them claims to be finished. The park commit's backing note is
+        the caller this exists for, and Total is what lets it say 'no steps in this document yet' rather
+        than reporting a plan that has not been written as a plan with nothing done.
+
+        A PLACEHOLDER STEP IS COUNTED BY ITS MARK, deliberately, and that is the one place this differs
+        from the findings reader. There, a resolved step still carrying the scaffold's words is a
+        FINDING -- it reports a plan as finished that was never written. Here it is a tick, because the
+        note this feeds is about what is BEHIND the ticks: a document whose only step is the untouched
+        stub, ticked, is exactly the misleading shape the note has to be able to describe. The gate
+        refuses it; the report describes it. Both readings are correct for their own caller.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    $marks = Get-BranchProgressMarks
+    $open = 0; $done = 0; $dropped = 0
+    foreach ($line in (Get-BranchProgressStepLines -Text $Text)) {
+        if ($line.StartsWith($marks.Open)) { $open++ }
+        elseif ($line.StartsWith($marks.Done)) { $done++ }
+        elseif ($line.StartsWith($marks.Dropped)) { $dropped++ }
+    }
+    return [pscustomobject]@{
+        Open     = $open
+        Done     = $done
+        Dropped  = $dropped
+        Resolved = $done + $dropped
+        Total    = $open + $done + $dropped
+    }
+}
+
 function Get-BranchProgressFindings {
     <#
         Pure: the reasons this step list is not finished, as an array of objects with Label and Line.
@@ -5539,37 +5612,19 @@ function Get-BranchProgressFindings {
         do, and then it reports success. A dropped step keeps its line and its reason on the page, which
         is the half that is actually worth reading later.
 
-        FENCE-AWARE, like every reader of this format: a step list may quote the convention it follows --
-        this repo's own README does -- and a guard that cannot tell a quote from a real step gets
-        switched off by the first person it accuses wrongly.
-
-        AND COMMENT-AWARE, FOR THE SAME REASON AND A SHARPER CASE. The Steps section's own guidance shows
-        all three marks as examples -- '- [ ] not done yet' among them -- inside an HTML comment. Reading
-        those as steps meant a freshly scaffolded list reported FOUR open steps: its own real one plus three
-        the form was using to explain itself. Worse than noise, because the three cannot be resolved: they
-        come back with the next scaffold, so the only way past the gate is to delete the instructions.
-        Measured the moment the guidance comments and this gate first met.
+        WHICH LINES COUNT AS STEPS AT ALL -- above the DEPLOY heading, outside fences, outside HTML
+        comments -- is Get-BranchProgressStepLines's answer, not this function's, and each of those three
+        rules was learned from a false accusation. Its docstring carries them; asking it rather than
+        preparing the text here is what keeps this gate and the tally beside it from disagreeing about
+        what a plan says.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     $marks = Get-BranchProgressMarks
-    # THE STEPS ARE ABOVE THE DEPLOY HEADING, AND ONLY THERE (August 23, 2026). The step list and the entry
-    # are sections of one document now, so a checkbox written into the entry's PROSE would otherwise hold up
-    # the PR -- and it cannot be resolved, because it is a sentence rather than a step. An entry legitimately
-    # describes work in that shape ("- [ ] not done yet" appears in this repo's own guidance), which is the
-    # same class of false accusation the fence-awareness below exists for.
-    #
-    # OWNED HERE RATHER THAN AT THE TWO CALL SITES, because "what counts as a step" is this function's whole
-    # subject: open-pr and ship-pr both ask it, and a split done in each is two chances to disagree about
-    # where the plan ends. A legacy cycle file has no DEPLOY section, so Split-DevelopmentCycle hands back the
-    # whole text and such a branch is read exactly as it always was.
-    $head = (Split-DevelopmentCycle -Text $Text).Head
-    $body = Remove-EntryHtmlComments -EntryText (Get-EntryTextOutsideFences -EntryText $head)
     $placeholder = (Get-BranchFileWording).FirstStep
 
     $findings = @()
-    foreach ($line in ($body -split '\r?\n')) {
-        $trimmed = $line.TrimStart()
+    foreach ($trimmed in (Get-BranchProgressStepLines -Text $Text)) {
         if ($trimmed.StartsWith($marks.Open)) {
             $findings += [pscustomobject]@{ Label = 'still open'; Line = $trimmed }
         } elseif ($placeholder -and $trimmed.Contains($placeholder)) {

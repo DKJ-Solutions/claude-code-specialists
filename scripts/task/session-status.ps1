@@ -145,19 +145,133 @@ git log --oneline -5 | ForEach-Object { Write-Host "  $_" }
 # a local git status. The measured instance: a briefing, a memory note and every local command agreed
 # the tree was clean while a fully-planned parked branch sat on the remote, overtaken hours earlier.
 Write-Section 'Parked branches on origin (no PR by design -- invisible everywhere else)'
-$trunk = 'main'
+#
+# THE TRUNK IS ASKED OF THE REMOTE, and the local ref is the FALLBACK rather than the answer. This read
+# refs/remotes/origin/HEAD alone until August 27, 2026, and that ref does not exist in a repo that was
+# initialised locally and wired to a remote afterwards -- no clone, no origin/HEAD. The trunk then fell
+# back to the literal 'main', so every repo whose trunk is called something else listed ITS OWN TRUNK as
+# a parked branch: the one line in this block guaranteed to send a reader looking for work that is not
+# there. Found by the suite the moment #960 added a second line per branch -- the assert that was meant
+# to catch it had been passing on a newline-removal artefact, with 'master' and 'Open' running together
+# into one word and \b therefore never matching.
+#
+# ls-remote --symref, AND IT IS THE SAME CALL THE HEADS COME FROM. The remote always knows its own HEAD,
+# no seam and no local ref required, and asking for HEAD alongside the heads keeps this block at one
+# network call rather than two. The refspecs are NAMED rather than left off: a bare ls-remote also returns
+# every tag, which in a repo with a release history is most of the payload and none of the answer -- and
+# --heads cannot be used, because it would exclude HEAD itself and with it the symref line.
+$trunk = ''
+$lsRemote = @()
+# THE EXIT CODE IS KEPT, and it is the same lesson the open-issues block below carries: `2>$null` means an
+# unreachable remote throws nothing and yields no output, so an empty payload is indistinguishable from
+# 'this remote has no branches'. Without this flag the degrade line would be unreachable and 'we could not
+# ask' would print as 'there are none' -- a wrong answer that looks like a right one.
+$lsRemoteOk = $false
 try {
-    $originHead = (git symbolic-ref --quiet refs/remotes/origin/HEAD 2>$null)
-    if ($originHead) { $trunk = ($originHead -split '/')[-1].Trim() }
+    $lsRemote = @(git ls-remote --symref origin 'HEAD' 'refs/heads/*' 2>$null)
+    $lsRemoteOk = ($LASTEXITCODE -eq 0)
+    foreach ($line in $lsRemote) {
+        if ($line -match '^ref:\s+refs/heads/(?<n>\S+)\s+HEAD\s*$') { $trunk = $Matches['n']; break }
+    }
+} catch { $lsRemoteOk = $false }
+if (-not $trunk) {
+    try {
+        $originHead = (git symbolic-ref --quiet refs/remotes/origin/HEAD 2>$null)
+        if ($originHead) { $trunk = ($originHead -split '/')[-1].Trim() }
+    } catch { }
+}
+if (-not $trunk) { $trunk = 'main' }
+#
+# AND EACH ONE IS PRINTED WITH WHAT IS BEHIND ITS PLAN (issue #960). A park publishes the branch's
+# development cycle and nothing else, so a branch whose work is uncommitted in another device's working
+# copy shows up here as a plan that claims to be finished with no commit behind a single tick -- and the
+# more complete the ticks, the more convincing the wrong reading. park-cycle stamps the counts into the
+# park commit at the moment they are true; this block only ECHOES that line. It deliberately re-measures
+# nothing: the figures describe a working copy this device cannot see, so a second measurement here
+# could only be wrong.
+#
+# THE MARKER IS ASKED OF park-lib WHERE IT IS THERE, and falls back to the literal otherwise -- the same
+# bargain as the changelog path below. Loaded guarded, so the promise in the header holds: a repo that
+# has adopted none of this workflow still gets a full report.
+#
+# AND YES, THIS PUTS Invoke-GitPark IN SCOPE OF A SCRIPT THAT PROMISES NEVER TO WRITE. Considered rather
+# than overlooked: dot-sourcing defines, it does not run, and nothing here calls it -- the alternative was
+# a second copy of the marker literal, which is the drift this whole mechanism is built to avoid. The
+# promise in the header is about what this script DOES, and it still does nothing but read. Note that
+# park-lib's git functions need native-capture-lib, which this script does not load; only the marker
+# getter is safe to call from here, and it is the only one that is called.
+$backingMarker = 'Backing:'
+try {
+    $parkLib = Join-Path $PSScriptRoot '..\lib\park-lib.ps1'
+    if (Test-Path -LiteralPath $parkLib -PathType Leaf) {
+        . $parkLib
+        if (Get-Command Get-GitParkBackingMarker -ErrorAction SilentlyContinue) {
+            $backingMarker = [string](Get-GitParkBackingMarker)
+        }
+    }
 } catch { }
-try {
-    $heads = @(git ls-remote --heads origin 2>$null |
+
+function Write-ParkBacking {
+    <#
+        Prints the backing note out of a parked branch's last commit, or one honest line saying why it
+        could not be read. Never re-measures -- see the block above.
+    #>
+    param([Parameter(Mandatory)][string]$Head, [Parameter(Mandatory)][string]$Marker)
+
+    # ITS OWN try, so a git edge here cannot surface as the caller's 'origin is unreachable'. A block that
+    # reports the wrong reason is worse than one that reports nothing: the reader acts on it.
+    $body = @()
+    try {
+        $ref = "refs/remotes/origin/$Head"
+        & git rev-parse --verify --quiet $ref 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "      (not fetched here -- 'git fetch origin' to read its backing note)" -ForegroundColor DarkGray
+            return
+        }
+        $body = @(& git log -1 --pretty=%B "origin/$Head" 2>$null)
+        if ($LASTEXITCODE -ne 0) { return }
+    } catch { return }
+    # FROM THE MARKER LINE TO THE NEXT BLANK LINE. The note is one paragraph by construction, and taking
+    # it that way rather than by a line count means the alarm paragraph -- which is longer than the
+    # 'Backing:' line and is the half that matters -- cannot be truncated by a rewording.
+    $inside = $false
+    $printed = 0
+    foreach ($line in $body) {
+        if (-not $inside) {
+            if ($line.TrimStart().StartsWith($Marker)) { $inside = $true } else { continue }
+        } elseif (-not $line.Trim()) {
+            break
+        }
+        Write-Host "      $($line.Trim())" -ForegroundColor DarkGray
+        $printed++
+    }
+    if ($printed -eq 0) {
+        # STATED, NOT SKIPPED, and here that convention earns its keep twice over. A blank under a branch
+        # whose plan reads as finished is the exact ambiguity #960 is about, one layer up: silence looks
+        # like "nothing is wrong" when it means "nobody wrote it down". Reached by a branch parked before
+        # this note existed, one parked by hand, and one whose last commit is new-branch's push at
+        # creation -- which stamps no note, deliberately, because at creation there is nothing behind the
+        # plan yet and no alarm could fire.
+        Write-Host "      (no backing note in its last commit -- parked by hand, or before this was recorded)" -ForegroundColor DarkGray
+    }
+}
+
+if (-not $lsRemoteOk) {
+    Write-Absent 'origin is unreachable'
+} else {
+    # THE HEADS COME OUT OF THE SAME PAYLOAD the trunk was read from -- see the refspec note above for why
+    # they are filtered here rather than by --heads.
+    $heads = @($lsRemote |
+        Where-Object { $_ -match "`trefs/heads/" } |
         ForEach-Object { ($_ -split "`t")[-1] -replace '^refs/heads/', '' } |
         Where-Object { $_ -and $_ -ne $trunk })
     if ($heads.Count -eq 0) { Write-Host "  none (trunk '$trunk' only)" }
-    else { $heads | ForEach-Object { Write-Host "  $_" } }
-} catch {
-    Write-Absent 'origin is unreachable'
+    else {
+        foreach ($h in $heads) {
+            Write-Host "  $h"
+            Write-ParkBacking -Head $h -Marker $backingMarker
+        }
+    }
 }
 
 # --- 4. OPEN ISSUES ----------------------------------------------------------------------------
