@@ -194,6 +194,35 @@ function New-LegacyEntryFile {
     [System.IO.File]::WriteAllText((Join-Path $Dir $Name), $body, $Utf8NoBom)
 }
 
+function New-FlatWindowEntryFile {
+    <#
+        An entry file in the shape a consumer carries RIGHT NOW: the current sections and impact table, but
+        one level shallower -- the entry at H2 with its sections at H3, which is what every entry written in
+        the flat window (August 5-26, 2026) looks like.
+
+        THE SHAPE #953 WAS FILED FOR, and the one New-LegacyEntryFile cannot stand in for. That fixture is a
+        heading plus prose, so re-levelling its first line was always enough; this one has sections BELOW its
+        heading, and they have to travel with it. Lift only the heading and the entry and its own sections sit
+        at ONE level, which Split-EntryBlocks reads as four entries -- a worse defect than the stray heading
+        it was fixing.
+
+        EXPRESSED AS 'one shallower than the entry level' rather than as the literal '##', deliberately. The
+        levels have moved twice; what makes this shape the interesting one is the RELATIONSHIP -- sections
+        exactly where the current entry heading sits -- and that survives the next move.
+    #>
+    param([string]$Dir, [string]$Name, [string]$Title, [string]$Rows = '| 0 | - | - |', [string]$Type = 'Feat')
+    $entryH = '#' * ((Get-EntryHeadingLevel) - 1)
+    $sectH  = '#' * (Get-EntryHeadingLevel)
+    $lines = @(
+        "$entryH $Title", '',
+        "$sectH What does this change do?", '', 'Demo entry body.',
+        '', "$sectH Who is this for", '',
+        '| Tier | Significance | Why |', '|---|---|---|', $Rows,
+        '', "$sectH Type of change", '', $Type
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Dir $Name), (($lines -join "`n") + "`n"), $Utf8NoBom)
+}
+
 function New-DocFile {
     # An H1 markdown doc (a meta file), NOT an entry.
     param([string]$Dir, [string]$Name, [string]$Heading)
@@ -568,7 +597,32 @@ $orderL = @(Get-EntryOrder -Changelog $clL)
 Assert-Equal 2 $orderL.Count 'legacy entry: it is an entry boundary in its own right'
 Assert-True ($orderL[0] -match 'Written before the table') 'legacy entry: and its tier-2 line still ranks it above the tier-1 entry'
 Assert-True ($clL -notmatch ('(?m)^' + ('#' * ((Get-EntryHeadingLevel) + 1)) + ' Written before the table')) 'legacy entry: nothing is left at the old level'
-Assert-True ($rL.Output -match 'pre-flat entry format') 'legacy entry: and the promotion is reported rather than done silently'
+Assert-True ($rL.Output -match ('written with its entry heading at H' + ((Get-EntryHeadingLevel) + 1))) 'legacy entry: the re-levelling is reported, and it names the level the author actually wrote'
+
+Write-Host "A flat-window entry is re-levelled WHOLE -- its sections move with its heading (inbound #953)" -ForegroundColor Cyan
+#      THE REGRESSION THIS SUITE COULD NOT CATCH BEFORE. The fold derived its promotion range from today's
+#      entry level ('#{level,level+1}'), so once the level reached 3 it recognised H3-or-H4 and no longer H2 --
+#      the level every flat-window entry carries. Measured in a consumer: the entry landed as a SIBLING of
+#      '## [Unreleased]' instead of a child of it. And the near-miss repair was worse than the defect: widening
+#      the range would have lifted the heading alone, leaving its H3 sections at the heading's new level, so one
+#      entry reads as four. Both halves are asserted below.
+$dirF = New-FoldFixture -Label 'flat-window'
+New-EntryFile           -Dir $dirF -Name 'feat-current.md' -Title 'Written at the current level' -Rows '| 1 | 3 | fine |'
+Invoke-Fold -Dir $dirF -Branch 'feat/current' | Out-Null
+New-FlatWindowEntryFile -Dir $dirF -Name 'feat-flat.md' -Title 'Written in the flat window' -Rows '| 1 | 4 | flat |'
+$rF = Invoke-Fold -Dir $dirF -Branch 'feat/flat'
+Assert-True ($rF.ExitCode -eq 0) 'flat-window: exits 0'
+$clF = Get-Changelog -Dir $dirF
+$orderF = @(Get-EntryOrder -Changelog $clF)
+Assert-Equal 2 $orderF.Count 'flat-window: TWO entries in the list -- the folded one is one entry, not four'
+Assert-True ($orderF -contains 'Written in the flat window') 'flat-window: and it is an entry boundary at the current level'
+Assert-True ($clF -notmatch ('(?m)^' + ('#' * ((Get-EntryHeadingLevel) - 1)) + ' Written in the flat window')) 'flat-window: nothing is left at the level it was written at'
+# COUNTED, NOT MATCHED, and the count is what makes it evidence. Written as a bare -match this assert PASSED
+# on the broken code: the fixture's OTHER entry was folded at the current level, so ITS '#### ' section
+# satisfied the pattern while the flat entry's sections had not moved at all. Two entries, two sections.
+Assert-Equal 2 (@([regex]::Matches($clF, ('(?m)^' + $foldSectH + ' What does this change do\?'))).Count) 'flat-window: its sections moved WITH it -- BOTH entries now carry one at the section level'
+Assert-True ($clF -notmatch ('(?m)^' + $foldEntryH + ' What does this change do\?')) 'flat-window: so no section of it is readable as an entry of its own'
+Assert-True ($rF.Output -match ('written with its entry heading at H' + ((Get-EntryHeadingLevel) - 1))) 'flat-window: the re-levelling is reported rather than done silently'
 
 Write-Host "An entry with no declaration at all is tier 0, and says so" -ForegroundColor Cyan
 $dirD = New-FoldFixture -Label 'undeclared'
