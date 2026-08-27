@@ -1,0 +1,136 @@
+<#
+.SYNOPSIS
+    Tests for plugins/teams/team-shopify/hooks/shopify-floor-sessioncheck.ps1 -- the session check that
+    reports a half-armed live-theme guard and a second, hand-written guard registered beside the shipped
+    one.
+
+.DESCRIPTION
+    WHY THIS SUITE EXISTS, and it is one message rather than the whole hook (inbound #994, August 27,
+    2026). The duplicate-guard finding used to advise convergence unconditionally, calling the shipped
+    guard "the superset". That is true of the MATCHER and not of the RULES: the guard's third rule
+    recognises a push aimed at live BY ID only where the repo has answered Get-ShopifyLiveThemeId, so in
+    a repo that has not, a hand-written guard that does know the id covers a case the shipped one does
+    not. Following the advice there removes real cover, on a line calling removal "a safety improvement",
+    and it fails SILENTLY -- the hook keeps running and only a push naming live by its number gets
+    through.
+
+    So what is pinned here is the CONDITION, not the wording: with the seam unanswered the message must
+    not tell anybody to converge now, and with it answered it must. A regression in either direction
+    re-opens a vector nobody would see.
+
+    THE PLACEHOLDER CASE IS PART OF IT. adopt-shopify-floor writes the seam block with a 'VUL-IN'
+    placeholder, so a non-numeric answer is a path a consumer really walks and must count as unanswered.
+
+    Every case runs against a scratch fixture tree via CLAUDE_PROJECT_DIR. Nothing here touches the repo
+    it runs in.
+
+    Pure ASCII (repo convention for .ps1).
+#>
+$ErrorActionPreference = 'Continue'
+
+$RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$Hook     = Join-Path $RepoRoot 'plugins\teams\team-shopify\hooks\shopify-floor-sessioncheck.ps1'
+# $PID in the fixture path: the test gate is a throttled PARALLEL scheduler, so two runs at one fixed
+# temp path tear down each other's tree mid-assert. Same reasoning as adopt-shopify-floor.tests.ps1.
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "shopify-floor-sessioncheck-fixture-$PID"
+
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$script:pass = 0
+$script:fail = 0
+
+function Assert-True {
+    param([bool]$Condition, [string]$Name)
+    if ($Condition) { $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green }
+    else            { $script:fail++; Write-Host "  [FAIL] $Name" -ForegroundColor Red }
+}
+
+function New-FixtureRepo {
+    <# A consuming repo. $LiveId $null means no repo-config.ps1 at all; a string is the seam's answer. #>
+    param([string]$Label, $LiveId, [switch]$WithOwnGuard)
+    $root = Join-Path $Fixture "repo-$Label"
+    if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
+    New-Item -ItemType Directory -Force -Path (Join-Path $root '.claude') | Out-Null
+    if ($null -ne $LiveId) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $root 'scripts') | Out-Null
+        [IO.File]::WriteAllText((Join-Path $root 'scripts\repo-config.ps1'),
+            "function Get-ShopifyLiveThemeId { '$LiveId' }`r`n", $Utf8NoBom)
+    }
+    if ($WithOwnGuard) {
+        $settings = '{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ ' +
+                    '{ "type": "command", "command": "pwsh -File .claude/hooks/guard-live-theme.ps1" } ] } ] } }'
+        [IO.File]::WriteAllText((Join-Path $root '.claude\settings.json'), $settings, $Utf8NoBom)
+    }
+    return $root
+}
+
+function Invoke-Check {
+    <# Run the hook against a fixture root in a child process, so its exit and its env stay contained. #>
+    param([string]$Root)
+    $prev = $env:CLAUDE_PROJECT_DIR
+    try {
+        $env:CLAUDE_PROJECT_DIR = $Root
+        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Hook 2>&1 |
+               ForEach-Object { $_.ToString() }
+        return @{ Out = ($out -join "`n"); Code = $LASTEXITCODE }
+    } finally { $env:CLAUDE_PROJECT_DIR = $prev }
+}
+
+Write-Host "== shopify-floor-sessioncheck.tests: the convergence advice is gated on the seam ==" -ForegroundColor Cyan
+
+try {
+    New-Item -ItemType Directory -Force -Path $Fixture | Out-Null
+
+    # --- the seam is answered: converge now -------------------------------------------------------
+    Write-Host "seam answered + a second guard -- the advice says converge" -ForegroundColor Cyan
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'answered' -LiveId '190793613653' -WithOwnGuard)
+    Assert-True ($r.Code -eq 0) 'answered: exit 0 -- a session check never blocks'
+    Assert-True ($r.Out -match 'a second live-theme guard is registered') 'answered: the duplicate is reported'
+    Assert-True ($r.Out -match 'the shipped guard is the superset') 'answered: and the superset claim is made'
+    Assert-True ($r.Out -notmatch 'BEFORE YOU CONVERGE') 'answered: no wait-for-the-seam warning -- there is nothing to wait for'
+    Assert-True ($r.Out -notmatch 'has not said which theme is live') 'answered: and the half-armed finding stays quiet'
+
+    # --- the seam is unanswered: do NOT converge yet -----------------------------------------------
+    # THE ONE THIS SUITE EXISTS FOR. Removing the local guard here opens the push-at-the-live-id vector.
+    Write-Host "seam unanswered + a second guard -- the advice says answer the seam first" -ForegroundColor Cyan
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'unanswered' -LiveId 'VUL-IN' -WithOwnGuard)
+    Assert-True ($r.Code -eq 0) 'unanswered: exit 0 -- still never blocks'
+    Assert-True ($r.Out -match 'has not said which theme is live') 'unanswered: the half-armed guard is reported'
+    Assert-True ($r.Out -match 'a second live-theme guard is registered') 'unanswered: the duplicate is still reported'
+    Assert-True ($r.Out -match 'BEFORE YOU CONVERGE') 'unanswered: the advice refuses to send them off the local guard yet'
+    Assert-True ($r.Out -notmatch 'the shipped guard is the superset') 'unanswered: and the superset claim is NOT made -- it is false here'
+    Assert-True ($r.Out -match 'covering a case the shipped one is not') 'unanswered: the reason is stated, not just the instruction'
+
+    # --- a numeric answer is what counts ------------------------------------------------------------
+    # adopt-shopify-floor writes 'VUL-IN' on purpose, so this is a path a consumer walks rather than a
+    # contrived input. Asserted from the other side in the check itself.
+    Write-Host "a non-numeric answer counts as no answer" -ForegroundColor Cyan
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'placeholder' -LiveId 'VUL-IN')
+    Assert-True ($r.Out -match 'has not said which theme is live') 'placeholder: read as unanswered, not as an answer'
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'numeric' -LiveId '190793613653')
+    Assert-True ($r.Out -notmatch 'has not said which theme is live') 'numeric: read as an answer'
+
+
+    # --- no duplicate at all: the advice never appears ----------------------------------------------
+    # The gate must not leak the convergence message into a repo with one guard, in EITHER seam state.
+    Write-Host "one guard only -- neither branch of the advice fires" -ForegroundColor Cyan
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'single-answered' -LiveId '190793613653')
+    Assert-True ($r.Out -notmatch 'a second live-theme guard') 'single, answered: no convergence advice'
+    Assert-True ([string]::IsNullOrWhiteSpace($r.Out)) 'single, answered: silent in the ordinary case'
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'single-unanswered' -LiveId 'VUL-IN')
+    Assert-True ($r.Out -notmatch 'a second live-theme guard') 'single, unanswered: no convergence advice either'
+
+    # --- no repo-config.ps1 at all: silent ----------------------------------------------------------
+    # A repo that has never run the bootstrap is not a repo with a broken answer.
+    Write-Host "no scripts/repo-config.ps1 -- silent, not accusatory" -ForegroundColor Cyan
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'nobootstrap' -LiveId $null)
+    Assert-True ($r.Code -eq 0) 'no config: exit 0'
+    Assert-True ($r.Out -notmatch 'has not said which theme is live') 'no config: the half-armed finding stays quiet'
+
+} finally {
+    Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue
+}
+
+Write-Host ""
+Write-Host "Summary: $script:pass passed, $script:fail failed" -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
+if ($script:fail -gt 0) { exit 1 }
+exit 0
