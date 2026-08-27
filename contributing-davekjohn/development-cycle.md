@@ -56,6 +56,18 @@ ship-pr step 5 runs git checkout main unconditionally after the merge. Read HEAD
 - [x] the lint gate: **0 errors** over all 30 checks.
 - [x] `internal-note.tests.ps1` -- the suite [#959](https://github.com/DaveKJohn/claude-code-specialists/issues/959) says can fail on console width -- run on its own here: 95/95. No `-SkipTests` was needed.
 
+#### The one failing suite is not this branch
+
+- [x] `open-pr`'s gate refused the push on `seam-lib.tests.ps1` (1 of 52, 212s). **Proven not to be this
+      branch** by running it from a worktree on `main` (`ccbeaa6b`), where it fails identically. It is
+      [#959](https://github.com/DaveKJohn/claude-code-specialists/issues/959)'s second instance, already
+      reported there by the branch that met it this morning, so shipping past it with `-SkipTests` follows
+      the precedent that branch set. CI runs all 52 suites and is green on this one.
+- [x] While there, its **proposed repair was measured and does not work** -- option 1's
+      `-replace "\r?\n\s*", ' '` leaves both known instances red, because a console wrap breaks mid-token
+      and a space-join re-breaks the word (`'CH` + `ANGELOG.md'` -> `'CH ANGELOG.md'`). Joining with `''`
+      fixes both. Added to #959 rather than repaired here: the repair is that issue's, this branch is
+      #972's.
 #### The gap, named rather than papered over
 
 `ship-pr.ps1`'s own step 5 has no automated test, and this branch does not add one. The decision it now makes
