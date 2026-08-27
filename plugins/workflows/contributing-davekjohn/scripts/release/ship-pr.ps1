@@ -58,6 +58,12 @@
          except for the required list, where unreadable means REFUSE, since a ruleset that requires
          nothing and one whose required checks have not reported look identical from here. The wait
          itself is unchanged; see the comment at the step.
+
+         AND SAY, BEFORE THE WATCH BEGINS, THAT NOBODY HAS TO SIT THROUGH IT (issue #985). Backgrounding
+         this run is the default: the merge cannot move before the check is green either way, so the only
+         thing the wait buys in the foreground is a second look at a result the local gate already gave.
+         The one condition is printed with it, because the invitation alone is unsafe -- step 5 checks out
+         the trunk in THIS tree, so the session's next move is a lane or nothing.
       4. TWO GATES, THEN MERGE. The step-list gate refuses while development-cycle.md has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
@@ -288,8 +294,29 @@ Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 # median cost of 0s, so THE WAIT IS LEFT EXACTLY AS IT IS and made legible instead (Dave,
 # August 24, 2026). The report still names no check of its own: the governing one is whichever finished
 # last, and 'required' comes from the repo's own ruleset via `gh pr checks --required`.
+#
+# AND WHAT IT SAYS BEFORE THE WATCH IS THAT NOBODY HAS TO SIT HERE (Dave, issue #985, August 27, 2026).
+# The wait is real -- 11m48s of `lint-en-tests` on PR #980, against a local run of the same suites minutes
+# earlier at 292s -- and it is not buying a first look at the result, it is buying a second one. The merge
+# still cannot move before the check is green, so what changes is who holds the session open, not the wait:
+# background this run and the ~12 minutes cost nothing.
+#
+# THE CONDITION IS PRINTED BESIDE THE INVITATION, because the invitation on its own is unsafe. Step 5 runs
+# `git checkout main` in THIS tree, so a session that backgrounds the ship and then starts the next piece of
+# work in the same checkout has HEAD pulled out from under it mid-branch. The lane is the answer measured on
+# August 23, 2026 -- the worktree is where you build, the primary checkout is where you ship -- and it is
+# named here rather than left to the docs, because this is the one moment the reader is about to need it.
+#
+# A LINE AND NOT A MECHANISM, deliberately. Three shapes were on the table and this is the smallest: a
+# green-and-unmerged reporter would re-add half of what #984 had deliberately removed five minutes before
+# #985 was filed, and a detached watcher would merge and fold onto the trunk with nobody reading the output.
+# Nothing else in this script changes -- the gates at step 4 already read refs/heads/<branch> for exactly
+# this shape (#970), so the hand-off needed permission and a reminder rather than machinery.
 $waitBegan = Get-Date
 Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor Cyan
+Write-Host "  Nothing here needs the session -- background this run and the wait costs nothing." -ForegroundColor DarkGray
+Write-Host "  Step 5 checks out main in THIS tree, so the next piece of work opens a lane" -ForegroundColor DarkGray
+Write-Host "  (scripts\task\worktree-lane.ps1 -Name <name>) -- or the session stops here." -ForegroundColor DarkGray
 $maxWaitSec = 180
 $waited = 0
 while ($true) {

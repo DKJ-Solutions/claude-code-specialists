@@ -170,7 +170,42 @@ keyboard:
 **The wider rule this belongs to still stands: these scripts assume one working tree per session.** The gates
 no longer depend on it, but step 5 does — it checks out the main branch and folds from there, whichever branch
 the session had moved to. Nothing in this workflow locks a checkout — no script claims one, and none ever did.
-Use a second clone or a git worktree if two things really do run at once.
+Use a second clone or a git worktree if two things really do run at once — which is exactly what the
+section below turns from an option into the default.
+
+## The wait runs in the background, and that is the default
+
+**Do not hold a session open for the length of CI.** Start this script as a background command and carry
+on; the merge cannot happen before the required check is green either way, so a foreground wait buys only
+a second look at a result the local gate has already given. Measured in the source repo on
+[PR #980](https://github.com/DaveKJohn/claude-code-specialists/pull/980) (August 27, 2026): `lint-en-tests`
+took **11m48s**, while the same suites had run locally minutes earlier in **292s**. Over 65 blocking runs
+the CI leg has a median of **8m 01s**, which at 73 merged PRs in a week is **9h 45m** of session time
+spent watching a second opinion. Dave, [issue #985](https://github.com/DaveKJohn/claude-code-specialists/issues/985):
+*"dit kan gewoon gerust in de achtergrond verder draaien"*.
+
+**One condition comes with it, and it is not optional.** Step 5 runs `git checkout main` in the tree the
+script was started from. So the session's next move is one of exactly two things:
+
+- **open the next branch as a lane** — `worktree-lane.ps1 -Name <name>`, the
+  [`worktree-lane` skill](../worktree-lane/SKILL.md); or
+- **stop.** A close-out that says *"PR #N opened, shipping in the background"* is a finished assignment,
+  not an open point — nothing about an in-flight ship needs answering before the session can be closed.
+
+Anything else in the primary checkout gets `HEAD` pulled out from under it mid-branch. That is the same
+one-tree-per-session rule as above, read forwards instead of backwards: the gates were hardened for this
+window, step 5 was not.
+
+**What this deliberately is not.** Two larger shapes were named and declined when the default was written
+down. A *green-and-unmerged reporter* at session start would re-add half of a status reporter the source
+repo had removed on purpose five minutes before #985 was filed. A *detached watcher* that merges when the
+check passes would put the merge and the fold — a commit that lands directly on the trunk under a named
+exception — behind a process nobody is reading. Neither is ruled out forever; both need designing rather
+than adopting, and #985 stays open as their home.
+
+**Backgrounding tells you nothing while it runs, and that is normal.** The output is buffered, so an empty
+log and an idle `gh` child are not evidence of a stall. Judge progress from `git log` and `gh pr view`, never
+from the log file.
 
 ## Why step 3 polls before it watches
 

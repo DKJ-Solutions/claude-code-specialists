@@ -54,6 +54,14 @@ One shipping lane, N building lanes. Branch A ships in the primary -- `git check
 there, because no other worktree holds `main` -- while you build branch B in its own lane. Nothing
 collides, and no shipping script is touched.
 
+**And since [issue #985](https://github.com/DaveKJohn/claude-code-specialists/issues/985) (Dave, August 27,
+2026) that pairing is the default rather than an option.** `ship-pr.ps1` is started as a background command
+and the session carries straight on -- so a lane is not the thing you reach for when two branches happen to
+overlap, it is the ordinary next move after every ship. The two halves only work together: backgrounding
+without a lane is what pulls `HEAD` out from under the work in progress, and a lane with a foreground ship
+saves nothing. `ship-pr` prints the reminder at the moment it begins to wait; the rule itself is in the
+[`ship-pr` skill](../ship-pr/SKILL.md).
+
 ## Opening a lane
 
 Run the shared script from the **root of the consuming repo**:

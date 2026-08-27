@@ -376,6 +376,15 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   precedent, now on `new-branch.ps1` too) — and **`git worktree remove` is not atomic**: on a
   Permission-denied it had already emptied the tree and deregistered the worktree, so a non-zero exit
   there is not evidence that nothing happened.
+  **AND SINCE #985 THE BACKGROUNDED SHIP IS THE DEFAULT, NOT A THING THAT SOMETIMES HAPPENS** (Dave,
+  August 27, 2026). `ship-pr.ps1` is started as a background command and the session carries straight on
+  — so a lane is the ordinary next move after every ship rather than the answer to an occasional
+  collision. The two halves only work together: backgrounding without a lane is what yanks HEAD, and a
+  lane with a foreground ship saves nothing. The script now prints both at the moment it begins to wait,
+  and the rule with its measurements is in
+  [`contributing-davekjohn/CONTRIBUTING.md`](../../../contributing-davekjohn/CONTRIBUTING.md#24-merge-the-pr)
+  and the [`ship-pr` skill](../../../plugins/workflows/contributing-davekjohn/skills/ship-pr/SKILL.md#the-wait-runs-in-the-background-and-that-is-the-default).
+  Two bigger shapes were named and declined there rather than overlooked; #985 stays open as their home.
 - **`main` moves under a long branch, and the green gate you ran proves nothing about the merged
   result.** The bullet above is about the *fold* and about two machines; this is the same collision
   arriving one step earlier, at the *branch*, and it bites hardest on the work that takes longest —
