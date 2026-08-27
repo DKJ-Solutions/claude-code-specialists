@@ -20,14 +20,24 @@
       2. a consumer whose seam resolves INSIDE the folder passes, including the exact-match
          'workflow-davekjohn' case and the backslash-separated case (proving the '\' -> '/'
          normalization);
-      3. a SOURCE repo (marketplace.json present) is exempt outright, even for the identical
+      3. a consumer whose seam resolves to that seam's own PRE-ISOLATION answer passes (issue #956),
+         and the tolerance is PER SEAM -- one seam's legacy answer handed to another is still refused,
+         which is what keeps this a history lookup rather than a shared allow-list;
+      4. a SOURCE repo (marketplace.json present) is exempt outright, even for the identical
          outside-the-folder path that got refused for the consumer in case 1 -- proving
          Test-IsWorkflowSourceRepo really short-circuits the whole check rather than the folder
          happening to match;
-      4. which of the Get-Default* computed defaults still branch on Test-IsWorkflowSourceRepo and which
+      5. Get-PreIsolationSeamPath answers every seam in the assert's set and answers NOTHING for
+         Get-ReleaseNoteRoot, which is exempt from the assert and must not acquire a legacy entry here;
+      6. which of the Get-Default* computed defaults still branch on Test-IsWorkflowSourceRepo and which
          stopped (issue #914) -- see section 3's own note for why the branch's ABSENCE needs an assert.
          The rest of what those functions do is exercised elsewhere too (cut-release-guardrail,
          internal-note, and the other group-D suites all read through them for real).
+
+    THE REFUSAL FIXTURE PATH CHANGED WITH #956 and the reason belongs here rather than in a diff: this
+    suite used to prove the refusal with 'CHANGELOG.md', which is now a RECOGNISED consumer layout. It
+    refuses on 'README.md' instead -- the exact path the assert's own docstring names as the case it
+    exists for, so the teeth are asserted on the example rather than on a path that had become legal.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -104,8 +114,33 @@ Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn\CHANGELOG.md'
 # THE CASE THAT PROVES THE SHORT-CIRCUIT, NOT JUST THE FOLDER MATCH: the exact same relative path that
 # gets refused for the consumer below passes here, unchanged, because Test-IsWorkflowSourceRepo exempts
 # a source repo outright before the folder check ever runs.
-Assert-True (Test-ReturnsNormally $sourceDir 'CHANGELOG.md' 'Get-ChangelogPath') `
+#
+# 'README.md' AND NOT 'CHANGELOG.md' SINCE #956: the changelog's pre-isolation answer now passes for a
+# consumer too, so asserting it here would no longer prove the exemption -- it would prove the legacy
+# tolerance one line below. The path has to be one a consumer is still refused, and this is that path.
+Assert-True (Test-ReturnsNormally $sourceDir 'README.md' 'Get-ChangelogPath') `
     'source repo, path outside the folder: still passes -- exempt regardless of where it resolves'
+
+# --- 1b. The pre-isolation answers (issue #956) -- every seam in the set, and the per-seam bound ------
+# WHY EACH OF THE FIVE IS LISTED rather than one standing in for the rest: the tolerance is a per-seam
+# lookup in Get-PreIsolationSeamPath, so a missing or mistyped entry breaks exactly one seam, in exactly
+# one consumer, at that consumer's next fold or cut -- with the merge already landed. A single sample
+# would have caught none of the other four.
+Write-Host "seam-lib.ps1 -- Assert-WorkflowIsolatedSeamPath: the pre-isolation answers (issue #956)" -ForegroundColor Cyan
+Assert-True (Test-ReturnsNormally $consumerDir 'CHANGELOG.md' 'Get-ChangelogPath') `
+    'consumer, changelog at the repo root (the pre-isolation answer): passes'
+Assert-True (Test-ReturnsNormally $consumerDir 'CHANGELOG.MD' 'Get-ChangelogPath') `
+    'and the match is case-insensitive, like every other path comparison in this guard'
+Assert-True (Test-ReturnsNormally $consumerDir 'releases/README.md' 'Get-ReleaseHistoryPath') `
+    'consumer, release history at releases/README.md (pre-isolation): passes'
+Assert-True (Test-ReturnsNormally $consumerDir 'releases/development' 'Get-ReleaseChangelogNotesRoot') `
+    'consumer, changelog notes at releases/development (PRE-#914 name): passes'
+Assert-True (Test-ReturnsNormally $consumerDir 'releases/changelog' 'Get-ReleaseChangelogNotesRoot') `
+    'and at releases/changelog -- the renamed directory kept at the root: passes too'
+Assert-True (Test-ReturnsNormally $consumerDir 'releases/github' 'Get-ReleaseGithubNotesRoot') `
+    'consumer, GitHub bodies at releases/github (pre-isolation): passes'
+Assert-True (Test-ReturnsNormally $consumerDir 'releases/internal' 'Get-ReleaseInternalNotesRoot') `
+    'consumer, internal notes at releases/internal (pre-isolation): passes'
 
 # --- 2. The refusing case -- child process, since it calls exit 1 and would abort this runner --------
 Write-Host "seam-lib.ps1 -- Assert-WorkflowIsolatedSeamPath: the refusal path (child process)" -ForegroundColor Cyan
@@ -137,12 +172,51 @@ function Invoke-AssertChild {
     } finally { $ErrorActionPreference = $prevEap }
 }
 
-$r = Invoke-AssertChild $consumerDir 'CHANGELOG.md' 'Get-ChangelogPath'
+# 'README.md', THE ASSERT'S OWN NAMED EXAMPLE -- see the file synopsis for why this fixture path had to
+# move off 'CHANGELOG.md' when #956 made that a recognised layout.
+$r = Invoke-AssertChild $consumerDir 'README.md' 'Get-ChangelogPath'
 Assert-True ($r.Code -eq 1) 'consumer, path outside the folder: exits 1'
 Assert-True ($r.Out -match 'Get-ChangelogPath') 'and the refusal names the seam'
-Assert-True ($r.Out -match 'CHANGELOG\.md') 'and the offending path'
+Assert-True ($r.Out -match 'README\.md') 'and the offending path'
 Assert-True ($r.Out -match 'contributing-davekjohn') 'and the folder it should have resolved inside'
+Assert-True ($r.Out -match "'CHANGELOG\.md'") `
+    "and it names the one answer that WOULD have been accepted, so the reader is not left guessing"
 
+# THE PER-SEAM BOUND, AND IT IS THE HALF THAT KEEPS THE GUARD USEFUL (issue #956). A legacy answer is
+# accepted for the seam it belonged to and for no other: hand the changelog's root answer to the
+# GitHub-body root and it is still refused. Without this assert, collapsing the lookup into one shared
+# allow-list would read as a simplification and pass every other test in this file.
+$rCross = Invoke-AssertChild $consumerDir 'CHANGELOG.md' 'Get-ReleaseGithubNotesRoot'
+Assert-True ($rCross.Code -eq 1) `
+    "consumer, ANOTHER seam's legacy answer: still refused -- the tolerance is per seam, not a shared list"
+Assert-True ($rCross.Out -match "'releases/github'") `
+    "and the refusal names THIS seam's own legacy answer rather than the one that was passed in"
+
+# A PATH THAT MERELY LOOKS LIKE THE LEGACY ANSWER IS NOT IT: the match is exact, so a deeper path under
+# a legacy file -- which no call site produces and a typo can -- is refused rather than waved through by
+# a prefix match.
+$rDeep = Invoke-AssertChild $consumerDir 'CHANGELOG.md/pending' 'Get-ChangelogPath'
+Assert-True ($rDeep.Code -eq 1) 'consumer, a path BELOW the legacy answer: refused (the match is exact)'
+
+
+# --- 2b. Get-PreIsolationSeamPath itself: the lookup, and the seam that must stay absent from it -----
+# ASSERTED DIRECTLY AS WELL AS THROUGH THE GUARD, because the two failures are different: the guard
+# asserts above prove a legacy answer is ACCEPTED, and these prove the table has an entry for every seam
+# in the set and no entry for the one seam that is exempt from the assert entirely. Get-ReleaseNoteRoot
+# is that one, and it is the trap: it is read the same way as the five and sits in the same libs, so
+# giving it a legacy entry "for symmetry" looks like completing the table. It would be inert at best --
+# nothing calls the assert for it -- and at worst it records the exempt seam as guarded.
+Write-Host "seam-lib.ps1 -- Get-PreIsolationSeamPath: the lookup" -ForegroundColor Cyan
+$assertedSeams = @('Get-ChangelogPath', 'Get-ReleaseHistoryPath', 'Get-ReleaseChangelogNotesRoot',
+    'Get-ReleaseGithubNotesRoot', 'Get-ReleaseInternalNotesRoot')
+foreach ($seam in $assertedSeams) {
+    $answers = @(Get-PreIsolationSeamPath -SeamName $seam)
+    Assert-True ($answers.Count -ge 1) "$seam has a pre-isolation answer: '$($answers -join "', '")'"
+}
+Assert-True (@(Get-PreIsolationSeamPath -SeamName 'Get-ReleaseNoteRoot').Count -eq 0) `
+    'Get-ReleaseNoteRoot has NONE -- it is exempt from the assert and must not acquire an entry here'
+Assert-True (@(Get-PreIsolationSeamPath -SeamName 'Get-SomethingNobodyDefined').Count -eq 0) `
+    'an unknown seam name answers nothing rather than throwing'
 
 # --- 3. The computed defaults: which of them stopped branching on the source (issue #914) -----------
 # THIS SECTION IS WHY THE FILE SYNOPSIS'S "out of scope" NOTE NO LONGER HOLDS FOR ALL OF THEM. #885 gave
