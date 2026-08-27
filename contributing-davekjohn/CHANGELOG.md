@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/step-0a-names-its-destination-and-its-end-point-v1` · 20260827-192811
+
+Step 0a of the cut-release skill asked for a measured end-to-end duration and left two things unsaid.
+**Its clock stopped at the publish**, while step 5 publishes the Release and *then* uploads the
+attachments -- so the step defined an end point one action before the release actually finished, and two
+people following it on the same release wrote down two different totals. The end point is now the last
+asset, named explicitly. **And it asked for a destination a patch does not have**: step 4 says a patch
+writes no document at all, and `Get-ReleaseConsumerBumps` defaults to minor and major, so on the release
+type cut most often the figure had nowhere to go but the closing chat report -- which the next paragraph
+named as insufficient. The requirement is conditional now, and says so.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The reported remedy is not the one that shipped, and the difference is worth knowing.** #988 asked the
+page to *name* the fallback destination rather than leave each consumer to invent one. There is no file
+it could name: the generated tier-0 note is rewritten by every cut, and the release history is a
+generated table. So this takes the other shape the same report offered -- state the condition -- and
+sends a repo to its own release-answers page for where to record its answer, which is what the reporting
+consumer did. The observation was right; the lever it reached for did not exist.
+
+**5 seconds is the whole argument, not a rounding error.** The measured gap between publish and last
+asset on the reported patch was 5s against a 59s release. That is small, on one attachment, and nothing
+in the instruction said whether it counted -- which is precisely the defect: a step whose premise is that
+the figure was *measured* cannot leave its own end point ambiguous. On a release with a dozen
+attachments the same ambiguity is minutes.
+
+**Score:** 3
+
+#### Pull Request
+
+step 0a names where the duration goes on a patch, and where the clock stops
+
+Plugins: contributing-davekjohn
+
+Plugins: contributing-davekjohn
+
+[PR #1005](https://github.com/DaveKJohn/claude-code-specialists/pull/1005)
+
+---
+
 ### DEPLOY: `docs/two-contributing-pages-gets-its-condition-v1` · 20260827-191634
 
 `CONTRIBUTING-portable.md` now says what has to happen **before** a repo retires its root
