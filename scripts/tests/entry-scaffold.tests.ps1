@@ -1336,6 +1336,51 @@ try {
     Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both present and the NEW one is the trunk reset: the old one still wins, because it is the one holding work'
     [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.File -replace '/', '\')), "# Development cycle: ``feat/mine``$([char]0x00B7)`n")
     Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'both naming a branch: the current name wins'
+
+    # --- -Reader: the same rule, against a tree the caller is not standing in (issue #970) ----------
+    #
+    # WHY THIS ARM EXISTS. ship-pr's gates before the merge must judge the document belonging to the PR
+    # they are shipping, which is the branch's own COMMIT -- the run waits on CI, and a session that
+    # backgrounds the ship and starts the next piece of work has moved the checkout by the time they look.
+    # Reading the text out of that commit is not enough on its own: the choice between the candidate names
+    # is made by READING each one, so the resolver has to answer for the same tree the reader does.
+    #
+    # THE FIXTURE ON DISK IS DELIBERATELY LEFT AS IT IS, and it is the assert. Its state right now is
+    # "both files present, both naming a branch" -- the case that resolves to the CURRENT name one line
+    # above. The reader below describes a different tree, in which only the OLD name exists, so the two
+    # arms must disagree. Agreeing would mean the reader was being ignored.
+    $readerTree = @{ $bfp.LegacyCycle = "# ``feat/in-flight-elsewhere`` cycle`n" }
+    $readerCalls = @{}
+    $treeReader = {
+        param([string]$Rel)
+        if (-not $readerCalls.ContainsKey($Rel)) { $readerCalls[$Rel] = 0 }
+        $readerCalls[$Rel]++
+        if ($readerTree.ContainsKey($Rel)) { return [string]$readerTree[$Rel] }
+        return $null
+    }
+    Assert-Equal $bfp.LegacyCycle (Resolve-BranchFilePath -Kind Cycle -Reader $treeReader) 'the reader answers for ITS tree, not for the directory the caller is standing in'
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'and the tree arm is unchanged beside it -- the two genuinely disagree'
+
+    # ONE READ PER CANDIDATE. Both loops ask the same question, and on this arm one question is a child
+    # process rather than a Test-Path -- so the memo is what keeps a resolve from spawning git twice per
+    # name. Asserted on the name that the first loop rejects and the second loop reconsiders.
+    $readerTree = @{ $bfp.File = "# Development cycle: ``main```n" }
+    $readerCalls = @{}
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -Reader $treeReader) 'nothing in that tree CLAIMS the branch: the resolver falls back to a name that at least exists'
+    Assert-Equal 1 $readerCalls[$bfp.File] 'and it read that candidate once, though both loops asked for it'
+
+    # $null MEANS ABSENT; EMPTY MEANS PRESENT AND DECLARING NOTHING. Both are falsy, and conflating them
+    # is the silent-skip direction: a gate handed "absent" for a document that is there says nothing at all.
+    $readerTree = @{ $bfp.File = '' }
+    $readerCalls = @{}
+    Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -Reader $treeReader) 'an EMPTY document exists, so the resolver names it rather than falling through to the writer default'
+
+    # The two arms are mutually exclusive by parameter set, so a caller cannot pass a reader AND a root
+    # and be left guessing which one answered.
+    $bothArms = $false
+    try { Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx -Reader $treeReader | Out-Null }
+    catch { $bothArms = $true }
+    Assert-True $bothArms '-RepoRoot and -Reader together are refused rather than silently resolved'
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $resolveFx -ErrorAction SilentlyContinue
 }

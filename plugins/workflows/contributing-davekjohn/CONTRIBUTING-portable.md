@@ -152,7 +152,10 @@ the [`open-pr` skill](skills/open-pr/SKILL.md) is the full account of each:
   or tier reason still empty once the guidance comments are stripped. `-Force` is the escape valve here,
   deliberately separate from `-SkipLint`/`-SkipTests`, because it overrules a judgement about content
   rather than skipping a tool;
-- **the step-list gate** — any step still `- [ ]`, as in step 2 above. No `-Force`;
+- **the step-list gate** — any step still `- [ ]`, as in step 2 above. No `-Force`. It runs a second time at
+  the merge, and there it judges the branch's own commit rather than the checkout, because the merge may be
+  minutes of CI away from the moment you started it — the [`ship-pr` skill](skills/ship-pr/SKILL.md) has the
+  two measurements behind that;
 - **the impact gate** — the Significance sections; see below;
 - **the resolves gate** — a plain `#123` in a PR body closes nothing on GitHub, so issues a PR resolves are
   passed as `-Resolves` and written as their own `Closes #<n>` lines.

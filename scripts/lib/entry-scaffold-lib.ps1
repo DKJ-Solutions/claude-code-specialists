@@ -4778,11 +4778,43 @@ function Resolve-BranchFilePath {
 
         Forward slashes out, like Get-BranchFilePaths, for the same reason: these strings go to git as often
         as to Join-Path.
+
+        -Reader RESOLVES AGAINST A TREE THE CALLER IS NOT STANDING IN (issue #970, August 27, 2026). The
+        default arm reads $RepoRoot; a caller that must answer for a COMMIT passes a scriptblock taking one
+        repo-relative path and returning its text, or $null where that tree does not have it. ship-pr.ps1 is
+        why: its gates before the merge judge the shipping branch's own commit, because a run that waits on
+        CI may find the checkout moved by the time it looks.
+
+        READING THE TEXT FROM A COMMIT IS NOT ENOUGH ON ITS OWN, which is why this is a parameter here rather
+        than a detail of the caller. The choice between the seven candidate names is made by READING each of
+        them, so a caller that resolves against the working tree and then reads the answer out of a commit
+        gets the mismatch this parameter exists to remove -- and it fails in the dangerous direction: the
+        resolver names a path that tree does not carry, the read comes back empty, and a gate reads that as
+        'no document' and says nothing.
+
+        EXISTENCE IS 'THE READER RETURNED TEXT', so both arms answer the two loops below identically -- and
+        that is $null, tested explicitly, never falsiness: an empty document EXISTS and declares no branch,
+        which is a different answer from a path that is not there.
     #>
+    [CmdletBinding(DefaultParameterSetName = 'Tree')]
     param(
         [Parameter(Mandatory)][ValidateSet('File', 'Cycle', 'Deployment')][string]$Kind,
-        [Parameter(Mandatory)][string]$RepoRoot
+        [Parameter(Mandatory, ParameterSetName = 'Tree')][string]$RepoRoot,
+        [Parameter(Mandatory, ParameterSetName = 'Reader')][scriptblock]$Reader
     )
+    # The default reader, so the loops below have exactly one shape. A PLAIN scriptblock, deliberately not
+    # .GetNewClosure(): a closure is a new dynamic module whose scope chain reaches the global scope rather
+    # than this dot-sourced lib's, so a body calling a sibling lib function would stop resolving it. Plain
+    # scriptblocks keep the session state they were created in and look their variables up dynamically, which
+    # is what makes $RepoRoot visible here and the caller's own variables visible in a passed-in -Reader.
+    if (-not $Reader) {
+        $Reader = {
+            param([string]$Rel)
+            $full = Join-Path $RepoRoot ($Rel -replace '/', '\')
+            if (-not (Test-Path -LiteralPath $full)) { return $null }
+            return [System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8)
+        }
+    }
     $paths = Get-BranchFilePaths
     $trunk = Get-BranchTrunkName
     # 'File' is the name a caller uses when it means the document rather than one of its two jobs; Cycle and
@@ -4803,11 +4835,20 @@ function Resolve-BranchFilePath {
         [string]$paths."PriorFolderOlder$legacyKind"
     )
 
+    # Read once per candidate and remember it: the second loop asks the same question again, and on the
+    # -Reader arm one question is a child process rather than a Test-Path.
+    $texts = @{}
+    $readCandidate = {
+        param([string]$Rel)
+        if (-not $texts.ContainsKey($Rel)) { $texts[$Rel] = & $Reader $Rel }
+        return $texts[$Rel]
+    }
+
     foreach ($rel in $candidates) {
         if (-not $rel) { continue }
-        $full = Join-Path $RepoRoot ($rel -replace '/', '\')
-        if (-not (Test-Path -LiteralPath $full)) { continue }
-        $declared = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8))
+        $text = & $readCandidate $rel
+        if ($null -eq $text) { continue }
+        $declared = Get-BranchFileDeclaredBranch -Text $text
         # A file declaring the trunk -- or declaring nothing at all -- is in its reset state and is not this
         # branch's work. Keep looking; if nothing claims the branch, the fallback below is today's file.
         if ($declared -and $declared -ne $trunk) { return $rel }
@@ -4817,7 +4858,7 @@ function Resolve-BranchFilePath {
     # writer's own name.
     foreach ($rel in $candidates) {
         if (-not $rel) { continue }
-        if (Test-Path -LiteralPath (Join-Path $RepoRoot ($rel -replace '/', '\'))) { return $rel }
+        if ($null -ne (& $readCandidate $rel)) { return $rel }
     }
     return $current
 }
