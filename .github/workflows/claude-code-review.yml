@@ -5,6 +5,21 @@ name: Claude Code Review
 # and this job fails rather than handing a credential to code from outside the repo. That failure is
 # the safe outcome, not a defect to work around: switching to `pull_request_target` to "fix" the red
 # check would run the fork's PR with this repo's secrets in scope.
+
+# AND A SECOND SILENCE, ALSO NOT A DEFECT -- measured on PR #968, the one that added the annotation
+# further down. A pull request that MODIFIES THIS FILE gets no review at all. The action validates
+# that the workflow is byte-identical to the copy on the default branch, and where it is not it logs
+#
+#   Skipping action due to workflow validation: ... must exist and have identical content to the
+#   version on the repository's default branch
+#
+# and then exits SUCCESSFULLY, in nine seconds. So the check goes GREEN and no review happened --
+# the one outcome the diagnostics below cannot reach, because they run only on failure.
+#
+# It is the same guarantee the `pull_request` choice above buys, applied to the workflow instead of
+# to the secrets: a PR must not review itself under rules it has just rewritten. Do not try to
+# defeat it. Just know that a change to THIS file is reviewed by people, and that the green tick it
+# collects means nothing until the change is on `main`.
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
@@ -86,6 +101,30 @@ jobs:
       # exactly why this step runs ON FAILURE ONLY: on a failed run it holds the error, and on a
       # successful one -- where it would hold review prose about the diff -- this step does not run.
       #
+      # WHY THE LOG WAS NOT ENOUGH -- issue #966, and that is what the annotation and the job summary
+      # below are for. #913 made the reason AVAILABLE; it did not make it LEGIBLE. The reason sits in the
+      # body of this step's log, while the line a reader meets first is the action's own
+      # `##[error]Claude result reported subtype success with is_error:true`, which names nothing. On
+      # August 27, 2026 that gap cost a full misdiagnosis: #966 was filed against a run whose log already
+      # read `api_error_status: 429`, inferred an expired OAuth token instead, and concluded the repair
+      # needed a secret rotated. So the annotation and the summary below add no information -- they move
+      # it to where the reader lands, which is the annotation list and the run summary page.
+      #
+      # SAME BOUND AS ABOVE, unchanged by that move. The annotation carries no text this log did not
+      # already carry, capped at the FIRST LINE and 300 characters. That one-line cap is not a policy
+      # choice: a newline would terminate the annotation command.
+      #
+      # THE ONE CAUSE THIS HAS ACTUALLY HAD, on all FOUR of its red runs -- two attempts on August 26 and
+      # two on August 27, 2026: `api_error_status: 429`, with `result` naming a session limit and the UTC
+      # time it resets. Worth stating plainly, because the mechanism is invisible from the workflow file:
+      # `CLAUDE_CODE_OAUTH_TOKEN` is a SUBSCRIPTION credential, so the session window it draws on is the
+      # same one interactive use draws on. A morning of heavy local work starves the review of every PR
+      # opened in that window, and no amount of retrying inside the run helps: it resets on the clock.
+      #
+      # AND THE CHECK STAYS RED ON THAT, deliberately. A 429 means this PR got no review, which is
+      # exactly what #966 wanted not to be silent; a green check would hide that better than a red one
+      # nobody can read. What was wrong here was the legibility, not the colour.
+      #
       # NOT ADDED TO claude.yml, deliberately. The same blindness is there and this same step would
       # cure it, but that workflow answers a human who typed '@claude' and is already reading the thread
       # when it fails. This one runs unattended on every PR, which is what makes its silence expensive.
@@ -114,3 +153,54 @@ jobs:
                 ((.result // "<the result message carried no result field>")[0:2000])
               end
           ' "$EXECUTION_FILE"
+
+          # The two fields the headline needs, read back separately: the status decides the
+          # WORDING and the result supplies the sentence. Both tolerate a missing result message
+          # without a special case -- `last` on an empty array is null and `null | .x` is null in
+          # jq, so each falls through to its `//` default and the empty-status branch below reports
+          # that silence as the finding.
+          #
+          # `.[0] // ""` after the split is not belt-and-braces, it is the bug this was written
+          # with: jq's `split` on an EMPTY string returns `[]`, not `[""]`, so `[][0]` is null and
+          # `-r` prints the literal word "null". Measured against a fixture carrying no `result`
+          # field, where the annotation then read "... named no API status. null".
+          status=$(jq -r '[.[] | select(.type == "result")] | last | (.api_error_status // "") | tostring' "$EXECUTION_FILE")
+          reason=$(jq -r '[.[] | select(.type == "result")] | last | (.result // "") | split("\n") | (.[0] // "") | .[0:300]' "$EXECUTION_FILE")
+
+          # The annotation TITLE may hold neither a comma nor '::' -- both are annotation-command
+          # syntax -- so the short form goes there and the full sentence goes in the message body.
+          case "$status" in
+            429) short='out of quota -- the review did not run'
+                 headline='The review did not run: the account behind CLAUDE_CODE_OAUTH_TOKEN is out of session quota, which resets on the clock and not on a re-run. Nothing to do with this diff.' ;;
+            529) short='API overloaded -- the review did not run'
+                 headline='The review did not run: the API was overloaded. Nothing to do with this diff.' ;;
+            '')  short='the review failed'
+                 headline='The review failed and the result message named no API status.' ;;
+            *)   short="the review failed with API status $status"
+                 headline="The review failed with API status $status." ;;
+          esac
+
+          # `%` is escaped because the runner percent-DECODES a command's data, so an unescaped
+          # `%0A` inside `result` would become a newline in the rendered annotation. It cannot forge
+          # a second command -- one only counts at the start of a line, and this message is capped
+          # to a single line -- but a diagnostic that renders wrong is the exact failure this step
+          # exists to prevent.
+          if [ -n "$reason" ]; then
+            echo "::error title=claude-review -- ${short}::${headline} ${reason//%/%25}"
+          else
+            echo "::error title=claude-review -- ${short}::${headline}"
+          fi
+
+          # The reason goes in a blockquote rather than a table cell: it is free text, and a `|` in
+          # it would break a table row instead of appearing in one.
+          {
+            echo "### claude-review: ${short}"
+            echo
+            echo "$headline"
+            echo
+            echo "\`api_error_status\`: \`${status:-null}\`"
+            echo
+            echo "> ${reason:-_the result message carried no result field_}"
+            echo
+            echo 'The full diagnostic is in the **Why the review failed** step of this job.'
+          } >> "$GITHUB_STEP_SUMMARY"
