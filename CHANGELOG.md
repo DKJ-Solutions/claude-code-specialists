@@ -32,6 +32,69 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/inbound-sixth-pattern-mirror-in-the-reporters-tree-v1` · 20260827-142712
+
+Triaging an inbound item now checks six things instead of five, and the sixth is **which tree the symptom
+is in**. Every earlier check holds the report against the tree you are standing in and quietly assumes
+the defect is there too; a reporter measuring from another repo can be right about the symptom, the
+reason, the line number and the 404, and wrong about whose file it is. The rule half lands in Chris's
+always-on body -- resolve the path in your own tree before accepting the attribution, and where it
+resolves to nothing the finding has neither collapsed nor been repaired -- and the measurement lands in
+the `triage-inbound` skill.
+
+The instance is [#954](https://github.com/DaveKJohn/claude-code-specialists/issues/954), closed
+August 27, 2026. It reported two dead `plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md`
+blob URLs above the horizontal rule in `releases/README.md`, verified 404 against the new path's 200.
+Every fact was true, and none of it was here: the tree returns **zero** live hits for that path, and that
+page has no horizontal rule at all. `94476de6` (August 13, inbound #646) moved the mirrored process half
+out of the file and into `RELEASES-portable.md`, taking both URLs with it; `8797f7a5` (August 26, #886)
+corrected the path in its new home. The links are in the reporter's
+`contributing-davekjohn/releases/README.md` -- a different path than the report names, whose own
+`releases/README.md` returns 404 -- at lines 196 and 289, above the rule at 336.
+
+**What made it invisible is the report's own justification**, which is the half worth distrusting: *"the
+content above the rule is a verbatim mirror of the source's page, so a local fix would just restart
+drift."* Sound reasoning from an identity the two trees had stopped sharing thirteen days earlier, ended
+by the very change that ended the mirroring. Being identical is a mirror's whole design, so its content
+can never tell you which side you are reading -- date it instead. Line 482 of their copy still describes
+`RELEASES-portable.md` as a proposal, which pins the mirror to before #646 landed. And a mirror retired
+upstream makes the proposed fix the wrong fix: repointing two URLs preserves a ~4,000-word hand-maintained
+copy of a process half that no longer exists, which is the exact cost #646 was filed to end.
+
+For somebody maintaining this repo the gain is one grep at intake and a closure that tells a reporter
+something they could not have worked out themselves. It is a 2 rather than higher because the check was
+already run in the triage that produced it -- what lands is the written form, and it is noticed on the next
+inbound rather than today.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Chris's body is loaded in every session of every repo that enables `team-alpha`, so this arrives on a
+plugin update whether or not anyone asked for it -- which is the reason its size was measured rather than
+estimated. The first draft cost **1,528 B**; what ships is **1,143 B**, about 285 tokens per session, and
+the trim took out the generic restatement rather than the tell.
+
+The check reaches a consumer in the direction they actually meet it. They do not receive inbound from
+consumers of their own, but they do receive reports -- from a session, a teammate, their own earlier
+notes -- about content they mirror from here, and the whole family of `*-portable.md` pages plus the
+above-the-rule half of the workflow folder's pages is mirrored content by design. #954 is what that looks
+like from the other side: a careful reporter, correct measurements, and an attribution built on a sharing
+relationship that had already been dissolved upstream. The paragraph that helps them most is the one
+saying a stale mirror can be dated from inside itself.
+
+**Score:** 2
+
+#### Pull Request
+
+the triage skill carries a sixth inbound pattern: the symptom is real and it is in the reporter's tree
+
+Plugins: team-alpha
+
+[PR #979](https://github.com/DaveKJohn/claude-code-specialists/pull/979)
+
+---
+
 ### DEPLOY: `fix/park-names-what-backs-the-ticks-v1` · 20260827-132350
 
 Every automatic park commit now says what is behind the plan it publishes. `park-cycle` measures three
