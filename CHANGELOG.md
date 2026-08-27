@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/seam-isolation-legacy-root-v1` · 20260827-121838
+
+`Assert-WorkflowIsolatedSeamPath` could not tell a typo from a layout, and treated both as a typo. It
+refuses with `exit 1` and had no opt-out, so a consumer that had been folding into a root `CHANGELOG.md`
+since before the workflow folder existed was hard-blocked at the fold — after the merge had already
+landed. It now accepts two answers instead of one: the folder, and the seam's **own** pre-isolation
+target, looked up per seam by `Get-PreIsolationSeamPath`.
+
+Per seam is the load-bearing half. `CHANGELOG.md` is a legal answer for `Get-ChangelogPath` and stays
+refused for `Get-ReleaseGithubNotesRoot`, and `README.md` — the case the guard exists for, and the one its
+own docstring names — is still refused for all five.
+
+For this repo the reach is nil, and that is worth stating plainly rather than dressing up: a source repo
+(`marketplace.json` present) is exempt from this assert outright and always was, so nothing here behaves
+differently. What lands here is a lib, a suite that grew from 25 asserts to 37, and the record of why the
+shape #956 proposed first was declined.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+**A blocker that is gone, and the reader has to act to collect it.** Two consumers answer this seam at
+their repo root, independently: `smartwatchbanden` (14 pending entries, set in its own 4.20.0 adoption
+commit) and `xoxowildhearts` (24). For them the fold and the cut were refused outright, and the
+work-arounds were real ones — `xoxowildhearts` folded by hand under its documented fold exception, and
+moved its `CHANGELOG.md` into the workflow folder purely to get past this guard. Both can be dropped
+now, and the moved file can move back.
+
+They notice this the moment they merge anything, without being told, because the failure they were
+meeting was total. The one thing they have to do is stop working around it.
+
+It reaches every other consumer as nothing at all: a repo already inside the folder passes the assert
+exactly as before, and a repo with a genuine typo is refused exactly as before, now with a message that
+names the answer it wanted.
+
+**Score:** 5
+
+#### Pull Request
+
+A consumer's pre-isolation root answer stays a valid seam target
+
+Plugins: contributing-davekjohn
+
+[PR #971](https://github.com/DaveKJohn/claude-code-specialists/pull/971)
+
+---
+
 ### DEPLOY: `fix/review-quota-names-itself-v1` · 20260827-115413
 
 A red `claude-review` now says why it is red where a reader actually lands -- in the run's annotation
