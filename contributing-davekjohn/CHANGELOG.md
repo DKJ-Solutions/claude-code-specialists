@@ -32,6 +32,64 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-step5-leaves-head-alone-v1` · 20260827-183450
+
+`ship-pr.ps1` step 5 ran `git checkout main` unconditionally, one line after the merge. Measured on
+git 2.54.0.windows.1, that had exactly two outcomes on a backgrounded ship -- the shape the script started
+inviting the same day, in #990: an uncommitted edit that **collides** with the trunk makes the checkout exit 1
+("Your local changes to the following files would be overwritten"), stopping the run between the merge and the
+fold -- PR merged, branch document still in the tree, every gate green until a release trips over it; an edit
+that **does not collide** lets it exit 0, and `HEAD` moves to the trunk *with the uncommitted work travelling
+along*, so the session carries on editing on `main` with its own work already sitting there.
+
+Step 5 now reads `HEAD` first. Still on the shipping branch, or already on the trunk: it runs exactly what it
+ran before, command for command. Anywhere else -- another branch, or detached -- it leaves that checkout alone
+and folds in a throwaway `git worktree` on the trunk, then takes it down again.
+
+**Three things were measured rather than reasoned, and each one closed a choice.** The worktree has main
+*checked out* rather than being detached, because from a detached `HEAD` the fold's bare `git push` dies with
+`fatal: You are not currently on a branch` (exit 128); it is only reachable at all because git refuses that
+add when the primary itself holds main, which is why `HEAD -eq 'main'` folds in place instead; and
+`fold-changelog-entry.ps1` needed no change, because its `-RepoRoot` has named this exact caller since #101 --
+*"a consumer that runs the fold from a temporary/detached worktree (e.g. a ship-pr.ps1 that checks out main
+elsewhere)"*.
+
+**The one decline this had to answer is `worktree-lane.ps1`'s**, which says in as many words that changing
+this line was weighed and rejected. It was -- for a different thing: folding via whichever worktree *already
+holds* main, to spare a lane two hand-back commands, a convenience traded against touching "the single line
+that produces the state nothing reports". #972 measured that line producing that state rather than merely
+risking it, and this adds a tree of its own instead of borrowing a lane's. Both scripts now say so, so a
+reader meeting the older paragraph is not left with a contradiction.
+
+Closes [#972](https://github.com/DaveKJohn/claude-code-specialists/issues/972).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**A backgrounded ship can no longer take your working tree with it.** `ship-pr.ps1` is workflow payload, so
+this reaches every repo running `contributing-davekjohn` -- and it lands one release after the change that
+made backgrounding the default, which is what turned a latent hazard into a routine one. Nothing about the
+ordinary run changes: a foreground ship, and a ship run beside a `worktree-lane`, execute the same commands
+they always did and still leave you on the trunk.
+
+**What changes is the cost of forgetting the lane.** It was your uncommitted work, silently, in one of the two
+directions git happens to choose; it is now a temporary directory. The lane is still the better move -- it is
+where you build, and it keeps one tree doing one thing -- and the skill page now says that as advice rather
+than as a condition, with both measured outcomes in a table beside it.
+
+**Score:** 3
+
+#### Pull Request
+
+Step 5 folds without moving the session's checkout
+
+Plugins: contributing-davekjohn
+
+[PR #997](https://github.com/DaveKJohn/claude-code-specialists/pull/997)
+
+---
+
 ### DEPLOY: `docs/review-429-tally-needs-no-count-v1` · 20260827-181941
 
 The comment above `claude-code-review.yml`'s **Why the review failed** step no longer counts this
