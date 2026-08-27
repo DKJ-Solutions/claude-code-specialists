@@ -47,11 +47,16 @@ function Get-DefaultChangelogPath {
         The changelog seam's computed default, so a repo that configures nothing still gets the right
         answer instead of needing to remember a setting: this repo's own root CHANGELOG.md if it
         publishes plugins (the same one-file test Get-ReleasePluginTier's fallback and
-        adopt-workflow-folder.ps1's source refusal already use -- a repo with a
-        .claude-plugin/marketplace.json is the workflow's SOURCE, not a consumer, and keeps its root
-        file), '<workflow folder>/CHANGELOG.md' otherwise, the folder name coming from
-        Get-WorkflowFolderName -- so every consumer is isolated by default and the Get-ChangelogPath seam
-        exists only for the repo that wants to differ from that.
+        adopt-workflow-folder.ps1's source refusal already use), '<workflow folder>/CHANGELOG.md'
+        otherwise, the folder name coming from Get-WorkflowFolderName -- so every consumer is isolated by
+        default and the Get-ChangelogPath seam exists only for the repo that wants to differ from that.
+
+        THE PARENTHESIS USED TO END "is the workflow's SOURCE, not a consumer, and keeps its root file",
+        and that half is amended rather than dropped in silence (issue #989, August 27, 2026). This
+        workflow's source moved its CHANGELOG.md into contributing-davekjohn/ with #980 and STATES the
+        seam to say so, so the root answer above is inert in the one repo it was written for. The test
+        itself is unchanged and still means what it computes; what has expired is the claim about what a
+        repo answering true to it does with its root. See Test-IsWorkflowSourceRepo below.
     #>
     param([Parameter(Mandatory)][string]$RepoRoot)
     if (Test-Path -LiteralPath (Join-Path $RepoRoot '.claude-plugin\marketplace.json') -PathType Leaf) {
@@ -65,10 +70,22 @@ function Test-IsWorkflowSourceRepo {
         The one-file test repeated at four sites before this function existed (Get-ReleasePluginTier's
         fallback in repo-config.ps1, adopt-workflow-folder.ps1's source refusal, source-repo-guard-lib.ps1's
         Assert-OwnCopy, and now every computed default in this file): a repo with
-        .claude-plugin/marketplace.json is the workflow's SOURCE and keeps its root files; every other repo
-        is a consumer and gets the isolated answer. Extracted here for the computed defaults below rather
-        than repeated a fifth time -- the other three sites are untouched (issue #885 is about the release
-        machinery's own defaults, not a repo-wide dedup of this test).
+        .claude-plugin/marketplace.json publishes plugins, and the defaults below hand it the root answer;
+        every other repo is a consumer and gets the isolated answer. Extracted here for the computed
+        defaults below rather than repeated a fifth time -- the other three sites are untouched (issue
+        #885 is about the release machinery's own defaults, not a repo-wide dedup of this test).
+
+        THE NAME PROMISES MORE THAN THE TEST DELIVERS, and it is worth knowing before relying on it
+        (issue #989, August 27, 2026). This sentence used to end "is the workflow's SOURCE and keeps its
+        root files", and BOTH halves have since drifted from the file it reads. A marketplace manifest
+        says a repo publishes plugins -- it does not say the repo publishes THIS workflow, and Dave's
+        own one-product-one-repository rule means the next product gets its own marketplace, so a repo
+        that consumes this workflow and publishes something else answers true here. And the second half
+        stopped being true of the one repo it was written for: since #980 this workflow's source keeps
+        its changelog and its release list inside contributing-davekjohn/, STATED as seams, so it does
+        not keep its root files either. Nothing is broken -- the source states both seams, so its
+        computed answer is never used -- and the function is left alone deliberately, because three
+        other sites read it and repairing the conflation is a change of its own rather than a docstring.
     #>
     param([Parameter(Mandatory)][string]$RepoRoot)
     return (Test-Path -LiteralPath (Join-Path $RepoRoot '.claude-plugin\marketplace.json') -PathType Leaf)
@@ -105,9 +122,20 @@ function Get-DefaultReleaseHistoryPath {
     <#
         The release-history seam's computed default (issue #885, group E), REVERSING the August 19, 2026
         answer rather than silently replacing it -- see script-contract-lib.ps1's Get-ReleaseHistoryPath
-        record for why that premise no longer holds. 'releases/README.md' for the source (unchanged: it
-        still keeps its root file, same as Get-DefaultChangelogPath), '<workflow folder>/releases/history.md'
-        for a consumer -- the folder name from Get-WorkflowFolderName, exactly as above.
+        record for why that premise no longer holds. 'releases/README.md' for a repo that publishes
+        plugins, '<workflow folder>/releases/history.md' for every other repo -- the folder name from
+        Get-WorkflowFolderName, exactly as above.
+
+        THAT FIRST BRANCH NO LONGER DESCRIBES THIS REPO, and the sentence is amended rather than quietly
+        corrected (issue #989, August 27, 2026). It used to read "'releases/README.md' for the source
+        (unchanged: it still keeps its root file, same as Get-DefaultChangelogPath)". Since #980 the source
+        keeps neither: its release list is <workflow folder>/releases/history.md and its changelog
+        <workflow folder>/CHANGELOG.md, both STATED as seams in scripts/repo-config.ps1 -- so this computed
+        answer is inert here and the branch now only fires for some OTHER repo that publishes plugins.
+        WHETHER THE BRANCH SHOULD SURVIVE THAT IS A SEPARATE QUESTION and deliberately not settled here:
+        removing it would move a plugin-publishing consumer's changelog under them, and the test it rests
+        on (Test-IsWorkflowSourceRepo) asks "does this repo publish plugins", not "is this repo THIS
+        workflow's source" -- which is the conflation to settle first. Read that function's own note.
 
         history.md, NOT README.md: that same folder's 'releases/README.md' already names its
         seam-ANSWERS page (adopt-workflow-folder.ps1's own scaffold target). The list and the answers are
@@ -253,10 +281,16 @@ function Assert-WorkflowIsolatedSeamPath {
         or rely on that literal fallback -- forcing it through this assert would refuse the one seam whose
         whole point is to keep meaning what it meant yesterday.
 
-        A SOURCE REPO (marketplace.json present) is exempt outright: it deliberately keeps these roots at
-        its own root by its own decision (Dave, August 14, 2026), and Get-Default*'s own computed answer
-        for a source IS that root -- so a source is not a repo that could resolve "outside the folder" in
-        the sense this check is guarding against.
+        A SOURCE REPO (marketplace.json present) is exempt outright, and the exemption stands while its
+        stated reason no longer does -- amended, not quietly left as it was (issue #989, August 27, 2026).
+        It read: "it deliberately keeps these roots at its own root by its own decision (Dave, August 14,
+        2026), and Get-Default*'s own computed answer for a source IS that root". The second clause is
+        still true of the computation and the FIRST is no longer true of this repo: #980 moved the
+        changelog and the release list into contributing-davekjohn/, so the source's answers now resolve
+        INSIDE the folder and would pass this check on the ordinary route, exemption or not. What the
+        exemption still covers is a repo that publishes plugins and does keep those roots at its root --
+        which is what the test actually detects, its name notwithstanding (see Test-IsWorkflowSourceRepo).
+        Removing it is therefore not the free tidy-up it looks like from here, and is left alone.
 
         Refuses (Write-Error + exit 1) rather than returning a bool, matching every other guardrail in
         cut-release.ps1: a caller that reaches this call is about to read or write the path, so a silent
