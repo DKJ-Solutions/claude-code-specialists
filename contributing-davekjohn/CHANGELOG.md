@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/check-wait-zero-date-overflow-v1` · 20260827-154618
+
+`ship-pr` no longer dies between the merge decision and the merge when a check registers while the CI
+wait is returning. `gh pr checks --json` serialises a check that has not finished yet as the zero time
+`0001-01-01T00:00:00Z` -- not as null, not as an empty string -- and `ConvertTo-CheckTimestamp` accepted
+it as a real timestamp, so the caller's own "unreadable, skip this record" guard never fired and the
+`[int]` cast in the DarkGray *which check governed the wait* line overflowed on 63.9 billion seconds. A
+reporting line took the run down after it had printed `CI green.`, leaving the PR unmerged and the entry
+unfolded with every check green -- the half-state the step's own comment calls "the state nothing
+reports". The zero time is now unreadable in both shapes gh can send it in, so an unfinished check drops
+out of the ordering it never belonged in, and the seconds arithmetic rounds and range-checks before it
+casts, at both sites, so no timestamp from that payload can throw there again.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer runs this code from their plugin cache, and the failure window is not rare: the CI wait
+is the one place in `ship-pr` that is guaranteed to be racing GitHub, so any check that registers while
+`--watch` is returning is in it. It cost a real run in `BWJ-ecommerce/xoxowildhearts` (PR #68), which is
+where #977 was filed from -- and the recovery reads as a fluke rather than a fix, because re-running a
+few minutes later merges cleanly once the check has a real `completedAt`. The consumer-visible half is
+therefore not the crash but the trust: a ship that stops after `CI green.` no longer leaves anyone
+guessing whether the merge happened.
+
+**Score:** 4
+
+#### Pull Request
+
+A not-yet-finished check's zero timestamp no longer kills ship-pr after CI is green
+
+Plugins: contributing-davekjohn
+
+[PR #986](https://github.com/DaveKJohn/claude-code-specialists/pull/986)
+
+---
+
 ### DEPLOY: `fix/remove-lock-and-handover-v1` · 20260827-153226
 
 Removed the `/lock` and `/handover` skills, and with them the one reporter both wrapped
