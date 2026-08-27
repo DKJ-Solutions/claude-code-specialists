@@ -190,7 +190,7 @@ function Get-SeamBlock([string]$Id, [string]$StoreDomain) {
     }
     $lines += @(
         '',
-        '# The remaining three, with their defaults, all optional:',
+        '# The remaining four, with their defaults, all optional:',
         '#',
         '#   Get-ShopifySyncReferencePattern   default ''^[Ss]ync''    the --grep pattern that recognises a',
         '#                                                            previous sync commit. The capital is not',
@@ -209,6 +209,15 @@ function Get-SeamBlock([string]$Id, [string]$StoreDomain) {
         '#                                                            somebody LOOKS at what third parties',
         '#                                                            changed before it becomes the base of new',
         '#                                                            branches -- which is the point of the step.',
+        '#   Get-ShopifySyncPrBody             default (none)        the PR body, composed from -Take, -Keep',
+        '#                                                            (the classified rows: Status/Path/Reason)',
+        '#                                                            and -Default (the body the script already',
+        '#                                                            composed). Answer it only where the PR body',
+        '#                                                            IS your review policy: a template, a',
+        '#                                                            checkbox, a fixed wording. Unanswered, the',
+        '#                                                            default already names both halves and every',
+        '#                                                            path with its kind -- changed, new or gone',
+        '#                                                            on live -- which is what a reader needs.',
         ''
     )
     return (($lines -join "`n") + "`n")

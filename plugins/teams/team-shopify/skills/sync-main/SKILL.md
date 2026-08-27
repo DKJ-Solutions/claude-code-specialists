@@ -53,6 +53,12 @@ would do to it.
    came in, not what was kept out.
 7. **Writes, commits and pushes only the `take-live` paths** on a sync branch. Whether it then merges is a
    seam answer, and the default is no.
+8. **Composes the PR body**, on both paths -- the record of what a third party did, and in a repo whose
+   policy is that the sync PR does not wait for a review, the *only* one. It names both halves and gives
+   every path its kind in words: `changed on live`, `new on live`, `gone from live`. The non-merging path
+   writes it to a file and hands you `gh pr create ... --body-file <path>`; the merging path passes it
+   straight to `gh`. `Get-ShopifySyncPrBody` replaces it with your own (inbound
+   [#1000](https://github.com/DaveKJohn/claude-code-specialists/issues/1000)).
 
 ## The three things that make it unable to destroy work
 
@@ -128,6 +134,7 @@ default beside it. `adopt-shopify-floor` writes the block; the two required ones
 | `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the `--grep` pattern that recognises a previous sync commit. |
 | `Get-ShopifySyncBranchPrefix` | `sync/live-` | the drift branch's prefix. It has to line up with whatever your PR guardrails and CI exempt, which is why it is yours to set. |
 | `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges it once CI is green. |
+| `Get-ShopifySyncPrBody` | *(none)* | the PR body. Called with `-Take`, `-Keep` (the classified rows, each carrying `Status`/`Path`/`Reason`) and `-Default` (the body the script composed), and it returns the body to use. |
 | `Get-TrunkBranchName` | `main` | the trunk. |
 | `Get-PrMergeMethod` | `merge` | read only when `Get-ShopifySyncMerges` is true. |
 

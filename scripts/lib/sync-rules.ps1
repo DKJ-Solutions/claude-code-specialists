@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     The pure rules the Shopify pre-task sync is built on: where to measure from, whose content a
-    path has held, and who wins a file.
+    path has held, who wins a file -- and the body of the PR that reports all of it.
 
 .DESCRIPTION
     Separated from scripts/task/sync-main.ps1 on purpose, and it is not tidiness. The risk in a sync is
@@ -16,12 +16,17 @@
     cannot answer the question the rule is asking, which is the reason the first half was demoted rather
     than repaired.
 
+    THE THIRD HALF, ADDED ON INBOUND #1000, IS NOT A QUERY: New-SyncPrBody composes what the sync PR says
+    about itself. It sits here for the same reason the queries do -- it is decided entirely by data in
+    hand, so the suite can walk it without running a sync -- and it fails in the same silent direction: a
+    body that omits a verdict class reads as a complete report of what a third party did.
+
     DEPENDENCY-FREE, AND DELIBERATELY NOT A READER OF scripts/repo-config.ps1. That file is read by
     team-shopify's live-theme guard on EVERY command, inside a 'try { . $configPath } catch { return
     $answers }' -- so a fault in anything it pulls in makes that catch fire and the guard continues with
     no live theme id, which is a hole in the one rule that cannot self-declare. The seam answers are
-    therefore read by the SCRIPT and passed in as parameters. Both functions here take everything they
-    need from their caller.
+    therefore read by the SCRIPT and passed in as parameters. Every function here takes everything it
+    needs from its caller.
 
     Pure ASCII, per this repo's script-layer convention.
 #>
@@ -530,4 +535,96 @@ function Get-SyncFileVerdict {
     }
 
     return [pscustomobject]@{ Action = 'take-live'; Reason = 'content this repo has never held for this path: a third party wrote it on live' }
+}
+
+# --- THE PR BODY -----------------------------------------------------------------------------------
+# The one thing the sync produces that a HUMAN reads, and the only record that drift was ever inspected
+# in a repo whose policy is that the sync PR does not wait for a review (inbound #1000). It lives here
+# rather than in the task script for the same reason every query above does: it is decided by data in
+# hand, so a suite can walk it without running a sync.
+#
+# WHY THE KIND IS SPELLED OUT PER FILE AND NOT LEFT TO THE STATUS LETTER. Inbound #1000 measured the
+# failure in a consumer's own sync PR #350: the body was a flat file list, so nothing in it recorded that
+# live had made 'templates/page.back-to-school.json' DISAPPEAR. A reader of a flat list cannot tell a
+# deletion from an edit, and a deletion is the one that needs a second look -- so 'gone from live' is
+# written out in words. "The diff shows what came in" is true and is not a record: the diff of a sync
+# branch shows what was TAKEN, never what live no longer has.
+function Get-SyncFileKind {
+    <#
+    .SYNOPSIS
+        The status letter as words, measured against the trunk exactly as Get-SyncFileVerdict measures it.
+    #>
+    param([Parameter(Mandatory = $true)][ValidateSet('M', 'A', 'D')][string]$Status)
+
+    switch ($Status) {
+        'M' { return 'changed on live' }
+        'A' { return 'new on live' }
+        default { return 'gone from live' }
+    }
+}
+
+function New-SyncPrBody {
+    <#
+    .SYNOPSIS
+        The default body for the sync PR: what was TAKEN from live and what was HELD BACK, each file with
+        its kind and its reason.
+
+    .DESCRIPTION
+        Rows are the classified objects the sync builds -- Status ('M'/'A'/'D'), Path and Reason. Both
+        halves are listed, because each answers a question the other cannot: the taken half is what a
+        third party wrote and the diff also shows, the held-back half is what the rule suppressed and
+        nothing else records at all.
+
+        FILES ARE GROUPED BY REASON rather than repeated one reason per line. Every file in a verdict
+        class carries the same sentence, so a 31-file sync would otherwise print the same clause 31 times
+        and bury the paths -- the shape the report the PR exists for cannot afford.
+
+        The order of the groups, and of the files inside one, is the caller's order. Nothing is sorted
+        here: the sync walks the mirror in a fixed order and a body that reorders it stops lining up with
+        the console output the operator just read.
+    #>
+    param(
+        [object[]]$Take = @(),
+        [object[]]$Keep = @(),
+        [string]$Intro = 'Third-party drift from the live theme.'
+    )
+
+    $lines = @($Intro)
+
+    $lines += Get-SyncPrBodySection -Rows $Take -Heading 'Taken from live' -EmptyText 'Nothing was taken from live.'
+    $lines += Get-SyncPrBodySection -Rows $Keep -Heading 'Held back, the trunk wins' -EmptyText 'Nothing was held back by the content rule.'
+
+    return (($lines -join "`n") + "`n")
+}
+
+function Get-SyncPrBodySection {
+    <#
+    .SYNOPSIS
+        One half of the body: a bold heading with its count, then the files grouped under their reason.
+    #>
+    param(
+        [object[]]$Rows = @(),
+        [Parameter(Mandatory = $true)][string]$Heading,
+        [Parameter(Mandatory = $true)][string]$EmptyText
+    )
+
+    $rows = @($Rows | Where-Object { $_ })
+    if ($rows.Count -eq 0) { return @('', $EmptyText) }
+
+    $out = @('', "**$Heading ($($rows.Count))**")
+    # Insertion-ordered grouping, so the body follows the caller's order rather than a hashtable's. An
+    # ordered dictionary is the whole trick; Group-Object would sort and lose it.
+    $groups = New-Object System.Collections.Specialized.OrderedDictionary
+    foreach ($r in $rows) {
+        $reason = [string]$r.Reason
+        if (-not $groups.Contains($reason)) { $groups[$reason] = New-Object System.Collections.ArrayList }
+        [void]$groups[$reason].Add($r)
+    }
+    foreach ($reason in @($groups.Keys)) {
+        $out += @('', "*$reason*", '')
+        foreach ($r in $groups[$reason]) {
+            $out += "- $(Get-SyncFileKind -Status ([string]$r.Status)) -- ``$($r.Path)``"
+        }
+    }
+    return $out
 }
