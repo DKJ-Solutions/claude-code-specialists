@@ -73,6 +73,14 @@ still right for a source that now declares the seam, not a sentence to rewrite.
 
 - [x] `check-plugin-integrity.ps1` + the suites, via `open-pr`. The two script copies must stay
       byte-identical, which that gate checks.
+- [x] One suite fails here and it is not this branch: `seam-lib.tests.ps1`, 1 failed of 37. Proven by
+      running it from a detached worktree on `origin/main` (700b1226, the commit whose CI run is green),
+      where it fails identically. The assert at line 182 matches `'CHANGELOG.md'` inside a ~380-character
+      `Write-Error` from `Assert-WorkflowIsolatedSeamPath`, and the console wrap lands on that phrase.
+      Measured: red at 120 and 130 columns, green at 140 and above. Same class as #959, and reported
+      there as its second instance -- with the note that it flips ABOVE 120, which contradicts that
+      issue's "CI has five characters of headroom" model. The gate was then run at a wide console so all
+      52 suites report honestly rather than being skipped.
 
 ### DEPLOY: `docs/portable-contributing-floor-v1`
 
