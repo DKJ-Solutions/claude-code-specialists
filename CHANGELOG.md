@@ -32,6 +32,89 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/park-names-what-backs-the-ticks-v1` · 20260827-132350
+
+Every automatic park commit now says what is behind the plan it publishes. `park-cycle` measures three
+figures before it commits -- how many of the document's steps are resolved, how many files are committed on
+the branch besides that document, how many are uncommitted in the working copy the park came from -- and
+writes them into the commit body as a `Backing:` line. Where the plan reads as **finished** with nothing
+behind it, an alarm paragraph says so in as many words and names the wrong move. `session-status` prints the
+note back under every parked branch, so `/lock` and `/handover` surface it without a checkout, and says
+plainly where there is none.
+
+The state it exists for was measured here on August 27, 2026
+([#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960)).
+`feat/adopt-act-on-this-skills-v1` sat on origin with three `park:` commits, eight resolved CREATE steps
+naming edits to three agent defs, three manuals and two lenses -- and a diff against `main` consisting of
+the cycle document alone, 161 insertions, one file. The edits were uncommitted in the other device's working
+copy, which no reader of origin can see. `#900` publishes the plan so a second device can read it, and on
+that branch it delivered the plan and inverted its purpose: from origin, *ticked and committed* and *ticked
+and uncommitted somewhere else* are the same document, and the more complete the ticks, the more convincing
+the wrong reading. A session picking it up in good faith either rebuilds eight changes that already exist,
+or opens a PR that merges 161 lines the fold then deletes.
+
+Four bounds decide the shape, and each of them was the alternative. **It is a note, never a gate** -- a park
+that refused because it disliked the plan would be worse than the misleading document, because then the plan
+would not reach the other machine at all. **Counts, never filenames** -- the uncommitted figure describes
+work nobody asked to publish, and listing those paths would defeat bound 1 (one document, never
+`git add -A`) one layer along. **The alarm fires on the finished shape only**: any resolved step with nothing
+committed would fire on nearly every early park, because a planning step ticked before a line of code exists
+is the ordinary case, and an alarm that fires on almost every park is one nobody reads by the time it
+matters. **And the measurement lives on the machine that holds the invisible work**, taken at the moment it
+becomes invisible -- nowhere else can take it, since from origin those files do not exist. That is also why
+the reader only echoes the line: a local recount would report 0 for a branch whose commit says 12, and the
+wrong number would be the confident one.
+
+The branch also repaired a defect it exposed rather than filing it, because it is one resolution in the block
+being edited: `session-status` was **listing the trunk as a parked branch**. It read the trunk from
+`refs/remotes/origin/HEAD` alone -- a ref a locally-initialised repo does not have -- and fell back to the
+literal `main`, so any repo whose trunk is named otherwise saw its own trunk in the one block that exists to
+show work that is *not* on the trunk. The suite's negative assert had been passing on a newline-removal
+artefact, with `master` and the next section's `Open` running together into one word so `\b` never matched.
+The trunk now comes from `git ls-remote --symref`, which asks the remote rather than a local ref and needs no
+seam, in the same call the branch list comes from.
+
+For somebody maintaining this repo the gain is that a parked branch can no longer lie about itself, and the
+cost is a handful of lines in a commit body nobody has to read. It is a 3 rather than higher because it
+changes no chain and blocks nothing -- but the state it describes has already cost one triage here, and the
+next reader of that branch would have paid for it in rebuilt work.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The same mechanism through a plugin update, and for a consumer the exposure is larger rather than equal: the
+two-device split this was measured on is the ordinary shape of working from a laptop and a desktop, and
+`park-cycle` runs on their Stop hook exactly as it does here. What arrives is `park-cycle.ps1`,
+`session-status.ps1` and both libs behind them, so nothing has to be configured -- `Get-GitParkBacking`,
+`Format-GitParkBacking` and `Get-GitParkBackingMarker` are available to any other script of theirs that has
+to judge whether a plan has work behind it, and `Get-BranchProgressTally` answers "how does this step list
+stand" for any caller that until now had only the gate's yes-or-no.
+
+The trunk repair reaches them harder than it reaches this repo, which is the part worth reading twice. This
+repo's trunk is `main` and its checkout was cloned, so `refs/remotes/origin/HEAD` exists and the defect never
+fired here. A consumer who ran `git init` and added a remote afterwards has no such ref, and one whose trunk
+is `master` -- or any name that is not `main` -- has been seeing their own trunk reported as a parked branch
+every time they ran `/lock` or `/handover`. That is the single most misleading line the block can print: it
+sends a reader looking for work on the one branch where the work has already landed.
+
+The `park` skill's pick-up section gains its second trap beside the one it already carried. The first asks
+whether a parked plan has been **overtaken** -- measured August 4, 2026, a plan superseded 1h43m after it was
+parked. This one asks whether it was ever **carried out**. The two are independent and both are one command;
+a plan can pass either and fail the other, and the skill now says so with the command that answers each.
+
+**Score:** 3
+
+#### Pull Request
+
+The park commit names what is behind the ticks
+
+Plugins: contributing-davekjohn
+
+[PR #976](https://github.com/DaveKJohn/claude-code-specialists/pull/976)
+
+---
+
 ### DEPLOY: `fix/entry-link-gate-follows-changelog-v1` · 20260827-131311
 
 `open-pr`'s link gate resolves the entry's relative links from the directory the fold actually writes into,
