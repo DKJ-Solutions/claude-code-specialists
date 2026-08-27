@@ -122,6 +122,19 @@ The remaining fixtures cover two of the four real 429 runs (including the one th
 over two turns before being cut off), a 529, a missing result message, and an unknown status with
 quotes, a comma and a `::` in the reason. All six exit clean and produce exactly one annotation.
 
+#### Why the fix could not be demonstrated on its own PR, and what that turned up
+
+The intention was to let this branch's own PR prove the annotation, since the quota window was still
+open when it went up. It did not, and the reason is worth more than the demonstration: a pull request
+that MODIFIES this workflow gets no review at all. The action validates the file against the copy on
+the default branch, logs `Skipping action due to workflow validation`, and exits SUCCESSFULLY -- green
+check, nine seconds, no review. So the diagnostics never fired, because they only run on failure.
+
+That is correct behaviour and the same guarantee the `pull_request` trigger buys, one level up: a PR
+must not review itself under rules it has just rewritten. But it was written down nowhere, and it is
+this branch's own subject wearing the opposite colour -- a check that says nothing while looking like
+it said yes. It is recorded at the top of the workflow now, beside the fork note it belongs with.
+
 ### DEPLOY: `fix/review-quota-names-itself-v1`
 
 A red `claude-review` now says why it is red where a reader actually lands -- in the run's annotation

@@ -5,6 +5,21 @@ name: Claude Code Review
 # and this job fails rather than handing a credential to code from outside the repo. That failure is
 # the safe outcome, not a defect to work around: switching to `pull_request_target` to "fix" the red
 # check would run the fork's PR with this repo's secrets in scope.
+
+# AND A SECOND SILENCE, ALSO NOT A DEFECT -- measured on PR #968, the one that added the annotation
+# further down. A pull request that MODIFIES THIS FILE gets no review at all. The action validates
+# that the workflow is byte-identical to the copy on the default branch, and where it is not it logs
+#
+#   Skipping action due to workflow validation: ... must exist and have identical content to the
+#   version on the repository's default branch
+#
+# and then exits SUCCESSFULLY, in nine seconds. So the check goes GREEN and no review happened --
+# the one outcome the diagnostics below cannot reach, because they run only on failure.
+#
+# It is the same guarantee the `pull_request` choice above buys, applied to the workflow instead of
+# to the secrets: a PR must not review itself under rules it has just rewritten. Do not try to
+# defeat it. Just know that a change to THIS file is reviewed by people, and that the green tick it
+# collects means nothing until the change is on `main`.
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
