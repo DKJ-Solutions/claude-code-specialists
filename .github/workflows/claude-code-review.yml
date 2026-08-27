@@ -114,9 +114,26 @@ jobs:
       # already carry, capped at the FIRST LINE and 300 characters. That one-line cap is not a policy
       # choice: a newline would terminate the annotation command.
       #
-      # THE ONE CAUSE THIS HAS ACTUALLY HAD, on all FOUR of its red runs -- two attempts on August 26 and
-      # two on August 27, 2026: `api_error_status: 429`, with `result` naming a session limit and the UTC
-      # time it resets. Worth stating plainly, because the mechanism is invisible from the workflow file:
+      # THE ONE CAUSE ITS LOGS HAVE EVER NAMED: `api_error_status: 429`, with `result` naming a session
+      # limit and the UTC time it resets. Stated as a CONDITION rather than a tally, deliberately, and the
+      # reason is this comment's own history. It read "on all FOUR of its red runs -- two attempts on
+      # August 26 and two on August 27, 2026" until issue #974 read the logs instead: there were THIRTEEN
+      # red runs carrying this diagnostic when that issue was filed, and SIXTEEN when it was repaired a
+      # day later. Wrong by roughly 3x when typed, and wrong again before anybody could correct it -- a
+      # tally of a workflow's red runs, written inside the workflow that produces them, is stale on the
+      # next one, which is the lesson CLAUDE.md already records about counting a name inside the document
+      # that carries it. So what is stated here is what needs no maintenance: EVERY red run whose log
+      # carries this diagnostic has named 429. The count did matter, which is why it is worth this much
+      # prose -- four occurrences across two days reads as an oddity, sixteen reads as "most PRs opened in
+      # a busy window get no review", which is the actual behaviour.
+      #
+      # AND ONE RUN IS OUTSIDE THAT SENTENCE RATHER THAN AGAINST IT: 32984348328 (August 26, 2026)
+      # reports `conclusion: failure` while its job carries `conclusion: null` and an EMPTY `steps` array,
+      # and `--log-failed` returns nothing. The diagnostic never ran there, so nothing can be attributed
+      # to it: it is unknown, not a second cause. The conditional above covers that by not reaching it,
+      # which an absolute "THE ONE CAUSE" could not.
+      #
+      # Worth stating plainly, because the mechanism is invisible from the workflow file:
       # `CLAUDE_CODE_OAUTH_TOKEN` is a SUBSCRIPTION credential, so the session window it draws on is the
       # same one interactive use draws on. A morning of heavy local work starves the review of every PR
       # opened in that window, and no amount of retrying inside the run helps: it resets on the clock.
