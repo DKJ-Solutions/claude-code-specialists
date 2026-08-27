@@ -175,7 +175,7 @@ try {
     # across a line break. A test that only pinned the exclusion would pass against a check that still sees
     # nothing.
     Write-Host "check 20b: the changelog intro is held, its entries stay history" -ForegroundColor Cyan
-    $shapeCl = Join-Path $Fixture 'CHANGELOG.md'
+    $shapeCl = Join-Path $Fixture 'contributing-davekjohn\CHANGELOG.md'
     $shapeEntry = @(
         ''
         '## #123 ' + ([char]0x00B7) + ' A real entry'
@@ -202,7 +202,7 @@ try {
     #     requires and this one deliberately does not. This is the exact sentence that was on main.
     Write-ShapeChangelog 'Everything merged since the last release: one `##` per change, and under it three named sections.'
     $e4 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($e4.Out -match '\[entry-shape\] CHANGELOG\.md:3: says an entry has 3') `
+    Assert-True ($e4.Out -match '\[entry-shape\] contributing-davekjohn[\\/]CHANGELOG\.md:3: says an entry has 3') `
         'entry-shape: a stale count in the changelog intro is reported, with its line, and needs no level marker'
 
     # 48. THE RELAXATION IS CONFINED TO THE HEAD. The same markerless claim below the first entry heading
@@ -221,7 +221,7 @@ try {
     #     bypass -- and the drift that prompted this was written exactly that way.
     Write-ShapeChangelog "Everything merged since the last release: one $docEntryH per change, and under it three`nnamed $docSectH sections."
     $e6 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($e6.Out -match '\[entry-shape\] CHANGELOG\.md:3: says an entry has 3') `
+    Assert-True ($e6.Out -match '\[entry-shape\] contributing-davekjohn[\\/]CHANGELOG\.md:3: says an entry has 3') `
         'entry-shape: a claim split across a line break in the intro is caught, at the line it starts on'
 
     # 50. And the right count clears it -- taken from the scaffolder, not from the literal 'six', so this

@@ -75,16 +75,6 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # workshop root copy falls back to the git root. Same resolution as every other mirrored script.
 $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 
-# A repo that publishes plugins is a workflow SOURCE, not a consumer, and it arranges that folder by
-# hand -- see the header. This is the same one-file test the source-repo guard uses for the same
-# distinction, and it is what keeps this refusal out of every genuine consumer's way.
-if (Test-Path -LiteralPath (Join-Path $repoRoot '.claude-plugin\marketplace.json') -PathType Leaf) {
-    Write-Host 'REFUSED: this repo publishes plugins, so it is a workflow source rather than a consumer.' -ForegroundColor Red
-    Write-Host 'The source arranges contributing-davekjohn/ by hand, and its answer differs from what this'
-    Write-Host 'command writes: it keeps NO root CONTRIBUTING.md at all (Dave, August 27, 2026), while the'
-    Write-Host 'page scaffolded here assumes you have one. Nothing was written.'
-    exit 1
-}
 
 # The scaffolded branch files come from the same formatters new-branch and the fold call, so this
 # command cannot write a shape of its own. repo-config.ps1 first and optional, exactly as new-branch
@@ -98,6 +88,25 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 # cut and the fold now read, so the paths this folder's own docs name can never disagree
 # with where the workflow actually reads and writes.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+
+# THE SOURCE OF *THIS* WORKFLOW arranges that folder by hand -- see the header -- so this command refuses
+# there. It sits below the dot-sources because the test it needs lives in seam-lib, and it still runs
+# before anything is written: loading a lib changes nothing on disk.
+#
+# NARROWED, ISSUE #998 (August 27, 2026). This used to be the bare one-file test -- does this repo have a
+# .claude-plugin/marketplace.json -- which answers "does this repo publish plugins", not "is this repo the
+# source of this workflow". Under Dave's own one-product-one-repository rule the next product gets its own
+# marketplace, so this refusal was on course to turn away a genuine consumer from the one command that
+# scaffolds the folder it needs, with a message telling it that it arranges that folder by hand. It does
+# not. Test-IsWorkflowSourceRepo reads the manifest now, so only the repo that publishes this workflow is
+# refused.
+if (Test-IsWorkflowSourceRepo -RepoRoot $repoRoot) {
+    Write-Host 'REFUSED: this repo publishes this workflow, so it is its source rather than a consumer.' -ForegroundColor Red
+    Write-Host 'The source arranges contributing-davekjohn/ by hand, and its answer differs from what this'
+    Write-Host 'command writes: it keeps NO root CONTRIBUTING.md at all (Dave, August 27, 2026), while the'
+    Write-Host 'page scaffolded here assumes you have one. Nothing was written.'
+    exit 1
+}
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $nl = "`n"

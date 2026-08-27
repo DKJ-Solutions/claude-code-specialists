@@ -169,6 +169,11 @@ function New-IntegrityFixture {
     # was added and this list was not. Loud is the design -- a silently dropped pair would be worse --
     # but it means adding a plugin means adding it here too.
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude-plugin') -Force | Out-Null
+    # THE WORKFLOW FOLDER, since issue #998 (August 27, 2026). This fixture publishes
+    # contributing-davekjohn, so it IS this workflow's source -- and #998 retired the source branch from
+    # Get-DefaultChangelogPath, so its changelog resolves to contributing-davekjohn/CHANGELOG.md like
+    # every other repo's. The three suites that write a changelog into this fixture write it there.
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'contributing-davekjohn') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-shopify\.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\.claude-plugin') -Force | Out-Null

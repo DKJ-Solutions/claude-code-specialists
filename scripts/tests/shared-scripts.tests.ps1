@@ -893,9 +893,16 @@ This follows the shape PRs #341-#343 established, see https://github.com/o/r/pul
 
 Everything merged since the last release, furthest reach first.
 '@
+    # THE CHANGELOG SEAM IS STATED, NOT INFERRED (issue #998, August 27, 2026). These fixtures keep
+    # CHANGELOG.md at their root and assert on it there. That used to follow from the marketplace stub
+    # below -- Get-DefaultChangelogPath returned the root answer for any repo publishing plugins -- and
+    # #998 retired that branch, so the computed default isolates for every repo now. Stating the seam is
+    # not a workaround: it is exactly the migration that collapse documents for a repo keeping its
+    # changelog at the root, and the same shape fold-changelog.tests.ps1 already patches in.
     $rcMinimal = @'
 $script:RepoName = 'DaveKJohn/claude-code-specialists'
 function Get-RepoName { return $script:RepoName }
+function Get-ChangelogPath { return 'CHANGELOG.md' }
 '@
     $targetEntryContent = @'
 ### Fold RepoRoot Test - Chore - 2026-07-21

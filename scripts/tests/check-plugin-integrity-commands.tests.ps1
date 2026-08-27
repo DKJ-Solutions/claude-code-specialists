@@ -158,7 +158,7 @@ try {
         'The install back then was `claude plugin install team-alpha@claude-code-specialists`, with no'
         'scope flag and no refresh -- which is exactly what that release documented.'
     )
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'contributing-davekjohn\CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
     $rL24 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($rL24.Out -match $LifecycleFindingPattern)) 'scenario 24: history is not held to the current rules'
     Assert-True ($rL24.Out -match '\[lifecycle\] checked 0') 'scenario 24: the history command was not even counted as enforced'
