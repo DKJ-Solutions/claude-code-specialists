@@ -46,8 +46,11 @@ tree before anything was built:
   are all in `scripts/lib/pr-issues-lib.ps1`, quoted accurately.
 - **Symptom** -- **reproduced**, which the report itself could not do ("I could not re-trigger the race
   on demand"). Feeding one unfinished check into the live function threw
-  `Cannot convert value "-63923421840" to type "System.Int32"` -- the same error, the same magnitude.
-  The race is not needed: the payload shape alone is sufficient.
+  `Cannot convert value "-63923421840" to type "System.Int32"`: the same error on the same cast, and
+  the same magnitude as #977's `-63,923,427,029` rather than the same number -- both figures are the
+  span from `DateTime.MinValue` to a moment, and the two moments are 5,189 seconds apart. That
+  is the finding: the race is not needed at all. The payload shape alone is sufficient, which is why
+  this is now a fixture in the suite rather than a crash waiting for a second sighting.
 - **Reasoning** -- stands, with one correction. The zero date does arrive as a non-`$null` value that
   the `continue` guard misses. But the report attributes that to 5.1's `ConvertFrom-Json` handing back
   a `[datetime]`, and on this machine it hands back a **`String`** -- measured, for the zero date and a
@@ -80,8 +83,8 @@ tree before anything was built:
 
 ### TEST
 
-- [x] 14 asserts added to `scripts/tests/pr-issues.tests.ps1`, in their own `#977` section. Suite green:
-      **239** asserts, up from 225.
+- [x] 15 asserts added to `scripts/tests/pr-issues.tests.ps1`, in their own `#977` section. Suite green:
+      **239** asserts, up from 224.
 - [x] The crash payload is asserted for the RIGHT line and not merely a surviving one: an unfinished
       check takes no part in the ordering, so `'lint-en-tests' finished last` is what the run now
       prints, and `claude-review` appears nowhere in it.
