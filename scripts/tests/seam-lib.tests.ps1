@@ -157,6 +157,30 @@ Assert-WorkflowIsolatedSeamPath -RepoRoot `$RepoRoot -RelativePath `$RelativePat
 "@
 [System.IO.File]::WriteAllText($wrapperPath, $wrapperContent, $Utf8NoBom)
 
+function Get-FlatOutput {
+    <#
+        Captured child output as ONE line: every record read as text, then joined with nothing between.
+        FOR PHRASE ASSERTS ONLY -- it deliberately glues genuinely separate lines together, which is
+        harmless for a substring match (it can only create a match spanning two real lines, never
+        destroy one) and wrong for anything that cares about line structure.
+
+        WHY THIS SUITE NEEDS IT (issue #982). Assert-WorkflowIsolatedSeamPath writes its refusal as a
+        single ~380-character Write-Error string, and the child WRAPS it at its own host width -- a
+        point that moves with the console width and with the length of the fixture's temp path, neither
+        of which this suite decides. The quoted 'CHANGELOG.md' the assert below proves sits in the
+        middle of it, so at 120-130 columns it arrives split as 'CH + ANGELOG.md' and the regex misses:
+        red on a developer console, green in CI, for a script that is correct in both places.
+
+        Read as text rather than rendered with Out-String, and joined with '' rather than a space --
+        both are load-bearing, and prune-merged.tests.ps1's copy carries the full reasoning: Out-String
+        FORMATS each record, landing a paragraph of PowerShell decoration between the two halves of a
+        wrapped sentence, and the wrap is a HARD break at a column, so the halves reconstruct exactly
+        ('CH' + 'ANGELOG.md') while a space between them would match nothing.
+    #>
+    param($Captured)
+    return (($Captured | ForEach-Object { [string]$_ }) -join '')
+}
+
 function Invoke-AssertChild {
     param([string]$RepoRootArg, [string]$RelativePathArg, [string]$SeamNameArg)
     # $psArgs, NOT $args: inside a function $args is an automatic variable holding the caller's own
@@ -167,8 +191,14 @@ function Invoke-AssertChild {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        $out = (& powershell @psArgs 2>&1 | Out-String)
-        return [pscustomobject]@{ Out = $out; Code = $LASTEXITCODE }
+        # Kept as records, so both readings are available: Out preserves the line structure, Flat is
+        # the wrap-proof one the phrase asserts below use.
+        $captured = @(& powershell @psArgs 2>&1)
+        return [pscustomobject]@{
+            Out  = ($captured | Out-String)
+            Flat = (Get-FlatOutput $captured)
+            Code = $LASTEXITCODE
+        }
     } finally { $ErrorActionPreference = $prevEap }
 }
 
@@ -176,10 +206,10 @@ function Invoke-AssertChild {
 # move off 'CHANGELOG.md' when #956 made that a recognised layout.
 $r = Invoke-AssertChild $consumerDir 'README.md' 'Get-ChangelogPath'
 Assert-True ($r.Code -eq 1) 'consumer, path outside the folder: exits 1'
-Assert-True ($r.Out -match 'Get-ChangelogPath') 'and the refusal names the seam'
-Assert-True ($r.Out -match 'README\.md') 'and the offending path'
-Assert-True ($r.Out -match 'contributing-davekjohn') 'and the folder it should have resolved inside'
-Assert-True ($r.Out -match "'CHANGELOG\.md'") `
+Assert-True ($r.Flat -match 'Get-ChangelogPath') 'and the refusal names the seam'
+Assert-True ($r.Flat -match 'README\.md') 'and the offending path'
+Assert-True ($r.Flat -match 'contributing-davekjohn') 'and the folder it should have resolved inside'
+Assert-True ($r.Flat -match "'CHANGELOG\.md'") `
     "and it names the one answer that WOULD have been accepted, so the reader is not left guessing"
 
 # THE PER-SEAM BOUND, AND IT IS THE HALF THAT KEEPS THE GUARD USEFUL (issue #956). A legacy answer is
@@ -189,7 +219,7 @@ Assert-True ($r.Out -match "'CHANGELOG\.md'") `
 $rCross = Invoke-AssertChild $consumerDir 'CHANGELOG.md' 'Get-ReleaseGithubNotesRoot'
 Assert-True ($rCross.Code -eq 1) `
     "consumer, ANOTHER seam's legacy answer: still refused -- the tolerance is per seam, not a shared list"
-Assert-True ($rCross.Out -match "'releases/github'") `
+Assert-True ($rCross.Flat -match "'releases/github'") `
     "and the refusal names THIS seam's own legacy answer rather than the one that was passed in"
 
 # A PATH THAT MERELY LOOKS LIKE THE LEGACY ANSWER IS NOT IT: the match is exact, so a deeper path under

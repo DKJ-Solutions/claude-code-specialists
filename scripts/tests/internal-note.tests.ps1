@@ -130,9 +130,41 @@ function Invoke-Script {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        $out = (& powershell @psArgs 2>&1 | Out-String)
-        return [pscustomobject]@{ Out = $out; Code = $LASTEXITCODE }
+        # Kept as records, so both readings are available: Out preserves the line structure, Flat is
+        # the wrap-proof one every phrase assert in this suite uses.
+        $captured = @(& powershell @psArgs 2>&1)
+        return [pscustomobject]@{
+            Out  = ($captured | Out-String)
+            Flat = (Get-FlatOutput $captured)
+            Code = $LASTEXITCODE
+        }
     } finally { $ErrorActionPreference = $prevEap }
+}
+
+function Get-FlatOutput {
+    <#
+        Captured child output as ONE line: every record read as text, then joined with nothing between.
+        FOR PHRASE ASSERTS ONLY -- it deliberately glues genuinely separate lines together, which is
+        harmless for a substring match (it can only create a match spanning two real lines, never
+        destroy one) and wrong for anything that cares about line structure. Test-Line below is the
+        other half of this pair: whole-line asserts go through it, against the generated document.
+
+        WHY THIS SUITE NEEDS IT (issue #959). new-internal-note.ps1 reports through Write-Warning, and
+        the child WRAPS those at its own host width -- a point that moves with the console width AND
+        with the length of the fixture's temp path, which is interpolated into the message and which
+        neither this suite nor the script decides. So 'fill in the date by hand' arrives split as
+        'the da + te by hand' and the regex misses: red on a developer console, green in CI, for a
+        script that is correct in both places. Measured red here at 300 columns and green at 120, so
+        the wrap point is not a margin anybody can stay ahead of by keeping the message short.
+
+        Read as text rather than rendered with Out-String, and joined with '' rather than a space --
+        both are load-bearing, and prune-merged.tests.ps1's copy carries the full reasoning: Out-String
+        FORMATS each record, landing a paragraph of PowerShell decoration between the two halves of a
+        wrapped sentence, and the wrap is a HARD break at a column, so the halves reconstruct exactly
+        ('da' + 'te by hand') while a space between them would re-break the very word the wrap broke.
+    #>
+    param($Captured)
+    return (($Captured | ForEach-Object { [string]$_ }) -join '')
 }
 
 function Test-Line {
@@ -184,8 +216,8 @@ Write-Host "new-internal-note -- the refusals (they protect written text)" -Fore
 $noNotes = New-Fixture -Label 'nonotes'
 $r = Invoke-Script -Dir $noNotes
 Assert-Equal 1 $r.Code 'no developer notes: exits 1 rather than writing a note with nothing in it'
-Assert-True ($r.Out -match 'Developer notes not found') 'no developer notes: says what is missing'
-Assert-True ($r.Out -match 'cut-release') 'no developer notes: names the script that produces them'
+Assert-True ($r.Flat -match 'Developer notes not found') 'no developer notes: says what is missing'
+Assert-True ($r.Flat -match 'cut-release') 'no developer notes: names the script that produces them'
 Assert-True (-not (Test-Path (Join-Path $noNotes 'releases\internal'))) 'no developer notes: nothing was created'
 Remove-Item -Recurse -Force -LiteralPath $noNotes -ErrorAction SilentlyContinue
 
@@ -199,7 +231,7 @@ Assert-True (Test-Path -LiteralPath $intPath) 'first run: the note exists'
 [System.IO.File]::WriteAllText($intPath, "# hand-written, do not lose me`n", $Utf8NoBom)
 $r = Invoke-Script -Dir $existing
 Assert-Equal 1 $r.Code 'second run without -Force: refuses'
-Assert-True ($r.Out -match '-Force') 'second run: names the flag that would overwrite'
+Assert-True ($r.Flat -match '-Force') 'second run: names the flag that would overwrite'
 Assert-True ([System.IO.File]::ReadAllText($intPath) -match 'do not lose me') 'second run: the written text is untouched'
 $r = Invoke-Script -Dir $existing -ExtraArgs @('-Force')
 Assert-Equal 0 $r.Code '-Force: overwrites'
@@ -250,8 +282,8 @@ Assert-True ($doc -notmatch 'A subheading inside the entry') 'an H4 inside an en
 # The skeleton says it is a skeleton, and points back at its source.
 Assert-True ($doc -match 'SKELETON') 'the document announces itself as a skeleton'
 Assert-True ($doc -match 'releases/changelog/3\.x/3\.2\.0\.md') 'and names the notes it was built from'
-Assert-True ($r.Out -match 'Step 1') 'the run prints the next step'
-Assert-True ($r.Out -match 'branch') 'and says it ships via a branch (the release commit is already tagged)'
+Assert-True ($r.Flat -match 'Step 1') 'the run prints the next step'
+Assert-True ($r.Flat -match 'branch') 'and says it ships via a branch (the release commit is already tagged)'
 Remove-Item -Recurse -Force -LiteralPath $happy -ErrorAction SilentlyContinue
 
 Write-Host "new-internal-note -- notes without the metadata lines" -ForegroundColor Cyan
@@ -263,7 +295,7 @@ Assert-Equal 0 $r.Code 'missing metadata does not stop the run'
 $doc = [System.IO.File]::ReadAllText((Join-Path $noMeta 'releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match '\*\*Date:\*\* \(fill in\)') 'a missing date becomes a visible placeholder'
 Assert-True ($doc -match '\*\*Type:\*\* \(fill in\)') 'and so does a missing type'
-Assert-True ($r.Out -match 'fill in the date by hand') 'and the run warns about it out loud'
+Assert-True ($r.Flat -match 'fill in the date by hand') 'and the run warns about it out loud'
 Remove-Item -Recurse -Force -LiteralPath $noMeta -ErrorAction SilentlyContinue
 
 Write-Host "new-internal-note -- notes with no entries at all" -ForegroundColor Cyan
@@ -603,7 +635,7 @@ Chore
 $flatZero = New-Fixture -Label 'flat-allzero' -NotesContent $flatZeroNotes -Version '3.8.0'
 $rfz = Invoke-Script -Dir $flatZero -Version '3.8.0'
 Assert-Equal 0 $rfz.Code 'flat shape, all tier 0: exit 0'
-Assert-True ($rfz.Out -match 'is tier 0') 'flat shape, all tier 0: the warning names the tier, not a parse failure'
+Assert-True ($rfz.Flat -match 'is tier 0') 'flat shape, all tier 0: the warning names the tier, not a parse failure'
 Remove-Item -Recurse -Force -LiteralPath $flatZero -ErrorAction SilentlyContinue
 
 Write-Host "Notes whose every entry is tier 0: an empty list, with the reason" -ForegroundColor Cyan
@@ -626,8 +658,8 @@ Body text.
 $allZero = New-Fixture -Label 'allzero' -NotesContent $allZeroNotes
 $r = Invoke-Script -Dir $allZero
 Assert-Equal 0 $r.Code 'all tier 0: exit 0 -- a thin release is not a failure'
-Assert-True ($r.Out -match 'is tier 0') 'all tier 0: the warning says every entry was tier 0'
-Assert-True ($r.Out -notmatch 'No entry titles found') 'all tier 0: and does NOT report it as a parse failure'
+Assert-True ($r.Flat -match 'is tier 0') 'all tier 0: the warning says every entry was tier 0'
+Assert-True ($r.Flat -notmatch 'No entry titles found') 'all tier 0: and does NOT report it as a parse failure'
 $doc = [System.IO.File]::ReadAllText((Join-Path $allZero 'releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match 'no entries found') 'all tier 0: the skeleton carries the fill-in-by-hand placeholder'
 Remove-Item -Recurse -Force -LiteralPath $allZero -ErrorAction SilentlyContinue
@@ -655,7 +687,7 @@ $oldNameCfg = "function Get-ReleaseDevelopmentNotesRoot { return 'legacy/devnote
 $retired = New-Fixture -Label 'seam-retired-name' -NotesContent $notes -RepoConfig $oldNameCfg -NotesRoot 'legacy/devnotes'
 $r = Invoke-Script -Dir $retired
 Assert-Equal 0 $r.Code 'retired seam name: the notes are found under the name a consumer already defined'
-Assert-True ($r.Out -match 'legacy/devnotes') 'retired seam name: and it is the retired seam''s path that was read'
+Assert-True ($r.Flat -match 'legacy/devnotes') 'retired seam name: and it is the retired seam''s path that was read'
 Remove-Item -Recurse -Force -LiteralPath $retired -ErrorAction SilentlyContinue
 
 # AND THE CURRENT NAME WINS WHERE BOTH ARE DEFINED, which is exactly the mid-migration state: a consumer
@@ -667,8 +699,8 @@ $bothCfg = "function Get-ReleaseChangelogNotesRoot { return 'legacy/current' }`n
 $both = New-Fixture -Label 'seam-both-names' -NotesContent $notes -RepoConfig $bothCfg -NotesRoot 'legacy/current'
 $r = Invoke-Script -Dir $both
 Assert-Equal 0 $r.Code 'both seam names defined: the CURRENT one is tried first'
-Assert-True ($r.Out -match 'legacy/current') 'both seam names defined: and it is the current name''s path that was read'
-Assert-True ($r.Out -notmatch 'legacy/stale') 'both seam names defined: the retired name is not consulted at all'
+Assert-True ($r.Flat -match 'legacy/current') 'both seam names defined: and it is the current name''s path that was read'
+Assert-True ($r.Flat -notmatch 'legacy/stale') 'both seam names defined: the retired name is not consulted at all'
 Remove-Item -Recurse -Force -LiteralPath $both -ErrorAction SilentlyContinue
 
 Write-Host ""

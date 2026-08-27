@@ -54,11 +54,28 @@ function Get-FlatOutput {
 
         Joined with '' rather than a space because the wrap is a HARD break at a column, so the halves
         reconstruct exactly ('dirt' + 'y working tree'); a space between them would match nothing.
-        park-branch.tests.ps1, shared-scripts.tests.ps1, new-branch.tests.ps1 and
-        find-specialist-mentions.tests.ps1 carry the older copy of this helper (session-status.tests.ps1
-        did too, until #957 removed it with the script it covered). They are green, so they are
-        deliberately left alone rather than repaired pre-emptively -- the risk is named in this
-        release's entry.
+        seam-lib.tests.ps1 and internal-note.tests.ps1 carry this same copy since #982/#959, where the
+        wrap reached both of them for real: red on a developer console, green in CI.
+
+        WHO ELSE ANSWERS THIS QUESTION, AND HOW -- measured August 27, 2026, because the list that stood
+        here was wrong in both directions and a stale at-risk record is worse than none. Three older
+        variants are in the tree, and they are NOT equally exposed:
+
+          * park-branch, park-cycle and worktree-lane: Out-String, then newlines removed. Safe against
+            the mid-word break, exposed to the decoration Out-String inserts between the halves. The
+            last two were absent from the list that stood here.
+          * new-branch: Out-String, then ALL whitespace stripped -- robust against a break anywhere, at
+            the price of asserts that must themselves be whitespace-free.
+          * find-specialist-mentions: joins with a SPACE, which is the one variant measured to fail
+            outright ('the da' + ' ' + 'te by hand' matches nothing). Exposed on both counts.
+
+        shared-scripts.tests.ps1 was named here and carries no copy at all: it captures the child's
+        stderr to a redirect FILE and strips all whitespace in Test-OutputContains, which is stronger
+        than this helper rather than older than it. (session-status.tests.ps1 did carry one, until #957
+        removed it with the script it covered.)
+
+        All five are green, so they are deliberately left alone rather than repaired pre-emptively --
+        the risk is named here, which is what this repo does with a risk that has not bitten yet.
     #>
     param($Captured)
     return (($Captured | ForEach-Object { [string]$_ }) -join '')
