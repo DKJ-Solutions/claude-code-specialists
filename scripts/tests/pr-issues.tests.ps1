@@ -454,6 +454,65 @@ $onlyOne = '[{"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","complet
 $line7 = Get-CheckWaitReport -ChecksJson $onlyOne -RequiredNamesJson $requiredOnly -WaitedSeconds 598
 Assert-True ($line7 -like "*'lint-en-tests' finished last*") 'one check governs its own wait -- Sort-Object over a single item still answers'
 Assert-True ($line7 -like '*, required*')                    'and is still labelled from the ruleset'
+
+# --- THE ZERO TIMESTAMP: a check that has NOT finished yet (issue #977) ---------------------------
+#
+# `gh pr checks --json` serialises an unfinished check's completedAt as `0001-01-01T00:00:00Z` -- the
+# THIRD shape, alongside a real stamp and an absent field, and the one nothing above reached. Every
+# assert in this suite fed it stamps that were either real or missing, so the report was only ever
+# exercised on payloads where the race had already resolved. It cost a live run in a consumer repo: the
+# [int] cast overflowed on -63,923,427,029 seconds AFTER `CI green.` was printed and BEFORE the merge,
+# leaving the PR unmerged and the entry unfolded with every check green.
+#
+# THE CRASH IS THE SMALLER HALF. An unfinished check did not govern the wait, so the fix has to produce
+# the RIGHT line and not merely a surviving one -- which is what the first two asserts below pin.
+$zeroCompleted = @'
+[
+  {"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","completedAt":"2026-08-24T09:09:58Z"},
+  {"name":"claude-review","startedAt":"2026-08-24T09:09:00Z","completedAt":"0001-01-01T00:00:00Z"}
+]
+'@
+$line8 = Get-CheckWaitReport -ChecksJson $zeroCompleted -RequiredNamesJson $requiredOnly -WaitedSeconds 598
+Assert-True ($line8 -like "*'lint-en-tests' finished last*") 'a check that has not finished cannot have finished last'
+Assert-True (-not ($line8 -like '*claude-review*'))          'so it takes no part in the ordering at all'
+Assert-True ($line8 -like '*9m 58s*')                        'and the check that DID finish still reports its own duration'
+
+# Both timestamp shapes carry it, and only one of them was proposed for repair in #977. In 5.1 which one
+# arrives depends on the edition rather than the payload, so a guard on either alone works on one
+# machine and overflows on the next -- measured: this machine hands the zero date through as a STRING.
+Assert-True ($null -eq (ConvertTo-CheckTimestamp -Value '0001-01-01T00:00:00Z')) 'timestamp: gh zero time as a string is unreadable, not the floor of the type'
+Assert-True ($null -eq (ConvertTo-CheckTimestamp -Value ([datetime]::MinValue)))  'timestamp: and as an already-parsed [datetime] too'
+Assert-True ($null -eq (Get-CheckWaitReport -ChecksJson '[{"name":"x","completedAt":"0001-01-01T00:00:00Z"}]')) 'a payload of nothing but unfinished checks answers nothing -- no line, no throw'
+
+# The zero date on startedAt costs the duration and nothing else: the check finished, so it still orders.
+$zeroStarted = '[{"name":"lint-en-tests","startedAt":"0001-01-01T00:00:00Z","completedAt":"2026-08-24T09:09:58Z"}]'
+$line9 = Get-CheckWaitReport -ChecksJson $zeroStarted -RequiredNamesJson $requiredOnly -WaitedSeconds 598
+Assert-True ($line9 -like "*'lint-en-tests' finished last*") 'a zero startedAt does not cost the ordering'
+Assert-True ($line9 -like '*duration unknown*')              'and the duration says so rather than being computed from the floor of the type'
+
+# THE CLASS, not just the door #977 came through. A readable but absurd stamp is a span no [int] holds,
+# from the same untrusted field, and it would reach the same cast -- at BOTH arithmetic sites. The second
+# is only reachable when a non-required check governs, which is why the excess payload is asserted too.
+$farFuture = '[{"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","completedAt":"9999-12-31T23:59:59Z"}]'
+$line10 = Get-CheckWaitReport -ChecksJson $farFuture -RequiredNamesJson $requiredOnly -WaitedSeconds 598
+Assert-True ($line10 -like '*duration unknown*') 'a duration too large for an [int] is unmeasured, not a throw'
+$farFutureExcess = @'
+[
+  {"name":"lint-en-tests","startedAt":"2026-08-24T09:00:00Z","completedAt":"2026-08-24T09:09:58Z"},
+  {"name":"claude-review","startedAt":"2026-08-24T09:00:00Z","completedAt":"9999-12-31T23:59:59Z"}
+]
+'@
+$line11 = Get-CheckWaitReport -ChecksJson $farFutureExcess -RequiredNamesJson $requiredOnly -WaitedSeconds 598
+Assert-True ($line11 -like "*'claude-review' finished last*")         'the excess site survives the same input'
+Assert-True (-not ($line11 -like '*after the last required check*'))  'and an excess it cannot measure is left out rather than stated wrong'
+
+# The helper itself, so the ordering of round-check-cast is pinned rather than inferred from the lines
+# above. -1 is the vocabulary both callers already read as unmeasured, which Format-CheckDuration turns
+# into '' -- so an unrenderable duration concatenates away instead of aborting the run printing it.
+Assert-Equal 598 (ConvertTo-CheckSeconds -Span ([timespan]::FromSeconds(598)))     'seconds: an ordinary span is a whole number of seconds'
+Assert-Equal 1   (ConvertTo-CheckSeconds -Span ([timespan]::FromMilliseconds(501))) 'seconds: rounded, not truncated'
+Assert-Equal -1  (ConvertTo-CheckSeconds -Span ([timespan]::FromSeconds(-5)))      'seconds: a negative span is unmeasured, which is what the guard was always meant to catch'
+Assert-Equal -1  (ConvertTo-CheckSeconds -Span ([timespan]::FromDays(100000)))     'seconds: and so is one no [int] holds -- range-checked BEFORE the cast, or the cast throws first'
 # --- -Resolves TOGETHER WITH -RefreshBody: the block must survive the refresh (#919) -----------------
 #
 # THE #341-#343 FAILURE REACHED THROUGH THE DOOR BUILT TO PREVENT IT. Everything above asserts that the
