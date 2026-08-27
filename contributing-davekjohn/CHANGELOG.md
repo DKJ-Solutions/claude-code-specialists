@@ -32,6 +32,56 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/remove-lock-and-handover-v1` · 20260827-153226
+
+Removed the `/lock` and `/handover` skills, and with them the one reporter both wrapped
+(`scripts/task/session-status.ps1`, its plugin mirror and its 636-line suite) --
+[#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave: the branch's own
+development cycle has taken over the job of recording where the work stands, so a gitignored lock file
+records nothing the tree does not already say. Full removal was his call when the alternative
+(re-homing the reporter under `/park`) was put to him.
+
+The removal is not free-standing, and three gates said so: `[skill-param]` refuses a shared-scripts
+registry entry naming a `SKILL.md` that does not exist, `[skill-list]` holds both marked spans in
+`README.md` to the real skill set, and the dead-link scan catches the pages that linked the two skills.
+So the registry entry, the two seam registrations naming the reporter as a reader, `.gitignore`'s
+`.claude/handover.md` line, both cost baselines and every live claim about the script went with it.
+
+**Two consequences, both accepted rather than papered over.** The park note keeps its writer and loses
+its automatic printer: `git log -1 --pretty=%B origin/<branch>` is now the only way to read it, and every
+doc and comment that promised the printout says so instead. And two pins that needed *a* reader, not that
+particular one, were re-pointed at `build-release-notes-page.ps1` -- which reads the same note-root seam,
+verified in the code rather than assumed.
+
+**What deliberately stayed** is the history: `CHANGELOG.md`, the release notes, and the dated measurements
+that merely record where a lesson was learned. A past-tense measurement does not become false when its
+subject is deleted. Two portable lessons the deleted script *did* carry -- the `2>$null`-makes-`catch`-
+unreachable trap and no-`return`-at-script-scope -- were kept and reframed, because neither is about the
+file they were measured in.
+
+Net always-on cost: the two skills were 380 tokens per session; Chris's lens grew by ~100 taking in the
+briefing mode whose portable home was the `/handover` page, so every session is roughly 280 tokens lighter.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a service subscriber. `/lock` and `/handover` were a session-management
+convenience for whoever authors work in this repo and its consumers, never anything an end user of a
+published product could see.
+
+**Score:** N/A
+
+#### Pull Request
+
+Remove the /lock and /handover skills and their session-status reporter
+
+Plugins: contributing-davekjohn
+
+[PR #984](https://github.com/DaveKJohn/claude-code-specialists/pull/984)
+
+---
+
 ### DEPLOY: `feat/workflow-folder-holds-the-repo-documents-v1` · 20260827-150731
 
 Every document the contribution cycle produces or governs now lives in `contributing-davekjohn/`.
