@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/portable-contributing-floor-v1` · 20260827-164539
+
+Payload only: the portable contributing page and the folder scaffolder. Nothing about this repo's own
+layout moves -- #980 did that on August 27, 2026, and this is the half of #969 that #980 did not carry.
+#969 itself is closed rather than rebased; the comment on it holds the forensics, including the 429
+session limit that stopped it 34 seconds after it opened and the one hunk of it that `main` has since
+refuted.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**`CONTRIBUTING-portable.md` stops naming a path where it means a role.** It described "two contributing
+pages", the root one being the floor -- so a consumer who keeps that floor somewhere else was reading a
+page that had no room for their answer. It now describes two **layers**: a floor, normally your root
+`CONTRIBUTING.md`, and the workflow's own page that wins on conflict. Nothing about the workflow depends
+on which file carries the floor, because every gate reads the branch's `development-cycle.md` and never a
+contributing page, and the page now says so.
+
+**The root page is still the recommendation, and it now says why in terms no gate can express.** GitHub
+links a root `CONTRIBUTING.md` from the new-issue and new-pull-request pages and from the sidebar, and it
+recognises that file only in the root, `.github/` or `docs/`; and it is the name a drive-by contributor
+looks for. Both reasons matter most in a public repo whose contributors have installed nothing, which is
+the reader the floor exists for. The source's own August 27, 2026 decision to delete its root page is
+recorded there as housekeeping rather than as the model -- which is the honest shape, since a consumer
+inheriting the source's answer by imitation would lose both of those for nothing.
+
+**And the scaffolder stops describing a source that moved.** Its refusal in a plugin-publishing repo said
+the source keeps its `CONTRIBUTING.md` and `releases/` at its root; since #980 neither half is true, and
+the refusal's real ground -- a source arranges that folder by hand -- was never the part that could go
+stale. A consumer who read the old text and copied the source's layout was copying a root that no longer
+exists.
+
+**Score:** 3
+
+#### Pull Request
+
+the portable contributing page states which file carries the floor, and the folder scaffolder stops claiming a root that moved
+
+Plugins: contributing-davekjohn
+
+[PR #991](https://github.com/DaveKJohn/claude-code-specialists/pull/991)
+
+---
+
 ### DEPLOY: `feat/ship-in-the-background-by-default-v1` · 20260827-164510
 
 Shipping a branch no longer costs the session the length of CI. `ship-pr.ps1` is started as a background
