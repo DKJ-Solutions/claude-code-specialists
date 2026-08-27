@@ -97,15 +97,15 @@ function New-Fixture {
     # here, not silently in someone's release.
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1') `
         -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1') -Force
-    # .claude-plugin/marketplace.json (issue #885): this fixture is a SOURCE repo, and that is what
-    # Get-DefaultReleaseInternalNotesRoot keys on -- so the internal note it WRITES lands at the root
-    # releases/internal/, which is where every assertion below expects it. Without this file the fixture
-    # reads as a consumer and the script looks for both roots inside a contributing-davekjohn/ it does
-    # not have.
-    #
-    # ITS INPUT IS A DIFFERENT MATTER SINCE #914: the tier-0 root stopped branching on the source, so the
-    # changelog notes it reads sit in contributing-davekjohn/releases/changelog/ in a source repo too. The
-    # fixture carries that mixed shape deliberately, because it is this repo's own tree.
+    # .claude-plugin/marketplace.json (issue #885) is still written, but it no longer decides where the
+    # note LANDS. Get-DefaultReleaseInternalNotesRoot branched on it until issue #998 (August 27, 2026),
+    # which retired the source branch from this default the same way #914 retired it from the tier-0
+    # one -- so both the note this fixture WRITES and the changelog notes it READS now sit inside
+    # contributing-davekjohn/, and the assertions below say so. THE MIXED SHAPE IS GONE, and its absence
+    # is the point: the fixture matches this repo's own tree, which states this seam at
+    # contributing-davekjohn/releases/internal. The manifest stays because the fixture is still a source
+    # repo for every other purpose, and because a fixture that quietly stops being one would hide which
+    # of these behaviours actually depends on it -- the answer, since #998, being none of them.
     New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), '{}', $Utf8NoBom)
     if ($null -ne $NotesContent) {
@@ -218,13 +218,13 @@ $r = Invoke-Script -Dir $noNotes
 Assert-Equal 1 $r.Code 'no developer notes: exits 1 rather than writing a note with nothing in it'
 Assert-True ($r.Flat -match 'Developer notes not found') 'no developer notes: says what is missing'
 Assert-True ($r.Flat -match 'cut-release') 'no developer notes: names the script that produces them'
-Assert-True (-not (Test-Path (Join-Path $noNotes 'releases\internal'))) 'no developer notes: nothing was created'
+Assert-True (-not (Test-Path (Join-Path $noNotes 'contributing-davekjohn\releases\internal'))) 'no developer notes: nothing was created'
 Remove-Item -Recurse -Force -LiteralPath $noNotes -ErrorAction SilentlyContinue
 
 $existing = New-Fixture -Label 'existing' -NotesContent $notes
 $r = Invoke-Script -Dir $existing
 Assert-Equal 0 $r.Code 'first run: creates the skeleton'
-$intPath = Join-Path $existing 'releases\internal\3.x\3.2.0.md'
+$intPath = Join-Path $existing 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'
 Assert-True (Test-Path -LiteralPath $intPath) 'first run: the note exists'
 # THE ASSERT THAT MATTERS MOST IN THIS FILE. Overwriting an edited note back to a skeleton destroys the
 # only content in the three tiers that cannot be regenerated from anything.
@@ -242,11 +242,11 @@ Write-Host "new-internal-note -- an invalid version is refused before any IO" -F
 $bad = New-Fixture -Label 'badver' -NotesContent $notes
 $r = Invoke-Script -Dir $bad -Version 'not-a-version'
 Assert-Equal 1 $r.Code 'a non X.Y.Z version exits 1'
-Assert-True (-not (Test-Path (Join-Path $bad 'releases\internal'))) 'and wrote nothing'
+Assert-True (-not (Test-Path (Join-Path $bad 'contributing-davekjohn\releases\internal'))) 'and wrote nothing'
 # A leading v is accepted: the tag form and the bare form are the same release.
 $r = Invoke-Script -Dir $bad -Version 'v3.2.0'
 Assert-Equal 0 $r.Code 'a leading v is accepted (tag form)'
-Assert-True (Test-Path (Join-Path $bad 'releases\internal\3.x\3.2.0.md')) 'and lands under the bare number'
+Assert-True (Test-Path (Join-Path $bad 'contributing-davekjohn\releases\internal\3.x\3.2.0.md')) 'and lands under the bare number'
 Remove-Item -Recurse -Force -LiteralPath $bad -ErrorAction SilentlyContinue
 
 # --- 2. The skeleton's shape ----------------------------------------------------------------------
@@ -254,7 +254,7 @@ Write-Host "new-internal-note -- the skeleton" -ForegroundColor Cyan
 $happy = New-Fixture -Label 'happy' -NotesContent $notes
 $r = Invoke-Script -Dir $happy
 Assert-Equal 0 $r.Code 'happy path: exit 0'
-$doc = [System.IO.File]::ReadAllText((Join-Path $happy 'releases\internal\3.x\3.2.0.md'))
+$doc = [System.IO.File]::ReadAllText((Join-Path $happy 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True (Test-Line -Text $doc -Pattern '# Internal summary v3\.2\.0') 'the title names the version'
 Assert-True (Test-Line -Text $doc -Pattern '\*\*Date:\*\* 2026-08-03') 'the date is copied from the developer notes'
 Assert-True (Test-Line -Text $doc -Pattern '\*\*Type:\*\* Minor') 'the type is copied too'
@@ -292,7 +292,7 @@ Write-Host "new-internal-note -- notes without the metadata lines" -ForegroundCo
 $noMeta = New-Fixture -Label 'nometa' -NotesContent "# Release notes v3.2.0`n`nNo metadata lines here.`n`n### #1 $midDot A title $midDot Feat $midDot 2026-08-03`n`nBody.`n"
 $r = Invoke-Script -Dir $noMeta
 Assert-Equal 0 $r.Code 'missing metadata does not stop the run'
-$doc = [System.IO.File]::ReadAllText((Join-Path $noMeta 'releases\internal\3.x\3.2.0.md'))
+$doc = [System.IO.File]::ReadAllText((Join-Path $noMeta 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match '\*\*Date:\*\* \(fill in\)') 'a missing date becomes a visible placeholder'
 Assert-True ($doc -match '\*\*Type:\*\* \(fill in\)') 'and so does a missing type'
 Assert-True ($r.Flat -match 'fill in the date by hand') 'and the run warns about it out loud'
@@ -302,7 +302,7 @@ Write-Host "new-internal-note -- notes with no entries at all" -ForegroundColor 
 $noEntries = New-Fixture -Label 'noentries' -NotesContent "# Release notes v3.2.0`n`n**Date:** 2026-08-03  `n**Type:** Patch`n`nNothing structured here.`n"
 $r = Invoke-Script -Dir $noEntries
 Assert-Equal 0 $r.Code 'no entries does not stop the run'
-$doc = [System.IO.File]::ReadAllText((Join-Path $noEntries 'releases\internal\3.x\3.2.0.md'))
+$doc = [System.IO.File]::ReadAllText((Join-Path $noEntries 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match 'no entries found') 'the list says so instead of being silently empty'
 Remove-Item -Recurse -Force -LiteralPath $noEntries -ErrorAction SilentlyContinue
 
@@ -314,8 +314,8 @@ $minorCfg = "function Get-ReleaseNotesGrouping { return 'minor' }`n"
 $perMinor = New-Fixture -Label 'perminor' -NotesDir '3.2' -NotesContent $notes -RepoConfig $minorCfg
 $r = Invoke-Script -Dir $perMinor
 Assert-Equal 0 $r.Code 'per-minor grouping: exit 0'
-Assert-True (Test-Path (Join-Path $perMinor 'releases\internal\3.2\3.2.0.md')) 'per-minor grouping: the note lands in releases/internal/3.2/'
-Assert-True (-not (Test-Path (Join-Path $perMinor 'releases\internal\3.x'))) 'per-minor grouping: and NOT in a 3.x folder'
+Assert-True (Test-Path (Join-Path $perMinor 'contributing-davekjohn\releases\internal\3.2\3.2.0.md')) 'per-minor grouping: the note lands in releases/internal/3.2/'
+Assert-True (-not (Test-Path (Join-Path $perMinor 'contributing-davekjohn\releases\internal\3.x'))) 'per-minor grouping: and NOT in a 3.x folder'
 Remove-Item -Recurse -Force -LiteralPath $perMinor -ErrorAction SilentlyContinue
 
 # --- 4. The wording seam (#410 class) -------------------------------------------------------------
@@ -335,7 +335,7 @@ function Get-InternalNoteWording {
 $translated = New-Fixture -Label 'nl' -NotesContent $notes -RepoConfig $nlCfg
 $r = Invoke-Script -Dir $translated
 Assert-Equal 0 $r.Code 'translated wording: exit 0'
-$doc = [System.IO.File]::ReadAllText((Join-Path $translated 'releases\internal\3.x\3.2.0.md'))
+$doc = [System.IO.File]::ReadAllText((Join-Path $translated 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True (Test-Line -Text $doc -Pattern '# Interne samenvatting v3\.2\.0') 'the title is overridden'
 Assert-True (Test-Line -Text $doc -Pattern '\*\*Voor wie:\*\* werkgevers en management') 'the audience label AND its text are overridden'
 foreach ($h in @('Wat er nu anders is', 'Wat het oplevert', 'Wat er nog open staat')) {
@@ -395,7 +395,7 @@ Body text.
 $tiered = New-Fixture -Label 'tiered' -NotesContent $tieredNotes
 $r = Invoke-Script -Dir $tiered
 Assert-Equal 0 $r.Code 'tiered notes: exit 0'
-$doc = [System.IO.File]::ReadAllText((Join-Path $tiered 'releases\internal\3.x\3.2.0.md'))
+$doc = [System.IO.File]::ReadAllText((Join-Path $tiered 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match '- \[Feat\] A consumer-facing feature') 'tiered notes: a tier-2 entry is carried over -- the ladder is cumulative'
 Assert-True ($doc -match '- \[Fix\] A consumer-facing fix')      'tiered notes: and the second one in that tier'
 Assert-True ($doc -match '- \[Docs\] Something for colleagues')  'tiered notes: the tier-1 entry is carried over'
@@ -507,7 +507,7 @@ Chore
 $cur = New-Fixture -Label 'current-shape' -NotesContent $currentNotes -Version '3.6.0'
 $rc = Invoke-Script -Dir $cur -Version '3.6.0'
 Assert-Equal 0 $rc.Code 'current shape: exit 0'
-$curDoc = [System.IO.File]::ReadAllText((Join-Path $cur 'releases\internal\3.x\3.6.0.md'))
+$curDoc = [System.IO.File]::ReadAllText((Join-Path $cur 'contributing-davekjohn\releases\internal\3.x\3.6.0.md'))
 # The type comes from the '#### Type of change' SECTION now, not from a heading field.
 Assert-True ($curDoc -match '- \[Feat\] A consumer-facing feature') 'current shape: a tier-2 entry becomes a bullet, its type read from the Type section'
 Assert-True ($curDoc -match '- \[Fix\] A consumer-facing fix')      'current shape: and the second one in that tier'
@@ -600,7 +600,7 @@ Chore
 $flat = New-Fixture -Label 'flat-shape' -NotesContent $flatNotes -Version '3.7.0'
 $rf = Invoke-Script -Dir $flat -Version '3.7.0'
 Assert-Equal 0 $rf.Code 'flat shape: exit 0'
-$flatDoc = [System.IO.File]::ReadAllText((Join-Path $flat 'releases\internal\3.x\3.7.0.md'))
+$flatDoc = [System.IO.File]::ReadAllText((Join-Path $flat 'contributing-davekjohn\releases\internal\3.x\3.7.0.md'))
 Assert-True ($flatDoc -match '- \[Feat\] A consumer-facing feature') 'flat shape: the tier-2 entry becomes a bullet'
 Assert-True ($flatDoc -match '- \[Docs\] Something for colleagues')  'flat shape: and so does the tier-1 entry'
 Assert-True ($flatDoc -notmatch 'Repo-internal housekeeping') `
@@ -660,7 +660,7 @@ $r = Invoke-Script -Dir $allZero
 Assert-Equal 0 $r.Code 'all tier 0: exit 0 -- a thin release is not a failure'
 Assert-True ($r.Flat -match 'is tier 0') 'all tier 0: the warning says every entry was tier 0'
 Assert-True ($r.Flat -notmatch 'No entry titles found') 'all tier 0: and does NOT report it as a parse failure'
-$doc = [System.IO.File]::ReadAllText((Join-Path $allZero 'releases\internal\3.x\3.2.0.md'))
+$doc = [System.IO.File]::ReadAllText((Join-Path $allZero 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match 'no entries found') 'all tier 0: the skeleton carries the fill-in-by-hand placeholder'
 Remove-Item -Recurse -Force -LiteralPath $allZero -ErrorAction SilentlyContinue
 
@@ -671,36 +671,39 @@ Write-Host "Untiered developer notes still carry everything" -ForegroundColor Cy
 $flat = New-Fixture -Label 'flat-still-works' -NotesContent "# Release notes v3.2.0`n`n**Date:** 2026-08-03`n**Type:** Patch`n`n## Maintenance`n`n### #1 $midDot An untiered entry $midDot Chore $midDot 2026-08-03`n`nBody.`n"
 $r = Invoke-Script -Dir $flat
 Assert-Equal 0 $r.Code 'untiered notes: exit 0'
-$doc = [System.IO.File]::ReadAllText((Join-Path $flat 'releases\internal\3.x\3.2.0.md'))
+$doc = [System.IO.File]::ReadAllText((Join-Path $flat 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True ($doc -match '- \[Chore\] An untiered entry') 'untiered notes: every entry is carried over, tier filter or not'
 Remove-Item -Recurse -Force -LiteralPath $flat -ErrorAction SilentlyContinue
 
 Write-Host "The tier-0 root answers under BOTH seam names" -ForegroundColor Cyan
 # THE RENAME'S FALLBACK, ASSERTED AS BEHAVIOUR RATHER THAN AS TEXT (issue #947, August 26, 2026). The seam
+# THE PATH SITS INSIDE THE WORKFLOW FOLDER SINCE ISSUE #998 (August 27, 2026) -- it was 'legacy/devnotes'
+# at the repo root, which Assert-WorkflowIsolatedSeamPath refused the moment the source exemption came off.
+# The SUBJECT here is the retired seam NAME, not where it points, so the path moves and the test is intact.
 # was Get-ReleaseDevelopmentNotesRoot until the directory rename of #914 caught up with it, and a consumer
 # receives that rename through a plugin update rather than by choosing to. Get-SeamValue takes an array of
 # names precisely so the retired one keeps answering -- so this plants the notes somewhere only the OLD
 # name points at and requires the script to find them. Drop the fallback and this fixture falls through to
 # the computed default, finds nothing there, and refuses: the exact silent break the array exists to
 # prevent, except here it is loud, because reading is a precondition of this script rather than an option.
-$oldNameCfg = "function Get-ReleaseDevelopmentNotesRoot { return 'legacy/devnotes' }`n"
-$retired = New-Fixture -Label 'seam-retired-name' -NotesContent $notes -RepoConfig $oldNameCfg -NotesRoot 'legacy/devnotes'
+$oldNameCfg = "function Get-ReleaseDevelopmentNotesRoot { return 'contributing-davekjohn/legacy/devnotes' }`n"
+$retired = New-Fixture -Label 'seam-retired-name' -NotesContent $notes -RepoConfig $oldNameCfg -NotesRoot 'contributing-davekjohn/legacy/devnotes'
 $r = Invoke-Script -Dir $retired
 Assert-Equal 0 $r.Code 'retired seam name: the notes are found under the name a consumer already defined'
-Assert-True ($r.Flat -match 'legacy/devnotes') 'retired seam name: and it is the retired seam''s path that was read'
+Assert-True ($r.Flat -match 'contributing-davekjohn/legacy/devnotes') 'retired seam name: and it is the retired seam''s path that was read'
 Remove-Item -Recurse -Force -LiteralPath $retired -ErrorAction SilentlyContinue
 
 # AND THE CURRENT NAME WINS WHERE BOTH ARE DEFINED, which is exactly the mid-migration state: a consumer
 # who adds the new name without deleting the old one must move, not stay. Asserted by pointing the two at
 # DIFFERENT directories and planting the notes only under the current one -- so a reader that preferred the
 # retired name would refuse rather than quietly pass.
-$bothCfg = "function Get-ReleaseChangelogNotesRoot { return 'legacy/current' }`n" +
-           "function Get-ReleaseDevelopmentNotesRoot { return 'legacy/stale' }`n"
-$both = New-Fixture -Label 'seam-both-names' -NotesContent $notes -RepoConfig $bothCfg -NotesRoot 'legacy/current'
+$bothCfg = "function Get-ReleaseChangelogNotesRoot { return 'contributing-davekjohn/legacy/current' }`n" +
+           "function Get-ReleaseDevelopmentNotesRoot { return 'contributing-davekjohn/legacy/stale' }`n"
+$both = New-Fixture -Label 'seam-both-names' -NotesContent $notes -RepoConfig $bothCfg -NotesRoot 'contributing-davekjohn/legacy/current'
 $r = Invoke-Script -Dir $both
 Assert-Equal 0 $r.Code 'both seam names defined: the CURRENT one is tried first'
-Assert-True ($r.Flat -match 'legacy/current') 'both seam names defined: and it is the current name''s path that was read'
-Assert-True ($r.Flat -notmatch 'legacy/stale') 'both seam names defined: the retired name is not consulted at all'
+Assert-True ($r.Flat -match 'contributing-davekjohn/legacy/current') 'both seam names defined: and it is the current name''s path that was read'
+Assert-True ($r.Flat -notmatch 'contributing-davekjohn/legacy/stale') 'both seam names defined: the retired name is not consulted at all'
 Remove-Item -Recurse -Force -LiteralPath $both -ErrorAction SilentlyContinue
 
 Write-Host ""

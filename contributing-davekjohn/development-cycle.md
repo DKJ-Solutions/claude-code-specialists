@@ -76,6 +76,17 @@ Issue #998: Test-IsWorkflowSourceRepo tests 'publishes plugins'. Eleven sites us
       idiom this repo already uses in team-shopify's floor check. An empty `{}` manifest is a real shape;
       a fixture carries one.
 - [x] The mirrors are byte-identical to their sources, compared as bytes.
+- [x] **Five suites went red on the first real gate run, and every one of them was a fixture encoding the
+      behaviour this branch changed** -- not a defect in the change. Repaired one at a time rather than
+      waved through, because a fixture that simulates a source repo is exactly where the collapse has to
+      be seen to work:
+      `shared-scripts` (three fold fixtures kept CHANGELOG.md at their root on the strength of a
+      marketplace stub -- they STATE `Get-ChangelogPath` now, which is the migration the collapse
+      documents), `internal-note` (its note lands in the folder now, and two fixtures pointed a seam at a
+      root `legacy/` path that the guard refuses once the source exemption is gone -- the subject there is
+      the retired seam NAME, so the path moved and the test is intact), and the three
+      `check-plugin-integrity` suites (their fixture publishes `contributing-davekjohn`, so it IS this
+      workflow's source and its changelog moved into the folder with everything else).
 - [x] The full gate (`check-plugin-integrity.ps1` + all suites) via `open-pr`.
 
 ### DEPLOY: `fix/the-source-test-means-what-its-name-says-v1`
