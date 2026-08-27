@@ -32,6 +32,54 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/release-history-default-stops-branching-on-source-v1` · 20260827-185053
+
+Four statements in `scripts/lib/seam-lib.ps1` rested on one premise -- *the workflow's source keeps its
+changelog and its release list at its own root* -- and #980 retired that premise on August 27, 2026 by
+moving both into `contributing-davekjohn/` and stating them as seams. All four now say what is actually
+true, each quoting what it used to say rather than being flipped in silence, which is the convention
+every relocated seam's record in this repo already follows. Nothing computes differently: the source
+states both seams, so the branch that still exists in the computation is inert here.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**One of the four is a guardrail, and that is the site the report did not reach.**
+`Assert-WorkflowIsolatedSeamPath` exempts a source repo outright, and its reason read *"it deliberately
+keeps these roots at its own root by its own decision (Dave, August 14, 2026), and Get-Default*'s own
+computed answer for a source IS that root."* The first clause is exactly what #980 retired. The
+exemption is still doing work -- it covers a repo that publishes plugins and does keep those roots at
+its root -- so it stays, with the difference between its old reason and its real one written down. A
+reader who deleted it on the strength of the stale sentence would have removed a live guard.
+
+**The question #989 actually asked is filed rather than answered, and the reason is a measurement.**
+It asked whether the source branch should survive at all, citing #914's precedent. `Test-IsWorkflowSourceRepo`
+is `Test-Path .claude-plugin/marketplace.json`: it detects *publishes plugins*, not *is this workflow's
+source*. Under Dave's own one-product-one-repository rule those two come apart on the next product, so
+collapsing the branch would repoint a plugin-publishing consumer's changelog with nothing said. That is
+a design decision touching a guard, not a docstring repair, so it leaves this branch as its own issue
+with the mechanism attached.
+
+**The branch name predates the answer and is left as it is.** It was created as
+`fix/release-history-default-stops-branching-on-source-v1`, before `Test-IsWorkflowSourceRepo` had been
+read and while collapsing still looked like the obvious repair. The defaults do still branch; the title
+and this entry say so, and renaming a pushed branch to tidy that up would cost more than the wart.
+
+**Score:** 2
+
+#### Pull Request
+
+four seam docstrings stop claiming the source keeps its changelog and release list at its root
+
+Plugins: contributing-davekjohn
+
+Plugins: contributing-davekjohn
+
+[PR #1001](https://github.com/DaveKJohn/claude-code-specialists/pull/1001)
+
+---
+
 ### DEPLOY: `fix/changelog-seam-record-names-four-readers-v1` · 20260827-183652
 
 The `Get-ChangelogPath` contract record named two readers and four scripts read it. `cut-release` and
