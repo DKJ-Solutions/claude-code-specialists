@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/changelog-seam-record-names-four-readers-v1` · 20260827-183652
+
+The `Get-ChangelogPath` contract record named two readers and four scripts read it. `cut-release` and
+`fold-changelog-entry` were named; `new-branch` and `open-pr` were not, having become readers with
+inbound #967 -- neither touches the file, and both need the DIRECTORY it names, because that is the base
+an entry's relative links resolve from once the entry folds into it. What the gap cost is not
+bookkeeping: `Write-ReachabilityGaps` walks only the scripts a record names, so a consumer defining this
+seam somewhere `new-branch` or `open-pr` could not see it ran on the computed fallback instead of their
+answer, silently, with the check reporting nothing because it never looked there. Both are named now, in
+the record and in the shipped config blueprint a consumer is handed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The record is now PINNED by the drift guard, and that is the half the report could not see.** It asked
+for an existing assert to be updated; there was none. `Get-ChangelogPath` was declared in the lib and
+absent from `$expectedContract` altogether -- so the loop that asserts every pinned record is *required
+by exactly* its named scripts had nothing to say about this one, and its reader list could go stale
+without a single test turning red. That is the mechanism behind the defect rather than a side-effect of
+it, so the row is what actually stops the next recurrence. Four new asserts come with it, each proving
+one named script really references the seam in its own source.
+
+**One reader is deliberately NOT in a list, and says so in prose instead.**
+`scripts/lint/check-plugin-integrity.ps1` reads `Get-ReleaseNoteRoot` to decide which hand-written tree
+its release-document tier check walks, and it is a repo-local gate rather than a shared script.
+`Resolve-SharedScriptPath` searches the scripts tree its own lib sits in, so naming it would resolve in
+the source and resolve to nothing in a consumer -- a reachability gap reported in one repo and invisible
+in every other. The record carries a sentence for it, so repointing that seam is still known to move
+that gate's scope here.
+
+**Score:** 3
+
+#### Pull Request
+
+the Get-ChangelogPath contract record names all four of its readers
+
+Plugins: contributing-davekjohn
+
+Plugins: contributing-davekjohn
+
+[PR #996](https://github.com/DaveKJohn/claude-code-specialists/pull/996)
+
+---
+
 ### DEPLOY: `fix/ship-step5-leaves-head-alone-v1` · 20260827-183450
 
 `ship-pr.ps1` step 5 ran `git checkout main` unconditionally, one line after the merge. Measured on
