@@ -375,6 +375,61 @@ function Format-EntryAudienceGuidance {
     return @($Lines | ForEach-Object { [string]$_ -replace '\{0\}', $sentence })
 }
 
+function Format-EntryLinkGuidance {
+    <#
+        The guidance block with '{1}' resolved to the sentence naming WHERE the entry's relative links have
+        to resolve from -- the directory the fold writes the changelog into. A block carrying no '{1}' comes
+        back untouched, which is the same contract as its '{0}' sibling above and what makes it safe over an
+        override: a repo that replaced the wording with its own prose gets exactly its own prose.
+
+        IT EXISTS BECAUSE THE BASE IS A SEAM AND THE SENTENCE WAS A CONSTANT (inbound #967). The block said
+        'resolve FROM THE REPO ROOT ... write scripts/x.ps1, never ../../scripts/x.ps1' in every repo, and
+        since #914 a consumer's CHANGELOG.md sits in the workflow folder -- the same directory this document
+        is in, where that advice is exactly backwards. So the one line is composed from the destination that
+        actually applies, from the same value open-pr's link gate resolves against.
+
+        IT MAY RETURN MORE LINES THAN IT WAS GIVEN, unlike Format-EntryAudienceGuidance, and that is why it
+        is a second function rather than a second token in the first. The sentence is two lines wide in the
+        root case and one in the isolated case, so the token line is repeated once per fragment with the
+        fragment substituted -- which keeps the '> ' of a blockquote, and any other prefix an override put
+        there, on every line it produces.
+
+        NOT -f, for the reason the sibling gives: these lines are form text that legitimately contains
+        braces, and the format operator throws on an unmatched one instead of leaving it alone.
+    #>
+    param(
+        [AllowEmptyCollection()][string[]]$Lines = @(),
+        # Repo-root-relative directory the entry's text lands in; '' is the repo root.
+        [string]$DestDirRel = '',
+        # Repo-root-relative directory the entry itself sits in. Defaults to this format's own.
+        [string]$EntryDirRel = ''
+    )
+    if (-not $EntryDirRel) { $EntryDirRel = (Get-BranchFilePaths).Directory }
+    $destNorm  = ($DestDirRel  -replace '\\', '/').Trim('/')
+    $entryNorm = ($EntryDirRel -replace '\\', '/').Trim('/')
+    $fragments = if (-not $destNorm) {
+        # The root, which is this repo's own answer and every consumer's before #914. Word for word what the
+        # block said when the base was a constant, so a repo whose changelog is at the root sees no change.
+        @('Relative links in that text resolve FROM THE REPO ROOT, not from this directory:',
+          'write `scripts/x.ps1`, never `../../scripts/x.ps1`.')
+    } elseif ([string]::Equals($destNorm, $entryNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+        # The isolated default: the changelog is in this very directory, so the link that reads correctly in
+        # front of the author IS the correct one. Said plainly, because the opposite was said here for weeks.
+        @('Relative links in that text resolve FROM THIS DIRECTORY -- `CHANGELOG.md` sits here too, so',
+          'write each path exactly as it reads in this file.')
+    } else {
+        @(('Relative links in that text resolve FROM `' + $destNorm + '/`, where `CHANGELOG.md` sits --'),
+          'not from this directory.')
+    }
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($line in @($Lines)) {
+        $s = [string]$line
+        if ($s -notmatch '\{1\}') { $out.Add($s); continue }
+        foreach ($fragment in $fragments) { $out.Add(($s -replace '\{1\}', $fragment)) }
+    }
+    return @($out)
+}
+
 function Remove-EntryAudienceGuidance {
     <#
         The counterpart of Format-EntryAudienceGuidance, for a repo that states NO audience tier:
@@ -1171,13 +1226,18 @@ $script:EntryGuidanceDefaults = [ordered]@{
     # said BEFORE the author writes rather than after, which is the same argument new-branch already makes
     # for printing the rubric at scaffold time.
     # AND THE LINK CONVENTION, which is the one field-level rule that CANNOT be derived from the file in
-    # front of you (inbound #806). This text folds verbatim into CHANGELOG.md at the repo ROOT, two
-    # directories up, so a relative link has to be written root-relative -- it therefore looks wrong here
-    # and only becomes right after it moves. Nothing said so, and the natural instinct produced the broken
-    # form: a consumer merged two '../../scripts/...' links that landed at the root pointing outside the
-    # repo, with every gate green. Said HERE and not only in the gate that refuses it, for the same reason
-    # the line above says 'ABOVE the Score line' -- guidance that arrives before the author writes is worth
-    # more than a refusal afterwards.
+    # front of you (inbound #806). This text folds verbatim into the CHANGELOG, so a relative link in it has
+    # to resolve FROM WHERE THAT FILE SITS rather than from here. Nothing said so, and the natural instinct
+    # produced the broken form: a consumer merged two '../../scripts/...' links that landed at the root
+    # pointing outside the repo, with every gate green. Said HERE and not only in the gate that refuses it,
+    # for the same reason the line above says 'ABOVE the Score line' -- guidance that arrives before the
+    # author writes is worth more than a refusal afterwards.
+    # WHICH DIRECTORY THAT IS, IS A SEAM AND NOT THE ROOT (inbound #967). It was the root in every repo until
+    # #914 made the changelog isolate-by-default, and a consumer's now sits in the workflow folder -- the same
+    # directory this document is in, where the correct link is the one that already reads correctly here. So
+    # the sentence is composed per repo by Format-EntryLinkGuidance rather than typed, and open-pr's gate
+    # resolves from the same value: a rule stated as a fact about the root was wrong in exactly the repos it
+    # was shipped to.
     #
     # IN THIS BLOCK AND NOT IN 'What', which is where it went first and would have been invisible: the
     # two-section entry renders 'Tier' above the section the body is written in, and 'What' is no longer
@@ -4171,13 +4231,22 @@ function Test-EntryDeclaresShape {
 
 # --- The entry's links, held against the destination its text lands at ---------------------------
 #
-# WHY THIS IS A QUESTION AT ALL. The entry is written one directory down, as the DEPLOY section of
-# contributing-davekjohn/development-cycle.md, and the fold moves its text VERBATIM into
-# CHANGELOG.md at the repo root. So a relative link in it has to be written root-relative -- which
-# means it looks wrong in the file the author is typing in and only becomes right after it moves. The
-# natural instinct produces the broken form, and nothing said so: reported from a consumer as inbound
-# #806, where two links reading '../../scripts/...' landed at the root pointing outside the repo, with
-# every gate green because their linter validated them where the file sat.
+# WHY THIS IS A QUESTION AT ALL. The entry is written as the DEPLOY section of
+# contributing-davekjohn/development-cycle.md, and the fold moves its text VERBATIM into the changelog. So a
+# relative link in it has to resolve from the CHANGELOG's OWN directory rather than from the one the author
+# is typing in -- and where those two differ it looks wrong in front of them and only becomes right after it
+# moves. The natural instinct produces the broken form, and nothing said so: reported from a consumer as
+# inbound #806, where two links reading '../../scripts/...' landed at the root pointing outside the repo,
+# with every gate green because their linter validated them where the file sat.
+#
+# AND THE DESTINATION IS A SEAM, WHICH IS THE HALF #806's REPAIR GOT WRONG BY ASSUMING (inbound #967). It
+# hard-coded the repo root as the base, which was true of every repo at the time and stopped being true when
+# #914 made Get-ChangelogPath isolate-by-default: a consumer's CHANGELOG.md sits in the workflow folder now,
+# the SAME directory the entry is written in, so the root base demanded the one form that is dead after the
+# fold and refused the form that is correct. Measured in BWJ-ecommerce/xoxowildhearts, whose own doc lint
+# measures from the folder -- so the two gates disagreed and its entries avoided relative markdown links
+# entirely. The base is a parameter now and the seam answers it; a repo that repoints the seam back to the
+# root gets #806's behaviour unchanged, because the root is then genuinely where the text lands.
 #
 # THE REPORT'S REASON WAS WRONG, AND THAT CHANGED THE REPAIR. It argued that "a consumer-side linter
 # structurally cannot [check this] -- it runs before the move", and proposed the fold as the only place
@@ -4240,23 +4309,69 @@ function Get-EntryLinkTargets {
     return @($targets)
 }
 
+function Get-PathRelativeToDirectory {
+    <#
+        Pure: $FullPath written as a forward-slashed relative path FROM $Directory, with '../' segments
+        where the target lies beside that directory rather than under it. Both arguments are absolute
+        filesystem paths. Returns '' where there is no relative form at all -- a different drive.
+
+        WHY THIS IS NOT A SUBSTRING, which is what it replaced (inbound #967). While the destination was
+        always the repo root, every target that resolved at all resolved UNDERNEATH it, so the answer was
+        the tail of the path and a substring reached it. A destination that is a SUBDIRECTORY has a second
+        case -- a target beside it rather than under it -- and there a substring silently produces nothing,
+        which in this file means a finding reported with no suggested repair.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$FullPath,
+        [Parameter(Mandatory)][string]$Directory
+    )
+    $dirFull  = [System.IO.Path]::GetFullPath($Directory).TrimEnd('\', '/')
+    $fileFull = [System.IO.Path]::GetFullPath($FullPath)
+    $dirParts  = @($dirFull  -split '[\\/]+' | Where-Object { $_ })
+    $fileParts = @($fileFull -split '[\\/]+' | Where-Object { $_ })
+    $i = 0
+    while ($i -lt $dirParts.Count -and $i -lt $fileParts.Count -and
+           [string]::Equals($dirParts[$i], $fileParts[$i], [System.StringComparison]::OrdinalIgnoreCase)) {
+        $i++
+    }
+    # Nothing shared at all means two roots -- another drive, a UNC share -- and no number of '../' reaches
+    # across that. '' is the same answer the caller gives for a target it cannot name a form for.
+    if ($i -eq 0) { return '' }
+    $segments = New-Object System.Collections.Generic.List[string]
+    for ($u = $i; $u -lt $dirParts.Count;  $u++) { $segments.Add('..') }
+    for ($d = $i; $d -lt $fileParts.Count; $d++) { $segments.Add($fileParts[$d]) }
+    return ($segments -join '/')
+}
+
 function Get-EntryLinkFindings {
     <#
-        The entry's relative links that do not resolve from -RepoRoot -- an array of objects with Target
-        (as written) and Suggested (the same link rewritten root-relative, or '' where that cannot be
-        worked out). Empty array means every relative link in the entry will still point somewhere once
-        the text sits in CHANGELOG.md.
+        The entry's relative links that do not resolve from the DESTINATION its text lands in -- an array of
+        objects with Target (as written) and Suggested (the same link rewritten for that destination, or ''
+        where that cannot be worked out). Empty array means every relative link in the entry will still
+        point somewhere once the text sits in the changelog.
 
-        -RepoRoot RATHER THAN THE ENTRY'S OWN DIRECTORY, and that IS the check: the destination is the
-        root, so the root is the base. A link validated where the file sits is the failure this exists to
-        catch, not the check itself.
+        -DestDirRel RATHER THAN THE ENTRY'S OWN DIRECTORY, and that IS the check: the destination is the
+        base. A link validated where the file sits is the failure this exists to catch, not the check
+        itself. It defaults to '' -- the repo root -- which is what this repo's own changelog is, and what
+        every consumer's was until #914; the section note above carries why it is a parameter and not
+        $RepoRoot any more.
 
         IT SUGGESTS THE REPAIR because the finding alone points the wrong way. An author told '../../scripts/x
         does not exist' reaches for another '../', which is how a correct link gets broken -- the repo's own
         link lint had to learn the same lesson on August 19, 2026 and now names the base it resolved from.
-        The suggestion is only offered where the '../'-relative reading DOES resolve, i.e. where the author
-        wrote a link that is right for the file in front of them; a target that resolves from neither base is
-        simply a typo and gets no guess.
+
+        AND IT TRIES TWO BASES FOR THAT GUESS, in likelihood order: the entry file's OWN directory, then the
+        repo root. One base was enough while the destination was always the root -- the only mistake possible
+        was writing the link as it read in front of you. With an isolated changelog there is a second, and it
+        is the one this repo's own guidance asked for until #967: a ROOT-relative link, correct everywhere
+        until the destination moved into the workflow folder. Offering no suggestion there would leave the
+        consumer who actually followed the instruction with the one finding that names no way out.
+
+        A target that resolves from neither base is simply a typo and gets no guess.
+
+        AND ONLY WHERE THE TARGET IS INSIDE THE REPO, a bound kept from the original rather than a new one:
+        a link resolving out of the tree gets no suggestion, because the form that would reach it from the
+        destination is not one anybody should be told to write.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
@@ -4264,24 +4379,37 @@ function Get-EntryLinkFindings {
         # Where the entry file itself sits, repo-root-relative -- used ONLY to work out the suggestion.
         # Defaults to the branch directory this format uses, so a caller that has no reason to care does
         # not have to supply it.
-        [string]$EntryDirRel = ''
+        [string]$EntryDirRel = '',
+        # Where the entry's TEXT lands, repo-root-relative: the directory of the changelog the fold writes
+        # into. '' is the repo root, which is the answer for a repo that publishes plugins and for any repo
+        # that repoints Get-ChangelogPath back there.
+        [string]$DestDirRel = ''
     )
     if (-not $EntryDirRel) { $EntryDirRel = (Get-BranchFilePaths).Directory }
+    $destDir = if ($DestDirRel) { Join-Path $RepoRoot ($DestDirRel -replace '/', '\') } else { $RepoRoot }
     $findings = @()
     foreach ($target in (Get-EntryLinkTargets -EntryText $EntryText)) {
-        $fromRoot = Join-Path $RepoRoot ($target -replace '/', '\')
-        if (Test-Path -LiteralPath $fromRoot) { continue }
-        # Does it resolve from where the file SITS? Then the author wrote a link that is right in front of
-        # them and wrong at the destination, which is the whole reported failure -- and the root-relative
-        # form of it is computable, so it is named instead of left to be worked out.
+        $fromDest = Join-Path $destDir ($target -replace '/', '\')
+        if (Test-Path -LiteralPath $fromDest) { continue }
+        # Does it resolve from somewhere an author plausibly meant? Then they wrote a link that is right by
+        # one convention and wrong at the destination, which is the whole reported failure -- and the form the
+        # destination needs is computable, so it is named instead of left to be worked out. The file's own
+        # directory first, because that is the instinct the gate exists to catch; the repo root second,
+        # because that is what this workflow's own guidance asked for until #967.
         $suggested = ''
-        $fromEntry = Join-Path (Join-Path $RepoRoot ($EntryDirRel -replace '/', '\')) ($target -replace '/', '\')
-        if (Test-Path -LiteralPath $fromEntry) {
-            $full = (Resolve-Path -LiteralPath $fromEntry).Path
-            $rootFull = (Resolve-Path -LiteralPath $RepoRoot).Path
-            if ($full.StartsWith($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
-                $suggested = $full.Substring($rootFull.Length).TrimStart('\', '/') -replace '\\', '/'
-            }
+        $rootFull = (Resolve-Path -LiteralPath $RepoRoot).Path
+        $bases = New-Object System.Collections.Generic.List[string]
+        $bases.Add((Join-Path $RepoRoot ($EntryDirRel -replace '/', '\')))
+        if (-not $bases.Contains($RepoRoot)) { $bases.Add($RepoRoot) }
+        foreach ($base in $bases) {
+            $candidate = Join-Path $base ($target -replace '/', '\')
+            if (-not (Test-Path -LiteralPath $candidate)) { continue }
+            $full = (Resolve-Path -LiteralPath $candidate).Path
+            # Outside the tree gets no suggestion -- the bound kept from the original, and the reason the
+            # loop cannot simply take the first base that resolves.
+            if (-not $full.StartsWith($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+            $suggested = Get-PathRelativeToDirectory -FullPath $full -Directory $destDir
+            if ($suggested) { break }
         }
         $findings += [pscustomobject]@{ Target = $target; Suggested = $suggested }
     }
@@ -4606,8 +4734,12 @@ $script:BranchFileDefaults = [ordered]@{
         '> into `CHANGELOG.md` at the merge. In each tier, write the reason',
         '> ABOVE the Score line -- anything below it is discarded.',
         '>',
-        '> Relative links in that text resolve FROM THE REPO ROOT, not from this directory:',
-        '> write `scripts/x.ps1`, never `../../scripts/x.ps1`.',
+        # '{1}' IS THE LINK SENTENCE, resolved per repo by Format-EntryLinkGuidance (inbound #967) -- the
+        # same shape as '{0}' below, and for the same reason: the base it names is a seam. It was two typed
+        # lines saying 'FROM THE REPO ROOT', which every consumer's changelog stopped being when #914 moved
+        # it into the workflow folder. One token, because the sentence is two lines wide in one case and the
+        # formatter repeats this line per fragment rather than the token spanning two of them.
+        '> {1}',
         '>',
         '> {0} That reader and nobody else -- what matters only',
         '> inside this repo belongs under the first `**Score:**`. If the change reaches that reader',
@@ -5106,7 +5238,17 @@ function Format-DevelopmentCycle {
         [string]$Description = '',
         [string]$Type = '',
         [string]$Body = '',
-        $ImpactRows = @()
+        $ImpactRows = @(),
+        # Where the entry's text lands, repo-root-relative -- the directory of the changelog the fold writes
+        # into, '' being the repo root. It shapes ONE line of the guidance: the base a relative link in the
+        # DEPLOY section has to resolve from.
+        #
+        # A PARAMETER RATHER THAN A SEAM READ IN HERE, deliberately (inbound #967). Every other reader of
+        # Get-ChangelogPath in this workflow -- cut-release, fold-changelog-entry, adopt-workflow-folder,
+        # session-status -- resolves it in the SCRIPT and passes the answer in, because the default needs a
+        # repo root and a lib that goes looking for one is a lib that can find the wrong tree. new-branch
+        # does the same; the default keeps every other caller, the suites included, on today's wording.
+        [string]$LinkDestDirRel = ''
     )
     $w      = Get-BranchFileWording
     $trunk  = Get-BranchTrunkName
@@ -5151,6 +5293,10 @@ function Format-DevelopmentCycle {
     } else {
         @(Remove-EntryAudienceGuidance -Lines @($w.StepsGuidance))
     }
+    # AND THE LINK SENTENCE, from the destination this repo's fold actually writes to (inbound #967). After
+    # the audience pass rather than before it, so an override that put both tokens on one line is resolved
+    # whichever order they sit in -- each pass only touches its own token.
+    $stepsBlock = @(Format-EntryLinkGuidance -Lines $stepsBlock -DestDirRel $LinkDestDirRel)
     foreach ($line in @($stepsBlock | Where-Object { $null -ne $_ })) { $lines.Add([string]$line) }
     $lines.Add('')
 

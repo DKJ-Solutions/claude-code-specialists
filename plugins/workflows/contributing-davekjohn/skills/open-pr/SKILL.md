@@ -204,19 +204,35 @@ the script that writes the scaffold read it from the same shared library, so the
 
 ## The link gate: do the entry's links survive the fold?
 
-The entry is the DEPLOY section of `contributing-davekjohn/development-cycle.md` — one directory down — and the
-fold copies its text **verbatim** into `CHANGELOG.md` at the repo root. So a relative link in it has to be
-written **root-relative**, which means it looks wrong in the file you are editing and only becomes right
-after it moves:
+The entry is the DEPLOY section of `contributing-davekjohn/development-cycle.md`, and the fold copies its text
+**verbatim** into your `CHANGELOG.md`. So a relative link in it has to resolve from **that file's directory**,
+which is not necessarily the one you are typing in — and where the two differ, the correct link looks wrong
+until it moves.
+
+**The base is your `Get-ChangelogPath`, read the same way the fold reads it.** Left unset, a repo that
+publishes no plugin marketplace gets `contributing-davekjohn/CHANGELOG.md` — the same directory as the
+document — so there the link that already reads correctly in front of you is the correct one. The source repo
+keeps its changelog at the root, and there it is the other way round:
 
 ```markdown
-See [the lib](scripts/lib/release-lib.ps1).          <- correct: resolves at the destination
-See [the lib](../../scripts/lib/release-lib.ps1).    <- resolves HERE, dead once it lands
+See [the lib](scripts/lib/release-lib.ps1).       <- correct where the changelog is at the ROOT
+See [the lib](../scripts/lib/release-lib.ps1).    <- correct where it sits BESIDE the document
 ```
 
-This gate refuses to push while a relative link in the entry does not resolve from the root, and it prints
-the **root-relative form** rather than only the dead one. That second half is the point: a finding that says
-only *"does not exist"* sends the author to add another `../`, which breaks a link that was right.
+This gate refuses to push while a relative link in the entry does not resolve at that destination, and it
+prints **the form the destination needs** rather than only the dead one. That second half is the point: a
+finding that says only *"does not exist"* sends the author to add another `../`, which breaks a link that was
+right.
+
+**It tries two bases for that suggestion** — the document's own directory first, then the repo root. The
+second exists for the author who followed the older wording: a root-relative link, correct everywhere until
+the changelog isolated, would otherwise be the one finding with no way out named (inbound
+[#967](https://github.com/DaveKJohn/claude-code-specialists/issues/967)).
+
+**And the refusal names the two directories it actually compared**, rather than restating the convention.
+Until #967 it named the repo root and `contributing-davekjohn/branch/`, and on the shipped defaults neither
+was in play: the first was the seam's old default, and the second was where the entry sat before it became a
+section of the cycle document.
 
 - **Only relative targets are judged.** `http(s):`, `mailto:`, a pure `#anchor` and an absolute `/path`
   are not resolved against a directory, so the move cannot break them.

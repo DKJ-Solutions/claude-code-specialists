@@ -40,6 +40,9 @@ $ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 # scaffold gate. Without it in the fixture, every entry-writing case here dies on a raw path-not-found
 # instead of testing anything.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# The changelog seam, which new-branch reads since inbound #967 to state the right link base in the guidance
+# it writes. It arrives with the plugin in a real consumer; a hand-built fixture has to be handed it.
+$SeamLibSrc       = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 # Direct Test-BranchName calls (separate from the CLI) for the empty/whitespace-only case --
 # PowerShell's mandatory-param binding catches an empty -Name via the CLI with a generic error, so
 # the exact Reason text can only be tested directly.
@@ -185,6 +188,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')      -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')               -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')      -Force
+    Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')                -Force
 
     $prevEap = $ErrorActionPreference
     try {

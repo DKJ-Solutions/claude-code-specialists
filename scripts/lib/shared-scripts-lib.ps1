@@ -321,6 +321,11 @@ function Get-SharedScriptPairs {
             # cut-release.ps1, new-internal-note.ps1, fold-changelog-entry.ps1 and session-status.ps1
             # all read an optional repo-config seam through now, where two of them used to carry their
             # own private copy of the function and two more probed inline instead of calling either.
+            # TWO MORE READERS SINCE INBOUND #967: new-branch.ps1 and open-pr.ps1, both for the changelog
+            # seam and both for the same reason -- the base an entry's relative links resolve from is the
+            # directory that seam names, and both used to assume the repo root. Already mirrored, so
+            # nothing about the payload changed; what changed is that a consumer running either one
+            # without this lib present would now fail, which is why the list is kept current.
             Name    = 'seam-lib'
             Source  = 'scripts\lib\seam-lib.ps1'
             Plugin = 'contributing-davekjohn'
