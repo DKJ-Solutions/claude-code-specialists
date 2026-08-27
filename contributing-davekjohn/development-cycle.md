@@ -47,9 +47,14 @@ of this branch:
 | 5.00 | `simplify` | 5·5 | **no mention anywhere** |
 | 4.47 | `code-review` | 5·4 | wired into Victor #19 and Edith #17 |
 
-Counted on this branch, 27 August 2026: `grep -rl` over `*.md` returns **0** files for `simplify`
-and **11** for `code-review` — of which four are archived release notes and one is `README.md`,
-leaving the two agent defs and the two manuals as the whole of its wiring.
+Recounted on this branch, 27 August 2026, and the recount changed the arithmetic without changing the
+conclusion. `grep -rl` over `*.md` returns **0** files for `simplify` and **11** for `code-review` —
+but **four of those eleven never mention the skill at all**: they match on the filename
+`.github/workflows/claude-code-review.yml`, which contains the string. Of the seven that do, three are
+archived release notes. That leaves the two agent defs and the two manuals as the whole of its
+wiring, which is what this plan assumed — reached by a different route than the first count
+suggested, and worth writing down because a naive count over-reports the subject here by more than
+half.
 
 #### The finding the assessment did not carry: these are not two of a kind
 
@@ -70,8 +75,21 @@ Read that way the obvious home for `simplify` is the wrong one, and provably so:
   a changed working copy — but the wrong *subject*: his standing scope is duplication of
   **behavioural rules across agent-defs and personas**, not the reuse and efficiency of script code.
 
-So `simplify` goes to whoever wrote the code. In this repo that is **Sylvester #15** for `scripts/**`
-and the manifests, who already carries `Edit`, `Write`, `Bash` and `Skill`.
+So `simplify` goes to whoever wrote the code — and **which specialist that is depends on the layer**,
+which this plan got wrong on the first pass and corrected while building.
+
+**Portable: Cody #13, the App Developer.** He is the one specialist in the plugin whose craft *is*
+writing code, he already carries `Write`, `Edit`, `Bash` and `Skill`, and `artifact-design` is
+already wired into his working method the same way. Sylvester #15 was the first answer here and it
+does not survive reading his portable playbook: his shipped scope is the **harness** — `.claude/`,
+settings, hooks, MCP, skills, marketplaces — and `scripts/**` is an *extension this repo's lens gives
+him*, not something he owns in every consumer. Writing `simplify` into his portable agent def would
+have claimed script authorship for him in repos that never granted it.
+
+**Local: Sylvester #15, in the lens.** Here the code *is* `scripts/**` and those are his, so the repo
+lens names him as the author who runs the tidy pass. That split is the source-is-default rule working
+exactly as intended: *"the reviewer must not apply his own findings"* is craft and travels; *"the
+author of code here is Sylvester"* is local and stays.
 
 #### The second half: `code-review` is wired, but unbounded
 
@@ -88,18 +106,21 @@ specialist to reach for. Naming them as out of bounds is the *sharpening* half o
 
 #### Where the change lands, and why not the lens
 
-Both halves are craft, not repo trivia: a reviewer must not apply his own findings in **any** repo,
-and an author tidying before the handoff is how the chain is meant to run everywhere. So both land in
-the **portable layer** — the agent defs under `plugins/teams/team-alpha/agents/` and the manuals
-beside them — and reach every consumer through the next release. The repo lens gets only what is
-genuinely local: Chris's routing line.
+The **rule** is craft, not repo trivia: a reviewer must not apply his own findings in **any** repo,
+and an author tidying before the handoff is how the chain is meant to run everywhere. So the rule
+lands in the **portable layer** — the agent defs under `plugins/teams/team-alpha/agents/` and the
+manuals beside them — and reaches every consumer through the next release.
+
+The **lens gets what is genuinely local**, and here that is two things rather than one: Chris's
+routing line, and Sylvester's own lens entry. The second is not optional — Sylvester never reads
+Chris's lens, so a routing line alone would name an owner who is never told.
 
 #### Tactically: three moves, smallest first
 
 1. **Bound what already exists** (`code-review`, Victor + Edith). Prose only: no new wiring, no
    generator run, no shared block. Lowest risk, and it stands on its own if the rest is dropped.
-2. **Give `simplify` a home** (Sylvester #15) — one agent def, one manual, one routing line.
-3. **State the pairing once** where both sides can see it: the author simplifies, the reviewer
+2. **Give `simplify` a home** — portable with Cody #13, local with Sylvester #15.
+3. **State the pairing once** where each side can see it: the author simplifies, the reviewer
    reviews.
 
 Deliberately **out of scope**: the four *Worth a trial* skills (`skill-doctor`, `security-review`,
@@ -109,19 +130,22 @@ that is Ravi's alarm and a separate branch — not a copy-paste here.
 
 ### CREATE
 
-- [ ] Re-verify both counts above on this branch before writing anything — the assessment is five days old
-- [ ] Victor #19: name `--fix` and `--comment` as out of bounds, in the agent def and the manual
-- [ ] Edith #17: bound `--fix` the same way — she also delivers findings and does not correct the text
-- [ ] Sylvester #15: add `simplify` to his working method at the author's moment, in the agent def and the manual
-- [ ] Write the `simplify` ↔ `code-review` pairing once per manual, in one sentence, without repeating the reasoning
-- [ ] Chris's lens: add the routing line so an assignment about simplification reaches Sylvester rather than Victor
+- [x] Re-verify both counts above on this branch before writing anything — the assessment is five days old. 0 and 11 both confirmed; the split behind the 11 was wrong and is corrected above (four hits are the filename `claude-code-review.yml`, not the skill)
+- [x] Victor #19: name `--fix` and `--comment` as out of bounds, in the agent def and the manual
+- [x] Edith #17: bound `--fix` the same way — she also delivers findings and does not correct the text
+- [~] Sylvester #15 in the **portable** layer: dropped, and the reason is the finding above — his shipped scope is the harness, not `scripts/**`, so this would have claimed script authorship for him in every consumer. Replaced by the next two lines
+- [x] Cody #13: add `simplify` at the author's moment, in the agent def (working method 4) and the manual (hard rules)
+- [x] Sylvester #15 in the **lens**: name him the local author who runs the tidy pass, because he never reads Chris's lens
+- [x] Write the `simplify` ↔ `code-review` pairing once per manual, in one sentence, without repeating the reasoning
+- [x] Chris's lens: add the routing line so an assignment about simplification reaches Sylvester rather than Victor
 
 ### TEST
 
-- [ ] Confirm the pairing sentence is NOT verbatim in ≥2 agent defs — if it is, it is a shared block and Ravi's call, not a paste
-- [ ] `check-plugin-integrity.ps1` green (manifests, frontmatter, dead links, install-line flags)
+- [x] Confirm the pairing sentence is NOT verbatim in ≥2 agent defs — if it is, it is a shared block and Ravi's call, not a paste
+- [x] Confirm no shared block was touched: the `<!-- BEGIN shared: -->` regions must still equal `agent-shared/` (lint check 7)
+- [x] `check-plugin-integrity.ps1` green (manifests, frontmatter, dead links, install-line flags)
 - [ ] All suites green (`scripts/tests/*.tests.ps1`)
-- [ ] Read the diff back against the three moves above: nothing touched outside the four agent defs/manuals and the one lens
+- [x] Read the diff back against the three moves above: nothing touched outside the three agent defs, three manuals and two lenses
 
 ### DEPLOY: `feat/adopt-act-on-this-skills-v1`
 
