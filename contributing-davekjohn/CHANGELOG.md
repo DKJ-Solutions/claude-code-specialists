@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/convergence-advice-waits-for-the-seam-v1` · 20260827-194141
+
+The Shopify floor session check told a repo with a second, hand-written live-theme guard to remove it,
+calling the shipped guard **the superset** and the removal *"a safety improvement rather than
+housekeeping"* -- unconditionally. That claim only holds once the repo has answered
+`Get-ShopifyLiveThemeId`. Until then the shipped guard's third rule recognises a push aimed at live
+**by id** not at all, so a hand-written guard that does know the id is covering a case the shipped one
+is not: the two are complementary, not superset and subset. The advice is gated on the seam now, and the
+unanswered branch says to answer it first and why. The same unconditional sentence in the team-shopify
+README gets the same condition, plus a **step 0** at the head of its convergence route.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The superset argument was about the matcher; the gap is in the rules, and that is the whole confusion.**
+`Bash|PowerShell` versus `Bash` says which commands a guard inspects. The live-id trigger says which
+commands it refuses. A guard can be narrower in the first and wider in the second at once -- which is
+precisely what an unanswered seam produces -- so the two claims never composed into "superset" the way
+the sentence assumed.
+
+**The failure direction is silent, which is why this is worth more than a wording fix.** Follow the old
+advice with the seam unanswered and nothing breaks: the hook keeps running, the guard keeps blocking
+publish, delete and `--allow-live`, every session start stays quiet. Only a push naming live by its
+number starts getting through, and nothing announces it. Neither consumer is exposed today -- both have
+answered the seam -- so this is about the next repo to install the plugin, not a live incident.
+
+**The hook had no test suite; it has one now, and its failure has been seen.** 18 asserts, and the three
+that matter were confirmed red against the pre-fix hook before being confirmed green against this one.
+That ordering is the point: an assert nobody has watched fail is a claim, not a test.
+
+**Score:** 4
+
+#### Pull Request
+
+the live-theme convergence advice states its condition instead of an unconditional superset
+
+Plugins: team-shopify
+
+Plugins: team-shopify
+
+[PR #1006](https://github.com/DaveKJohn/claude-code-specialists/pull/1006)
+
+---
+
 ### DEPLOY: `docs/step-0a-names-its-destination-and-its-end-point-v1` · 20260827-192811
 
 Step 0a of the cut-release skill asked for a measured end-to-end duration and left two things unsaid.
