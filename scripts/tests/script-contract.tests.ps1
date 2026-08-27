@@ -525,6 +525,15 @@ function Get-RosterIgnoredIds { return @() }
         # derive the intro/list boundary from that structurally. Their absence from this list is the point --
         # if either came back, the count assert below would have to change too, which is the conversation
         # that should happen.
+        # AND THE SEAM THAT NAMES THE CHANGELOG ITSELF (issue #983, August 27, 2026). It was declared in
+        # the lib and absent from THIS table, which is why its Scripts list could go stale in silence:
+        # inbound #967 gave it two more readers -- new-branch and open-pr, neither of which touches the
+        # file and both of which need the DIRECTORY it names, that being the base an entry's relative
+        # links resolve from once the entry folds into it -- and registered them against seam-lib without
+        # adding them here or to the record. Nothing went red, because nothing was pinned. This row is the
+        # pin, and it is exactly the staleness the Get-LintScript comment above describes: a record that
+        # named two callers while four call them.
+        @{ Function = 'Get-ChangelogPath';    Lib = 'scripts\repo-config.ps1';     Scripts = @('cut-release', 'fold-changelog-entry', 'new-branch', 'open-pr') },
         # The four stub-wording knobs (issue #410). These DO belong in this loop, unlike Get-LiveStage:
         # they are attributed to 'new-branch', a genuinely registered shared script, so the
         # per-script assertions below apply to them unchanged.
