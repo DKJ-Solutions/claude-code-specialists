@@ -70,7 +70,18 @@ function Invoke-Adopt {
     try {
         $env:CLAUDE_PROJECT_DIR = $Dir
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script @ScriptArgs
-        return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($out -join "`n") }
+        # Flat is FOR PHRASE ASSERTS ONLY: the child wraps its Write-Host lines at its own host width,
+        # a point that moves with the console and with the fixture's temp path length, so a phrase
+        # sitting mid-line arrives split MID-WORD across two records. Joined with '' rather than a
+        # space because the break is a hard one at a column, so the halves reconstruct exactly --
+        # prune-merged.tests.ps1's Get-FlatOutput carries the full reasoning, and #982/#959 are the two
+        # suites this class had already turned red. Out keeps the line structure for the [create]/
+        # [exists] asserts, which are per-line and must stay that way.
+        return [pscustomobject]@{
+            Code = $LASTEXITCODE
+            Out  = ($out -join "`n")
+            Flat = (($out | ForEach-Object { [string]$_ }) -join '')
+        }
     } finally {
         if ($null -eq $prevPd) { Remove-Item Env:CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
         else { $env:CLAUDE_PROJECT_DIR = $prevPd }
@@ -149,6 +160,40 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-Equal 1 $r4.Code 'plugin source: exit 1'
     Assert-Match 'REFUSED' $r4.Out 'plugin source: says it is refusing, and why'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c4 'contributing-davekjohn'))) 'plugin source: nothing was written'
+
+    # --- 5. The two generated note roots #914 moved (issue #955) -------------------------------------
+    # BOTH DIRECTIONS ARE ASSERTED, and the silent one is the half that matters. A warning that fires
+    # unconditionally is one every consumer learns to scroll past, and this block exists precisely
+    # BECAUSE the two sibling seams' warnings were noticed. So: it names the resolved roots always, and
+    # it warns only where a pre-#914 tree is genuinely still sitting at the repo root.
+    #
+    # Asserted on Flat, not Out: these phrases sit mid-line in a Write-Host the child wraps at its own
+    # width, which is the exact shape that turned seam-lib and internal-note red (#982, #959).
+    Write-Host "adopt-workflow-folder -- the two note roots #914 moved" -ForegroundColor Cyan
+    $c5 = New-FixtureConsumer -Label 'strandednotes'
+    New-Item -ItemType Directory -Path (Join-Path $c5 'releases\development\2.x') -Force | Out-Null
+    1..3 | ForEach-Object {
+        [System.IO.File]::WriteAllText((Join-Path $c5 "releases\development\2.x\2.$_.0.md"), "note $_")
+    }
+    New-Item -ItemType Directory -Path (Join-Path $c5 'releases\github\2.x') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $c5 'releases\github\2.x\2.1.0.md'), 'body')
+    $r5 = Invoke-Adopt -Dir $c5
+    Assert-Equal 0 $r5.Code 'stranded notes: exit 0 -- this is a warning, never a refusal'
+    Assert-Match 'Get-ReleaseChangelogNotesRoot ->' $r5.Flat 'stranded notes: the changelog-notes root is named with its resolved answer'
+    Assert-Match 'Get-ReleaseGithubNotesRoot' $r5.Flat 'stranded notes: and so is the github-notes root'
+    Assert-Match 'a generated-notes tree is still sitting at' $r5.Flat 'stranded notes: the re-adoption warning fires'
+    Assert-Match 'releases/development/  -- 3 \.md file' $r5.Flat 'stranded notes: it names the tree AND counts what is in it, so the reader can see the scale'
+    Assert-Match 'releases/github/  -- 1 \.md file' $r5.Flat 'stranded notes: for both roots, not just the first'
+    Assert-Match 'git mv the tree' $r5.Flat 'stranded notes: and it offers the migrate answer'
+    Assert-Match 'define the seam in' $r5.Flat 'stranded notes: and the repoint answer, because both are honest'
+
+    # THE SILENT CASE. A fresh consumer has no such tree and must not be warned about one.
+    Write-Host "adopt-workflow-folder -- no stranded tree, no warning" -ForegroundColor Cyan
+    $c6 = New-FixtureConsumer -Label 'nonotes'
+    $r6 = Invoke-Adopt -Dir $c6
+    Assert-Equal 0 $r6.Code 'no stranded tree: exit 0'
+    Assert-Match 'Get-ReleaseChangelogNotesRoot ->' $r6.Flat 'no stranded tree: the resolved roots are still named'
+    Assert-True ($r6.Flat -notmatch 'a generated-notes tree is still sitting at') 'no stranded tree: and the warning stays silent'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

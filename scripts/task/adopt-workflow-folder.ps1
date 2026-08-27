@@ -419,6 +419,65 @@ Write-Host 'absent file. And the major in that heading is a version decision thi
 Write-Host 'you. Missing altogether, the cut is not silent: it warns'
 Write-Host "  ""$historyRelPath is missing -- row not added: <the row>"""
 Write-Host 'and cuts the release anyway, so the cost of forgetting is one row you add by hand.'
+
+# THE TWO GENERATED NOTE ROOTS #914 MOVED, WHICH HAD NO WARNING AT ALL (issue #955, August 27, 2026).
+# Both sibling seams above got an explicit re-adoption note when #885 isolated them; #914 did the same
+# thing to these two on August 26 and nothing followed it, so a consumer's next cut would start two
+# fresh trees inside the folder beside the history already sitting at their root -- no error, no
+# warning, nowhere in the adoption or the cut.
+#
+# WHAT IT COST, MEASURED RATHER THAN IMAGINED. djcylow-react had run every adoption skill on every
+# bump and still carried 39 files under releases/development/ and 2 under releases/github/ at its repo
+# root. They found it themselves and repaired it with git mv (their PR #158), and their own
+# repo-config.ps1 now records that nothing in the plugin migrated the files and nothing warned that it
+# had to. That note is this block: the next consumer should not have to write it a second time.
+#
+# GET-RELEASEINTERNALNOTESROOT IS DELIBERATELY NOT HERE. For a consumer it has resolved inside the
+# folder since #885 -- it never had a root answer to split away from, so there is nothing to warn
+# about. Two roots, not three, and the issue's own third seam name is the retired alias of the first.
+#
+# RESOLVED BUT NOT ASSERTED, on purpose. The cut already runs Assert-WorkflowIsolatedSeamPath over both
+# of these; adding a second refusal here would turn an informational adoption run into one that can
+# exit 1 on a seam the reader has not been told about yet, which is the opposite of what this block is.
+$changelogNotesRel = Get-SeamValue -Name 'Get-ReleaseChangelogNotesRoot', 'Get-ReleaseDevelopmentNotesRoot' `
+    -Default (Get-DefaultReleaseChangelogNotesRoot -RepoRoot $repoRoot)
+$githubNotesRel = Get-SeamValue -Name 'Get-ReleaseGithubNotesRoot' `
+    -Default (Get-DefaultReleaseGithubNotesRoot -RepoRoot $repoRoot)
+
+Write-Host ''
+Write-Host 'THE TWO GENERATED NOTE ROOTS ARE ALSO ISOLATED BY DEFAULT NOW (issue #914):' -ForegroundColor Cyan
+Write-Host "  Get-ReleaseChangelogNotesRoot -> $changelogNotesRel"
+Write-Host "  Get-ReleaseGithubNotesRoot    -> $githubNotesRel"
+
+# The pre-isolation answers, asked of the same lookup the cut's own tolerance uses rather than listed
+# again here -- so a name added there is warned about here without this block learning it separately.
+$strandedNoteRoots = @()
+foreach ($seamName in @('Get-ReleaseChangelogNotesRoot', 'Get-ReleaseGithubNotesRoot')) {
+    foreach ($legacyRel in @(Get-PreIsolationSeamPath -SeamName $seamName)) {
+        $legacyAbs = Join-Path $repoRoot ($legacyRel -replace '/', '\')
+        if (Test-Path -LiteralPath $legacyAbs -PathType Container) {
+            $count = @(Get-ChildItem -LiteralPath $legacyAbs -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue).Count
+            $strandedNoteRoots += [pscustomobject]@{ Seam = $seamName; Rel = $legacyRel; Count = $count }
+        }
+    }
+}
+
+if ($strandedNoteRoots.Count) {
+    Write-Host ''
+    Write-Host 'RE-ADOPTING AN EXISTING CONSUMER, READ THIS: a generated-notes tree is still sitting at' -ForegroundColor Yellow
+    Write-Host 'your repo root, where these two seams pointed before #914 isolated them:' -ForegroundColor Yellow
+    foreach ($s in $strandedNoteRoots) {
+        Write-Host ("  $($s.Rel)/  -- $($s.Count) .md file(s), read by $($s.Seam) until 4.20.0") -ForegroundColor Yellow
+    }
+    Write-Host 'Your next cut writes into the isolated paths named above instead, and leaves that tree' -ForegroundColor Yellow
+    Write-Host 'behind silently -- two brand-new, empty-looking trees beside your real history. Nothing' -ForegroundColor Yellow
+    Write-Host 'in the plugin moves the files for you. Two honest answers: git mv the tree onto the' -ForegroundColor Yellow
+    Write-Host 'isolated path so the computed default is right again, or define the seam in' -ForegroundColor Yellow
+    Write-Host 'scripts/repo-config.ps1 to keep pointing at your root tree. The cut accepts that root' -ForegroundColor Yellow
+    Write-Host 'answer for these two seams specifically (issue #956), so repointing is not a fight with' -ForegroundColor Yellow
+    Write-Host 'the isolation guard.' -ForegroundColor Yellow
+}
+
 Write-Host ''
 Write-Host 'And if your Get-MojibakePaths copy predates August 14, 2026, re-adopt it: the old copy still'
 Write-Host 'names the retired root branch/ location, so the moved files sit outside its coverage.'
