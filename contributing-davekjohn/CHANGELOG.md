@@ -32,6 +32,57 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/test-capture-flattens-the-console-wrap-v1` · 20260827-200044
+
+Two test suites stop failing on the width of the console they happen to run in.
+`scripts/tests/seam-lib.tests.ps1` and `scripts/tests/internal-note.tests.ps1` captured their child
+process with `Out-String` and matched phrases against the result, so a hard wrap at the console column
+split the phrase mid-word and the regex missed -- red on a developer machine, green in CI, for a script
+that was correct in both places. Both now carry the canonical `Get-FlatOutput` helper
+`prune-merged.tests.ps1` already documents: the capture is kept as records and joined with nothing
+between them, so the two halves reconstruct exactly. Each suite keeps both readings -- `Out` where the
+line structure matters, `Flat` for the phrase asserts -- because the join deliberately glues genuinely
+separate lines together and is wrong as a general-purpose capture.
+
+The repair proposed in #959 was measured before it was applied and does not work: joining with a space
+re-breaks the very word the wrap broke, so `'the da' + ' ' + 'te by hand'` matches nothing. The join
+has to be `''`, and the `\s*` in that proposal has to go with it, or it eats the continuation's
+genuine leading space.
+
+Third change, and the one that outlasts these two suites: the at-risk list `prune-merged.tests.ps1`
+maintains in its own docstring was wrong in both directions -- it named `shared-scripts`, which
+carries no copy of the helper at all but a stronger redirect-file mechanism, and it omitted
+`park-cycle` and `worktree-lane`, which do carry one. It now separates the three older variants by how
+exposed each actually is, and names the one that joins with a space as the variant measured to fail
+outright. All five stay unrepaired on purpose: they are green, and a risk that has not bitten is
+written down here rather than built against.
+
+Why it matters beyond three files: `open-pr.ps1` refuses to push while any suite fails, so this
+blocked every branch on the machine it fired on until somebody reached for `-SkipTests` -- the gate
+being switched off rather than heeded, which is the failure the class was written down to prevent. It
+had already cost at least three branches a `-SkipTests` run, each for work that had nothing to do
+with it.
+
+Closes [#982](https://github.com/DaveKJohn/claude-code-specialists/issues/982) and
+[#959](https://github.com/DaveKJohn/claude-code-specialists/issues/959).
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A. Nothing here ships: `scripts/tests/` is not plugin payload, and no consumer receives these three
+files or the helper in them.
+
+**Score:** N/A
+
+#### Pull Request
+
+Phrase asserts survive the console wrap in seam-lib and internal-note
+
+[PR #1003](https://github.com/DaveKJohn/claude-code-specialists/pull/1003)
+
+---
+
 ### DEPLOY: `fix/convergence-advice-waits-for-the-seam-v1` · 20260827-194141
 
 The Shopify floor session check told a repo with a second, hand-written live-theme guard to remove it,
