@@ -61,8 +61,9 @@ two documents is wrong. It has been wrong three times, and every time a number i
 like a decision:
 
 - nine rows under the heading "The nine skills" while the directory held twelve — `lock`, `handover` and
-  `prompt` had each arrived without one (`prompt` itself is gone since
-  [#882](https://github.com/DaveKJohn/claude-code-specialists/issues/882), Dave);
+  `prompt` had each arrived without one (all three are gone now:
+  [#882](https://github.com/DaveKJohn/claude-code-specialists/issues/882) retired `prompt` and
+  [#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957) the other two, both Dave's);
 - thirteen rows against fourteen directories — `check-branch-entry` had shipped without a row and stayed
   missing until August 21, 2026, when `prune-merged` was added and the set was recounted;
 - fourteen rows against sixteen directories, under a heading still reading twelve — `measure-skill` and
@@ -111,8 +112,6 @@ below changes for you, and nothing here asks you to run anything.
 | [`prune-merged`](skills/prune-merged/SKILL.md) | merged branches have piled up in the clone — reaps the local ones it can prove are merged, and leaves every other one alone |
 | [`cut-release`](skills/cut-release/SKILL.md) | the release: the bump, the notes, the tag, and the closing steps the script does not automate |
 | [`release-notes-page`](skills/release-notes-page/SKILL.md) | after a release — builds the hand-written notes into one browsable page for the reader they are written for, and optionally the Cloudflare Worker that hosts it |
-| [`lock`](skills/lock/SKILL.md) | closing a session — records where the work stands before a context clear |
-| [`handover`](skills/handover/SKILL.md) | opening the next one — reads that record back (named for the file it reads, and to stay out of the built-in `/continue`'s way) |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |
 | [`measure-skill`](skills/measure-skill/SKILL.md) | pricing what a skill costs the sessions that carry it — always-on against on-invoke tokens, the delta against a stored baseline, and the wall-clock of the script behind it |
 

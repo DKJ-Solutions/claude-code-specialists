@@ -53,8 +53,3 @@ $RECYCLE.BIN/
 # machine. A consumer whose repository is PRIVATE should commit theirs instead, where a tracked token
 # is what survives a lost machine.
 contributing-davekjohn/releases/page/
-
-# The locked next topic (/lock -> /clear -> /handover). Deliberately NOT committed: it is one
-# developer's working intent, it goes stale within hours, and all three commands run on one machine
-# within minutes -- committing it would mean a pull request per session close.
-.claude/handover.md

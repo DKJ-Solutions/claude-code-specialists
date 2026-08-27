@@ -150,21 +150,6 @@ function Get-SharedScriptPairs {
             Skill  = 'prune-merged'
         },
         @{
-            # TWO SKILLS READ THIS ONE SCRIPT, and Skill is a single field on purpose -- it answers "which
-            # page documents this script's SURFACE", not "who calls it". /lock and /handover run the same
-            # reporter and differ only in what they do with the answer, so the parameter surface is
-            # documented once, in the page a reader reaches first. 'cut-release' is already named by two
-            # entries here, so a name serving more than one relationship is precedented.
-            Name   = 'session-status'
-            Source = 'scripts\task\session-status.ps1'
-            Plugin = 'contributing-davekjohn'
-            Skill  = 'lock'
-            # A fixture path, so the suite can assert the printout against a known lock file instead of
-            # whatever this machine happens to have locked. A consumer never types it, and documenting it
-            # would invite someone to point the command at a file outside their repo.
-            SkillParamsExempt = @('StoreOverride')
-        },
-        @{
             # Issue #411. Was excluded as "workshop-only" on the reasoning that merge policy and the CI
             # check name are repo-specific. Only the first half held: the check NAME never entered the
             # logic (step 3 watches whatever checks exist and reads the exit code), and the merge METHOD
@@ -318,9 +303,10 @@ function Get-SharedScriptPairs {
         },
         @{
             # Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): the one definition
-            # cut-release.ps1, new-internal-note.ps1, fold-changelog-entry.ps1 and session-status.ps1
-            # all read an optional repo-config seam through now, where two of them used to carry their
-            # own private copy of the function and two more probed inline instead of calling either.
+            # cut-release.ps1, new-internal-note.ps1 and fold-changelog-entry.ps1 all read an optional
+            # repo-config seam through now, where two of them used to carry their own private copy of the
+            # function and the third probed inline instead of calling either. session-status.ps1 was a
+            # fourth until #957 removed it with /lock and /handover.
             # TWO MORE READERS SINCE INBOUND #967: new-branch.ps1 and open-pr.ps1, both for the changelog
             # seam and both for the same reason -- the base an entry's relative links resolve from is the
             # directory that seam names, and both used to assume the repo root. Already mirrored, so

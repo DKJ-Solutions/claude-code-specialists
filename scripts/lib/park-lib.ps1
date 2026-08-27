@@ -41,6 +41,13 @@
     They sit here for the reason the scope map does: the park commit's body is this file's format, so a
     caller cannot stamp a fact in a shape the reader cannot find.
 
+    THAT READER IS A PERSON SINCE #957, and every shape decision below still assumes one. A reporter used
+    to find the note in a parked branch's last commit and print it back; it went with /lock and /handover.
+    Nothing about the writing side changed -- the note is read with 'git log -1 --pretty=%B origin/<branch>'
+    now, which is a git rendering rather than a block inside another script's output, and every constraint
+    the shapes were chosen for (the 72-column body, the single paragraph, no hanging indent) is a property
+    of that rendering too.
+
     Self-contained apart from the shared native-capture helper: git only, no repo-owned config, so a
     consumer needs no scaffold for it.
 
@@ -90,11 +97,12 @@ function Test-GitOriginConfigured {
     return @(($res.Output | Out-String) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -eq 'origin' }).Count -gt 0
 }
 
-# THE FIRST WORD OF THE BACKING NOTE, and the ONE literal both sides of it share. park-cycle writes the
-# note into the commit body; session-status finds it again in a parked branch's last commit and prints it
-# back. A second copy of this word is the drift shape where the writer stamps a fact the reader never
-# finds -- and the failure would be silent on both sides: a commit that says everything, a report that
-# says nothing.
+# THE FIRST WORD OF THE BACKING NOTE, and the one literal that makes it findable. park-cycle writes the
+# note into the commit body and a reader greps for this word in 'git log'. It was the literal BOTH SIDES
+# shared until #957: session-status found the note again in a parked branch's last commit and printed it
+# back, and a second copy of the word would have been the drift shape where the writer stamps a fact the
+# reader never finds, silent on both sides. With the reading side gone the accessor stays, because the
+# suites assert against it and a literal spelled twice is the same drift one release later.
 $script:GitParkBackingMarker = 'Backing:'
 
 function Get-GitParkBackingMarker {
@@ -204,10 +212,11 @@ function Split-GitParkBackingLines {
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
-        # 72, THE COMMIT-BODY CONVENTION, AND IT IS LOAD-BEARING FOR THE READER TOO. session-status prints
-        # this note indented six spaces inside its parked-branches block; at 78 the result is 84 columns,
-        # which an 80-column console reflows -- and a reflowed note breaks mid-word, since the indent is
-        # not repeated. 72 + 6 fits, so the line a reader sees is the line this function wrote.
+        # 72, THE COMMIT-BODY CONVENTION, AND IT WAS LOAD-BEARING FOR A SECOND READER TOO. session-status
+        # printed this note indented six spaces inside its parked-branches block; at 78 the result is 84
+        # columns, which an 80-column console reflows -- and a reflowed note breaks mid-word, since the
+        # indent is not repeated. 72 + 6 fits. That reporter went with /lock and /handover (#957), so only
+        # the git convention is left holding the number -- which is the half that never depended on it.
         [int]$Width = 72
     )
     $out = @()
@@ -272,8 +281,9 @@ function Format-GitParkBacking {
     # WRAPPED, because this is a commit body and a git log renders it as written. Unwrapped it ran to 143
     # characters in the case it was measured on, which every `git log` view truncates or reflows -- and
     # the clause most likely to fall off the end is the last one, the uncommitted count that carries the
-    # whole point. No hanging indent: session-status takes the note from its marker to the next BLANK
-    # line, so an indented continuation would print with the indent doubled and read as a quote.
+    # whole point. No hanging indent: a reader takes the note from its marker to the next BLANK line, so
+    # an indented continuation reads as a quote -- and did print with the indent doubled while #957's
+    # reporter was the one doing the taking.
     $lines = @(Split-GitParkBackingLines -Text "$($script:GitParkBackingMarker) $stepClause; $committedClause; $uncommittedClause.")
 
     $finished = ($total -gt 0 -and $open -eq 0 -and $resolved -gt 0 -and
@@ -289,8 +299,10 @@ function Format-GitParkBacking {
             'checkout at all. Establish where it is before rebuilding any of it.'
         }
         # WRAPPED THE SAME WAY AS THE LINE ABOVE, through the same helper, so the width is one decision.
-        # It is one paragraph with the marker line, deliberately: session-status stops at the first blank
-        # line, and an alarm in a paragraph of its own would be the half that gets dropped.
+        # It is one paragraph with the marker line, deliberately: a reader stops at the first blank line,
+        # and an alarm in a paragraph of its own is the half that gets dropped. Measured against a reader
+        # that did exactly that in code (session-status, gone with /lock and /handover in #957); the same
+        # is true of anyone skimming a 'git log' body.
         $lines += Split-GitParkBackingLines -Text $alarm
     }
     return ($lines -join "`n")

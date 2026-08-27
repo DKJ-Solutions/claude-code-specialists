@@ -327,7 +327,7 @@ already does, rather than adopted wholesale. Done, per practice:
 | **Provide specific context in prompts** | The requester's side; nothing for this repo to build. |
 | **Configure the environment** | Adopted except for one item: the pruned `CLAUDE.md`. See the re-measurement above — this is the single practice the repo visibly and knowingly diverges from. |
 | **Communicate effectively** | Bianca #02 is an entire specialist for interview-to-spec. |
-| **Manage the session** | The `lock` and `handover` skills are exactly the checkpoint/resume pattern, with a reporter behind both. |
+| **Manage the session** | Adopted, and the mechanism changed on August 27, 2026: `lock` and `handover` were the checkpoint/resume pair, with a reporter behind both, until [#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957) removed all three — the branch's own development cycle had taken the job over, and it is a checkpoint that survives a context clear *and* a machine, which a gitignored file never did. `park` carries the branch itself across. |
 | **Automate and scale** | The shared-scripts layer, and an adversarial review step the page suggests: Marlowe reviews the *conclusion* while the other reviewers check the craft. |
 | **Avoid the failure patterns** | The over-specified `CLAUDE.md` is the one being lived. The trust-then-verify gap is closed by the gates. |
 

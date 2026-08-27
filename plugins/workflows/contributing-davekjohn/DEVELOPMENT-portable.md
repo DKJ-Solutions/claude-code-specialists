@@ -663,8 +663,10 @@ Four things about it are deliberate:
 - **It is measured on the machine that holds the invisible work**, at the one moment it becomes invisible.
   Nowhere else can take that measurement: from origin those files do not exist.
 
-`session-status.ps1` — so `/lock` and `/handover` — prints the note back under every parked branch, and
-says so plainly where there is none (a branch parked by hand, or one whose last commit is `new-branch`'s
-push at creation, which stamps no note because at creation there is nothing behind the plan yet). It
-**echoes** the line rather than recounting: the figures describe a working copy the reading machine cannot
-see, so a local recount could only be confidently wrong.
+`git log -1 --pretty=%B origin/<branch>` is how the note is read back, and it is worth knowing that it is
+now the only way. A reporter used to print it under every parked branch automatically — and to say so
+plainly where there was none (a branch parked by hand, or one whose last commit is `new-branch`'s push at
+creation, which stamps no note because at creation there is nothing behind the plan yet). That reporter
+went with `/lock` and `/handover` on August 27, 2026. Nothing about the note itself changed: it is still
+stamped, still on the commit, and still an **echo** rather than a recount — the figures describe a working
+copy the reading machine cannot see, so a local recount could only be confidently wrong.

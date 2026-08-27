@@ -91,7 +91,7 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 }
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 # Get-SeamValue + the computed defaults (issue #885): this scaffold reads the SAME seam definitions the
-# cut, the fold and session-status now read, so the paths this folder's own docs name can never disagree
+# cut and the fold now read, so the paths this folder's own docs name can never disagree
 # with where the workflow actually reads and writes.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
@@ -114,7 +114,7 @@ $nl = "`n"
 $historyRelPath = Get-SeamValue -Name 'Get-ReleaseHistoryPath' -Default (Get-DefaultReleaseHistoryPath -RepoRoot $repoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $historyRelPath -SeamName 'Get-ReleaseHistoryPath'
 # WHERE THIS REPO KEEPS ITS CHANGELOG (issue #885, group A). Same reasoning: the scaffold below has to
-# name the same path the cut/fold/session-status seam resolves to, not a literal that can drift from it.
+# name the same path the cut/fold seam resolves to, not a literal that can drift from it.
 $changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel -SeamName 'Get-ChangelogPath'
 

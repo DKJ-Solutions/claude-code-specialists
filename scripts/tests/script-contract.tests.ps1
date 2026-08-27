@@ -566,10 +566,11 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-ReleaseHistoryPath';    Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'new-internal-note') },
         @{ Function = 'Get-ReleaseConsumerBumps';            Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release') },
         # WHERE that document goes, beside the knob saying WHETHER it is written (inbound #616). Two
-        # scripts, and the pair is the point: the cut writes the note, session-status reads the newest one
-        # back. A seam reaching only the writer would have a repointed root written to and looked for in
-        # two different places, reported as "no release note was found".
-        @{ Function = 'Get-ReleaseNoteRoot';                 Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'session-status') },
+        # scripts, and the pair is the point: the cut writes the note, build-release-notes-page reads the
+        # newest one back. A seam reaching only the writer would have a repointed root written to and looked
+        # for in two different places, reported as "no release note was found". The reading half was
+        # session-status until #957 removed it with /lock and /handover -- a change of identity, not of shape.
+        @{ Function = 'Get-ReleaseNoteRoot';                 Lib = 'scripts\repo-config.ps1'; Scripts = @('cut-release', 'build-release-notes-page') },
         # The two knobs that configured the retired remove-before-publishing marker are gone with it
         # (August 5, 2026): the consumer document is the tier-2 entries now, so there is nothing to
         # promote and nothing to label. Their absence from this list is the point -- if they came back,

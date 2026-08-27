@@ -303,10 +303,10 @@ $script:ContractRecords = @(
        Adopt = 'copy'; AdoptWhy = 'a location convention, same reasoning and same "no prior seam to redefine" argument as Get-ReleaseChangelogNotesRoot above -- read that record first (issue #885, group E). Its own function rather than folded into that one because the two roots are read by different scripts on different days: the cut writes the changelog note at every release, the internal note is a separate, later run';
        Optional = $true; Default = 'releases/internal (source) or contributing-davekjohn/releases/internal (consumer), computed';
        Returns = "the repo-root-relative directory new-internal-note.ps1 writes the tier-1 internal note's skeleton into. Must agree with cut-release.ps1's own read of Get-ReleaseChangelogNotesRoot's tier -- both roots hold documents from the SAME release, at the SAME grouped sub-path" },
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogPath'; Scripts = @('cut-release', 'fold-changelog-entry', 'session-status');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ChangelogPath'; Scripts = @('cut-release', 'fold-changelog-entry');
        Adopt = 'copy'; AdoptWhy = "a location convention, and its computed default already states this repo's own answer without being copied: 'CHANGELOG.md' when .claude-plugin/marketplace.json exists (this repo publishes plugins), 'contributing-davekjohn/CHANGELOG.md' otherwise -- the same one-file test Get-ReleasePluginTier's fallback already uses, applied here so a consumer that configures nothing is isolated from this repo's own root changelog by default, and this repo's own explicit declaration would only restate what the computation already answers correctly (issue #885)";
        Optional = $true; Default = 'CHANGELOG.md (source) or contributing-davekjohn/CHANGELOG.md (consumer), computed';
-       Returns = "the repo-root-relative path to the flat CHANGELOG.md this workflow reads pending entries from and folds/empties. Three readers: the cut (reads it for the tier gate, empties it down to its intro), the fold (reads it, inserts an entry, writes it back), and session-status (reads it to report what is pending). Before this seam the path was hard-coded in all three, and the cut's read carried no Test-Path guard -- a repo whose changelog was not at the root threw rather than being told what was wrong" },
+       Returns = "the repo-root-relative path to the flat CHANGELOG.md this workflow reads pending entries from and folds/empties. The readers named here: the cut (reads it for the tier gate, empties it down to its intro) and the fold (reads it, inserts an entry, writes it back). session-status was a third until #957 removed it with /lock and /handover; it read the file to report what was pending. Before this seam the path was hard-coded in each of them, and the cut's read carried no Test-Path guard -- a repo whose changelog was not at the root threw rather than being told what was wrong" },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleasePluginTier'; Scripts = @('cut-release');
        Adopt = 'decide'; AdoptWhy = 'THE case this whole axis exists for. It sits in the workflow half, so the roster/workflow split of #522 says it travels, and $true asserts the consuming repo publishes plugins -- which a storefront does not. Its fallback is COMPUTED (does .claude-plugin/marketplace.json exist), so a consumer that states nothing already gets the right answer, and a copied $true overrides a correct computation with a false claim';
        Optional = $true; Default = 'whether .claude-plugin/marketplace.json exists';
@@ -360,9 +360,12 @@ $script:ContractRecords = @(
     # without it for a repo whose hand-written notes live somewhere else: naming the bumps would point
     # the cut at a directory that does not exist there, so the only safe value was @() -- the tier
     # switched off, which is not an answer to the question the knob asks. Two scripts read it, and both
-    # matter: the cut writes the note, session-status looks for the newest one. A seam reaching only the
-    # writer would have the notes written to the new root and looked for in the old, reported as "no
-    # release note was found" -- which reads like a repo that has not cut one yet.
+    # matter: the cut writes the note, build-release-notes-page looks for the newest one. A seam reaching
+    # only the writer would have the notes written to the new root and looked for in the old, reported as
+    # "no release note was found" -- which reads like a repo that has not cut one yet.
+    # THE READER USED TO BE session-status, removed by #957 with /lock and /handover. The pair is unchanged
+    # in shape and so is the argument -- what changed is which script stands on the reading side of it,
+    # which is exactly the substitution a record naming its readers rather than its callers survives.
     # ADOPT FLIPPED FROM 'copy' TO 'decide' ON AUGUST 12, 2026, and the trigger was this repo's own value
     # moving off the default. The old AdoptWhy justified copying on the grounds that the source's answer
     # WAS the default, so copying it changed nothing -- a true sentence that expired the moment the source
@@ -371,7 +374,7 @@ $script:ContractRecords = @(
     # was found", which reads as a repo that has not cut one yet. This is where the documents already live,
     # which only the consumer can say. The DEFAULT deliberately stays releases/notes for the same reason:
     # a repo that answers nothing must keep meaning what it meant yesterday.
-    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNoteRoot'; Scripts = @('cut-release', 'session-status');
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReleaseNoteRoot'; Scripts = @('cut-release', 'build-release-notes-page');
        Adopt = 'decide'; AdoptWhy = 'where your hand-written notes already live, which is a fact about your tree rather than a convention to inherit. Answer the default releases/notes if you have never cut one; repoint it if they are already somewhere else. The source repo answers releases/audience, so that every root under its releases/ names its READER rather than the form of the document -- copy that rename only if it suits you';
        Optional = $true; Default = 'releases/notes';
        Returns = "the repo-root-relative directory the hand-written release note is written into and read back from. The per-release folder INSIDE it is Get-ReleaseNotesGrouping's answer (<X>.x or <X.Y>), so this is the root alone, with no trailing slash. the generated tier-0 tree kept no equivalent knob until #885 measured one into existence (Get-ReleaseChangelogNotesRoot above), #914 then moved and renamed the directory it points at and #947 the seam itself -- while THIS root's default deliberately did not move with either, because it is the one seam consumers already configure or rely on the literal fallback of" },

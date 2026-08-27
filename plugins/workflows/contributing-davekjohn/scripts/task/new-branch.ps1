@@ -136,7 +136,7 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 # AND THE SEAM READER (inbound #967). The guidance this script writes into the document states WHERE a
 # relative link in the DEPLOY section has to resolve from, and that is the changelog's directory -- a seam,
 # not the repo root, since #914 made it isolate-by-default. Resolved in the script and passed in, the way
-# cut-release, fold-changelog-entry, adopt-workflow-folder and session-status all read it: the computed
+# cut-release, fold-changelog-entry and adopt-workflow-folder all read it: the computed
 # default needs a repo root, and a lib that goes looking for one can find the wrong tree.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 

@@ -56,17 +56,21 @@ product: agent defs, manuals, docs, and tooling.
   in [Derek #05](05-05-extension.md#branch--repo-hygiene). Note which sources were wrong there: not a
   truncated channel this time, but two of Chris's own artefacts, which is why the rule is to read the
   repo rather than to read a *better* summary.
-  **A third mode joined them on August 19, 2026 and its rule is portable, so it lives in the `/handover`
-  skill rather than here**
-  ([`handover/SKILL.md`](../../../plugins/workflows/contributing-davekjohn/skills/handover/SKILL.md)): a
-  briefing that is complete, current, and states a **cause that does not exist**. The instance was this
+  **A third mode joined them on August 19, 2026**, and until August 27 its rule lived in the `/handover`
+  skill because it was the portable half: a briefing that is complete, current, and states a **cause that
+  does not exist**. That skill is gone
+  ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), so the mode is recorded
+  here beside its two siblings — the payload that carried it travelled to consumers, and this lens does
+  not, which is a gap filed rather than pretended away. The instance was this
   repo's — a lock six minutes old, correct about its subject (inbound
   [#747](https://github.com/DaveKJohn/claude-code-specialists/issues/747)) and wrong about the mechanism,
   while the report it summarised had named the right line. Neither truncation nor staleness but
-  *transcription*, and it survived every check the skill listed at the time. The lesson goes to every repo
-  that uses `/lock`, which is why the measurement went into the payload; what is repo-specific here is only
-  that the report and the pickup were the same team an hour apart — the same shape as the fifth inbound
-  pattern in the `triage-inbound` skill, and the same argument for recounting even when the report is
+  *transcription*, and it survived every check that page listed at the time. **It survives the removal of
+  the commands too**, because the mode is a property of summaries rather than of `/lock`: a recap Dave
+  types, a `/loop` prompt, a branch document's PLAN section and a post-compaction summary are all the same
+  artefact from this rule's point of view. What was repo-specific about the instance is that the report and
+  the pickup were the same team an hour apart — the same shape as the fifth inbound pattern in the
+  `triage-inbound` skill, and the same argument for recounting even when the report is
   your own.
 - **The inbound verification, and the six ways a report fails on pickup.** An inbound item is verified
   as still standing before it is routed, and five more things are checked beside the symptom: whether its
