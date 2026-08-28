@@ -170,6 +170,31 @@ function Invoke-Sync {
     return @{ Out = ($out | Out-String); Code = $LASTEXITCODE }
 }
 
+function Invoke-LabelSeamRun {
+    <# One drift run against a consumer whose only extra seam is the label one, so every assert in that
+       block reads the same printed 'gh pr create' line and differs only in what the seam answered.
+
+       THE DRIFT IS A FILE ONLY LIVE HAS, which is the cheapest shape that reaches the PR step at all --
+       a run with nothing to take exits before composing either the body or the labels. #>
+    param([Parameter(Mandatory = $true)][string]$Label, [string]$Seam = '')
+    $repo = New-Consumer -Label $Label -ThemeId '123456' -StoreDomain 'a-store.myshopify.com' -ExtraSeams $Seam
+    Add-FixtureCommit -Dir $repo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    $mir = New-Mirror -Label $Label -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+    return (Invoke-Sync -Dir $repo -Mirror $mir)
+}
+
+function Get-PrintedCreateLine {
+    <# The 'gh pr create' line the non-merging path prints, without the DarkGray notes around it -- those
+       mention '--label' too, and an assert reading the whole output would pass on the wrong line. #>
+    param([Parameter(Mandatory = $true)][string]$Output)
+    if ($Output -match '(gh pr create[^\r\n]*)') { return $Matches[1] }
+    return ''
+}
+
 try {
     # --- The seam refusals, both before anything is touched -----------------------------------------
     Write-Host 'the seam refusals'
@@ -350,6 +375,52 @@ try {
     if ($r.Out -match '--body-file "([^"]+)"') { $badFile = $Matches[1]; $script:trees += $badFile }
     $badBody = if ($badFile -and (Test-Path -LiteralPath $badFile)) { [System.IO.File]::ReadAllText($badFile) } else { '' }
     Assert-True ($badBody -match 'new on live -- .sections/from-editor\.liquid.') 'seam/throw: the default body is written instead'
+
+    # --- The label seam: the PR ROUTE rather than the body (inbound #1023) -------------------------
+    # ASSERTED ON THE PRINTED LINE, and that is a property of the suite rather than a shortcut. The
+    # merging path needs a 'gh' that talks to GitHub, which this suite deliberately does not have -- but
+    # the printed line is composed from the SAME list in the same place, so what it carries is what the
+    # create would carry. It is also the path most consumers run, the merge seam being opt-in.
+    Write-Host ''
+    Write-Host 'the PR label seam'
+
+    $r = Invoke-LabelSeamRun -Label 'nolabel'
+    $line = Get-PrintedCreateLine -Output $r.Out
+    Assert-True ($line -ne '') 'seam/labels: the unanswered case still prints the create line'
+    Assert-True ($line -notmatch '--label') 'seam/labels: and carries no --label, which is the default and the behaviour before #1023'
+    Assert-True ($r.Out -notmatch 'Get-ShopifySyncPrLabels') 'seam/labels: an unanswered seam is silent, not reported as missing'
+
+    # A BARE STRING IS ACCEPTED, and this is the assert that matters most for a config file: 'return "sync"'
+    # is what somebody writes first, and the @() around the pipeline is what keeps that one label a label
+    # rather than four characters PowerShell iterates over.
+    $r = Invoke-LabelSeamRun -Label 'onelabel' -Seam "function Get-ShopifySyncPrLabels { return 'sync' }"
+    $line = Get-PrintedCreateLine -Output $r.Out
+    Assert-True ($line -match '--label "sync"') 'seam/labels: a bare string arrives as one label on the printed line'
+    Assert-True (([regex]::Matches($line, '--label')).Count -eq 1) 'seam/labels: exactly one --label, not one per character'
+    Assert-True ($r.Out -match 'Get-ShopifySyncPrLabels: sync') 'seam/labels: and the run names what it is going to apply'
+
+    # REPEATED '--label' RATHER THAN ONE COMMA-SEPARATED VALUE, so a label whose own name holds a comma
+    # cannot arrive as two.
+    $r = Invoke-LabelSeamRun -Label 'twolabels' -Seam "function Get-ShopifySyncPrLabels { return @('sync', 'automated') }"
+    $line = Get-PrintedCreateLine -Output $r.Out
+    Assert-True (([regex]::Matches($line, '--label')).Count -eq 2) 'seam/labels: an array becomes one --label per entry'
+    Assert-True ($line -match '--label "sync".*--label "automated"') 'seam/labels: both of them, in the order the seam answered'
+
+    # A CLEARED PLACEHOLDER READS AS UNANSWERED, the same rule the theme id gets. A blank entry left behind
+    # in a config file must not become an empty --label, which gh rejects and which would fail the create
+    # for a repo that had answered the seam correctly enough.
+    $r = Invoke-LabelSeamRun -Label 'blanklabels' -Seam "function Get-ShopifySyncPrLabels { return @('sync', '', '   ') }"
+    $line = Get-PrintedCreateLine -Output $r.Out
+    Assert-True (([regex]::Matches($line, '--label')).Count -eq 1) 'seam/labels: blank and whitespace entries are dropped, not passed on'
+
+    # AND A THROWING LABEL SEAM IS REPORTED, which is the body seam's rule above applied to the PR route:
+    # the fallback here is not a correct answer but a PR a guardrail repo cannot merge, so it must not be
+    # reached quietly.
+    $r = Invoke-LabelSeamRun -Label 'labelthrow' -Seam "function Get-ShopifySyncPrLabels { throw 'no labels today' }"
+    Assert-True ($r.Code -eq 0) 'seam/labels: a broken label seam costs the label, never the sync'
+    Assert-True ($r.Out -match 'Get-ShopifySyncPrLabels threw' -and $r.Out -match 'no labels today') 'seam/labels: and it is reported by name, with the fault'
+    $line = Get-PrintedCreateLine -Output $r.Out
+    Assert-True ($line -notmatch '--label') 'seam/labels: the line then carries no label it could not compose'
 
     # --- Both sides moved: a conflict, and nothing written -----------------------------------------
     # The one thing the floor still decides. It can only ever escalate to a human, which is why a wrong
