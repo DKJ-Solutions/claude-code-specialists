@@ -32,6 +32,50 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/entry-links-judged-where-the-fold-writes-v1` · 20260828-213555
+
+A changelog entry's relative links are judged where the fold actually writes them, not at the repo root.
+
+Check 4 of [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) validates the branch
+document against a different base than its own directory, because its DEPLOY section is pasted verbatim
+into the changelog and has to resolve THERE. That base was `$RepoRoot`, which was right for as long as
+`CHANGELOG.md` was -- and on August 27, 2026 it moved into `contributing-davekjohn/`, beside
+`development.md`. From that day the gate demanded the root form and the fold broke it: a link written as
+`../plugins/...`, correct for BOTH files now that they share a directory, was refused as dead, while the
+form the gate accepted resolved from `contributing-davekjohn/` after the fold and was dead there. The
+document's own guidance had already been repaired -- it says *resolve FROM THIS DIRECTORY* -- so the gate
+was the half arguing with the tooling around it. Latent rather than firing: no folded entry carried a
+relative link, and the first one to write one got it wrong whichever form it picked.
+
+The base is now the changelog's own directory, read from the same seam the fold and open-pr's link gate
+read, so the three cannot disagree about where an entry's text lands. The special case SURVIVES that
+repair rather than being dropped, which is the part the report did not have: for today's filename the new
+base equals the file's own directory and the branch looks like dead weight, but the legacy
+`branch/branch-*.md` names sit one level BELOW the changelog, and a branch open since before the
+August 23 merge still carries one. Dropping the case would have reproduced the original defect at a
+smaller radius.
+
+The suite had been asserting the root by name, which is why it stayed green through the move. It now
+covers both names and pins the direction: the root form is asserted DEAD on the legacy file, so neither
+leaving `$RepoRoot` in place nor deleting the case passes.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `check-plugin-integrity.ps1` is this repo's own gate and ships to nobody. The portable half of the
+convention, `Get-EntryLinkFindings`, was already correct.
+
+**Score:** N/A
+
+#### Pull Request
+
+the entry's links are judged where the fold actually writes, not at the repo root
+
+[PR #1043](https://github.com/DaveKJohn/claude-code-specialists/pull/1043)
+
+---
+
 ### DEPLOY: `docs/v4-22-0-note-correction-v1` · 20260828-210436
 
 The published `v4.22.0` note stops telling its readers that the test suites cost 443s, and stops
