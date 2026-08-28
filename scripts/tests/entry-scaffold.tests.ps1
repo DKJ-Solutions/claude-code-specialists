@@ -31,6 +31,16 @@ $BranchInfoSrc   = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # guidance it writes. In a real consumer it arrives with the plugin, beside the scripts; the fixture below
 # is a hand-built stand-in for that tree, so it has to be copied in like the other two.
 $SeamLibSrc      = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
+# AND THE TWO THE PUSH PATH NEEDS, which the fixture below did NOT hold until inbound #1046 -- and it has
+# been silently broken since #900 made the creation push the default. new-branch dot-sourced
+# native-capture-lib.ps1 unconditionally in its push block, so the fixture's run has been dying there with
+# exit 1 all along; it happened AFTER the document was written, the child's stderr goes to $null and its
+# exit code is not read, so every assert below stayed green over a run that failed. #1046 moved that
+# dot-source ABOVE the checkout (a second caller needs it before HEAD moves) and the same missing file then
+# killed the run BEFORE the document existed, which is how a two-week-old hole surfaced. Same reasoning as
+# seam-lib above: in a real consumer these arrive with the plugin, so the stand-in tree has to hold them.
+$NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
+$ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 $OpenPrSrc       = Join-Path $RepoRoot 'scripts\release\open-pr.ps1'
 
 $script:pass = 0
@@ -174,7 +184,8 @@ Copy-Item -LiteralPath $NewBranchSrc -Destination (Join-Path $fixture 'scripts\t
 Copy-Item -LiteralPath $BranchInfoSrc -Destination (Join-Path $fixture 'scripts\lib\branch-info.ps1') -Force
 Copy-Item -LiteralPath $LibSrc -Destination (Join-Path $fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
 Copy-Item -LiteralPath $SeamLibSrc -Destination (Join-Path $fixture 'scripts\lib\seam-lib.ps1') -Force
-
+Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $fixture 'scripts\lib\native-capture-lib.ps1') -Force
+Copy-Item -LiteralPath $ParkLibSrc -Destination (Join-Path $fixture 'scripts\lib\park-lib.ps1') -Force
 $prevEap = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'
@@ -193,6 +204,7 @@ try {
     try {
         $env:CLAUDE_PROJECT_DIR = $fixture
         & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'scripts\task\new-branch.ps1') -Name 'feat/round-trip-v1' 2>$null | Out-Null
+        $script:roundTripCode = $LASTEXITCODE
     } finally {
         Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
         Pop-Location
@@ -200,6 +212,14 @@ try {
 } finally {
     $ErrorActionPreference = $prevEap
 }
+
+# AND THE RUN IS HELD TO ITS EXIT CODE (inbound #1046). Nothing read it, which is how a broken run went
+# unnoticed for two weeks: this fixture was missing native-capture-lib.ps1, new-branch dot-sourced that
+# unconditionally in its push block, and the resulting exit 1 landed AFTER the document was written -- so
+# every assert below passed over a script that had died. The child's stderr goes to $null and its output to
+# Out-Null by design (this suite measures the FILE, not the chatter), which leaves the exit code as the only
+# thing that can say the run finished at all. So it is asserted, once, here.
+Assert-Equal 0 $script:roundTripCode 'the round-trip run finished -- a fixture missing one of the shared libs cannot pass silently any more'
 
 # ONE DOCUMENT, at a fixed path: contributing-davekjohn/development.md, not feat-round-trip-v1.md in the
 # root and not a pair under branch/. The path comes from the same lib the readers use.

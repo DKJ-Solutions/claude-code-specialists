@@ -35,12 +35,51 @@ The script:
    `final`; soft-warns (but proceeds) on an unknown prefix. It also **completes the version suffix**: a
    name with no `-v<N>` gets the lowest free one, checked against the branches that exist locally and on
    the remote, so a second cycle on the same subject becomes `-v2` rather than colliding.
-2. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
+2. **Measures the base it is about to cut from** and warns if it is behind `origin/<trunk>`, naming the
+   count. It does not refuse and it does not move `HEAD` for you -- see below.
+3. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
    running it again on the same branch simply resumes it instead of failing.
-3. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
+4. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
    document come into existence in a single step. Idempotent: a document that already belongs to this
    branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
    unless it holds uncommitted work, which is kept and reported instead.
+
+## The base a branch is cut from (inbound #1046)
+
+`worktree-lane.ps1` refuses a stale trunk in so many words -- *"a lane must not be based on a stale
+trunk"* -- and bases its worktree on `origin/<trunk>`. `new-branch` used to cut from whatever `HEAD`
+held and never look, in a run that reaches `origin` moments later to push. Two scripts, one hazard, two
+answers.
+
+**What that cost, measured in a consumer with two sessions on one board:** a branch cut from a trunk 17
+commits behind `origin/main`, to fix an issue the other session had closed by a merged PR four minutes
+earlier. The result was a complete duplicate of already-merged work -- branch, commit, PR, and every
+gate green on both -- found only when the PR sat without a CI check. The claim step does not catch this
+and it looks like it should: `gh issue edit <n> --add-assignee @me` **succeeds silently on a closed
+issue**.
+
+So `new-branch` now measures `HEAD..origin/<trunk>` and says what it found:
+
+| what it reads | what it prints |
+|---|---|
+| the base is behind by N | a warning naming N, the local remedy (`git pull --ff-only`) and the lane route -- **twice**, once before the checkout and once as the last line of the run |
+| the base is current | one dim line saying so, so silence is never ambiguous |
+| no `refs/remotes/origin/<trunk>` in the repo | one dim line saying the question could not be asked -- no fetch is attempted and no gap is claimed |
+
+**It warns; it does not refuse.** Refusing matches the lane script and stays open as a stronger
+follow-up, but this script is mirrored into every consumer's plugin cache and arrives by plugin
+**update** rather than by choice.
+
+**Why it is said twice.** Everything this script prints after the check -- the scaffold, the tier rubric,
+the commit, the push -- sits between the first copy and the end of the run, so a single line at that
+depth is off-screen by the time you read anything. The bottom copy is the one that gets read.
+
+**`HEAD..origin/<trunk>`, not a trunk-versus-origin comparison**, deliberately: it answers *"what is my
+base missing"*, so a branch intentionally stacked on another branch gets the gap it actually carries
+rather than a reading about a trunk it was never cut from. **The local question gates the network one** --
+the remote-tracking ref is read first, which is what keeps the script usable offline and costs nothing in
+a repo that cannot answer. In a lane worktree (detached at `origin/<trunk>`) it reads 0, so the route that
+already handles this hazard is never warned about.
 
 ## The rest of the chain — the commands, written here because they are readable here
 
