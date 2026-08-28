@@ -358,6 +358,18 @@ authorship for him in consumers that never granted it.
   them, is the tested runner, and was checked against exactly the two conditions above before it did — no
   suite writes into the tree, no two share a fixture path. A hand-rolled runner is checked against neither,
   so its red is evidence about the runner, not about the suite.
+
+  **And the tested runner has now done it too, three times — so the second half of that lesson stands on
+  its own.** *Re-run a red suite alone before believing its assert* was written for a hand-rolled runner;
+  the reds of August 16 (`bootstrap-drift`, `fix-mojibake`, post-split pool) and the **11 of 54** reported
+  out of the `v4.22.0` cut in
+  [#1033](https://github.com/DaveKJohn/claude-code-specialists/issues/1033) both came out of
+  `Invoke-TestSuiteGate` itself. Neither reproduces: five full runs on that tree were all green, and the
+  release's 443s "green" figure turns out to be a **2x-load** reading rather than the gate's cost — the
+  numbers are in [Nolan #25](06-25-extension.md#a-gate-verdict-that-moves-is-a-load-reading--n5-and-the-caller-is-not-a-variable-august-28-2026).
+  Six of those eleven scan the live tree and five do not, so the collision above explains part of it and
+  nothing explains the rest. Do not read a lone red from the pool as a finding about the tree until it has
+  been run alone.
 - **A count in these documents is either DATED or LIVE, and the two are maintained in opposite directions.**
   The 27 above is a dated measurement and stays 27 — the 510s-vs-159s figure beside it means nothing when
   paired with any other count. The 30 in the paragraph above is live advice about what to try next, so it
