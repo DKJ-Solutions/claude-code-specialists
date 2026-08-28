@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/new-branch-warns-on-stale-base-v1` · 20260828-224008
+
+`new-branch.ps1` now measures the base it is about to cut from and warns when it is behind
+`origin/<trunk>`, naming the count -- the same fact `worktree-lane.ps1` has always refused on. The two
+scripts met one hazard and answered it in opposite ways: the lane fetches and bases its worktree on
+`origin/<trunk>`, while `new-branch` cut from whatever `HEAD` held and never looked, in a run that
+reaches `origin` moments later to push. The safe base existed but was reachable only if you already knew
+to take the lane route.
+
+It warns rather than refusing, and it says it **twice** -- once before the checkout, once as the last
+line of the run, because the scaffold, the commit and the push all print in between. A repo with no
+`refs/remotes/origin/<trunk>` is neither asked nor warned, which is what keeps the script usable
+offline. Both skill pages say what changed, and the lane's own page now states that it still goes
+further by *taking* the right base rather than reporting the wrong one.
+
+Along the way it surfaced a two-week-old hole in `entry-scaffold.tests.ps1`: its round-trip fixture was
+missing `native-capture-lib.ps1`, so since #900 that fixture's `new-branch` run had been exiting 1 in the
+push block -- after the document was written, with nobody reading the exit code, which is why 610 asserts
+stayed green over a script that had died. The fixture is complete now and the run is held to its exit
+code, because nothing else in that suite can tell a finished run from a dead one.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every repo running this workflow gets the warning on its next `new-branch`, through a plugin update
+rather than by choosing it -- which is exactly why this warns instead of refusing. What it prevents was
+measured, not imagined: a branch cut from a trunk 17 commits behind `origin/main`, to fix an issue
+another session had closed by a merged PR four minutes earlier, producing a complete duplicate of
+already-merged work -- branch, commit, PR, every gate green on both -- found only when the PR sat without
+a CI check. The claim step is no safeguard against it either: `gh issue edit <n> --add-assignee @me`
+succeeds silently on a closed issue.
+
+**Score:** 4
+
+#### Pull Request
+
+new-branch warns when the branch base is behind origin
+
+Plugins: contributing-davekjohn
+
+[PR #1050](https://github.com/DaveKJohn/claude-code-specialists/pull/1050)
+
+---
+
 ### DEPLOY: `fix/ship-pr-names-a-run-that-never-started-v1` · 20260828-222631
 
 `ship-pr.ps1` now says *"CI never RAN"* when the workflow run failed to start, instead of reporting it
