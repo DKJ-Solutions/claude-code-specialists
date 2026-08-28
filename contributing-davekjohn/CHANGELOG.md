@@ -32,6 +32,57 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/shopify-sync-pr-label-seam-v1` · 20260828-143223
+
+`sync-main.ps1`'s merging path opened its PR with a bare `gh pr create`, so a repo whose guardrail
+requires every PR to carry a label got a sync PR that went red on CI and could not merge. None of the
+eight seams the script read was a label seam, so there was no way to answer it from `repo-config.ps1`
+-- which is why a consumer still carried a wrapper around this script purely to get a label on.
+
+`Get-ShopifySyncPrLabels` answers it: a string or an array, empty and absent both meaning no label,
+which is the behaviour every existing consumer already had. **The labels go on both paths**, for the
+reason inbound #1000 established for the body: the non-merging path is the default one, and a printed
+`gh pr create` line without `--label` hands the operator the same red CI one paste later.
+
+Two decisions worth naming. **The labels go on the create rather than a `gh pr edit` afterwards** --
+the guardrail reads labels when it runs, so a PR opened bare starts its first check run bare and
+labelling a moment later leaves a red run to re-trigger. The cost is that a label the repo does not
+have fails the create outright, which is the better end to fail at: the branch is pushed, nothing is
+lost, and the message says what to correct. **And it is a seam rather than a route through the workflow
+plugin's `open-pr.ps1`**, which would have brought the lint and test gates along too: that couples
+`team-shopify` to `contributing-davekjohn`, and the merging path deliberately uses nothing but `gh` so a
+consumer on either workflow plugin, or neither, gets the same behaviour. The gates are the cost of that
+choice and the script now says so rather than leaving it implied.
+
+A fault in the seam is reported rather than swallowed -- the one answer in that block treated that way,
+because its fallback is not a correct answer but a PR a guardrail repo cannot merge.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A `team-shopify` consumer whose CI requires a label on every PR can let the shared sync open and merge
+its own PR for the first time: answer `Get-ShopifySyncPrLabels` in `scripts/repo-config.ps1` and delete
+whatever wrapper was there to put the label on. The consumer this came from has one to delete. Nobody
+else has to do anything -- unanswered, the seam changes nothing at all, and the printed line is byte
+for byte what it was.
+
+What it deliberately does not bring is the lint and test gates: those live in `open-pr.ps1`, and reaching
+them from here would couple the two plugins. A repo that wants them runs the sync with the merge seam off
+and opens the PR through its own route, which is what the default already does.
+
+**Score:** 4
+
+#### Pull Request
+
+A label seam for the Shopify sync PR
+
+Plugins: team-shopify
+
+[PR #1024](https://github.com/DaveKJohn/claude-code-specialists/pull/1024)
+
+---
+
 ### DEPLOY: `fix/fold-stops-the-doubled-plugins-line-v1` · 20260828-121729
 
 `fold-changelog-entry.ps1` wrote the `Plugins:` line -- derived from the PR's touched files --
