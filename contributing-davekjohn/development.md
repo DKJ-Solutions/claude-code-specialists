@@ -65,6 +65,9 @@ reason -- a gate that fires on almost every run is one nobody reads by the time 
       the fingerprint hashes the dirty list away, so it can answer "same tree as last time" and never
       "is this tree HEAD". A count, never filenames.
 - [x] Plugin mirrors rebuilt via `scripts/sync/build-shared-scripts.ps1`.
+- [x] Documented in `contributing-davekjohn/CONTRIBUTING.md` as **2.2.3**, at the point where it fires
+      and directly after the step-list gate whose question it completes. The DEPLOY lock moved to 2.2.4,
+      and the three cross-references to its old number were repointed with it.
 
 ### TEST
 
