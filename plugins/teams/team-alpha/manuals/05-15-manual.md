@@ -74,6 +74,16 @@ and safe hook construction.
   notification only in Ghostty, Kitty and iTerm2 — in any other terminal, the VS Code one included,
   it had been firing correctly into nothing for as long as it existed. Nothing was broken and nothing
   was misconfigured; there was simply no channel, and no exit code anywhere could have said so.
+- **A notification arrives carrying nothing but its own text, so the payload names where it came from.**
+  The two rules above get the message delivered; this one decides whether the person reading it can act
+  on it. A phone shows one stream: every machine that person runs, every repo checked out on each, every
+  session inside those — and none of it rides along, because a push has no working directory, no branch
+  and no terminal title. So *"needs your decision"* from one repo is indistinguishable from the same
+  sentence sent by three others, and the only way to learn which one is waiting is to walk to each
+  machine. The channel is shared even when the hook is personal. Put the origin **in the text**: the
+  repo first, and the machine as well wherever more than one of them runs the same hook. The measured
+  case was a single phone topic fed by several checkouts at once, where every message was correct,
+  delivered — and unattributable.
 - **Harness config lives in TWO trees, and a search of the project sees one of them.**
   `~/.claude/settings.json` and `~/.claude/hooks/` are machine-wide and sit outside every repo, so a
   grep of the project tree reports "no hook configured" with complete confidence while that hook runs
