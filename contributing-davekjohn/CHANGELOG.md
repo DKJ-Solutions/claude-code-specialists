@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/park-cycle-resurrects-shipped-branch-v1` · 20260828-203741
+
+The Stop hook no longer puts a shipped branch back on `origin`. `park-cycle.ps1`'s PR bound asked
+`gh pr list --state open`, so it lifted the moment a PR merged -- and on the machine that merged, a
+pruned remote-tracking ref then read as "a local commit nobody can see", and the hook pushed the branch
+back seconds after `deleteBranchOnMerge` had removed it. Measured on PR #1027: merged 12:56:25, deleted
+12:56:27, re-created 13:05:30, at the PR's own head OID with nothing on it `main` did not already have.
+
+That quietly undid the one setting cleaning the remote up, and it poisoned the read it collided with:
+`git ls-remote --heads origin` is how a parked branch is found, since a parked branch has no PR by
+design -- so the signal for real parked work started reporting shipped branches, each carrying a `park:`
+commit whose `Backing:` line read *2 of 2 steps resolved*. A branch that reads as finished work waiting
+to be picked up, hours after it landed.
+
+The bound now asks `--state all`: the question it was always protecting is *has this branch been
+published?*, not *is a PR open right now?*. The refusal names which state stopped it and points at
+`park-branch.ps1` for a branch whose work genuinely resumed -- that judgement belongs to the deliberate
+park, never the automatic one. It also covers the closed-unmerged head #992 left behind, which
+`prune-merged.ps1` cannot see by design. The other candidate repair, refusing when `HEAD` is an ancestor
+of the trunk, would not have: that branch sat 96 files divergent from `main`.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- `park-cycle.ps1` ships to every consumer of the `contributing-davekjohn` workflow plugin, so the
+resurrection stops there too, but this repo is not a subscribed service and has no such reader.
+
+**Score:** N/A
+
+#### Pull Request
+
+park-cycle no longer resurrects a branch whose PR already shipped
+
+Plugins: contributing-davekjohn
+
+[PR #1037](https://github.com/DaveKJohn/claude-code-specialists/pull/1037)
+
+---
+
 ### DEPLOY: `docs/the-gate-red-was-load-not-its-caller-v1` · 20260828-203405
 
 The test gate's verdict does not depend on who calls it, and the release figure that said the suites cost
