@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/fenced-links-rewritten-by-the-cut-v1` · 20260829-005017
+
+A markdown link written inside a code fence, an inline code span or an html comment is an illustration
+of a link -- a sample entry, a quoted path, a line a gate prints -- and the release cut now leaves it
+exactly as written. It used to rewrite it, because the two halves of one rule had two implementations:
+`Get-EntryLinkTargets`, which open-pr's link gate reads, excluded code and comments; `Convert-EntryRelativeLinks`,
+which the cut reads, applied its regex to the whole entry. So the cut rebased links the gate had never
+looked at. Both halves now read one function, `Get-EntryCodeSpans`, which answers where the code is
+rather than handing back the text without it -- the form a rewriter can use and a stripper cannot. They
+also match the same link shape now: the rewriter used to match from the `]` while the gate matches from
+the `[`, and since the offset test reads the start of a match, a link whose label sat inside a code span
+but whose `](target)` did not was excluded by one half and rewritten by the other.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Prevents a silently mangled illustration inside a tagged, immutable release document: quote a relative
+markdown link inside a fence in a changelog entry, cut a release, and the generated note ships that
+example with an extra `../../../` on the front, discoverable only by a reader. [#1047](https://github.com/DaveKJohn/claude-code-specialists/issues/1047)
+widened the exposure by one class hours earlier the same day when it stopped exempting `../`, which is the ordinary
+shape a quoted example has. Nothing has broken yet in this repo -- no entry here has quoted one -- so this
+is the failure named rather than the failure repaired.
+
+**Score:** 1
+
+#### Pull Request
+
+the cut leaves a markdown link inside a code fence alone
+
+Plugins: contributing-davekjohn
+
+[PR #1054](https://github.com/DaveKJohn/claude-code-specialists/pull/1054)
+
+---
+
 ### DEPLOY: `fix/entry-links-die-at-the-cut-v1` · 20260828-234113
 
 Since the changelog moved into `contributing-davekjohn/`, no relative markdown link in an entry could
