@@ -32,6 +32,34 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/hook-delivery-is-verified-at-the-receiver-v1` · 20260828-143521
+
+Sylvester's manual now says how a hook is proven to work: the exit code says it RAN, only the receiver
+says it ARRIVED. The measured case behind it is Claude Code's own `Notification` event, which produces a
+desktop notification by default only in Ghostty, Kitty and iTerm2 -- so in any other terminal a
+perfectly correct hook fires into nothing, and no exit code anywhere can say so. The second rule is
+where to look before concluding nothing is configured: `~/.claude/settings.json` and `~/.claude/hooks/`
+are machine-wide and outside every repo, so a grep of the project tree answers "no hook configured"
+with complete confidence while that hook runs on every turn.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The manual is plugin payload, so both rules reach every consuming repo at the next release. It changes
+no script and no gate -- a consumer notices it the next time they debug a hook that appears to do
+nothing, which is exactly the moment it is worth having.
+
+**Score:** 2
+
+#### Pull Request
+
+Sylvester verifies a hook at the receiving end, and looks in the user-level config too
+
+[PR #1025](https://github.com/DaveKJohn/claude-code-specialists/pull/1025)
+
+---
+
 ### DEPLOY: `feat/shopify-sync-pr-label-seam-v1` · 20260828-143223
 
 `sync-main.ps1`'s merging path opened its PR with a bare `gh pr create`, so a repo whose guardrail
