@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/chris-on-demand-manual-v1` · 20260828-105519
+
+The orchestrator gets the on-demand half every other specialist already had. His persona is loaded on
+every turn in every consuming repo, and until now the lint gate's check 6b required an agent def
+behind every manual -- which he has none of, by design, being the only specialist who can ask the
+owner anything. So every rule he carried sat on the always-on path whether or not the session ever
+needed it. 6b now accepts a persona as a backer, and three sections moved into
+`manuals/01-01-manual.md`: the workflow phase model, delegating parallel work, and the six inbound
+checks in full. Each is unknowable at the start of a turn, which is what made them the right three.
+
+**5,139 B off the always-on path, ~1,647 tokens, 20.0% of the persona** -- on top of the 1,861 B the
+compression branch before it recovered, and paid for by no rule being dropped. The gate enforces the
+half that can break: a persona backing a manual must name it, since it is the only half that loads.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consuming repo pays this path before its first assignment, so the saving lands on each of them
+at the next plugin update without anyone doing anything. Nothing a consumer has to act on: no rule
+changed, no file they own moved, and a persona with no manual -- Bianca, Derek, Rendall -- is
+untouched in both directions.
+
+**Score:** 3
+
+#### Pull Request
+
+Chris gets an on-demand manual, like every other specialist
+
+Plugins: team-alpha
+
+[PR #1019](https://github.com/DaveKJohn/claude-code-specialists/pull/1019)
+
+---
+
 ### DEPLOY: `docs/trim-chris-persona-v1` · 20260828-101704
 
 Chris's persona is the one document on the always-on path that every consuming repo pays too, and it
