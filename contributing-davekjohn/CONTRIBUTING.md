@@ -182,14 +182,14 @@ On an error or a failing suite **nothing is pushed and no PR is opened** — `-S
 escape valves, and using one is a decision rather than a convenience.
 
 Its own number because the three gates below fire *here*, at the push, and because what it publishes is fixed
-at this moment: 2.2 is what it puts in the body, and 2.2.3 locks that body against later edits to the
+at this moment: 2.2 is what it puts in the body, and 2.2.4 locks that body against later edits to the
 document.
 
 ### 2.2. Copy the last DEPLOY into the PR
 
-`open-pr.ps1` composes the PR body from the document, and **four gates read it on the way**. Three run
-locally, before the push and before the merge; the fourth runs in CI, and it exists because the first three
-cannot. The repo's own lint and test gates are separate and stated in the [root `CLAUDE.md`](../CLAUDE.md):
+`open-pr.ps1` composes the PR body from the document, and **five gates read it on the way**. Four run
+locally, before the push and before the merge; the fifth runs in CI, and it exists because the local four are
+escapable by not using the scripts. The repo's own lint and test gates are separate and stated in the [root `CLAUDE.md`](../CLAUDE.md):
 `open-pr.ps1` runs [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) and then every
 `scripts/tests/*.tests.ps1`, refusing to push on any error or failing suite.
 
@@ -252,7 +252,45 @@ silent direction — a name the branch does not carry reads as *no document at a
 knowing: **a step ticked in the editor and not committed no longer satisfies the merge gate**, which is what
 its own message has always asked for.
 
-#### 2.2.3. the DEPLOY lock, on the section the PR published
+#### 2.2.3. the backing gate, on whether anything is behind the plan
+
+**Dave, issue [#1026](https://github.com/DaveKJohn/claude-code-specialists/issues/1026),
+August 28, 2026.** The step-list gate above asks whether the plan is *finished*. It cannot ask whether
+anything was actually built, and nor can the three gates beside it: **all four read this document, and none
+reads the diff**. So `open-pr.ps1` asks the second question — a plan reading as finished with **nothing
+committed on the branch besides this document** does not become a PR.
+
+**What it was measured on.** PR #1025 merged an entry describing two new rules in a manual whose edit was
+never committed. The branch's whole diff was `development.md`; the fold then *removes* that file, so the merge
+delivered a changelog entry and no content at all. Every gate was green.
+
+**The measurement is not new — its delivery is.** `park-cycle`'s backing note
+([#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960), repaired by #976) had already named
+the count, named the state and given the instruction that would have prevented the merge. It wrote it into a
+**commit body**, which is exactly right for the reader that note exists for — a session on a second device
+picking the branch up from origin — and invisible to the session that is holding the uncommitted file and
+about to open the PR. Both readers now ask one function, `Get-BranchBackingFinding`, so a park that alarms and
+a gate that stays silent cannot disagree over one tree.
+
+**Two shapes, two answers, and the split is by whose fault it is.** Work sitting uncommitted **in this working
+copy** is this session's own omission and one `git commit` from repaired — that one is **refused**. **Nothing
+uncommitted here either** means the work is not on this machine at all, which from here cannot be told apart
+from a branch legitimately shipping its entry alone — that one is **said out loud and allowed**, because
+refusing it would wedge the cross-device flow #960 exists to serve.
+
+**It is `-Force`-able, unlike the step-list gate above.** The valve exists because a branch whose whole
+deliverable really is the changelog entry is rare rather than impossible, and `-Force` still prints the warning
+— a gate whose escape valve falls silent is a gate that quietly stopped existing.
+
+**And the gates now say when they ran against a dirty tree.** This is the other half of the same measurement,
+and it is a sentence rather than a refusal. The lint gate and the suites judge the **working tree**; the push
+ships **HEAD**. On a clean tree those are the same thing and a green result is evidence about the PR; on a
+dirty one they are not, and nothing said so — #1025's lint run walked the manual *with* both new rules in it
+and reported zero errors. `Get-GateFingerprint` cannot answer this: it hashes the dirty list away, so it knows
+*same tree as last time* and never *is this tree HEAD*. A dirty tree mid-flight is ordinary, so it is never
+refused here; what was missing was only the line that stops a green result from being read as proof.
+
+#### 2.2.4. the DEPLOY lock, on the section the PR published
 
 **Dave, issue [#884](https://github.com/DaveKJohn/claude-code-specialists/issues/884), August 25, 2026.** The
 DEPLOY section travels four times — this document, the PR body, `CHANGELOG.md`, the developer release notes —
@@ -282,14 +320,22 @@ the network, not about the section, and a gate that refused on that would be ref
 there: this section is what step 5 folds verbatim into `CHANGELOG.md`, so a lock satisfied by a stray checkout's
 document would be approving the fold of a section it never read.
 
-#### 2.2.4. the CI gate, because the three above are local
+#### 2.2.5. the CI gate, because the four above are local
 
 **August 20, 2026** (inbound
-[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The three gates above live in
-`open-pr` and `ship-pr`, so all three are escapable by not using them: a branch pushed by hand, or a PR opened
-in the GitHub UI, meets none of them. The convention was therefore enforced by whoever remembered the
+[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The gates above live in
+`open-pr` and `ship-pr`, so every one of them is escapable by not using them: a branch pushed by hand, or a PR
+opened in the GitHub UI, meets none of them. The convention was therefore enforced by whoever remembered the
 scripts — and a convention that enforces nothing rots quietly, which matters here because `CHANGELOG.md` is
 the only readable answer to "what is merged but not yet released".
+
+**It re-checks three of the four, and the backing gate is deliberately not among them** (August 28, 2026).
+That gate's whole subject is what sits **uncommitted in a working copy**, and a CI runner has no working copy
+— it checks out the commit, so its tree is clean by construction and the measurement there would always read
+zero. A check that cannot fail is not a check, and adding one would state a guarantee CI is in no position to
+make. The half of it that *is* visible from a commit — a branch whose diff is its development document alone
+— stays local on purpose too: it is a judgement about whether a change was finished, which belongs where the
+author can still act on it.
 
 [`check-branch-entry.ps1`](../scripts/lint/check-branch-entry.ps1) closes that, and
 [`.github/workflows/branch-entry.yml`](../.github/workflows/branch-entry.yml) is the handful of lines that call
@@ -347,7 +393,7 @@ the branch document. Both are recoverable and neither announces itself. Waiting 
 
 **Waiting is the whole mechanism — there is no queue file and no lock.** The PR stays open and green; the
 merge is simply not performed yet. A branch that waits costs nothing, because the DEPLOY lock
-([2.2.3](#223-the-deploy-lock-on-the-section-the-pr-published)) has already fixed what this PR publishes:
+([2.2.4](#224-the-deploy-lock-on-the-section-the-pr-published)) has already fixed what this PR publishes:
 time passing does not change it.
 
 #### 2.3.3. The queue ahead has drained — sync with `main`, then merge
@@ -400,7 +446,7 @@ backgrounding a ship is either a **lane** —
 worktree is where you build and the primary checkout is where you ship — or nothing at all. A close-out that
 reads *"PR #N opened, shipping in the background"* is a finished assignment, not an open point. Anything else
 started in the primary gets `HEAD` pulled out from under it mid-branch, which is the hazard the two gates in
-2.2.2 and 2.2.3 were hardened against and that step 5 was not.
+2.2.2 and 2.2.4 were hardened against and that step 5 was not.
 
 **Two larger shapes were declined when this was written down**, and #985 stays open as their home. A
 *green-and-unmerged reporter* at session start would have re-added half of the `session-status` reporter that

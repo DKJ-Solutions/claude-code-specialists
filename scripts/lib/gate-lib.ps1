@@ -168,6 +168,40 @@ function Get-GateFingerprint {
     return (($hash | ForEach-Object { $_.ToString('x2') }) -join '')
 }
 
+function Get-GateTreeDirtyCount {
+    <#
+        How many files differ from HEAD right now -- dirty or untracked. Returns $null when git cannot
+        answer, which a caller reports as "not measured" rather than as zero.
+
+        WHY THIS EXISTS BESIDE THE FINGERPRINT (issue #1026). Get-GateFingerprint already walks exactly
+        this list, and then hashes it away: what comes back is a value that answers "is this the same
+        tree as last time" and cannot answer "is this tree HEAD". Those are different questions and the
+        second one is the one a gate result depends on -- the gates judge the WORKING TREE while the PR
+        ships HEAD, so on a dirty tree a green run is evidence about something other than what merges.
+        Measured on PR #1025, where a lint run walked a manual WITH two new rules in it, reported zero
+        errors, and the rules were not in the PR.
+
+        A COUNT, NEVER FILENAMES, borrowed from the same bound park-lib works under: the caller prints
+        this into a console line about an unrelated gate, and the files it counts are frequently nothing
+        to do with the change being shipped.
+
+        NOT A GATE, deliberately. A dirty tree is the ordinary state of a session mid-flight and refusing
+        it would make the gates ceremony; what was missing was never a refusal but the sentence that
+        stops a green result from reading as proof about the PR.
+
+        core.quotePath IS FORCED ON, but NOT for park-lib's reason. That lib quotes because it COMPARES
+        the paths against a list, and a code-page mis-decode there can accidentally match or fail to
+        match. Nothing is compared here -- the answer is a count of lines -- and the risk is one line
+        further down: an unquoted path containing a newline is reported across two lines and inflates the
+        count by one. Quoting escapes it, so one file stays one file whatever it is called.
+    #>
+    param([Parameter(Mandatory)][string]$RepoRoot)
+
+    $statusLines = Invoke-GitRead -RepoRoot $RepoRoot -GitArgs @('-c', 'core.quotePath=true', 'status', '--porcelain', '--untracked-files=all')
+    if ($null -eq $statusLines) { return $null }
+    return @($statusLines | Where-Object { "$_".Trim() }).Count
+}
+
 function Get-GateEvidencePath {
     <#
         Where the record lives: inside the git directory, which is per-worktree and never committed.

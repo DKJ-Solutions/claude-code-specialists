@@ -255,15 +255,19 @@ The constitution above, concretely implemented here:
   here was measured there. Moved off this always-on path on August 15, 2026, where it was 9,440 B over
   102 lines: 26% of this document, and the same shape as the release craft moved out the day before.
 
-- **Four more gates arrive with the workflow plugin**, and all of them read the branch's own document.
-  Three run locally: the **scaffold gate** refuses to push an entry still carrying the wording
+- **Five more gates arrive with the workflow plugin**, and all of them read the branch's own document.
+  Four run locally: the **scaffold gate** refuses to push an entry still carrying the wording
   `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
-  `contributing-davekjohn/development.md` has an unresolved step above its DEPLOY heading, and the
+  `contributing-davekjohn/development.md` has an unresolved step above its DEPLOY heading, the
+  **backing gate** refuses to push when that plan reads as finished while nothing is committed on the
+  branch behind it and the work sits uncommitted in the working copy, and the
   **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
-  at the moment the PR opens, because that is what the review approved and what the fold folds. The fourth
+  at the moment the PR opens, because that is what the review approved and what the fold folds. The fifth
   runs in **CI** (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the
-  first three are escapable by not using the scripts; it re-uses their functions rather than restating the
-  convention, and it reports the significance instead of refusing on it. Their mechanics, escape valves and
+  local four are escapable by not using the scripts; it re-uses three of their functions rather than
+  restating the convention, and it reports the significance instead of refusing on it. **The backing gate is
+  deliberately not among the three**: its subject is what sits uncommitted in a working copy, and a CI
+  runner checks out a commit, so there the measurement always reads zero. Their mechanics, escape valves and
   the measurements behind them are in
   [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
   sits at the point where it fires rather than in a list of its own.

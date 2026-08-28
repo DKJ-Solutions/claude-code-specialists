@@ -230,6 +230,54 @@ function Split-GitParkBackingLines {
     return $out
 }
 
+function Get-BranchBackingFinding {
+    <#
+        Pure: is this a plan that CLAIMS to be finished with no work on the branch behind it, and if so
+        which of the two shapes -- as an object, or $null when there is nothing to say.
+
+        Kind is 'UncommittedHere' when the work is sitting uncommitted in THIS working copy, and
+        'NotInThisCheckout' when nothing is uncommitted here either. They are different faults and their
+        two callers answer them differently: the park note describes both, while open-pr's backing gate
+        REFUSES the first -- this session's own omission, one command from repaired -- and only warns on
+        the second, which cannot be told apart from a branch legitimately shipping its entry alone, and
+        where refusing would wedge the cross-device flow #960 exists to serve.
+
+        WHY IT IS A FUNCTION AND NOT TWO INLINE TESTS (issue #1026). The condition was written once for
+        Format-GitParkBacking's alarm; open-pr's gate needs exactly the same question answered, and a
+        second spelling of it is the drift shape this repo keeps paying for -- a park that alarms and a
+        gate that does not, over one tree, with nothing to say which is right.
+
+        WHY IT IS THAT NARROW. 'Any resolved step with no commit behind it' would fire on nearly every
+        early branch: a planning step ticked before a line of code exists is the ordinary case, and a
+        warning that fires almost always is one nobody reads by the time it matters. Open == 0 with
+        Resolved > 0 is a plan claiming completeness, and it is rare.
+
+        AN UNMEASURED COMMITTED FIGURE IS NOT A FINDING. 'not measured' and '0' are different claims, and
+        raising the alarm on the first would fire it on a checkout that merely has no trunk ref.
+
+        -Steps IS DUCK-TYPED, like Format-GitParkBacking's: any object carrying Open, Resolved and Total.
+    #>
+    param(
+        [Parameter(Mandatory)]$Steps,
+        [Parameter(Mandatory)]$Backing
+    )
+
+    $total    = [int]$Steps.Total
+    $open     = [int]$Steps.Open
+    $resolved = [int]$Steps.Resolved
+
+    if (-not ($total -gt 0 -and $open -eq 0 -and $resolved -gt 0)) { return $null }
+    if (-not ($Backing.CommittedKnown -and [int]$Backing.Committed -eq 0)) { return $null }
+
+    $uncommitted = if ($Backing.UncommittedKnown) { [int]$Backing.Uncommitted } else { 0 }
+    return [pscustomobject]@{
+        Kind        = if ($uncommitted -gt 0) { 'UncommittedHere' } else { 'NotInThisCheckout' }
+        Total       = $total
+        Resolved    = $resolved
+        Uncommitted = $uncommitted
+    }
+}
+
 function Format-GitParkBacking {
     <#
         The backing note as commit-body text: one 'Backing:' sentence always, plus an alarm paragraph
@@ -286,11 +334,13 @@ function Format-GitParkBacking {
     # reporter was the one doing the taking.
     $lines = @(Split-GitParkBackingLines -Text "$($script:GitParkBackingMarker) $stepClause; $committedClause; $uncommittedClause.")
 
-    $finished = ($total -gt 0 -and $open -eq 0 -and $resolved -gt 0 -and
-                 $Backing.CommittedKnown -and [int]$Backing.Committed -eq 0)
-    if ($finished) {
+    # THE CONDITION IS ASKED OF Get-BranchBackingFinding, NOT RESTATED HERE (issue #1026). open-pr's
+    # backing gate needs the identical question answered, and two spellings of it over one tree is how a
+    # park that alarms and a gate that stays silent end up disagreeing with nothing to say which is right.
+    $finding = Get-BranchBackingFinding -Steps $Steps -Backing $Backing
+    if ($finding) {
         $alarm = 'This plan reads as FINISHED and no work behind it is on origin. '
-        $alarm += if ($Backing.UncommittedKnown -and [int]$Backing.Uncommitted -gt 0) {
+        $alarm += if ($finding.Kind -eq 'UncommittedHere') {
             'That work is uncommitted in the working copy this park came from -- it is not missing. ' +
             'Do NOT rebuild it, and do not open a PR that would merge this document alone: ask that ' +
             'checkout to commit and push first.'
