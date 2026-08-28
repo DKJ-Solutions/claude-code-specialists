@@ -1235,6 +1235,16 @@ $clean = Remove-EntryPluginsLine -EntryText $entryWithPlugins
 Assert-NoMatch $clean '(?m)^Plugins:' 'Plugins line removed'
 Assert-NoMatch $clean '(?m)^\s*$\r?\n\s*$\r?\n\s*$' 'no triple blank line left behind'
 Assert-Equal "## #5 x`n`nBody." (Remove-EntryPluginsLine -EntryText "## #5 x`n`nBody.") 'entry without a Plugins line stays unchanged'
+# THE #1015 SHAPES: the fold now calls this to strip before it appends its one authoritative line, so a
+# hand-copied line -- and the doubled line 8 cuts shipped -- must not survive. Both a repeated identical
+# line and two lines that disagree are removed entirely: the fold owns the value, so it does not try to
+# keep either candidate.
+$dblSame = "## #6 y`n`nBody.`n`nPlugins: team-alpha`n`nPlugins: team-alpha`n`n[PR #6](u)`n"
+Assert-NoMatch (Remove-EntryPluginsLine -EntryText $dblSame) '(?m)^Plugins:' 'a doubled identical Plugins line is removed, both copies'
+$dblDiff = "## #7 z`n`nBody.`n`nPlugins: a, b, c`n`nPlugins: b, c`n`n[PR #7](u)`n"
+$dblDiffClean = Remove-EntryPluginsLine -EntryText $dblDiff
+Assert-NoMatch $dblDiffClean '(?m)^Plugins:' 'two Plugins lines that disagree are both removed -- the fold rewrites the value'
+Assert-Match   $dblDiffClean '(?m)^\[PR #7\]\(u\)$' 'and the closing line still sits one blank line below the body'
 
 # RETIRED, AUGUST 8, 2026, with the functions they covered: Convert-EntryLinksForPluginChangelog,
 # Build-PluginChangelogIntro, Build-PluginChangelogSection, Add-PluginChangelogSection and
@@ -1250,6 +1260,12 @@ Assert-Equal "## #5 x`n`nBody." (Remove-EntryPluginsLine -EntryText "## #5 x`n`n
 # under -StripAdminSections, for the consumer document. Worth recording because it kept the function alive
 # for two days on the strength of a line that still existed rather than a reader that wanted it removed,
 # and the reader it was originally written for describes the consumer document exactly.
+#
+# ISSUE #1015, AUGUST 28, 2026: it gained a SECOND production caller and MOVED to entry-scaffold-lib.ps1
+# so both can reach it. fold-changelog-entry.ps1 strips any `Plugins:` line already in the entry before
+# appending the one it derives from the PR's touched files -- an author who mirrored the folded shape
+# into the branch document left a second line and the unconditional append doubled it. It is still in
+# scope here through release-lib.ps1's dot-source of that lib, under the same name.
 
 Write-Host "Get-MarketplaceName" -ForegroundColor Cyan
 Assert-Equal 'claude-code-specialists' (Get-MarketplaceName -MarketplaceJson '{ "name": "claude-code-specialists", "plugins": [] }') 'reads the name field'

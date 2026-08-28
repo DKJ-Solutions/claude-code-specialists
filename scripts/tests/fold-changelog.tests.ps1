@@ -619,6 +619,24 @@ Assert-True ($orderL[0] -match 'Written before the table') 'legacy entry: and it
 Assert-True ($clL -notmatch ('(?m)^' + ('#' * ((Get-EntryHeadingLevel) + 1)) + ' Written before the table')) 'legacy entry: nothing is left at the old level'
 Assert-True ($rL.Output -match ('written with its entry heading at H' + ((Get-EntryHeadingLevel) + 1))) 'legacy entry: the re-levelling is reported, and it names the level the author actually wrote'
 
+Write-Host "A stray 'Plugins:' line in the entry does not survive the fold, and the fold says so (issue #1015)" -ForegroundColor Cyan
+#      THE DOUBLING THIS FIXES. fold-changelog-entry.ps1 appends the ONE authoritative 'Plugins:' line,
+#      derived from the PR's touched files. An author who mirrored a folded entry's shape into the branch
+#      document's '#### Pull Request' section left a second one, and the unconditional append doubled it --
+#      22 reached the changelog, 8 in a single cut. This fixture declares no plugins and matches no PR, so
+#      nothing is recomputed; the point is that the hand-written line is gone from the record either way,
+#      and that the strip is reported rather than silent (a branch opened before the branch-entry gate
+#      still reaches this line).
+$dirPL = New-FoldFixture -Label 'stray-plugins'
+New-EntryFile -Dir $dirPL -Name 'fix-carries-a-plugins-line.md' -Title 'Carries a stray Plugins line' -ExtraBody 'Plugins: hand-written-value'
+$rPL = Invoke-Fold -Dir $dirPL -Branch 'fix/carries-a-plugins-line'
+Assert-True ($rPL.ExitCode -eq 0)                              'stray Plugins: exits 0'
+$clPL = Get-Changelog -Dir $dirPL
+Assert-True ($clPL -match 'Carries a stray Plugins line')      'stray Plugins: the entry is folded'
+Assert-True ($clPL -notmatch '(?m)^Plugins:')                  'stray Plugins: no Plugins: line survives into the changelog'
+Assert-True ($clPL -notmatch 'hand-written-value')             'stray Plugins: and its value is gone with it'
+Assert-True ($rPL.Output -match "carried a 'Plugins:' line")   'stray Plugins: the fold NAMES what it dropped rather than doing it silently'
+
 Write-Host "A flat-window entry is re-levelled WHOLE -- its sections move with its heading (inbound #953)" -ForegroundColor Cyan
 #      THE REGRESSION THIS SUITE COULD NOT CATCH BEFORE. The fold derived its promotion range from today's
 #      entry level ('#{level,level+1}'), so once the level reached 3 it recognised H3-or-H4 and no longer H2 --

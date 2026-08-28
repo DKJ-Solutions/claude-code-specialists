@@ -686,23 +686,17 @@ function Get-EntryPlugins {
     return @($m.Groups[1].Value -split '\s*,\s*' | Where-Object { $_ })
 }
 
-function Remove-EntryPluginsLine {
-    <#
-        Removes the 'Plugins: ...' metadata line (plus the blank line left behind by it) from an
-        entry block. That line drives the per-plugin selection in cut-release.ps1, but is repo
-        administration and should not be visible in a document written for a consumer; the root
-        CHANGELOG and the development notes do show it.
-
-        ITS CALLER IS THE CONSUMER DOCUMENT, since August 10, 2026 -- Format-RankedEntries under
-        -StripAdminSections. It had none for two days: the per-plugin CHANGELOG it was written for was
-        retired on August 8 and this function was deliberately kept because the line it strips still
-        existed. That reasoning turned out to be right for the wrong reason -- what wanted it was not the
-        line surviving but a reader who should not see it, and that reader was already being handed it.
-    #>
-    param([Parameter(Mandatory)][string]$EntryText)
-    $t = [regex]::Replace($EntryText, '(?m)^Plugins:[^\r\n]*(\r?\n)?', '')
-    return [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
-}
+# --- MOVED, NOT DELETED: Remove-EntryPluginsLine now lives in entry-scaffold-lib.ps1 ---------------
+#
+# In scope here regardless, because this file dot-sources that lib unconditionally at the top -- so
+# Format-RankedEntries below (under -StripAdminSections) reaches it under exactly the same name.
+#
+# WHY IT MOVED (issue #1015, August 28, 2026). It gained a second caller that cannot depend on this
+# file: fold-changelog-entry.ps1 writes the ONE authoritative 'Plugins:' line from the PR's touched
+# files, and an entry that already carried a hand-written one ended up with two -- 22 of them shipped.
+# The fold needs to strip before it appends, and its dot-source was narrowed to the small libs on
+# August 9, 2026, so the helper went down to the lib that owns the entry format. Same move as
+# Get-ReleaseChangeTypes and Set-EntryHeadingLevel, same reason.
 
 function Convert-RootRelativeLinks {
     <#

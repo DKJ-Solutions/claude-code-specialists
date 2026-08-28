@@ -3732,6 +3732,30 @@ function Get-EntryPrTitle {
     return ''
 }
 
+function Remove-EntryPluginsLine {
+    <#
+        Removes the 'Plugins: ...' metadata line (plus the blank line left behind by it) from an
+        entry block. That line drives the per-plugin selection in cut-release.ps1, but is repo
+        administration and should not be visible in a document written for a consumer; the root
+        CHANGELOG and the development notes do show it.
+
+        TWO CALLERS NOW, AND THEY WANT OPPOSITE THINGS FROM IT. Format-RankedEntries in release-lib.ps1
+        (under -StripAdminSections) strips the line so a consumer document never carries it. The FOLD
+        strips it so it can write the ONE authoritative line itself -- fold-changelog-entry.ps1 derives
+        the line from the PR's touched files and appends it, and an entry that already carried a
+        hand-written one (issue #1015) would otherwise end up with two.
+
+        IT LIVES HERE, IN THE LIB THAT OWNS THE ENTRY FORMAT, for the same reason Get-ReleaseChangeTypes
+        and Set-EntryHeadingLevel do: the fold needs it and cannot depend on release-lib.ps1, whose
+        dot-source it narrowed to the small libs on August 9, 2026. It used to sit in release-lib.ps1,
+        whose Format-RankedEntries still calls it by this same name through that file's dot-source of
+        this one.
+    #>
+    param([Parameter(Mandatory)][string]$EntryText)
+    $t = [regex]::Replace($EntryText, '(?m)^Plugins:[^\r\n]*(\r?\n)?', '')
+    return [regex]::Replace($t, '(\r?\n)\1\1+', '$1$1')
+}
+
 function Get-ReleaseChangeTypes {
     <#
         The change types the repo's branch table produces -- 'Feat', 'Fix', 'Docs', 'Chore' here. Read from
@@ -4469,6 +4493,21 @@ function Get-EntryScaffoldFindings {
         if (-not $p.Marker) { continue }
         if ($body.Contains($p.Marker)) {
             $findings += [pscustomobject]@{ Label = $p.Label; Marker = $p.Marker }
+        }
+    }
+
+    # A 'Plugins:' LINE IS THE FOLD'S TO WRITE, NEVER THE AUTHOR'S (issue #1015, August 28, 2026). It is
+    # derived from the PR's touched files and appended by fold-changelog-entry.ps1 at the merge -- the
+    # same model Get-EntryPrTitle already encodes by skipping this line and the '[PR #N]' footer when it
+    # reads the title. An author who mirrored the folded-entry shape into the '#### Pull Request' section
+    # left a second one behind, and the fold's unconditional append doubled it: 22 reached the changelog,
+    # 8 in one cut. Refused on any entry shape -- it is wrong before the format existed too -- so it sits
+    # here rather than under the shape-gated half below. The fold still strips a stray one as a net for a
+    # branch opened before this gate; this is where the author is told.
+    if ([regex]::IsMatch($body, '(?m)^Plugins:\s')) {
+        $findings += [pscustomobject]@{
+            Label  = "a 'Plugins:' line -- the fold writes this at the merge, delete it"
+            Marker = ([regex]::Match($body, '(?m)^Plugins:[^\r\n]*')).Value
         }
     }
 
