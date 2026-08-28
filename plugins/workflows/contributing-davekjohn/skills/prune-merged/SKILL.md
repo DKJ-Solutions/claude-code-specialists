@@ -6,8 +6,10 @@ description: >-
   locally. Fast-forwards the trunk, drops stale remote-tracking refs, and deletes only the local
   branches whose merge can be PROVEN: an ancestor of the trunk, or a branch whose PR is merged. A
   branch with neither proof -- unfinished work, a parked branch, a branch pushed from another machine
-  -- is left alone and reported. Touches NO remote branch. Use when merged branches have piled up in
-  the clone, or as the closing tidy-up of a working session.
+  -- is left alone and reported. Touches NO remote branch: -IncludeRemote additionally CLASSIFIES the
+  heads on the remote with those same two proofs and hands the delete command over paste-ready, rather
+  than running it. Use when merged branches have piled up in the clone, as the closing tidy-up of a
+  working session, or when you need to know what a `git ls-remote --heads` line actually means.
 disable-model-invocation: true
 ---
 
@@ -38,7 +40,9 @@ gh api -X PATCH repos/<owner>/<repo> -F delete_branch_on_merge=true
 **Nothing in this workflow deletes a remote branch**, and that is a decision rather than a gap. With the
 setting on, merged branches disappear by themselves, so a remote delete would only ever reach branches
 that are **not** merged — exactly the ones whose loss is unrecoverable. All of the risk, almost none of
-the benefit. Check your own repo's governance before reaching for `git push origin --delete`.
+the benefit. Check your own repo's governance before reaching for `git push origin --delete`. What this
+script will do is work out *which* heads that command would be safe on and hand you the line —
+[`-IncludeRemote`](#-includeremote-reads-that-commands-output-for-you), below.
 
 ## What the skill does
 
@@ -61,7 +65,8 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/prune-merged.ps1
 
 `-DryRun` reports what would go and deletes nothing. The fast-forward and the ref prune still run —
 neither loses anything, and without them the branch list being reported on is the stale one.
-`-Remote <name>` fetches and prunes a remote other than `origin`.
+`-Remote <name>` fetches and prunes a remote other than `origin`. `-IncludeRemote` adds the
+report-only remote pass described in the next section.
 
 The script:
 
@@ -93,12 +98,51 @@ be established, the run says so, and every squash-merged branch is kept.
 ## `git fetch --prune` proves nothing about the remote
 
 It only drops tracking refs for branches **already gone** from the remote, so a clean local list is no
-evidence whatsoever that the remote is clean. The script prints the one command that answers it, and it
-is worth keeping in mind whenever you reason about what has and has not landed:
+evidence whatsoever that the remote is clean. The one command that answers it is worth keeping in mind
+whenever you reason about what has and has not landed:
 
 ```powershell
 git ls-remote --heads origin
 ```
+
+### `-IncludeRemote` reads that command's output for you
+
+Its output is a list of shas and names, and **the two states you care about look identical in it**: a
+merged leftover that is safe to delete, and live parked work that must not be touched. Telling them
+apart by hand is four commands per head — ancestry, a PR lookup, a diff against the trunk, the head's
+own commit message — and it has to be redone every time, because nothing in the list remembers the
+answer.
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/prune-merged.ps1" -IncludeRemote
+```
+
+Every head that is not the trunk is put through **the same two proofs the local pass uses**, and the
+report has two halves:
+
+- **Neither proof** → `Kept origin/<branch> -- live work (unfinished, parked, or another open PR)`.
+  This is the half worth having: parked work is labelled as such instead of being re-investigated, and
+  somebody else's open branch is not mistaken for a leftover.
+- **A proof** → the delete command, printed for you to paste:
+
+  ```
+  git push origin --delete <branch>   # ancestor of main
+  ```
+
+**It runs nothing on the remote**, with or without the switch — deleting a remote branch stays a manual
+act, and this hands over the command rather than taking the decision. Because a head is only ever named
+here on positive proof of a merge, the set it can point at is exactly the set that is safe to lose; a
+head it cannot prove is one it tells you to leave alone. Check your own repo's governance before
+pasting the line.
+
+**Without the switch nothing on the remote is read at all**: the run ends by naming the raw `ls-remote`
+command, as it always has, now with the switch beside it. The pass is opt-in because it costs a network
+round trip plus one ancestry check per head, and most runs are a local tidy-up.
+
+One thing the switch changed for every run: **a clone with nothing but the trunk left no longer ends
+early.** That used to be the one state in which the closing line about the remote was never printed —
+and it is precisely the state in which the remote question is worth asking, because a freshly tidied
+clone is the strongest possible piece of evidence about nothing.
 
 ## Why this is a separate command and not part of `ship-pr`
 
@@ -121,6 +165,8 @@ dual-context via `${CLAUDE_PROJECT_DIR}`.
 ## Important
 
 - **No remote branch is ever deleted by this script**, and no PR is opened or merged by it.
+  `-IncludeRemote` prints a delete command; it never runs one, and the test suite asserts that
+  structurally — no git call in the source carries a `--delete` argument, in quotes of either kind.
 - This script is maintained in the source repo; do not modify it locally in the consumer. A change
   lands first in the source (`scripts/task/prune-merged.ps1`) and then travels via a release to the
   plugin mirror -- guarded by the shared-scripts drift lint.

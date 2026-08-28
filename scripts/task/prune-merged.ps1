@@ -42,12 +42,31 @@
          property: a parked branch (`park-branch.ps1`), unfinished work, or a branch pushed from
          another machine is never lost, because none of them has either proof.
 
+    THE REMOTE PASS (`-IncludeRemote`, issue #1042) READS AND CLASSIFIES; IT STILL DELETES NOTHING.
+    `git ls-remote --heads` is the only read that surfaces a parked branch, and this script named that
+    command in its closing line while interpreting none of its output -- so every head that was not the
+    trunk had the same classification re-derived BY HAND: ancestry, a merged PR, a diff against the
+    trunk, the park commit. Measured three times in two days on three separate threads (#992, #1035,
+    #1039), and twice the session also had to hand-write a don't-sweep-this-one warning about a live
+    head belonging to somebody else's open PR. The switch is opt-in because the pass costs a network
+    round trip and one merge-base per head, and the local tidy-up is what most runs are for.
+
+    IT DOES NOT WEAKEN THE DECLINED PERMISSION, and it was built not to. What Dave declined on
+    July 27, 2026 was EXECUTING a remote delete; what the decision says should happen instead is
+    exactly this pass's output -- the command handed over paste-ready. A head is only ever reported
+    deletable on the SAME two proofs the local pass uses, so the set this can name is the set the
+    permission could not have reached safely; a head with neither proof is reported KEPT with its
+    reason, which is the half that stops live parked work being re-investigated per session.
+
     WHAT THIS SCRIPT DOES NOT DO, and why each is a decision:
 
       - IT DELETES NOTHING ON THE REMOTE. `git push origin --delete` is a manual action in this
          house: with `deleteBranchOnMerge` on, merged branches disappear by themselves, so a remote
          delete would only ever reach branches that are NOT merged -- exactly the ones whose loss is
-         unrecoverable. All of the risk, almost none of the benefit.
+         unrecoverable. All of the risk, almost none of the benefit. `-IncludeRemote` prints that
+         command for a head it can prove is merged; it never runs one, and the suite asserts that
+         structurally (no git call in this file carries a `--delete` argument, in quotes of either
+         kind).
       - IT IS NOT PART OF THE MERGE. Reaping is a separate command so that a session cannot delete a
          branch as a side effect of shipping a PR. `ship-pr.ps1` reports the remote setting when it is
          off and stops there.
@@ -66,18 +85,29 @@
     fast-forward and the prune of remote-tracking refs -- still run: neither loses anything, and
     without them the branch list this reports on is the stale one.
 
+.PARAMETER IncludeRemote
+    (Optional switch) additionally read `git ls-remote --heads <remote>` and classify every head that
+    is not the trunk with the same two proofs the local pass uses. REPORT-ONLY: a head that is provably
+    merged is handed over as a paste-ready `git push <remote> --delete <branch>` line, a head with
+    neither proof is reported kept with its reason. Nothing on the remote is touched, with or without
+    this switch. Combines with -DryRun, which only ever concerned the LOCAL deletions.
+
 .PARAMETER Remote
-    (Optional) the remote to fetch and prune, default 'origin'.
+    (Optional) the remote to fetch and prune, default 'origin'. -IncludeRemote reads its heads.
 
 .EXAMPLE
     ./scripts/task/prune-merged.ps1 -DryRun
 
 .EXAMPLE
     ./scripts/task/prune-merged.ps1
+
+.EXAMPLE
+    ./scripts/task/prune-merged.ps1 -IncludeRemote
 #>
 [CmdletBinding()]
 param(
     [switch]$DryRun,
+    [switch]$IncludeRemote,
     [string]$Remote = 'origin'
 )
 
@@ -191,30 +221,40 @@ $branches = @(($listRes.Output | Out-String) -split '\r?\n' |
     ForEach-Object { $_.Trim() } |
     Where-Object { $_ -and $_ -ne $trunk })
 
+# A CLEAN LOCAL LIST NO LONGER ENDS THE RUN, and that is the #1042 half of this script that is easiest
+# to miss. It proves nothing whatsoever about the remote -- the reason the remote pass exists at all --
+# so a clone that has just been tidied is exactly the state in which the remote question is worth
+# asking, and the closing line saying so was the one thing the old early exit skipped. Everything below
+# is now guarded on the count instead: the merged-PR lookup, the per-branch loop and the local report
+# all no-op on an empty list, and the run still ends in a line about the remote.
 if ($branches.Count -eq 0) {
     Write-Host "Nothing to reap: '$trunk' is the only local branch." -ForegroundColor Green
-    exit 0
 }
 
 # THE MERGED-PR LOOKUP IS ONE CALL, NOT ONE PER BRANCH. A repo five days into this workflow already
 # has dozens of merged PRs and this command is a tidy-up, not a report -- so the whole merged set is
 # read once and matched locally. gh may be absent or unauthenticated: that is not an error here, it
 # only means proof (b) cannot be established, so a squash-merged branch is KEPT and says why.
+# ONE CALL SERVES BOTH PASSES, and it is skipped entirely when neither has anything to ask it: an
+# empty local list with no -IncludeRemote is a run with nothing left to classify, and a gh call there
+# would only be able to produce a warning.
 $mergedHeads = @()
 $ghKnown = $false
-$ghCmd = Get-Command 'gh' -ErrorAction SilentlyContinue
-if ($ghCmd) {
-    $prRes = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-        'pr', 'list', '--state', 'merged', '--limit', '200', '--json', 'headRefName', '--jq', '.[].headRefName')
-    if ($prRes.ExitCode -eq 0) {
-        $ghKnown = $true
-        $mergedHeads = @(($prRes.Output | Out-String) -split '\r?\n' |
-            ForEach-Object { $_.Trim() } | Where-Object { $_ })
+if ($branches.Count -gt 0 -or $IncludeRemote) {
+    $ghCmd = Get-Command 'gh' -ErrorAction SilentlyContinue
+    if ($ghCmd) {
+        $prRes = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+            'pr', 'list', '--state', 'merged', '--limit', '200', '--json', 'headRefName', '--jq', '.[].headRefName')
+        if ($prRes.ExitCode -eq 0) {
+            $ghKnown = $true
+            $mergedHeads = @(($prRes.Output | Out-String) -split '\r?\n' |
+                ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        } else {
+            Write-Warning "gh could not list merged PRs -- a squash-merged branch cannot be proven merged and will be kept. ($(($prRes.Output | Out-String).Trim()))"
+        }
     } else {
-        Write-Warning "gh could not list merged PRs -- a squash-merged branch cannot be proven merged and will be kept. ($(($prRes.Output | Out-String).Trim()))"
+        Write-Warning "gh is not available -- a squash-merged branch cannot be proven merged and will be kept."
     }
-} else {
-    Write-Warning "gh is not available -- a squash-merged branch cannot be proven merged and will be kept."
 }
 
 $deleted = @()
@@ -255,23 +295,105 @@ foreach ($branch in $branches) {
     }
 }
 
-# --- The report ------------------------------------------------------------------------------------
-$verb = if ($DryRun) { 'Would delete' } else { 'Deleted' }
-foreach ($d in $deleted) {
-    Write-Host "  $verb $($d.Branch) (git branch $($d.Flag) -- $($d.Proof))" -ForegroundColor Green
-}
-foreach ($k in $kept) {
-    Write-Host "  Kept $($k.Branch) -- $($k.Why)" -ForegroundColor Yellow
+# --- The local report --------------------------------------------------------------------------------
+if ($branches.Count -gt 0) {
+    $verb = if ($DryRun) { 'Would delete' } else { 'Deleted' }
+    foreach ($d in $deleted) {
+        Write-Host "  $verb $($d.Branch) (git branch $($d.Flag) -- $($d.Proof))" -ForegroundColor Green
+    }
+    foreach ($k in $kept) {
+        Write-Host "  Kept $($k.Branch) -- $($k.Why)" -ForegroundColor Yellow
+    }
+
+    $summary = "$($deleted.Count) $(if ($DryRun) { 'reapable' } else { 'deleted' }), $($kept.Count) kept, of $($branches.Count) local branch$(if ($branches.Count -eq 1) { '' } else { 'es' }) beside '$trunk'."
+    Write-Host $summary -ForegroundColor Cyan
+    if ($DryRun -and $deleted.Count -gt 0) {
+        Write-Host "Nothing was deleted -- rerun without -DryRun to reap them." -ForegroundColor DarkGray
+    }
 }
 
-$summary = "$($deleted.Count) $(if ($DryRun) { 'reapable' } else { 'deleted' }), $($kept.Count) kept, of $($branches.Count) local branch$(if ($branches.Count -eq 1) { '' } else { 'es' }) beside '$trunk'."
-Write-Host $summary -ForegroundColor Cyan
-if ($DryRun -and $deleted.Count -gt 0) {
-    Write-Host "Nothing was deleted -- rerun without -DryRun to reap them." -ForegroundColor DarkGray
+# --- 5. The remote heads, classified and handed over -- never touched (issue #1042) -----------------
+# The reasoning is in the header: this is the read that surfaces a parked branch, and until this pass
+# existed the script named the command and interpreted none of it, so the same per-head triage was
+# re-derived by hand. It stays report-only, which is what keeps it inside the declined permission
+# rather than around it.
+if (-not $IncludeRemote) {
+    # THE REMOTE IS NOT THIS SCRIPT'S BUSINESS BY DEFAULT, and saying so is what stops the next reader
+    # concluding that a clean local list means a clean remote. One line, naming the command that
+    # actually answers it -- and now also the switch that answers it here.
+    Write-Host "The remote is untouched by design -- verify it with: git ls-remote --heads $Remote (or rerun with -IncludeRemote to have those heads classified here)." -ForegroundColor DarkGray
+    exit 0
 }
 
-# THE REMOTE IS NOT THIS SCRIPT'S BUSINESS, and saying so is what stops the next reader concluding
-# that a clean local list means a clean remote. One line, printed always, naming the command that
-# actually answers it.
-Write-Host "The remote is untouched by design -- verify it with: git ls-remote --heads $Remote" -ForegroundColor DarkGray
+$lsRes = Invoke-Git -Arguments @('ls-remote', '--heads', $Remote)
+if ($lsRes.ExitCode -ne 0) {
+    Write-Warning "could not read the heads on $Remote -- the remote pass is skipped, and nothing above it is affected. ($(($lsRes.Output | Out-String).Trim()))"
+    exit 0
+}
+
+# ls-remote prints '<sha>\t refs/heads/<name>'. Split on the FIRST run of whitespace only: a branch
+# name may not contain whitespace, but a tab-vs-spaces assumption about git's output format is a
+# needless one to make.
+$heads = @(($lsRes.Output | Out-String) -split '\r?\n' |
+    ForEach-Object { $_.Trim() } |
+    Where-Object { $_ } |
+    ForEach-Object {
+        $parts = $_ -split '\s+', 2
+        if ($parts.Count -eq 2 -and $parts[1].StartsWith('refs/heads/')) {
+            [pscustomobject]@{ Sha = $parts[0]; Branch = $parts[1].Substring('refs/heads/'.Length) }
+        }
+    } |
+    Where-Object { $_ -and $_.Branch -ne $trunk })
+
+if ($heads.Count -eq 0) {
+    Write-Host "Nothing standing on $Remote beside '$trunk'." -ForegroundColor Green
+    exit 0
+}
+
+$remoteReapable = @()
+$remoteKept     = @()
+
+foreach ($h in $heads) {
+    # ANCESTRY IS JUDGED ON THE SHA ls-remote REPORTED, against the local trunk step 2 fast-forwarded.
+    # The object is present because step 3 fetched this remote; where it is NOT -- a fetch that failed,
+    # or a head pushed between the fetch and this read -- merge-base exits non-zero and the head is
+    # KEPT. That is the safe direction, and the only one: this pass hands over a delete command, so an
+    # unprovable head must never look provable.
+    $ancestor = (Invoke-Git -Arguments @('merge-base', '--is-ancestor', $h.Sha, $trunk)).ExitCode -eq 0
+    $mergedPr = ($mergedHeads -contains $h.Branch)
+
+    if ($ancestor -or $mergedPr) {
+        $remoteReapable += [pscustomobject]@{
+            Branch = $h.Branch
+            Proof  = if ($ancestor) { 'ancestor of ' + $trunk } else { 'merged PR' }
+        }
+        continue
+    }
+
+    # THE HEAD THIS PASS EXISTS TO LABEL. Neither proof means live work -- unfinished, parked, or
+    # somebody else's open PR -- and naming it here is what replaces the hand-written
+    # don't-sweep-this-one warning that two of the three measured triages had to add by hand.
+    $why = if ($ghKnown) {
+        'not an ancestor of the trunk and no merged PR -- live work (unfinished, parked, or another open PR)'
+    } else {
+        'not an ancestor of the trunk, and no merged PR could be checked -- treat as live'
+    }
+    $remoteKept += [pscustomobject]@{ Branch = $h.Branch; Why = $why }
+}
+
+foreach ($k in $remoteKept) {
+    Write-Host "  Kept $Remote/$($k.Branch) -- $($k.Why)" -ForegroundColor Yellow
+}
+
+# THE COMMANDS COME LAST so they are the block a reader copies from, and they are printed rather than
+# run: deleting a remote branch is a manual act in this house.
+if ($remoteReapable.Count -gt 0) {
+    Write-Host "Merged heads still standing on $Remote -- deleting a remote branch is a manual act here, so the commands are handed over rather than run:" -ForegroundColor Cyan
+    foreach ($r in $remoteReapable) {
+        Write-Host "  git push $Remote --delete $($r.Branch)   # $($r.Proof)" -ForegroundColor Green
+    }
+}
+
+$remoteSummary = "$($remoteReapable.Count) deletable, $($remoteKept.Count) kept, of $($heads.Count) head$(if ($heads.Count -eq 1) { '' } else { 's' }) on $Remote beside '$trunk'. Nothing on the remote was touched."
+Write-Host $remoteSummary -ForegroundColor Cyan
 exit 0

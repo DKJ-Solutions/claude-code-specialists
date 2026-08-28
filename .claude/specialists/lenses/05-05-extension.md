@@ -325,6 +325,16 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   `--delete` argument. Its local deletions are the mirror image of the declined permission: every one
   requires positive proof of a merge, so the set it can reach is exactly the set the permission could
   *not* have reached safely.
+  **Since August 28, 2026 that script also *composes* the paste-ready command, under `-IncludeRemote`**
+  ([#1042](https://github.com/DaveKJohn/claude-code-specialists/issues/1042)) — which is this bullet
+  being carried out rather than worked around, since handing the command over is what the decision says
+  should happen. It reads `git ls-remote --heads`, puts every head that is not the trunk through the
+  same two proofs, prints `git push <remote> --delete <branch>` for one it can prove and
+  `Kept <remote>/<branch> -- live work` for one it cannot, and runs neither. The structural assert was
+  widened in the same movement to a quote of **either** kind, because the file now contains those words
+  in a double-quoted string on purpose. The reason it was built: the classification had been
+  re-derived by hand three times in two days (#992, #1035, #1039), and twice the session also had to
+  hand-write a *don't sweep this one* warning about a live head — which is the `Kept` line's whole job.
 - **A parked branch can be silently overtaken, and exactly one command shows it exists.** The mechanism,
   the pick-up check and the measurement are in the **portable** `park` skill, which is where a consumer
   meets this too — a parked branch has no PR by design, so `git ls-remote --heads origin` is the only

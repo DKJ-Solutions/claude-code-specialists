@@ -155,11 +155,13 @@ function Invoke-PruneMerged {
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Dir,
-        [switch]$DryRun
+        [switch]$DryRun,
+        [switch]$IncludeRemote
     )
     $scriptPath = Join-Path $Dir 'scripts\task\prune-merged.ps1'
     $callArgs = @()
     if ($DryRun) { $callArgs += '-DryRun' }
+    if ($IncludeRemote) { $callArgs += '-IncludeRemote' }
 
     $prevPd  = $env:CLAUDE_PROJECT_DIR
     $prevEap = $ErrorActionPreference
@@ -296,8 +298,61 @@ try {
     # git call actually takes here (Invoke-NativeCapture takes an array of quoted strings) -- rather
     # than on the bare words, which appear in the script's own header explaining why it does not do
     # this. A prose ban and a code ban are two different assertions and only the second is worth one.
+    #
+    # QUOTES OF EITHER KIND SINCE #1042, and the widening is the point of it. That issue added a pass
+    # that PRINTS `git push <remote> --delete <branch>`, so the file now contains those words in a
+    # double-quoted string on purpose -- and a real call written as "--delete" instead of '--delete'
+    # would have slipped past the single-quote form while looking exactly like the printed line. The
+    # printed line survives this because what precedes its `--delete` is a SPACE, not a quote: an
+    # argument is a string that starts there, a printed flag is a word inside one.
     $srcText = [System.IO.File]::ReadAllText($PruneMergedSrc)
-    Assert-True ($srcText -notmatch "'--delete") 'remote: and no git call in the source carries a --delete argument, so the property is structural rather than only untested here'
+    Assert-True ($srcText -notmatch '["'']--delete') 'remote: and no git call in the source carries a --delete argument, in quotes of either kind, so the property is structural rather than only untested here'
+
+    # --- (g) -IncludeRemote classifies the heads it used to only name -------------------------------
+    #     Issue #1042. `git ls-remote --heads` is the only read that surfaces a parked branch, and the
+    #     script named that command while interpreting none of it -- so the same per-head triage was
+    #     re-derived by hand, three times in two days. This asserts BOTH halves of the repair: the
+    #     paste-ready command for a head with positive proof, and the labelled keep for one without.
+    #     The unmerged head is deleted LOCALLY first, so it exists only on the remote -- the shape of a
+    #     parked branch or another machine's push, which is the case the pass exists for.
+    Write-Host "prune-merged.ps1 -- -IncludeRemote classifies the remote heads" -ForegroundColor Cyan
+    $dirG = New-Fixture -Label 'g'
+    New-MergedBranch   -Dir $dirG -Name 'feat/landed-and-pushed'
+    New-UnmergedBranch -Dir $dirG -Name 'feat/parked-elsewhere'
+    Invoke-FixtureGit -Arguments @('-C', $dirG, 'push', '-q', 'origin', 'feat/landed-and-pushed')
+    Invoke-FixtureGit -Arguments @('-C', $dirG, 'push', '-q', 'origin', 'feat/parked-elsewhere')
+    Invoke-FixtureGit -Arguments @('-C', $dirG, 'branch', '-q', '-D', 'feat/parked-elsewhere')
+    $rG = Invoke-PruneMerged -Dir $dirG -IncludeRemote
+    Assert-Equal 0 $rG.Code '-IncludeRemote: exit 0'
+    Assert-True ($rG.Out -match 'git push origin --delete feat/landed-and-pushed') '-IncludeRemote: a provably merged head is handed over as the paste-ready command'
+    Assert-True ($rG.Out -match 'Kept origin/feat/parked-elsewhere') '-IncludeRemote: and a head with neither proof is labelled Kept instead of being left to be re-derived'
+    Assert-True ($rG.Out -match 'treat as live') '-IncludeRemote: with the reason, which is what replaces the hand-written do-not-sweep-this-one warning'
+    Assert-True ($rG.Out -notmatch 'Kept origin/main') '-IncludeRemote: the trunk is never a candidate on the remote either'
+    #     THE SAFETY PROPERTY OF THIS PASS: it hands over a command and runs none. Both heads -- the one
+    #     it called deletable and the one it kept -- are still standing afterwards.
+    $remoteHeadsG = @(& git -C $dirG ls-remote --heads origin | ForEach-Object { $_ }) -join ' '
+    Assert-True ($remoteHeadsG -match 'feat/landed-and-pushed') '-IncludeRemote: the head it printed a delete command for is STILL on the remote -- it reports, it does not run'
+    Assert-True ($remoteHeadsG -match 'feat/parked-elsewhere') '-IncludeRemote: and so is the one it kept'
+
+    # --- (h) A clean local list does not skip the remote pass ---------------------------------------
+    #     "The trunk is the only local branch" used to end the run on the spot -- and that is exactly
+    #     the state in which the remote question is worth asking, since a clone that has just been
+    #     tidied proves nothing whatsoever about origin. The second run below is the other half: with
+    #     no switch, nothing on the remote is classified and the closing line names the switch that
+    #     would. Asserted as a pair, because either one alone would pass on a script that ignored the
+    #     flag entirely.
+    Write-Host "prune-merged.ps1 -- a clean local list still reports the remote" -ForegroundColor Cyan
+    $dirH = New-Fixture -Label 'h'
+    New-MergedBranch -Dir $dirH -Name 'fix/gone-locally'
+    Invoke-FixtureGit -Arguments @('-C', $dirH, 'push', '-q', 'origin', 'fix/gone-locally')
+    Invoke-FixtureGit -Arguments @('-C', $dirH, 'branch', '-q', '-d', 'fix/gone-locally')
+    $rH = Invoke-PruneMerged -Dir $dirH -IncludeRemote
+    Assert-Equal 0 $rH.Code 'clean local: exit 0'
+    Assert-True ($rH.Out -match 'Nothing to reap') 'clean local: it still says the local list is empty'
+    Assert-True ($rH.Out -match 'git push origin --delete fix/gone-locally') 'clean local: AND the remote pass still runs -- the early exit does not swallow it'
+    $rH2 = Invoke-PruneMerged -Dir $dirH
+    Assert-True ($rH2.Out -notmatch 'git push origin --delete') 'clean local: without the switch nothing about the remote is classified'
+    Assert-True ($rH2.Out -match '-IncludeRemote') 'clean local: the closing line names the switch that would classify it, rather than only the raw command'
 } finally {
     foreach ($f in $script:fixtures) {
         if ($f -and (Test-Path -LiteralPath $f)) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

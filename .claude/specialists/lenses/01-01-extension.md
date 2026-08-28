@@ -47,7 +47,12 @@ product: agent defs, manuals, docs, and tooling.
   [Derek #05](05-05-extension.md#branch--repo-hygiene) — and the three gates
   (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` + `check-script-contract.ps1`). Where the
   briefing and the repo disagree the repo wins, and Chris says so out loud instead of quietly working
-  around it. **The instance behind each of the three modes is in the
+  around it. **Do not classify that `ls-remote` output by hand — run
+  `scripts/task/prune-merged.ps1 -IncludeRemote` instead**: it puts every head through the same two
+  proofs the local pass uses, prints the paste-ready delete command for a merged leftover and
+  `Kept ... -- live work` for everything else, and touches nothing. Hand-derivation was itself the
+  defect ([#1042](https://github.com/DaveKJohn/claude-code-specialists/issues/1042)), measured three
+  times in two days. **The instance behind each of the three modes is in the
   [specialists handbook](../README.md#the-three-ways-a-briefing-fails-measured-here)** — the rule stays
   here, the evidence is one file away.
 - **The inbound verification, and the six ways a report fails on pickup.** An inbound item is verified
