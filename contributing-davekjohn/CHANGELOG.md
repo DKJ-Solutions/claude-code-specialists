@@ -32,6 +32,66 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-pr-names-a-run-that-never-started-v1` · 20260828-222631
+
+`ship-pr.ps1` now says *"CI never RAN"* when the workflow run failed to start, instead of reporting it
+as a check that went red.
+
+Measured August 28, 2026 in a consumer repo (inbound #1044): Actions stopped starting jobs because an
+account payment had failed. Every run ended in about four seconds with zero steps, no logs, and no
+annotation on the ordinary run page. `ship-pr` reported it as *"CI did not pass for PR #N (exit 1) --
+NOT merged: the required-check list could not be read ... Fix CI and re-run, or merge manually once
+green."* Every clause of that is literally true, and together they point the reader at their own code
+for a state no branch can repair and no re-run will change. One PR was merged by hand as a result --
+the habit the workflow exists to prevent.
+
+**The merge decision does not move, and that is deliberate.** No state was added to
+`Get-MergeBlockVerdict`: refusing on an unreadable required-check list is the conservative half of
+#943 and it still refuses, on exactly the same payload. What changed is which sentence the operator
+reads beside the refusal. Two pure functions carry it, in the lib where the rest of the check
+reasoning already lives: `Get-FailedCheckRunIds` pulls the Actions run ids out of the failing checks'
+`link` field -- the only place a `gh pr checks` payload names the run behind a check -- and
+`Get-StalledRunNote` reads one `gh run view <id> --json conclusion,status,url,jobs` and answers
+whether any job in it executed a step. Both are best-effort: an unreadable payload costs the note and
+leaves the old wording, because a diagnostic must never be the reason a refusal cannot be printed.
+
+**Why the step count and not the annotation.** The reason text the reporter eventually found
+(*"recent account payments have failed or your spending limit needs to be increased"*) sits on a
+check-run annotation, and going after it would have been building on the half of the report that could
+not be verified here: it describes the empty state two ways -- an empty jobs array and jobs with zero
+steps -- and the entry point to the annotation differs between them. Both shapes are recognised
+instead, because *no step ran* is the fact that makes "fix your code" wrong under every cause of it: a
+failed payment, a reached spending limit, Actions disabled for the org, no runner able to take the
+job. The note names the single command that prints the reason, which the run page does not show.
+
+The assert that keeps it from crying wolf is the negative one: a job that executed even one step is an
+ordinary failure and keeps the wording that is correct for it. A run still in progress is not stalled
+either -- `ship-pr` only reaches this after `--watch`, so that cannot happen, which is precisely why it
+is asserted.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The report proposed a direction rather than a patch, and two of its details did not survive contact
+with the tree -- the signal turned out to be one API call deep rather than two, and its account of the
+empty state was ambiguous between two shapes. Neither was a defect in the report; both would have
+become defects in the repair if the reason had been transcribed instead of checked. The fix recognises
+both shapes and reaches for the fact rather than the cause, so it holds for the three causes nobody
+has hit yet as well as for the one that was measured.
+
+**Score:** 2
+
+#### Pull Request
+
+ship-pr tells a stalled Actions run apart from a check that went red
+
+Plugins: contributing-davekjohn
+
+[PR #1048](https://github.com/DaveKJohn/claude-code-specialists/pull/1048)
+
+---
+
 ### DEPLOY: `feat/prune-merged-classifies-remote-heads-v1` · 20260828-215400
 
 `prune-merged.ps1` gains `-IncludeRemote`: it now reads `git ls-remote --heads` and says what each head
