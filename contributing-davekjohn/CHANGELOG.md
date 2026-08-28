@@ -31,3 +31,43 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `fix/the-guard-refusal-does-not-teach-forgery-v1` · 20260828-182455
+
+`guard-live-theme` stops teaching the one habit it exists to prevent, and authoring the rule it enforces
+no longer depends on which shell your platform uses.
+
+The refusal a consumer met while moving a printed `shopify theme delete` out of a `Write-Host` format
+string told them to *"add the marker `# …-THEME-DELETE-AUTHORIZED` to this exact command"*. On a command
+that writes a **file** that advice works, because the marker is matched over the whole command string —
+so a reader doing as they were told marks a non-delete as an authorised delete. The guard's own header
+already argued that a guard making its own rule impossible to write down gets switched off; this was the
+sharper version, one that made the rule *hazardous* to write down. Every refusal now carries one line
+saying a marker authorises a **command**, never a file write, and the suite asserts that line is present.
+
+The matching half was an asymmetry nobody chose. The matcher has read both the Bash and the PowerShell
+tool since day one — that breadth is what closes the wrapper vector — while both exemptions knew only
+the POSIX spellings. A PowerShell `@' … '@` body is now stripped exactly as a heredoc body is, gated on
+the same execution test, and the write cmdlets join `$TEXT_TOOLS` beside their POSIX twins. The
+here-string half is the one that mattered: the segment split is on newlines, so an unstripped body
+matches on its own body line, a segment away from the cmdlet consuming it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches a service subscriber — this is a plugin-carried hook, and it reaches Shopify consumers
+of `team-shopify` on their next update.
+
+**Score:** N/A
+
+#### Pull Request
+
+The live-theme guard stops teaching marker forgery, and PowerShell authoring is exempt like Bash
+
+Plugins: team-shopify
+
+[PR #1034](https://github.com/DaveKJohn/claude-code-specialists/pull/1034)
+
+---
+
