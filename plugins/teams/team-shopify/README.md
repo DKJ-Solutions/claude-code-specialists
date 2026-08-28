@@ -252,14 +252,42 @@ So the matching asks **where** the words sit rather than whether they occur:
 
 - **Heredoc bodies are stripped** — `cat > file <<EOF … EOF` writes data and the body never runs. *Unless*
   an interpreter is consuming it (`bash <<EOF`), in which case the body **is** a script.
-- **Text tools are skipped** — a segment led by `grep`, `sed`, `perl`, `awk`, `cat`, `echo`, `git` and
-  friends is handling the words, not obeying them. *Unless* the command pipes into an interpreter or uses
-  `eval`/`xargs`: `echo "…" | bash` really does execute.
+- **Here-string bodies are stripped** for the same reason — a PowerShell `@' … '@` body is assigned or
+  piped somewhere and nothing in it runs. *Unless* the command also shows an execution vector
+  (`Invoke-Expression`, `iex`, `[scriptblock]::Create`, or the `eval`/`xargs`/pipe-into-a-shell forms).
+- **Text tools are skipped** — a segment led by `grep`, `sed`, `perl`, `awk`, `cat`, `echo`, `git`,
+  `Out-File`, `Set-Content`, `Get-Content`, `Select-String` and friends is handling the words, not
+  obeying them. *Unless* the command pipes into an interpreter or uses `eval`/`xargs`/`iex`:
+  `echo "…" | bash` really does execute.
 - **Everything else is matched per shell segment**, so a real command after a heredoc, after a semicolon,
   or inside a wrapper is still caught.
 
 **Every one of those exemptions has a counter-case in the suite** (`scripts/tests/guard-live-theme.tests.ps1`
-in the source repo, 69 asserts), because an exemption without one is a hole with a comment on it.
+in the source repo, 102 asserts), because an exemption without one is a hole with a comment on it.
+
+### The two PowerShell halves arrived late, and the asymmetry was not a decision
+
+Inbound #1032, from a consumer moving a printed `shopify theme delete` command out of a format string into
+a function its test suite could assert. The matcher has covered **both** shells since the first day — that
+breadth is what closes the wrapper vector — while both exemptions above knew only the POSIX spellings. So
+the same file, written by the same session, was permitted through Bash and refused through PowerShell:
+whether you were allowed to write this rule down depended on which shell your platform uses, which is not
+a security boundary.
+
+Of the two repairs, the here-string stripping is the one that matters. The segment split is on **newlines**,
+so an unstripped body turns each of its own lines into a segment — the line that matches is the body line,
+and the cmdlet that would have earned it the text-tool exemption sits a segment away. Adding the write
+cmdlets alone would not have fixed the reported case.
+
+**And the refusal text was the sharper half of the same defect.** What that consumer met told them to
+*"add the marker `# …-THEME-DELETE-AUTHORIZED` to this exact command"* — and on a command that writes a
+**file**, following that advice **works**, because the marker is matched over the whole command string. A
+reader doing as they were told would mark a non-delete as an authorised delete, which is precisely the
+erosion the marker exists to prevent. The quote above says a guard making its own rule impossible to write
+down gets switched off; this was the sharper version, a guard that made its own rule *hazardous* to write
+down. Every refusal now carries one extra line saying that a marker authorises a **command**, never a file
+write, and pointing at an editor instead — and the suite asserts that line is there, because a sentence
+nothing asserts is a sentence the next edit removes.
 
 ### The two limits, stated rather than hidden
 
