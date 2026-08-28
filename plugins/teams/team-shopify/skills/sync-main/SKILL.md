@@ -59,6 +59,12 @@ would do to it.
    writes it to a file and hands you `gh pr create ... --body-file <path>`; the merging path passes it
    straight to `gh`. `Get-ShopifySyncPrBody` replaces it with your own (inbound
    [#1000](https://github.com/DaveKJohn/claude-code-specialists/issues/1000)).
+9. **Labels the PR, on both paths, if you asked for any** -- `Get-ShopifySyncPrLabels` answers what goes
+   on it, and nothing does by default. Answer it if a guardrail workflow of yours **fails an unlabelled
+   PR**: the merging path would otherwise open one that goes red on CI and cannot merge, and the printed
+   line would hand you the same failure one paste later. The labels go on the `gh pr create` itself
+   rather than a `gh pr edit` afterwards, so the first check run already sees them (inbound
+   [#1023](https://github.com/DaveKJohn/claude-code-specialists/issues/1023)).
 
 ## The three things that make it unable to destroy work
 
@@ -135,6 +141,7 @@ default beside it. `adopt-shopify-floor` writes the block; the two required ones
 | `Get-ShopifySyncBranchPrefix` | `sync/live-` | the drift branch's prefix. It has to line up with whatever your PR guardrails and CI exempt, which is why it is yours to set. |
 | `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges it once CI is green. |
 | `Get-ShopifySyncPrBody` | *(none)* | the PR body. Called with `-Take`, `-Keep` (the classified rows, each carrying `Status`/`Path`/`Reason`) and `-Default` (the body the script composed), and it returns the body to use. |
+| `Get-ShopifySyncPrLabels` | *(none)* | the label(s) the sync PR carries. Returns a string or an array of them; empty and absent both mean no label. Answer it where a guardrail workflow fails an unlabelled PR. |
 | `Get-TrunkBranchName` | `main` | the trunk. |
 | `Get-PrMergeMethod` | `merge` | read only when `Get-ShopifySyncMerges` is true. |
 

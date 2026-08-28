@@ -87,6 +87,20 @@
     around that -- its own template, a checkbox, its own wording -- is Get-ShopifySyncPrBody's answer,
     which receives the same rows and the default body to build on.
 
+    AND THE PR ROUTE IS A SEAM FOR THE SAME REASON THE BODY IS (inbound #1023). A repo may require every
+    PR to carry a label -- a guardrail workflow that fails an unlabelled one is the measured case -- and
+    a sync PR opened without one goes red on CI and cannot merge. So Get-ShopifySyncPrLabels answers what
+    to put on it, and the labels go on BOTH paths for the reason the body does: the printed line is what
+    the operator pastes, and a line missing --label lands the same red CI a moment later. Answering the
+    seam is what let that consumer delete its own wrapper around this script.
+
+    WHY A LABEL SEAM RATHER THAN ROUTING THROUGH THE WORKFLOW PLUGIN'S open-pr.ps1, which would bring the
+    lint and test gates along with it: that would couple team-shopify to contributing-davekjohn, and the
+    merging path below deliberately uses nothing but 'gh' so a consumer on either workflow plugin, or on
+    neither, gets the same behaviour. A seam keeps that property; a cross-plugin call does not. The gates
+    are the cost of that choice and they are named here rather than quietly dropped: a repo that wants
+    them runs the sync with the merge seam off and opens the PR through its own route.
+
     WHAT IT NEVER DOES: it does not push to live, publish a theme, or delete one. It reads from live and
     writes to git. team-shopify's PreToolUse guard covers those three acts independently and is not
     weakened here.
@@ -108,6 +122,9 @@
                                       checkboxes or its own wording around it. Default: what
                                       New-SyncPrBody composes, which names both halves and every path
                                       with its kind.
+      Get-ShopifySyncPrLabels         the label(s) the sync PR carries. Returns a string or an array of
+                                      them; empty and absent both mean no label, which is the default
+                                      and was the only behaviour before inbound #1023.
       Get-TrunkBranchName             the trunk. Default: 'main'.
       Get-PrMergeMethod               only read when Get-ShopifySyncMerges is true. Default: 'merge'.
 
@@ -210,7 +227,7 @@ $seam = & {
     Set-StrictMode -Off
     $answers = @{
         LiveThemeId = ''; StoreDomain = ''; Pattern = ''; BranchPrefix = ''
-        Merges = $false; Trunk = ''; MergeMethod = ''
+        Merges = $false; Trunk = ''; MergeMethod = ''; Labels = @()
     }
     $configPath = Join-Path $args[0] 'scripts\repo-config.ps1'
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return $answers }
@@ -222,6 +239,24 @@ $seam = & {
     if (Get-Command Get-ShopifySyncMerges           -ErrorAction SilentlyContinue) { $answers.Merges       = [bool](Get-ShopifySyncMerges) }
     if (Get-Command Get-TrunkBranchName             -ErrorAction SilentlyContinue) { $answers.Trunk        = [string](Get-TrunkBranchName) }
     if (Get-Command Get-PrMergeMethod               -ErrorAction SilentlyContinue) { $answers.MergeMethod  = [string](Get-PrMergeMethod) }
+    # THE ONE ANSWER IN THIS BLOCK WHOSE FAULT IS REPORTED, and it is the body seam's reason below applied
+    # to the PR route (inbound #1023). Every other default here is a CORRECT answer, so falling back to one
+    # is silent by design. No label is different: in a repo whose guardrail requires one, the fallback
+    # opens a PR that goes red on CI and cannot merge, which is the failure the seam exists to prevent --
+    # so it must not happen quietly. Its own try/catch rather than the block-wide one above, because that
+    # one returns the whole hashtable of defaults and would cost the store and the theme id too.
+    #
+    # AN ARRAY OR A BARE STRING, both accepted: 'return "sync"' is what a consumer writes first, and
+    # demanding @('sync') would make the seam wrong in the way that is hardest to see in a config file.
+    # @() around the pipeline keeps one label an array rather than a string PowerShell then iterates by
+    # character. Blank entries are dropped, so a 'VUL-IN' cleared to '' reads as unanswered.
+    if (Get-Command Get-ShopifySyncPrLabels -ErrorAction SilentlyContinue) {
+        try {
+            $answers.Labels = @(Get-ShopifySyncPrLabels | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+        } catch {
+            Write-Host "Get-ShopifySyncPrLabels threw, so the sync PR gets no label: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
     return $answers
 } $repoRoot
 
@@ -288,6 +323,7 @@ $pattern      = if (([string]$seam.Pattern).Trim())      { ([string]$seam.Patter
 $branchPrefix = if (([string]$seam.BranchPrefix).Trim()) { ([string]$seam.BranchPrefix).Trim() } else { 'sync/live-' }
 $mergeMethod  = if (([string]$seam.MergeMethod).Trim())  { ([string]$seam.MergeMethod).Trim() }  else { 'merge' }
 $merges       = ([bool]$seam.Merges) -and (-not $StopBeforeMerge) -and (-not $DryRun)
+$prLabels     = @($seam.Labels)
 
 Write-Host ''
 Write-Host "=== pre-task sync  |  store: $store  theme: $liveId ===" -ForegroundColor Cyan
@@ -588,14 +624,31 @@ try {
     $body        = if ($seamBody) { $seamBody } else { $defaultBody }
     if ($seamBody) { Write-Host 'PR body: composed by Get-ShopifySyncPrBody.' -ForegroundColor DarkGray }
 
+    # --- the labels, composed ONCE for both paths too ------------------------------------------------
+    # '--label' REPEATED RATHER THAN ONE COMMA-SEPARATED VALUE: gh accepts both, and repeating it is the
+    # form that cannot be broken by a label whose own name contains a comma. As arguments for the create
+    # below and as text for the line the operator pastes, from the same list, so the two cannot disagree.
+    $labelArgs = @(); foreach ($l in $prLabels) { $labelArgs += @('--label', $l) }
+    $labelText = ($prLabels | ForEach-Object { " --label `"$_`"" }) -join ''
+    if ($prLabels.Count -gt 0) {
+        Write-Host "PR label(s) from Get-ShopifySyncPrLabels: $($prLabels -join ', ')" -ForegroundColor DarkGray
+    }
+
     if (-not $merges) {
         $bodyFile = Join-Path ([System.IO.Path]::GetTempPath()) ("sync-pr-body-$PID-" + ($branch -replace '[^A-Za-z0-9]', '-') + '.md')
         [System.IO.File]::WriteAllText($bodyFile, $body, (New-Object System.Text.UTF8Encoding($false)))
         Write-Host ''
         Write-Host 'Done -- and deliberately NOT merged.' -ForegroundColor Green
         Write-Host 'Open the PR, look at what the third parties changed, and merge it yourself:' -ForegroundColor Green
-        Write-Host "  gh pr create --base $trunk --head $branch --title `"$msg`" --body-file `"$bodyFile`"" -ForegroundColor Cyan
+        Write-Host "  gh pr create --base $trunk --head $branch --title `"$msg`" --body-file `"$bodyFile`"$labelText" -ForegroundColor Cyan
         Write-Host ''
+        if ($prLabels.Count -gt 0) {
+            # WHY THE PRINTED LINE CARRIES THEM AND THE NOTE SAYS SO. This path is the default one, so it is
+            # the common one -- and a repo that answered the label seam did so because an unlabelled PR fails
+            # its guardrail. Printing a line without them would hand the operator the exact failure the seam
+            # was answered to prevent, one paste later.
+            Write-Host '  The --label flag(s) are Get-ShopifySyncPrLabels'' answer; keep them on the line.' -ForegroundColor DarkGray
+        }
         if ($seamBody) {
             # The claim below is about the DEFAULT body's shape, and a seam is free to drop either half.
             # Printing it over somebody else's body would be this script vouching for a record it did not
@@ -611,9 +664,29 @@ try {
     # --- the merging variant ------------------------------------------------------------------------
     # Only reached where Get-ShopifySyncMerges says so. It uses nothing but 'gh': a consumer on either
     # workflow plugin, or on neither, gets the same behaviour, and Get-PrMergeMethod is read defensively
-    # above rather than required.
-    & gh pr create --base $trunk --head $branch --title $msg --body $body
-    if ($LASTEXITCODE -ne 0) { Write-Host 'Could not open the PR. The branch is pushed; open it by hand.' -ForegroundColor Red; exit 1 }
+    # above rather than required. Get-ShopifySyncPrLabels is read the same way and adds no dependency --
+    # '--label' is gh's own flag, which is what kept the label answer on this side of that line.
+    #
+    # ON THE CREATE RATHER THAN A 'gh pr edit --add-label' AFTER IT, deliberately: the guardrail that made
+    # this necessary reads the labels when it RUNS, and a PR opened bare starts its first check run bare.
+    # Labelling a moment later leaves a red run to re-trigger, which is most of the failure still standing.
+    # The cost is that a label the repo does not have fails the create outright instead of degrading -- gh
+    # validates before opening -- and that is the better end to fail at: the branch is pushed, nothing is
+    # lost, and the message below says what to do.
+    #
+    # '@labelArgs' AND NOT '$labelArgs', measured against Windows PowerShell 5.1: the splat form
+    # contributes nothing when the list is empty, while the bare variable passes an EMPTY STRING argument
+    # -- which gh reads as a positional argument and rejects. No label is the default, so that is the path
+    # nearly every consumer takes.
+    & gh pr create --base $trunk --head $branch --title $msg --body $body @labelArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'Could not open the PR. The branch is pushed; open it by hand.' -ForegroundColor Red
+        if ($prLabels.Count -gt 0) {
+            Write-Host "  If it named a label: gh refuses a label this repo does not have. Answered: $($prLabels -join ', ')" -ForegroundColor Red
+            Write-Host '  Create the label, or correct Get-ShopifySyncPrLabels in scripts/repo-config.ps1.' -ForegroundColor Red
+        }
+        exit 1
+    }
 
     $pr = ([string](& gh pr view $branch --json number --jq '.number')).Trim()
     Write-Host "Sync PR #$pr opened; waiting up to $ChecksTimeoutMinutes min for CI." -ForegroundColor Cyan

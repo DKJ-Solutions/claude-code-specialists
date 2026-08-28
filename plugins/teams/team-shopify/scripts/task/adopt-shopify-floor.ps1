@@ -32,7 +32,7 @@
     answered-or-commented rule applies to the store domain. sync-main is the higher-risk half of the same
     problem the guard covers: a live theme has no locking, so work starts by mirroring live into the
     trunk, and the obvious wholesale implementation overwrites whatever the trunk has done since. Its
-    other three seams are listed in the block with their defaults rather than written out, because those
+    other five seams are listed in the block with their defaults rather than written out, because those
     defaults are right for both existing consumers -- what they buy is that nobody has to read the script
     to find out what is configurable.
 
@@ -190,7 +190,7 @@ function Get-SeamBlock([string]$Id, [string]$StoreDomain) {
     }
     $lines += @(
         '',
-        '# The remaining four, with their defaults, all optional:',
+        '# The remaining five, with their defaults, all optional:',
         '#',
         '#   Get-ShopifySyncReferencePattern   default ''^[Ss]ync''    the --grep pattern that recognises a',
         '#                                                            previous sync commit. The capital is not',
@@ -218,6 +218,14 @@ function Get-SeamBlock([string]$Id, [string]$StoreDomain) {
         '#                                                            default already names both halves and every',
         '#                                                            path with its kind -- changed, new or gone',
         '#                                                            on live -- which is what a reader needs.',
+        '#   Get-ShopifySyncPrLabels           default (none)        the label(s) the sync PR carries. A',
+        '#                                                            string or an array of them; empty and',
+        '#                                                            absent both mean no label. Answer it where',
+        '#                                                            a guardrail workflow fails an unlabelled PR:',
+        '#                                                            without one the sync PR goes red on CI and',
+        '#                                                            cannot merge. They go on the create AND on',
+        '#                                                            the printed line, so whichever route you',
+        '#                                                            take carries them (inbound #1023).',
         ''
     )
     return (($lines -join "`n") + "`n")

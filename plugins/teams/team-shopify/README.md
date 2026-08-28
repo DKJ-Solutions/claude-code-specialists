@@ -114,8 +114,8 @@ work from previous agencies — measured on a live store in August 2026: ninetee
 a current preview. Nothing in a command distinguishes a spent preview from any of the rest, so the marker
 is what makes the deletion deliberate; being merely non-live is not enough.
 
-**Five more belong to the pre-task sync** (`sync-main`), and only the store is required beside the theme
-id — the other four have defaults that are right for both existing Shopify consumers:
+**Six more belong to the pre-task sync** (`sync-main`), and only the store is required beside the theme
+id — the other five have defaults that are right for both existing Shopify consumers:
 
 | function | default | what it decides |
 |---|---|---|
@@ -124,6 +124,7 @@ id — the other four have defaults that are right for both existing Shopify con
 | `Get-ShopifySyncBranchPrefix` | `sync/live-` | the drift branch's prefix. Yours to set because it has to line up with whatever your PR guardrails and CI exempt. |
 | `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges once CI is green. The default pushes and stops, so somebody *looks* at what third parties changed before it becomes the base of new branches. |
 | `Get-ShopifySyncPrBody` | *(none)* | the PR body, given the classified rows and the body the script already composed. Answer it only where the PR body **is** your review policy — a template, a checkbox, a fixed wording. Unanswered, the default already names both halves and every path with its kind. |
+| `Get-ShopifySyncPrLabels` | *(none)* | the label(s) the sync PR carries — a string or an array of them. Answer it where a guardrail workflow **fails an unlabelled PR**: without one the sync PR goes red on CI and cannot merge. They go on the `gh pr create` *and* on the line the non-merging path prints, so whichever route you take carries them. |
 | `Get-TrunkBranchName` | `main` | the trunk. Not a Shopify seam — the sync simply reads it if your repo has answered it. |
 
 **And one more belongs to the preview push** (`push-preview`), which otherwise reuses the store domain,

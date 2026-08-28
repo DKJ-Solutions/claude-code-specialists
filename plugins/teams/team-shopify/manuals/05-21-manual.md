@@ -79,7 +79,7 @@ merged work three times in one week (inbound
 [#787](https://github.com/DaveKJohn/claude-code-specialists/issues/787)). It reads from live and writes to
 git: it never pushes to live, publishes, or deletes a theme.
 
-**Two things to know before running it, both of them about reading the result:**
+**Three things to know before running it, and the first two are about reading the result:**
 
 - **It stops before the merge by default.** The point of the step is a moment where somebody *looks* at
   what third parties changed before it becomes the base of new branches, so it pushes a `sync/live-…`
@@ -93,6 +93,13 @@ git: it never pushes to live, publishes, or deletes a theme.
   wraps its own template around it through `Get-ShopifySyncPrBody`. It was a flat file list until
   inbound [#1000](https://github.com/DaveKJohn/claude-code-specialists/issues/1000), and a flat list had
   already failed: in a consumer's own sync PR nothing recorded that a template had gone from live.
+- **If a guardrail of yours fails an unlabelled PR, answer `Get-ShopifySyncPrLabels` before you let the
+  sync open one.** Nothing is labelled by default, so in such a repo the merging path opens a PR that
+  goes red on CI and cannot merge — and the non-merging path prints a command that does the same thing a
+  paste later. The seam puts the labels on both, on the `gh pr create` itself rather than a `gh pr edit`
+  afterwards, so the first check run already sees them. This is the seam that let a consumer delete the
+  wrapper it had been keeping around this script purely to get a label on (inbound
+  [#1023](https://github.com/DaveKJohn/claude-code-specialists/issues/1023)).
 
 **And it refuses rather than guessing when it has no reference point** — no previous sync commit and no
 tag. That refusal is the rule protecting itself: without a floor, *every* file looks untouched by the

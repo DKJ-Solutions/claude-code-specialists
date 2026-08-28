@@ -52,10 +52,10 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
 [#787](https://github.com/DaveKJohn/claude-code-specialists/issues/787)). `sync-main` is the higher-risk
 half of the problem the guard covers: a live theme has no locking, so work starts by mirroring live into
 the trunk, and the obvious wholesale implementation overwrites whatever the trunk has done since. Only
-the store is worth answering on day one -- the other four seams
+the store is worth answering on day one -- the other five seams
 (`Get-ShopifySyncReferencePattern`, `Get-ShopifySyncBranchPrefix`, `Get-ShopifySyncMerges`,
-`Get-ShopifySyncPrBody`) are listed in the block with their defaults, which are right for both existing
-Shopify consumers. Listing them is what saves the next reader from having to open the script to learn
+`Get-ShopifySyncPrBody`, `Get-ShopifySyncPrLabels`) are listed in the block with their defaults, which
+are right for both existing Shopify consumers. Listing them is what saves the next reader from having to open the script to learn
 what is configurable.
 
 ## Why the seam is written as a comment when you do not pass the id
