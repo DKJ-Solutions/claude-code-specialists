@@ -686,6 +686,62 @@ Assert-Equal "'a', 'b' and 'c'"     (Format-CheckNameList -Names @('a','b','c'))
 Assert-Equal "'lint en tests'"      (Format-CheckNameList -Names @('lint en tests')) 'a name with spaces stays one quoted item'
 Assert-Equal "'a'"                  (Format-CheckNameList -Names @('a','',$null))    'blanks are dropped rather than quoted as empty'
 
+# INBOUND #1044 -- A RUN THAT NEVER STARTED IS NOT A CHECK THAT WENT RED.
+# Measured August 28, 2026 in a consumer repo: Actions refused to start jobs because an account
+# payment had failed, every run ended in ~4s with zero steps, and ship-pr reported "CI did not pass
+# ... Fix CI and re-run". Both halves true, and together they send the reader into their own code for
+# a state no branch can repair -- it cost a hand-merge. The verdict above is deliberately untouched;
+# what these asserts pin is the DIAGNOSIS printed beside the refusal.
+
+# The lookup key: only the failing records, only their Actions run, deduped, in order.
+$linkChecks = '[{"bucket":"fail","name":"lint-en-tests","state":"FAILURE","link":"https://github.com/o/r/actions/runs/123/job/456"},{"bucket":"pass","name":"branch-entry","state":"SUCCESS","link":"https://github.com/o/r/actions/runs/999/job/1"},{"bucket":"fail","name":"claude-review","state":"FAILURE","link":"https://github.com/o/r/actions/runs/123/job/789"}]'
+Assert-NameSet @('123') (Get-FailedCheckRunIds -ChecksJson $linkChecks) 'two failing checks from ONE run yield that run once, and the green check is not asked about'
+$extChecks = '[{"bucket":"fail","name":"ext","state":"FAILURE","link":"https://ci.example.com/build/7"}]'
+Assert-NameSet @() (Get-FailedCheckRunIds -ChecksJson $extChecks) 'a failing status with no Actions run is skipped -- it has no jobs to ask about'
+Assert-NameSet @() (Get-FailedCheckRunIds -ChecksJson $pr937All) 'a payload without the link field yields nothing rather than throwing'
+foreach ($bad in @('', '   ', 'not json', '[]')) {
+    Assert-NameSet @() (Get-FailedCheckRunIds -ChecksJson $bad) "an unreadable checks payload ('$bad') yields no run ids"
+}
+
+# The diagnosis itself. Both shapes the report measured count as "nothing ran".
+$runNoJobs  = '{"conclusion":"failure","status":"completed","url":"https://github.com/o/r/actions/runs/123","jobs":[]}'
+$runNoSteps = '{"conclusion":"failure","status":"completed","url":"https://github.com/o/r/actions/runs/123","jobs":[{"name":"lint-en-tests","steps":[]}]}'
+$runRan     = '{"conclusion":"failure","status":"completed","url":"https://github.com/o/r/actions/runs/123","jobs":[{"name":"lint-en-tests","steps":[{"name":"Set up job","conclusion":"success"}]}]}'
+
+$noteA = Get-StalledRunNote -RunJson $runNoJobs -RunId '123'
+Assert-True ($noteA -ne '') 'a run with an empty jobs array is recognised as never having started'
+Assert-True ($noteA -like '*never started*') 'and the note says so in those words -- the whole point of the repair'
+Assert-True ($noteA -like '*not a check that went red*') 'it states the negative too, since that is the reading being corrected'
+Assert-True ($noteA -like '*gh run view 123*') 'and names the one command that prints the reason, which the run page does not show'
+
+$noteB = Get-StalledRunNote -RunJson $runNoSteps -RunId '123'
+Assert-True ($noteB -ne '') 'a run whose only job executed no step is the same state'
+Assert-True ($noteB -like '*one job executed no step*') 'and the note distinguishes it from "no job at all"'
+
+# THE ASSERT THAT KEEPS THIS FROM CRYING WOLF. An ordinary red check runs steps, and on those the
+# operator must keep reading the old wording -- "fix CI and re-run" is correct there.
+Assert-Equal '' (Get-StalledRunNote -RunJson $runRan -RunId '123') 'a job that executed even one step is an ordinary failure -- no note'
+$runMixed = '{"status":"completed","jobs":[{"name":"a","steps":[]},{"name":"b","steps":[{"name":"Set up job"}]}]}'
+Assert-Equal '' (Get-StalledRunNote -RunJson $runMixed) 'one job of two having run is still "something ran"'
+$runTwoIdle = '{"status":"completed","jobs":[{"name":"a","steps":[]},{"name":"b","steps":[]}]}'
+Assert-True ((Get-StalledRunNote -RunJson $runTwoIdle) -like '*none of its 2 jobs executed a step*') 'two idle jobs are counted rather than described in the singular'
+
+# A run that has not finished has no steps either. ship-pr only reaches this after --watch, so it
+# cannot happen there -- asserted anyway, because "cannot happen" is how the premise #943 replaced
+# was justified.
+Assert-Equal '' (Get-StalledRunNote -RunJson '{"status":"in_progress","jobs":[{"name":"a","steps":[]}]}') 'a run still in progress is not stalled'
+Assert-Equal '' (Get-StalledRunNote -RunJson '{"status":"queued","jobs":[]}') 'a queued run is not stalled either'
+
+# Unreadable in, empty out: a diagnostic must never be the reason a refusal cannot be printed.
+foreach ($bad in @('', '   ', 'not json', 'null', '{}', '{"status":"completed"}')) {
+    Assert-Equal '' (Get-StalledRunNote -RunJson $bad) "an unreadable run payload ('$bad') costs the note and nothing else"
+}
+
+# Without a run id the note still stands and falls back to the URL the payload carried.
+$noteNoId = Get-StalledRunNote -RunJson $runNoJobs
+Assert-True ($noteNoId -like '*https://github.com/o/r/actions/runs/123*') 'no run id: the note points at the run URL instead'
+Assert-True ($noteNoId -notlike '*gh run view *') 'and does not print a command with a missing argument'
+
 # AND SHIP-PR ITSELF STILL USES IT. The asserts above prove the decision; this one proves the caller
 # asks for it -- the same reasoning as the open-pr ordering assert above, and the same failure mode: a
 # reverted call site would leave every assert here green while the merge refused as before.
@@ -694,6 +750,11 @@ Assert-True (Test-Path -LiteralPath $shipPrPath) 'ship-pr.ps1 exists where this 
 $shipText = [System.IO.File]::ReadAllText((Resolve-Path $shipPrPath).Path, [System.Text.Encoding]::UTF8)
 Assert-True ($shipText -like '*Get-MergeBlockVerdict -RequiredChecksJson*') 'ship-pr.ps1 consults the verdict rather than the --watch exit code alone'
 Assert-True ($shipText -like '*--required*name,bucket,state*') 'and asks gh for the required checks WITH their state, since --json mode does not carry it in the exit code'
+Assert-True ($shipText -like '*Get-FailedCheckRunIds -ChecksJson*') 'ship-pr.ps1 asks which runs failed before it words the refusal (#1044)'
+Assert-True ($shipText -like '*Get-StalledRunNote -RunJson*') 'and asks whether those runs ever started'
+Assert-True ($shipText -like '*startedAt,completedAt,link*') 'which needs the link field, the only one naming the run behind a check'
+Assert-True ($shipText -like '*CI never RAN for PR*') 'and a stalled run gets its own lead sentence rather than "CI did not pass"'
+Assert-True ($shipText -like '*Fix CI and re-run, or merge manually once green.*') 'while an ordinary red check keeps the wording that is correct for it'
 $idxWatch   = $shipText.IndexOf("'--watch'")
 $idxVerdict = $shipText.IndexOf('Get-MergeBlockVerdict')
 Assert-True ($idxWatch -ge 0 -and $idxVerdict -gt $idxWatch) 'the wait still happens FIRST and the verdict second -- #831 kept the wait, #943 changed only the verdict'
