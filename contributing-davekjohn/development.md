@@ -70,7 +70,7 @@ reason -- a gate that fires on almost every run is one nobody reads by the time 
       one -- the DEPLOY lock to 2.2.4 and the CI gate to 2.2.5 -- along with the three prose
       cross-references to the DEPLOY lock's old number.
 - [x] The two claims that counted the gates were repointed with it: `CONTRIBUTING.md`'s 2.2 intro and the
-      always-on [`CLAUDE.md`](../CLAUDE.md), which both said **four**. Both now say five, and both state
+      always-on root `CLAUDE.md`, which both said **four**. Both now say five, and both state
       that CI re-checks three of the four local gates rather than all of them -- the backing gate's
       subject is what sits uncommitted in a working copy, and a CI runner checks out a commit, so there
       the measurement always reads zero. A check that cannot fail is not a check.
