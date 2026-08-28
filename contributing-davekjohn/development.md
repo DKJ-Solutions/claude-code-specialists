@@ -37,19 +37,35 @@ Record the two lessons from issue #1022 in Sylvester's portable manual, beside t
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Sylvester's portable manual: two rules beside the existing pipe-test rule -- a hook is verified
+      at the receiving end, and harness config lives in two trees.
+- [~] No lens edit. Neither lesson is repo-specific, so the portable half is the whole of it
+      (portable-first; the lens is the exception that needs a reason).
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` + all suites green locally.
+
 ### DEPLOY: `docs/hook-delivery-is-verified-at-the-receiver-v1`
 
-**Score:**
+Sylvester's manual now says how a hook is proven to work: the exit code says it RAN, only the receiver
+says it ARRIVED. The measured case behind it is Claude Code's own `Notification` event, which produces a
+desktop notification by default only in Ghostty, Kitty and iTerm2 -- so in any other terminal a
+perfectly correct hook fires into nothing, and no exit code anywhere can say so. The second rule is
+where to look before concluding nothing is configured: `~/.claude/settings.json` and `~/.claude/hooks/`
+are machine-wide and outside every repo, so a grep of the project tree answers "no hook configured"
+with complete confidence while that hook runs on every turn.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+The manual is plugin payload, so both rules reach every consuming repo at the next release. It changes
+no script and no gate -- a consumer notices it the next time they debug a hook that appears to do
+nothing, which is exactly the moment it is worth having.
+
+**Score:** 2
 
 #### Pull Request
 
 Sylvester verifies a hook at the receiving end, and looks in the user-level config too
-
