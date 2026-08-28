@@ -76,12 +76,19 @@ function New-Fixture {
     <#
         A throwaway git repo with park-cycle.ps1 and its four libs copied in, an initial commit on
         'main', and (unless -NoOrigin) a bare repo wired up as 'origin'. Also writes a `gh` shim whose
-        answer is chosen by -GhAnswer: 'none' (an empty list), 'pr' (one PR, number 42) or 'fail'
-        (exit 1, which is how gh missing, logged out or offline all arrive).
+        answer is chosen by -GhAnswer: 'none' (an empty list), 'pr' (one open PR, number 42),
+        'merged'/'closed' (a PR in that state, visible only to '--state all'), 'pr-nostate' (an open PR
+        whose payload carries no `state` field at all) or 'fail' (exit 1, which is how gh missing,
+        logged out or offline all arrive).
+
+        THE 'merged' AND 'closed' SHIMS ARE ARGUMENT-AWARE, AND THAT IS THE REGRESSION GUARD FOR #1035.
+        They answer `[]` unless the command line carries `--state all`, exactly as the real gh does -- so
+        a park-cycle that narrows the query back to `--state open` sees no PR, pushes, and turns these
+        cases red. An unconditional shim would pass either way and prove nothing about the query.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Label,
-        [ValidateSet('none', 'pr', 'fail')][string]$GhAnswer = 'none',
+        [ValidateSet('none', 'pr', 'merged', 'closed', 'pr-nostate', 'fail')][string]$GhAnswer = 'none',
         [switch]$NoOrigin,
         # Writes a scripts/repo-config.ps1 answering the OPTIONAL trunk seam with this name. Omitted:
         # no repo-config at all, which is the unadopted repo every other fixture here models.
@@ -100,10 +107,23 @@ function New-Fixture {
 
     # A .cmd rather than a .ps1: Invoke-NativeCapture resolves 'gh' as a native command, and only an
     # executable extension on PATHEXT is found that way.
+    #
+    # `findstr` on %* is how a .cmd reads its own arguments here. /C: makes the needle a literal, so the
+    # leading dashes are not read as findstr's own switches; errorlevel 1 means "not found", which for
+    # these two shims is the `--state open` call that must come back empty.
+    $stateAware = {
+        param([string]$Record)
+        "@echo off`r`necho %* | findstr /C:`"--state all`" >nul`r`nif errorlevel 1 (echo []) else (echo $Record)`r`n"
+    }
     $ghBody = switch ($GhAnswer) {
-        'none' { "@echo off`r`necho []`r`n" }
-        'pr'   { "@echo off`r`necho [{`"number`":42}]`r`n" }
-        'fail' { "@echo off`r`nexit /b 1`r`n" }
+        'none'       { "@echo off`r`necho []`r`n" }
+        'pr'         { "@echo off`r`necho [{`"number`":42,`"state`":`"OPEN`"}]`r`n" }
+        # An open PR is returned by `--state open` and `--state all` alike, so this one is unconditional
+        # on purpose -- it models the shape gh really produces rather than the query being asked.
+        'pr-nostate' { "@echo off`r`necho [{`"number`":42}]`r`n" }
+        'merged'     { & $stateAware "[{`"number`":1027,`"state`":`"MERGED`"}]" }
+        'closed'     { & $stateAware "[{`"number`":969,`"state`":`"CLOSED`"}]" }
+        'fail'       { "@echo off`r`nexit /b 1`r`n" }
     }
     [System.IO.File]::WriteAllText((Join-Path $dir '_bin\gh.cmd'), $ghBody, (New-Object System.Text.ASCIIEncoding))
 
@@ -298,9 +318,66 @@ try {
 
     $rD = Invoke-ParkCycle -Dir $fixD
     Assert-Equal 0 $rD.Code 'PR open: exit 0 -- this is a normal outcome, not an error'
-    Assert-True ($rD.Out -match 'PR #42 is open') 'PR open: names the PR it found'
+    Assert-True ($rD.Out -match 'PR #42 for') 'PR open: names the PR it found'
+    Assert-True ($rD.Out -match 'is open') 'PR open: and says which of the three refusals this is'
     Assert-Equal 1 (Get-CommitCount -Dir $fixD) 'PR open: nothing committed'
     Assert-True (-not (Test-RefOnRemote -Bare "$fixD.git" -Ref 'refs/heads/feat/has-a-pr-v1')) 'PR open: nothing pushed'
+
+    # --- (d2) THE PR ALREADY MERGED (#1035): the branch shipped -> no commit, no push --------------
+    # THE DEFECT THIS CLOSES. Scoped to `--state open`, this bound lifted at the merge -- and the Stop
+    # hook then pushed the branch back onto origin seconds after deleteBranchOnMerge had removed it,
+    # where `git ls-remote --heads origin` reports the resurrected head as parked work carrying a
+    # `Backing:` line reading '2 of 2 steps resolved'. Measured on PR #1027, whose number this shim uses.
+    #
+    # THE DOCUMENT IS LEFT DIRTY HERE, deliberately: a clean one would be refused by the gate above for
+    # having nothing to do, and would prove nothing about this bound. Dirty is also the real shape --
+    # a session standing on the shipped branch after the fold.
+    Write-Host "park-cycle.ps1 -- the PR already merged: the branch shipped, so it is not resurrected" -ForegroundColor Cyan
+    $fixD2 = New-Fixture -Label 'd2' -GhAnswer 'merged'
+    Switch-ToBranch -Dir $fixD2 -Name 'fix/already-shipped-v1'
+    $null = New-CycleDocument -Dir $fixD2 -Branch 'fix/already-shipped-v1'
+
+    $rD2 = Invoke-ParkCycle -Dir $fixD2
+    Assert-Equal 0 $rD2.Code 'PR merged: exit 0'
+    Assert-True ($rD2.Out -match 'PR #1027 for') 'PR merged: names the PR it found -- which only --state all can return'
+    Assert-True ($rD2.Out -match 'already MERGED') 'PR merged: says the branch shipped, not that a PR is open'
+    Assert-True ($rD2.Out -match 'resurrect') 'PR merged: and names what the push would have done'
+    Assert-Equal 1 (Get-CommitCount -Dir $fixD2) 'PR merged: nothing committed'
+    Assert-True (-not (Test-RefOnRemote -Bare "$fixD2.git" -Ref 'refs/heads/fix/already-shipped-v1')) 'PR merged: the head is NOT put back on origin'
+
+    # --- (d3) THE PR CLOSED UNMERGED (#992): published all the same -> no commit, no push ----------
+    # The head #992 left behind sat 96 files divergent from main, so the other candidate repair -- refuse
+    # when HEAD is an ancestor of the trunk -- would have pushed it back happily. Asking about the PR
+    # rather than about the trunk is what covers both this and (d2), and this case is what pins that.
+    Write-Host "park-cycle.ps1 -- the PR closed unmerged: published, so still not resurrected" -ForegroundColor Cyan
+    $fixD3 = New-Fixture -Label 'd3' -GhAnswer 'closed'
+    Switch-ToBranch -Dir $fixD3 -Name 'docs/closed-unmerged-v1'
+    $null = New-CycleDocument -Dir $fixD3 -Branch 'docs/closed-unmerged-v1'
+
+    $rD3 = Invoke-ParkCycle -Dir $fixD3
+    Assert-Equal 0 $rD3.Code 'PR closed: exit 0'
+    Assert-True ($rD3.Out -match 'PR #969 for') 'PR closed: names the PR it found'
+    Assert-True ($rD3.Out -match 'is CLOSED') 'PR closed: says which refusal this is'
+    Assert-True ($rD3.Out -match 'park-branch') 'PR closed: names the escape valve for work that genuinely resumed'
+    Assert-Equal 1 (Get-CommitCount -Dir $fixD3) 'PR closed: nothing committed'
+    Assert-True (-not (Test-RefOnRemote -Bare "$fixD3.git" -Ref 'refs/heads/docs/closed-unmerged-v1')) 'PR closed: nothing pushed'
+
+    # --- (d4) NO `state` IN THE PAYLOAD: the wording degrades, the REFUSAL does not ----------------
+    # Set-StrictMode -Version Latest THROWS on a property gh did not return, so an older gh or a changed
+    # --json field would take the whole script down mid-bound -- and this script always exits 0 because a
+    # hook that fails interrupts the work it was added to protect. The guarded read must cost the
+    # sentence and nothing else.
+    Write-Host "park-cycle.ps1 -- a payload without 'state': the refusal survives the missing field" -ForegroundColor Cyan
+    $fixD4 = New-Fixture -Label 'd4' -GhAnswer 'pr-nostate'
+    Switch-ToBranch -Dir $fixD4 -Name 'feat/no-state-field-v1'
+    $null = New-CycleDocument -Dir $fixD4 -Branch 'feat/no-state-field-v1'
+
+    $rD4 = Invoke-ParkCycle -Dir $fixD4
+    Assert-Equal 0 $rD4.Code 'no state field: exit 0, not a mid-bound crash'
+    Assert-True ($rD4.Out -match 'PR #42 for') 'no state field: still names the PR'
+    Assert-True ($rD4.Out -notmatch 'cannot be found on this object') 'no state field: StrictMode did not throw'
+    Assert-Equal 1 (Get-CommitCount -Dir $fixD4) 'no state field: nothing committed'
+    Assert-True (-not (Test-RefOnRemote -Bare "$fixD4.git" -Ref 'refs/heads/feat/no-state-field-v1')) 'no state field: nothing pushed'
 
     # --- (e) gh CANNOT ANSWER -> fail-safe: do not push -------------------------------------------
     # gh missing, logged out, offline, or an unparseable payload all arrive here. Being one turn stale is

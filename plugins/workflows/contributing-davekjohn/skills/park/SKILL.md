@@ -134,6 +134,22 @@ document has diverged from what the PR published, so a pusher that kept running 
 pusher. Same reason its fail-safe runs in that direction: when `gh` cannot say whether a PR exists, it does
 **not** push. Being one turn stale is a nuisance; an unmergeable branch is a defect.
 
+**And *exists* means ever, not just right now**
+([#1035](https://github.com/DaveKJohn/claude-code-specialists/issues/1035)). Scoped to *open* PRs, that
+bound lifted again the moment a PR merged — and on the machine that merged, a pruned `origin/<branch>`
+then reads as absent, absent reads as *"a local commit nobody can see"*, and the next Stop hook pushes the
+branch **back** onto the remote seconds after `deleteBranchOnMerge` deleted it. Measured here: merged at
+12:56:25, deleted 12:56:27, re-created 13:05:30, at the PR's own head OID with nothing on it the trunk did
+not already have. That is worse than an ordinary stale ref, because it collides with the read directly
+above: `git ls-remote --heads origin` is the *only* way a parked branch surfaces, so the signal for real
+parked work starts reporting branches that shipped hours ago — each carrying a `park:` commit whose
+`Backing:` line reads *2 of 2 steps resolved*, which is exactly what finished work waiting to be resumed
+looks like. So the bound asks about **any** PR with this head, merged and closed included, and the question
+it is really answering is *has this branch been published?* rather than *is a PR open?*.
+
+**If the work on such a branch genuinely resumed, park it by hand** — `park-branch.ps1`, deliberately.
+That judgement belongs to the explicit park; the automatic one refuses and says which state refused it.
+
 **Its commit body carries the `Backing:` note** described under *Picking a parked branch back up* above --
 what is actually behind the plan it is publishing, measured on the machine that holds the work. A note, not
 a gate: it never changes whether the park happens.

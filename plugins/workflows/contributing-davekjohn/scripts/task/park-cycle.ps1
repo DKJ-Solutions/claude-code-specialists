@@ -32,7 +32,11 @@
          which is right for a deliberate park (park-branch.ps1) and wrong for an automatic one: it
          would publish work in progress nobody asked to publish.
       2. NOT ON THE TRUNK, where the fold REMOVES this document by design.
-      3. NOT ONCE A PR EXISTS -- the lock above.
+      3. NOT ONCE A PR EXISTS -- the lock above, and EXISTS means ever, not just now. Merged and closed
+         count (issue #1035): scoped to open PRs this bound lifted at the merge, and the hook then pushed
+         the branch back onto origin seconds after deleteBranchOnMerge had removed it, where
+         `git ls-remote --heads origin` reports the resurrected head as parked work. Read the bound
+         itself for the measurement and for why the other candidate repair was not taken.
       4. NO AMEND, NO FORCE. Keeping the history to one commit would mean `git push --force`, which
          the constitution forbids on any branch without Dave's explicit permission. So this costs a
          handful of small commits per branch, and the recognisable `park:` subject Invoke-GitPark
@@ -225,22 +229,66 @@ if (-not (Test-GitOriginConfigured -RepoRoot $root)) {
     exit 0
 }
 
-# BOUND 3: THE DEPLOY LOCK. Any open PR with this head means its body has published a DEPLOY section
-# that ship-pr will compare this document against, so from here on the document is the PR's to change,
-# not this script's. Deliberately NOT filtered by --base: the question is not which PR would be merged
-# but whether one has published a body at all, and a stacked PR publishes one just as an ordinary one
-# does.
+# BOUND 3: THE DEPLOY LOCK -- AND THE QUESTION IT IS ACTUALLY ASKING, WHICH IS "HAS THIS BRANCH BEEN
+# PUBLISHED?". Any PR with this head means its body has published a DEPLOY section that ship-pr will
+# compare this document against, so from here on the document is the PR's to change, not this script's.
+# Deliberately NOT filtered by --base: the question is not which PR would be merged but whether one has
+# published a body at all, and a stacked PR publishes one just as an ordinary one does.
+#
+# '--state all', NOT '--state open' (issue #1035). Scoped to open PRs, this bound LIFTED the moment the
+# PR merged, and nothing below it asked whether the branch had already shipped. Measured on
+# fix/the-hook-rules-follow-their-own-entry-v1 (PR #1027): merged at 12:56:25, deleted by
+# deleteBranchOnMerge two seconds later, and RE-CREATED on origin at 13:05:30 by this script's own Stop
+# hook -- at the PR's head OID, with nothing on it that main did not already have. Three behaviours line
+# up to produce it: this bound lifting; the "anything to do at all" gate above reading a remote-tracking
+# ref without fetching, so a pruned origin/<branch> reads as absent and absent reads as "a local commit
+# nobody can see"; and Invoke-GitPark pushing even with nothing to commit, which is deliberate (#175).
+# Widening the bound is the cheapest of the three and the only one that repairs what the bound is FOR.
+#
+# WHY NOT "REFUSE WHEN HEAD IS AN ANCESTOR OF THE TRUNK", the other candidate. It answers a different
+# question -- "is there anything on this branch?" rather than "has this branch been published?" -- and it
+# does not cover the head #992 left behind, whose PR closed unmerged and which sat 96 files divergent
+# from main. That head is invisible to prune-merged by design, and an ancestor test would have let this
+# script push it back just as happily. Asking about the PR covers both.
+#
+# THE ESCAPE VALVE IS park-branch.ps1. This bound belongs to the AUTOMATIC park alone; a branch whose PR
+# closed and whose work genuinely resumed is parked by hand, deliberately, which is where that judgement
+# belongs -- and is why widening this cannot strand anyone.
 #
 # FAIL-SAFE DIRECTION. gh missing, gh not logged in, no network, an unparseable payload -- every one of
 # them means the answer is unknown, and unknown does not push. See the lock paragraph in the header.
-$prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--state', 'open', '--json', 'number', '--limit', '1') -DiscardStderr
+$prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--state', 'all', '--json', 'number,state', '--limit', '1') -DiscardStderr
 if ($prList.ExitCode -ne 0) {
     Write-CycleParkNote "could not ask gh whether '$branch' has a PR -- not pushing (the DEPLOY lock must not be broken from here)." 'DarkYellow'
     exit 0
 }
 $prRecord = Get-ExistingPrRecord -Json (($prList.Output | Out-String))
 if ($null -ne $prRecord) {
-    Write-CycleParkNote "PR #$($prRecord.number) is open for '$branch' -- the document is the PR's from here on."
+    # THE NOTE SAYS WHICH REFUSAL THIS IS, the way the other bounds do: an open PR owns the document,
+    # while a merged or closed one means the branch was already published and a push would put a deleted
+    # head back on origin -- where `git ls-remote --heads origin` reports it as parked work, which is the
+    # one read that exists to surface a branch with no PR.
+    #
+    # READ THROUGH PSObject.Properties, not $prRecord.state: Set-StrictMode -Version Latest THROWS on a
+    # property gh did not return, and an older gh, a changed --json field or a hand-rolled shim must cost
+    # the wording, never the refusal -- this script always exits 0 because a hook that fails interrupts
+    # the work it was added to protect. The default arm is the pre-#1035 sentence, so an unknown state
+    # degrades to exactly what this bound used to say.
+    #
+    # AND IT IS TWO STEPS, NOT ONE. Properties['state'] returns $null for an absent field, and
+    # $null.Value throws under StrictMode just as $prRecord.state does -- so the guard has to be the
+    # $null test, not the indexer. Caught by this suite's own 'pr-nostate' fixture on the first run.
+    $stateProp = $prRecord.PSObject.Properties['state']
+    $prState = if ($stateProp) { ([string]$stateProp.Value).ToUpperInvariant() } else { '' }
+    $why = switch ($prState) {
+        'MERGED' { "has already MERGED -- the branch shipped, and pushing it back would resurrect a head that 'git ls-remote' reports as parked work." }
+        'CLOSED' { "is CLOSED -- the branch was published and its PR ended; pushing it back would resurrect a head that 'git ls-remote' reports as parked work." }
+        default  { "is open -- the document is the PR's from here on." }
+    }
+    $valve = if ($prState -eq 'MERGED' -or $prState -eq 'CLOSED') {
+        " If the work genuinely resumed on this branch, park it by hand with park-branch.ps1 -- that decision is deliberate, and this bound is the automatic park's alone."
+    } else { '' }
+    Write-CycleParkNote "PR #$($prRecord.number) for '$branch' $why$valve"
     exit 0
 }
 
