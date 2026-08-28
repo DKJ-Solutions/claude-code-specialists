@@ -32,6 +32,50 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/entry-links-die-at-the-cut-v1` · 20260828-234113
+
+Since the changelog moved into `contributing-davekjohn/`, no relative markdown link in an entry could
+survive both hops it has to make. `open-pr`'s link gate judges a link from the changelog's own directory —
+correctly, because the fold copies the entry text there verbatim — while the release cut rebased it as
+though it had been written against the repo root, one directory too far. The form the gate demanded landed
+in the tagged release record pointing at a root `CONTRIBUTING.md` this repo does not have; the form that
+survived the cut was refused before the PR could open. The measured workaround was to write no relative
+links at all.
+
+The cut now measures from the changelog. `Convert-RootRelativeLinks` is `Convert-EntryRelativeLinks` —
+renamed because its old name asserted the base that had stopped being true — and both `cut-release.ps1`
+derivations ask one shared `Get-EntryLinkPrefix` instead of counting their own segments back to the root.
+
+And `../` is rewritten now, which is the half the report did not see. It was exempt from the day the
+rewriter existed, on the reasoning that a link already climbing out of a directory had been aimed by hand.
+With an isolated changelog that stopped being the exception: `../` is the ordinary form for every target
+outside the workflow folder, and the one `Get-PathRelativeToDirectory` hands the author when the gate
+refuses something. The cut was silently skipping exactly the links the gate had just dictated.
+
+A repo whose changelog is still at the root gets the retired answer byte for byte, which is asserted rather
+than argued — so nothing changes for a consumer that never moved it.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer running an isolated changelog is in this: their entries either carry links that die in the
+release record, or — the measured outcome — carry no relative links at all, because that is the only way
+past both gates. Nothing errors when a link dies; a reader finds it inside a tagged, immutable document.
+The repair arrives with the plugin update and needs no change on their side.
+
+**Score:** 4
+
+#### Pull Request
+
+The cut rebases entry links from the changelog's directory, and ../ links with them
+
+Plugins: contributing-davekjohn
+
+[PR #1053](https://github.com/DaveKJohn/claude-code-specialists/pull/1053)
+
+---
+
 ### DEPLOY: `fix/skill-page-promises-a-version-scan-v1` · 20260828-233800
 
 The `new-branch` skill page said the script completes a missing version suffix by scanning for the
