@@ -37,19 +37,32 @@ PR #1025 merged the entry without its content: open-pr commits the branch files 
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] The two rules committed into `plugins/teams/team-alpha/manuals/05-15-manual.md` -- the edit
+      itself, staged and committed by hand rather than left in the working tree.
 
 ### TEST
 
+- [x] `git show HEAD:<manual>` carries both rules, which is the check that failed on #1025.
+
 ### DEPLOY: `fix/the-hook-rules-follow-their-own-entry-v1`
 
-**Score:**
+The two hook rules are now IN Sylvester's manual, where PR #1025's entry already said they were.
+#1025 folded a changelog entry describing them while the edit sat uncommitted in the working tree:
+`open-pr` commits the branch files -- the development document -- and nothing else, so a change made
+outside them is pushed by nobody and merges as an entry with no content behind it. Nothing refused it,
+because every gate reads that document rather than the diff. The lesson for the next branch is the
+plain one: the author stages and commits their own work before `open-pr` runs, and the check is
+`git show HEAD:<path>`, never the working tree.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+Without this the manual a consumer receives at the next release does not contain the rules this
+repo's changelog says it gained -- the release notes would describe a page nobody can find.
+
+**Score:** 3
 
 #### Pull Request
 
 The two hook rules land in Sylvester's manual, where PR #1025's entry already said they were
-
