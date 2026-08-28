@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/sync-sees-its-own-standing-branches-v1` · 20260828-151820
+
+`sync-main` now asks `origin` whether a sync branch from a previous run is still standing, and refuses
+before the theme pull if one is. Measured in a consumer at four unmerged branches in seven days — the
+newest a strict superset of all three, two byte-identical — with every one of those four runs green,
+because nothing in the script had ever looked at its own previous output. The exclusion rule was correct
+throughout; the gap was downstream of it.
+
+The guard anchors on **your** `Get-ShopifySyncBranchPrefix`, uses the same two-part merged test as
+`prune-merged` so a repo without `delete_branch_on_merge` is answered too, and prints a per-branch verdict
+saying whether this run supersedes each predecessor or holds paths it does not. `-DryRun` reports without
+refusing; `-AllowStacking` runs anyway, for the one case where a third party reverted a path on live in
+between and the predecessor holds the only copy.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+It closes the failure mode this script was hardest to see: not a wrong answer, but four *right* answers
+nobody had a reason to compare. The whole justification for stopping before the merge is a moment where
+somebody looks — and four competing candidates for one set of edits is not that moment.
+
+**Score:** 4
+
+#### Pull Request
+
+The pre-task sync reads its own standing branches, and refuses to stack a fifth
+
+Plugins: team-shopify
+
+[PR #1028](https://github.com/DaveKJohn/claude-code-specialists/pull/1028)
+
+---
+
 ### DEPLOY: `fix/the-hook-rules-follow-their-own-entry-v1` · 20260828-145625
 
 The two hook rules are now IN Sylvester's manual, where PR #1025's entry already said they were.
