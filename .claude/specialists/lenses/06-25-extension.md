@@ -903,6 +903,50 @@ naming because they are cheap to apply and were skipped: **the firing frequency 
 one — but for *whether to build a thing at all*, frequency is the deciding figure), and **the thing being
 proposed would have broken the rule it existed to teach**.
 
+### A gate verdict that moves is a load reading — n=5, and the caller is not a variable (August 28, 2026)
+
+[#1033](https://github.com/DaveKJohn/claude-code-specialists/issues/1033) was filed out of the `v4.22.0`
+cut, where the gate answered three different ways on one tree: **54/54 green in 443s** inside
+`cut-release.ps1`, **11 of 54 failed in 626s** when `Invoke-TestSuiteGate` was driven from the session
+afterwards, and one of those eleven **green alone** in a fresh process. The report read that spread as
+the gate depending on *who invoked it* — a session that had dot-sourced `native-capture-lib.ps1` and
+`repo-config.ps1` against a fresh process — and drew the consequence that CI, which dot-sources both, is
+on the failing side while the release route is on the passing one.
+
+**That axis does not exist.** `cut-release.ps1` dot-sources exactly those two libs (lines 262 and 275)
+before it calls the gate, so the green run and the red run had *identical* state; and CI runs
+`-MaxParallel ([Environment]::ProcessorCount)` on a **four**-core runner, which is four lanes, not the
+eighteen the red run used. The report's central inference is falsified by the two files it names.
+
+Re-measured on `f2ca263f` — the same tree, one markdown file later, which no suite reads — across every
+axis the report did name, **five full runs, all 54/54 green**:
+
+| run | lanes | console | machine | total |
+|---|---|---|---|---|
+| A | 16 (the default, `cores-2`) | CP 850 | idle | **194s** |
+| B | 18 (the CI shape) | CP 850 | idle | **216s** |
+| C | 18 | CP 65001 (UTF-8, the agent-session shape) | idle | **203s** |
+| D1 | 18 | CP 850 | a second identical gate beside it | **421s** |
+| D2 | 18 | CP 850 | ditto | **419s** |
+
+**D is the row that pays for the table.** Two gates side by side — 36 suites over 18 cores — land on
+**421s and 419s**, which is the release's own *green* 443s to within 5%. So 443s was never this gate's
+cost; it was a reading of what else that machine was doing, and the cost on that tree is **~200s**. The
+626s red is 3.2x idle, i.e. heavier still. This is the same discipline the n=5 section above already
+states — *state the machine state and the n beside this number, or it says nothing* — arriving a second
+time, and this time the figure that went stale was one written into a **published release note**.
+
+**And the phenomenon is not new, which is the finding worth keeping.** Red under the gate, green alone,
+on these same suites, has now been recorded three times: the `Start-Job` fan-out of August 12, 2026 (6 of
+31, all green alone) in [Sylvester #15](05-15-extension.md), the two post-split reds of August 16
+(`bootstrap-drift`, `fix-mojibake`) in the honest footnote above, and these eleven. Six of the eleven run
+the lint gate over the live tree and five do not, so the live-repo collision covers part of it and no
+reproduction has ever been obtained for the rest. What cost that release **22m 01s** was therefore not
+the flake but the *search*: the standing response — re-run the red suite alone before believing its
+assert — was already written down twice, in two lenses the gate's own output points at neither of. The
+pointer now lives in `Invoke-TestSuiteGate`'s docstring, beside the converse rule from inbound #821 that
+was already there.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup

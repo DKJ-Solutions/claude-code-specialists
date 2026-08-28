@@ -347,6 +347,29 @@ function Invoke-TestSuiteGate {
         it changes how all 50 children are created, for a hazard whose one known instance is now scoped to
         a few lines inside the suite that needs it. Named rather than fixed, deliberately.
 
+        AND THE CONVERSE, MEASURED (issue #1033, August 28, 2026). The rule above reads in one direction
+        only, and the commoner event is the other one: a suite RED under the gate and GREEN standalone. A
+        re-run during the v4.22.0 cut reported 11 of 54 suites failed in 626s, every one with the same
+        shape -- a child that exited 1, then every downstream assert about what that child should have
+        written -- on a tree the cut itself had just passed 54/54 on. The report inferred that the verdict
+        depended on WHO CALLED the gate, because the red run came from a session that had dot-sourced this
+        lib and repo-config while the green one came from cut-release.ps1. IT DOES NOT: cut-release
+        dot-sources exactly those two libs before calling this function, so both runs had identical state,
+        and the axis the report names cannot be the difference. Five full runs on that same tree were all
+        54/54 green -- 16 lanes 194s, 18 lanes 216s, 18 lanes with the console at UTF-8 203s, and two
+        18-lane runs side by side 421s and 419s. That last pair is the number to keep: 2x load reproduces
+        the release's own 443s "green" wall clock to within 5%, which makes 443s a reading of the MACHINE
+        rather than a cost of this gate, whose cost on that tree was ~200s.
+
+        SO A RED HERE IS EVIDENCE ABOUT THE RUN BEFORE IT IS EVIDENCE ABOUT THE TREE, and the standing
+        response is re-running the suite alone -- which is already written down twice, from two earlier
+        sightings of these same suites: the Start-Job fan-out of August 12, 2026 (6 of 31, all green
+        alone) and the two reds in the post-split pool of August 16 (bootstrap-drift and fix-mojibake,
+        both green alone, not diagnosed). What cost 22 minutes of that release was not the flake; it was
+        that neither page was reached before the chase started. NOT REPAIRED HERE, deliberately and for
+        the same reason the console is not isolated above: three sightings and no reproduction is a
+        hazard to name, not yet a mechanism to fix.
+
         Returns $true when every suite exited 0, $false when any did not, and $true with a warning when
         there is nothing to run -- an empty or missing directory is a repo without suites, not a failure.
     #>
