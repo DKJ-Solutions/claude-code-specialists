@@ -34,6 +34,14 @@
          runs both, so the check reports it -- and the three cases that must NOT trip it are asserted
          beside the one that must: the shipped copy wired by hand, an unrelated PreToolUse hook, and a
          settings file that does not parse.
+      7. THE SAME RULE, AUTHORED IN POWERSHELL (inbound #1032) -- groups 2 and 3 over again in the
+         other shell, which is where the gap was. The matcher covered both shells from the first day;
+         both exemptions knew only the POSIX spellings, and no case here had a PowerShell twin. So a
+         consumer on Windows could not move its own printed delete command into a testable function,
+         and the refusal it met advised adding the delete marker to that command -- advice that WORKS
+         on a file write, because the marker is matched over the whole string. Group 7 closes both
+         halves and asserts the refusal WORDING, because a sentence nothing asserts is a sentence the
+         next edit removes.
 
     Groups 1 to 3 are ported from the reference implementation the reporting consumer offered
     (BWJ-ecommerce/xoxowildhearts, inbound #769), which is where the false-positive lesson was paid
@@ -101,6 +109,25 @@ function Invoke-Guard {
     try {
         $payload | & powershell -NoProfile -ExecutionPolicy Bypass -File $Guard 2>&1 | Out-Null
         return $LASTEXITCODE
+    } finally {
+        if ($null -eq $prev) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
+        else { $env:CLAUDE_PROJECT_DIR = $prev }
+    }
+}
+
+function Get-GuardRefusal {
+    <#
+        The refusal TEXT rather than the exit code. Invoke-Guard discards stderr on purpose -- forty
+        cases care only whether the command was blocked -- but the wording is itself a guard property
+        since inbound #1032, and a sentence nothing asserts is a sentence the next edit removes.
+    #>
+    param([string]$Command, [string]$Root)
+    $payload = @{ tool_name = 'PowerShell'; tool_input = @{ command = $Command } } | ConvertTo-Json -Compress -Depth 5
+    $prev = $env:CLAUDE_PROJECT_DIR
+    $env:CLAUDE_PROJECT_DIR = $Root
+    try {
+        $out = $payload | & powershell -NoProfile -ExecutionPolicy Bypass -File $Guard 2>&1
+        return (($out | ForEach-Object { "$_" }) -join "`n")
     } finally {
         if ($null -eq $prev) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
         else { $env:CLAUDE_PROJECT_DIR = $prev }
@@ -380,6 +407,69 @@ function Get-ShopifyThemeDeleteMarker { return 'XOXO-THEME-DELETE-AUTHORIZED' }
     Assert-Equal 0 (Invoke-Guard -Command "cat > CLAUDE.md <<'EOF'${LF}shopify theme delete --theme 1 # XOXO-THEME-DELETE-AUTHORIZED${LF}EOF" -Root $both) 'documenting the authorised delete is still writing, not running'
     Assert-Equal 2 (Invoke-Guard -Command "cat > notes.md <<'EOF'${LF}harmless${LF}EOF${LF}shopify theme delete --theme $LIVE # XOXO-THEME-DELETE-AUTHORIZED" -Root $both) 'counter-case: a real live-theme delete after a heredoc is still caught'
     Assert-Equal 0 (Invoke-Guard -Command 'git status && shopify theme delete --theme 42 # XOXO-THEME-DELETE-AUTHORIZED' -Root $both) 'an authorised delete after a harmless command is allowed'
+
+    # --- group 7: authoring the rule in POWERSHELL, and the note that stops it teaching forgery -----
+    # INBOUND #1032. Group 2 proves that WRITING one of these commands into a file is not running it --
+    # in Bash. The matcher covered both shells from day one, the exemptions covered only the POSIX
+    # spellings, and nobody had asserted the PowerShell twin of a single group 2 case. So a consumer on
+    # Windows could not move its own printed delete command into a function, and the refusal it met
+    # told it to add the delete marker to 'this exact command' -- which, on a command that writes a
+    # file, WORKS. Group 7 is group 2 and group 3 again in the other shell, plus the refusal text
+    # itself, because a sentence with no assert on it is a sentence the next edit removes.
+    Write-Host "group 7 -- the same rule, authored in PowerShell" -ForegroundColor Cyan
+    $psMentions = @(
+        # The reported case, as close to verbatim as a fixture gets: the printed command being moved
+        # out of a format string into a function a test suite can assert.
+        @{ n = 'a here-string carrying the delete, piped to Out-File'
+           c = "`$fn = @'${LF}function Get-ThemeDeleteCommand([string]`$Id) { `"shopify theme delete --theme `$Id`" }${LF}'@${LF}`$fn | Out-File -FilePath scripts\theme.ps1" },
+        @{ n = 'the double-quoted here-string form too'
+           c = "`$doc = @`"${LF}Never run shopify theme publish yourself.${LF}`"@${LF}Set-Content -Path CLAUDE.md -Value `$doc" },
+        @{ n = 'Out-File is the redirection'      ; c = 'Out-File -InputObject "shopify theme delete --theme 1" -FilePath notes.md' },
+        @{ n = 'Set-Content writes text'          ; c = 'Set-Content -Path notes.md -Value "shopify theme delete --theme 1"' },
+        @{ n = 'Add-Content appends it'           ; c = 'Add-Content -Path notes.md -Value "shopify theme publish --theme 1"' },
+        @{ n = 'Select-String is grep'            ; c = 'Select-String -Pattern "shopify theme publish" -Path CLAUDE.md' },
+        @{ n = 'Get-Content is cat'               ; c = 'Get-Content CLAUDE.md | Select-String "shopify theme delete"' }
+    )
+    foreach ($case in $psMentions) { Assert-Equal 0 (Invoke-Guard -Command $case.c -Root $both) "PS mention: $($case.n)" }
+
+    # AND EVERY ONE OF THOSE EXEMPTIONS HAS ITS COUNTER-CASE, exactly as group 3 is to group 2. The
+    # here-string strip is gated on the same $executesText that gates the text-tool exemption, so the
+    # PowerShell ways of executing a string are what make it safe to have.
+    $psHoles = @(
+        @{ n = 'a here-string fed to Invoke-Expression IS a script'
+           c = "`$c = @'${LF}shopify theme delete --theme 1${LF}'@${LF}Invoke-Expression `$c" },
+        @{ n = 'and through the iex alias'
+           c = "`$c = @'${LF}shopify theme publish --theme 1${LF}'@${LF}`$c | iex" },
+        @{ n = 'and through [scriptblock]::Create'
+           c = "`$c = @'${LF}shopify theme publish --theme 1${LF}'@${LF}& ([scriptblock]::Create(`$c))" },
+        @{ n = 'a real command AFTER a closed here-string'
+           c = "`$doc = @'${LF}harmless text${LF}'@${LF}`$doc | Out-File notes.md${LF}shopify theme publish --theme 1" },
+        # AN OPENER WITH NO CLOSER MUST NOT SWALLOW THE REST. PowerShell would refuse to parse this, so
+        # nothing would run either way -- which is the argument not to lean on: that would rest the
+        # exemption on a claim about somebody else's parser rather than on what the guard can see.
+        @{ n = 'an UNTERMINATED here-string puts its body back'
+           c = "`$doc = @'${LF}harmless${LF}shopify theme publish --theme 1" },
+        @{ n = 'a write cmdlet does not cover a real command beside it'
+           c = 'Set-Content -Path a.txt -Value x; shopify theme publish --theme 1' },
+        # A MARKER INSIDE A STRIPPED BODY IS DOCUMENTATION, NOT AUTHORISATION -- the same property the
+        # heredoc path has always had, asserted for the new one before somebody discovers it.
+        @{ n = 'a delete marker written INTO a file does not authorise a real delete'
+           c = "`$doc = @'${LF}Add # XOXO-THEME-DELETE-AUTHORIZED to the command.${LF}'@${LF}`$doc | Out-File notes.md${LF}shopify theme delete --theme 42" }
+    )
+    foreach ($case in $psHoles) { Assert-Equal 2 (Invoke-Guard -Command $case.c -Root $both) "PS counter-case: $($case.n)" }
+
+    # THE REFUSAL TEXT IS PART OF THE GUARD. The delete refusal told an author to add the marker to the
+    # command in front of them; on a file write that advice works, and it trains the habit the marker
+    # exists to prevent. The note now rides on every refusal, so every refusal is checked for it --
+    # including publish, which has no marker at all and whose 'run it yourself' was wrong the same way.
+    foreach ($case in @(
+        @{ n = 'publish';    c = 'shopify theme publish --theme 1' },
+        @{ n = 'delete';     c = 'shopify theme delete --theme 42' },
+        @{ n = 'live push';  c = "shopify theme push --theme $LIVE --allow-live" }
+    )) {
+        $refusal = Get-GuardRefusal -Command $case.c -Root $both
+        Assert-True ($refusal -match 'AUTHORING, NOT RUNNING') "the $($case.n) refusal says a marker authorises a command, not a file write"
+    }
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue
 }

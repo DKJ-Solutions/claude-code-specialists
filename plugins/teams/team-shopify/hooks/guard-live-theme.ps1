@@ -37,15 +37,34 @@
       - HEREDOC BODIES are stripped. 'cat > file <<EOF ... EOF' writes data and the body never runs.
         UNLESS an interpreter is consuming it ('bash <<EOF'), in which case the body IS a script and
         nothing is stripped.
+      - HERE-STRING BODIES are stripped for the same reason, in the same way. A PowerShell '@'' ... ''@'
+        body is assigned or piped somewhere and nothing in it runs. UNLESS the command also shows an
+        execution vector (Invoke-Expression, iex, [scriptblock]::Create, or the eval/xargs/pipe-into-a-
+        shell forms below), in which case nothing is stripped.
       - TEXT TOOLS are skipped. A segment whose leading command is grep, sed, perl, awk, cat, echo,
-        git and friends is handling text rather than running the CLI. UNLESS the command pipes into an
-        interpreter or uses eval/xargs -- 'echo "..." | bash' really does execute, and that override
-        is the whole reason the exemption is safe to have.
+        git, Out-File, Set-Content, Get-Content, Select-String and friends is handling text rather than
+        running the CLI. UNLESS the command pipes into an interpreter or uses eval/xargs/iex --
+        'echo "..." | bash' really does execute, and that override is the whole reason the exemption is
+        safe to have.
       - EVERYTHING ELSE is matched per shell segment, so a real command after a heredoc, after a
         semicolon, or inside a wrapper is still caught.
 
     Every one of those exemptions has a counter-case in the suite, because an exemption without one is
     a hole with a comment on it.
+
+    THE TWO POWERSHELL HALVES ABOVE ARRIVED LATE, AND THE ASYMMETRY WAS NOT A DECISION (inbound #1032).
+    The matcher covered both shells from the first day -- that breadth is what closes the wrapper
+    vector -- while both exemptions knew only the POSIX spellings. So a consumer writing this very rule
+    into its own scripts was permitted through Bash and refused through PowerShell, which made the
+    answer depend on which shell its platform uses. That is not a security boundary. Of the two, the
+    here-string stripping is the one that matters: the segment split is on NEWLINES, so an unstripped
+    body turns each of its lines into a segment, and the cmdlet that would have earned the exemption
+    sits a segment away from the line that matches.
+
+    AND THE REFUSAL TEXT IS PART OF THE GUARD, not commentary on it. See $AUTHORING_NOTE below for the
+    sentence every refusal now carries and the reason it had to be written: the delete refusal used to
+    tell a reader who was AUTHORING to add the delete marker to 'this exact command', which on a
+    file-writing command works -- and teaches the habit the marker exists to prevent.
 
     THE RESIDUAL LIMIT, STATED RATHER THAN HIDDEN. A text tool asked to execute -- 'perl -e' with a
     system() call, say -- is exempted by the rule above and is not caught. That is a deliberate trade:
@@ -148,9 +167,18 @@ if ($DELETE_MARKER -and $DELETE_MARKER.ToLower() -eq $MARKER.ToLower()) { $DELET
 
 # Commands that read or write text rather than run the store CLI. A segment led by one of these is
 # handling the words, not obeying them.
+#
+# THE SECOND ROW IS THE POWERSHELL HALF OF THE FIRST, AND IT WAS MISSING UNTIL INBOUND #1032. The
+# matcher covers both the Bash and the PowerShell tool -- that breadth is what closes the wrapper
+# vector -- while the exemption knew only the POSIX spellings. So whether a consumer was allowed to
+# write this rule into its own scripts depended on which shell its platform uses, which is not a
+# security boundary. 'Out-File' is the redirection, 'Get-Content' is cat, 'Select-String' is grep, and
+# each is exempt for the reason its twin above is: a segment led by it cannot invoke the store CLI.
 $TEXT_TOOLS = @(
     'grep', 'egrep', 'fgrep', 'rg', 'sed', 'perl', 'awk', 'cat', 'echo', 'printf', 'head', 'tail',
-    'less', 'more', 'jq', 'git', 'findstr', 'tee', 'diff', 'wc', 'sort', 'uniq', 'tr', 'cut'
+    'less', 'more', 'jq', 'git', 'findstr', 'tee', 'diff', 'wc', 'sort', 'uniq', 'tr', 'cut',
+    'out-file', 'set-content', 'add-content', 'get-content', 'select-string', 'tee-object',
+    'write-output', 'write-host', 'out-string'
 )
 
 # Interpreters: a heredoc they read is a script, and a pipe into them executes what came before.
@@ -195,6 +223,60 @@ function Remove-HeredocBodies([string]$text) {
     return ($out -join "`n")
 }
 
+function Remove-HereStringBodies([string]$text) {
+    <#
+        THE POWERSHELL TWIN OF Remove-HeredocBodies, AND THE REPAIR FOR INBOUND #1032. A here-string
+        body is data for exactly the reason a heredoc body is: it is assigned or piped somewhere, and
+        nothing in it runs. Only the POSIX syntax was known here, so the same file written by the same
+        session was permitted through Bash and refused through PowerShell -- and whether authoring was
+        allowed is not something a consumer's platform should decide.
+
+        THE SEGMENT SPLIT BELOW IS ON NEWLINES, which is why adding the write cmdlets to $TEXT_TOOLS
+        was not enough on its own: an unstripped body turns every one of its lines into a segment, so
+        the segment that matches is the body line itself and the cmdlet consuming it is a segment away.
+
+        THE CALLER GATES THIS ON -not $executesText, and that is what keeps it from becoming a hole. A
+        body handed to Invoke-Expression, iex or [scriptblock]::Create IS a script, and then nothing is
+        stripped -- the same override 'bash <<EOF' gets one function up.
+    #>
+    if ($text -notmatch '@[''"]') { return $text }
+
+    $lines = $text -split "`r?`n"
+    $out = New-Object System.Collections.Generic.List[string]
+    # AN UNCLOSED BODY IS PUT BACK RATHER THAN DROPPED, which is the counter-case this function needed
+    # and did not have on its first draft: without the buffer, an opener with no closer strips every
+    # line after it to the end of the command, so a real invocation could hide behind one. PowerShell
+    # would refuse to PARSE that command, so nothing would have run either way -- and that is exactly
+    # the argument not to rely on: the exemption would rest on a claim about somebody else's parser
+    # instead of on what this file can see. Held is what an unparseable payload already gets a few
+    # lines down, for the same reason.
+    $held = New-Object System.Collections.Generic.List[string]
+    $terminator = $null
+
+    foreach ($line in $lines) {
+        if ($null -ne $terminator) {
+            # The language requires the closer at the START of a line. Leading whitespace is tolerated
+            # anyway, because tolerating it can only end a body EARLY -- which scans MORE text, never
+            # less, and therefore fails towards checking.
+            if ($line -match ('^\s*' + $terminator + '@')) { $terminator = $null; $held.Clear() }
+            else { $held.Add($line) }
+            continue
+        }
+
+        $out.Add($line)
+
+        # An opener is @' or @" with nothing after it but whitespace. That end-of-line rule is the
+        # language's own, and requiring it here means a quote-at-sign inside an expression is not
+        # mistaken for one.
+        $m = [regex]::Match($line, '@([''"])\s*$')
+        if (-not $m.Success) { continue }
+        $terminator = [regex]::Escape($m.Groups[1].Value)
+    }
+
+    if ($null -ne $terminator) { $out.AddRange($held) }
+    return ($out -join "`n")
+}
+
 function Get-LeadingCommand([string]$segment) {
     $s = $segment.Trim()
     # Drop leading env assignments (FOO=bar cmd ...) and a leading subshell/brace opener.
@@ -208,7 +290,17 @@ $scan = Remove-HeredocBodies $cmd
 
 # A pipe into an interpreter, an eval or an xargs means text somewhere in this command is about to be
 # executed. When that is in play, no segment gets the text-tool exemption.
-$executesText = ($scan -match "\|\s*($INTERPRETERS)\b") -or ($scan -match '\beval\b') -or ($scan -match '\bxargs\b')
+#
+# Invoke-Expression, its 'iex' alias and [scriptblock]::Create are the POWERSHELL members of that set,
+# named here with inbound #1032. They earn their place twice over: they disable the text-tool exemption
+# like the rest, and they are what makes stripping a here-string body safe to do at all -- a body is
+# data only for as long as nothing executes it, and this line is where that is decided.
+$executesText = ($scan -match "\|\s*($INTERPRETERS)\b") -or ($scan -match '\beval\b') -or ($scan -match '\bxargs\b') -or
+                ($scan -match '\b(invoke-expression|iex)\b') -or ($scan -match '\[scriptblock\]::create')
+
+# Stripped only once the line above has ruled out execution, so this exemption carries its own
+# override rather than borrowing one from elsewhere in the file.
+if (-not $executesText) { $scan = Remove-HereStringBodies $scan }
 
 # Split into shell segments so that a real command next to a harmless one is still seen.
 $segments = [regex]::Split($scan, '(?:\|\||&&|[;|\r\n])')
@@ -219,8 +311,29 @@ $authorised = $scan.ToLower().Contains($MARKER.ToLower())
 # reason about. Empty $DELETE_MARKER can never match, which is what keeps the capability off.
 $deleteAuthorised = $DELETE_MARKER -and $scan.ToLower().Contains($DELETE_MARKER.ToLower())
 
+# APPENDED TO EVERY REFUSAL, BECAUSE THE REFUSAL TEXT USED TO ADVISE THE ONE THING THAT MUST NOT BE
+# DONE (inbound #1032). A consumer editing a script, a test or a doc that CONTAINS one of these
+# commands meets this guard -- the guard's own header says so, and so does that consumer's own repo,
+# which carries the delete literal in four files. What the refusal told them was to add the delete
+# marker to 'this exact command', and on a command that writes a FILE that advice works, because the
+# marker is matched over the whole string. So the reader is trained to mark non-deletes as authorised
+# deletes, which is precisely the erosion the marker exists to prevent. The header above already
+# argues that a guard making its own rule impossible to write down is one somebody switches off; this
+# is the sharper version, a guard that made its own rule HAZARDOUS to write down.
+#
+# It is written once, here, rather than into the four refusals: all four were wrong in the same way,
+# and a sentence copied four times is a sentence that will be corrected three times.
+$AUTHORING_NOTE = @(
+    '  AUTHORING, NOT RUNNING? A marker authorises a COMMAND, never a file write, so do NOT add one to',
+    '  get past this -- it would mark a file write as an authorised delete, which is the erosion the',
+    '  marker exists to prevent. Writing this text into a script or a doc is already exempt (heredoc and',
+    "  here-string bodies, and segments led by a text or file-write command), so reach for the harness's",
+    '  Edit/Write tool rather than a shell if one is fighting you.'
+) -join "`n"
+
 function Deny([string]$msg) {
     [Console]::Error.WriteLine("BLOCKED (guard-live-theme): $msg")
+    [Console]::Error.WriteLine($AUTHORING_NOTE)
     exit 2
 }
 
