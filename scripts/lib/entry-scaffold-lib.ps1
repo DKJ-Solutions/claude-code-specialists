@@ -214,7 +214,7 @@ function Get-EntryTextOutsideFences {
 function Get-EntryCodeSpans {
     <#
         Pure: where the CODE and the COMMENTS sit in an entry, as spans over the text exactly as it was
-        given -- an array of objects with Start and Length, ordered by Start and non-overlapping. Three
+        given -- an array of objects with Start and Length, ordered by Start. Three
         kinds, in the order they are resolved: fenced blocks (``` and ~~~, off the shared flags), inline
         code spans, and html comments. That is the same set, in the same order, that Get-EntryLinkTargets
         has excluded since it existed.
@@ -237,6 +237,15 @@ function Get-EntryCodeSpans {
         only cost a missed finding; for the rewriter it can only leave a link alone, which is the same
         safe direction -- a link that resolves against the wrong directory is visible, and a mangled
         illustration in a tagged release document is not.
+
+        AND THE SPANS CAN OVERLAP, which is why nothing here claims otherwise. Two stray single backticks
+        on either side of a fenced block pair with each other across it and yield one span containing the
+        fenced ones, because the masking blanks a fence rather than closing it off. That is not new and it
+        is not this function's to decide: the three strippers it replaced behaved identically, so the link
+        gate has read that shape the same way for as long as it has existed, and changing it here would
+        change what the gate finds rather than what the cut rewrites. Both readers below tolerate it --
+        Remove-EntryCodeSpans advances its cursor monotonically and Test-EntryOffsetInCodeSpans asks each
+        span independently -- and the two halves still agree, which is the invariant that matters.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
     if (-not $EntryText) { return @() }

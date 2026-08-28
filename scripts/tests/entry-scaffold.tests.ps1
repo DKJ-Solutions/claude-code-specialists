@@ -727,9 +727,20 @@ foreach ($s in $spans) {
 }
 $ordered = $true
 for ($i = 1; $i -lt $spans.Count; $i++) {
-    if ($spans[$i].Start -lt ($spans[$i - 1].Start + $spans[$i - 1].Length)) { $ordered = $false }
+    if ($spans[$i].Start -lt $spans[$i - 1].Start) { $ordered = $false }
 }
-Assert-True $ordered 'the spans come back ordered and non-overlapping -- each pass masks what it found before the next runs'
+Assert-True $ordered 'the spans come back ordered by Start'
+
+# THEY CAN OVERLAP, AND NOTHING CLAIMS OTHERWISE. Two stray single backticks on either side of a fenced
+# block pair with each other ACROSS it, because the masking blanks a fence rather than closing it off --
+# so the inline pass yields one span containing the fenced ones. That behaviour is inherited, not
+# introduced: the three strippers this replaced did exactly the same, which is why it is asserted here as
+# a property of the shape rather than repaired. Found in review before it shipped, on a docstring that
+# had claimed non-overlap.
+$straddle = @('text ` oops', '```', 'fenced', '```', 'and [a real link](../foo.md) after and ` closes it.') -join "`n"
+$straddleSpans = @(Get-EntryCodeSpans -EntryText $straddle)
+Assert-True ($straddleSpans[0].Length -gt ($straddle.Length / 2)) 'the paired stray backticks swallow the fence between them'
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $straddle)).Count 'so the gate reads no link there -- the rewriter half of this pair is asserted in release-lib.tests.ps1, where both libs are loaded'
 Assert-Equal 0 (@(Get-EntryCodeSpans -EntryText '')).Count 'an empty entry has no spans rather than throwing'
 Assert-Equal 0 (@(Get-EntryCodeSpans -EntryText 'plain prose with [a](b.md)')).Count 'and prose with no code at all yields none'
 

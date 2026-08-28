@@ -757,13 +757,20 @@ function Convert-EntryRelativeLinks {
     # #1047 widened the gap by one class when it stopped exempting '../', which is the ordinary shape for a
     # quoted example. Get-EntryCodeSpans is now the single answer both halves read.
     $codeSpans = @(Get-EntryCodeSpans -EntryText $EntryText)
+    # THE MATCH IS THE WHOLE LINK, LABEL INCLUDED, AND THAT IS THE HALF THAT MAKES THE SPANS USABLE. This
+    # matched from the ']' while Get-EntryLinkTargets matches from the '[', and the offset test reads the
+    # START of a match -- so a link whose LABEL sat inside a code span but whose '](target)' did not was
+    # excluded by the gate and rewritten here, which is the very disagreement this change exists to end.
+    # Matching the gate's shape is what puts both halves on the same offset; found in review, before it
+    # shipped. The prefix is then INSERTED at the target group's own index, so the label is never rebuilt.
     $sb = New-Object System.Text.StringBuilder
     $cursor = 0
-    foreach ($m in [regex]::Matches($EntryText, '\]\((?!https?:|mailto:|#|/)([^)]+)\)')) {
+    foreach ($m in [regex]::Matches($EntryText, '\[(?:[^\]]*)\]\((?!https?:|mailto:|#|/)([^)]+)\)')) {
         if (Test-EntryOffsetInCodeSpans -Offset $m.Index -Spans $codeSpans) { continue }
-        [void]$sb.Append($EntryText.Substring($cursor, $m.Index - $cursor))
-        [void]$sb.Append("](${Prefix}$($m.Groups[1].Value))")
-        $cursor = $m.Index + $m.Length
+        $at = $m.Groups[1].Index
+        [void]$sb.Append($EntryText.Substring($cursor, $at - $cursor))
+        [void]$sb.Append($Prefix)
+        $cursor = $at
     }
     [void]$sb.Append($EntryText.Substring($cursor))
     return $sb.ToString()

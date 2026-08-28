@@ -761,6 +761,29 @@ foreach ($t in $gateTargets) {
     Assert-Match $kept ([regex]::Escape('](../../../' + $t + ')')) "the rewriter moved '$t' -- exactly what the gate judged"
 }
 
+# THE MATCH SHAPE IS PART OF THE AGREEMENT, and this is the case that proved it. This function matched
+# from the ']' while the gate matches from the '[', and the offset test reads the START of a match -- so a
+# link whose LABEL sat inside a code span but whose '](target)' did not was excluded by the gate and
+# rewritten here. Exactly the disagreement the change exists to end, in a new place. Found in review
+# before it shipped; the repair was to match the gate's own shape and insert the prefix at the target's
+# index, so the label is never rebuilt.
+$splitSpan = 'a ` [text` ](../foo.md) b'
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $splitSpan)).Count 'the gate reads no link when the label is quoted'
+Assert-Equal $splitSpan (Convert-EntryRelativeLinks -EntryText $splitSpan -Prefix '../../') 'and neither does the rewriter -- both now key on the same offset, the link opening bracket'
+
+# The straddle case from entry-scaffold.tests.ps1, completed here where both libs are loaded: two stray
+# backticks pair ACROSS a fence and swallow it, the gate reads nothing, and the rewriter moves nothing.
+# Inherited behaviour -- the three strippers this replaced did the same -- and harmless precisely because
+# both halves inherit it together.
+$straddleEntry = @('text ` oops', '```', 'fenced', '```', 'and [a real link](../foo.md) after and ` closes it.') -join "`n"
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $straddleEntry)).Count 'straddle: the gate reads no link'
+Assert-Equal $straddleEntry (Convert-EntryRelativeLinks -EntryText $straddleEntry -Prefix '../../') 'straddle: and the rewriter moves none'
+
+# A bare '](x)' with no opening bracket is not a link, and since the repair neither half treats it as one.
+$noLabel = 'stray ](a.md) here'
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $noLabel)).Count 'the gate has never read a bracketless target'
+Assert-Equal $noLabel (Convert-EntryRelativeLinks -EntryText $noLabel -Prefix '../') 'and the rewriter no longer does either'
+
 # CRLF, because the offsets are computed over the text AS GIVEN and a rejoined copy would normalise them.
 # This repo's own entry file is written by scripts that preserve whatever the document already used.
 $crlf = "See [a](x.md).`r`n`r`n``````text`r`n[b](y.md)`r`n``````" + "`r`nAnd [c](z.md)."

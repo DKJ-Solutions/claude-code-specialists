@@ -57,6 +57,10 @@ return the entry with the illustrations still in it. So the shared form is offse
 - [x] Docstrings on both functions updated to name the shared owner, so neither reads as the one that
       decides what an illustration is.
 - [x] Mirrored to `../plugins/workflows/contributing-davekjohn/scripts/lib/` via `build-shared-scripts.ps1`.
+- [x] Review pass (Victor, Edith, Sebastian) on the diff; two findings from the copy edit reproduced and
+      repaired before the PR -- the rewriter now matches the gate's own link shape (it keyed on `]` where
+      the gate keys on `[`, so a quoted label with an unquoted target disagreed), and the docstring's
+      claim that the spans never overlap was false and is now stated the other way with its reason.
 
 ### TEST
 
@@ -64,10 +68,13 @@ return the entry with the illustrations still in it. So the shared form is offse
       alone while three real links beside them are rewritten, an assert that the rewriter moves exactly
       the set `Get-EntryLinkTargets` reads, and a CRLF fixture proving the offsets land on the right
       characters.
-- [x] `../scripts/tests/entry-scaffold.tests.ps1`: the primitives themselves -- span bounds, ordering and
-      non-overlap, the empty cases, the stray-backtick case that proves masking rather than stripping, the
-      boundary behaviour of the offset test, and the measured `[PR #N](url)` fixture still reading zero
-      through the shared function.
+- [x] `../scripts/tests/entry-scaffold.tests.ps1`: the primitives themselves -- span bounds, ordering, the
+      empty cases, the stray-backtick case that proves masking rather than stripping, the boundary
+      behaviour of the offset test, the straddling-backtick case that documents why the spans may overlap,
+      and the measured `[PR #N](url)` fixture still reading zero through the shared function.
+- [x] `../scripts/tests/release-lib.tests.ps1` again, for the two review findings: a quoted label with an
+      unquoted target, the straddle case completed where both libs are loaded, and a bracketless `](x)`,
+      each asserted on BOTH halves so a future divergence fails rather than ships.
 - [x] All 55 suites green; `check-plugin-integrity.ps1` and `check-script-contract.ps1` clean.
 
 ### DEPLOY: `fix/fenced-links-rewritten-by-the-cut-v1`
@@ -78,7 +85,10 @@ exactly as written. It used to rewrite it, because the two halves of one rule ha
 `Get-EntryLinkTargets`, which open-pr's link gate reads, excluded code and comments; `Convert-EntryRelativeLinks`,
 which the cut reads, applied its regex to the whole entry. So the cut rebased links the gate had never
 looked at. Both halves now read one function, `Get-EntryCodeSpans`, which answers where the code is
-rather than handing back the text without it -- the form a rewriter can use and a stripper cannot.
+rather than handing back the text without it -- the form a rewriter can use and a stripper cannot. They
+also match the same link shape now: the rewriter used to match from the `]` while the gate matches from
+the `[`, and since the offset test reads the start of a match, a link whose label sat inside a code span
+but whose `](target)` did not was excluded by one half and rewritten by the other.
 
 **Score:** 2
 
@@ -87,7 +97,7 @@ rather than handing back the text without it -- the form a rewriter can use and 
 Prevents a silently mangled illustration inside a tagged, immutable release document: quote a relative
 markdown link inside a fence in a changelog entry, cut a release, and the generated note ships that
 example with an extra `../../../` on the front, discoverable only by a reader. [#1047](https://github.com/DaveKJohn/claude-code-specialists/issues/1047)
-widened the exposure by one class a day earlier when it stopped exempting `../`, which is the ordinary
+widened the exposure by one class hours earlier the same day when it stopped exempting `../`, which is the ordinary
 shape a quoted example has. Nothing has broken yet in this repo -- no entry here has quoted one -- so this
 is the failure named rather than the failure repaired.
 
