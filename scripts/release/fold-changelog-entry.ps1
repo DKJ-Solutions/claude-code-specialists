@@ -510,6 +510,21 @@ foreach ($file in $entryFiles) {
     # BEFORE the promote and the footer below, so the comment count cannot change what those measure.
     $entryContent = (Remove-EntryHtmlComments -EntryText $entryContent).TrimEnd()
 
+    # THE 'Plugins:' LINE IS THE FOLD'S TO WRITE, so a copy already in the entry is removed here, before
+    # the footer below appends the authoritative one (issue #1015). That line is derived from the PR's
+    # touched files further down; an author who mirrored the folded-entry shape into the branch
+    # document's '#### Pull Request' section left a second one behind, and 22 doubled 'Plugins:' lines
+    # reached the changelog -- 8 in a single cut -- before this strip existed. The unconditional append
+    # below could not tell a written entry from an already-folded one.
+    #
+    # SAID OUT LOUD RATHER THAN DONE SILENTLY. The stray line is the author's, the branch-entry gate now
+    # refuses it on the branch, and Remove-EntryPluginsLine is one call -- but a branch opened before
+    # that gate shipped still arrives here, so the fold names what it dropped and where it came from.
+    if ([regex]::IsMatch($entryContent, '(?m)^Plugins:\s')) {
+        Write-Host "  ($file carried a 'Plugins:' line -- the fold writes that line itself, so the copy in the entry was dropped. Delete it from the branch document's '#### Pull Request' section.)" -ForegroundColor DarkYellow
+        $entryContent = (Remove-EntryPluginsLine -EntryText $entryContent).TrimEnd()
+    }
+
     # THE DOCUMENT'S TAIL IS NORMALISED BEFORE ANYTHING IS MEASURED IN IT: it ends with exactly one blank
     # line, whatever it ended with before. BOTH insertion paths below need that, and only one of them used
     # to ensure it -- the one that runs when nothing is pending, which is the rarer of the two.
