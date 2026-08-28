@@ -32,14 +32,20 @@ The script:
 
 1. Validates the branch name via the shared SSOT helper `Test-BranchName`
    (`scripts/lib/branch-info.ps1`) -- hard-rejects an empty name, `main`, or a name containing
-   `final`; soft-warns (but proceeds) on an unknown prefix. It also **completes the version suffix**: a
-   name with no `-v<N>` gets the lowest free one, checked against the branches that exist locally and on
-   the remote, so a second cycle on the same subject becomes `-v2` rather than colliding.
-2. **Measures the base it is about to cut from** and warns if it is behind `origin/<trunk>`, naming the
+   `final`; soft-warns (but proceeds) on an unknown prefix.
+2. **Completes the version suffix**, after that validation rather than inside it: a name with no
+   `-v<N>` gets `-v1` appended, and an explicit `-vN` is left exactly as typed. **It appends `-v1` and
+   nothing else -- it does not look for the lowest free number**, and that restraint is the design.
+   `new-branch` is idempotent, so a second run on the same subject *resumes* that branch instead of
+   opening another one, which is what the `-Park` flow needs; a scan would turn every rerun into a new
+   branch. A bump is therefore a decision you state by typing `-v2`. The full reasoning, and why this
+   is a completion rather than a refusal in the validator, is in
+   [`DEVELOPMENT-portable.md`](../../DEVELOPMENT-portable.md#the-version-suffix).
+3. **Measures the base it is about to cut from** and warns if it is behind `origin/<trunk>`, naming the
    count. It does not refuse and it does not move `HEAD` for you -- see below.
-3. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
+4. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
    running it again on the same branch simply resumes it instead of failing.
-4. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
+5. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
    document come into existence in a single step. Idempotent: a document that already belongs to this
    branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
    unless it holds uncommitted work, which is kept and reported instead.
