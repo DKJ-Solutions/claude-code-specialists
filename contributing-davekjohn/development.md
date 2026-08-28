@@ -35,19 +35,57 @@
 
 Relax lint check 6b so a manual may be backed by a persona; move Chris's evidence-carrying prose off the always-on path into manuals/01-01-manual.md. Closes #1017.
 
+#### The decision this branch implements
+
+#1017 named three candidates and reserved the choice. Dave picked the first on August 28, 2026:
+relax the gate and give Chris a manual. Candidate 2 (a new portable skill) was declined on its own
+measurement -- a skill's description is paid by every session in every consumer whether it fires or
+not, so it buys back less than it costs to reach.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `check-plugin-integrity.ps1`: 6b accepts a persona as a backer, and requires a persona that
+      backs a manual to name it. Header docs for 3c and 6b corrected in the same edit -- 3c asserted
+      that check 6 leaves personas alone, which stopped being true.
+- [x] `manuals/01-01-manual.md`: the phase model, parallel delegation, and the six inbound checks in
+      full, plus what "leading" means for a persona-backed pair.
+- [x] `personas/01-01-persona.md`: those three replaced by the rule and a pointer. 25,674 -> 20,535 B.
+- [x] `.claude/specialists/README.md` and root `README.md`: the contradiction #1017 measured
+      ("the leading half is the manual" + "Chris remains a persona"), resolved rather than reworded.
+- [~] The index table in the handbook -- not touched: its column is **Agent def**, and Chris still
+      has none. The row was already correct.
 
 ### TEST
 
+- [x] Check 6 had **no** coverage in any of the four integrity suites. Seven asserts added to
+      `check-plugin-integrity-docs.tests.ps1` covering all four states, not just the new one: no
+      backer, a silent persona, a naming persona, and a persona with no manual at all.
+- [x] Full gate green -- `check-plugin-integrity.ps1` 0 errors, `check-roster-sync.ps1` 0 errors.
+
 ### DEPLOY: `feat/chris-on-demand-manual-v1`
 
-**Score:**
+The orchestrator gets the on-demand half every other specialist already had. His persona is loaded on
+every turn in every consuming repo, and until now the lint gate's check 6b required an agent def
+behind every manual -- which he has none of, by design, being the only specialist who can ask the
+owner anything. So every rule he carried sat on the always-on path whether or not the session ever
+needed it. 6b now accepts a persona as a backer, and three sections moved into
+`manuals/01-01-manual.md`: the workflow phase model, delegating parallel work, and the six inbound
+checks in full. Each is unknowable at the start of a turn, which is what made them the right three.
+
+**5,139 B off the always-on path, ~1,647 tokens, 20.0% of the persona** -- on top of the 1,861 B the
+compression branch before it recovered, and paid for by no rule being dropped. The gate enforces the
+half that can break: a persona backing a manual must name it, since it is the only half that loads.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+Every consuming repo pays this path before its first assignment, so the saving lands on each of them
+at the next plugin update without anyone doing anything. Nothing a consumer has to act on: no rule
+changed, no file they own moved, and a persona with no manual -- Bianca, Derek, Rendall -- is
+untouched in both directions.
+
+**Score:** 3
 
 #### Pull Request
 

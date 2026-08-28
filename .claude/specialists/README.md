@@ -72,12 +72,29 @@ Which specialists here are a subagent lens vs. a persona lens (lens-only), and w
 live, is inventoried in [Layout of this directory](#layout-of-this-directory) above — not repeated
 here. What follows are the rules that build on that split:
 
-**Rules:** where both exist, the **manual is leading**; the agent def is the executable
-abbreviation. The *principle* and the manuals belong to [Tessa #16](lenses/06-16-extension.md);
-the agent-def config (frontmatter, tools, model) belongs to [Sylvester #15](lenses/05-15-extension.md).
-**Chris remains a persona** — he is the only one who can **ask** Dave anything.
-[Tessa #16](lenses/06-16-extension.md) guards the two-part manual split (portable body vs.
-repo lens) on every change here.
+**Rules:** where a manual and an **agent def** both exist, the **manual is leading**; the agent def is
+the executable abbreviation. The *principle* and the manuals belong to
+[Tessa #16](lenses/06-16-extension.md); the agent-def config (frontmatter, tools, model) belongs to
+[Sylvester #15](lenses/05-15-extension.md). **Chris remains a persona** — he is the only one who can
+**ask** Dave anything. [Tessa #16](lenses/06-16-extension.md) guards the two-part manual split
+(portable body vs. repo lens) on every change here.
+
+**A persona may back a manual too, and that pairing is leading in neither direction**
+([#1017](https://github.com/DaveKJohn/claude-code-specialists/issues/1017), August 28, 2026). Until
+that day the lint gate's check 6b required an agent def behind every manual, so the two sentences
+above read together as *"the leading half is the manual, and Chris may not have one"* — and Chris,
+uniquely, paid for it in tokens: he is loaded on **every** turn, so every rule the gate kept out of a
+manual sat on the always-on path. Measured before the split, his persona was 25,674 B, about 35% of
+that path; three sections came off it for **5,166 B**.
+
+**What "leading" means for such a pair is different and narrower, and the root README states it** —
+[Manuals — the split model](../../README.md#agent-def-vs-manual--two-files-one-specialist) is this
+model's one canonical home, as the section above says. In short: split by **when** each half is
+needed, not by authority. What belongs here is only what it cost *this* repo. Chris's three moved
+sections — the phase model, parallel delegation, the six inbound checks — are each unknowable at the
+start of a turn, which is exactly why none of them was ever worth a session's context. Bianca, Derek
+and Rendall have no manual and are untouched in both directions, so this changed one file's loading
+and nothing else about how the four personas work here.
 
 ### Where a new rule goes — the source is the default, the lens is the exception
 

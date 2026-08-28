@@ -430,6 +430,23 @@ documents. Moreover, the manual format is the common denominator across the whol
 persona-only specialists (Chris, Derek, Rendall) have no agent def, but do have a full playbook as a
 template in `personas/` (see below).
 
+**A persona may also back a manual of its own, and then the pair works differently from an agent def
+and its manual** ([#1017](https://github.com/DaveKJohn/claude-code-specialists/issues/1017),
+August 28, 2026). An agent def is an *abbreviation* of its manual — the same craft, less of it — which
+is what lets one be leading. A persona and its manual are two halves of one body split by **when they
+are needed**: the persona holds what applies before the assignment is known, the manual what applies
+once a particular situation has arrived. Neither outranks the other, and the test for where a rule
+goes is timing rather than importance — a rule that governs every turn stays in the persona however
+long it is, a rule that governs one kind of situation moves however short it is.
+
+**This matters for exactly one specialist, and only because of how he loads.** A persona is read on
+demand like anything else, except the orchestrator's, which an `@` import pulls into **every** turn —
+so he was the one specialist for whom "no manual" meant "every rule on the always-on path". The lint
+gate said so literally: check 6b required an agent def behind every manual, and he has none by design.
+It now accepts a persona as a backer, and requires that persona to **name** the manual, for the same
+reason 6a makes an agent def name its own — the persona is the only half that gets loaded, so an
+unnamed manual is a file nothing would ever read. A persona with no manual stays the ordinary case.
+
 **The exception — a rule that keeps the subagent from walking into a wall belongs in both.** The
 division above assumes the subagent consults its manual at the moment it matters. For a rule about
 *what the craft is*, that holds: it notices the gap and looks it up. It does not hold for a rule

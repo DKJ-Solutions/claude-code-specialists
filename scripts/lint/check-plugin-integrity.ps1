@@ -16,7 +16,8 @@
       3c. every <plugin>/personas/*-persona.md: frontmatter contains 'id:' and 'group:', and the
          file name <group>-<id>-persona.md matches that frontmatter. Personas (orchestrator +
          main-loop specialists) DELIBERATELY have no agent def -- they run in the main loop, not
-         as a subagent -- and are therefore left alone by check 6's agent-def<->manual link.
+         as a subagent -- so check 6 never demands one of them. It does read them in one direction:
+         a persona MAY back a manual of the same id (6b), and then has to name it.
       4. dead relative links AND broken anchors in every ROOT *.md (README.md, CHANGELOG.md, CLAUDE.md,
          CONTRIBUTING.md, SECURITY.md, INSTALL.md, UNINSTALL.md and any unfolded changelog entry file
          -- globbed, never named), every .claude/extensions/*.md, every <plugin>/skills/*/SKILL.md, every
@@ -31,7 +32,8 @@
          itself, which would otherwise only break at execution time).
       6. specialists-system integrity: per plugin, every '<group>-<id>' is unique across the
          agent defs, every agent def has a valid 'name:' + a corresponding manuals/<g>-<id>-manual.md
-         which it also names, and conversely every manual has an agent def (no orphan manual).
+         which it also names, and conversely every manual is backed by an agent def OR a persona of
+         the same id (no orphan manual) -- a persona-backed manual must be named by that persona.
       7. shared agent-def blocks: every <!-- BEGIN/END shared:NAME --> region in an agent def still
          equals its canonical source in teams/agent-shared/<name>.md (see scripts/agents/build-agent-defs.ps1)
          -- a hand-edit inside the sentinels or a forgotten rebuild is thus caught at the gate.
@@ -873,7 +875,15 @@ if (Test-CheckEnabled 'parse') {
 #   6a. every '<group>-<id>' is unique across all agent defs; every agent def has a valid 'name:'
 #       (Claude Code call name), a corresponding manuals/<g>-<id>-manual.md in the same plugin, and
 #       names that manual in its text.
-#   6b. no orphan manual: every manuals/<g>-<id>-manual.md has an agents/<g>-<id>-agent.md.
+#   6b. no orphan manual: every manuals/<g>-<id>-manual.md is backed by an agents/<g>-<id>-agent.md
+#       OR a personas/<g>-<id>-persona.md. A PERSONA MAY BACK A MANUAL (#1017). Being a persona says
+#       where a specialist RUNS -- in the main loop rather than as a subagent -- and says nothing
+#       about whether their craft has a playbook worth reading on demand. Until this changed it said
+#       both, and the orchestrator paid for it: always loaded, and the one specialist whose every rule
+#       had to sit on the always-on path, because the gate refused him the on-demand half the other
+#       fifteen have. Where a persona backs a manual it must NAME it, for the same reason 6a makes an
+#       agent def name its own -- nothing else would ever read it. A persona with no manual is the
+#       normal case and is asserted about in neither direction.
 # (The roster->lens link is already covered by the dead-link scan above, since that scans CLAUDE.md.)
 
 $idOwner = @{}
@@ -910,10 +920,21 @@ $manuals | ForEach-Object {
         if ($_.BaseName -match '^(\d{2})-(\d{2})-manual$') {
             $g = $Matches[1]; $id = $Matches[2]
             $pluginRoot = Split-Path (Split-Path $_.FullName -Parent) -Parent
-            $agentPath = Join-Path $pluginRoot ("agents\$g-$id-agent.md")
-            if (-not (Test-Path -LiteralPath $agentPath -PathType Leaf)) {
+            $agentPath   = Join-Path $pluginRoot ("agents\$g-$id-agent.md")
+            $personaPath = Join-Path $pluginRoot ("personas\$g-$id-persona.md")
+            $hasAgent   = Test-Path -LiteralPath $agentPath   -PathType Leaf
+            $hasPersona = Test-Path -LiteralPath $personaPath -PathType Leaf
+            if (-not $hasAgent -and -not $hasPersona) {
                 $rel = $_.FullName.Replace($RepoRoot, '.')
-                Add-Error "[specialist] ${rel}: orphan manual -- no corresponding agents/$g-$id-agent.md in the same plugin."
+                Add-Error "[specialist] ${rel}: orphan manual -- no corresponding agents/$g-$id-agent.md or personas/$g-$id-persona.md in the same plugin."
+            } elseif (-not $hasAgent) {
+                # Persona-backed. The naming half of 6a applies here for the same reason it does there:
+                # the manual is only ever read because the body that IS loaded points at it.
+                $pText = [System.IO.File]::ReadAllText($personaPath, [System.Text.Encoding]::UTF8)
+                if ($pText -notmatch [regex]::Escape("manuals/$g-$id-manual.md")) {
+                    $pRel = $personaPath.Replace($RepoRoot, '.')
+                    Add-Error "[specialist] ${pRel}: persona backs 'manuals/$g-$id-manual.md' but does not name it, so nothing would ever read it."
+                }
             }
         }
     }

@@ -3,7 +3,8 @@
     check-plugin-integrity.ps1, part 4 of 4: the checks over what this repo SHIPS -- shared-script
     parameters against their skill (18), claimed section counts (20), the changelog intro (20b),
     machine-specific commands in skill pages (22), the PR template contract (24), consumer tier
-    links (25), frontmatter byte-order marks (26) -- and the -SkipCheck parameter itself.
+    links (25), frontmatter byte-order marks (26), the manual/backer pairing (6b) -- and the
+    -SkipCheck parameter itself.
 
 .DESCRIPTION
     The fixture, the assert helpers and Invoke-Integrity live in check-plugin-integrity-fixture.ps1,
@@ -628,6 +629,68 @@ try {
     Assert-True ($c5.Code -ne 0) `
         'corrupt marketplace: and the run still fails -- check 1 reported the unparseable file'
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), $goodMarketplace, $Utf8NoBom)
+
+    # --- check 6b: a manual is backed by an agent def OR a persona ------------------------------------
+    # ADDED WITH #1017 (August 28, 2026), which relaxed 6b -- and found check 6 had no coverage at all,
+    # in any of the four suites. The relaxation is the kind that fails silently in the direction that
+    # matters: a gate that now accepts MORE cannot be seen to have started accepting everything. So all
+    # four states are asserted, not just the new one.
+    #
+    # The fixture's team-alpha carries no specialists, so this scenario builds its own pair and removes
+    # them again -- every other check in this file reads that plugin too, and a stray agent def would
+    # change what checks 7 and 26 walk for the scenarios below.
+    Write-Host "check 6b: a manual may be backed by a persona, and must then be named by it" -ForegroundColor Cyan
+    $spAgents   = Join-Path $Fixture 'plugins\teams\team-alpha\agents'
+    $spManuals  = Join-Path $Fixture 'plugins\teams\team-alpha\manuals'
+    $spPersonas = Join-Path $Fixture 'plugins\teams\team-alpha\personas'
+    New-Item -ItemType Directory -Path $spManuals  -Force | Out-Null
+    New-Item -ItemType Directory -Path $spPersonas -Force | Out-Null
+    $spManualPath  = Join-Path $spManuals  '99-99-manual.md'
+    $spPersonaPath = Join-Path $spPersonas '99-99-persona.md'
+    $spAgentPath   = Join-Path $spAgents   '99-99-agent.md'
+    [System.IO.File]::WriteAllText($spManualPath, "---`nid: 99`ngroup: 99`n---`n`n# Fixture manual`n", $Utf8NoBom)
+
+    # 1. Neither backer: still an orphan. The check's whole reason for existing survives the relaxation.
+    $b1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($b1.Out -match 'orphan manual') `
+        'check 6b: a manual with neither an agent def nor a persona is still an orphan'
+    Assert-True ($b1.Out -match 'personas/99-99-persona\.md') `
+        'check 6b: and the finding names the persona path too, so the reader learns the second way out'
+
+    # 2. A persona that does NOT name the manual: accepted as a backer, refused for being silent. This is
+    #    the half that can break -- a persona is the only file that gets loaded, so an unnamed manual is
+    #    a file nothing will ever read, which is indistinguishable from not having written it.
+    [System.IO.File]::WriteAllText($spPersonaPath, "---`nid: 99`ngroup: 99`n---`n`n# Fixture persona`n", $Utf8NoBom)
+    $b2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($b2.Out -match 'orphan manual')) `
+        'check 6b: a persona backs the manual, so it is no longer an orphan'
+    Assert-True ($b2.Out -match 'does not name it') `
+        'check 6b: but a persona that never names its manual is refused -- nothing would read it'
+
+    # 3. A persona that names it: clean.
+    [System.IO.File]::WriteAllText($spPersonaPath,
+        "---`nid: 99`ngroup: 99`n---`n`n# Fixture persona`n`nPlaybook: manuals/99-99-manual.md`n", $Utf8NoBom)
+    $b3 = Invoke-Integrity -FixtureRoot $Fixture
+    # ASSERTED ON THE FINDING TEXT, not on '[specialist]'. That bracket also opens the coverage line
+    # ('[specialist] checked 1'), which this check prints on every run including a clean one -- so the
+    # obvious absence assert passes only while the check is silent about everything, including itself.
+    Assert-True (-not ($b3.Out -match 'orphan manual')) `
+        'check 6b: a persona that names its manual passes -- the pairing #1017 asked for'
+    Assert-True (-not ($b3.Out -match 'does not name it')) `
+        'check 6b: and naming it is what clears the second finding, nothing else about the file changed'
+
+    # 4. A persona with NO manual is the normal case and is asserted about in neither direction. Bianca,
+    #    Derek and Rendall are all in this state, so a rule that read a bare persona as a finding would
+    #    fail the real repo on three files.
+    Remove-Item -LiteralPath $spManualPath -Force
+    $b4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($b4.Out -match 'orphan manual|does not name it')) `
+        'check 6b: a persona with no manual at all is untouched -- three real specialists live there'
+
+    Remove-Item -LiteralPath $spPersonaPath -Force
+    if (Test-Path -LiteralPath $spAgentPath) { Remove-Item -LiteralPath $spAgentPath -Force }
+    Remove-Item -LiteralPath $spManuals -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $spPersonas -Recurse -Force -ErrorAction SilentlyContinue
 
     # --- -SkipCheck: the guard rails around the one parameter that can make this gate check less ------
     #     The parameter exists for THIS suite and nothing else. Its failure mode is silence -- a gate
