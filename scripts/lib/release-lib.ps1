@@ -698,18 +698,86 @@ function Get-EntryPlugins {
 # August 9, 2026, so the helper went down to the lib that owns the entry format. Same move as
 # Get-ReleaseChangeTypes and Set-EntryHeadingLevel, same reason.
 
-function Convert-RootRelativeLinks {
+# --- RENAMED, NOT DELETED: Convert-RootRelativeLinks is now Convert-EntryRelativeLinks -------------
+#
+# The old name asserted the base -- repo-root-relative -- and that assertion is exactly what stopped
+# being true, so keeping it would have left the one line a reader checks first saying the wrong thing.
+# Nothing outside this file called it by either name: it is a lib function behind Build-ReleaseNotes,
+# Build-ConsumerNotes and Build-ReleaseNoteDraft, and a consumer runs the SCRIPTS rather than the lib.
+
+function Convert-EntryRelativeLinks {
     <#
-        Rewrites repo-root-relative markdown links with the given prefix; external (http/mailto),
-        anchor (#), absolute (/) and ../ links are left alone. The engine behind Build-ReleaseNotes.
-        It had a second caller until August 8, 2026 -- the per-plugin CHANGELOG link rewriter, which
-        went with the documents it wrote.
+        Rewrites the relative markdown links in an entry so they still resolve from a document that sits
+        at a DIFFERENT depth than the changelog the entry's text lives in. $Prefix is the path from that
+        document's own directory to the CHANGELOG's directory -- see Get-EntryLinkPrefix, which derives
+        it. External (http/mailto), anchor (#) and absolute (/) links are left alone: none of them is
+        resolved against a directory, so none of them can be broken by the text moving.
+
+        THE BASE IS THE CHANGELOG'S DIRECTORY, NOT THE REPO ROOT (inbound #1047, August 28, 2026), and
+        that is not a preference -- it is what the fold does. The fold copies an entry VERBATIM into
+        CHANGELOG.md, so whatever directory that file sits in IS the base every relative link in an entry
+        is written against. open-pr's link gate has judged them from exactly there since #967
+        (Get-EntryLinkFindings -DestDirRel); this function was still prefixing as though the answer were
+        the repo root, which is the same answer only while the changelog sits AT the root. It stopped
+        sitting there when #914 made the changelog isolate-by-default, and in this repo when CHANGELOG.md
+        moved into contributing-davekjohn/ on August 27, 2026.
+
+        The two hops therefore disagreed, and no relative link satisfied both: the form the gate demanded
+        (`CONTRIBUTING.md`) was rebased one directory too far and landed in the release record pointing at
+        a root CONTRIBUTING.md this repo does not have, while the form that survived the cut was refused
+        before the PR was ever opened. The measured workaround was to write no relative links at all.
+
+        AND '../' IS REWRITTEN NOW, WHICH IS THE HALF THE REPORT DID NOT SEE. It used to be exempt, on the
+        reasoning that a link already climbing out of a directory was one the author had aimed by hand.
+        With the changelog inside the workflow folder, '../' is no longer the exception but the ORDINARY
+        form for every target outside that folder -- and it is the form the gate itself hands the author,
+        because Get-PathRelativeToDirectory emits it. Leaving it alone meant the cut silently skipped
+        precisely the links the gate had just dictated. Prefixing is enough to move one: '../../../' +
+        '../scripts/x' resolves through its own '..' segments to the same file, in every markdown renderer
+        and on GitHub.
+
+        Exempting it cost this repo nothing to keep only because nothing in the entry file used it while
+        the changelog was at the root -- there, a '../' link points outside the repo and open-pr refuses
+        it. So the exemption never protected a working link; it protected a broken one.
     #>
     param(
-        [Parameter(Mandatory)][string]$EntryText,
-        [Parameter(Mandatory)][string]$Prefix
+        [Parameter(Mandatory)][AllowEmptyString()][string]$EntryText,
+        # Empty is a real answer: a repo whose notes sit in the changelog's OWN directory needs no
+        # rewriting at all, and Get-EntryLinkPrefix returns '' for exactly that case.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Prefix
     )
-    return [regex]::Replace($EntryText, '\]\((?!https?:|mailto:|#|/|\.\./)([^)]+)\)', "](${Prefix}`$1)")
+    if (-not $Prefix) { return $EntryText }
+    return [regex]::Replace($EntryText, '\]\((?!https?:|mailto:|#|/)([^)]+)\)', "](${Prefix}`$1)")
+}
+
+function Get-EntryLinkPrefix {
+    <#
+        Pure: the prefix that moves an entry's relative links from the CHANGELOG's directory to the
+        directory a generated release document sits in -- '../../../' for a note at
+        contributing-davekjohn/releases/changelog/4.x/ whose changelog is contributing-davekjohn/CHANGELOG.md.
+        Both arguments are repo-relative paths to FILES; either separator is accepted. Returns '' where
+        the two documents share a directory, which is Convert-EntryRelativeLinks' no-op.
+
+        IT EXISTS SO THE TWO CALL SITES CANNOT DRIFT (inbound #1047). cut-release.ps1 derives this twice --
+        once for the tier-0 notes, once for the hand-written draft -- and both used to count the note's own
+        segments back to the repo root, which is the derivation the report measured as wrong. One owner, so
+        a repo that repoints Get-ChangelogPath gets both documents right or neither.
+
+        A CHANGELOG AT THE REPO ROOT PRODUCES THE OLD ANSWER, BYTE FOR BYTE: the destination directory is
+        then '' and the prefix is one '../' per segment of the note's own directory, which is what
+        `('../' * $notesDepth)` computed. So nothing changes for a repo that never moved its changelog.
+    #>
+    param(
+        # The generated document, repo-relative -- e.g. 'contributing-davekjohn/releases/changelog/4.x/4.23.0.md'.
+        [Parameter(Mandatory)][string]$NoteRelPath,
+        # The changelog the entry text is copied out of, repo-relative -- what Get-ChangelogPath answers.
+        [Parameter(Mandatory)][string]$ChangelogRelPath
+    )
+    $noteDir = ((Split-Path $NoteRelPath -Parent) -replace '\\', '/').Trim('/')
+    $destDir = ((Split-Path $ChangelogRelPath -Parent) -replace '\\', '/').Trim('/')
+    $rel = Get-RelativeLinkPath -FromDir $noteDir -To $destDir
+    if (-not $rel) { return '' }
+    return "$rel/"
 }
 
 # --- MOVED, NOT DELETED: Get-ReleaseChangeTypes now lives in entry-scaffold-lib.ps1 ----------------
@@ -1012,7 +1080,10 @@ function Get-RelativeLinkPath {
     #>
     param(
         [AllowEmptyString()][string]$FromDir = '',
-        [Parameter(Mandatory)][string]$To
+        # EMPTY IS A REAL DESTINATION -- the repo root (inbound #1047). $FromDir has always allowed it for
+        # the mirror-image reason, and Get-EntryLinkPrefix asks this question of a repo whose changelog
+        # sits AT the root, where the answer is one '..' per segment of $FromDir and nothing else.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$To
     )
     # NOT $from/$to: PowerShell variable names are case-INsensitive, so '$to = @(...)' would assign to
     # the [string]-typed parameter $To itself -- and the type constraint coerces the segment array back
@@ -1069,24 +1140,26 @@ function Build-ReleaseNotes {
         # changed between 2.2.0 and 2.16.0", and hand-editing a generated file is not a repeatable
         # release. Empty by default, so an ordinary release is byte-identical to before.
         [string]$Summary = '',
-        # Prefix to resolve repo-root-relative links in entry bodies from the deeper location of
-        # the notes file. THE DEFAULT IS THE SHALLOWEST SHAPE ANY REPO HAS -- a root directly under
-        # releases/, three folders deep. cut-release.ps1 does not rely on it: it derives the prefix from
-        # the note path the seam produced, because a root one level deeper (this repo since #914) needs a
-        # fourth '../' and nothing would error if it did not get one.
+        # Prefix that moves an entry body's relative links from the CHANGELOG's directory -- the base they
+        # are written against, because the fold copies them there verbatim -- to the notes file's own.
+        # THE DEFAULT IS THE SHALLOWEST SHAPE ANY REPO HAS -- a root directly under releases/, three
+        # folders deep, with the changelog at the repo root. cut-release.ps1 does not rely on it: it asks
+        # Get-EntryLinkPrefix, because a notes root one level deeper (this repo since #914) needs a fourth
+        # '../' and a changelog that is NOT at the root needs one fewer, and nothing would error either way.
         [string]$LinkPrefix = '../../../'
     )
-    # Entries are written with repo-root-relative links; rewrite them so they resolve correctly
-    # from the notes file, at whatever depth the caller says it sits (see the LinkPrefix note above). External
-    # (http/mailto), anchor (#) and absolute (/) links are left alone, as are links that already
-    # start with ../. Format-RankedEntries then re-levels the entries and normalizes to LF, so the CRLF
-    # of the source CHANGELOG does not cross the pure-LF output.
+    # Entries are written relative to the CHANGELOG's own directory; rewrite them so they resolve from the
+    # notes file, at whatever offset the caller says it sits (see the LinkPrefix note above). External
+    # (http/mailto), anchor (#) and absolute (/) links are left alone; '../' links are NOT, since inbound
+    # #1047 -- they are the ordinary form for a target outside an isolated changelog's folder, and the one
+    # open-pr's gate hands the author. Format-RankedEntries then re-levels the entries and normalizes to
+    # LF, so the CRLF of the source CHANGELOG does not cross the pure-LF output.
     if ($TierGroups) {
         $sections = @()
         foreach ($group in @($TierGroups)) {
             $groupEntries = @($group.Entries | Where-Object { $_ -and $_.Trim() })
             if ($groupEntries.Count -eq 0) { continue }
-            $linked = @($groupEntries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+            $linked = @($groupEntries | ForEach-Object { Convert-EntryRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
             # NO TIER HEADING, AND THE ENTRIES SIT AT '##' -- EXACTLY CHANGELOG.md'S LEVELS (Dave, #881,
             # August 25, 2026). This group used to render as '## Tier 2 - consumers' with its entries one
             # level under it, which put every heading in this document one level DEEPER than the changelog
@@ -1117,7 +1190,7 @@ function Build-ReleaseNotes {
         # divided, which is a heading in all but name. Every entry boundary now reads identically.
         $body = ($sections -join "`n`n---`n`n")
     } else {
-        $linked = @($Entries | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+        $linked = @($Entries | ForEach-Object { Convert-EntryRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
         $body = Format-RankedEntries -Entries $linked -EntryLevel 2
     }
 
@@ -1302,7 +1375,7 @@ function Build-ConsumerNotes {
         [string]$LinkPrefix = '../../../'
     )
     $real = @($Entries | Where-Object { $_ -and $_.Trim() })
-    $linked = @($real | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+    $linked = @($real | ForEach-Object { Convert-EntryRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
     # ORDERED BY THE CONSUMER SCORE, not the internal one (issue #467). This is the only document whose
     # reader is the consumer, and 'what does a consumer notice' is a different question from 'what does the
     # organisation get out of it' -- which is precisely why the two are separate documents and separate
@@ -1485,7 +1558,7 @@ function Build-ReleaseNoteDraft {
     if ($Title) { $out.Add($Title); $out.Add('') }
 
     if ($real.Count -gt 0) {
-        $linked = @($real | ForEach-Object { Convert-RootRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
+        $linked = @($real | ForEach-Object { Convert-EntryRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
         # THE SAME SWITCHES THE CONSUMER DOCUMENT USED, called rather than re-derived: the score orders the
         # section and is then stripped, and the branch administration goes. Entries sit one level deeper
         # than before because they now live under a section heading rather than under the H1.

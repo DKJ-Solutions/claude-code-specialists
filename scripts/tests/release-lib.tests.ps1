@@ -696,10 +696,52 @@ Write-Host "Build-ReleaseNotes -- link rewriting" -ForegroundColor Cyan
 $linkEntry = New-FlatEntry -Heading "#9 $midDot Something" -Rows @('| 1 | 2 | fine |') `
     -Body 'See [the lint](scripts/lint/x.ps1) and [the site](https://example.com) and [#heading](#heading).' -Pr 9
 $ln = Build-ReleaseNotes -Entries @($linkEntry) -Version '0.2.1' -Date '2026-07-14' -Type 'Patch' -LinkPrefix '../../../'
-Assert-Match $ln '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative link gets the ../../../ prefix'
+Assert-Match $ln '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'a link relative to the changelog gets the ../../../ prefix'
 Assert-Match $ln '\[the site\]\(https://example\.com\)' 'external link untouched'
 Assert-Match $ln '\[#heading\]\(#heading\)' 'anchor link untouched'
 Assert-Match $ln '\[PR #9\]\(https://example\.test/9\)' 'PR link untouched'
+
+# --- '../' IS REWRITTEN TOO (inbound #1047, August 28, 2026) ---------------------------------------
+# It was exempt from the day the rewriter existed, on the reasoning that a link already climbing out of a
+# directory had been aimed by hand. Once the changelog moved into the workflow folder that stopped being
+# the exception and became the ORDINARY form for every target outside it -- and it is the form open-pr's
+# own gate hands the author, because Get-PathRelativeToDirectory emits it. So the cut was silently
+# skipping precisely the links the gate had just dictated, and they landed dead in a tagged document.
+$upEntry = New-FlatEntry -Heading "#10 $midDot Up" -Rows @('| 1 | 2 | fine |') `
+    -Body 'See [the lint](../scripts/lint/x.ps1) and [absolute](/x.md).' -Pr 10
+$up = Build-ReleaseNotes -Entries @($upEntry) -Version '0.2.2' -Date '2026-08-28' -Type 'Patch' -LinkPrefix '../../../'
+Assert-Match $up '\[the lint\]\(\.\./\.\./\.\./\.\./scripts/lint/x\.ps1\)' `
+    "a '../' link is prefixed as well -- its own '..' segments still resolve, one directory further up"
+Assert-Match $up '\[absolute\]\(/x\.md\)' 'an absolute link is still left alone -- no directory resolves it'
+
+# An empty prefix is a real answer, not a missing one: a repo whose notes sit in the changelog's OWN
+# directory needs no rewriting at all, and a Mandatory [string] would have thrown on it.
+$same = Convert-EntryRelativeLinks -EntryText 'See [x](../a.md) and [y](b.md).' -Prefix ''
+Assert-Equal 'See [x](../a.md) and [y](b.md).' $same 'an empty prefix returns the text untouched'
+
+# --- Get-EntryLinkPrefix: the offset between the two documents (inbound #1047) ---------------------
+# The first case is this repo since August 27, 2026, and the number is the whole bug: the note sits four
+# directories down from the root, so the retired `('../' * $notesDepth)` produced FOUR -- one too many,
+# because the entry's links are written against contributing-davekjohn/, not against the root.
+Write-Host "Get-EntryLinkPrefix -- measured from the changelog, not from the repo root" -ForegroundColor Cyan
+Assert-Equal '../../../' (Get-EntryLinkPrefix -NoteRelPath 'contributing-davekjohn/releases/changelog/4.x/4.23.0.md' `
+        -ChangelogRelPath 'contributing-davekjohn/CHANGELOG.md') `
+    'an isolated changelog: three, not the four the note is deep'
+Assert-Equal '../../../' (Get-EntryLinkPrefix -NoteRelPath 'contributing-davekjohn/releases/audience/4.x/4.23.0.md' `
+        -ChangelogRelPath 'contributing-davekjohn/CHANGELOG.md') `
+    'and the hand-written draft sits at the same offset'
+# The old answer, byte for byte, for a repo that never moved its changelog -- which is what makes this
+# change safe for every consumer still answering the seam with the root.
+Assert-Equal '../../../' (Get-EntryLinkPrefix -NoteRelPath 'releases/changelog/4.x/4.23.0.md' `
+        -ChangelogRelPath 'CHANGELOG.md') `
+    'a changelog AT the repo root reproduces the retired depth count exactly'
+Assert-Equal '' (Get-EntryLinkPrefix -NoteRelPath 'contributing-davekjohn/4.23.0.md' `
+        -ChangelogRelPath 'contributing-davekjohn/CHANGELOG.md') `
+    'a note in the changelog OWN directory needs no prefix at all'
+# Windows separators reach this from Get-ChangelogPath in some repos, so both are accepted.
+Assert-Equal '../../../' (Get-EntryLinkPrefix -NoteRelPath 'contributing-davekjohn\releases\changelog\4.x\4.23.0.md' `
+        -ChangelogRelPath 'contributing-davekjohn\CHANGELOG.md') `
+    'backslashed paths answer identically'
 
 # --- Get-RelativeLinkPath: the history row's anchor (August 14, 2026) ------------------------------
 # The first two cases are the old `-replace '^releases/'` answers, byte for byte -- that identity is
