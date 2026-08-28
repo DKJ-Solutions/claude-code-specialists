@@ -239,3 +239,85 @@ The team and its organization come about **in consultation with Dave** and may c
 new specialists only come about by agreement (see
 [Chris #01](lenses/01-01-extension.md#new-specialists--only-by-agreement)). If the organization
 changes, Tessa updates this document.
+
+## Measured instances kept off the always-on path
+
+**Everything below is evidence, and that is why it is here.** The always-on document path —
+`CLAUDE.md` and everything it `@`-imports — is read by every session before a single assignment is
+given, so the rule a measurement supports belongs there and the measurement itself does not. This
+handbook is loaded on demand, which makes it the destination. Each entry names the rule it stands
+behind, so the two can be read together when that is what a session actually needs.
+
+**Add to this section rather than to a lens when a measurement outgrows the sentence it justifies**,
+and measure before and after with
+`scripts/maintenance/measure-always-on.ps1` — the point is the path getting smaller, not the prose
+moving.
+
+### The three ways a briefing fails, measured here
+
+Behind *"Verify the stand against the repo, not against a handover text"* in
+[Chris's lens](lenses/01-01-extension.md#the-dave-rules). Three modes, three instances, none of which
+the mode above it would have caught.
+
+**Truncated — July 29, 2026.** Dave's self-verifying start prompt arrived **three times, identically
+truncated** at the same character: it broke off mid-word inside open point 2 and resumed at the tail
+of a bullet whose subject was gone, taking one pitfall with it entirely, the opening of another, and —
+unknowably — any open points numbered after 2. Asking again did not help; the channel would not carry
+it. The visible points looked complete, which is exactly the danger.
+
+**Stale — the same day, and again on August 4, 2026.** A briefing's *expectations* go stale as well as
+its facts: that July 29 prompt kept predicting the one `[INFO]` that
+[#257](https://github.com/DaveKJohn/claude-code-specialists/pull/257) had already removed. On August 4
+a briefing *and* a memory note *and* every local command agreed the tree was clean while a
+fully-planned parked branch sat on the remote, overtaken hours earlier by work merged from a different
+branch — which is what put `git ls-remote --heads origin` in the checklist. Note which sources were
+wrong there: not a truncated channel this time, but two of Chris's own artefacts. That is the argument
+for reading the repo rather than for reading a *better* summary.
+
+**Transcribed — August 19, 2026.** A briefing that is complete, current, and states a **cause that does
+not exist**: a lock six minutes old, correct about its subject (inbound
+[#747](https://github.com/DaveKJohn/claude-code-specialists/issues/747)) and wrong about the mechanism,
+while the report it summarised had named the right line. Neither truncation nor staleness but
+*transcription*, and it survived every check in force at the time. Its rule lived in the `/handover`
+skill until that skill was removed
+([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave); the mode is a property
+of summaries rather than of any one command, so a recap Dave types, a `/loop` prompt, a branch
+document's PLAN section and a post-compaction summary are all the same artefact from this rule's point
+of view. What was repo-specific about it is that the report and the pickup were the same team an hour
+apart — the same shape as the fifth inbound pattern in the `triage-inbound` skill, and the same
+argument for recounting even when the report is your own.
+
+**The portable half of this rule reaches no consumer.** It travelled in the payload of the skill that
+was removed, and this handbook does not travel. That is a gap recorded here rather than pretended away.
+
+### Why `Get-RosterIgnoredIds` is empty
+
+Behind *"Adopting a specialist that arrives with a plugin update is the default and needs no
+approval"* in [`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing).
+
+Five of the six specialists who rarely have work here were left off the roster and registered in
+`Get-RosterIgnoredIds` instead (Bianca joined them briefly on July 28, 2026). That list turned out
+never to have been a decision: it was introduced by the same commit that built the roster check,
+pre-populated to keep that new check quiet, and justified in the code as *"a documented choice in
+`CLAUDE.md`"* while `SPECIALISTS.md` only ever said those specialists had no lens **yet**. Dave, asked
+about it on July 28, 2026, did not recognise the list as his — so the six were adopted and the list is
+empty.
+
+The shape is worth keeping separately from the outcome: a check was made quiet by a list, and the list
+then cited a document that did not say what it was cited for. Neither half is visible from the other,
+which is why the entry survived until somebody asked whose decision it was.
+
+### The branch check fires on the follow-up assignment
+
+Behind *"The check runs at the start of every assignment, not every session"* in
+[Chris's lens](lenses/01-01-extension.md#the-gatekeepers-as-implemented-here).
+
+Measured August 10, 2026. `ship-pr.ps1` switches to `main` in order to fold, so a successful chain ends
+with the session on the trunk and the tree clean. Dave caught it after **seven** files had been edited
+there; nothing was committed, so a `git checkout -b` carried the work across intact and the cost was
+zero.
+
+**The shape is what makes it recur.** It fires on a *follow-up* assignment inside one conversation —
+*"do the next thing"* — where no new session and no fresh intake prompts the ritual, and it is the
+**previous chain's success** that put you in the wrong place. A check tied to session start would
+therefore never catch it, which is why the rule is worded against the assignment instead.

@@ -34,61 +34,33 @@ product: agent defs, manuals, docs, and tooling.
   (what was decided earlier and why), and the manuals — and adjusts the routing accordingly instead
   of asking something the docs already lay down.
 - **Verify the stand against the repo, not against a handover text.** A session-start briefing — Dave's
-  own recap, a summary, a `/loop` prompt — is a pointer, not an inventory. On July 29, 2026 his
-  self-verifying start prompt arrived **three times, identically truncated** at the same character: it
-  broke off mid-word inside open point 2 and resumed at the tail of a bullet whose subject was gone,
-  taking one pitfall with it entirely, the opening of another, and — unknowably — any open points
-  numbered after 2. Asking again did not help; the channel would not carry it. The visible points looked
-  complete, and that is exactly the danger: nothing in a truncated list announces what is missing. So
-  before treating a briefing as the work list, read the repo's own answer — `git status`/`git log`, the
-  **pending entries** in [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md) (one `###` per change under
-  `## [Unreleased]`, furthest reach
-  first), the repo root for **unfolded entry files** (the silent half-state found that same morning), **`git ls-remote --heads origin` for
-  parked branches**, and the three gates (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` +
-  `check-script-contract.ps1`). Where the briefing and the repo disagree the
-  repo wins, and Chris says so out loud instead of quietly working around it. Corollary that showed up
-  the same day: a briefing's *expectations* go stale too — the prompt kept predicting the one `[INFO]`
-  that [#257](https://github.com/DaveKJohn/claude-code-specialists/pull/257) had already removed.
-  **`git ls-remote` earned its place on August 4, 2026**, when a briefing *and* a memory note *and* every
-  local command agreed the tree was clean while a fully-planned parked branch sat on the remote,
-  overtaken hours earlier by work merged from a different branch. A parked branch has no PR by design, so
-  it is invisible to every other item in this list — the mechanism and what to do when you find one are
-  in [Derek #05](05-05-extension.md#branch--repo-hygiene). Note which sources were wrong there: not a
-  truncated channel this time, but two of Chris's own artefacts, which is why the rule is to read the
-  repo rather than to read a *better* summary.
-  **A third mode joined them on August 19, 2026**, and until August 27 its rule lived in the `/handover`
-  skill because it was the portable half: a briefing that is complete, current, and states a **cause that
-  does not exist**. That skill is gone
-  ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), so the mode is recorded
-  here beside its two siblings — the payload that carried it travelled to consumers, and this lens does
-  not, which is a gap filed rather than pretended away. The instance was this
-  repo's — a lock six minutes old, correct about its subject (inbound
-  [#747](https://github.com/DaveKJohn/claude-code-specialists/issues/747)) and wrong about the mechanism,
-  while the report it summarised had named the right line. Neither truncation nor staleness but
-  *transcription*, and it survived every check that page listed at the time. **It survives the removal of
-  the commands too**, because the mode is a property of summaries rather than of `/lock`: a recap Dave
-  types, a `/loop` prompt, a branch document's PLAN section and a post-compaction summary are all the same
-  artefact from this rule's point of view. What was repo-specific about the instance is that the report and
-  the pickup were the same team an hour apart — the same shape as the fifth inbound pattern in the
-  `triage-inbound` skill, and the same argument for recounting even when the report is
-  your own.
+  own recap, a summary, a `/loop` prompt, a branch document's PLAN section, a post-compaction summary —
+  is a pointer, not an inventory, and it fails in three measured ways: it arrives **truncated**, and
+  nothing in a truncated list announces what is missing; its facts *and* its expectations go **stale**;
+  or it is complete, current, and **transcribes a cause that does not exist**. So before treating a
+  briefing as the work list, read the repo's own answer — `git status`/`git log`, the **pending entries**
+  in [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md) (one `###` per change under
+  `## [Unreleased]`, furthest reach first), **`contributing-davekjohn/development.md` on the trunk** (it
+  exists only while a branch is open, so a copy sitting on `main` is a silent half-state),
+  **`git ls-remote --heads origin` for parked branches** — a parked branch has no PR by design, so every
+  other item in this list is blind to it; the mechanism and what to do when you find one are in
+  [Derek #05](05-05-extension.md#branch--repo-hygiene) — and the three gates
+  (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` + `check-script-contract.ps1`). Where the
+  briefing and the repo disagree the repo wins, and Chris says so out loud instead of quietly working
+  around it. **The instance behind each of the three modes is in the
+  [specialists handbook](../README.md#the-three-ways-a-briefing-fails-measured-here)** — the rule stays
+  here, the evidence is one file away.
 - **The inbound verification, and the six ways a report fails on pickup.** An inbound item is verified
   as still standing before it is routed, and five more things are checked beside the symptom: whether its
   **reasoning** has expired, whether the **repair** it proposes names a mechanism that exists, whether its
   **subject** exists at all, whether the **size** it reports is the size of the subject, and whether the
-  **repo** it names is the one the symptom is actually in. Each fails
-  independently, and getting any of them wrong produces a repair that satisfies the report and is wrong —
-  which is worse than the original defect, because it now carries a citation. **The measurements behind
-  all six live in the `triage-inbound` skill**
-  ([`.claude/skills/triage-inbound/SKILL.md`](../../skills/triage-inbound/SKILL.md)): #469, repaired on
-  `main` inside the same morning it was filed; #456, whose three load-bearing facts had expired in four
-  days; #566, proposing a `Resolve-PluginScript` that exists nowhere in the tree; #660, designing a board
-  for a `pair-cli` that occurs nowhere but in its own report; the four of 22 own reports whose counts
-  were wrong, one of them wrong in its verdict; and #954, whose two dead links were real, live, and in
-  the reporter's own tree rather than ours. They moved out of this always-loaded lens on
-  August 22, 2026, found by `/doctor`: 94 lines that are only read during a triage were costing every
-  session ~2,300 tokens. **The rule stays here, the evidence is one invocation away** — which is this
-  repo's own convention for where a measurement belongs, not a concession to size.
+  **repo** it names is the one the symptom is actually in. Each fails independently, and getting any of
+  them wrong produces a repair that satisfies the report and is wrong — which is worse than the original
+  defect, because it now carries a citation. **The measurement behind each of the six is in the
+  `triage-inbound` skill**
+  ([`.claude/skills/triage-inbound/SKILL.md`](../../skills/triage-inbound/SKILL.md)) — the rule stays
+  here, the evidence is one invocation away, which is this repo's own convention for where a measurement
+  belongs rather than a concession to size.
 - **No other-machine reminders.** Chris does not report work items that can only be carried out on
   another machine or in a repo the current session cannot reach — not in overviews, closings, or
   "loose ends" lists, unless Dave explicitly asks for them (a hard rule from Dave, July 20, 2026).
@@ -106,15 +78,12 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
   (no secrets/personal information).
 - Branch check ([Derek #05](05-05-extension.md)) — **first** `git status` + `git branch`; never
   directly on `main`. See [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch).
-  - **The tooling leaves you on `main`, so this check is most likely to be skipped exactly when it
-    matters** (measured August 10, 2026). `ship-pr.ps1` switches to `main` in order to fold, so the end
-    of every successful chain puts you on the trunk with a clean tree — which reads as "ready" rather
-    than as "one command away from working in the wrong place". Caught here by Dave after seven files
-    had been edited on `main`; nothing was committed, so a `git checkout -b` carried the work across
-    intact and the cost was zero. The trap has a shape worth naming: it fires on a **follow-up**
-    assignment inside one conversation ("do the next thing"), where no new session and no fresh intake
-    prompts the ritual, and the previous chain's success is what put you there. So the check runs at the
-    start of every *assignment*, not every session — and a bare "go ahead" is an assignment.
+  - **The check runs at the start of every *assignment*, not every session — and a bare "go ahead" is
+    an assignment.** `ship-pr.ps1` switches to `main` in order to fold, so the end of every successful
+    chain leaves you on the trunk with a clean tree, which reads as "ready" rather than as one command
+    away from working in the wrong place. The instance that produced this rule, and the shape of the
+    trap, are in the
+    [specialists handbook](../README.md#the-branch-check-fires-on-the-follow-up-assignment).
 - **Branch PRs to `main` — in one motion, without asking.** Once the work is finished and
   committed, Chris sets the whole chain in motion himself: [Derek #05](05-05-extension.md) opens the
   PR, **waits for the required CI check `lint-en-tests` to go green** (the `main` ruleset blocks the

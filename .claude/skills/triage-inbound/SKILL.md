@@ -148,3 +148,19 @@ just advice.
   here, so verifying it *closed* it. Here nothing was repaired away — the defect is live, it is simply
   not ours, and the closure's whole value is telling the reporter which file to open and what to do that
   is not what they asked for.
+
+## The reason, measured on its own — inbound #388
+
+The second pattern above has one more instance, moved here on August 28, 2026 from `CLAUDE.md`'s
+general working practices, where it was costing every session the space of a rule it only illustrates.
+It is the cleanest case in this file of a report whose **symptom was real and whose reason was not**.
+
+Inbound [#388](https://github.com/DaveKJohn/claude-code-specialists/issues/388) (August 2, 2026)
+reported that the teardown does not count a fixture's `README.md` *"even as prose"*, and proposed
+deleting the sentence that promised the count. The symptom checked out: nothing about that file appears
+in the output. The reason did not. The prose pass **does** scan the root markdown; the file scores **0**
+because it deliberately names no specialist, and the note is printed only above zero.
+
+Following the proposal would have deleted a correct sentence and left the next reader with the same
+confusion, minus the explanation. That is the shape worth carrying: a repair built on an unverified
+reason is worse than the defect it replaces, because it now carries a citation.
