@@ -118,34 +118,55 @@ try {
     Assert-True (-not ($b3.Out -match [regex]::Escape('09-99-agent.md'))) `
         'payload scan: removing the agent def clears its finding -- the report tracked the file, not the fixture'
 
-    # --- Scenario B4: the entry's links resolve from the REPO ROOT, not from branch/ ----------------
-    # The entry file's text is pasted verbatim into CHANGELOG.md at the root, so its links have to work
-    # there. Until the branch/ split it sat in the root and that held by construction; moving it one level
-    # down turned every root-relative link in an entry into a dead one, measured on the first entry written
-    # after the move. Both halves are asserted, because a fix that simply stopped scanning branch/ would
-    # satisfy the first and lose the check entirely.
+    # --- Scenario B4: the entry's links resolve WHERE THE FOLD WRITES, not where the file sits --------
+    # The branch document's DEPLOY section is pasted verbatim into the changelog, so its links have to work
+    # THERE. Until the branch/ split the file sat beside the changelog in the root and that held by
+    # construction; moving it one level down turned every link in an entry into a dead one, measured on the
+    # first entry written after the move.
+    #
+    # THE BASE IS THE CHANGELOG'S DIRECTORY AND NOT THE REPO ROOT (issue #1041, August 28, 2026). Those were
+    # the same value until CHANGELOG.md moved into contributing-davekjohn/ on August 27, and this scenario
+    # asserted the root by name -- so it passed while the check demanded a form the fold then broke.
+    #
+    # BOTH NAMES ARE EXERCISED, because they land on opposite sides of the repair:
+    #   * TODAY'S name sits IN the changelog's directory, so the correct link is the one that reads
+    #     correctly in front of the author. This is the case the issue measured and the only one an author
+    #     meets today.
+    #   * A LEGACY name sits one level BELOW it, so the base still differs from where the file sits -- which
+    #     is why the special case survives the repair rather than being dropped. A branch open since before
+    #     the August 23 merge still carries one.
+    # And the root form is asserted DEAD on the legacy file, which is the direction pin: a repair that
+    # simply left $RepoRoot in place, or one that dropped the case altogether, fails one of the three.
     Write-Host "check 4 coverage -- an entry's links are judged where the text LANDS" -ForegroundColor Cyan
     $entryDirFx = Join-Path $Fixture 'contributing-davekjohn\branch'
     New-Item -ItemType Directory -Path $entryDirFx -Force | Out-Null
     $entryFx    = Join-Path $entryDirFx 'branch-deployment.md'
     $progressFx = Join-Path $entryDirFx 'branch-cycle.md'
-    # 'connectors/README.md' exists in this fixture and is root-relative -- exactly the shape an entry
-    # writes, and exactly what resolving from contributing-davekjohn/branch/ would call dead.
+    $devFx      = Join-Path $Fixture 'contributing-davekjohn\development.md'
+    # 'connectors/README.md' exists in this fixture. From contributing-davekjohn/ -- where this fixture's
+    # CHANGELOG.md resolves to -- it is reached with one '../', and the bare root form is dead there.
     [System.IO.File]::WriteAllText($entryFx,
-        "## Fixture entry`n`nSee [the connectors README](connectors/README.md) and [nope]($deadLink).`n", $Utf8NoBom)
+        "## Fixture entry`n`nSee [the connectors README](../connectors/README.md), [the root form](connectors/README.md) and [nope]($deadLink).`n", $Utf8NoBom)
+    # Today's single document: the changelog sits in ITS directory, so the link reads exactly as written.
+    [System.IO.File]::WriteAllText($devFx,
+        "## Development: ``feat/fixture```n`n### DEPLOY: ``feat/fixture```n`nSee [the connectors README](../connectors/README.md).`n", $Utf8NoBom)
     # The step list never travels, so it keeps the ordinary nested convention: '../../' to reach the root.
     [System.IO.File]::WriteAllText($progressFx,
         "# Branch progress`n`n**Branch:** ``feat/fixture```n`n## Steps`n`n- [ ] see [the connectors README](../../connectors/README.md)`n", $Utf8NoBom)
 
     $b4 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($b4.Out -match 'dead link ''connectors/README\.md''')) `
-        'entry links: a root-relative link in the entry is NOT dead -- it is judged from the repo root, where the fold puts the text'
+    Assert-True (-not ($b4.Out -match 'dead link ''\.\./connectors/README\.md''')) `
+        'entry links: the link that reads correctly beside the changelog is NOT dead -- that is where the fold puts the text'
+    Assert-True (-not ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\development.md'))) `
+        "entry links: today's document is judged from its own directory, because the changelog sits there too"
+    Assert-True ($b4.Out -match 'dead link ''connectors/README\.md''') `
+        'entry links: the ROOT form IS dead on the legacy name -- the base is the changelog, not the repo root'
     Assert-True ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\branch\branch-deployment.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
         'entry links: a genuinely dead link in the entry IS still reported -- the rebase is not a way out of the check'
     Assert-True (-not ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\branch\branch-cycle.md'))) `
         'entry links: the step list keeps the ordinary nested convention -- it never travels, so ../../ is correct there'
 
-    Remove-Item -LiteralPath $entryFx, $progressFx -Force
+    Remove-Item -LiteralPath $entryFx, $progressFx, $devFx -Force
 
     # --- Scenario B5: plugins/ is read WHOLE, and a file gathered twice is reported once -------------
     # Inbound #566. Every rule in the scan set names either a SHAPE of file (SKILL.md, *-manual.md,

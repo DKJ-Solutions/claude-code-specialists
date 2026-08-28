@@ -711,6 +711,43 @@ Write-Coverage -Category 'link-scan' -Checked $linkFiles.Count `
 Write-Coverage -Category 'link-scan/lenses' -Checked $lensLinkFiles.Count `
     -Note $(if ($lensLinkFiles.Count -eq 0) { 'no repo-lens file in the seam, its pre-seam location, or the legacy path -- expected after a deliberate teardown, otherwise the lens tree has moved or been lost' } else { '' })
 
+# WHERE THIS REPO'S CHANGELOG ACTUALLY LIVES, resolved once for the four checks that need to name it: the
+# entry's LINK BASE in check 4 just below, the lifecycle-command exclusion (check 11), the entry-heading
+# pass (check 19) and the shape-claim pass (check 20b). All of them said the literal 'CHANGELOG.md' until
+# August 27, 2026, when the file moved into contributing-davekjohn/ and this repo answered
+# Get-ChangelogPath to say so. A gate that keeps naming the old path does not fail loudly -- it silently
+# judges a file that is not there, which is the quietest way for a check to stop checking.
+#
+# IT IS RESOLVED HERE, ABOVE THE LINK SCAN, RATHER THAN 500 LINES DOWN WHERE IT USED TO SIT (issue #1041).
+# Check 4 needs it to answer where an entry's links resolve from, and check 4 runs first -- so the value
+# has to exist before the loop rather than in front of its first other consumer.
+#
+# DOT-SOURCED IN A SCRIPTBLOCK, the idiom check 16 established and for its reason: repo-config is not
+# loaded in this process anywhere else, and pulling two dozen repo functions into the whole lint to serve
+# four checks is how a gate acquires a dependency nobody meant to give it.
+#
+# READ THE SAME WAY THE FOLD READS IT -- Get-SeamValue over Get-DefaultChangelogPath -- rather than with a
+# literal fallback of its own. A gate whose idea of "the changelog" can differ from the fold's is a gate
+# that passes a document nobody writes and never sees the one that is written.
+#
+# THIS ADDS seam-lib.ps1 TO THE GATE'S DEPENDENCIES, which the lint fixture has to copy alongside the
+# other libs. That is stated here because the failure is loud but misleading: the dot-source fails inside
+# the fixture's own copy of this script, the gate dies before check 4, and four suites report several
+# dozen unrelated scenarios as broken -- the same shape the fixture's marketplace list has twice paid for.
+$changelogRel = & {
+    $clCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
+    if (Test-Path -LiteralPath $clCfg) { . $clCfg }
+    . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+    Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $RepoRoot)
+}
+$changelogRelWin = $changelogRel -replace '/', '\'
+$changelogFull   = Join-Path $RepoRoot $changelogRelWin
+# AND THE DIRECTORY IT SITS IN, which is the base an entry's relative links are judged from -- the same
+# value open-pr's link gate computes for Get-EntryLinkFindings, by the same Split-Path. No fallback for a
+# changelog at the ROOT: $RepoRoot is absolute (Resolve-Path, above), so the parent of a file directly in
+# it IS $RepoRoot, which is exactly the answer that case wants.
+$changelogDirForLinks = Split-Path -Parent $changelogFull
+
 $linkRegex = [regex]'\[(?:[^\]]*)\]\(([^)]+)\)'
 $slugCache = @{}
 foreach ($lf in $linkFiles) {
@@ -728,12 +765,31 @@ foreach ($lf in $linkFiles) {
     # links need to resolve THERE, not at the source location in the plugin. So validate them as if
     # the file were already at that destination (this repo mirrors the consumer layout).
     #
-    # THE CHANGELOG ENTRY IS THE SECOND CASE OF THE SAME RULE (August 6, 2026). Its text is pasted
-    # verbatim into CHANGELOG.md at the repo root, so its links have to resolve THERE -- and until the
-    # branch/ split they did by construction, because the entry file itself sat in the root. Moving it one
-    # level down turned every root-relative link in an entry into a dead one: measured on the first entry
-    # written after the move, with five more of the same shape already pending in CHANGELOG.md. Validating
-    # it where the file sits would force authors to write '../' links that break the moment they land.
+    # THE BRANCH DOCUMENT IS THE SECOND CASE OF THE SAME RULE (August 6, 2026). Its DEPLOY section is
+    # pasted verbatim into the changelog, so its links have to resolve WHERE THE FOLD WRITES -- and until
+    # the branch/ split they did by construction, because the entry file itself sat beside the changelog in
+    # the root. Moving it one level down turned every link in an entry into a dead one: measured on the
+    # first entry written after the move, with five more of the same shape already pending. Validating it
+    # where the file sits would force authors to write '../' links that break the moment they land.
+    #
+    # THE BASE IS THE CHANGELOG'S OWN DIRECTORY, NOT $RepoRoot (issue #1041, August 28, 2026), and that is
+    # the whole of this repair. It was the repo root while the changelog was, and CHANGELOG.md moved into
+    # contributing-davekjohn/ on August 27 -- so the special case went on demanding the root form that the
+    # fold then breaks. Measured: a DEPLOY link written as '../plugins/...' -- correct for BOTH
+    # development.md and the changelog, which now sit in one directory -- was refused as dead, and the form
+    # this check accepted resolved from contributing-davekjohn/ after the fold and was dead there. Precisely
+    # the failure the paragraph above says this case exists to prevent, running backwards.
+    #
+    # THE SPECIAL CASE SURVIVES THE REPAIR RATHER THAN BEING DROPPED, which is the part that is not
+    # obvious: for TODAY'S name the base now equals the file's own directory, so this branch and the
+    # fall-through agree and it looks like dead weight. The LEGACY names do not agree -- they sit in
+    # contributing-davekjohn/branch/, one level BELOW the changelog -- and a branch open since before the
+    # August 23 merge still carries one. Dropping the case would judge those where they sit, which is the
+    # original defect at a smaller radius.
+    #
+    # READ FROM THE SEAM, not from a literal, for the reason the resolution block above the loop gives:
+    # this is the same value the fold and open-pr's link gate resolve, so the three cannot disagree about
+    # where an entry's text lands.
     #
     # THE STEP LIST IS DELIBERATELY NOT INCLUDED, though it sits in the same directory. It never travels:
     # it is read where it lies and reset in place, so 'where the file sits' IS its destination, and the
@@ -742,17 +798,17 @@ foreach ($lf in $linkFiles) {
     # from the same place -- see Resolve-BranchFilePath.
     #
     # AND IT IS THE WHOLE DOCUMENT, NOT ONLY ITS DEPLOY SECTION (August 23, 2026). Strictly, the entry's text
-    # is what folds to the root; the plan above it stays where it is. One rule for one file is the honest
-    # simplification: the head is guidance comments and phase headings, which carry no links at all in the
-    # scaffold, and an author who does write one in a step means the same repo-root path the section below
-    # asks for. Two bases inside one document would be a rule nobody could apply while writing.
+    # is what folds; the plan above it stays where it is. One rule for one file is the honest simplification:
+    # the head is guidance comments and phase headings, which carry no links at all in the scaffold, and an
+    # author who does write one in a step means the same path the section below asks for. Two bases inside
+    # one document would be a rule nobody could apply while writing.
     $entryRelsForLinks = @((Get-BranchFilePaths).File, (Get-BranchFilePaths).LegacyDeployment,
         (Get-BranchFilePaths).OlderDeployment) |
         ForEach-Object { '\' + ($_ -replace '/', '\') }
     if ($lf -match '\\personas\\.*-persona\.md$') {
         $dir = Join-Path $RepoRoot '.claude\extensions'
     } elseif (@($entryRelsForLinks | Where-Object { $lf.EndsWith($_) }).Count -gt 0) {
-        $dir = $RepoRoot
+        $dir = $changelogDirForLinks
     } else {
         $dir = Split-Path -Parent $lf
     }
@@ -1266,33 +1322,10 @@ $lcScopeRegex   = [regex]'--scope\s+project'
 $lcScopeUninstallRegex = [regex]'--scope\s+(?:project|local)'
 $lcRefreshRegex = [regex]'claude\s+plugin\s+marketplace\s+update|staying-up-to-date'
 
-# WHERE THIS REPO'S CHANGELOG ACTUALLY LIVES, resolved once for the three checks below that need to name
-# it: this lifecycle-command exclusion, the entry-heading pass (check 19) and the shape-claim pass
-# (check 20b). All three said the literal 'CHANGELOG.md' until August 27, 2026, when the file moved into
-# contributing-davekjohn/ and this repo answered Get-ChangelogPath to say so. A gate that keeps naming the
-# old path does not fail loudly -- it silently judges a file that is not there, which is the quietest way
-# for a check to stop checking.
-#
-# DOT-SOURCED IN A SCRIPTBLOCK, the idiom check 16 established and for its reason: repo-config is not
-# loaded in this process anywhere else, and pulling two dozen repo functions into the whole lint to serve
-# three checks is how a gate acquires a dependency nobody meant to give it.
-#
-# READ THE SAME WAY THE FOLD READS IT -- Get-SeamValue over Get-DefaultChangelogPath -- rather than with a
-# literal fallback of its own. A gate whose idea of "the changelog" can differ from the fold's is a gate
-# that passes a document nobody writes and never sees the one that is written.
-#
-# THIS ADDS seam-lib.ps1 TO THE GATE'S DEPENDENCIES, which the lint fixture has to copy alongside the
-# other libs. That is stated here because the failure is loud but misleading: the dot-source fails inside
-# the fixture's own copy of this script, the gate dies before check 11, and four suites report several
-# dozen unrelated scenarios as broken -- the same shape the fixture's marketplace list has twice paid for.
-$changelogRel = & {
-    $clCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
-    if (Test-Path -LiteralPath $clCfg) { . $clCfg }
-    . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
-    Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $RepoRoot)
-}
-$changelogRelWin = $changelogRel -replace '/', '\'
-$changelogFull   = Join-Path $RepoRoot $changelogRelWin
+# The changelog's path and the directory an entry's links resolve from are BOTH resolved above the link
+# scan (check 4 needs the second one), so this check, check 19 and check 20b read $changelogRel,
+# $changelogRelWin and $changelogFull from there. See that block for why the seam is read rather than the
+# literal.
 
 $lifecycleFiles = @($linkFiles | Where-Object {
     $rel = $_.Substring($RepoRoot.Length).TrimStart('\', '/')
