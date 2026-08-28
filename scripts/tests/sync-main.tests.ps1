@@ -143,6 +143,37 @@ function Add-FixtureCommit {
     Invoke-Git -C $Dir push -q origin main
 }
 
+function Add-PredecessorBranch {
+    <#
+        A sync branch from an earlier run, pushed to the fixture's origin and then DELETED LOCALLY -- which
+        is the state that matters, not a convenience. A predecessor pushed from another machine has no
+        local ref at all, and that is exactly the branch the naming loop's refs/remotes/origin/* check
+        cannot see; deleting it here makes the case real and exercises the guard's own fetch.
+
+        -MergeIntoTrunk merges it into main first, so the ancestry half of the two-part merged test has a
+        subject. The ref is left standing on origin afterwards on purpose: a consumer without
+        delete_branch_on_merge keeps it forever, and refusing that consumer's every future run is the
+        failure mode of getting this test wrong.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Dir,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [hashtable]$Files = @{},
+        [switch]$MergeIntoTrunk
+    )
+    Invoke-Git -C $Dir checkout -q -b $Name
+    foreach ($rel in $Files.Keys) { Set-FixtureFile -Root $Dir -Rel $rel -Value $Files[$rel] }
+    Invoke-Git -C $Dir add -A
+    Invoke-Git -C $Dir commit -q -m 'sync: mirror in-flight third-party edits from live (1 file(s))'
+    Invoke-Git -C $Dir push -q -u origin $Name
+    Invoke-Git -C $Dir checkout -q main
+    if ($MergeIntoTrunk) {
+        Invoke-Git -C $Dir merge -q --no-edit $Name
+        Invoke-Git -C $Dir push -q origin main
+    }
+    Invoke-Git -C $Dir branch -q -D $Name
+}
+
 function New-Mirror {
     <# A stand-in for the live theme: a directory holding whatever live is supposed to have. #>
     param([Parameter(Mandatory = $true)][string]$Label, [hashtable]$Files = @{})
@@ -473,6 +504,124 @@ try {
     Assert-True ($r.Out -match 'gitignored here and are left alone') 'ignored: the filter reports what it excluded'
     Assert-True ($r.Out -notmatch 'settings_data\.json\s+content this repo has never held') 'ignored: and the ignored file is not captured as drift'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $ign 'config\settings_data.json'))) 'ignored: nor written into the repo'
+
+    # --- the standing-predecessor guard (inbound #1021) ---------------------------------------------
+    # WHAT THESE CASES PROTECT is the one failure in this script that produced no error at all: four sync
+    # branches in seven days, each run green, the newest a strict superset of the three before it. The
+    # rules in sync-rules.ps1 were correct throughout -- so nothing here re-tests them. What is measured
+    # is the SCRIPT's behaviour around the answer: that it refuses, that the refusal lands before the
+    # pull, that a dry run still reports instead of refusing, and that a merged branch is not a
+    # predecessor.
+    #
+    # gh IS NOT REACHED OVER THE NETWORK BY ANY OF THIS, and it is worth saying why the suite does not
+    # have to arrange that: the script does Set-Location to the fixture, whose origin is a local bare
+    # repo, so 'gh pr list' has no GitHub repository to answer for and fails. That drives the two-part
+    # merged test onto its ancestry half and onto the "gh could not answer" note -- deterministically,
+    # offline, and covering the fallback rather than skipping it.
+    Write-Host ''
+    Write-Host 'the standing-predecessor guard'
+
+    $predBranch = 'sync/live-2026-08-21'
+
+    $guardRepo = New-Consumer -Label 'guard' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $guardRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Add-PredecessorBranch -Dir $guardRepo -Name $predBranch -Files @{ 'sections/from-editor.liquid' = 'a third party wrote this' }
+    $guardMirror = New-Mirror -Label 'guard' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+
+    $refused = Invoke-Sync -Dir $guardRepo -Mirror $guardMirror
+    Assert-True ($refused.Code -eq 1) 'guard: a standing sync branch refuses the run'
+    Assert-True ($refused.Out -match 'STILL STANDING: sync/live-2026-08-21') 'guard: and names the branch that is standing'
+    Assert-True ($refused.Out -match 'Refusing: 1 sync branch') 'guard: with the count, because four is the case that produced this'
+    Assert-True ($refused.Out -match 'gh pr list --head sync/live-2026-08-21') 'guard: it hands over the command that shows what that branch holds'
+    Assert-True ($refused.Out -match '-AllowStacking') 'guard: and names the override rather than leaving it to be found'
+
+    # THE REFUSAL IS UPSTREAM OF THE MIRROR STEP, which is the whole reason the detection sits at the
+    # naming step rather than beside the verdict it feeds. A refused run must cost no theme pull.
+    Assert-True ($refused.Out -notmatch 'mirroring live') 'guard: the refusal lands BEFORE the mirror step, so it costs no pull'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $guardRepo 'sections\from-editor.liquid'))) 'guard: nothing was written into the repo'
+    $onBranch = ([string](& git -C $guardRepo rev-parse --abbrev-ref HEAD)).Trim()
+    Assert-True ($onBranch -eq 'main') 'guard: and no sync branch was checked out'
+
+    # A DRY RUN IS EXEMPT, and this is the case the exemption exists for: somebody looking at an open sync
+    # PR asks whether today's drift already contains it. A refusal here would withhold the answer.
+    $dry = Invoke-Sync -Dir $guardRepo -Mirror $guardMirror -Extra @('-DryRun')
+    Assert-True ($dry.Code -eq 0) 'guard/dry: a dry run reports instead of refusing'
+    Assert-True ($dry.Out -match 'all of them in this run') 'guard/dry: and says this run supersedes that branch'
+    Assert-True ($dry.Out -match 'close that PR') 'guard/dry: naming the action, not just the verdict'
+
+    # -AllowStacking LETS IT THROUGH, and the verdict is printed before anything is written rather than
+    # after the push: the operator asked for a second candidate, so they get its relationship to the first.
+    $stacked = Invoke-Sync -Dir $guardRepo -Mirror $guardMirror -Extra @('-AllowStacking')
+    Assert-True ($stacked.Code -eq 0) 'guard/override: -AllowStacking runs the sync anyway'
+    Assert-True ($stacked.Out -match 'continuing anyway') 'guard/override: and says so rather than falling silent'
+    Assert-True ($stacked.Out -match 'all of them in this run') 'guard/override: with the verdict, before the branch is written'
+
+    # THE SECOND ROW, which is what the override actually exists for: a path the predecessor captured and
+    # this run does not, because a third party reverted it on live in between. Neither branch supersedes
+    # the other, and the uncovered path is named rather than counted.
+    $indepRepo = New-Consumer -Label 'guard-indep' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $indepRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Add-PredecessorBranch -Dir $indepRepo -Name 'sync/live-2026-08-20' -Files @{ 'sections/reverted-since.liquid' = 'live had this, then lost it' }
+    $indepMirror = New-Mirror -Label 'guard-indep' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+    $indep = Invoke-Sync -Dir $indepRepo -Mirror $indepMirror -Extra @('-DryRun')
+    Assert-True ($indep.Out -match '1 NOT in this run') 'guard/independent: a path this run does not take denies supersession'
+    Assert-True ($indep.Out -match 'sections/reverted-since\.liquid') 'guard/independent: and that path is named, because it is the decision'
+    Assert-True ($indep.Out -match 'Neither supersedes the other') 'guard/independent: so neither branch is presented as redundant'
+
+    # A MERGED BRANCH IS NOT A PREDECESSOR. Its ref lingers here because the fixture has no
+    # delete_branch_on_merge, which is exactly the consumer this script must not refuse forever.
+    $mergedRepo = New-Consumer -Label 'guard-merged' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $mergedRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Add-PredecessorBranch -Dir $mergedRepo -Name 'sync/live-2026-08-19' -Files @{ 'sections/landed.liquid' = 'this one was merged' } -MergeIntoTrunk
+    $mergedMirror = New-Mirror -Label 'guard-merged' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/landed.liquid'      = 'this one was merged'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+    $merged = Invoke-Sync -Dir $mergedRepo -Mirror $mergedMirror -Extra @('-DryRun')
+    Assert-True ($merged.Out -notmatch 'STILL STANDING') 'guard/merged: a branch already in the trunk is not standing'
+    Assert-True ($merged.Out -match 'all merged') 'guard/merged: and the run says it looked and found them merged'
+
+    # THE PREFIX IS THE SEAM'S, NOT 'sync/'. This is the one defect the inbound report's own proposal
+    # carried, and it fails silently in production: a consumer whose branches are named otherwise gets a
+    # guard that scans, finds nothing, and never fires.
+    $seamRepo = New-Consumer -Label 'guard-prefix' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com' `
+        -ExtraSeams "function Get-ShopifySyncBranchPrefix { return 'theme-drift/' }"
+    Add-FixtureCommit -Dir $seamRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Add-PredecessorBranch -Dir $seamRepo -Name 'theme-drift/2026-08-21' -Files @{ 'sections/from-editor.liquid' = 'a third party wrote this' }
+    Add-PredecessorBranch -Dir $seamRepo -Name 'sync/live-2026-08-21' -Files @{ 'sections/other.liquid' = 'not this consumer''s prefix' }
+    $seamMirror = New-Mirror -Label 'guard-prefix' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+    $seamRun = Invoke-Sync -Dir $seamRepo -Mirror $seamMirror
+    Assert-True ($seamRun.Code -eq 1) 'guard/prefix: a branch under the consumer''s own prefix refuses the run'
+    Assert-True ($seamRun.Out -match 'STILL STANDING: theme-drift/2026-08-21') 'guard/prefix: the seam''s prefix is what the scan anchors on'
+    Assert-True ($seamRun.Out -notmatch 'STILL STANDING: sync/live-2026-08-21') 'guard/prefix: and a ''sync/'' branch is not this consumer''s predecessor'
+
+    # NO PREDECESSOR AT ALL is the ordinary state, and it must stay silent rather than becoming one more
+    # line every run prints -- a signal that is always present stops being read, which is the failure
+    # this whole guard was filed about.
+    $cleanRepo = New-Consumer -Label 'guard-clean' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $cleanRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    $cleanRun = Invoke-Sync -Dir $cleanRepo -Mirror (New-Mirror -Label 'guard-clean' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }) -Extra @('-DryRun')
+    Assert-True ($cleanRun.Code -eq 0) 'guard/none: no standing branch is not a refusal'
+    Assert-True ($cleanRun.Out -match 'none on origin') 'guard/none: the step reports that it looked'
+    Assert-True ($cleanRun.Out -notmatch 'Standing sync branches, measured') 'guard/none: and prints no verdict table for branches that do not exist'
 }
 finally {
     foreach ($d in $script:trees) {

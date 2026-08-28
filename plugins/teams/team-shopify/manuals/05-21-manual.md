@@ -79,7 +79,7 @@ merged work three times in one week (inbound
 [#787](https://github.com/DaveKJohn/claude-code-specialists/issues/787)). It reads from live and writes to
 git: it never pushes to live, publishes, or deletes a theme.
 
-**Three things to know before running it, and the first two are about reading the result:**
+**Four things to know before running it, and the first two are about reading the result:**
 
 - **It stops before the merge by default.** The point of the step is a moment where somebody *looks* at
   what third parties changed before it becomes the base of new branches, so it pushes a `sync/live-…`
@@ -100,6 +100,16 @@ git: it never pushes to live, publishes, or deletes a theme.
   afterwards, so the first check run already sees them. This is the seam that let a consumer delete the
   wrapper it had been keeping around this script purely to get a label on (inbound
   [#1023](https://github.com/DaveKJohn/claude-code-specialists/issues/1023)).
+- **Stopping before the merge only works while somebody then merges — so a standing sync branch now
+  stops the run.** This is the first bullet's own hole, not an exception to it: every run measures live
+  against the *trunk*, so a branch that is pushed and never merged leaves the trunk unchanged and the
+  next run re-captures the same drift onto a new one. Measured in a consumer at **four branches in seven
+  days**, the newest a strict superset of all three, two of them byte-identical, and each of the four
+  runs green — the exclusion rule was correct the whole time. Read the refusal as an instruction to go
+  and merge something: `-DryRun` tells you whether today's drift already contains that open PR, and
+  `-AllowStacking` is for the one case where it does not, because a third party *reverted* a path on
+  live in between (inbound
+  [#1021](https://github.com/DaveKJohn/claude-code-specialists/issues/1021)).
 
 **And it refuses rather than guessing when it has no reference point** — no previous sync commit and no
 tag. That refusal is the rule protecting itself: without a floor, *every* file looks untouched by the
