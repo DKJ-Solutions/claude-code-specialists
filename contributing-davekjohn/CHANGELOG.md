@@ -32,6 +32,55 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/prune-merged-classifies-remote-heads-v1` · 20260828-215400
+
+`prune-merged.ps1` gains `-IncludeRemote`: it now reads `git ls-remote --heads` and says what each head
+on the remote actually is, instead of only naming the command that lists them.
+
+That list is the only read that surfaces a parked branch, and in it a merged leftover and live parked
+work look identical. Telling them apart was four commands per head -- ancestry, a PR lookup, a diff
+against the trunk, the head's own commit message -- and it had to be redone every time, because nothing
+in the output remembers the answer. Measured three times in two days, on three separate threads (#992,
+#1035, #1039); twice the session also had to hand-write a *don't sweep this one* warning about somebody
+else's live head. That warning is now a printed line.
+
+The pass puts every head that is not the trunk through **the two proofs the script already computed for
+local branches**, and prints one of two things: `git push origin --delete <branch>` for a head it can
+prove is merged, or `Kept origin/<branch> -- live work` for one it cannot. **It runs neither.** That is
+what keeps it inside the July 27, 2026 decision rather than around it: what was declined was *executing*
+a remote delete, and handing the command over paste-ready is what that decision says should happen
+instead. Because a head is only ever named on positive proof, the set the report points at is exactly
+the set that is safe to lose.
+
+Two smaller things travel with it. A clone with nothing but the trunk no longer ends the run early --
+that was the one state in which the closing line about the remote was never printed, and it is the state
+in which the remote question matters most. And the suite's structural assert widened from `'--delete` to
+a quote of either kind, because the file now contains those words in a double-quoted string on purpose;
+a real call written `"--delete"` would have slipped past the old form while looking exactly like the
+printed line.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A guardrail was extended by doing more of what it already said, not less. The declined permission has
+two halves -- don't run the delete, hand over the command -- and only the first had ever been built.
+Reading the second half as the specification is what turned "add a remote pass" from an erosion of the
+rule into an implementation of it, and the test that proves it is the same one that used to prove the
+script's restraint.
+
+**Score:** 2
+
+#### Pull Request
+
+prune-merged classifies the remote heads it used to only name
+
+Plugins: contributing-davekjohn
+
+[PR #1045](https://github.com/DaveKJohn/claude-code-specialists/pull/1045)
+
+---
+
 ### DEPLOY: `fix/entry-links-judged-where-the-fold-writes-v1` · 20260828-213555
 
 A changelog entry's relative links are judged where the fold actually writes them, not at the repo root.
