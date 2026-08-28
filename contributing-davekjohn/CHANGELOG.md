@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/a-notification-names-where-it-came-from-v1` · 20260828-154451
+
+Sylvester's hook craft gains the rule that closes the gap between a notification that *arrives* and one
+that can be *acted on*: the payload names where it came from. A phone shows one stream — every machine
+somebody runs, every repo checked out on each, every session inside those — and none of that context rides
+along, because a push has no working directory, no branch and no terminal title. So the same sentence sent
+by four sessions is four identical messages, and the only way to learn which one is waiting is to walk to
+each machine.
+
+It sits directly after *"the exit code says the hook RAN; only the receiver says it ARRIVED"*, because it
+is the next question at that same receiving end: the bullet above establishes there is a channel, this one
+that what lands on it is attributable. The sender itself stays personal and stays in `~/.claude`, exactly
+as the bullet below it already says — which is why the lesson had to be written here rather than fixed
+there. It is not one machine's misconfiguration; it is what every consumer meets the moment a second repo
+starts sending into the same topic.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing reaches a service subscriber here — this is a manual bullet for whoever wires a hook to a phone.
+
+**Score:** N/A
+
+#### Pull Request
+
+A notification names the repo and machine it came from
+
+Plugins: team-alpha
+
+[PR #1030](https://github.com/DaveKJohn/claude-code-specialists/pull/1030)
+
+---
+
 ### DEPLOY: `fix/sync-sees-its-own-standing-branches-v1` · 20260828-151820
 
 `sync-main` now asks `origin` whether a sync branch from a previous run is still standing, and refuses
