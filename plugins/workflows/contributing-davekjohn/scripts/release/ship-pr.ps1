@@ -360,8 +360,12 @@ $waitedSec = [int][math]::Round(((Get-Date) - $waitBegan).TotalSeconds)
 $checkFactsJson = ''
 $requiredFactsJson = ''
 try {
+    # `link` rides along for inbound #1044: it is the only field in this payload that names the
+    # Actions RUN behind a check, and the fact separating "the job never started" from "a check went
+    # red" lives on the run rather than on the check. It costs nothing on a green run -- the block
+    # that reads it is inside the refusal below.
     $checkFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-        'pr', 'checks', "$pr", '--json', 'name,bucket,state,startedAt,completedAt', '--repo', $repo)
+        'pr', 'checks', "$pr", '--json', 'name,bucket,state,startedAt,completedAt,link', '--repo', $repo)
     if ($checkFacts.ExitCode -eq 0) { $checkFactsJson = $checkFacts.Output -join "`n" }
     # `--required` exits non-zero on a repo whose ruleset requires nothing, which is a legitimate state
     # and not an error. For the wait report the label is then simply omitted rather than guessed; for
@@ -378,7 +382,37 @@ try {
 if ($checks.ExitCode -ne 0) {
     $verdict = Get-MergeBlockVerdict -RequiredChecksJson $requiredFactsJson -ChecksJson $checkFactsJson
     if ($verdict.Blocked) {
-        Write-Error "CI did not pass for PR #$pr (exit $($checks.ExitCode)) -- NOT merged: $($verdict.Reason). Fix CI and re-run, or merge manually once green."
+        # WHICH REFUSAL THIS IS -- inbound #1044. The verdict is unchanged and stays unchanged: this
+        # cannot let a merge through, it only decides which sentence the operator reads. A run that
+        # never STARTED (an account payment failed, a spending limit reached, no runner available)
+        # reports as a plain check failure through `gh pr checks`, and "Fix CI and re-run" then sends
+        # the reader into their own code for a state no branch can repair. Measured August 28, 2026 in
+        # a consumer repo, where it cost a hand-merge.
+        #
+        # Best-effort by construction. Every read is guarded and every failure degrades to the wording
+        # that was already there -- a diagnostic must never be the reason a refusal cannot be printed.
+        $stalled = @()
+        try {
+            foreach ($runId in @(Get-FailedCheckRunIds -ChecksJson $checkFactsJson)) {
+                # -DiscardStderr because this output is PARSED: a gh warning merged into it would
+                # break the parse and cost the note. Nothing here reads a job NAME, only counts and
+                # the run's own URL, so the console code page cannot change the answer and -Utf8
+                # would buy nothing.
+                $runFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                    'run', 'view', "$runId", '--json', 'conclusion,status,url,jobs', '--repo', $repo)
+                if ($runFacts.ExitCode -ne 0) { continue }
+                $note = Get-StalledRunNote -RunJson ($runFacts.Output -join "`n") -RunId $runId
+                if ($note) { $stalled += $note }
+            }
+        } catch {
+            $stalled = @()
+        }
+
+        if ($stalled.Count -gt 0) {
+            Write-Error "CI never RAN for PR #$pr -- NOT merged: $($verdict.Reason). $($stalled -join ' ')"
+        } else {
+            Write-Error "CI did not pass for PR #$pr (exit $($checks.ExitCode)) -- NOT merged: $($verdict.Reason). Fix CI and re-run, or merge manually once green."
+        }
         exit 1
     }
     # Loud, and deliberately not reassuring. The merge is allowed to proceed because the ruleset says

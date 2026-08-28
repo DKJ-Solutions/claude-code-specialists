@@ -896,3 +896,145 @@ function Get-MergeBlockVerdict {
         FailedOther    = $failedOther
     }
 }
+
+function Get-FailedCheckRunIds {
+    <#
+    .SYNOPSIS
+        The GitHub Actions run ids behind the FAILING records of a `gh pr checks --json` payload, in
+        the order they appear and without duplicates. Empty when nothing failed or nothing is readable.
+
+    .DESCRIPTION
+        The lookup key for Get-StalledRunNote below. `gh pr checks` reports a check, not the run that
+        produced it, and the fact that separates "the job never started" from "a check went red" lives
+        on the RUN -- so the caller needs an id before it can ask. The only place the payload carries
+        one is the `link` field, whose Actions form is
+        `https://github.com/<owner>/<repo>/actions/runs/<runId>/job/<jobId>`.
+
+        A LINK THAT IS NOT AN ACTIONS RUN IS SKIPPED, DELIBERATELY. A commit status posted by an
+        external service links wherever that service likes, and it has no run, no jobs and no steps --
+        asking GitHub about a run id scraped out of such a URL would be asking about something else.
+        Skipping it costs the caller nothing: a check with no run is not the failure mode being
+        diagnosed, so there is nothing this diagnosis could have said about it.
+
+        Failing is read through Get-CheckOutcome, so 'cancel', 'timed out' and 'startup failure' come
+        along for the same reason they do in the verdict above -- none of them is green, and a run that
+        was cancelled before it started is exactly the shape being looked for.
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,bucket,state,link` output. Anything that will not parse yields
+        an empty list, because this only ever costs the caller a diagnostic line it can do without.
+    #>
+    param([string]$ChecksJson)
+
+    if (-not $ChecksJson -or -not $ChecksJson.Trim()) { return @() }
+    try { $parsed = $ChecksJson | ConvertFrom-Json } catch { return @() }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object; the
+    # same trap the two parses in Get-MergeBlockVerdict walked into.
+    $records = @(@($parsed) | Where-Object { $_ })
+
+    $ids = New-Object System.Collections.Generic.List[string]
+    foreach ($r in $records) {
+        if ((Get-CheckOutcome -Record $r) -ne 'fail') { continue }
+        if (-not $r.PSObject.Properties['link']) { continue }
+        $link = [string]$r.link
+        if ($link -notmatch '/actions/runs/(\d+)') { continue }
+        $id = $Matches[1]
+        if (-not $ids.Contains($id)) { $ids.Add($id) | Out-Null }
+    }
+    return @($ids)
+}
+
+function Get-StalledRunNote {
+    <#
+    .SYNOPSIS
+        One sentence for the operator when a workflow run FAILED TO START rather than failed -- i.e.
+        when no job in it executed a single step. '' when something did run, which is the ordinary case
+        and the case the caller's existing wording already covers.
+
+    .DESCRIPTION
+        Inbound #1044, measured August 28, 2026 in a consumer repo: GitHub Actions stopped starting
+        jobs because an account payment had failed, every run ended in ~4s with zero steps, and
+        ship-pr.ps1 reported it as
+
+            CI did not pass for PR #N (exit 1) -- NOT merged: <verdict reason>.
+            Fix CI and re-run, or merge manually once green.
+
+        Every word of that is true and together they point at the wrong thing. "CI did not pass" reads
+        as *a check ran and went red*, so the operator goes to their own code; the actual state was
+        that nothing ran, which no branch can repair and no re-run will change. One PR was merged by
+        hand as a result -- the habit this workflow exists to prevent.
+
+        THE MERGE DECISION IS UNCHANGED, and deliberately. Refusing on an unreadable required-check
+        list is the conservative half of #943 and stays exactly as it was: this adds no state to
+        Get-MergeBlockVerdict and cannot let a merge through. What moves is the DIAGNOSIS handed to
+        the operator alongside the refusal.
+
+        WHY THE STEP COUNT AND NOT THE ANNOTATION. The reason text ("recent account payments have
+        failed or your spending limit needs to be increased") sits on the check-run annotation, two API
+        levels down and absent from the ordinary run page -- which is what made the state expensive to
+        recognise. This does not go fetch it, for two reasons. The annotation is one CAUSE of a run
+        that never started (a spending limit, Actions disabled for the org, and no runner able to take
+        the job all produce the same shape), while "no step ran" is the FACT that makes "fix your code"
+        wrong in every one of them. And the report measured the empty state two ways -- an empty jobs
+        array and jobs with zero steps -- so the entry point to the annotation is not the same in both.
+        Both shapes are recognised here; the note names the one command that prints the reason.
+
+        A RUN THAT HAS NOT FINISHED IS NOT STALLED. A job still queued also has no steps, so a payload
+        whose status is anything but 'completed' returns ''. ship-pr only reaches this after --watch,
+        where that cannot happen -- asserted anyway, because "cannot happen" is how the premise this
+        repo keeps replacing was justified.
+
+    .PARAMETER RunJson
+        `gh run view <runId> --json conclusion,status,url,jobs` output. Unreadable in, '' out: this is
+        a diagnostic and must never be the reason a refusal cannot be printed.
+
+    .PARAMETER RunId
+        The run id, so the note can name the command that prints the reason. Optional; left out, the
+        note ends after the URL it read from the payload.
+    #>
+    param(
+        [string]$RunJson,
+        [string]$RunId = ''
+    )
+
+    if (-not $RunJson -or -not $RunJson.Trim()) { return '' }
+    try { $run = $RunJson | ConvertFrom-Json } catch { return '' }
+    if ($null -eq $run) { return '' }
+
+    # A field gh was never asked for is absent, and absent is not empty under Set-StrictMode -- the
+    # same guard Get-CheckOutcome applies, for the same reason.
+    $status = ''
+    if ($run.PSObject.Properties['status']) { $status = ([string]$run.status).Trim().ToLowerInvariant() }
+    if ($status -and $status -ne 'completed') { return '' }
+
+    if (-not $run.PSObject.Properties['jobs']) { return '' }
+    $jobs = @($run.jobs | Where-Object { $_ })
+
+    $what = ''
+    if ($jobs.Count -eq 0) {
+        $what = 'the run created no job at all'
+    } else {
+        $ran = @($jobs | Where-Object {
+            $_.PSObject.Properties['steps'] -and @($_.steps | Where-Object { $_ }).Count -gt 0
+        })
+        if ($ran.Count -gt 0) { return '' }
+        $what = if ($jobs.Count -eq 1) {
+            'its one job executed no step'
+        } else {
+            "none of its $($jobs.Count) jobs executed a step"
+        }
+    }
+
+    $url = ''
+    if ($run.PSObject.Properties['url']) { $url = ([string]$run.url).Trim() }
+
+    $note = "The run did not FAIL, it never started: $what, so nothing was tested -- this is not a check that went red, and re-running the branch will not change it."
+    $note += ' The cause is outside this repository (a failed account payment or a reached spending limit, Actions disabled for the org, or no runner able to take the job) and the reason text is not on the run page.'
+    if ($RunId) {
+        $note += " Print it with: gh run view $RunId"
+    } elseif ($url) {
+        $note += " The run is at $url"
+    }
+    return $note
+}
