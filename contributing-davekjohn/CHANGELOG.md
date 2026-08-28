@@ -32,6 +32,47 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/trim-chris-persona-v1` · 20260828-101704
+
+Chris's persona is the one document on the always-on path that every consuming repo pays too, and it
+was 27,535 B. It is now 25,674 -- **1,861 B / ~596 tokens, 6.8%** -- with no rule removed and no
+generated block touched.
+
+Two sections carried it. The fixed ritual's step 6 said the same thing about the close-out in four
+paragraphs where two do. The inbound route described **six** ways a report fails on pickup across five
+running prose paragraphs, while every document that refers to them -- the repo lens, the
+`triage-inbound` skill -- already calls them "the six". They are a numbered list now, so the count in
+the prose and the count on the page finally agree, and a reader checking a report against them can
+find the fifth one.
+
+**What this branch could not do is the more useful half, and it is filed rather than left implicit.**
+The other fifteen specialists split into an always-listed agent def and a `manuals/` playbook read on
+demand; Chris has no manual, because check 6b of the integrity gate refuses one to a specialist with no
+agent def and he is deliberately a persona. So every rule he carries has to sit in the always-loaded
+body, which is why he is ~35% of the path. Measurement, the inconsistency in the handbook that states
+both halves of it, and the three candidate answers are in
+[#1017](https://github.com/DaveKJohn/claude-code-specialists/issues/1017) -- choosing between them is a
+structural decision and not a branch's.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer gets the same rules in a shorter persona, and the six inbound checks as a list they can work
+through instead of five paragraphs they have to parse. No behaviour changes.
+
+**Score:** 2
+
+#### Pull Request
+
+Compress the orchestrator's always-loaded persona without dropping a rule
+
+Plugins: team-alpha
+
+[PR #1018](https://github.com/DaveKJohn/claude-code-specialists/pull/1018)
+
+---
+
 ### DEPLOY: `docs/trim-always-on-path-v1` · 20260828-093822
 
 Every session paid 27,762 tokens of instruction documents before its first assignment. It now pays
