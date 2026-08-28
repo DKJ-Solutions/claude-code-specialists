@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/open-pr-sees-the-uncommitted-work-v1` · 20260828-161636
+
+`open-pr` now refuses to open a PR for a plan that reads as finished while the work behind it sits
+uncommitted in the working copy -- the shape that let PR #1025 merge a changelog entry describing a
+manual edit that never left a working copy. The measurement is not new: `park-cycle` already took it and
+wrote it into a commit body, where only a reader on another device would find it. It is now put in front
+of the session that can still act on it, from the same shared function, so the two cannot disagree.
+
+Alongside it, both gates now say out loud when they ran against a dirty tree. They judge the working
+tree while the PR ships HEAD, so on a dirty tree a green result proves the working copy and not what
+merges -- which is how #1025's lint run walked a manual *with* the two new rules in it and reported zero
+errors.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+The repair is a *delivery* change, not a new measurement. Something in the system had already noticed
+the exact failure, written it down precisely, and filed it where only the wrong reader would look. The
+fix is one function shared by both readers rather than a second gate with its own opinion.
+
+**Score:** 3
+
+#### Pull Request
+
+open-pr refuses a finished plan with work still uncommitted, and the gates say when they ran dirty
+
+Plugins: contributing-davekjohn
+
+[PR #1031](https://github.com/DaveKJohn/claude-code-specialists/pull/1031)
+
+---
+
 ### DEPLOY: `docs/a-notification-names-where-it-came-from-v1` · 20260828-154451
 
 Sylvester's hook craft gains the rule that closes the gap between a notification that *arrives* and one
