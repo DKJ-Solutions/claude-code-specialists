@@ -32,6 +32,50 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/fold-stops-the-doubled-plugins-line-v1` · 20260828-121729
+
+`fold-changelog-entry.ps1` wrote the `Plugins:` line -- derived from the PR's touched files --
+unconditionally, so an entry that already carried one folded with two, one blank line apart. 22 such
+doubled lines are in the record; 8 shipped in the v4.21.0 cut. `Get-EntryPlugins` reads this line and
+the release notes are published output, so it is cosmetic per occurrence and permanent.
+
+The mechanism, established before the guard was added (issue #1015 asked for exactly that): not a
+script running twice, but a session hand-writing a `Plugins:` line into the `#### Pull Request`
+section of its branch document -- mirroring what a folded entry looks like. `new-branch.ps1` scaffolds
+that section with the title alone; all 8 doubled v4.21.0 entries had the line added in the branch's
+own work commit (`c898d9f3` for PR #1010), the non-doubled plugin-touching entries did not.
+
+Three parts. **The fold now strips any `Plugins:` line already in the entry before it appends its
+own**, for every entry, and names what it dropped rather than doing it silently -- so a branch opened
+before the gate below still folds clean, loudly. `Remove-EntryPluginsLine` moved from `release-lib.ps1`
+into `entry-scaffold-lib.ps1` so the fold can reach it, the same move `Get-ReleaseChangeTypes` and
+`Set-EntryHeadingLevel` made and for the same reason. **`Get-EntryScaffoldFindings` refuses a
+`Plugins:` line in the entry**, so `open-pr` and CI tell the author on the branch, before the merge.
+**The 22 shipped doublings are de-duplicated** -- 21 exact repeats collapsed; `3.6.0.md` (PR #483)
+carried two lines that disagreed and the fold-written one was kept.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer receives `fold-changelog-entry.ps1` and `entry-scaffold-lib.ps1` through the workflow
+plugin. One who had been hit by the same doubling -- an author on their side copying the folded shape
+into a branch document -- stops shipping doubled `Plugins:` lines into their own changelog, and their
+branch-entry gate gains a check that names the stray line before the merge. No action is required of
+anyone; the fold repairs a stray line on its own and says so.
+
+**Score:** 2
+
+#### Pull Request
+
+The fold stops emitting a doubled Plugins line, and the branch document stops carrying one
+
+Plugins: contributing-davekjohn
+
+[PR #1020](https://github.com/DaveKJohn/claude-code-specialists/pull/1020)
+
+---
+
 ### DEPLOY: `feat/chris-on-demand-manual-v1` · 20260828-105519
 
 The orchestrator gets the on-demand half every other specialist already had. His persona is loaded on
