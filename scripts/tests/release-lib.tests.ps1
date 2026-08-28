@@ -719,6 +719,80 @@ Assert-Match $up '\[absolute\]\(/x\.md\)' 'an absolute link is still left alone 
 $same = Convert-EntryRelativeLinks -EntryText 'See [x](../a.md) and [y](b.md).' -Prefix ''
 Assert-Equal 'See [x](../a.md) and [y](b.md).' $same 'an empty prefix returns the text untouched'
 
+# --- CODE AND COMMENTS ARE LEFT ALONE (inbound #1052, August 28, 2026) -----------------------------
+# The gate that judges an entry's links (Get-EntryLinkTargets) has excluded fences, inline code spans and
+# html comments since it existed -- a link written there is an ILLUSTRATION of a link, not one. This
+# function applied its regex to the whole entry, so the two halves of one rule disagreed: a link the gate
+# never looked at was rewritten anyway, and the damage lands in a TAGGED, immutable release document where
+# only a reader finds it. #1047 widened it by one class when it stopped exempting '../', which is exactly
+# the shape a quoted example has.
+Write-Host "Convert-EntryRelativeLinks -- an illustration of a link is not a link (inbound #1052)" -ForegroundColor Cyan
+$illustrated = @(
+    'Real: [the lib](scripts/lib/x.ps1) and [up](../scripts/y.ps1).',
+    'Inline `[PR #7](url)` and `[q](../a.md)` are quoted, not linked.',
+    '',
+    '```markdown',
+    '- **[`scripts/x.ps1`](../../scripts/x.ps1)** an example entry',
+    '```',
+    '',
+    '~~~text',
+    'a tilde fence quoting [y](../b.md)',
+    '~~~',
+    '',
+    '<!-- [PR #NN](../z.md) - merged <date> -->',
+    'Tail: [again](docs/a.md).'
+) -join "`n"
+$kept = Convert-EntryRelativeLinks -EntryText $illustrated -Prefix '../../../'
+Assert-Match $kept '\[the lib\]\(\.\./\.\./\.\./scripts/lib/x\.ps1\)' 'a real link in prose is still rewritten'
+Assert-Match $kept '\[up\]\(\.\./\.\./\.\./\.\./scripts/y\.ps1\)' "and so is a real '../' link, which is what #1047 fixed"
+Assert-Match $kept '\[again\]\(\.\./\.\./\.\./docs/a\.md\)' 'and one after every quoted block, so the walk does not stop at the first illustration'
+Assert-Match $kept '`\[PR #7\]\(url\)`' 'the measured false finding -- a link inside INLINE backticks -- is untouched'
+Assert-Match $kept '`\[q\]\(\.\./a\.md\)`' "and so is a relative one, which is the class #1047 stopped exempting"
+Assert-Match $kept '\[`scripts/x\.ps1`\]\(\.\./\.\./scripts/x\.ps1\)' 'a link inside a ``` fence keeps the depth its illustration needs'
+Assert-Match $kept '\[y\]\(\.\./b\.md\)' 'a tilde fence excludes just as well -- the flags are shared, so both forms are read'
+Assert-Match $kept '<!-- \[PR #NN\]\(\.\./z\.md\) - merged <date> -->' 'and an html comment is left as written'
+
+# THE TWO HALVES NOW AGREE BY CONSTRUCTION, and this is the assert that says so: the gate reads exactly
+# the targets the rewriter moves. Both call Get-EntryCodeSpans, so a future change to what counts as an
+# illustration cannot land in one half only.
+$gateTargets = @(Get-EntryLinkTargets -EntryText $illustrated)
+Assert-Equal 3 $gateTargets.Count 'the gate reads three links in that entry'
+foreach ($t in $gateTargets) {
+    Assert-Match $kept ([regex]::Escape('](../../../' + $t + ')')) "the rewriter moved '$t' -- exactly what the gate judged"
+}
+
+# THE MATCH SHAPE IS PART OF THE AGREEMENT, and this is the case that proved it. This function matched
+# from the ']' while the gate matches from the '[', and the offset test reads the START of a match -- so a
+# link whose LABEL sat inside a code span but whose '](target)' did not was excluded by the gate and
+# rewritten here. Exactly the disagreement the change exists to end, in a new place. Found in review
+# before it shipped; the repair was to match the gate's own shape and insert the prefix at the target's
+# index, so the label is never rebuilt.
+$splitSpan = 'a ` [text` ](../foo.md) b'
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $splitSpan)).Count 'the gate reads no link when the label is quoted'
+Assert-Equal $splitSpan (Convert-EntryRelativeLinks -EntryText $splitSpan -Prefix '../../') 'and neither does the rewriter -- both now key on the same offset, the link opening bracket'
+
+# The straddle case from entry-scaffold.tests.ps1, completed here where both libs are loaded: two stray
+# backticks pair ACROSS a fence and swallow it, the gate reads nothing, and the rewriter moves nothing.
+# Inherited behaviour -- the three strippers this replaced did the same -- and harmless precisely because
+# both halves inherit it together.
+$straddleEntry = @('text ` oops', '```', 'fenced', '```', 'and [a real link](../foo.md) after and ` closes it.') -join "`n"
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $straddleEntry)).Count 'straddle: the gate reads no link'
+Assert-Equal $straddleEntry (Convert-EntryRelativeLinks -EntryText $straddleEntry -Prefix '../../') 'straddle: and the rewriter moves none'
+
+# A bare '](x)' with no opening bracket is not a link, and since the repair neither half treats it as one.
+$noLabel = 'stray ](a.md) here'
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $noLabel)).Count 'the gate has never read a bracketless target'
+Assert-Equal $noLabel (Convert-EntryRelativeLinks -EntryText $noLabel -Prefix '../') 'and the rewriter no longer does either'
+
+# CRLF, because the offsets are computed over the text AS GIVEN and a rejoined copy would normalise them.
+# This repo's own entry file is written by scripts that preserve whatever the document already used.
+$crlf = "See [a](x.md).`r`n`r`n``````text`r`n[b](y.md)`r`n``````" + "`r`nAnd [c](z.md)."
+$crlfOut = Convert-EntryRelativeLinks -EntryText $crlf -Prefix '../'
+Assert-Match $crlfOut '\[a\]\(\.\./x\.md\)' 'crlf: the link before the fence is rewritten'
+Assert-Match $crlfOut '\[b\]\(y\.md\)' 'crlf: the fenced one is not -- the span landed on the right characters'
+Assert-Match $crlfOut '\[c\]\(\.\./z\.md\)' 'crlf: and the one after the closing fence is rewritten again'
+Assert-Equal $crlf.Length ($crlfOut.Length - 6) 'crlf: exactly the two prose links grew, by exactly the prefix'
+
 # --- Get-EntryLinkPrefix: the offset between the two documents (inbound #1047) ---------------------
 # The first case is this repo since August 27, 2026, and the number is the whole bug: the note sits four
 # directories down from the root, so the retired `('../' * $notesDepth)` produced FOUR -- one too many,
