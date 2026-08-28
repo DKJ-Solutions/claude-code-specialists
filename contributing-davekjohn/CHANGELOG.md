@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/trim-always-on-path-v1` · 20260828-093822
+
+Every session paid 27,762 tokens of instruction documents before its first assignment. It now pays
+25,195 -- **2,567 fewer, 9.2%**, across `CLAUDE.md`, `SPECIALISTS.md` and Chris's lens.
+
+Nothing was decided differently. Eight passages of *evidence* moved to destinations those documents
+already named, under the rule the repo states itself: the decision belongs on the always-on path, the
+measurement behind it does not. Two of the eight turned out to be neither evidence nor decision but
+**duplication** -- the `contributing-davekjohn/CONTRIBUTING.md` layering history and the
+1,700-vs-26,914 lens measurement were already written out in full at the pages `CLAUDE.md` was pointing
+at -- so those were deleted rather than moved. Every bound on the three direct-on-`main` exceptions is
+still stated here, verbatim and checkable; what left them is their history.
+
+The evidence has three new homes, each of which is read on demand and costs a session nothing until it
+is opened: a `## Measured instances kept off the always-on path` section in the specialists handbook
+(the three ways a briefing fails, why `Get-RosterIgnoredIds` is empty, why the branch check fires on
+the follow-up assignment), a section in Tessa's lens for the *portable*-word repair and the `grep -c`
+miscount that came with it, and inbound #388 in the `triage-inbound` skill, beside the five other ways
+a report fails on pickup.
+
+Chris's persona carries another 35% of the path and was deliberately left alone: it is plugin payload
+that ships to every consumer, and trimming it is a release-bound change rather than a repo-local one.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- every file touched is repo-owned. Nothing here ships in a plugin, so no consumer sees a
+difference.
+
+**Score:** N/A
+
+#### Pull Request
+
+Move the measured evidence off the always-on document path
+
+[PR #1016](https://github.com/DaveKJohn/claude-code-specialists/pull/1016)
+
+---
+
 ### DEPLOY: `feat/shopify-sync-pr-body-seam-v1` · 20260827-215731
 
 `team-shopify`'s pre-task sync now writes the PR body itself, on **both** paths, and a consumer can replace
