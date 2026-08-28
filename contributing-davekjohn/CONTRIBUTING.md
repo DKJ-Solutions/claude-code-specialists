@@ -187,9 +187,9 @@ document.
 
 ### 2.2. Copy the last DEPLOY into the PR
 
-`open-pr.ps1` composes the PR body from the document, and **four gates read it on the way**. Three run
-locally, before the push and before the merge; the fourth runs in CI, and it exists because the first three
-cannot. The repo's own lint and test gates are separate and stated in the [root `CLAUDE.md`](../CLAUDE.md):
+`open-pr.ps1` composes the PR body from the document, and **five gates read it on the way**. Four run
+locally, before the push and before the merge; the fifth runs in CI, and it exists because the local four are
+escapable by not using the scripts. The repo's own lint and test gates are separate and stated in the [root `CLAUDE.md`](../CLAUDE.md):
 `open-pr.ps1` runs [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) and then every
 `scripts/tests/*.tests.ps1`, refusing to push on any error or failing suite.
 
@@ -320,14 +320,22 @@ the network, not about the section, and a gate that refused on that would be ref
 there: this section is what step 5 folds verbatim into `CHANGELOG.md`, so a lock satisfied by a stray checkout's
 document would be approving the fold of a section it never read.
 
-#### 2.2.4. the CI gate, because the three above are local
+#### 2.2.5. the CI gate, because the four above are local
 
 **August 20, 2026** (inbound
-[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The three gates above live in
-`open-pr` and `ship-pr`, so all three are escapable by not using them: a branch pushed by hand, or a PR opened
-in the GitHub UI, meets none of them. The convention was therefore enforced by whoever remembered the
+[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The gates above live in
+`open-pr` and `ship-pr`, so every one of them is escapable by not using them: a branch pushed by hand, or a PR
+opened in the GitHub UI, meets none of them. The convention was therefore enforced by whoever remembered the
 scripts — and a convention that enforces nothing rots quietly, which matters here because `CHANGELOG.md` is
 the only readable answer to "what is merged but not yet released".
+
+**It re-checks three of the four, and the backing gate is deliberately not among them** (August 28, 2026).
+That gate's whole subject is what sits **uncommitted in a working copy**, and a CI runner has no working copy
+— it checks out the commit, so its tree is clean by construction and the measurement there would always read
+zero. A check that cannot fail is not a check, and adding one would state a guarantee CI is in no position to
+make. The half of it that *is* visible from a commit — a branch whose diff is its development document alone
+— stays local on purpose too: it is a judgement about whether a change was finished, which belongs where the
+author can still act on it.
 
 [`check-branch-entry.ps1`](../scripts/lint/check-branch-entry.ps1) closes that, and
 [`.github/workflows/branch-entry.yml`](../.github/workflows/branch-entry.yml) is the handful of lines that call

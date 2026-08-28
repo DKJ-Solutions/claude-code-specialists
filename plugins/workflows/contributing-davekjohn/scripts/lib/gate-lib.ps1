@@ -189,9 +189,11 @@ function Get-GateTreeDirtyCount {
         it would make the gates ceremony; what was missing was never a refusal but the sentence that
         stops a green result from reading as proof about the PR.
 
-        core.quotePath IS FORCED ON for the same reason park-lib forces it: PowerShell 5.1 decodes a
-        child's stdout with whatever console code page the run inherited, and quoting holds the wire to
-        ASCII, where every candidate code page agrees on the line count.
+        core.quotePath IS FORCED ON, but NOT for park-lib's reason. That lib quotes because it COMPARES
+        the paths against a list, and a code-page mis-decode there can accidentally match or fail to
+        match. Nothing is compared here -- the answer is a count of lines -- and the risk is one line
+        further down: an unquoted path containing a newline is reported across two lines and inflates the
+        count by one. Quoting escapes it, so one file stays one file whatever it is called.
     #>
     param([Parameter(Mandatory)][string]$RepoRoot)
 

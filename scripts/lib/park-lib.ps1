@@ -237,10 +237,10 @@ function Get-BranchBackingFinding {
 
         Kind is 'UncommittedHere' when the work is sitting uncommitted in THIS working copy, and
         'NotInThisCheckout' when nothing is uncommitted here either. They are different faults and their
-        two callers answer them differently: the park note describes both, open-pr's backing gate REFUSES
-        the first (this session's own omission, one command from repaired) and only warns on the second
-        (which is indistinguishable from a branch that legitimately ships its entry alone, and from the
-        cross-device flow #960 exists to serve).
+        two callers answer them differently: the park note describes both, while open-pr's backing gate
+        REFUSES the first -- this session's own omission, one command from repaired -- and only warns on
+        the second, which cannot be told apart from a branch legitimately shipping its entry alone, and
+        where refusing would wedge the cross-device flow #960 exists to serve.
 
         WHY IT IS A FUNCTION AND NOT TWO INLINE TESTS (issue #1026). The condition was written once for
         Format-GitParkBacking's alarm; open-pr's gate needs exactly the same question answered, and a

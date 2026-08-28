@@ -66,8 +66,14 @@ reason -- a gate that fires on almost every run is one nobody reads by the time 
       "is this tree HEAD". A count, never filenames.
 - [x] Plugin mirrors rebuilt via `scripts/sync/build-shared-scripts.ps1`.
 - [x] Documented in `contributing-davekjohn/CONTRIBUTING.md` as **2.2.3**, at the point where it fires
-      and directly after the step-list gate whose question it completes. The DEPLOY lock moved to 2.2.4,
-      and the three cross-references to its old number were repointed with it.
+      and directly after the step-list gate whose question it completes. Everything below it shifted by
+      one -- the DEPLOY lock to 2.2.4 and the CI gate to 2.2.5 -- along with the three prose
+      cross-references to the DEPLOY lock's old number.
+- [x] The two claims that counted the gates were repointed with it: `CONTRIBUTING.md`'s 2.2 intro and the
+      always-on [`CLAUDE.md`](../CLAUDE.md), which both said **four**. Both now say five, and both state
+      that CI re-checks three of the four local gates rather than all of them -- the backing gate's
+      subject is what sits uncommitted in a working copy, and a CI runner checks out a commit, so there
+      the measurement always reads zero. A check that cannot fail is not a check.
 
 ### TEST
 
@@ -78,8 +84,11 @@ reason -- a gate that fires on almost every run is one nobody reads by the time 
       `$null` outside a repository, and that open-pr prints the warning **above** the lint gate.
 - [x] `park-cycle.tests.ps1` still green at 64 asserts: the `Format-GitParkBacking` refactor is
       behaviour-preserving.
-- [x] End-to-end against a real fixture reproducing #1025: the gate reports `UncommittedHere, 1 file(s)`
-      and falls silent the moment the edit is committed.
+- [x] End-to-end against a real fixture reproducing #1025 -- the plan document committed, the manual edit
+      left in the working copy. `Get-BranchBackingFinding` returns the `UncommittedHere` kind over one
+      uncommitted file, and returns `$null` the moment that edit is committed. The same fixture on a
+      checkout whose trunk ref is absent returns `$null` too, which is the "not measured is not zero"
+      guard doing its job rather than a miss.
 
 ### DEPLOY: `fix/open-pr-sees-the-uncommitted-work-v1`
 

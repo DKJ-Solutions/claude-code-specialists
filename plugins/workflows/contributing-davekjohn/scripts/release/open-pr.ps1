@@ -617,7 +617,11 @@ Answer them and run again. Shipping it as it stands is -Force.
     $progressRel  = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
     $progressPath = Join-Path $repoRoot $progressRel
     if (Test-Path -LiteralPath $progressPath) {
-        $stepFindings = @(Get-BranchProgressFindings -Text ([System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)))
+        # ONE READ FOR BOTH GATES BELOW. The step gate asks whether the plan is finished and the backing
+        # gate asks what is behind it -- two questions about the same document, and reading it twice would
+        # let them answer over two different versions of it if anything wrote in between.
+        $progressText = [System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)
+        $stepFindings = @(Get-BranchProgressFindings -Text $progressText)
         if ($stepFindings.Count -gt 0) {
             $marks = Get-BranchProgressMarks
             $stepDetail = ($stepFindings | ForEach-Object { "  - $($_.Label): $($_.Line)" }) -join "`n"
@@ -659,7 +663,7 @@ for this gate - '$($marks.Dropped.Trim())' is the way past a step that should no
         # -Force-ABLE, unlike the step gate above. There IS a legitimate case: a branch whose whole
         # deliverable is the changelog entry. Rare rather than impossible, so the valve is a warning; no
         # valve is a wedged author.
-        $tally   = Get-BranchProgressTally -Text ([System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8))
+        $tally   = Get-BranchProgressTally -Text $progressText
         $backing = Get-GitParkBacking -RepoRoot $repoRoot -Trunk (Get-BranchTrunkName) -Paths @($progressRel)
         $backingFinding = Get-BranchBackingFinding -Steps $tally -Backing $backing
 
