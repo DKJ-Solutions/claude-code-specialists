@@ -908,17 +908,24 @@ if ($SummaryFile) {
 # complete", and what lets a hand-written note paste an entry at the level it was written at (#881). A repo
 # whose entries declare no tier gets one group and the same document in arrival order.
 #
-# THE LINK PREFIX IS DERIVED FROM THE NOTE'S OWN DEPTH, exactly as the hand-written draft below does it,
-# and this call was the ONE that still left it at Build-ReleaseNotes' '../../../' default (issue #914,
-# August 26, 2026). That default is the depth of a root sitting directly under releases/, which is where
-# this tree sat until #914 moved it into contributing-davekjohn/ -- one level deeper, so every
-# root-relative link in every note this cut writes would have pointed one directory short. Nothing would
-# have errored: a dead relative link in a generated document is discovered by a reader, and this repo has
-# already paid for that once (the v4.6.0 overview row). The derivation is what makes the root a seam
-# rather than a constant, so the answer is right at whatever depth a repo answers with.
-$notesDepth = @($notesRelPath -split '/').Count - 1
+# THE LINK PREFIX IS DERIVED, exactly as the hand-written draft below does it, and this call was the ONE
+# that still left it at Build-ReleaseNotes' '../../../' default (issue #914, August 26, 2026). That default
+# is the depth of a root sitting directly under releases/, which is where this tree sat until #914 moved it
+# into contributing-davekjohn/ -- one level deeper, so every relative link in every note this cut writes
+# would have pointed one directory short. Nothing would have errored: a dead relative link in a generated
+# document is discovered by a reader, and this repo has already paid for that once (the v4.6.0 overview
+# row). The derivation is what makes the root a seam rather than a constant.
+#
+# AND IT IS MEASURED FROM THE CHANGELOG, NOT FROM THE REPO ROOT (inbound #1047, August 28, 2026). It used
+# to count the note's own segments back to the root -- `('../' * $notesDepth)` -- which is the entry's base
+# only while CHANGELOG.md sits AT the root. It stopped sitting there when #914 made the changelog
+# isolate-by-default, and in this repo when it moved into contributing-davekjohn/ on August 27, 2026, so
+# the prefix was one directory too deep and every link the PR gate had just dictated landed dead in a
+# tagged, immutable document. Get-EntryLinkPrefix answers both halves at once and is shared with the draft
+# below, so the two documents cannot disagree about where the entry text came from.
+$notesLinkPrefix = Get-EntryLinkPrefix -NoteRelPath $notesRelPath -ChangelogRelPath $changelogRel
 $notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $today -Type $typeLabel `
-    -Title $Title -Summary $summaryText -LinkPrefix ('../' * $notesDepth)
+    -Title $Title -Summary $summaryText -LinkPrefix $notesLinkPrefix
 # THE CHANGELOG IS EMPTIED, AND NOTHING IS WRITTEN BACK INTO IT (August 5, 2026). This call used to hand
 # over the version, the date, the type, the notes path and three seam values to rebuild a release block and
 # one section per tier. There is no block and there are no sections: the intro stays as the repo wrote it,
@@ -950,13 +957,15 @@ $cutNote = ($consumerBumps -contains $bumpType)
 $noteRelPath = "$noteRootRelPath/$notesDirName/$new.md"
 if ($cutNote) {
     $noteWording = Get-SeamValue -Name 'Get-ReleaseNoteWording', 'Get-InternalNoteWording' -Default @{}
-    # The link prefix is DERIVED FROM THE NOTE'S OWN DEPTH rather than left at the '../../../' default
-    # (August 14, 2026): that default is the depth of releases/audience/<X>.x/, and a consumer whose
-    # note root sits inside the workflow folder is one level deeper -- every root-relative link in the
-    # note would silently point one directory short. For this repo the derivation produces the default.
-    $noteDepth = @($noteRelPath -split '/').Count - 1
+    # The link prefix is DERIVED rather than left at the '../../../' default (August 14, 2026): that
+    # default is the depth of releases/audience/<X>.x/ under a repo-root changelog, and a consumer whose
+    # note root sits inside the workflow folder is one level deeper -- every relative link in the note
+    # would silently point one directory short. Measured from the CHANGELOG's directory since inbound
+    # #1047, by the same one owner as the tier-0 notes above; see that call's comment for why the repo
+    # root was the wrong base.
+    $noteLinkPrefix = Get-EntryLinkPrefix -NoteRelPath $noteRelPath -ChangelogRelPath $changelogRel
     $noteContent = Build-ReleaseNoteDraft -Entries $audienceEntries -Version $new -Date $today `
-        -Type $typeLabel -Title $Title -Wording $noteWording -LinkPrefix ('../' * $noteDepth) `
+        -Type $typeLabel -Title $Title -Wording $noteWording -LinkPrefix $noteLinkPrefix `
         -AudienceTier $audienceTier
 }
 

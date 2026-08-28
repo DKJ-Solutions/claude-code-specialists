@@ -156,15 +156,34 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'bodyRelPath'
 # THE TIER-0 NOTES' LINK PREFIX IS DERIVED, NOT DEFAULTED (issue #914, August 26, 2026). Build-ReleaseNotes
 # defaults $LinkPrefix to '../../../', the depth of a root sitting directly under releases/ -- and #914 moved
 # this repo's root one level deeper, into contributing-davekjohn/. The call had been relying on that default
-# since the function existed, so the move would have written every root-relative link in every note one
+# since the function existed, so the move would have written every relative link in every note one
 # directory short, with nothing erroring: a dead relative link inside a tagged, immutable document, found by
 # a reader. Asserted on the CALL, because that is where the mistake was, and on the derivation rather than on
 # a count of '../' -- pinning four would turn red for the next repo whose root sits somewhere else, which is
 # the whole reason the root is a seam.
-Assert-True ($cutReleaseText -match '(?m)^\$notesDepth\s*=\s*@\(\$notesRelPath -split') `
-    "the tier-0 notes' link depth is derived from the note path the seam produced"
-Assert-True ($cutReleaseText -match "-LinkPrefix \('\.\./' \* \`$notesDepth\)") `
+#
+# AND IT IS DERIVED FROM THE CHANGELOG PATH, NOT FROM THE NOTE'S DEPTH ALONE (inbound #1047, August 28,
+# 2026). The derivation this used to pin -- `('../' * $notesDepth)` -- counted back to the repo ROOT, which
+# is the entry's base only while CHANGELOG.md sits there. So both halves are asserted: that the seam's
+# changelog answer reaches the call at all, and that the shared helper is what turns the two into a prefix.
+# Pinning the helper by NAME is the point: two call sites deriving this independently is what #1047 measured.
+Assert-True ($cutReleaseText -match '(?m)^\$notesLinkPrefix\s*=\s*Get-EntryLinkPrefix -NoteRelPath \$notesRelPath -ChangelogRelPath \$changelogRel') `
+    "the tier-0 notes' link prefix is derived from the note path AND the changelog the seam produced"
+Assert-True ($cutReleaseText -match '-LinkPrefix \$notesLinkPrefix') `
     'and Build-ReleaseNotes is called with it rather than left on its shallowest-shape default'
+# The hand-written draft asks the SAME helper, which is what stops the two documents disagreeing about
+# where the entry text was copied from -- they derived it separately, and identically wrongly, until #1047.
+Assert-True ($cutReleaseText -match '\$noteLinkPrefix\s*=\s*Get-EntryLinkPrefix -NoteRelPath \$noteRelPath -ChangelogRelPath \$changelogRel') `
+    'the hand-written draft derives its prefix through the same one owner'
+Assert-True ($cutReleaseText -match '-LinkPrefix \$noteLinkPrefix') `
+    'and Build-ReleaseNoteDraft is called with it'
+# NEITHER CALL COUNTS BACK TO THE REPO ROOT ANY MORE. The old shape is cheap to reintroduce by hand -- it
+# reads as an obvious depth calculation -- and it is wrong in silence, which is the whole reason #1047 was
+# filed from a consumer rather than caught here. Matched on the ARGUMENT rather than on the expression
+# alone: both comments above quote the retired derivation by name, which is what a reader needs and what a
+# bare `('../' * $x)` pattern would turn red on.
+Assert-True (-not ($cutReleaseText -match "-LinkPrefix \('\.\./' \*")) `
+    'and neither call rebuilds the repo-root depth it used to count'
 # THE BODY HAS ITS OWN ROOT SINCE AUGUST 12, 2026 (Dave). Asserted on the ROOT rather than on the whole
 # literal, so a grouping change (<X>.x -> <X.Y>) does not turn this red for a reason it is not about. It
 # used to be written into releases/development/ with a '-github-body' suffix: the one generated document
