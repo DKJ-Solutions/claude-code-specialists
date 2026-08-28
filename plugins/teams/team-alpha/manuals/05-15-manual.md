@@ -66,6 +66,20 @@ and safe hook construction.
 - **Pipe-test hooks before they go live** — test the raw command (pipe the hook JSON in, check the
   exit code), then put it in `settings.json`; a hook that silently does nothing is worse than no
   hook.
+- **The exit code says the hook RAN; only the receiver says it ARRIVED.** A pipe test proves the
+  command works, and a hook whose transport is sound can still deliver nothing, because the event
+  also has to reach a channel somebody is actually watching. So the last step of putting a hook live
+  is taken at the receiving end: subscribe, listen, fire the real payload, and read what came out.
+  The measured case is Claude Code's own `Notification` event, which by default produces a desktop
+  notification only in Ghostty, Kitty and iTerm2 — in any other terminal, the VS Code one included,
+  it had been firing correctly into nothing for as long as it existed. Nothing was broken and nothing
+  was misconfigured; there was simply no channel, and no exit code anywhere could have said so.
+- **Harness config lives in TWO trees, and a search of the project sees one of them.**
+  `~/.claude/settings.json` and `~/.claude/hooks/` are machine-wide and sit outside every repo, so a
+  grep of the project tree reports "no hook configured" with complete confidence while that hook runs
+  on every turn. Read both before concluding a capability is unconfigured. That tree is also the
+  right home for anything personal: a notification routed to somebody's phone is nobody's repo
+  content, least of all a public repo's.
 - **Deterministic guardrail hooks belong in `settings.json`, not in a plugin.** A hook that enforces
   a hard rule at execution time must always be active — independent of plugin trust or which plugins
   are enabled. Plugins carry subagents/skills; the safety hooks stay deliberately in the repo config.
