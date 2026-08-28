@@ -712,6 +712,55 @@ $tildeStripped = Remove-EntryTierLine -EntryText $tildeEntry
 Assert-True ($tildeStripped -match '(?m)^Tier: 2$') 'tilde: Remove-EntryTierLine leaves the QUOTED line inside the fence alone'
 Assert-True ($tildeStripped -notmatch '(?m)^Tier: 1$') 'tilde: and removes the real one'
 Assert-True ((Remove-EntryImpactTable -EntryText $tildeEntry) -match 'quoted') 'tilde: Remove-EntryImpactTable leaves a ~~~-quoted table alone'
+
+# --- Get-EntryCodeSpans / Remove-EntryCodeSpans -- the three exclusions, as OFFSETS (inbound #1052) ---
+# The exclusion was three successive deletions, which is everything a reader needs and nothing a REWRITER
+# can use: the cut has to hand the entry back with the illustrations still in it. So the two halves of one
+# rule were a stripper and nothing, and links inside fences were rewritten by a cut that the gate judging
+# those links never saw. Offsets are the form both halves can read.
+Write-Host "Get-EntryCodeSpans -- where the code is, not the text without it (inbound #1052)" -ForegroundColor Cyan
+$spanEntry = 'a `x` b' + "`n" + '```' + "`nfenced`n" + '```' + "`n<!-- c -->`nd"
+$spans = @(Get-EntryCodeSpans -EntryText $spanEntry)
+Assert-Equal 5 $spans.Count 'one inline span, three fenced lines (both markers included) and one comment'
+foreach ($s in $spans) {
+    Assert-True ($s.Start -ge 0 -and ($s.Start + $s.Length) -le $spanEntry.Length) 'every span lies inside the text it was measured over'
+}
+$ordered = $true
+for ($i = 1; $i -lt $spans.Count; $i++) {
+    if ($spans[$i].Start -lt ($spans[$i - 1].Start + $spans[$i - 1].Length)) { $ordered = $false }
+}
+Assert-True $ordered 'the spans come back ordered and non-overlapping -- each pass masks what it found before the next runs'
+Assert-Equal 0 (@(Get-EntryCodeSpans -EntryText '')).Count 'an empty entry has no spans rather than throwing'
+Assert-Equal 0 (@(Get-EntryCodeSpans -EntryText 'plain prose with [a](b.md)')).Count 'and prose with no code at all yields none'
+
+# THE MASKING IS WHAT KEEPS THE OFFSETS TRUE, and this is the case that proves it: a lone backtick inside a
+# fence must not pair with one in the prose after it. Stripping would have made them adjacent.
+$strayTick = '```' + "`nsee ``pair`n" + '```' + "`nreal `code` here"
+$strayOut = Remove-EntryCodeSpans -EntryText $strayTick
+Assert-True ($strayOut -notmatch 'pair') 'a stray backtick inside a fence is masked with the fence'
+Assert-True ($strayOut -match 'real') 'and the prose after it survives -- the stray tick found no partner outside'
+
+# Remove-EntryCodeSpans is NOT Get-EntryTextOutsideFences: it cuts the spans, so a fenced line leaves its
+# break behind and an inline span leaves the prose around it whole.
+$removed = Remove-EntryCodeSpans -EntryText 'keep `drop` this'
+Assert-Equal 'keep  this' $removed 'an inline span is cut out of its own line, not the line out of the entry'
+
+# Test-EntryOffsetInCodeSpans -- the rewriter's half, on the START of a match.
+$probe = @([pscustomobject]@{ Start = 4; Length = 3 })
+Assert-Equal $false (Test-EntryOffsetInCodeSpans -Offset 3 -Spans $probe) 'the character before a span is outside it'
+Assert-Equal $true  (Test-EntryOffsetInCodeSpans -Offset 4 -Spans $probe) 'its first character is inside'
+Assert-Equal $true  (Test-EntryOffsetInCodeSpans -Offset 6 -Spans $probe) 'and so is its last'
+Assert-Equal $false (Test-EntryOffsetInCodeSpans -Offset 7 -Spans $probe) 'the character after it is outside again'
+Assert-Equal $false (Test-EntryOffsetInCodeSpans -Offset 0 -Spans @()) 'no spans means nothing is inside one'
+
+# AND THE READER STILL ANSWERS WHAT IT ANSWERED, which is what makes swapping its three strippers for the
+# shared function safe: the fixture below is the measured one, and the count is still zero.
+$sharedQuoting = @(
+    'Prose mentioning `[PR #N](url)` inline.', '',
+    '```markdown', '- **[`scripts/x.ps1`](../../scripts/x.ps1)** an example', '```', '',
+    '<!-- link to the PR in github: [PR #NN](url) - merged <date> -->', ''
+) -join "`n"
+Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $sharedQuoting)).Count 'the link gate reads the same set through the shared function'
 # And the ranker, which is where a fence-blind read cost an ordering (PR #478).
 $tildeList = @(
     '', 'Intro.', '',

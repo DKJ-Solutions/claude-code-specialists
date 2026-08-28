@@ -711,7 +711,9 @@ function Convert-EntryRelativeLinks {
         at a DIFFERENT depth than the changelog the entry's text lives in. $Prefix is the path from that
         document's own directory to the CHANGELOG's directory -- see Get-EntryLinkPrefix, which derives
         it. External (http/mailto), anchor (#) and absolute (/) links are left alone: none of them is
-        resolved against a directory, so none of them can be broken by the text moving.
+        resolved against a directory, so none of them can be broken by the text moving. So is anything
+        inside a code fence, an inline code span or an html comment: that is an illustration of a link
+        rather than one, and it is the same set open-pr's link gate excludes (inbound #1052).
 
         THE BASE IS THE CHANGELOG'S DIRECTORY, NOT THE REPO ROOT (inbound #1047, August 28, 2026), and
         that is not a preference -- it is what the fold does. The fold copies an entry VERBATIM into
@@ -747,7 +749,24 @@ function Convert-EntryRelativeLinks {
         [Parameter(Mandatory)][AllowEmptyString()][string]$Prefix
     )
     if (-not $Prefix) { return $EntryText }
-    return [regex]::Replace($EntryText, '\]\((?!https?:|mailto:|#|/)([^)]+)\)', "](${Prefix}`$1)")
+    # CODE AND COMMENTS ARE LEFT ALONE (inbound #1052, August 28, 2026). A markdown link written inside a
+    # fence, an inline code span or an html comment is an ILLUSTRATION -- a sample entry, a quoted path,
+    # a line a gate prints -- and open-pr's link gate has excluded exactly that set since it existed. This
+    # function did not, so the two halves of one rule disagreed: a link the gate never judged was rewritten
+    # anyway, and the result is a silently mangled illustration inside a tagged, immutable release document.
+    # #1047 widened the gap by one class when it stopped exempting '../', which is the ordinary shape for a
+    # quoted example. Get-EntryCodeSpans is now the single answer both halves read.
+    $codeSpans = @(Get-EntryCodeSpans -EntryText $EntryText)
+    $sb = New-Object System.Text.StringBuilder
+    $cursor = 0
+    foreach ($m in [regex]::Matches($EntryText, '\]\((?!https?:|mailto:|#|/)([^)]+)\)')) {
+        if (Test-EntryOffsetInCodeSpans -Offset $m.Index -Spans $codeSpans) { continue }
+        [void]$sb.Append($EntryText.Substring($cursor, $m.Index - $cursor))
+        [void]$sb.Append("](${Prefix}$($m.Groups[1].Value))")
+        $cursor = $m.Index + $m.Length
+    }
+    [void]$sb.Append($EntryText.Substring($cursor))
+    return $sb.ToString()
 }
 
 function Get-EntryLinkPrefix {

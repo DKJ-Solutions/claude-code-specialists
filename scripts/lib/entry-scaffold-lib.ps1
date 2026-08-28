@@ -211,6 +211,113 @@ function Get-EntryTextOutsideFences {
     return ($kept -join "`n")
 }
 
+function Get-EntryCodeSpans {
+    <#
+        Pure: where the CODE and the COMMENTS sit in an entry, as spans over the text exactly as it was
+        given -- an array of objects with Start and Length, ordered by Start and non-overlapping. Three
+        kinds, in the order they are resolved: fenced blocks (``` and ~~~, off the shared flags), inline
+        code spans, and html comments. That is the same set, in the same order, that Get-EntryLinkTargets
+        has excluded since it existed.
+
+        IT EXISTS BECAUSE A STRIPPER ONLY SERVES A READER (inbound #1052, August 28, 2026). The exclusion
+        was written as three successive deletions, which is everything a reader needs -- it looks at what
+        is left and never has to hand the text back. A REWRITER cannot use that shape at all: it has to
+        return the entry with the illustrations still in it, so it needs to know WHERE the code is rather
+        than to be handed the text without it. So the two halves of one rule were a stripper and nothing,
+        and the cut rewrote markdown links inside fences that the gate judging those links never saw.
+        Offsets are the form both can use: the reader deletes them (Remove-EntryCodeSpans below), the
+        rewriter skips any match that begins inside one.
+
+        MASKED, NOT STRIPPED, BETWEEN THE PASSES, which is what keeps the offsets true. Each pass blanks
+        what it found before the next one runs, so a stray backtick inside a fence cannot pair with one in
+        the prose after it, and a comment inside a fence costs nothing -- the same ordering the stripper
+        had, for the same reasons, with the character positions preserved.
+
+        An unclosed fence swallows the tail, exactly as Get-FencedLineFlags does. For a reader that can
+        only cost a missed finding; for the rewriter it can only leave a link alone, which is the same
+        safe direction -- a link that resolves against the wrong directory is visible, and a mangled
+        illustration in a tagged release document is not.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+    if (-not $EntryText) { return @() }
+    $spans = New-Object System.Collections.Generic.List[object]
+    $chars = $EntryText.ToCharArray()
+
+    # 1. Fenced blocks, line by line: the shared pair gives the flags AND the separators, so the offset
+    #    walks the original text rather than a rejoined copy that may have normalised the line endings.
+    $pair = Get-EntryLineFlagPairs -EntryText $EntryText
+    $offset = 0
+    $lineIndex = 0
+    for ($i = 0; $i -lt $pair.Parts.Count; $i++) {
+        $part = [string]$pair.Parts[$i]
+        if ($i % 2 -eq 0) {
+            if ($part.Length -gt 0 -and $pair.Fenced[$lineIndex]) {
+                $spans.Add([pscustomobject]@{ Start = $offset; Length = $part.Length })
+                for ($k = 0; $k -lt $part.Length; $k++) { $chars[$offset + $k] = ' ' }
+            }
+            $lineIndex++
+        }
+        $offset += $part.Length
+    }
+
+    # 2. Inline code spans, matching a run of backticks with the same run closing it, so '``a`b``' is one
+    #    span rather than two. Non-greedy, and (?s) because a span may legitimately wrap a line in prose.
+    foreach ($m in [regex]::Matches((-join $chars), '(?s)(`+).*?\1')) {
+        $spans.Add([pscustomobject]@{ Start = $m.Index; Length = $m.Length })
+        for ($k = 0; $k -lt $m.Length; $k++) { $chars[$m.Index + $k] = ' ' }
+    }
+
+    # 3. HTML comments last: the guidance blocks the scaffolder writes are comments, and one of them shows
+    #    the fold's closing line.
+    foreach ($m in [regex]::Matches((-join $chars), '(?s)<!--.*?-->')) {
+        $spans.Add([pscustomobject]@{ Start = $m.Index; Length = $m.Length })
+    }
+
+    return @($spans | Sort-Object -Property Start)
+}
+
+function Remove-EntryCodeSpans {
+    <#
+        Pure: the entry with every code span and html comment cut out -- the reader's half of
+        Get-EntryCodeSpans, for a caller that wants to match PROSE and never has to give the text back.
+
+        It is not Get-EntryTextOutsideFences: that one drops whole fenced LINES and answers only the first
+        of the three questions. This drops exactly the spans, so a fenced line leaves its line break behind
+        and an inline span leaves the prose around it intact -- which is what a scanner wants and what a
+        line-oriented reader must not have.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
+    $spans = @(Get-EntryCodeSpans -EntryText $EntryText)
+    if ($spans.Count -eq 0) { return $EntryText }
+    $sb = New-Object System.Text.StringBuilder
+    $cursor = 0
+    foreach ($span in $spans) {
+        if ($span.Start -gt $cursor) { [void]$sb.Append($EntryText.Substring($cursor, $span.Start - $cursor)) }
+        $cursor = [Math]::Max($cursor, $span.Start + $span.Length)
+    }
+    if ($cursor -lt $EntryText.Length) { [void]$sb.Append($EntryText.Substring($cursor)) }
+    return $sb.ToString()
+}
+
+function Test-EntryOffsetInCodeSpans {
+    <#
+        Pure: does $Offset fall inside one of $Spans (as Get-EntryCodeSpans returns them)? The rewriter's
+        half -- it walks the entry's link matches and leaves alone any that begins inside code.
+
+        The test is on the START of a match rather than on any overlap: a link that begins in prose and
+        runs into a fence is malformed markdown either way, and rewriting it is the same answer the whole
+        entry gets.
+    #>
+    param(
+        [Parameter(Mandatory)][int]$Offset,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Spans
+    )
+    foreach ($span in $Spans) {
+        if ($Offset -ge $span.Start -and $Offset -lt ($span.Start + $span.Length)) { return $true }
+    }
+    return $false
+}
+
 # --- The tier line -------------------------------------------------------------------------------
 #
 # 'Tier: N' declares how far an entry reaches. It was superseded by the impact table below on the day it
@@ -4302,7 +4409,9 @@ function Get-EntryLinkTargets {
         it is a false one: '`[PR #N](url)' inside INLINE backticks, in an entry explaining what the fold
         writes. So fences alone are not enough -- the repo's own link lint strips fenced code, inline code
         AND html comments, and its comment names this very '[PR #NN](url)' case as the finding that forced
-        the third exclusion. One rule, three strippers, same set.
+        the third exclusion. One rule, one set -- and since #1052 one function, Get-EntryCodeSpans, which
+        the cut's link rewriter reads too, so the gate that judges links and the rewriter that moves them
+        cannot disagree about what counts as an illustration.
 
         THE ANCHOR IS DROPPED AND THE TITLE WITH IT: 'file.md#section' is judged as 'file.md', and
         'file.md "Title"' as 'file.md'. Whether the anchor exists is a different question with a different
@@ -4310,13 +4419,9 @@ function Get-EntryLinkTargets {
         there at all", which is the question the move can change.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$EntryText)
-    $scan = Get-EntryTextOutsideFences -EntryText $EntryText
-    # Inline code spans, matching a run of backticks with the same run closing it, so '``a`b``' is one span
-    # rather than two. Non-greedy, and (?s) because a span may legitimately wrap a line in prose.
-    $scan = [regex]::Replace($scan, '(?s)(`+).*?\1', '')
-    # HTML comments last: the guidance blocks the scaffolder writes are comments, and one of them shows the
-    # fold's closing line. Stripped AFTER the code passes, so a comment inside a fence costs nothing.
-    $scan = [regex]::Replace($scan, '(?s)<!--.*?-->', '')
+    # The three exclusions are ONE function now (inbound #1052), because the cut needed the same set and
+    # could not use a stripper -- it has to hand the entry back with the illustrations still in it.
+    $scan = Remove-EntryCodeSpans -EntryText $EntryText
 
     $targets = New-Object System.Collections.Generic.List[string]
     foreach ($m in [regex]::Matches($scan, '\[(?:[^\]]*)\]\(([^)]+)\)')) {
