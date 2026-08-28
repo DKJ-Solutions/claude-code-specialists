@@ -286,6 +286,12 @@ $repo = Get-RepoName
 # not-repo-owned, travels-with-the-payload reasoning as the three libs above.
 . (Join-Path $PSScriptRoot '..\lib\gate-lib.ps1')
 
+# WHAT IS BEHIND THE PLAN (issue #1026). park-cycle already takes this measurement, on the device holding
+# the work, and writes it into a commit body -- where the reader who could act on it never looks. open-pr
+# is that reader, and it had no way to ask the question. Same not-repo-owned, travels-with-the-payload
+# reasoning as the libs above; park-lib needs only the native-capture helper, loaded further up.
+. (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
+
 # Pre-flight (#86): an unfilled scaffold (repo-config still at VUL-IN) would otherwise only fail
 # further down with an unclear gh error. Stop here with a clear pointer.
 if ($repo -match 'VUL-IN' -or (Get-LintScript) -match 'VUL-IN') {
@@ -629,6 +635,73 @@ for this gate - '$($marks.Dropped.Trim())' is the way past a step that should no
 "@
             exit 1
         }
+
+        # BACKING GATE (issue #1026): a finished plan with nothing behind it does not become a PR.
+        #
+        # WHAT WAS MEASURED. PR #1025 merged an entry describing two new rules in a manual whose edit was
+        # never committed: the branch's whole diff was this document, the fold then removed it, and the
+        # merge delivered a changelog entry and nothing else. Every gate was green -- the four that read
+        # this document are satisfied by an entry with no content behind it, because none of them reads
+        # the diff.
+        #
+        # AND THE SIGNAL ALREADY EXISTED, in the wrong place. park-cycle's backing note (#960/#976) named
+        # the count, named the state and gave the instruction that would have prevented the merge -- in a
+        # COMMIT BODY, which is right for the reader on a second device and invisible to the session that
+        # is holding the uncommitted file and about to open the PR. This gate is that same measurement,
+        # from the same function, delivered to the reader who can still act on it.
+        #
+        # THE CONDITION IS THE PARK NOTE'S ALARM, asked of the same function rather than spelled again --
+        # Get-BranchBackingFinding in park-lib. Deliberately just as narrow: a plan that CLAIMS to be
+        # complete with nothing committed on the branch to show for it. 'Any resolved step with no commit
+        # behind it' would fire on nearly every early branch, and a gate that fires on almost every run is
+        # one nobody reads by the time it matters.
+        #
+        # -Force-ABLE, unlike the step gate above. There IS a legitimate case: a branch whose whole
+        # deliverable is the changelog entry. Rare rather than impossible, so the valve is a warning; no
+        # valve is a wedged author.
+        $tally   = Get-BranchProgressTally -Text ([System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8))
+        $backing = Get-GitParkBacking -RepoRoot $repoRoot -Trunk (Get-BranchTrunkName) -Paths @($progressRel)
+        $backingFinding = Get-BranchBackingFinding -Steps $tally -Backing $backing
+
+        if ($backingFinding) {
+            # THE TWO KINDS ARE DIFFERENT FAULTS AND GET DIFFERENT ANSWERS. Work uncommitted HERE is this
+            # session's own omission, repairable in one command, and it is what #1025 was -- so it refuses.
+            # 'NotInThisCheckout' means the work is not on this machine at all, which open-pr cannot tell
+            # from a branch that legitimately ships only its entry; that one is said out loud and allowed,
+            # because refusing it would wedge the cross-device flow #960 exists to serve.
+            $stateLine = "$($backingFinding.Resolved) of $($backingFinding.Total) step(s) resolved; nothing else committed on this branch"
+
+            if ($backingFinding.Kind -eq 'NotInThisCheckout') {
+                Write-Warning @"
+backing gate: $stateLine, and nothing is uncommitted here either.
+
+The plan reads as FINISHED and this PR would carry $progressRel alone -- the fold removes that file, so
+the merge would deliver a changelog entry and no content. If the work is on another machine, let that
+checkout commit and push first. Opening the PR anyway is what you are doing now.
+"@
+            } elseif ($Force) {
+                Write-Warning "backing gate: $stateLine, and $($backingFinding.Uncommitted) file(s) are uncommitted here - but -Force was given."
+            } else {
+                Write-Error @"
+backing gate: the plan reads as FINISHED and $($backingFinding.Uncommitted) file(s) are uncommitted - nothing pushed, no PR opened.
+
+  $stateLine
+  $($backingFinding.Uncommitted) file(s) uncommitted in this working copy, besides $progressRel
+
+This PR would carry that document alone. The fold removes it at the merge, so what would land is a
+changelog entry describing work that never arrived -- which is how PR #1025 shipped a manual edit that
+only ever existed in a working copy.
+
+The work is not missing; it is right here, uncommitted. Commit it and run again:
+
+  git status
+  git add -A && git commit
+
+If this branch really does ship its entry alone, run with -Force.
+"@
+                exit 1
+            }
+        }
     }
 
     # Impact gate, on the same read of the same file. The entry declares how far this change reaches and how
@@ -832,6 +905,22 @@ If the title really does begin with that word, ship it with -Force.
 # file, so asking twice would hash the same tree twice. $null means git could not answer, and every
 # helper then reports "no evidence", which runs the gates exactly as before.
 $gateFingerprint = Get-GateFingerprint -RepoRoot $repoRoot
+
+# AND THE GATES SAY WHEN THEY RAN AGAINST SOMETHING OTHER THAN HEAD (issue #1026). Both gates below judge
+# the WORKING TREE; the push a few lines further down ships HEAD. On a clean tree those are the same thing
+# and a green result is evidence about the PR. On a dirty one they are not, and nothing said so: PR #1025's
+# lint run walked a manual with two new rules in it, reported zero errors, and shipped a PR without them.
+#
+# ONE LINE, ABOVE BOTH GATES rather than repeated inside each. It is the same fact about the same tree, and
+# a warning printed twice is read half as often as one printed once. Said before either gate runs, so it
+# frames the results that follow instead of trailing them.
+#
+# NOT A REFUSAL. A dirty tree mid-flight is ordinary -- the backing gate above is where the one shape that
+# is genuinely wrong gets stopped. This is here so a green line stops being mistaken for proof.
+$gateDirtyCount = Get-GateTreeDirtyCount -RepoRoot $repoRoot
+if ($null -ne $gateDirtyCount -and $gateDirtyCount -gt 0 -and (-not $SkipLint -or -not $SkipTests)) {
+    Write-Warning "the gates below run against a DIRTY tree - $gateDirtyCount file(s) differ from HEAD, and the PR ships HEAD. A green result proves the working copy, not what merges."
+}
 
 # Lint gate: catch invalid manifests/frontmatter/dead links before they land on main via a PR.
 # The lint script is repo-specific (via repo-config); errors block (exit code 1). -SkipLint

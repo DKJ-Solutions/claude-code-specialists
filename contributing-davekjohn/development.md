@@ -33,21 +33,74 @@
 
 ### PLAN
 
+Issue #1026: `open-pr` merges an entry with no content behind it. PR #1025 shipped a changelog entry
+describing two new rules in a manual whose edit was never committed -- the branch's whole diff was its
+development document, the fold removed that file, and the merge delivered an entry and nothing else.
+
+Two faults, and the second is the one worth repairing:
+
+1. The lint gate and the suites judge the **working tree** while the PR ships **HEAD**, so on a dirty
+   tree a green result is evidence about something other than what merges. Nothing said so.
+2. The signal already existed and reached the wrong reader. `park-cycle`'s backing note (#960/#976)
+   named the count, named the state and gave the instruction that would have prevented the merge -- in
+   a **commit body**, which is right for a reader on a second device and invisible to the session that
+   is holding the uncommitted file and about to open the PR.
+
+Mechanism chosen by Dave, August 28, 2026, from the three the issue listed: the **narrow refusal plus
+the dirty note**, not a blanket refusal on any dirty tree. `park-lib`'s own stated principle is the
+reason -- a gate that fires on almost every run is one nobody reads by the time it matters.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `Get-BranchBackingFinding` in `scripts/lib/park-lib.ps1`: the pure condition -- is this a plan
+      that claims to be finished with nothing committed behind it, and which of the two shapes.
+      `Format-GitParkBacking` now **asks** it instead of restating the alarm test, so the park note and
+      the gate cannot drift apart over one tree.
+- [x] The **backing gate** in `scripts/release/open-pr.ps1`, after the step-list gate and before the
+      push: refuses `UncommittedHere` (`-Force` is the valve, and it still warns), warns on
+      `NotInThisCheckout` rather than refusing -- from open-pr that shape is indistinguishable from a
+      branch legitimately shipping its entry alone, and refusing it would wedge the cross-device flow
+      #960 exists to serve.
+- [x] `Get-GateTreeDirtyCount` in `scripts/lib/gate-lib.ps1` plus one warning line above both gates:
+      the fingerprint hashes the dirty list away, so it can answer "same tree as last time" and never
+      "is this tree HEAD". A count, never filenames.
+- [x] Plugin mirrors rebuilt via `scripts/sync/build-shared-scripts.ps1`.
 
 ### TEST
 
+- [x] New suite `scripts/tests/backing-gate.tests.ps1` -- 41 asserts. Most of them assert **silence**,
+      because narrowness is the property that would break quietly: a half-done plan, a document with no
+      steps, a finished plan with work committed, and an unmeasurable trunk ref all stay quiet.
+- [x] `scripts/tests/gate-lib.tests.ps1` case 11 -- clean/modified/untracked-in-a-new-directory counts,
+      `$null` outside a repository, and that open-pr prints the warning **above** the lint gate.
+- [x] `park-cycle.tests.ps1` still green at 64 asserts: the `Format-GitParkBacking` refactor is
+      behaviour-preserving.
+- [x] End-to-end against a real fixture reproducing #1025: the gate reports `UncommittedHere, 1 file(s)`
+      and falls silent the moment the edit is committed.
+
 ### DEPLOY: `fix/open-pr-sees-the-uncommitted-work-v1`
 
-**Score:**
+`open-pr` now refuses to open a PR for a plan that reads as finished while the work behind it sits
+uncommitted in the working copy -- the shape that let PR #1025 merge a changelog entry describing a
+manual edit that never left a working copy. The measurement is not new: `park-cycle` already took it and
+wrote it into a commit body, where only a reader on another device would find it. It is now put in front
+of the session that can still act on it, from the same shared function, so the two cannot disagree.
+
+Alongside it, both gates now say out loud when they ran against a dirty tree. They judge the working
+tree while the PR ships HEAD, so on a dirty tree a green result proves the working copy and not what
+merges -- which is how #1025's lint run walked a manual *with* the two new rules in it and reported zero
+errors.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+The repair is a *delivery* change, not a new measurement. Something in the system had already noticed
+the exact failure, written it down precisely, and filed it where only the wrong reader would look. The
+fix is one function shared by both readers rather than a second gate with its own opinion.
+
+**Score:** 3
 
 #### Pull Request
 
 open-pr refuses a finished plan with work still uncommitted, and the gates say when they ran dirty
-

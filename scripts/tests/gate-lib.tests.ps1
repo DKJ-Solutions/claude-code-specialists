@@ -262,6 +262,43 @@ try {
     Assert-True ($ci -notmatch 'Test-GateEvidence') 'ci.yml does not consult gate evidence'
     Assert-True ($ci -notmatch 'gate-lib') 'ci.yml does not load gate-lib at all'
 
+    # --- 11. the dirty-tree statement (issue #1026) --------------------------------------------
+    # The fingerprint answers "same tree as last time" and CANNOT answer "is this tree HEAD" -- it
+    # hashes the distinction away. That second question is the one a gate RESULT depends on, because
+    # the gates judge the working tree while the PR ships HEAD. Measured on PR #1025: a lint run
+    # walked a manual with two new rules in it, reported zero errors, and the rules were not in the PR.
+    Write-Host "`n== 11. how far the tree is from HEAD ==" -ForegroundColor Cyan
+    $r11 = New-GitFixture
+    Assert-Equal 0 (Get-GateTreeDirtyCount -RepoRoot $r11) 'a clean tree is zero files from HEAD'
+
+    Set-FixtureFile -Dir $r11 -Name 'tracked.txt' -Content "two`n"
+    Assert-Equal 1 (Get-GateTreeDirtyCount -RepoRoot $r11) 'a modified tracked file counts'
+
+    # --untracked-files=all, for the same reason park-lib forces it: git's default collapses an
+    # untracked DIRECTORY to one entry naming the directory, so a new suite inside a new folder would
+    # count as a single file -- or as none, once the folder is the thing being reported.
+    New-Item -ItemType Directory -Path (Join-Path $r11 'fresh') -Force | Out-Null
+    Set-FixtureFile -Dir $r11 -Name 'fresh\a.txt' -Content "a`n"
+    Set-FixtureFile -Dir $r11 -Name 'fresh\b.txt' -Content "b`n"
+    Assert-Equal 3 (Get-GateTreeDirtyCount -RepoRoot $r11) 'untracked files inside a NEW directory are counted individually'
+
+    # Committing clears it: that is the whole point -- a clean tree is what makes a green gate
+    # evidence about the PR rather than about the working copy.
+    Invoke-FixtureGit -Dir $r11 'add' '-A'
+    Invoke-FixtureGit -Dir $r11 'commit' '-qm' 'second'
+    Assert-Equal 0 (Get-GateTreeDirtyCount -RepoRoot $r11) 'committing the lot brings it back to zero'
+
+    # NOT MEASURED is not ZERO. Zero is the reassuring answer, and handing it back for "git could not
+    # answer" would print an all-clear over an unknown.
+    Assert-True ($null -eq (Get-GateTreeDirtyCount -RepoRoot $FixtureRoot)) 'outside a repository the count is $null, never 0'
+
+    # And open-pr has to actually SAY it -- the lib being right proves nothing about it being reached.
+    Assert-True ($openPr -match 'Get-GateTreeDirtyCount -RepoRoot \$repoRoot') 'open-pr measures the distance from HEAD'
+    Assert-Equal 1 ([regex]::Matches($openPr, 'Get-GateTreeDirtyCount').Count) 'exactly once, above both gates rather than inside each'
+    Assert-True ($openPr -match 'DIRTY tree') 'and warns in words a reader can act on'
+    # Said BEFORE either gate runs, so it frames the results instead of trailing them.
+    Assert-True ($openPr.IndexOf('Get-GateTreeDirtyCount') -lt $openPr.IndexOf('if (-not $SkipLint)')) 'the warning is printed above the lint gate, not after it'
+
 } finally {
     if (Test-Path -LiteralPath $FixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $FixtureRoot -ErrorAction SilentlyContinue
