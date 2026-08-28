@@ -186,21 +186,15 @@ on the day that specialist first has work here.
 
 
 
-Five of those six used to be left off the roster and registered in `Get-RosterIgnoredIds` instead
+**Adopting a specialist that arrives with a plugin update is the default and needs no approval.**
 
-(Bianca joined them briefly on July 28, 2026). That list turned out never to have been a decision:
+Five of those six were once registered in `Get-RosterIgnoredIds` instead of being listed here; that
 
-it was introduced by the same commit that built the roster check, pre-populated to keep that new check
+list is empty now, and it is reserved for a deliberate, self-authored exception. Why it turned out
 
-quiet, and justified in the code as "a documented choice in CLAUDE.md" while this file only ever said
+never to have been a decision is in the
 
-those specialists had no lens *yet*. Dave, asked about it on July 28, 2026, did not recognise the list
-
-as his — so the six were adopted and the list is empty. **Adopting a specialist that arrives with a
-
-plugin update is the default and needs no approval**; the ignore-list is now reserved for a deliberate,
-
-self-authored exception. See the `sync-roster` skill for the reasoning.
+[specialists handbook](README.md#why-get-rosterignoredids-is-empty) and in the `sync-roster` skill.
 
 
 

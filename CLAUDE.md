@@ -106,14 +106,9 @@ release and the destructive actions above happen only on Dave's explicit request
   the outside. Read the code, the doc, or the output that would have to be true for that explanation
   to hold — and if it does not, the repair changes with it. Building the proposed fix on an unverified
   reason produces a change that satisfies the report and is wrong, which is worse than the original
-  defect: it now carries a citation. Inbound
-  [#388](https://github.com/DaveKJohn/claude-code-specialists/issues/388) is the measured instance
-  (August 2, 2026). It reported that the teardown does not count a fixture's `README.md` "even as
-  prose", and proposed deleting the sentence that promised the count. The symptom was real — nothing
-  about that file appears in the output — but the reason was not: the prose pass *does* scan the root
-  markdown, and the file scores **0** because it deliberately names no specialist, with the note
-  printed only above zero. Following the proposal would have deleted a correct sentence and left the
-  next reader with the same confusion, minus the explanation.
+  defect: it now carries a citation. The measured instance, inbound #388, is in the
+  [`triage-inbound` skill](.claude/skills/triage-inbound/SKILL.md), beside the five other ways a
+  report fails on pickup.
 - Within a branch, be proactive about creating new folders/files as soon as a new topic comes up.
   Don't ask permission first for the file structure itself; do ask for the content if something is
   sensitive or uncertain.
@@ -146,21 +141,16 @@ bootstrap path, and consumption — is in the [root `README.md`](README.md); the
 [connectors README](connectors/README.md#maintenance-drift-lint).
 
 **One product, one repository — and therefore one marketplace.** This repo used to be framed as a
-*workshop*: `davekjohns-workshop`, the marketplace where **all** of Dave's plugins would be built, with
-the specialists as the first family among more to come. That framing was retired on August 3, 2026,
-together with the directory layer that was holding a place for the second family. The reason is the
-release train: it is repo-wide, so one `CHANGELOG.md`, one `vX.Y.Z` tag and a lockstep version bump
-cover everything in the repo. A second, unrelated product would be bumped for work it never had, one
-tag would span two products, and one changelog would mix two histories. So the next product gets its
-own repository and its own marketplace instead.
+*workshop* meant to house every future plugin family; that framing was retired on August 3, 2026,
+because the release train is repo-wide and a second product would be bumped for work it never had.
+The reasoning, and which sense of the word deliberately survived, is in
+[`README.md`](README.md#one-product-one-repository).
 
 **The nuance, so nobody repairs the wrong thing: lockstep *within* this product is correct** and
-[`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The plugins are one system —
-a stack of teams plus one opt-in workflow — and a consumer running `team-alpha` alongside `team-shopify`
-needs matching versions. What was wrong was never the lockstep, but housing unrelated products in a single release
-train, and that dissolved with the reorganisation rather than needing a fix. Decision by Dave,
-August 3, 2026; the reader-facing statement is in
-[`README.md`](README.md#one-product-one-repository).
+[`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The plugins are one system — a
+stack of teams plus one opt-in workflow — and a consumer running `team-alpha` alongside `team-shopify`
+needs matching versions. What was wrong was never the lockstep but housing unrelated products in a
+single release train, and that dissolved with the reorganisation rather than needing a fix.
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
 its own `team-alpha` plugin (the core team), with the `github` marketplace source
@@ -207,18 +197,12 @@ level existed to hold several product families side by side, which the
 `scripts/sync/`, not plugin payload, and must not travel along in the plugin cache. `agent-shared/`
 stayed **inside** `plugins/` for the mirror-image reason: it *is* plugin source.
 
-**And on August 17, 2026 it moved one level further in, to `plugins/teams/agent-shared/`** (Dave). Same
-reasoning, applied one level down: every file carrying a shared block is a team's — 30 agent defs and
-personas across all four teams, none in either workflow — so sitting beside `teams/` and `workflows/`
-claimed a reach the folder does not have. **Nothing in the tooling had to learn the new address**, which
-is the part worth keeping: every script that asks which plugins exist reads `marketplace.json` through
+**And on August 17, 2026 it moved one level further in, to `plugins/teams/agent-shared/`** (Dave):
+every file carrying a shared block is a team's, so sitting beside `teams/` and `workflows/` claimed a
+reach the folder does not have. **Nothing in the tooling had to learn the new address** — every script
+that asks which plugins exist reads `marketplace.json` through
 [`plugin-tree-lib.ps1`](scripts/lib/plugin-tree-lib.ps1), so a directory in no marketplace is not a
-plugin wherever it sits — and the `[plugin-kind]` rule that requires `team-*` under `plugins/teams/` is
-anchored on the published set rather than on a sweep of that directory. Under the previous
-shape this exact folder had to be excluded **by name**, and that exclusion had already gone stale once.
-The one thing that did change is a publish: `agent-shared/` now sits inside the `teams` kind-directory,
-which `publish-to-business.ps1` prunes when it holds no plugin — so it travels with the teams it feeds
-instead of unconditionally. Reader-facing statement in
+plugin wherever it sits. Reader-facing statement, and what the move changed for the publish, in
 [`plugins/teams/README.md`](plugins/teams/README.md).
 
 ### claude-code-specialists's safety implementation
@@ -234,24 +218,13 @@ gates, and the three direct-on-`main` exceptions with their bounds. **The layer 
 plugin's page wins.** It does not replace anything below; it adds the workflow's own mechanics (the four
 gates on the branch dossier, how those three exceptions actually run, the measurements behind them).
 
-**That folder used to carry two pages and now carries one** (August 26, 2026,
-[#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)): a `CONTRIBUTING.md` layering over
-a root `CONTRIBUTING.md` since August 14, 2026 (Dave), and a `CLAUDE.md` layering over
-this file since August 19. They said the same thing about their own layering twice, so they merged into the
-one page linked above. The reason the layer exists at all is
-unchanged and is the one the two moves before it give: this file loads on **every** session, the folder page
-only when a session touches that folder.
-
-**And there is no root `CONTRIBUTING.md` left to layer over** (Dave, August 27, 2026). It held the standard
-workflow — branch + PR, CI green, one change per branch — deliberately at the root so it would still mean
-something with no plugin installed, and the folder page has absorbed those three rules rather than pointing
-at them. So this file is now the only root document that page layers over, and **the guarantee the root page
-existed for is unchanged**: those three rules are enforced by the `main` ruleset and by CI, which do not care
-which folder states them. What is lost is GitHub's own *Contributing guidelines* link above a new issue or
-PR, GitHub reading that page from the root, `docs/` or `.github/` and nowhere else — a signpost rather than a
-guard, and the cost is written out on the page itself. The same instruction moved `CHANGELOG.md` and the
-release history into that folder; the reasoning for each sits at its own seam in
-[`scripts/repo-config.ps1`](scripts/repo-config.ps1).
+**That folder carries one page, and no root `CONTRIBUTING.md` layers under it any more** (Dave,
+August 26 and 27, 2026, in the same instruction that moved `CHANGELOG.md` and the release history
+there). Both moves, and what the second one cost — GitHub shows its *Contributing guidelines* link
+only for a page in the root, `docs/` or `.github/` — are written out on the page itself, and the
+reasoning per file sits at its own seam in
+[`scripts/repo-config.ps1`](scripts/repo-config.ps1). The reason the layer exists at all is
+unchanged: this file loads on **every** session, that page only when a session touches that folder.
 
 The constitution above, concretely implemented here:
 
@@ -301,20 +274,13 @@ The constitution above, concretely implemented here:
      folds the entry into `contributing-davekjohn/CHANGELOG.md` and clears it, and with `-Commit`/`-Push`
      makes that commit itself. **Bounded to two paths** — that changelog and the branch's development
      document, which the same run **removes** — and the commit names them, so nothing else in the tree
-     can ride along. It was three until August 23, 2026, when the
-     entry and the step list became sections of one document: the bound narrowed with the tree rather
-     than being relaxed. Later that day the second path stopped being a rewrite and became a deletion —
-     the document exists only while a branch is open — which narrows what the exception does without
-     changing what it may touch. Committing stays opt-in, because it is this exception being used.
-
-     **The second path is named by its resolver rather than spelled out here, and that is the fix for a
-     gap this rename opened** (August 27, 2026, #963/#958). The bound used to quote the filename, and the
-     document has now been renamed four times — so on the day of each rename every branch already open
-     carried a name the bound did not list, which put its own fold outside the exception it runs under.
-     `Resolve-BranchFilePath` is the one place that knows which of the eight recognised names holds this
-     branch's work, and the commit prints the path it actually touched. So the bound is still exactly two
-     paths and still checkable after the fact — it is simply no longer a spelling that goes stale under
-     the tooling it governs. Today's writer is `contributing-davekjohn/development.md`.
+     can ride along. Committing stays opt-in, because it is this exception being used.
+     **The second path is named by its resolver, `Resolve-BranchFilePath`, rather than spelled out here.**
+     That document has been renamed four times, and on the day of each rename every branch already open
+     carried a name the bound did not list — which put its own fold outside the exception it runs under.
+     So the bound is still exactly two paths and still checkable after the fact, because the commit prints
+     the path it actually touched; it is simply no longer a spelling that goes stale under the tooling it
+     governs. Today's writer is `contributing-davekjohn/development.md`.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `contributing-davekjohn/releases/`,
      **empties the changelog down to its intro**, commits that on `main`, and tags `vX.Y.Z`.
@@ -331,17 +297,12 @@ The constitution above, concretely implemented here:
      hand-written documents of a cut that was actually asked for**: the note under
      `Get-ReleaseNoteRoot` and `releases/internal/<dir>/<X.Y.Z>.md`, named in the commit, and nothing
      else. Outside a cut there is nothing for it to be part of, and a later edit to an
-     already-published note is an ordinary change on the ordinary route. **This reverses the
-     August 4, 2026 answer**, which sent those documents through a branch + PR; the reason for the
-     reversal is that a release is one procedure, and running it across two routes left the trunk
-     carrying a tagged release whose own notes were still in review.
+     already-published note is an ordinary change on the ordinary route. It reverses the
+     August 4, 2026 answer, which sent those documents through a branch + PR.
 
-  **An exception is only safe while it stays the size it was granted at** — the lesson `ship-pr.ps1`
-  cost on August 2, 2026, and the reason every bound above is stated here rather than left to the
-  layer below. **That argument is what the August 4 answer rested on, and it survives the reversal
-  intact**: widening was refused then and the bounds are written out now for exactly the same reason.
-  What changed is the judgement about which size is right, not the rule about stating it. How the
-  three actually run and the measurements behind each are in
+  **An exception is only safe while it stays the size it was granted at**, which is why every bound
+  above is stated here rather than left to the layer below. How the three actually run, the
+  measurements behind each, and both halves of that August 4 reversal are in
   [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) -- the fold under its PULL
   REQUEST step, the release commit and the notes commit under CUT RELEASE --
   and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
@@ -356,13 +317,11 @@ The constitution above, concretely implemented here:
   learned here — not the lens** (Dave, August 4, 2026). The lens is for what a *consumer* would
   genuinely have to differ on; it is not the convenient place to write something down because it is the
   file already open. Writing a portable rule into the lens leaves the source thinner than the repo that
-  maintains it, and nobody downstream ever receives it. Measured that day: the release manager's
-  portable persona was **1,700 bytes** while its repo lens had grown to **26,914** — sixteen times
-  larger, holding the release craft itself rather than anything specific to this repo. **Which layer a
-  rule belongs in, and the split when a rule has both a portable and a local half, is in the
+  maintains it, and nobody downstream ever receives it. **Which layer a rule belongs in, the split when
+  a rule has both a portable and a local half, and the measurement behind that convention are in the
   [specialists handbook](.claude/specialists/README.md#where-a-new-rule-goes--the-source-is-the-default-the-lens-is-the-exception)**
-  — including the measured convention that personas and manuals carry no repo-specific detail at all
-  while skills carry the evidence behind a procedure.
+  — including that personas and manuals carry no repo-specific detail at all while skills carry the
+  evidence behind a procedure.
 
 ### The how (Dave's, across his repos) vs. the what (this repo only)
 
@@ -374,24 +333,14 @@ exception, the scripts, and the plugin lint gate) belongs to this repo alone and
 **Neither half is a universal baseline, and the top half least of all.** It names Dave as the
 decision-maker throughout and reaches for mechanisms only this repo has — a `plugin.json` version
 bump, the release overview's `#### N.x` section, the test pinning which major that overview targets.
-The word *portable* stood in all three of these places until August 19, 2026 and was wrong in each:
-what travels is the shape (a constitution, then a repo slot), not the content. A repo adopting this
+What travels is the shape (a constitution, then a repo slot), not the content, so a repo adopting this
 system writes its own owner into the top half rather than inheriting Dave.
 
-**The word still appears elsewhere in this file and is correct there** — do not sweep it. Those are
-the *plugin* sense: a persona body, a manual, the portable half of a rule. Those files genuinely
-travel to a consumer through a release. What was wrong was applying that word to this repo's
-constitution, which travels nowhere on its own.
-
-**Neither sentence above carries a count, and that is the second lesson of the same day.** The
-paragraph first said Dave was named *fifteen* times. That figure came from `grep -c`, which counts
-**lines containing** a string rather than occurrences — and one of those lines was
-`github.com/DaveKJohn/...`, the GitHub org in a URL, which the same measurement separately counted as
-a link to this repo's own issue. The true figure was **14**, and it became 15 the moment this repair
-added a sentence of its own. A tally of a name, written inside the document that carries the name, is
-wrong when typed and wrong again after the next edit. Neither claim needs one: *throughout* and
-*elsewhere in this file* are true without maintenance. Caught by Dave, who read the paragraph and
-counted.
+**The word *portable* appears elsewhere in this file in the plugin sense — a persona body, a manual,
+the portable half of a rule — and is correct there; do not sweep it.** Those files genuinely travel to
+a consumer through a release, while this repo's constitution travels nowhere on its own. Why the word
+had to be corrected in the three places above, and the miscount the repair itself introduced, are in
+[Tessa's lens](.claude/specialists/lenses/06-16-extension.md#the-portable-word-and-the-count-that-came-with-it).
 
 The one line below is the whole specialist surface of this file. Everything about the team — who they
 are, what each covers, how they are routed to — sits behind it, so removing the plugin is removing one

@@ -219,3 +219,29 @@ otherwise be false about her own manual. The citations belong here:
 In short: the **how** (writing, keeping things consistent, securing lessons in the docs) is portable;
 the **what** (`CLAUDE.md`, `README.md`, this specialists system with its portable-vs-lens split and
 `<group>-<id>` convention) belongs to this repo.
+
+### The *portable* word, and the count that came with it
+
+Behind *"Neither half is a universal baseline"* in
+[`CLAUDE.md`](../../../CLAUDE.md#the-how-daves-across-his-repos-vs-the-what-this-repo-only). Two lessons
+from one day, August 19, 2026, and the second one is about the repair rather than the defect.
+
+**The word was wrong in three places.** `CLAUDE.md` called its own top half *portable* where it reaches
+for mechanisms only this repo has — a `plugin.json` version bump, the release overview's `#### N.x`
+section, the test pinning which major that overview targets. What actually travels is the **shape** (a
+constitution, then a repo slot), not the content: the top half names Dave as the decision-maker
+throughout, and a repo adopting this system writes its own owner in rather than inheriting him. The same
+word elsewhere in that file is the *plugin* sense — a persona body, a manual, the portable half of a
+rule — and is correct, which is why the repair had to be three targeted edits and not a sweep.
+
+**Then the repair introduced a count, and the count was wrong.** The new paragraph said Dave was named
+*fifteen* times. That figure came from `grep -c`, which counts **lines containing** a string rather than
+occurrences — and one of those lines was `github.com/DaveKJohn/...`, the GitHub org in a URL, which the
+same measurement separately counted as a link to this repo's own issue. The true figure was **14**, and
+it became 15 the moment the repair added a sentence of its own. Caught by Dave, who read the paragraph
+and counted.
+
+**The rule that falls out of it: a tally of a name, written inside the document that carries the name,
+is wrong when typed and wrong again after the next edit.** Neither claim needed one — *throughout* and
+*elsewhere in this file* are true without maintenance. Before writing a count into prose, ask what the
+next edit does to it; and never take `grep -c` for an occurrence count, which is `grep -o | wc -l`.
