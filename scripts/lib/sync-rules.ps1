@@ -21,6 +21,12 @@
     hand, so the suite can walk it without running a sync -- and it fails in the same silent direction: a
     body that omits a verdict class reads as a complete report of what a third party did.
 
+    THE FOURTH HALF, ADDED ON INBOUND #1021, IS THE ONLY ONE THAT DOES NOT MEASURE AGAINST THE TRUNK.
+    Get-SyncBranchNamesFromRefs and Get-SyncPredecessorReport ask whether a PREVIOUS run's branch is
+    still standing, because every rule above is complete only while somebody then merges the branch a run
+    produces. Its banner further down says what four unmerged branches in seven days looked like from the
+    inside, which was: like four normal successful runs.
+
     DEPENDENCY-FREE, AND DELIBERATELY NOT A READER OF scripts/repo-config.ps1. That file is read by
     team-shopify's live-theme guard on EVERY command, inside a 'try { . $configPath } catch { return
     $answers }' -- so a fault in anything it pulls in makes that catch fire and the guard continues with
@@ -627,4 +633,158 @@ function Get-SyncPrBodySection {
         }
     }
     return $out
+}
+
+# ===================================================================================================
+# THE FOURTH HALF (inbound #1021): DOES A PREVIOUS RUN'S BRANCH STILL STAND?
+#
+# Everything above measures this run against the trunk. That is complete only while somebody then MERGES
+# the branch a run produces -- and the seam's default (Get-ShopifySyncMerges $false) deliberately stops
+# before the merge so a human looks at third-party drift first. Stopping only works while the looking
+# happens. A sync branch pushed and never merged leaves the trunk unchanged, so the next run re-measures
+# against the same trunk, re-captures the same drift onto a new branch, and so does the one after it.
+#
+# MEASURED IN A CONSUMER (BWJ-ecommerce/xoxowildhearts, 2026-08-28): four branches in seven days, the
+# newest a strict superset of all three predecessors, two of them byte-identical duplicates of each
+# other, and a dry run naming the fifth. Nothing errored at any point -- each new branch looks exactly
+# like a normal successful run, which is the whole difficulty. The exclusion rule was working correctly
+# throughout: it declined 31 files whose content the repo had held before. The gap is downstream of it.
+#
+# AND THE SCRIPT ALREADY READ ITS OWN OUTPUT, WHICH IS WHY THIS IS TWO PURE FUNCTIONS AND NOT A NEW
+# QUERY. The branch-naming loop in sync-main.ps1 checks refs/heads/<branch> and
+# refs/remotes/origin/<branch> before settling on a name -- so it SEES the predecessor and draws no
+# conclusion from it. The '-2' suffix in that measurement is the predecessor being noticed and
+# discarded. What was missing was never the lookup; it was a verdict on what the lookup found.
+# ===================================================================================================
+
+function Get-SyncBranchNamesFromRefs {
+    <#
+    .SYNOPSIS
+        The branch names in 'git ls-remote --heads' output that sit under a given branch prefix.
+
+    .DESCRIPTION
+        ANCHORED ON 'refs/heads/<prefix>', NEVER ON THE PREFIX ALONE. Two things fall out of that. A
+        'tooling/sync-live-something' branch cannot report itself as its own predecessor, because the
+        match is on the whole ref rather than on a substring of it. And the prefix is the CALLER's, which
+        is the half that matters upstream: Get-ShopifySyncBranchPrefix is a seam whose README says it is
+        "yours to set because it has to line up with whatever your PR guardrails and CI exempt". A
+        consumer who answered it 'theme-drift/' and got a scan hardcoded to 'sync/' would have a guard
+        that finds nothing and never fires -- the same always-silent failure this function exists to end,
+        wearing the opposite face.
+
+        WHY ls-remote AND NOT THE LOCAL refs/remotes/origin/* THE NAMING LOOP READS. A tracking ref is
+        only as fresh as the last fetch, and a predecessor pushed from another machine has no local ref
+        at all. The naming loop can afford that -- a name collision it misses is caught by git on the
+        push -- but a predecessor it misses is exactly the branch that stacks.
+
+        WHAT IS DROPPED, and each of them appears in real output: blank lines, git's warning and progress
+        lines (no tab, so no ref), and '^{}' peeled refs. A line is read as '<sha> TAB <ref>' because
+        that is ls-remote's format; a ref containing a tab is not representable in it.
+
+        PURE: it parses text. The caller runs git.
+
+    .PARAMETER Lines
+        The raw output lines of 'git ls-remote --heads origin'.
+
+    .PARAMETER Prefix
+        The sync branch prefix, as the seam answered it -- 'sync/live-' by default. Whitespace-only is
+        refused rather than treated as a match-everything wildcard: "every branch is a sync branch" is
+        never the correct answer, and returning nothing instead would leave the guard inert in silence.
+    #>
+    param(
+        [string[]]$Lines = @(),
+        [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$Prefix
+    )
+
+    if (-not $Prefix.Trim()) {
+        throw "Get-SyncBranchNamesFromRefs: the branch prefix is whitespace. It decides which branches count as this sync's own, so an empty one has no safe reading."
+    }
+
+    $anchor = 'refs/heads/' + $Prefix
+    $names  = New-Object System.Collections.ArrayList
+
+    foreach ($line in @($Lines)) {
+        if ($null -eq $line) { continue }
+        $text = [string]$line
+        $tab  = $text.IndexOf("`t")
+        if ($tab -lt 0) { continue }
+        $ref = $text.Substring($tab + 1).Trim()
+        if (-not $ref) { continue }
+        if ($ref.EndsWith('^{}')) { continue }
+        # Ordinal, because git refs are case-sensitive and a prefix differing only in case names a
+        # different branch. Erring toward "not a predecessor" here is the same direction the report below
+        # errs in, and for the same reason.
+        if (-not $ref.StartsWith($anchor, [System.StringComparison]::Ordinal)) { continue }
+        $name = $ref.Substring('refs/heads/'.Length)
+        if ($name -and -not $names.Contains($name)) { [void]$names.Add($name) }
+    }
+
+    return @($names)
+}
+
+function Get-SyncPredecessorReport {
+    <#
+    .SYNOPSIS
+        Per standing sync branch: whether this run's take set covers every path that branch captured,
+        and which paths it does not.
+
+    .DESCRIPTION
+        SUPERSESSION IS MEASURED ON PATHS, NEVER ON CONTENT, and that is stated rather than assumed. Each
+        run writes live's CURRENT bytes, so a path both runs captured is fresher in this one by
+        construction -- which is what makes a path-level answer sound for the ordinary case. The case it
+        does not cover: a path a third party REVERTED on live between the two runs is no longer drift, so
+        this run never captures it, and it lands in Uncovered. That is correct output rather than a miss --
+        the predecessor holds a version of that file which nothing else does, and the operator has to
+        decide. It is also exactly what an override on the caller's refusal exists for.
+
+        CASE-SENSITIVE PATH COMPARISON, chosen for its failure direction rather than for correctness on
+        Windows. Ordinal matching can report a covered path as uncovered where two spellings differ only
+        in case; the cost is a supersession this run declines to claim, so nobody is told to close a PR.
+        Case-insensitive matching fails the other way -- it would call a path covered that this run never
+        wrote, and closing the predecessor on that verdict loses the only copy of the drift. Git itself is
+        case-sensitive, so the strict reading is also the true one.
+
+        PURE: it compares two sets of strings. The caller runs git to build both.
+
+    .PARAMETER Predecessors
+        One object per standing branch, each carrying 'Branch' (the name) and 'Paths' (what it captured).
+
+    .PARAMETER TakePaths
+        The paths THIS run has decided to take.
+    #>
+    param(
+        [object[]]$Predecessors = @(),
+        [string[]]$TakePaths = @()
+    )
+
+    $taken = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    foreach ($p in @($TakePaths)) {
+        if ($null -ne $p -and ([string]$p).Trim()) { [void]$taken.Add(([string]$p).Trim()) }
+    }
+
+    $out = New-Object System.Collections.ArrayList
+
+    foreach ($pred in @($Predecessors | Where-Object { $_ })) {
+        $paths = @(@($pred.Paths) |
+            Where-Object { $null -ne $_ -and ([string]$_).Trim() } |
+            ForEach-Object { ([string]$_).Trim() })
+        $uncovered = New-Object System.Collections.ArrayList
+        foreach ($path in $paths) {
+            if (-not $taken.Contains($path)) { [void]$uncovered.Add($path) }
+        }
+
+        # A PREDECESSOR THAT CAPTURED NOTHING IS NOT SUPERSEDED, and the report has to say so. An empty
+        # path set makes the covers-everything test vacuously true, which would present a branch this run
+        # knows nothing about as safely replaceable by it. It reaches here from a branch whose diff
+        # against the trunk could not be read -- a ref that vanished between the ls-remote and the diff,
+        # or a clone without its objects -- so "unknown" is the honest verdict and Superseded stays false.
+        [void]$out.Add([pscustomobject]@{
+            Branch     = [string]$pred.Branch
+            Captured   = $paths.Count
+            Uncovered  = @($uncovered)
+            Superseded = ($paths.Count -gt 0 -and $uncovered.Count -eq 0)
+        })
+    }
+
+    return @($out)
 }

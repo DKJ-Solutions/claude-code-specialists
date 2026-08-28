@@ -101,6 +101,28 @@
     are the cost of that choice and they are named here rather than quietly dropped: a repo that wants
     them runs the sync with the merge seam off and opens the PR through its own route.
 
+    THE STANDING-PREDECESSOR GUARD (inbound #1021), AND IT IS THE ONE CHECK THAT IS NOT ABOUT THE TRUNK.
+    Stopping before the merge only works while somebody then merges. A sync branch pushed and never
+    merged leaves the trunk unchanged, so the NEXT run re-measures against the same trunk, re-captures the
+    same drift onto a new branch, and so does the one after that -- and each of those runs succeeds and
+    looks like it. Measured in a consumer: four branches in seven days, the newest a strict superset of
+    all three, two of them byte-identical duplicates, and a dry run naming the fifth. So step [3/6] asks
+    'git ls-remote' whether a branch under the prefix is still standing, and refuses if one is.
+
+    REFUSING RATHER THAN WARNING, BECAUSE REFUSING COSTS NOTHING. The drift a refused run would have
+    captured is already sitting on the predecessor; the trunk lacks it either way. All the push adds is a
+    second candidate for one set of edits -- which is the failure, not the symptom of it: the entire
+    justification for stopping before the merge is a moment where somebody LOOKS, and four competing
+    candidates is not that moment. -AllowStacking overrides it for the case named on that parameter.
+
+    AND THE REFUSAL SITS BEFORE THE THEME PULL, WHICH IS WHY THE DETECTION IS AT THE NAMING STEP rather
+    than beside the verdict it produces. A refused run then costs no pull and no network. The verdict --
+    which of the predecessor's paths this run covers -- needs the take set and therefore runs later, at
+    both places the take set is complete: the dry-run report and the pre-push report. A DRY RUN IS EXEMPT
+    from the refusal for the reason it is exempt from the clean-tree check: it writes nothing, and asking
+    "what would this do, and does it supersede the pile?" is exactly what somebody staring at four open
+    sync PRs needs, so the answer must not be a refusal.
+
     WHAT IT NEVER DOES: it does not push to live, publish a theme, or delete one. It reads from live and
     writes to git. team-shopify's PreToolUse guard covers those three acts independently and is not
     weakened here.
@@ -152,6 +174,13 @@
     Push the sync branch and stop, even where Get-ShopifySyncMerges says to merge. The escape valve only
     runs in the safe direction: there is no switch that forces a merge the seam has not asked for.
 
+.PARAMETER AllowStacking
+    Run even though a previous sync branch is still standing. Without it such a run is refused before the
+    theme pull -- see THE STANDING-PREDECESSOR GUARD above. What it is FOR is the one case where the two
+    branches are genuinely independent: a path a third party reverted on live between the runs is no
+    longer drift, so this run never captures it, and the predecessor holds the only copy. The run then
+    still prints the per-branch verdict, so the second candidate is a decision rather than an accident.
+
 .PARAMETER ChecksTimeoutMinutes
     How long to wait for CI on the sync PR before giving up and leaving it unmerged. Only used when the
     seam says to merge. Default: 15.
@@ -169,6 +198,7 @@ param(
     [string]$MirrorPath = '',
     [switch]$KeepMirror,
     [switch]$StopBeforeMerge,
+    [switch]$AllowStacking,
     [int]$ChecksTimeoutMinutes = 15,
     [string]$RootOverride = '',
     # RETIRED, AND ACCEPTED ONLY TO REFUSE IT BY NAME. -SkipPull meant "run the rule over whatever is
@@ -318,6 +348,49 @@ function Get-SyncPrBodySeamAnswer {
     } $RepoRoot $Take $Keep $Default
 }
 
+function Write-SyncPredecessorVerdict {
+    <#
+    .SYNOPSIS
+        Print, per standing sync branch, whether this run's take set covers what that branch captured.
+
+    .DESCRIPTION
+        Called at BOTH points where the take set is complete -- the dry-run report and the pre-push
+        report -- which is why it is a function rather than two copies of the same eleven lines. The two
+        rows it can print are the two the operator acts on differently, so each one names the action
+        rather than leaving it to be worked out:
+
+          all of them in this run     this run supersedes that branch. Close its PR, re-run, merge this.
+          M NOT in this run           neither supersedes the other, and the uncovered paths are named.
+
+        THE SECOND ROW IS WHY -AllowStacking EXISTS, and the uncovered paths are printed rather than
+        counted because they are the whole decision: a path a third party reverted on live between the two
+        runs is no longer drift, so this run never captures it, and that branch holds the only copy.
+    #>
+    param(
+        [object[]]$Standing = @(),
+        [string[]]$TakePaths = @()
+    )
+
+    if (@($Standing).Count -eq 0) { return }
+
+    $report = @(Get-SyncPredecessorReport -Predecessors $Standing -TakePaths $TakePaths)
+    Write-Host ''
+    Write-Host 'Standing sync branches, measured against what this run takes:' -ForegroundColor Yellow
+    foreach ($r in $report) {
+        if ($r.Captured -eq 0) {
+            Write-Host "  $($r.Branch) -- its file set could not be read, so nothing is claimed about it." -ForegroundColor Yellow
+        } elseif ($r.Superseded) {
+            Write-Host "  $($r.Branch) -- $($r.Captured) file(s), all of them in this run." -ForegroundColor Green
+            Write-Host '      This run supersedes it: close that PR, then merge this one.' -ForegroundColor DarkGray
+        } else {
+            $u = @($r.Uncovered)
+            Write-Host "  $($r.Branch) -- $($r.Captured) file(s), $($u.Count) NOT in this run:" -ForegroundColor Red
+            foreach ($p in $u) { Write-Host "      $p" -ForegroundColor Red }
+            Write-Host '      Neither supersedes the other. Those paths exist only on that branch.' -ForegroundColor DarkGray
+        }
+    }
+}
+
 $trunk        = if (([string]$seam.Trunk).Trim())        { ([string]$seam.Trunk).Trim() }        else { 'main' }
 $pattern      = if (([string]$seam.Pattern).Trim())      { ([string]$seam.Pattern).Trim() }      else { Get-SyncDefaultReferencePattern }
 $branchPrefix = if (([string]$seam.BranchPrefix).Trim()) { ([string]$seam.BranchPrefix).Trim() } else { 'sync/live-' }
@@ -398,6 +471,113 @@ while (
     if ($n -gt 20) { Write-Host "Twenty sync branches already exist for $stamp. Something is wrong; stopping." -ForegroundColor Red; exit 1 }
 }
 Write-Host "      $branch"
+
+# --- 4b. is a PREVIOUS run's branch still standing? ------------------------------------------------
+# Inbound #1021, and it belongs here rather than beside the verdict it produces: a refusal at this point
+# costs no theme pull and no network beyond two read-only queries. See THE STANDING-PREDECESSOR GUARD in
+# the header for why the answer is a refusal rather than a warning.
+#
+# 'ls-remote' IS ASKED FOR EVERY HEAD AND FILTERED LOCALLY, not narrowed with a server-side pattern.
+# ls-remote's pattern matching is tail-based, and a pattern that under-matches would drop a predecessor
+# silently -- which is the failure being repaired. Get-SyncBranchNamesFromRefs anchors on
+# 'refs/heads/<prefix>' and is the authoritative filter; the extra heads cost one line each to skip.
+Write-Host ''
+Write-Host '[3b/6] previous sync branches ...' -ForegroundColor Yellow
+$standing   = @()
+$candidates = @(Get-SyncBranchNamesFromRefs -Prefix $branchPrefix -Lines @(
+    Invoke-SyncGitQuiet @('ls-remote', '--heads', 'origin')))
+
+if ($candidates.Count -eq 0) {
+    Write-Host '      none on origin.'
+} else {
+    # THE FETCH RUNS IN A DRY RUN TOO, and that is not a breach of "nothing will be written": it updates
+    # remote-tracking refs and touches no file the operator has. The alternative is answering from refs as
+    # old as the last fetch -- and a predecessor pushed from another machine has no local ref at all,
+    # which is precisely the branch that stacks. The trunk is in the same refspec because a dry run does
+    # not pull, and a stale base would be read as the diff base below.
+    Invoke-SyncGitQuiet @('fetch', '--quiet', 'origin',
+        "+refs/heads/${trunk}:refs/remotes/origin/$trunk",
+        "+refs/heads/$branchPrefix*:refs/remotes/origin/$branchPrefix*") | Out-Null
+
+    # THE MERGED TEST IS THE TWO-PART ONE prune-merged.ps1 ALREADY USES, and both parts are needed here
+    # rather than one. On a repo with delete_branch_on_merge a merged branch's ref is gone from origin, so
+    # ls-remote never lists it and ancestry alone would do -- but that setting is the CONSUMER's, not this
+    # script's, and a repo without it keeps the ref of every squash-merged branch forever. Reading the
+    # setting would be one more thing to get wrong; doing both halves is what prune-merged settled on for
+    # the same question.
+    #
+    # AND WHERE gh CANNOT ANSWER, THE BRANCH READS AS STANDING. That is the opposite of prune-merged's
+    # fallback and the same principle: each errs toward doing nothing. There, a branch that cannot be
+    # proven merged is KEPT; here, a run that cannot be proven safe is REFUSED -- loudly, naming
+    # -AllowStacking. A refusal costs nothing, so it is the cheap side to be wrong on.
+    $mergedHeads = @()
+    $ghKnown     = $false
+    if (Get-Command 'gh' -ErrorAction SilentlyContinue) {
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $ghOut   = @(& gh pr list --state merged --limit 200 --json headRefName --jq '.[].headRefName' 2>$null)
+            $ghKnown = ($LASTEXITCODE -eq 0)
+            if ($ghKnown) {
+                $mergedHeads = @($ghOut | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+            }
+        } catch {
+            $ghKnown = $false
+        } finally {
+            $ErrorActionPreference = $prevEap
+        }
+    }
+
+    foreach ($name in $candidates) {
+        Invoke-SyncGitQuiet @('merge-base', '--is-ancestor',
+            "refs/remotes/origin/$name", "refs/remotes/origin/$trunk") | Out-Null
+        if ($LASTEXITCODE -eq 0) { continue }
+        if ($mergedHeads -contains $name) { continue }
+
+        # What that branch captured. Three dots: the branch side of the merge base, which for a sync
+        # branch is exactly the file set the run behind it decided to take. An unreadable diff leaves
+        # Paths empty, and Get-SyncPredecessorReport reads that as "not superseded" rather than as "no
+        # paths, therefore covered".
+        $predPaths = @(Invoke-SyncGitQuiet @('diff', '--name-only',
+            "refs/remotes/origin/$trunk...refs/remotes/origin/$name") |
+            ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+        $standing += [pscustomobject]@{ Branch = $name; Paths = @($predPaths) }
+    }
+
+    if ($standing.Count -eq 0) {
+        Write-Host "      $($candidates.Count) found on origin, all merged."
+    } else {
+        foreach ($s in $standing) {
+            $n    = @($s.Paths).Count
+            $what = if ($n -gt 0) { "$n file(s)" } else { 'file set unreadable' }
+            Write-Host "      STILL STANDING: $($s.Branch) -- $what" -ForegroundColor Yellow
+        }
+        if (-not $ghKnown) {
+            Write-Host '      (gh could not list merged PRs, so a squash-merged branch reads as standing.)' -ForegroundColor DarkGray
+        }
+        if (-not $DryRun -and -not $AllowStacking) {
+            Write-Host ''
+            Write-Host "Refusing: $($standing.Count) sync branch(es) from a previous run are still standing." -ForegroundColor Red
+            Write-Host '  Stopping before the merge only works while somebody then merges. Until one of these' -ForegroundColor Red
+            Write-Host '  lands, this run would re-capture the same drift onto a second branch and the trunk' -ForegroundColor Red
+            Write-Host '  would still lack it -- so nothing is gained and there is one more thing to read.' -ForegroundColor Red
+            Write-Host '  Nothing was pulled and nothing was written.' -ForegroundColor Red
+            Write-Host ''
+            Write-Host '  Look at what those branches hold, merge or close them, then run this again:' -ForegroundColor Yellow
+            foreach ($s in $standing) {
+                Write-Host "    gh pr list --head $($s.Branch) --state open" -ForegroundColor Cyan
+            }
+            Write-Host '  Or ask whether THIS run supersedes them, without writing anything:' -ForegroundColor Yellow
+            Write-Host '    -DryRun         reports the per-branch verdict and stops' -ForegroundColor Cyan
+            Write-Host '  Or, where a predecessor is genuinely independent -- a path reverted on live since:' -ForegroundColor Yellow
+            Write-Host '    -AllowStacking' -ForegroundColor Cyan
+            exit 1
+        }
+        if ($AllowStacking -and -not $DryRun) {
+            Write-Host '      -AllowStacking: continuing anyway; the verdict per branch follows below.' -ForegroundColor Magenta
+        }
+    }
+}
 
 # --- 5. live, into a MIRROR outside the repo --------------------------------------------------------
 Write-Host ''
@@ -576,16 +756,30 @@ try {
         Write-Host ''
         Write-Host "No third-party drift. Everything live holds differently is a version this repo has had" -ForegroundColor Green
         Write-Host "before -- $trunk has simply moved on. Nothing to sync, nothing written." -ForegroundColor Green
+        # AND THIS IS THE MOST MISLEADING PLACE TO STOP WITHOUT SAYING IT. "Nothing to sync" is true of
+        # live and false of the repo while a predecessor stands: that branch holds drift the trunk still
+        # lacks, and an empty take set makes every one of its paths uncovered -- correctly. Without this
+        # line the run reads as "all clear" to the one operator who most needs to go and merge something.
+        Write-SyncPredecessorVerdict -Standing $standing -TakePaths @()
         exit 0
     }
 
     if ($DryRun) {
         Write-Host ''
         Write-Host "DRY RUN -- would put the $($take.Count) file(s) above on $branch. Nothing written." -ForegroundColor Magenta
+        # THE DRY RUN IS THE ONE PLACE THIS VERDICT IS THE WHOLE POINT OF THE RUN. A dry run is exempt from
+        # the refusal at [3b/6] precisely so somebody staring at open sync PRs can ask "does today's drift
+        # supersede that pile?" -- and this is the answer to that question.
+        Write-SyncPredecessorVerdict -Standing $standing -TakePaths @($take | ForEach-Object { $_.Path })
         exit 0
     }
 
     # --- the sync branch: write ONLY what was decided, commit, push ---------------------------------
+    # REACHABLE WITH A PREDECESSOR STANDING ONLY UNDER -AllowStacking, so the verdict is printed BEFORE
+    # anything is written rather than after the push. The operator asked for a second candidate; what they
+    # get is a second candidate whose relationship to the first is on the screen.
+    Write-SyncPredecessorVerdict -Standing $standing -TakePaths @($take | ForEach-Object { $_.Path })
+
     Write-Host ''
     Write-Host "Third-party drift on $($take.Count) file(s); putting it on $branch." -ForegroundColor Cyan
     & git checkout -b $branch | Out-Null

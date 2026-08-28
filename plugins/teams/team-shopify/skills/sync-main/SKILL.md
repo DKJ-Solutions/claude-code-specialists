@@ -41,6 +41,9 @@ would do to it.
    everything, which is the one ordering mistake that leaves the check useless while looking fine.
 4. **Decides the sync branch's name**, before anything is pulled. A name that cannot be created is a
    reason to stop while the tree is still clean, not after several hundred files have been written.
+   **Then asks `origin` whether a sync branch from a PREVIOUS run is still standing, and refuses if one
+   is** -- see [Why a standing sync branch stops the run](#why-a-standing-sync-branch-stops-the-run).
+   Still before the pull, so a refused run costs no network.
 5. **Pulls the live theme into a mirror outside the repo** and compares it against the trunk. Two stages,
    for speed: an in-process object-id comparison first, then the same comparison with CR bytes ignored --
    which is how the CLI's line-ending rewrites (measured at **37 of 712 files** on one real store) drop
@@ -116,6 +119,65 @@ before it becomes the base of new branches. Auto-merging removes exactly the rev
 add. The two Shopify consumers this shipped from answer it differently -- one merges once CI is green,
 one stops at the push -- which is why it is a seam rather than a decision made for you.
 
+## Why a standing sync branch stops the run
+
+**Stopping before the merge only works while somebody then merges.** That is the hole in the section
+above, and it is the other half of the same argument rather than an exception to it. Every run measures
+live against the **trunk**. A sync branch that is pushed and never merged leaves the trunk unchanged --
+so the next run re-measures against the same trunk, re-captures the same drift onto a new branch, and so
+does the one after that. Nothing in the script used to look at its own previous output, so the pile grew
+in silence and **each new branch looked exactly like a normal successful run**.
+
+Measured in a consumer over seven days, from four runs (inbound
+[#1021](https://github.com/DaveKJohn/claude-code-specialists/issues/1021)):
+
+| PR | branch | files captured | state |
+|---|---|---|---|
+| #55 | `sync/live-2026-08-21` | 3 | open |
+| #56 | `sync/live-2026-08-27` | 15 | open |
+| #60 | `sync/live-2026-08-27-2` | 15 | open |
+| -- | `sync/live-2026-08-28` | 21 | pushed, no PR |
+
+The newest was a **strict superset of all three** on both axes; #56 and #60 captured the identical
+15-file set and were byte-identical, which is what the same-day `-2` suffix produces when the first one
+is never merged. A `-DryRun` then named the fifth before anything stopped it. **The exclusion rule was
+working correctly throughout** -- it declined 31 files whose content the repo had held before. The gap
+was downstream of it entirely.
+
+**It matters more than tidiness.** The whole justification for stopping before the merge is a moment
+where somebody *looks*. Four competing candidates for one set of edits is not that moment -- it is the
+signal-always-present failure, where a thing that is always there stops being read.
+
+**It refuses rather than warns, because refusing costs nothing.** The drift a refused run would have
+captured is already sitting on the predecessor; the trunk lacks it either way. All the push adds is a
+second candidate for the same content.
+
+So step 4 asks `git ls-remote` -- not the local `origin/*` refs, which are only as fresh as your last
+fetch and hold nothing at all for a branch pushed from another machine. Anything under **your**
+`Get-ShopifySyncBranchPrefix` counts, so a consumer who set that seam to `theme-drift/` is scanned for
+`theme-drift/` branches. A branch is *standing* unless it is an ancestor of the trunk or has a merged PR
+-- the same two-part test `prune-merged` uses, both halves, so a repo without
+`delete_branch_on_merge` is answered too. Where `gh` cannot answer, a branch reads as standing: a
+refusal costs nothing, so that is the cheap side to be wrong on.
+
+Two rows come out of it, and the verdict runs wherever the take set is complete -- the dry-run report,
+the pre-push report, and the "nothing to sync" exit, which is the most misleading place to stop quietly:
+
+| the report says | what to do |
+|---|---|
+| *N file(s), all of them in this run* | this run supersedes it. Close that PR, re-run, merge this one. |
+| *N file(s), M NOT in this run* | neither supersedes the other, and the uncovered paths are named. |
+
+**Supersession is measured on paths, never content**, and that is stated rather than assumed: each run
+writes live's *current* bytes, so a path both runs captured is fresher here by construction. The case it
+does not cover is the second row -- a path a third party **reverted** on live between the runs is no
+longer drift, so this run never captures it and that branch holds the only copy. That is what
+`-AllowStacking` exists for.
+
+**A dry run is exempt from the refusal**, for the reason it is exempt from the clean-tree check: it
+writes nothing, and *"does today's drift already contain that open PR?"* is exactly the question somebody
+staring at four sync PRs needs answered. A refusal there would withhold it.
+
 ## Parameters
 
 | parameter | what it does |
@@ -125,6 +187,7 @@ one stops at the push -- which is why it is a seam rather than a decision made f
 | `-MirrorPath` | use a live mirror you already have instead of pulling one, for rehearsing the rule offline. The mirror is read and never modified. |
 | `-KeepMirror` | do not delete the pulled mirror afterwards. A **refused** run keeps it regardless, because the conflict report names files inside it. |
 | `-StopBeforeMerge` | push the sync branch and stop, even where `Get-ShopifySyncMerges` says to merge. The escape valve runs in the **safe direction only**: there is no switch that forces a merge the seam has not asked for. |
+| `-AllowStacking` | run even though a sync branch from a previous run is still standing. Without it such a run is refused before the pull. What it is *for* is the one case where the two branches are genuinely independent -- a path a third party **reverted on live** between the runs is no longer drift, so this run never captures it and that branch holds the only copy. The run then still prints the per-branch verdict, so a second candidate is a decision rather than an accident. See [Why a standing sync branch stops the run](#why-a-standing-sync-branch-stops-the-run). |
 | `-ChecksTimeoutMinutes` | how long to wait for CI on the sync PR before giving up and leaving it unmerged. Only used when the seam says to merge. Default: `15`. |
 | `-SkipPull` | **retired.** It meant "run the rule over the working tree", which cannot mean anything now that the pull goes to a mirror and the tree is written only for `take-live` paths. It is still accepted, purely so the refusal can name what replaced it: `-DryRun` or `-MirrorPath`. |
 
@@ -188,6 +251,7 @@ otherwise see it arrive as brand-new foreign content on every single run.
 | **no reference point: no matching commit and no tag** | the floor no longer decides who wins a file, but it is what notices that **both** sides changed the same path -- and without it such a conflict would be taken silently. Tag the current state, or sync by hand this once. |
 | **REFUSING TO SYNC: both sides changed these paths** | the one case nothing can decide for you. Nothing was written. Run the `git diff --no-index` line it prints for each path, merge the two by hand, commit that, and run the sync again. |
 | twenty sync branches already exist for today | something is wrong upstream of this; nothing was written. |
+| **a sync branch from a previous run is still standing** | look at what it holds and merge or close it, then run this again. Nothing was pulled and nothing was written. `-DryRun` answers whether *this* run supersedes it without writing anything; `-AllowStacking` runs anyway where the two are genuinely independent. |
 | this repo publishes plugins | you are in the repo this script is maintained in, not a Shopify consumer. There is no live theme here to mirror. |
 
 ## Why this ships instead of being written per repo

@@ -514,6 +514,125 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
     Assert-True ($withNull -match '\*\*Taken from live \(1\)\*\*') 'body/null: and it is not counted either'
 
     Assert-True ((New-SyncPrBody -Take $rowsTake -Keep $rowsKeep -Intro 'Custom intro.') -match '^Custom intro\.') 'body/intro: the opening line is the caller''s to set'
+
+    # ===============================================================================================
+    # THE STANDING-PREDECESSOR PAIR (inbound #1021)
+    #
+    # Both functions are pure, so these cases need no fixture at all -- which is the reason the parsing
+    # and the verdict were split out of sync-main.ps1 rather than written inline there. What each group
+    # protects is a failure that is SILENT in production: a predecessor the scan does not see, and a
+    # supersession claimed on a path this run never wrote.
+    # ===============================================================================================
+    Write-Host ''
+    Write-Host 'Get-SyncBranchNamesFromRefs -- which refs count as this sync' -ForegroundColor Cyan
+
+    # EACH LINE IS ONE DOUBLE-QUOTED STRING WITH AN EMBEDDED `t, NEVER A '+' CONCATENATION. In PowerShell
+    # the COMMA BINDS TIGHTER THAN '+', so 'a' + "`t" + 'b', 'c' + "`t" + 'd' inside @() does not build two
+    # tab-separated lines -- it builds one flat array of the fragments, and every assert then measures a
+    # fixture that looks right in the source and is not. Measured on this suite: the parser was correct
+    # throughout and four asserts failed anyway.
+    $refLines = @(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`trefs/heads/main",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`trefs/heads/sync/live-2026-08-21",
+        "cccccccccccccccccccccccccccccccccccccccc`trefs/heads/sync/live-2026-08-27-2",
+        "dddddddddddddddddddddddddddddddddddddddd`trefs/heads/tooling/sync/live-helper",
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`trefs/heads/feat/sync/live-something",
+        '',
+        'warning: redirecting to https://github.com/x/y.git/',
+        "ffffffffffffffffffffffffffffffffffffffff`trefs/heads/sync/live-2026-08-28^{}"
+    )
+    $names = @(Get-SyncBranchNamesFromRefs -Lines $refLines -Prefix 'sync/live-')
+    Assert-Equal 2 $names.Count 'refs: only the two real sync branches are returned'
+    Assert-True ($names -contains 'sync/live-2026-08-21') 'refs: a plain ls-remote line yields its branch name'
+    Assert-True ($names -contains 'sync/live-2026-08-27-2') 'refs: the -2 suffix a stacked run produces is a branch like any other'
+
+    # THE SELF-REPORT TRAP, and it is why the anchor is the whole ref rather than a substring of it. A
+    # tooling branch whose NAME contains the prefix would otherwise report itself as its own predecessor,
+    # and the guard would then refuse every run forever with no branch to merge.
+    Assert-True (-not ($names -contains 'tooling/sync/live-helper')) 'refs: a prefix appearing mid-ref is not a match'
+    Assert-True (-not ($names -contains 'feat/sync/live-something')) 'refs: and neither is one behind another prefix'
+    Assert-True (-not ($names -contains 'main')) 'refs: the trunk is not a sync branch'
+    Assert-True (-not ($names -contains 'sync/live-2026-08-28')) 'refs: a peeled ^{} ref is dropped rather than read as a branch'
+    Assert-True (@($names | Where-Object { -not $_ }).Count -eq 0) 'refs: a blank line and a warning line produce no entry'
+
+    # THE SEAM CASE, which is the one defect the inbound report's own proposal carried: it anchored on a
+    # literal 'sync/'. Get-ShopifySyncBranchPrefix is a seam the README calls "yours to set", so a
+    # hardcoded anchor gives a consumer a guard that finds nothing and never fires -- the same
+    # always-silent failure, wearing the opposite face.
+    $driftLines = @(
+        "1111111111111111111111111111111111111111`trefs/heads/theme-drift/2026-08-28",
+        "2222222222222222222222222222222222222222`trefs/heads/sync/live-2026-08-28"
+    )
+    $drift = @(Get-SyncBranchNamesFromRefs -Lines $driftLines -Prefix 'theme-drift/')
+    Assert-Equal 1 $drift.Count 'refs/seam: a consumer''s own prefix is what decides, not a hardcoded ''sync/'''
+    Assert-True ($drift -contains 'theme-drift/2026-08-28') 'refs/seam: and it finds that consumer''s branch'
+    Assert-Equal 0 (@(Get-SyncBranchNamesFromRefs -Lines $driftLines -Prefix 'Sync/live-')).Count 'refs: matching is ordinal, so a prefix differing only in case names nothing'
+
+    Assert-Equal 0 (@(Get-SyncBranchNamesFromRefs -Lines @() -Prefix 'sync/live-')).Count 'refs: no input is no predecessors, not an error'
+    $dupes = @(Get-SyncBranchNamesFromRefs -Prefix 'sync/live-' -Lines @(
+        "3333333333333333333333333333333333333333`trefs/heads/sync/live-2026-08-28",
+        "3333333333333333333333333333333333333333`trefs/heads/sync/live-2026-08-28"))
+    Assert-Equal 1 $dupes.Count 'refs: a name repeated in the output is reported once'
+
+    # WHITESPACE-ONLY PREFIX THROWS RATHER THAN MATCHING EVERYTHING OR NOTHING. Both silent readings are
+    # wrong in a way nobody would notice: match-everything reports the trunk as a predecessor, and
+    # match-nothing leaves the guard permanently inert.
+    $threw = $false
+    try { Get-SyncBranchNamesFromRefs -Lines $refLines -Prefix '   ' | Out-Null } catch { $threw = $true }
+    Assert-True $threw 'refs: a whitespace-only prefix is refused, because neither silent reading of it is safe'
+
+    Write-Host ''
+    Write-Host 'Get-SyncPredecessorReport -- does this run supersede the branch already standing?' -ForegroundColor Cyan
+
+    $predA = [pscustomobject]@{ Branch = 'sync/live-2026-08-21'; Paths = @('sections/a.liquid', 'sections/b.liquid') }
+    $predB = [pscustomobject]@{ Branch = 'sync/live-2026-08-27'; Paths = @('sections/a.liquid', 'templates/gone.json') }
+
+    # THE MEASURED SHAPE: the newest run is a strict SUPERSET of the predecessor. That is the row where an
+    # operator may close the older PR, so it is the row that must never be reported wrongly.
+    $superset = @(Get-SyncPredecessorReport -Predecessors @($predA) -TakePaths @(
+        'sections/a.liquid', 'sections/b.liquid', 'assets/new.js'))
+    Assert-Equal 1 $superset.Count 'report: one row per standing branch'
+    Assert-True $superset[0].Superseded 'report/superset: a take set covering every captured path supersedes it'
+    Assert-Equal 0 @($superset[0].Uncovered).Count 'report/superset: with nothing uncovered'
+    Assert-Equal 2 $superset[0].Captured 'report/superset: and the captured count is the branch''s own, not this run''s'
+
+    $partial = @(Get-SyncPredecessorReport -Predecessors @($predB) -TakePaths @('sections/a.liquid'))
+    Assert-True (-not $partial[0].Superseded) 'report/partial: one uncovered path is enough to deny supersession'
+    Assert-Equal 1 @($partial[0].Uncovered).Count 'report/partial: and the uncovered path is counted'
+    Assert-True (@($partial[0].Uncovered) -contains 'templates/gone.json') 'report/partial: named, because it is the whole decision'
+
+    $none = @(Get-SyncPredecessorReport -Predecessors @($predA) -TakePaths @())
+    Assert-Equal 2 @($none[0].Uncovered).Count 'report/nodrift: an empty take set leaves every path uncovered'
+    Assert-True (-not $none[0].Superseded) 'report/nodrift: so "nothing to sync" never reads as "that branch is redundant"'
+
+    # THE VACUOUS-TRUTH TRAP. A branch whose diff could not be read arrives with no paths, and
+    # covers-everything is then trivially true -- which would present a branch this run knows nothing
+    # about as safely replaceable by it.
+    $unknown = @(Get-SyncPredecessorReport -Predecessors @(
+        [pscustomobject]@{ Branch = 'sync/live-unreadable'; Paths = @() }) -TakePaths @('sections/a.liquid'))
+    Assert-True (-not $unknown[0].Superseded) 'report/unknown: a branch with no readable file set is NOT superseded'
+    Assert-Equal 0 $unknown[0].Captured 'report/unknown: and it says so with a zero count rather than silently'
+
+    $mixed = @(Get-SyncPredecessorReport -Predecessors @($predA, $predB) -TakePaths @(
+        'sections/a.liquid', 'sections/b.liquid'))
+    Assert-Equal 2 $mixed.Count 'report/mixed: several standing branches are each answered separately'
+    Assert-True $mixed[0].Superseded 'report/mixed: the covered one is superseded'
+    Assert-True (-not $mixed[1].Superseded) 'report/mixed: and the other is not, in the same run'
+
+    # CASE SENSITIVITY, ASSERTED FOR ITS DIRECTION rather than for correctness on a Windows checkout.
+    # Ordinal comparison can call a covered path uncovered; the cost is a supersession this run declines
+    # to claim. The inverse would call a path covered that this run never wrote, and closing the
+    # predecessor on that verdict loses the only copy of the drift.
+    $cased = @(Get-SyncPredecessorReport -Predecessors @(
+        [pscustomobject]@{ Branch = 'sync/live-cased'; Paths = @('Sections/A.liquid') }) -TakePaths @('sections/a.liquid'))
+    Assert-True (-not $cased[0].Superseded) 'report/case: a path differing only in case is not counted as covered'
+
+    $blanks = @(Get-SyncPredecessorReport -Predecessors @(
+        [pscustomobject]@{ Branch = 'sync/live-blanks'; Paths = @('sections/a.liquid', '', $null, '  ') }) -TakePaths @('sections/a.liquid'))
+    Assert-Equal 1 $blanks[0].Captured 'report/blanks: an empty path is not a captured file'
+    Assert-True $blanks[0].Superseded 'report/blanks: so it cannot deny a supersession that holds'
+    Assert-Equal 0 (@(Get-SyncPredecessorReport -Predecessors @() -TakePaths @('x'))).Count 'report: no standing branches is an empty report'
+    Assert-Equal 0 (@(Get-SyncPredecessorReport -Predecessors @($null) -TakePaths @('x'))).Count 'report: a $null row is dropped rather than reported as a branch'
 }
 finally {
     foreach ($d in $script:trees) {
