@@ -34,6 +34,15 @@
         open-pr later to the 'question' label. Validation is deliberately delegated to the consumer's
         table, so extended prefixes (Shopify's style/, liquid/, ...) simply work.
 
+    THE BASE IS MEASURED AND REPORTED, NOT CHOSEN (inbound #1046, August 28, 2026). worktree-lane.ps1
+    refuses a stale trunk in so many words -- "a lane must not be based on a stale trunk" -- while this
+    script cut from whatever HEAD held and never asked. It now counts how far the base is behind
+    origin/<trunk> and WARNS with that count, twice: before the checkout, and as the last line of the
+    run, because everything this script prints in between buries the first copy. It still creates the
+    branch: refusing matches the lane and stays open as a follow-up, but this file reaches consumers by
+    plugin update rather than by choice. A repo with no origin/<trunk> ref is not asked and not warned,
+    which is what keeps the script usable offline.
+
 .PARAMETER Name
     The branch name, form <prefix>/<short-name> (e.g. feat/new-plugin).
 
@@ -140,6 +149,13 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 # default needs a repo root, and a lib that goes looking for one can find the wrong tree.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
+# THE NATIVE-COMMAND CAPTURE HELPER, dot-sourced HERE rather than inside the push block where it sat until
+# inbound #1046. Two callers now need it and the first one runs long before the push: the stale-base check
+# below, which asks git two questions before HEAD is touched. Not repo-owned and dependency-free, so
+# loading it early costs a file read and changes nothing else. Why every git call in this repo goes through
+# it: the lib's own header (the #96/#97/#107 stderr-under-EAP=Stop lesson).
+. (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+
 # The repo-owned fallback type (#410) -- OPTIONAL, unlike branch-info.ps1 above. repo-config.ps1 may
 # be absent (a repo that never needed it) or may fail to load (a syntax error in someone's edit);
 # neither is a reason to stop, because every string it supplies has a working default. So: Test-Path,
@@ -218,6 +234,78 @@ if ($Name -notmatch '-v\d+$') {
     $completed = "$Name-v1"
     Write-Host "Branch name completed: '$Name' -> '$completed' (a development cycle carries its version; a second cycle on the same subject is '-v2', typed deliberately)." -ForegroundColor Cyan
     $Name = $completed
+}
+
+# --- THE BASE THIS BRANCH IS CUT FROM, MEASURED AND REPORTED (inbound #1046) -----------------------
+#
+# worktree-lane.ps1 and this script meet the SAME hazard -- a base that is behind origin -- and until now
+# they answered it in opposite ways. The lane fetches and bases its worktree on origin/<trunk>, refusing
+# outright when the fetch fails: "a lane must not be based on a stale trunk." This script ran
+# `git checkout -b` from whatever HEAD happened to be and never looked, in a run that reaches origin
+# moments later to push -- so the remote was already in hand when the base was picked.
+#
+# WHAT THAT COST, measured in a consumer with two sessions on one board: a branch cut from a trunk 17
+# commits behind origin/main, to fix an issue the other session had closed by a merged PR FOUR MINUTES
+# earlier. The result was a complete duplicate of already-merged work -- branch, commit, PR, every gate
+# green on both -- found only when the PR sat without a CI check and the run list was read by hand. The
+# claim step does not catch this and it looks like it should: `gh issue edit <n> --add-assignee @me`
+# succeeds silently on a CLOSED issue.
+#
+# IT WARNS AND DOES NOT REFUSE, which is the report's own first step rather than the stronger option it
+# names. Refusing matches the lane script and stays open as a follow-up, but this file is mirrored into
+# every consumer's plugin cache and arrives by plugin UPDATE rather than by choice -- the same reasoning
+# the version-suffix block above gives for keeping its rule out of Test-BranchName. So the first step
+# measures the fact the lane already refuses on, and says it out loud.
+#
+# AND IT SAYS IT TWICE -- here, and as the LAST line of the run. That repeat is the whole difference
+# between a warning that works in this script and one that does not: the scaffold, the commit and the
+# push all print AFTER this point, so a single line at this depth is off-screen by the time the run
+# ends. The bottom copy is the one a reader actually sees.
+#
+# THE LOCAL QUESTION GATES THE NETWORK ONE, which is what keeps this usable offline. refs/remotes/origin/
+# <trunk> is read FIRST: no such ref means no origin, or a clone that has never fetched, and then there is
+# nothing to compare against -- so no fetch is attempted and nothing is claimed. Where the ref does exist
+# the fetch is attempted to freshen it, and the count is reported either way, NAMING which of the two it
+# came from: "17 behind the origin/main you last saw" is a different sentence from "17 behind origin/main",
+# and a reader who is offline needs to be told which one they got.
+#
+# THE FETCH IS THE ONE COST ADDED TO A ROUTINE RUN. worktree-lane already pays it on every lane, and it is
+# gated above on a ref that only exists in a repo with a reachable remote in its history, so the repos that
+# cannot answer the question pay nothing.
+#
+# HEAD..origin/<trunk> RATHER THAN A TRUNK-VS-ORIGIN COMPARISON, deliberately: it answers "what is my base
+# missing", which is the question, and it stays correct when HEAD is NOT the trunk -- a branch deliberately
+# stacked on another branch gets the gap it actually carries instead of a reading about a trunk it was
+# never cut from. In a lane worktree (detached at origin/<trunk> by worktree-lane) it reads 0, so the
+# route that already handles this hazard is never warned about.
+$staleBaseNote = ''
+$trackedTrunk  = "refs/remotes/origin/$trunk"
+# Through Invoke-NativeCapture rather than the hand-written EAP dance the branch-exists check below still
+# uses: that dance is exactly what this lib centralizes, and the lib is loaded by the time we get here.
+$tracked = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', $trackedTrunk) -DiscardStderr
+if ($tracked.ExitCode -ne 0) {
+    Write-Host "Base not compared: this repo has no $trackedTrunk (no origin, or never fetched)." -ForegroundColor DarkGray
+} else {
+    # -DiscardStderr ON THE FETCH, and not only for tidiness: a failing git fetch echoes the remote URL,
+    # which in a repo cloned over HTTPS with a credential in the URL is a secret. The message below says
+    # the fetch failed and that the gap may be larger, which is everything a reader can act on.
+    $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', 'origin', '--quiet') -DiscardStderr
+    $fresh = ($fetch.ExitCode -eq 0)
+    $rev   = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-list', '--count', "HEAD..origin/$trunk") -DiscardStderr
+    $revText = (($rev.Output | Out-String).Trim())
+    $behind = 0
+    if ($rev.ExitCode -eq 0 -and $revText -match '^\d+$') { $behind = [int]$revText }
+    if ($behind -gt 0) {
+        $against = if ($fresh) { "origin/$trunk" } else { "the origin/$trunk this repo last fetched (git fetch failed -- the real gap may be larger)" }
+        $staleBaseNote = "'$Name' is based on a commit $behind behind $against."
+        Write-Warning $staleBaseNote
+        Write-Host "  new-branch does not move HEAD for you, so this branch carries that gap -- work already merged upstream is" -ForegroundColor Yellow
+        Write-Host "  invisible from here, including an issue somebody else has just closed. Bring the base up to date first" -ForegroundColor Yellow
+        Write-Host "  (git pull --ff-only), or open the work as a lane, which bases it on origin/$trunk itself:" -ForegroundColor Yellow
+        Write-Host "  scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor Yellow
+    } elseif ($fresh) {
+        Write-Host "Base is current with origin/$trunk." -ForegroundColor DarkGray
+    }
 }
 
 # Note: Test-BranchName above only catches the explicitly named hard rejects (empty/'main'/
@@ -516,7 +604,6 @@ if ($Park) {
 if ($NoPush) {
     Write-Host "new-branch: -NoPush -- branch and document are local only, nothing is on origin." -ForegroundColor Yellow
 } else {
-    . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
     # ONE IMPLEMENTATION SINCE #507 (August 7, 2026). These four steps used to be written out here as
     # well as in park-branch.ps1, and the copies had drifted where it hurts a reader rather than a
     # script: both wrote `park: <branch> (work parked for later)` while committing different things, so
@@ -540,6 +627,14 @@ if ($NoPush) {
             -Paths @($cycleRel)
         if (-not $ok) { exit 1 }
     }
+}
+
+# THE REPEAT, and it is the half of the stale-base check that a reader actually reads (inbound #1046). See
+# the block above the checkout for the measurement; this exists because everything between there and here
+# -- the scaffold, its tier rubric, the commit, the push -- prints in between, so the warning that fired
+# before HEAD moved is well off-screen by now. Last line of the run, or nothing at all.
+if ($staleBaseNote) {
+    Write-Warning "$staleBaseNote Bring the base up to date (git pull --ff-only) or reopen this as a lane before you build on it."
 }
 
 exit 0

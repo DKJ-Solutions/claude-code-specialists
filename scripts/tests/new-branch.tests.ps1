@@ -231,6 +231,60 @@ function New-BareOrigin {
     return $bare
 }
 
+function Publish-FixtureTrunk {
+    <#
+        Push the fixture's 'main' to its bare origin with -u, which is what brings
+        refs/remotes/origin/main into existence. THAT REF IS THE GATE the stale-base check reads first
+        (inbound #1046), so without this call every fixture in this file answers "not compared" -- which
+        is exactly why the check landed green against the whole existing suite and needs sections of its
+        own.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Dir)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $Dir push -u -q origin main 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+}
+
+function Add-OriginCommits {
+    <#
+        Advance the bare origin's 'main' by $Count commits WITHOUT touching $Dir -- the second session on
+        the same board, reproduced. Done through a throwaway clone rather than by committing in the
+        fixture and resetting it back, so the fixture's own HEAD and reflog stay exactly as new-branch
+        will find them.
+
+        Deliberately leaves the fixture's remote-tracking ref STALE: the point of the check under test is
+        that its own fetch is what discovers the gap.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Bare,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][int]$Count
+    )
+    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-other.git")
+    if (Test-Path -LiteralPath $clone) { Remove-Item -Recurse -Force -LiteralPath $clone }
+    $script:fixtures += $clone
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        # --branch main IS LOAD-BEARING, not tidiness. `git init --bare` leaves the bare repo's HEAD
+        # pointing at refs/heads/master while New-Fixture only ever pushes 'main', so a plain clone lands
+        # on an UNBORN 'master': the three commits below go there, `push origin main` fails with
+        # "src refspec main does not match any", and the fixture reads 0 behind -- a green-looking helper
+        # that proves nothing. Same literal trunk name as New-Fixture, for the same reason.
+        & git clone -q --branch main $Bare $clone 2>$null | Out-Null
+        & git -C $clone config user.email 'other-session@local.invalid' 2>$null | Out-Null
+        & git -C $clone config user.name 'Other Session' 2>$null | Out-Null
+        for ($i = 1; $i -le $Count; $i++) {
+            [System.IO.File]::WriteAllText((Join-Path $clone "upstream-$i.txt"), "$i`n", (New-Object System.Text.UTF8Encoding $false))
+            & git -C $clone add -A 2>$null | Out-Null
+            & git -C $clone commit -q -m "upstream $i" 2>$null | Out-Null
+        }
+        & git -C $clone push -q origin main 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+}
+
 function Test-BranchOnRemote {
     <# Is $Ref present in the bare repo $Bare? The push assert, read from the remote rather than from
        the pusher's own output -- "reports it parked" and "actually pushed" are two claims. #>
@@ -954,6 +1008,72 @@ Write-Output `$t.Type
     Assert-Equal 0 $rR.Code '-Park: still exit 0'
     Assert-True (Test-Phrase -Text $rR.Out -Phrase 'the switch is accepted and changes nothing') '-Park: says out loud that it is the default now'
     Assert-True (Test-BranchOnRemote -Bare $bareR -Ref 'refs/heads/feat/park-is-default-v1') '-Park: and the push happened -- same outcome as (o), which is the point'
+
+    # --- (s) THE BASE IS BEHIND ORIGIN: warned, with the count, and warned AGAIN at the end (#1046) --
+    # THE CASE THE REPORT WAS FILED ON. In a consumer with two sessions on one board, new-branch cut from
+    # a trunk 17 commits behind origin/main to fix an issue the other session had closed by a merged PR
+    # four minutes earlier -- a complete duplicate, every gate green on both. worktree-lane refuses this
+    # hazard by name; this script said nothing. Three asserts, because the warning has three jobs: name
+    # the count, name the way out, and still be on screen when the run ends.
+    Write-Host "new-branch.ps1 -- a base behind origin is warned about, with the count (#1046)" -ForegroundColor Cyan
+    # NAMED $fixStale AND NOT $fixtureS, WHICH IS NOT A STYLE CHOICE. PowerShell variable names are
+    # case-INSENSITIVE, so `$fixtureS` and the teardown accumulator `$script:fixtures` are the SAME
+    # variable at script scope -- and since the fixture path lands in it as a string first, every later
+    # `$script:fixtures += ...` CONCATENATED onto it. The run failed with a Set-Location on three temp
+    # paths glued together, and the teardown list was destroyed with it. Exactly the collision
+    # new-branch.ps1 documents on $RepoRoot/$repoRoot; a single-letter suffix is what walks into it.
+    $fixStale = New-Fixture -Label 's'
+    $bareStale = New-BareOrigin -Dir $fixStale -Label 's'
+    Publish-FixtureTrunk -Dir $fixStale
+    Add-OriginCommits -Bare $bareStale -Label 's' -Count 3
+
+    $rS = Invoke-NewBranch -Dir $fixStale -Name 'feat/cut-from-stale' -Title 'Cut from stale'
+    # A WARNING AND NOT A REFUSAL, which is the whole shape of the first step: the branch still exists.
+    Assert-Equal 0 $rS.Code 'stale base: new-branch exit 0 -- this warns, it does not refuse'
+    $branchesS = ((& git -C $fixStale branch --list 'feat/cut-from-stale-v1') -join '').Trim()
+    Assert-True ([bool]$branchesS) 'stale base: and the branch really is created'
+    # THE COUNT ITSELF, asserted as the literal number rather than on the word 'behind'. A check that
+    # fires without a figure is the thing worktree-lane's message already beat.
+    Assert-True (Test-Phrase -Text $rS.Out -Phrase '3 behind origin/main') 'stale base: names how far behind the base is, as a number'
+    Assert-True (Test-Phrase -Text $rS.Out -Phrase 'feat/cut-from-stale-v1') 'stale base: and names the branch it applies to, version suffix included'
+    # THE WAY OUT, both halves -- the local fix and the route that never has this problem.
+    Assert-True (Test-Phrase -Text $rS.Out -Phrase 'git pull --ff-only') 'stale base: names the local remedy'
+    Assert-True (Test-Phrase -Text $rS.Out -Phrase 'worktree-lane.ps1') 'stale base: and the lane route, which bases itself on origin by design'
+    # THE REPEAT, which is the half that actually gets read: the scaffold, the tier rubric, the commit and
+    # the push all print between the first copy and the end of the run. Counted rather than matched, so a
+    # single surviving copy fails here even though every assert above would still pass.
+    # Counted against Get-FlatOutput's own normalization, phrase stripped the same way Test-Phrase strips
+    # it -- a raw phrase would match zero times in whitespace-free text and read as "the repeat is missing".
+    $flatStale = Get-FlatOutput $rS.Out
+    $behindHits = @([regex]::Matches($flatStale, [regex]::Escape(('3 behind origin/main' -replace '\s', '')))).Count
+    Assert-Equal 2 $behindHits 'stale base: said twice -- once before the checkout, once as the last line'
+
+    # --- (t) THE BASE IS CURRENT: nothing to warn about -----------------------------------------------
+    # The negative half, and it is what keeps the check from becoming noise on every run. Same fixture
+    # shape as (s) minus the upstream commits, so the only difference is the gap itself.
+    Write-Host "new-branch.ps1 -- a current base is not warned about (#1046)" -ForegroundColor Cyan
+    $fixCurrent = New-Fixture -Label 't'
+    $null = New-BareOrigin -Dir $fixCurrent -Label 't'
+    Publish-FixtureTrunk -Dir $fixCurrent
+
+    $rT = Invoke-NewBranch -Dir $fixCurrent -Name 'feat/cut-from-current' -Title 'Cut from current'
+    Assert-Equal 0 $rT.Code 'current base: new-branch exit 0'
+    Assert-True (Test-Phrase -Text $rT.Out -Phrase 'Base is current with origin/main') 'current base: says so, so silence is never ambiguous'
+    Assert-True (-not (Test-Phrase -Text $rT.Out -Phrase 'behind origin/main')) 'current base: and warns about nothing'
+
+    # --- (u) NO REMOTE-TRACKING TRUNK: not asked, not claimed (#1046) -------------------------------
+    # THE OFFLINE GUARANTEE, and the reason the local question gates the network one. A repo with an
+    # origin it has never fetched from -- every other fixture in this file -- has nothing to compare
+    # against, so the check must neither reach for the network nor imply an answer it does not have.
+    Write-Host "new-branch.ps1 -- no remote-tracking trunk: the base is not compared (#1046)" -ForegroundColor Cyan
+    $fixNoTrack = New-Fixture -Label 'u'
+    $null = New-BareOrigin -Dir $fixNoTrack -Label 'u'
+
+    $rU = Invoke-NewBranch -Dir $fixNoTrack -Name 'feat/never-fetched' -Title 'Never fetched'
+    Assert-Equal 0 $rU.Code 'no tracking trunk: new-branch exit 0'
+    Assert-True (Test-Phrase -Text $rU.Out -Phrase 'Base not compared') 'no tracking trunk: says the question could not be asked'
+    Assert-True (-not (Test-Phrase -Text $rU.Out -Phrase 'behind origin/main')) 'no tracking trunk: and claims no gap it cannot measure'
+    Assert-True (-not (Test-Phrase -Text $rU.Out -Phrase 'Base is current')) 'no tracking trunk: nor a currency it cannot measure either'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

@@ -94,6 +94,11 @@ What it does, in order:
 2. Fetches `origin` and bases the lane on `origin/main`, not on the local trunk. The "fresh pull before
    every new branch" rule applies to a lane exactly as it does to a branch, and reading origin directly
    also means the lane does not care what the primary currently has checked out.
+   **And it is no longer the only script that looks** (inbound #1046, August 28, 2026): `new-branch`
+   used to cut from whatever `HEAD` held, so the safe base was reachable only by already knowing to
+   take the lane route. It now measures `HEAD..origin/<trunk>` and warns with the count. The lane still
+   goes further -- it *takes* the right base rather than reporting the wrong one -- which is why the
+   warning `new-branch` prints names this script as the way out.
 3. Adds the worktree **detached** at that commit.
 4. Delegates to `new-branch.ps1` with the lane as its `-RepoRoot`, so the branch and both branch files
    come into being **inside** the lane. Every rule `new-branch` enforces therefore holds in a lane
