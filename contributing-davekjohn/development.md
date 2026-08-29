@@ -106,6 +106,12 @@ asked for it.
 
 - [x] `check-plugin-integrity.ps1`: 0 findings across all 33 checks, including the dead-link scan over
       the two new issue links, `[frontmatter-bom]` and `[skill-command]` over the changed skill page
+- [x] `orchestrator-skill.tests.ps1`: its `disable-model-invocation` assert read the **whole page**, so
+      it went red the first time that page *discussed* the flag — a false failure on correct prose, and
+      the same bare-mention-versus-declaration distinction the `[lifecycle]` integrity check already
+      draws. Narrowed to the frontmatter block, where the key would actually take effect; the intent it
+      guards is unchanged and one assert was added for the block itself. **No assert was added pinning
+      that the body keeps discussing the flag** — that would pin wording nobody decided on
 - [x] The suites, via `open-pr`'s own gate — not pre-run here, which would measure the same thing twice
       and credit nothing
 - [~] No new assert, and this is a stated test gap rather than an oversight. What would have to be
