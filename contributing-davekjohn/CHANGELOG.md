@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-quotepath-flake-names-its-own-axis-v1` · 20260829-233821
+
+The `sync-main` quotepath flake had nothing to do with character encoding, and cannot happen again.
+
+It went red once under the CI gate on a branch byte-identical to the trunk, was filed as a possible
+second axis behind #821 -- a git path decoded off the inherited console code page -- and was explicitly
+left without a proposed fix because no measurement supported one. The real cause is smaller and fully
+reproducible: the assert's needle was the three characters `caf`, and `c`, `a` and `f` are all hex
+digits. The fixtures are named off a GUID and the run prints their paths, so roughly one run in 500
+spells the needle in a temp directory and fails an assert about a file it never touched. Forcing the
+suffix to `caf123` reproduces the reported line and count exactly, and it is why the neighbouring
+`drift on 2 file(s)` assert stayed green: nothing was ever miscounted as drift.
+
+The needle now carries its path prefix. Its tail stays truncated on purpose -- mojibake is what the
+assert hunts, and pinning the full filename would pin exactly the bytes that go wrong.
+
+The measured cost was a red required check on a clean branch: `lint-en-tests` blocks the merge, so it
+also sent whoever was shipping to hunt for a cause in a diff that had none. That is what is gone. It
+had already happened twice under two different explanations, which is the more expensive half.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`scripts/tests/` is repo-internal and travels in no plugin -- `sync-main.ps1` is mirrored to
+`team-shopify`, its suite is not, and this branch does not touch the script. No consumer installs the
+change and no subscriber of the service can observe it.
+
+**Score:** N/A
+
+#### Pull Request
+
+The quotepath flake was a hex collision, not an encoding one
+
+[PR #1121](https://github.com/DaveKJohn/claude-code-specialists/pull/1121)
+
+---
+
 ### DEPLOY: `fix/the-status-in-the-annotation-gets-the-same-care-as-the-reason-v1` · 20260829-232217
 
 The annotation a failed `claude-review` leaves behind can no longer be garbled or forged by a field
