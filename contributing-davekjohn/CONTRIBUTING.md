@@ -45,15 +45,21 @@ instead of asserting one repo's answer as the rule:
 
 📄 **[The contribution cycle — the portable half](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md)**
 
-Read that first. **This page is this repo's set of answers to it, arranged as the four steps work actually
+Read that first. **This page is this repo's set of answers to it, arranged as the five steps work actually
 moves through** (Dave, [#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894)). That
-arrangement is why there are exactly four numbered `##` sections below and nothing else, why each carries its
+arrangement is why there are exactly five numbered `##` sections below and nothing else, why each carries its
 substeps as `###`, and why every gate sits as a `####` under the step where it fires rather than in a list of
 its own.
 
-**Four `##` sections *in total*, which is why this page now begins at step 1.** The two sections that used to
-sit between the title and step 1 — the seam table and the pointer list — were `##` as well, so the page read
-as six top-level sections of which two were not steps. They moved to
+**They were four until August 29, 2026**, when `## 1. NEW ISSUE / TASK` was written ahead of them (Dave) and
+everything below shifted up by one. The page opened at the branch, so the layer that decides *whether there
+is anything to branch on* — a colleague's ticket, or a finding somebody wrote down — was the one part of the
+route it did not describe. Every step number moved with it, and so did the two anchors that pointed at one
+from outside this page.
+
+**Five `##` sections *in total*, which is why this page begins at step 1.** The two sections that used to sit
+between the title and the first step — the seam table and the pointer list — were `##` as well, so the page
+read as six top-level sections of which two were not steps. They moved to
 [`README.md`](README.md) on August 26, 2026 (Dave), where a folder index is what they always were.
 
 **The levels here moved twice in two days, in opposite directions, and both moves were right.** On
@@ -64,9 +70,109 @@ document title that is no longer an H1). Later the same day this page moved one 
 
 ---
 
-## 1. NEW DEVELOPMENT TASK
+## 1. NEW ISSUE / TASK
 
-### 1.1. Create the branch and the empty `development.md`
+**This is the layer before a branch exists.** Step 2 opens a branch and writes the document that carries it;
+this step is where the thing that branch is *for* comes from, and whether it is written down anywhere the
+next person can find it. A request that only ever existed in a conversation is a request that gets built
+twice, or half.
+
+**Two headings, and they are kinds rather than steps** — the only `###` on this page that carry no number.
+Work reaches a repo running this workflow two ways, and they fail differently: a **person** files a request
+from a tracker outside the repo, or **Claude** finds something while doing other work. Neither precedes the
+other, and numbering them would claim an order that does not exist.
+
+**Both end in the same place: a GitHub issue in this repo.** That is what step 2 branches on, and it is why
+the two halves sit under one step rather than in two places.
+
+### Human
+
+**Somebody else's tracker asks, and a GitHub issue here carries the analysis.** In the repos where this
+happens, colleagues file in **Asana** and the repo answers with one issue per ticket, the Asana link in its
+head. The issue is not a copy of the ticket: it is the layer between the request and the code — what was
+asked in the requester's own words, what we already know, and then the gate that decides whether it can be
+built at all.
+
+**That gate is the reason the step exists.** A request written by somebody who is not going to build it is
+incomplete in ways the builder otherwise discovers halfway through the branch. So the issue answers *do we
+know enough?* before a branch is opened, in one of two fixed sentences with the reason behind it; at *no*,
+the missing pieces go back to the requester and the work waits. **A ticket with open questions is not
+built** — that is the standing agreement, and it is what keeps the discovery in front of the branch instead
+of inside it.
+
+**The rules are portable and travel with this plugin**, in
+[`TICKETWORK-portable.md`](../plugins/workflows/contributing-davekjohn/TICKETWORK-portable.md): where the
+provenance boundary between a copied field and our own judgement sits, how to tell a gap from a notice, why
+six kinds of question are not gaps, and what the log carries. **A repo that receives ticket work writes the
+other half itself** — its tracker, its language, the form of a ticket, its closed `State` vocabulary, and the
+border with its own research documents — as a local `TICKETWORK.md` beside this page. `smartwatchbanden` is
+the worked example.
+
+**This half is a no-op in this repo, and that is an answer rather than an omission.** Nothing is filed into
+this repository from a tracker upstream of it: Dave assigns directly, and what he assigns becomes a branch
+under step 2 or an issue under `### Claude` below. So there is no local `TICKETWORK.md` here and no Asana
+link in any issue head. **It is described anyway for the same reason step 5 is** — the workflow ships this
+layer, the consumers running it do have that tracker, and a page that only documented what this repo
+happens to use would leave them reading a route with a hole in it.
+
+### Claude
+
+**A finding becomes an issue, not a question at the end of the turn.** Something real that is outside the
+assignment — a bug, a doc that has gone stale, a measurement that contradicts what a page claims, a decision
+that is not yours to make — is filed and the assignment is finished. Dave has to be able to close a session
+and clear its context without first answering everything that was found along the way, and the close-out
+names the numbers so he can see what was parked rather than lost.
+
+**Filing needs no permission, and asking for it is the same failure as not filing.** *"Shall I open an issue
+for this?"* leaves the finding in the reply for Dave to answer, which is precisely what filing prevents.
+
+**The question to answer first is not *may I* but *does it still stand*.** Read the code, the script or the
+output that would have to be true for the finding to hold — the same treatment an inbound report gets,
+applied to your own. Where it collapses, say so plainly instead of filing a weakened version of it. Where it
+holds, the rest of the bar is short: search the tracker so you add to the existing thread rather than open
+its duplicate, one subject per issue, and say what you **measured** and what you only **inferred**. Do not
+file work you were asked to do, or a finding you can simply fix inside the assignment.
+
+**An inconsistency is always filed**, whatever its size and whoever caused it — two statements in the tree
+that cannot both be true. Where your own branch created it, file it anyway and say so in the issue, because
+that is the reader's first question. Scoping a contradiction out of the work is a reason not to edit the
+file; it is never a reason not to file it.
+
+**The labels are the branch prefixes, which is what makes an issue readable as work.** `enhancement`, `bug`
+and `documentation` map onto `feat/`, `fix/` and `docs/` and onto the changelog types they produce — see the
+table in step 2.1 — so an issue already names the prefix its branch will get.
+
+**`inbound` is the fourth label and it means something different.** It marks a core improvement discovered in
+a *consuming* repo: the shared agent defs, manuals, personas and skills have one source, so a consumer files
+here with [the inbound template](../.github/ISSUE_TEMPLATE/inbound-improvement.md) instead of patching its
+own copy, and the improvement comes back to every consumer through a release. **On this side that is simply
+the ordinary chain**, because this is the source — but not before the item is verified. A filed report is a
+snapshot of the moment somebody wrote it, and **six things fail independently**: the symptom, the reason, the
+proposed repair, the size, the subject and the repo. Getting one wrong produces a repair that satisfies the
+report and is wrong, which is worse than the original defect because it now carries a citation. The
+measurement behind each is in the
+[`triage-inbound` skill](../.claude/skills/triage-inbound/SKILL.md).
+
+**Claim an issue before working it** — `gh issue edit <n> --add-assignee @me` — and read the claim as well as
+write it: an issue that already carries an assignee is somebody's. The tracker is the only thing two sessions
+share, so an unassigned issue is indistinguishable from an untouched one, which is how the same repair gets
+built twice and discovered at the merge. A claim with no branch and no recent activity is a question for
+Dave rather than a locked door.
+
+**These rules are Chris's, stated here rather than owned here.** The filing bar, the six inbound checks and
+the claim live in the orchestrator's persona body, which ships with `team-alpha` — so where this paragraph
+and that body disagree, the body is the source and this is the bug. They are written out anyway because a
+contributor reading this page has no guarantee of having the plugin, and a route with a step that is only
+legible to an agent is not a route.
+
+Then step 2 opens the branch that carries it out, and the issue number goes in the DEPLOY body so the fold
+carries it into [`CHANGELOG.md`](CHANGELOG.md) with the change that closed it.
+
+---
+
+## 2. NEW DEVELOPMENT TASK
+
+### 2.1. Create the branch and the empty `development.md`
 
 **Two steps, one command, and that is the point rather than a shortcut.** `new-branch` does both: a branch is
 never entry-less, so there is no moment at which the branch exists and its document does not. They are
@@ -119,7 +225,7 @@ branch open. **There is no `branch/templates/` any more either** (Dave, August 2
 reference copies sat there because the working files were deliberately bare, and the merged document carries
 its own guidance, so the reference and the file you write in are the same page.
 
-### 1.2. Write `### PLAN`, `### CREATE`, `### TEST`
+### 2.2. Write `### PLAN`, `### CREATE`, `### TEST`
 
 **Three phases, written in order, and each one is a list of `- [ ]` steps.** PLAN is what the work turns out
 to be once it has been looked at rather than guessed at; CREATE is the steps that build it; TEST is the steps
@@ -129,19 +235,19 @@ line**, which exists so nobody ticks a box for work they did not do.
 **A section needing its own heading goes in as a `####` under whichever phase owns it.** That is how the four
 top-level headings stay four.
 
-### 1.3. Write `### DEPLOY`
+### 2.3. Write `### DEPLOY`
 
 Its own step because it is written **last** and from a different question: the three phases above say what
-must *happen*, DEPLOY says what the change *does*. See 1.5 for what "secured" means, and why the two are
+must *happen*, DEPLOY says what the change *does*. See 2.5 for what "secured" means, and why the two are
 separate numbers rather than one.
 
-### 1.4. Verify every checkbox is resolved
+### 2.4. Verify every checkbox is resolved
 
 **Nothing here is on your memory.** `open-pr` and `ship-pr` both refuse while a step above DEPLOY is still
 open, and there is no `-Force`. This step is the moment to read the list rather than the moment to discover
-one was missed — the step-list gate under 2.2 is the same question asked by a machine.
+one was missed — the step-list gate under 3.2 is the same question asked by a machine.
 
-### 1.5. Wrap and secure DEPLOY: the development cycle is complete
+### 2.5. Wrap and secure DEPLOY: the development cycle is complete
 
 **DEPLOY is written LAST, once TEST says so.** The other three phases carry the steps (`- [x]` done, `- [~]`
 dropped with the reason on the line); `` ### DEPLOY: `<branch>` `` **is** the changelog entry and folds
@@ -163,17 +269,17 @@ you will see here.
 **In each tier, the reason goes ABOVE the `**Score:**` line** — anything below it is discarded.
 
 **And then the development cycle is complete, and the branch waits.** Nothing else happens on it until an
-explicit *open the PR* command, which is step 2.1. That wait is short and usually implicit — see
+explicit *open the PR* command, which is step 3.1. That wait is short and usually implicit — see
 [`CLAUDE.md`](../CLAUDE.md) for the two narrow classes of change where it is a real stop, and why everything
 else runs straight through.
 
 ---
 
-## 2. PULL REQUEST
+## 3. PULL REQUEST
 
-### 2.1. Open the PR
+### 3.1. Open the PR
 
-**This is where the waiting ends.** Step 1.5 leaves the cycle complete and the branch parked on an explicit
+**This is where the waiting ends.** Step 2.5 leaves the cycle complete and the branch parked on an explicit
 *open the PR* command — see [`CLAUDE.md`](../CLAUDE.md) for the narrow set of changes that genuinely wait on
 Dave's word, and for why the default is that they do not.
 
@@ -182,10 +288,10 @@ On an error or a failing suite **nothing is pushed and no PR is opened** — `-S
 escape valves, and using one is a decision rather than a convenience.
 
 Its own number because the three gates below fire *here*, at the push, and because what it publishes is fixed
-at this moment: 2.2 is what it puts in the body, and 2.2.4 locks that body against later edits to the
+at this moment: 3.2 is what it puts in the body, and 3.2.4 locks that body against later edits to the
 document.
 
-### 2.2. Copy the last DEPLOY into the PR
+### 3.2. Copy the last DEPLOY into the PR
 
 `open-pr.ps1` composes the PR body from the document, and **five gates read it on the way**. Four run
 locally, before the push and before the merge; the fifth runs in CI, and it exists because the local four are
@@ -193,7 +299,7 @@ escapable by not using the scripts. The repo's own lint and test gates are separ
 `open-pr.ps1` runs [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) and then every
 `scripts/tests/*.tests.ps1`, refusing to push on any error or failing suite.
 
-#### 2.2.1. the scaffold gate, on the changelog entry itself
+#### 3.2.1. the scaffold gate, on the changelog entry itself
 
 **August 3, 2026.** `open-pr.ps1` refuses to push a branch whose entry still carries the wording
 `new-branch.ps1` scaffolded it with — the placeholder title, the "to do / where I left off" heading, or the
@@ -216,7 +322,7 @@ with those strings right now, and consumers receive the new scripts through a pl
 choosing to. A gate that forgot them would wave exactly those entries through. **Recognise both, write one** —
 the same rule the tier line gets, and the same rule the folder rename got in step 3 below.
 
-#### 2.2.2. the step-list gate, on the branch's own plan
+#### 3.2.2. the step-list gate, on the branch's own plan
 
 **Dave, August 6, 2026.** A branch reaches a PR when its own plan is finished, so `open-pr.ps1` refuses to
 push and `ship-pr.ps1` refuses to merge while the step half of `development.md` has an unresolved step.
@@ -252,7 +358,7 @@ silent direction — a name the branch does not carry reads as *no document at a
 knowing: **a step ticked in the editor and not committed no longer satisfies the merge gate**, which is what
 its own message has always asked for.
 
-#### 2.2.3. the backing gate, on whether anything is behind the plan
+#### 3.2.3. the backing gate, on whether anything is behind the plan
 
 **Dave, issue [#1026](https://github.com/DaveKJohn/claude-code-specialists/issues/1026),
 August 28, 2026.** The step-list gate above asks whether the plan is *finished*. It cannot ask whether
@@ -290,7 +396,7 @@ and reported zero errors. `Get-GateFingerprint` cannot answer this: it hashes th
 *same tree as last time* and never *is this tree HEAD*. A dirty tree mid-flight is ordinary, so it is never
 refused here; what was missing was only the line that stops a green result from being read as proof.
 
-#### 2.2.4. the DEPLOY lock, on the section the PR published
+#### 3.2.4. the DEPLOY lock, on the section the PR published
 
 **Dave, issue [#884](https://github.com/DaveKJohn/claude-code-specialists/issues/884), August 25, 2026.** The
 DEPLOY section travels four times — this document, the PR body, `CHANGELOG.md`, the developer release notes —
@@ -316,11 +422,11 @@ legacy path keeps promoting, because there the H2 genuinely stays behind. The re
 in `pr-body-lib.ps1`. **An unreadable body is not a finding** — `gh` failing says something about the token or
 the network, not about the section, and a gate that refused on that would be refusing on no evidence.
 
-**Which copy of the document it compares is the paragraph at the end of 2.2.2**, and it matters more here than
+**Which copy of the document it compares is the paragraph at the end of 3.2.2**, and it matters more here than
 there: this section is what step 5 folds verbatim into `CHANGELOG.md`, so a lock satisfied by a stray checkout's
 document would be approving the fold of a section it never read.
 
-#### 2.2.5. the CI gate, because the four above are local
+#### 3.2.5. the CI gate, because the four above are local
 
 **August 20, 2026** (inbound
 [#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The gates above live in
@@ -362,7 +468,7 @@ The script answers the trunk case gracefully as well, but a gate should not need
 correctly. **It is not in the `main` ruleset** — making a check required is a repo-settings change and
 therefore Dave's, so today it reports on every PR and blocks nothing.
 
-### 2.3. Check whether another PR is already merging
+### 3.3. Check whether another PR is already merging
 
 **One merge at a time, and a PR that arrives second waits its turn** (Dave,
 [#912](https://github.com/DaveKJohn/claude-code-specialists/issues/912), August 26, 2026). Before the merge,
@@ -373,12 +479,12 @@ this step costs one command and you move on.
 PRs, and GitHub is happy to merge two at once — the same shape as the four-headings rule in the branch
 document, and stated here for the same reason: a convention nobody writes down is a convention nobody keeps.
 
-#### 2.3.1. Nothing else merging — go to 2.4
+#### 3.3.1. Nothing else merging — go to 3.4
 
 The normal case. The queue exists for the moment two pieces of work finish together, not as a step every
 branch performs.
 
-#### 2.3.2. Something else is merging — this PR joins the QUEUE and waits
+#### 3.3.2. Something else is merging — this PR joins the QUEUE and waits
 
 **Two PRs cannot merge at the same time, and `CHANGELOG.md` is why.** Every branch's fold writes into the
 same file at the same place — the top of `## [Unreleased]`, newest to oldest — and it writes there *after*
@@ -393,10 +499,10 @@ the branch document. Both are recoverable and neither announces itself. Waiting 
 
 **Waiting is the whole mechanism — there is no queue file and no lock.** The PR stays open and green; the
 merge is simply not performed yet. A branch that waits costs nothing, because the DEPLOY lock
-([2.2.4](#224-the-deploy-lock-on-the-section-the-pr-published)) has already fixed what this PR publishes:
+([3.2.4](#324-the-deploy-lock-on-the-section-the-pr-published)) has already fixed what this PR publishes:
 time passing does not change it.
 
-#### 2.3.3. The queue ahead has drained — sync with `main`, then merge
+#### 3.3.3. The queue ahead has drained — sync with `main`, then merge
 
 **Bring the branch up to date with `main` before merging it.** The PRs ahead have each folded an entry onto
 the trunk, so `main` carries `CHANGELOG.md` content this branch has never seen. Fetch and merge `origin/main`
@@ -412,7 +518,7 @@ against.
 before folding — so the fold itself is never performed against a stale trunk. What it does not do is bring
 the *branch* forward, which is what this step is.
 
-### 2.4. Merge the PR
+### 3.4. Merge the PR
 
 **The merge does not wait, with two exceptions.** The portable half leaves this to each repo, because it is a
 governance decision rather than a configuration value. Here, a finished branch **opens, merges and folds in one
@@ -446,7 +552,7 @@ backgrounding a ship is either a **lane** —
 worktree is where you build and the primary checkout is where you ship — or nothing at all. A close-out that
 reads *"PR #N opened, shipping in the background"* is a finished assignment, not an open point. Anything else
 started in the primary gets `HEAD` pulled out from under it mid-branch, which is the hazard the two gates in
-2.2.2 and 2.2.4 were hardened against and that step 5 was not.
+3.2.2 and 3.2.4 were hardened against and that step 5 was not.
 
 **Two larger shapes were declined when this was written down**, and #985 stays open as their home. A
 *green-and-unmerged reporter* at session start would have re-added half of the `session-status` reporter that
@@ -466,11 +572,11 @@ workflows, which is the safe outcome and not a defect to work around.
 
 Merge method: **`merge`** — a merge commit, not a squash (`Get-PrMergeMethod`).
 
-### 2.5. Copy the last DEPLOY into `CHANGELOG.md` under `## [Unreleased]`, newest to oldest
+### 3.5. Copy the last DEPLOY into `CHANGELOG.md` under `## [Unreleased]`, newest to oldest
 
-### 2.6. Delete `development.md`
+### 3.6. Delete `development.md`
 
-**2.5 and 2.6 are one command, and the first direct-on-`main` exception.**
+**3.5 and 3.6 are one command, and the first direct-on-`main` exception.**
 [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) folds the entry into `CHANGELOG.md`
 and clears it, and on request makes that commit itself — **bounded to `CHANGELOG.md` plus
 `development.md`**, which the same run removes. Since August 2, 2026 that bound is enforced rather than
@@ -487,19 +593,19 @@ The pending entries, ranked furthest-reach-first, are in [`CHANGELOG.md`](CHANGE
 
 ---
 
-## 3. CUT RELEASE
+## 4. CUT RELEASE
 
 A release here is **repo-wide and in lockstep**, which works because this repository holds *one* product whose
 plugins are one system — see [One product, one repository](../README.md#one-product-one-repository). A second,
 unrelated product would get its own repository and marketplace rather than joining this release train.
 
 **A release only ever happens on Dave's explicit request.** It is the irreversible, outward-facing class from
-step 2.4. Once asked for, the closing steps of that same checklist are covered by the request — including
-publishing the GitHub Release. Step 4 below is the one part that is **not**.
+step 3.4. Once asked for, the closing steps of that same checklist are covered by the request — including
+publishing the GitHub Release. Step 5 below is the one part that is **not**.
 
 **The step numbers below match [#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894)
 exactly, and they did not before.** That issue used to ask for a step creating *three* kinds of release note
-under one root inside this folder. Its August 26, 2026 edit dropped that step, so section 3 is seven steps on
+under one root inside this folder. Its August 26, 2026 edit dropped that step, so section 4 is seven steps on
 both sides and nothing is pending between them.
 
 **The subject did not go away with it, and it is now settled.** It stood on its own as
@@ -508,7 +614,7 @@ tier-0 root renamed `development` -> `changelog`, and it and `github/` moved out
 folder beside `audience/`. The three note roots are siblings now, `releases/` at the root holds nothing but
 the release list, and the layout question the step was about has an answer rather than an owner.
 
-### 3.1. The bump: tier 0 only is a PATCH, anything higher is a MINOR
+### 4.1. The bump: tier 0 only is a PATCH, anything higher is a MINOR
 
 This repo runs the shared floor unchanged. The portable half asks each repo to say so out loud where its own
 rule is stricter than the gate's, because a contributor otherwise picks their bump type from the wrong rule.
@@ -522,15 +628,15 @@ document about work they cannot see. Full model:
 [the tier model](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md#the-tier-model) and
 [what a release must earn](../plugins/workflows/contributing-davekjohn/RELEASES-portable.md#what-a-release-must-earn).
 
-### 3.2. Cut the `## [Unreleased]` section out of the changelog
+### 4.2. Cut the `## [Unreleased]` section out of the changelog
 
-### 3.3. Paste it into the development notes
+### 4.3. Paste it into the development notes
 
-### 3.4. Write the GitHub version
+### 4.4. Write the GitHub version
 
-### 3.5. Publish it as a new tag
+### 4.5. Publish it as a new tag
 
-**3.2 through 3.5 are one command, and the second direct-on-`main` exception.**
+**4.2 through 4.5 are one command, and the second direct-on-`main` exception.**
 [`cut-release.ps1`](../scripts/release/cut-release.ps1) bumps all plugin versions in lockstep, generates the
 release notes, **empties `CHANGELOG.md` down to its intro**, commits that on `main`, and tags the version.
 Deliberately no branch or PR — just like the fold. See
@@ -571,7 +677,7 @@ their writing norm, the bump rules, and the measurements behind each. It was mov
 August 15, 2026, where it was 41,168 B and 32% of everything loaded before a word of work. **Read it before
 changing any rule above**: most of what looks arbitrary here was measured there.
 
-### 3.6. Write the audience version
+### 4.6. Write the audience version
 
 **This is the third direct-on-`main` exception.** The cut generates the development notes and the audience
 **draft**, then names the documents it deliberately did not write. The internal note has its own script
@@ -619,7 +725,7 @@ was true at its merge and overtaken an hour later — stale, deliberately untouc
 it, updated the count without re-reading the target, and was therefore false on arrival and is corrected. That
 is the failure to watch for here: **a stale line copied forward becomes a false line.**
 
-### 3.7. Optional: wait for a `SHIP MAIN` or `PUSH LIVE` command
+### 4.7. Optional: wait for a `SHIP MAIN` or `PUSH LIVE` command
 
 **Optional because it depends on one seam answer, and here that answer is no** (Dave,
 [#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894), August 26, 2026). Where
@@ -627,24 +733,24 @@ is the failure to watch for here: **a stale line copied forward becomes a false 
 customer sees anything — the cut **stops here** and waits. Where it is empty, as it is in this repo, merging to
 `main` already is publication and there is nothing to wait for.
 
-**It sits at the end of step 3 rather than at the start of step 4, and the distinction is the point.** The
-waiting is the last thing the *cut* does; what follows the command is step 4's single act. Putting the
-condition inside step 4 read as though the cut had already finished, which is what this move corrects.
+**It sits at the end of step 4 rather than at the start of step 5, and the distinction is the point.** The
+waiting is the last thing the *cut* does; what follows the command is step 5's single act. Putting the
+condition inside step 5 read as though the cut had already finished, which is what this move corrects.
 
 **That command is never covered by the request that authorised the cut.** A Release document describes a
-version; a live push changes what customers see. Decision by Dave, August 5, 2026 — restated under 4.1, where
+version; a live push changes what customers see. Decision by Dave, August 5, 2026 — restated under 5.1, where
 it bites.
 
 ---
 
-## 4. SHIP MAIN / PUSH LIVE
+## 5. SHIP MAIN / PUSH LIVE
 
-### 4.1. Publish and distribute the audience release notes
+### 5.1. Publish and distribute the audience release notes
 
-**The waiting moved up to 3.7, and this step is what happens after it** (Dave,
+**The waiting moved up to 4.7, and this step is what happens after it** (Dave,
 [#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894), August 26, 2026). It used to be two
 steps here — wait for `main` to be live, *then* publish — which put the condition and the act in the same
-section as though the cut had already ended. It has not: 3.7 is the last thing the cut does, and it is where
+section as though the cut had already ended. It has not: 4.7 is the last thing the cut does, and it is where
 the checklist stops and waits for a `SHIP MAIN` or `PUSH LIVE` command. So this section is now the single act
 that command releases.
 
@@ -657,7 +763,7 @@ sees whatever the trunk holds.
 
 **It is not a no-op in every repo that runs this workflow, which is why the step exists.** A consumer with a
 live stage — a Shopify repo, where `main` still has to be pushed to a live theme before a customer sees
-anything — answers `Get-LiveStage` with that stage, and then the order in step 4 is load-bearing: the audience
+anything — answers `Get-LiveStage` with that stage, and then the order in step 5 is load-bearing: the audience
 notes describe what the audience can see, so publishing them before the push describes something that is not
 there yet.
 
