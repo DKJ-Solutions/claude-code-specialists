@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/lint-barred-skill-imperatives-v1` · 20260829-210904
+
+The lint gate now refuses a printed instruction that tells its reader to run a skill that reader cannot
+invoke. A skill whose frontmatter carries `disable-model-invocation: true` has its page removed from the
+model's context entirely, so a session told to `run the 'cut-release' skill` is refused by the harness and
+cannot even read the page that would explain the route -- while the reader who *can* run it, the person at
+the keyboard, is never told the line is theirs to type. Check 30 holds every printed script message and
+every shipped markdown line to naming the command and the actor instead.
+
+**Seven sites were named with a bare imperative and are repaired**: both `roster-sessioncheck` hooks,
+two lines in `check-roster-sync.ps1`, `adopt-config.ps1`, `adopt-shopify-floor.ps1` and `INSTALL.md`.
+Two of those are repaired by PR #1105 as well, in its exact wording, so the overlap resolves to identical
+text.
+
+The rule is frontmatter-driven rather than a phrasing convention, which is what lets
+`check-script-contract.ps1` go on naming the unflagged `adopt-workflow-folder` with the same bare
+imperative. Offered as optional by #1093 and deliberately not built there, under this repo's rule that a
+risk which has not bitten gets named rather than repaired -- built now because it bit twice a month apart
+(#731 -> #734, then #1093/#1096 rediscovered from scratch when a consumer adoption stopped on it) with
+nothing connecting the two.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every rule this repo adds to a gate has to be measured over the tree first, and this one shows why: the
+obvious version of the check -- an imperative verb plus a barred skill name -- is **half wrong**, four of
+its eight findings false. The discriminator that fixes it is one word, and the sharpest false finding it
+removes is `run park-cycle by hand`, where `\bpark\b` matches inside a longer name because a hyphen is not
+a word character. Shipped as measured: 11 findings, 7 sites, none of them false.
+
+**Score:** 2
+
+#### Pull Request
+
+The lint gate refuses a printed instruction that names a skill the model cannot invoke
+
+Plugins: contributing-davekjohn, team-alpha, team-shopify
+
+[PR #1111](https://github.com/DaveKJohn/claude-code-specialists/pull/1111)
+
+---
+
 ### DEPLOY: `fix/red-check-names-its-reason-in-the-transcript-v1` · 20260829-204558
 
 A failing check that does not block the merge now says **why** it failed, in the same transcript that
