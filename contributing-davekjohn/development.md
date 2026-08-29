@@ -60,9 +60,9 @@ no tracker feeds it -- the same shape step 5 already uses for a live stage this 
 
 ### TEST
 
-- [ ] Every in-page anchor and every inbound link to a renumbered heading resolves --
-      `check-plugin-integrity.ps1`'s dead-link scan is the measurement
-- [ ] `check-plugin-integrity.ps1` clean and all suites green
+- [x] Every in-page anchor and every inbound link to a renumbered heading resolves --
+      `check-plugin-integrity.ps1`'s dead-link scan is the measurement -- 298 links scanned, 0 findings
+- [x] `check-plugin-integrity.ps1` clean and all 54 suites green
 
 ### DEPLOY: `docs/contributing-new-issue-task-chapter-v1`
 
