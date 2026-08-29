@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/red-check-names-its-reason-in-the-transcript-v1` · 20260829-204558
+
+A failing check that does not block the merge now says **why** it failed, in the same transcript that
+reports it. `ship-pr` reads the failing check's annotations and prints the sentence that workflow wrote
+about itself -- so a red `claude-review` arrives as *"out of quota -- the review did not run ... resets
+Aug 31, 7am (UTC)"* instead of as a red mark with a log to go hunting through.
+
+The rule is generic on purpose: **a failure annotation carrying a title** was written by a workflow
+author, while the Actions runner emits its own untitled (*"Process completed with exit code 1"*). Nothing
+is keyed on a check name, so a consuming repo gets the same relay for workflows this repo has never seen.
+
+Filed as [#1103](https://github.com/DaveKJohn/claude-code-specialists/issues/1103) and, before it, seven
+more threads about the same red check -- one of which concluded that a secret needed rotating, against a
+log already reading `429`. The reason had been printed in the run since #966; what was missing was a
+reader standing where it was printed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It repairs a reporting loop rather than a bug: the eighth issue about a check whose own diagnostic had
+already answered the question. The measurement is the eight threads, and the repair is not a ninth
+explanation but moving the existing one to where the reader lands.
+
+**Score:** 2
+
+#### Pull Request
+
+a failing non-required check names its own reason where ship-pr's operator reads it
+
+Plugins: contributing-davekjohn
+
+[PR #1110](https://github.com/DaveKJohn/claude-code-specialists/pull/1110)
+
+---
+
 ### DEPLOY: `docs/orchestrator-skill-is-the-pre-bootstrap-door-v1` · 20260829-201457
 
 A consumer's session can now find the orchestrator during the adoption itself, instead of one restart
