@@ -877,9 +877,23 @@ try {
     $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
     Assert-Match '\[RECORD-SHAPE\]' $r.Out 'pathless record: the marker fires since #323'
     Assert-Match 'no record for this path, only a pathless one' $r.Out 'pathless record: the detail names the shape'
-    Assert-Match 'demotes' $r.Out 'pathless record: and names what produces it -- a session start, not the reader'
     Assert-Match 'prints NOTHING' $r.Out 'pathless record: warns that the prescribed query is silent about it, which is the only visible evidence otherwise'
-    Assert-Match 'Re-install at project scope' $r.Out 'pathless record: the remedy is in the line'
+    # THE LINE STOPPED ASSERTING A CAUSE (inbound #1095), and these four asserts are the repair rather than
+    # a rewording. It used to say the shape is what a session start "leaves behind when it demotes" and that
+    # "this repo simply no longer has its own record" -- both are ONE of two readings stated as fact. The
+    # conjunction this arm fires on is equally the resting state of a plugin installed machine-wide on
+    # purpose, and #323 measured why no predicate can separate them: the demotion writes scope='user' and
+    # drops projectPath, producing the same shape as an ordinary user install. Measured against a real
+    # consumer where the plugin predated the repo by three weeks.
+    #
+    # THE OLD ASSERT WAS 'demotes' AND IT IS REPLACED BY ITS NEGATIVE, deliberately: the word is the claim,
+    # so a test asserting it PINNED the defect. Same for the bare remedy -- 'Re-install at project scope
+    # from this root' is right for one of the two states and destructive advice for the other.
+    Assert-NotMatch 'the shape a SESSION START leaves behind when it demotes' $r.Out 'pathless record: the line no longer states the demotion as fact'
+    Assert-NotMatch 'this repo simply no longer has its own record' $r.Out 'pathless record: nor claims a record this repo may never have had'
+    Assert-Match 'if you installed this plugin at project scope FROM THIS ROOT' $r.Out 'pathless record: the remedy is conditional on the one question only the reader can answer'
+    Assert-Match 'installed machine-wide on purpose, this line is expected and needs no action' $r.Out 'pathless record: and the no-action branch is stated OUT LOUD -- an unstated one reads as a defect to clear'
+    Assert-Match 're-install it at project scope' $r.Out 'pathless record: the #323 remedy is still reachable, on the branch it belongs to'
     # The permissive predicate must stay permissive: a pathless record really does load here.
     Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'pathless record: the OTHER marker stays silent -- it loads machine-wide'
     Assert-Equal 0 $r.Code 'pathless record: exit 0 -- nothing is broken'

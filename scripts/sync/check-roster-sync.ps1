@@ -647,7 +647,31 @@ if ($enabledIds.Count -gt 0) {
                 # The shape nothing reported before #323. Named in full, because the reader's own
                 # verification query prints NOTHING for this plugin while it is plainly loading -- so
                 # without this line the only visible evidence is an absence.
-                Write-Host "  [RECORD-SHAPE] '$safeId' has no record for this path, only a pathless one (scope: '$scopeList') -- the shape a SESSION START leaves behind when it demotes a 'project' record and drops its projectPath. The plugin loads machine-wide, so nothing is broken; this repo simply no longer has its own record, and it prints NOTHING in the specialists-init step 0c query while it is plainly loading. Re-install at project scope from this root." -ForegroundColor DarkGray
+                #
+                # IT REPORTS THE OBSERVATION AND ASKS THE READER FOR THE HISTORY (inbound #1095). It used to
+                # state the demotion as fact -- "the shape a SESSION START leaves behind when it demotes",
+                # "this repo simply no longer has its own record" -- and close with a bare
+                # "Re-install at project scope from this root." Both halves are wrong in the common case.
+                # The conjunction this arm fires on (no record for this path, a pathless one exists) is ALSO
+                # the resting state of every correctly user-installed plugin in every repo that has not
+                # project-installed it, so the line fires machine-wide, at every session start, for a
+                # deliberately chosen install shape -- and then instructs the reader to undo it, which
+                # converts a machine-wide install into a per-repo one and adds a record nobody wanted.
+                # Measured in a fresh consumer on August 29, 2026, on a plugin installed machine-wide three
+                # weeks before that repo existed.
+                #
+                # AND THE CAUSE IS NOT RECOVERABLE FROM THE DATA, which is why the fix is the wording rather
+                # than a predicate. The obvious gate -- suppress this for scope 'user' -- was proposed and
+                # withdrawn on the same issue: #323 measured the demotion directly, and it WRITES
+                # scope='user', drops projectPath, and merges away any pre-existing pathless record. A
+                # demoted record is byte-for-byte the shape of an ordinary machine-wide install. Gating on
+                # scope would restore exactly the silence #314/#315/#323 were built to end.
+                #
+                # So the arm keeps firing and stops claiming. The one question that separates the two states
+                # is one the reader answers instantly and the register cannot answer at all: did YOU install
+                # this here at project scope? The remedy is conditional on that, and the no-action branch is
+                # stated out loud -- an unstated "or this is fine" reads as a defect the reader must clear.
+                Write-Host "  [RECORD-SHAPE] '$safeId' has no record for this path, only a pathless one (scope: '$scopeList') -- so it loads from a machine-wide install and prints NOTHING in the specialists-init step 0c query while it is plainly loading. Two states look identical here and the register cannot tell them apart: if you installed this plugin at project scope FROM THIS ROOT, that record is gone (#323) -- re-install it at project scope. If it is installed machine-wide on purpose, this line is expected and needs no action." -ForegroundColor DarkGray
             }
         }
     }
