@@ -338,7 +338,32 @@ try {
     Assert-True ($r.Out -match 'sections/editor\.liquid\s+content this repo has never held') 'foreign/changed: a third party''s edit to an untouched file is taken'
     Assert-True ($r.Out -match 'sections/brand-new\.liquid\s+content this repo has never held') 'foreign/added: a file only live has and we never held is taken'
     Assert-True ($r.Out -notmatch 'sections/crlf\.liquid') 'crlf: a line-ending-only difference is not a difference at all'
-    Assert-True ($r.Out -notmatch 'caf') 'quotepath: a path with a non-ASCII byte is compared, not read as a new file'
+    # THE NEEDLE CARRIES ITS PATH PREFIX, and that is the whole of inbound #1117 (August 29, 2026).
+    # It read `-notmatch 'caf'` and went red under the CI gate on PR #1105 -- a branch byte-identical
+    # to the trunk in both this suite and the script it tests, green locally, green on the trunk 16
+    # minutes later, and the only CI failure in 30 runs. It was filed as a possible second axis behind
+    # #821 (a git path decoded off the console code page) and it is not that at all.
+    #
+    # WHAT IT ACTUALLY WAS: `c`, `a` and `f` are all hex digits, and the fixtures are named
+    # `syncmain-<pid>-<label>-<six hex chars>` from a GUID. The run PRINTS those paths --
+    # "using the mirror given: ...\Temp\syncmirror-32348-live-caf123" -- so roughly one run in 500
+    # spells the needle in a directory name and fails an assert about a file it never touched.
+    # Reproduced by forcing the suffix to 'caf123': `FAILED: 1 of 80 asserts.`, the same one, which is
+    # also why the sibling `drift on 2 file(s)` assert stayed green in the CI run -- nothing was ever
+    # miscounted as drift. Measured over 2,000,000 random six-hex names: 0.0968% contain 'caf', and
+    # two such names are printed per run, so 0.194% -- one in 517.
+    #
+    # THE TAIL IS STILL TRUNCATED ON PURPOSE. Matching the full `sections/caf<e9>.liquid` would defeat
+    # the assert: mojibake is what it is looking for, and mojibake lands in exactly the bytes the full
+    # name would pin. So the needle keeps its short tail and gains the one prefix that makes it name a
+    # path in the report rather than three characters anywhere in a temp directory.
+    #
+    # AND THE FIXTURE SUFFIX IS DELIBERATELY LEFT ALONE. Making it digits-only would kill 'caf' and
+    # open the same door to a digit needle -- this tree already has `-notmatch '2099'` and
+    # `-notmatch '332340'` (neither at risk today: one suite has no GUID, the other's tag does not
+    # reach the haystack). A random suffix is legitimately random; asserting on a three-character
+    # substring of a whole run's output was the defect.
+    Assert-True ($r.Out -notmatch 'sections/caf') 'quotepath: a path with a non-ASCII byte is compared, not read as a new file'
     Assert-True ($r.Out -match 'drift on 2 file\(s\)') 'take: exactly the two foreign files go into the sync'
     # THE MIRROR MODEL'S OWN GUARANTEE: a held-back file is never written, so it cannot be damaged by a
     # rule that got it wrong or by a failure halfway. The wholesale version overwrote first and restored
