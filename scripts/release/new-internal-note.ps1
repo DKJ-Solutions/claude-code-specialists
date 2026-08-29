@@ -199,7 +199,12 @@ $dev = [System.IO.File]::ReadAllText($devFile, [System.Text.Encoding]::UTF8)
 
 function Get-MetaLine {
     param([string]$Text, [string]$Label)
-    $m = [regex]::Match($Text, "(?m)^\*\*${Label}:\*\*\s*(.+?)\s*$")
+    # BOTH SPELLINGS OF THE MARKDOWN HARD BREAK ARE TRIMMED (inbound #1100): release-lib.ps1 wrote two
+    # trailing spaces until that repair and writes a trailing backslash now, and every note already
+    # published carries the old form. Without the backslash in this class the date would be carried into
+    # the internal note as '2026-08-29\' -- a silently wrong value rather than a loud failure, which is
+    # exactly the shape a parser change has to be checked for.
+    $m = [regex]::Match($Text, "(?m)^\*\*${Label}:\*\*\s*(.+?)[\s\\]*$")
     if ($m.Success) { return $m.Groups[1].Value }
     return ''
 }

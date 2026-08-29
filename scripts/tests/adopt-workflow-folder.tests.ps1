@@ -22,6 +22,10 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\adopt-workflow-folder.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-workflow-folder-test-fixture-$PID"
 
+# Dot-sourced for ONE constant: Get-EntryHeadingLevel, which the scaffolded CHANGELOG intro is asserted
+# against rather than against a literal '###' (inbound #1098). The lib is pure and loads no state.
+. (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
+
 $script:pass = 0
 $script:fail = 0
 
@@ -148,6 +152,20 @@ try {
 # layout, so removing the comparison turned this assert red while the thing it checks was untouched. The
 # list's filename is what the assert is about.
 Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list actually lives instead'
+    # THE CHANGELOG INTRO STATES THE LEVEL THE FOLD ACTUALLY WRITES (inbound #1098). It said '##' while the
+    # fold has written '###' since the levels shifted, so the one piece of prose a consumer ever reads ABOUT
+    # their own changelog contradicted the first entry three lines below it. Nothing breaks, which is why it
+    # survived a release: no gate compares the two, and the first person to notice is somebody debugging why
+    # their hand-written '##' entry did not fold.
+    #
+    # ASSERTED AGAINST Get-EntryHeadingLevel RATHER THAN AGAINST '###'. Pinning the literal would pass while
+    # the sentence went stale again at the next shift, which is exactly the failure being repaired -- and it
+    # would also turn red for a repo that legitimately overrode the level. The constant is the claim.
+    $clText = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\CHANGELOG.md'), [System.Text.Encoding]::UTF8)
+    $entryHashes = '#' * (Get-EntryHeadingLevel)
+    Assert-Match ('one `' + $entryHashes + '` per change') $clText '-Apply: the changelog intro states the heading level the fold writes'
+    Assert-True ($clText -notmatch 'one `#{1,2}` per change') '-Apply: and no longer states a shallower one'
+
     # And the closing block names the two seams only this repo can answer.
     Assert-Match 'Get-ReleaseNoteRoot' $r2.Out '-Apply: the next-steps block names Get-ReleaseNoteRoot'
     Assert-Match 'Get-ReleaseHistoryPath' $r2.Out '-Apply: and Get-ReleaseHistoryPath'

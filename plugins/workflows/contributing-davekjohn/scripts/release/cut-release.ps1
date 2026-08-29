@@ -458,12 +458,27 @@ if ((git status --porcelain)) { Write-Error "Working tree not clean -- commit/st
 # ticket file or ADOPTION.md essentially never has, since those open with a plain # title. So a new
 # permanent root doc is safe with NO configuration, and $reservedRootMd above becomes an optional
 # override rather than something that has to be kept current.
+#
+# -OpeningHeadingOnly IS WHAT MAKES THAT PROMISE TRUE (inbound #1099). It was not, and the gap was exactly
+# the words "since those open with a plain # title": the name test does not read only the opening line, it
+# scans EVERY heading, so one backticked word anywhere -- '## Deploying `web`', '## The `build` step' --
+# declared a branch and turned an ordinary root doc into an unfolded entry. Measured in a live consumer on
+# a test run's own log, whose '## Step 3 -- `specialists-init` * **PASS**' read as the branch
+# 'specialists-init'. The switch stops the heading scan after the document's first heading, which is where
+# every real entry declares its branch, so the class of file this comment calls safe now is.
 $strayEntries = @(Get-ChildItem -Path $repoRoot -Filter '*.md' -File |
     Where-Object { $reservedRootMd -notcontains $_.Name } |
-    Where-Object { Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($_.FullName)) } |
+    Where-Object { Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($_.FullName)) -OpeningHeadingOnly } |
     Select-Object -ExpandProperty Name)
 if ($strayEntries.Count -gt 0) {
-    Write-Error "There are still unfolded changelog entry files in the root: $($strayEntries -join ', '). Fold them first (fold-changelog-entry.ps1)."
+    # THE REMEDY COVERS BOTH WAYS THIS GATE FIRES (inbound #1099, the #1081 lesson in another script).
+    # "Fold them first" is right for the case the guard is FOR and DESTRUCTIVE for the other one -- a
+    # permanent doc read as an entry gets pasted into CHANGELOG.md and deleted. The gate cannot tell the
+    # two apart; the reader can, so it names both routes and the seam that settles it, which nothing on
+    # screen used to mention.
+    Write-Error ("There are still unfolded changelog entry files in the root: $($strayEntries -join ', '). " +
+        "Fold them first (fold-changelog-entry.ps1) -- or, if one of them is NOT a changelog entry, add its " +
+        "name to Get-ReservedRootMd in scripts\repo-config.ps1 and cut again.")
     exit 1
 }
 

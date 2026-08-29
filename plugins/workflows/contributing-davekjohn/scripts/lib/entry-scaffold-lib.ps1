@@ -5697,8 +5697,33 @@ function Get-BranchFileDeclaredBranch {
         The label is read from the wording rather than hardcoded, so a repo that translated it can still be
         recognised -- a predicate that only knows the English label would read every file in a translated
         repo as unscaffolded and overwrite it.
+
+        -OpeningHeadingOnly STOPS THE HEADING SCAN AFTER THE DOCUMENT'S FIRST HEADING (inbound #1099), and it
+        exists for exactly one caller: the release cut's scan of a repo's ROOT *.md files. That scan asks a
+        different question from every other caller here. The others hand this function a document they already
+        know is a branch document, at a fixed path, and want the branch out of it -- for which the widest
+        possible reading is right, and the comments below say at length why narrowing it is the expensive
+        direction. The root scan hands it an ARBITRARY document and asks whether it is one at all, and there
+        the width is what breaks: any `##` heading carrying a backticked word -- '## Deploying `web`',
+        '## The `build` step' -- reads as a branch declaration, so an ordinary run log or ADOPTION.md is
+        reported as an unfolded entry. Measured in a live consumer, on a heading reading
+        '## Step 3 -- `specialists-init` * **PASS**'.
+
+        THE OPENING HEADING IS THE HONEST NARROWING, rather than anchoring a lead word. Every shape this
+        predicate reads declares its branch in the document's OWN first heading -- '# `feat/x` progress',
+        '## Branch `feat/x` changelog', '## Development: `feat/x-v1`' -- so nothing an entry can be is lost,
+        while a document whose first heading is a plain '# Title' stops being read past it. A lead-word anchor
+        would have been the narrowing this predicate's own comments forbid: the title is a wording seam, a repo
+        may set it to anything, and branches open across a rename carry titles no list holds.
+
+        THE '**Branch:**' FALLBACK IS NOT NARROWED, deliberately. It is a legacy shape that sits BELOW the H1
+        title of a pre-split root entry -- exactly the file this scan exists to catch -- and its line regex is
+        anchored end to end, so it cannot collide with ordinary prose the way the heading pattern can.
     #>
-    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
+        [switch]$OpeningHeadingOnly
+    )
 
     # TWO SHAPES, ONE WRITTEN. The branch is named in the file's H1 -- '# `feat/x` progress' -- since
     # August 6, 2026, because that heading has to say which branch this is anyway and a second line
@@ -5748,12 +5773,19 @@ function Get-BranchFileDeclaredBranch {
     # while Get-EntryHeadingPattern must not be one -- that pattern scans a document for EVERY entry
     # boundary, so an entry's own inner sections would parse as siblings. This one stops at the first hit.
     $headingRx = '^#{1,3}\s+[^`]*`([^`]+)`'
+    $anyHeadingRx = '^#{1,6}\s'
     $label = (Get-BranchFileWording).BranchLabel
     $lineRx = '^\*\*' + [regex]::Escape([string]$label) + ':\*\*\s*`([^`]+)`\s*$'
 
     $fallback = ''
+    $sawHeading = $false
     foreach ($line in ($Text -split '\r?\n')) {
-        if ($line -match $headingRx) { return $Matches[1] }
+        if ($line -match $anyHeadingRx) {
+            if (-not ($OpeningHeadingOnly -and $sawHeading)) {
+                if ($line -match $headingRx) { return $Matches[1] }
+            }
+            $sawHeading = $true
+        }
         if ((-not $fallback) -and $line -match $lineRx) { $fallback = $Matches[1] }
     }
     return $fallback
@@ -6045,8 +6077,16 @@ function Test-BranchChangelogIsFilled {
         once written and an H1 while reset, so only the level test needs to speak for those -- and where both
         speak, they agree.
     #>
-    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
-    $declared = Get-BranchFileDeclaredBranch -Text $Text
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
+        [switch]$OpeningHeadingOnly
+    )
+    # -OpeningHeadingOnly is passed straight through to the name test; what it means, and why only the
+    # release cut's ROOT scan asks for it, is documented on Get-BranchFileDeclaredBranch (inbound #1099).
+    # It is a pass-through rather than a second predicate on purpose: one predicate answering "is this an
+    # entry" is the whole point of this function, and the fold and the cut once came to disagree exactly
+    # because there were two.
+    $declared = Get-BranchFileDeclaredBranch -Text $Text -OpeningHeadingOnly:$OpeningHeadingOnly
     if ($declared -and $declared -ne (Get-BranchTrunkName)) { return $true }
 
     # A DOCUMENT DECLARING THE TRUNK IS A RESET, AND THAT IS NOW THE ANSWER RATHER THAN A FALL-THROUGH
