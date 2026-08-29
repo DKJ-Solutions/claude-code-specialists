@@ -995,6 +995,52 @@ Assert-Equal 1 $wtCount                                                         
 # ---------------------------------------------------------------------------------------------------
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
 
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "A branch the changelog already carries is refused, not folded a second time" -ForegroundColor Cyan
+#      INBOUND #1082, measured in a consumer: two entries, same branch, same text, two PR numbers, both
+#      folds reported as a success. The route in was #1077 (open-pr's open-only lookup letting a re-run of
+#      ship-pr open a second PR for an already-merged branch); this is the second line of defence, and it
+#      exists because the step that WRITES the record had nothing to say about writing it twice.
+#
+#      REFUSING IS SAFE HERE FOR A REASON THAT DOES NOT GENERALISE, which is why this suite states it: an
+#      unscored entry that is refused leaves merged work with NO record, while a duplicate that is refused
+#      leaves the record already standing.
+$dirD = New-FoldFixture -Label 'duplicate'
+$dupMd = [char]0x00B7
+$seeded = $script:FixtureIntro.TrimEnd() + "`n`n" + ((@(
+    "$foldEntryH DEPLOY: ``feat/dup-thing-v1`` $dupMd 20260101-000000", '',
+    'The entry this branch already has.', '',
+    '[PR #7](https://example.invalid/pull/7)', ''
+)) -join "`n")
+[System.IO.File]::WriteAllText((Join-Path $dirD 'CHANGELOG.md'), $seeded, $Utf8NoBom)
+New-EntryFile -Dir $dirD -Name 'feat-dup-thing-v1.md' -Title 'Second time round'
+$rD = Invoke-Fold -Dir $dirD
+$clD = Get-Changelog -Dir $dirD
+
+Assert-True ($rD.ExitCode -eq 1)                                        'duplicate: the run ends non-zero, so ship-pr sees it'
+Assert-True (Test-Path (Join-Path $dirD 'feat-dup-thing-v1.md'))        'duplicate: the entry file is NOT removed'
+Assert-True ($clD -notmatch 'Second time round')                        'duplicate: and nothing was written to CHANGELOG.md'
+Assert-Equal 1 @(Get-EntryOrder -Changelog $clD).Count                  'duplicate: the list still holds exactly the one entry'
+Assert-True ($rD.Output -match 'PR #7')                                 'duplicate: the refusal names the PR of the entry already there'
+Assert-True ($rD.Output -notmatch 'CHANGELOG\.md updated')              'duplicate: and does not claim the changelog was updated'
+
+# -Force IS THE ESCAPE VALVE, and it is asserted because a gate whose way past is untested is a gate
+# nobody can get past when it is wrong.
+$rF = Invoke-Fold -Dir $dirD -ExtraArgs @('-Force')
+$clF = Get-Changelog -Dir $dirD
+Assert-True ($rF.ExitCode -eq 0)                                        'duplicate: -Force folds it after all'
+Assert-True (-not (Test-Path (Join-Path $dirD 'feat-dup-thing-v1.md'))) 'duplicate: -Force removes the entry file as any fold does'
+Assert-True ($clF -match 'Second time round')                           'duplicate: -Force writes the entry'
+
+# A DIFFERENT BRANCH IS NOT A DUPLICATE, which is the false positive that would wedge every fold in a repo
+# whose changelog is not empty.
+$dirN = New-FoldFixture -Label 'notduplicate'
+[System.IO.File]::WriteAllText((Join-Path $dirN 'CHANGELOG.md'), $seeded, $Utf8NoBom)
+New-EntryFile -Dir $dirN -Name 'feat-other-thing-v1.md' -Title 'A different branch'
+$rN = Invoke-Fold -Dir $dirN
+Assert-True ($rN.ExitCode -eq 0)                                        'not a duplicate: a branch with no entry of its own folds normally'
+Assert-True ((Get-Changelog -Dir $dirN) -match 'A different branch')    'not a duplicate: and lands in the list'
 Write-Host ""
 Write-Host "Result: $($script:pass) pass, $($script:fail) fail." -ForegroundColor $(if ($script:fail -gt 0) { 'Red' } else { 'Green' })
 if ($script:fail -gt 0) { exit 1 }

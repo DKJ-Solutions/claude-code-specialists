@@ -670,7 +670,13 @@ $repoConfigRosterPart = $repoConfigRosterPart.Replace('__SEAM_ROSTER_PATH__', $s
 # supported id: it can go once every register entry has moved.
 $workflowPluginName  = 'contributing-davekjohn'
 $workflowPluginNames = @($workflowPluginName, 'workflow-davekjohn')
-$hasWorkflowPack = (@($pluginNames | Where-Object { $workflowPluginNames -contains $_ }).Count -gt 0)
+# Which of those names this repo actually enabled, captured once: $hasWorkflowPack asks whether
+# there is one, and the settings proposal further down needs to know WHICH -- a consumer still on the
+# migration name has that segment in their plugin path, and a rule anchored on the other spelling
+# would match nothing for them.
+$workflowNamesHere   = @($pluginNames | Where-Object { $workflowPluginNames -contains $_ })
+$hasWorkflowPack     = ($workflowNamesHere.Count -gt 0)
+$workflowNameHere    = if ($hasWorkflowPack) { $workflowNamesHere[0] } else { $workflowPluginName }
 
 $repoConfigScaffold = $repoConfigHeader + $repoConfigRosterPart
 if ($hasWorkflowPack) {
@@ -899,14 +905,66 @@ $importBlock
 $claudeDir = Join-Path $ConsumerRoot '.claude'
 if (-not (Test-Path -LiteralPath $claudeDir)) { New-Item -ItemType Directory -Path $claudeDir -Force | Out-Null }
 $suggestPath = Join-Path $claudeDir 'settings.suggested.jsonc'
-$suggestion = @'
+
+# THE ALLOW HALF (inbound #1075). Until it existed, this proposal carried exactly one permissions
+# half -- 'deny' -- so a consumer who followed the adoption to the letter got a repo that FORBIDS the
+# five things the workflow must never do and PERMITS nothing it must do. Under a prompting mode that
+# is a prompt per step; under auto mode the classifier can refuse outright, with no prompt to approve.
+# And the gap can only be closed from OUTSIDE a session: a permissions file is never agent-editable
+# (team-alpha's own settings manual says so, and that boundary is correct), so the human is the only
+# one who can paste the lines -- which makes shipping them more important, not less.
+#
+# THE PATHS ARE WILDCARDED, AND THAT IS THE FIX RATHER THAN A SHORTCUT. The report proposed writing
+# the resolved plugin root into each rule. That path is VERSION-PINNED -- an install record reads
+# .../plugins/cache/<marketplace>/<plugin>/<version>/ -- so a rule naming today's root stops matching
+# at the consumer's next plugin update, silently, while still reading as covered. A permission rule
+# that expires is worse than none. The '*' stands in for the machine-specific root and the version;
+# every token before it is literal, which is what holds the rule to this plugin's script of that name
+# and keeps it clear of the startup warning that fires when an allow rule wildcards the program or
+# the subcommand. Rule syntax per the permission reference: '*' matches at any position, and
+# PowerShell rules take the same shape as Bash rules.
+#
+# NAMED BY THE PLUGIN THAT IS ACTUALLY ENABLED, not by the current id -- $workflowNameHere, resolved
+# where $hasWorkflowPack is: a consumer still on the migration name 'workflow-davekjohn' has that
+# segment in their cache path, and a rule anchored on the other spelling would match nothing for them.
+$allowBlock = if ($hasWorkflowPack) {
+    @"
+    // The workflow's own entry points -- the three commands the documented cycle is made of. Both
+    // tool shapes, because the same line can arrive through the Bash tool or the PowerShell tool.
+    //
+    // DELIBERATELY ABSENT: cut-release.ps1, because it cuts a release and that one is worth a
+    // prompt; and 'gh repo delete' / 'gh repo archive', for the same reason. 'gh repo edit' earns
+    // its place in the single form the workflow assumes -- it needs deleteBranchOnMerge on.
+    "allow": [
+      "Bash(powershell -NoProfile -File *$workflowNameHere*new-branch.ps1*)",
+      "Bash(powershell -NoProfile -File *$workflowNameHere*open-pr.ps1*)",
+      "Bash(powershell -NoProfile -File *$workflowNameHere*ship-pr.ps1*)",
+      "PowerShell(powershell -NoProfile -File *$workflowNameHere*new-branch.ps1*)",
+      "PowerShell(powershell -NoProfile -File *$workflowNameHere*open-pr.ps1*)",
+      "PowerShell(powershell -NoProfile -File *$workflowNameHere*ship-pr.ps1*)",
+      "Bash(gh repo edit --delete-branch-on-merge*)"
+    ],
+"@
+} else {
+    @'
+    // Empty on purpose: no workflow plugin is enabled here, so there is no scripted entry point to
+    // permit -- this repo keeps the way of working it already had, and its commands are its own.
+    // The 'deny' half below still applies. Enable 'contributing-davekjohn' and re-run
+    // specialists-init, and this half is filled in with that workflow's entry points.
+    "allow": [],
+'@
+}
+
+$suggestion = @"
 // PROPOSAL -- created by specialists-init. This is NOT active configuration.
 // Copy desired blocks to .claude/settings.json (or settings.local.json) and remove
 // this file afterward. Hooks are a STUB: scripts are repo-specific and do not exist here yet --
 // replace with guards/lints appropriate for this repo (or omit).
 {
-  // Governance: block destructive git actions prohibited by safety rules.
+  // Governance: permit what the way of working is made of, block the destructive git actions the
+  // safety rules prohibit. Both halves are ready to use as they stand.
   "permissions": {
+$allowBlock
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
@@ -926,7 +984,7 @@ $suggestion = @'
     ]
   }
 }
-'@
+"@
 # TRAILING NEWLINE, because the here-string above ends at its closing brace and WriteAllText adds
 # nothing (inbound #363). Same defect the #337.2 warning names for CLAUDE.md, one file over -- and that
 # warning does not cover this one, so nothing pointed at it.
@@ -1001,9 +1059,22 @@ Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delet
 # are a stub, but this line -- "copy desired parts" -- is the instruction a reader actually acts on, and
 # it named no exception. The permissions block is ready to use; the hook block points at a script no
 # part of this family creates. A reader who copied both got a Stop hook firing at a missing file.
-Write-Host "     Note: the 'permissions' block is ready to use as-is. The 'hooks' block is NOT -- its" -ForegroundColor Gray
-Write-Host "     script path is a placeholder this bootstrap does not create. Point it at a real script" -ForegroundColor Gray
-Write-Host "     in this repo or leave the block out." -ForegroundColor Gray
+#
+# AND SAY WHAT THE PERMISSIONS BLOCK NOW DOES (inbound #1075). "Ready to use as-is" was true and beside
+# the point while the block had one half: copying it made the repo safer and no more usable, and the
+# reader had no way to tell that from this line. So it names both halves and what the allow half covers.
+Write-Host "     Note: the 'permissions' block is ready to use as-is -- it now has BOTH halves." -ForegroundColor Gray
+if ($hasWorkflowPack) {
+    Write-Host "     Its 'allow' half permits this workflow's own entry points (new-branch / open-pr /" -ForegroundColor Gray
+    Write-Host "     ship-pr, plus 'gh repo edit --delete-branch-on-merge'); cut-release is deliberately" -ForegroundColor Gray
+    Write-Host "     NOT in it. You are the only one who can widen a permissions file, so nothing in a" -ForegroundColor Gray
+    Write-Host "     session can place these for you." -ForegroundColor Gray
+} else {
+    Write-Host "     Its 'allow' half is empty and says why: no workflow plugin is enabled here, so there" -ForegroundColor Gray
+    Write-Host "     is no scripted entry point to permit." -ForegroundColor Gray
+}
+Write-Host "     The 'hooks' block is NOT ready -- its script path is a placeholder this bootstrap does" -ForegroundColor Gray
+Write-Host "     not create. Point it at a real script in this repo or leave the block out." -ForegroundColor Gray
 Write-Host "  4. Restart Claude Code session to activate new @-imports + config." -ForegroundColor Gray
 Write-Host "  5. Register this repo in the workshop's connector register -- paste-ready block below." -ForegroundColor Gray
 

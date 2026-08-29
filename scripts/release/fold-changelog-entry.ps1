@@ -141,7 +141,13 @@ param(
     # Push the fold commit. Implies -Commit. Separate because a fold commit sitting unpushed on main is
     # its own silent half-state -- the repo looks folded locally and unfolded to everyone else -- and
     # that is precisely the class of half-finished state this repo keeps finding the expensive way.
-    [switch]$Push
+    [switch]$Push,
+    # The escape valve for the duplicate-entry gate below, and for nothing else. It overrules a JUDGEMENT
+    # about content -- "the changelog already carries an entry naming this branch" -- rather than skipping
+    # a tool, which is the same test the entry scaffold gate's -Force is granted on. No case that needs it
+    # has been measured; it exists so a false positive cannot wedge a fold that has to land, since this is
+    # the step that writes the record and the branch is usually gone by the time anyone notices.
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -465,6 +471,10 @@ if ($tierProblems.Count -gt 0) {
 
 # What this run actually folded -- the source for both the commit message and the committed pathspec.
 $folded = @()
+# What this run REFUSED to fold -- see the duplicate gate in the loop. Kept so the run can end on a
+# non-zero code without stopping the entries around it: in fold-all mode a duplicate is one file's
+# problem, and the others still have to land.
+$refused = @()
 
 foreach ($file in $entryFiles) {
     $filePath = Join-Path $repoRoot $file
@@ -648,6 +658,31 @@ foreach ($file in $entryFiles) {
             $branchForPr = $base -replace '^([^-]+)-', '$1/'
         }
     }
+
+    # ONE BRANCH, ONE ENTRY -- the second line of defence for the route inbound #1077 opened, reported
+    # separately as #1082 because the step that WRITES the record had nothing to say about writing it
+    # twice. Measured in a consumer: two entries, same branch, same text, two PR numbers, both folds
+    # reported as a success. Nothing downstream catches it either -- the cut counts a duplicate twice in
+    # its tier breakdown and prints it twice in the published note, under two links that both work.
+    #
+    # WHY REFUSING IS SAFE HERE AND IS NOT SAFE FOR A MISSING SCORE, which this file's header is explicit
+    # about ("refusing the fold of an already-merged branch is the silent half-state this repo has
+    # measured"). That reasoning turns on what the refusal LEAVES BEHIND: an unscored entry that is not
+    # folded leaves merged work with no record at all, while a duplicate that is not folded leaves the
+    # record already standing. There is nothing to lose by stopping, which is exactly what makes this the
+    # one place a refusal costs nothing.
+    #
+    # THE BRANCH NAME IS THE KEY AND THE STAMP IS NOT -- Get-FoldedEntryForBranch's own docstring carries
+    # why, since that is a fact about the entry FORMAT rather than about this script.
+    $alreadyFolded = if ($branchForPr) { Get-FoldedEntryForBranch -ChangelogText $changelogContent -Branch $branchForPr } else { $null }
+    if ($alreadyFolded -and -not $Force) {
+        $whichOne = if ($alreadyFolded.PrNumber -gt 0) { "PR #$($alreadyFolded.PrNumber)" } else { 'an entry carrying no PR number' }
+        Write-Host "Refused: CHANGELOG.md already carries an entry for '$branchForPr' ($whichOne) -- '$file' was NOT folded." -ForegroundColor Red
+        Write-Host "  $($alreadyFolded.Heading)" -ForegroundColor DarkGray
+        Write-Host "  A second cycle on the same subject gets its own branch, which new-branch names -v2. Pass -Force to fold anyway." -ForegroundColor DarkGray
+        $refused += $file
+        continue
+    }
     # gh can write messages to stderr; Invoke-NativeCapture runs it under EAP=Continue so that
     # cannot become a terminating error before the graceful exit-code handling below (#107).
     # -DiscardStderr (2>$null) keeps stderr out of the captured JSON. 'files' is simply included in
@@ -799,7 +834,9 @@ foreach ($file in $entryFiles) {
     }
 }
 
-Write-Host "CHANGELOG.md updated." -ForegroundColor Green
+# Only when something actually landed: after a run whose every entry was refused as a duplicate, this
+# line was the loudest true-sounding thing on screen and said the opposite of what happened.
+if ($folded.Count -gt 0) { Write-Host "CHANGELOG.md updated." -ForegroundColor Green }
 
 # THE STEP LIST GOES WITH THE ENTRY, and since August 23, 2026 that needs no write at all. The two were
 # separate files: the entry was cleared in the loop above and the step list here, keyed on the entry
@@ -844,6 +881,9 @@ if ($Push) { $Commit = $true }
 if ($Commit) {
     if ($folded.Count -eq 0) {
         Write-Host "Nothing was folded, so there is nothing to commit." -ForegroundColor Yellow
+        # Non-zero when the reason nothing was folded is a REFUSAL: ship-pr reads this code, and a
+        # duplicate that ends the run on 0 is the silent success this gate exists to stop.
+        if ($refused.Count -gt 0) { exit 1 }
         exit 0
     }
     $subjects = @($folded | ForEach-Object {
@@ -927,4 +967,13 @@ if ($Commit) {
         }
         Write-Host "Pushed." -ForegroundColor Green
     }
+}
+
+# A REFUSED ENTRY ENDS THE RUN NON-ZERO, and it is reported HERE rather than at the moment of refusal
+# because in fold-all mode a duplicate is one file's problem: the entries around it still have to land.
+# ship-pr reads this code, which is what carries the gate into the cycle instead of leaving it on screen.
+if ($refused.Count -gt 0) {
+    $what = if ($refused.Count -eq 1) { 'entry was' } else { 'entries were' }
+    Write-Host "$($refused.Count) $what refused as a duplicate and NOT folded: $($refused -join ', ')" -ForegroundColor Red
+    exit 1
 }

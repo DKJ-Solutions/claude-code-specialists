@@ -200,6 +200,25 @@ a time — a fold-all that failed halfway would leave earlier entries folded and
 - a tier the model has no meaning for (`Tier: 5`, `Tier: two`, or an impact row `| 5 | 3 | … |`);
 - a significance cell off the scale (`| 2 | 9 | … |`).
 
+**And one refusal that arrives after the entry has been read: a branch the changelog already carries an
+entry for.** The fold used to write a second one and report both runs as a success — measured in a
+consumer as two entries, same branch, same text, two PR numbers, with nothing downstream refusing them
+either: the cut counts a duplicate twice in its tier breakdown and prints it twice in the published note,
+under two links that both work. The refusal names the PR of the entry already there, leaves the entry file
+on disk and ends the run non-zero, so `ship-pr` sees it. `-Force` folds anyway.
+
+**The branch name is the key, and the merge stamp is not** — the fold writes that stamp at fold time, so a
+duplicate carries a different one, which is why nothing matched. A second cycle on the same subject is a
+`-v2` branch by construction, so two entries naming one branch is not a state this cycle reaches
+legitimately. The entry *text* is not a key either: two branches may describe the same change in the same
+words.
+
+**Refusing is safe here for a reason that does not generalise.** This page says elsewhere that a missing
+score is folded anyway rather than refused, and that still holds: an entry that is refused for a missing
+score leaves merged work with no record at all, while a duplicate that is refused leaves the record
+already standing. There is nothing to lose by stopping, which is what makes this the one place a refusal
+costs nothing.
+
 **Two refusals disappeared with the sections, and both are structural rather than relaxed:** "could not find
 the heading — stopping" (issue #178) has no heading name left to mismatch, and "this repo declares no section
 for tier N" has no mapping left to miss — a tier the repo does not use is now a position in the list rather

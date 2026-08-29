@@ -150,6 +150,16 @@ try {
     # #337.2 warning covers CLAUDE.md and not this file, so nothing pointed at it.
     Assert-True ($suggestText.EndsWith("`n")) 'settings.suggested.jsonc ends in a newline (#363)'
 
+    # --- inbound #1075: the proposal carries BOTH permission halves ---------------------------------
+    # It used to carry one -- 'deny' -- so a consumer following the adoption to the letter got a repo
+    # that forbids five things and permits nothing, and the only person who may widen a permissions
+    # file was handed nothing to paste. This fixture enables NO workflow plugin, so the allow half is
+    # empty here on purpose: what is asserted is that the emptiness is STATED rather than absent, which
+    # is the difference between "nothing to permit" and "we forgot".
+    Assert-True ($suggestText -match '"allow"\s*:\s*\[') 'core-only: the proposal has an allow half at all (#1075)'
+    Assert-True ($suggestText -match '"allow"\s*:\s*\[\s*\]') 'core-only: and it is empty -- no workflow plugin, so no scripted entry point to permit'
+    Assert-True ($suggestText -match 'no workflow plugin is enabled here') 'core-only: the empty allow half says WHY it is empty'
+
     # --- 1b. Register proposal: the bootstrap points at the workshop register (gap found 2026-07-28) --
     #     Bootstrapping a consumer used to leave no trace towards the connector register, and nothing
     #     else filled that gap -- a third consumer ran unregistered for days while the workshop stayed
@@ -240,6 +250,36 @@ try {
     $biScaffold = Join-Path $FixtureWf 'scripts\lib\branch-info.ps1'
     Assert-True (Test-Path -LiteralPath $rcScaffold) 'workflow plugin: scripts/repo-config.ps1 scaffold placed'
     Assert-True (Test-Path -LiteralPath $biScaffold) 'workflow plugin: scripts/lib/branch-info.ps1 scaffold placed'
+
+    # --- inbound #1075: with a workflow enabled, the allow half names ITS entry points ---------------
+    # The rules are asserted by SHAPE, not by literal path, and that is the finding rather than test
+    # convenience: the report asked for the resolved plugin root, which is version-pinned
+    # (.../cache/<marketplace>/<plugin>/<version>/), so a rule carrying today's path stops matching at
+    # the consumer's next plugin update -- silently, while still reading as covered. The wildcard is
+    # what makes the rule outlive an update, so what has to hold is that the path IS wildcarded and
+    # that the plugin name and the script name are the literal parts anchoring it.
+    $sugWf = [System.IO.File]::ReadAllText((Join-Path $FixtureWf '.claude\settings.suggested.jsonc'))
+    foreach ($entry in @('new-branch.ps1', 'open-pr.ps1', 'ship-pr.ps1')) {
+        Assert-True ($sugWf -match [regex]::Escape("`"Bash(powershell -NoProfile -File *contributing-davekjohn*$entry*)`"")) `
+            "workflow plugin: allow half covers $entry through the Bash tool (#1075)"
+        Assert-True ($sugWf -match [regex]::Escape("`"PowerShell(powershell -NoProfile -File *contributing-davekjohn*$entry*)`"")) `
+            "workflow plugin: allow half covers $entry through the PowerShell tool (#1075)"
+    }
+    Assert-True ($sugWf -match 'gh repo edit --delete-branch-on-merge') 'workflow plugin: allow half covers the one gh repo edit the workflow assumes'
+    # THE EXCLUSION IS THE POINT, so it is pinned rather than left to the comment beside it: a release
+    # is irreversible and outward-facing, and the whole value of a narrow allow half is that a reader
+    # can see what it does NOT wave through. Matched against the RULES only, not the whole file --
+    # the comment above them names those exclusions on purpose, and a whole-file match would read that
+    # sentence as the very thing it warns against.
+    $allowRules = ([regex]::Match($sugWf, '(?s)"allow"\s*:\s*\[(.*?)\]')).Groups[1].Value
+    Assert-True ($allowRules -match 'new-branch\.ps1') 'workflow plugin: the extracted allow rules are the rules (guard on the extraction itself)'
+    Assert-True (-not ($allowRules -match 'cut-release')) 'workflow plugin: cut-release is deliberately NOT allowed -- a release is worth a prompt'
+    Assert-True (-not ($allowRules -match 'gh repo delete|gh repo archive')) 'workflow plugin: and neither is deleting or archiving the repo'
+    # The next-steps line is where a reader is actually invited to copy the block, so the caveat lives
+    # there too (the #363 rule, applied to the half #1075 added).
+    Assert-True ($rWf.Out -match "(?s)'permissions' block is ready to use as-is.*BOTH halves.*allow.*new-branch") `
+        'workflow plugin: step 3 says the block has both halves and what the allow half covers'
+
     $rcText = [System.IO.File]::ReadAllText($rcScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($rcText -match 'VUL-IN') 'repo-config scaffold carries the VUL-IN marker'
     Assert-True ($rcText -match 'function Get-RepoName') 'repo-config scaffold supplies Get-RepoName'

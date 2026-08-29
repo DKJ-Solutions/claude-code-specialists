@@ -426,6 +426,35 @@ if ($prLookup.ExitCode -ne 0) {
     $existingPr = Get-ExistingPrRecord -Json ($prLookup.Output -join "`n")
 }
 
+# ALREADY MERGED IS ITS OWN OUTCOME, AND IT IS THE ANSWER TO A QUESTION THE LOOKUP ABOVE CANNOT ASK.
+# '--state open' is the right filter for "is there a PR to update", and it was the only one until
+# inbound #1077: for a branch whose PR is MERGED it answers "none", so this script took the create path
+# and GitHub refused with 'No commits between main and <branch>'. What the reader then saw was a
+# PowerShell error naming gh authentication, on a branch that was in fact completely finished.
+#
+# THE STATE IS NOT EXOTIC, which is why it earns a query of its own rather than a better error message:
+# a second session, a hand-merge on github.com, or simply re-running ship-pr all produce it -- and the
+# local branch survives a merge, because --delete-branch-on-merge removes the remote one only.
+#
+# BEFORE THE GATES, THE PUSH AND THE CREATE, deliberately: there is nothing to lint, nothing to push and
+# nothing to open for a branch whose work has landed. Exit 0 rather than 1 -- nothing failed, and the
+# run's only news is good. ship-pr reads the same state for itself in its step 2, because both scripts
+# are runnable on their own and neither may depend on the other having looked.
+#
+# A FAILED QUERY IS STILL NOT AN ANSWER, same as above: it leaves $mergedPr null and the run continues
+# exactly as it did before this block existed.
+if (-not $existingPr) {
+    $mergedLookup = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'merged', '--json', 'number,url', '--limit', '1', '--repo', $repo) -DiscardStderr
+    if ($mergedLookup.ExitCode -eq 0) {
+        $mergedPr = Get-ExistingPrRecord -Json ($mergedLookup.Output -join "`n")
+        if ($mergedPr) {
+            Write-Host "PR #$($mergedPr.number) for '$branch' is already merged -- nothing to open. $($mergedPr.url)" -ForegroundColor Green
+            Write-Host "A follow-up cycle on the same subject gets its own branch: new-branch completes the name with -v2." -ForegroundColor DarkGray
+            exit 0
+        }
+    }
+}
+
 # -Title IS ACCEPTED AND IGNORED (#506). Said out loud rather than silently dropped: a caller who passed a
 # title has an expectation about what the PR will be called, and the one thing worse than not honouring it
 # is not honouring it quietly. HERE and not at the parameter, because the answer needs the entry AND the
@@ -1369,7 +1398,22 @@ try {
     # argument list. The temp body file is cleaned up in finally, whether or not gh succeeds.
     $create = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('pr', 'create', '--base', 'main', '--head', $branch, '--title', $prTitle, '--body-file', $bodyFile, '--label', $label, '--repo', $repo) + $extraGhArgs)
     $create.Output | ForEach-Object { Write-Host $_ }
-    if ($create.ExitCode -ne 0) { Write-Error "Creating the PR failed (is gh logged in?)."; exit 1 }
+    if ($create.ExitCode -ne 0) {
+        # GH'S OWN MESSAGE IS THE REASON; THE LOGIN HINT IS A SUFFIX (inbound #1077). This line used to
+        # be the fixed guess "Creating the PR failed (is gh logged in?)", printed as the loudest thing on
+        # screen under gh's actual answer -- and on the run that was measured, gh had just listed PRs,
+        # pushed and read the issue list in the same invocation. The one hypothesis offered was the one
+        # thing that was demonstrably fine, and it sent the reader to gh auth status, then to their token,
+        # then to their network. The hint is kept for the case it is still the best available answer: a gh
+        # that printed nothing at all.
+        $reason = Get-PrCreateFailureReason -OutputLines $create.Output
+        if ($reason) {
+            Write-Error "Creating the PR failed: $reason"
+        } else {
+            Write-Error "Creating the PR failed and gh printed no reason (exit $($create.ExitCode)) -- is gh logged in?"
+        }
+        exit 1
+    }
 } finally {
     Remove-Item -Path $bodyFile -Force -ErrorAction SilentlyContinue
 }

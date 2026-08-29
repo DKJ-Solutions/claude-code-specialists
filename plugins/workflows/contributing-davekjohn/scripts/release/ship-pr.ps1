@@ -352,7 +352,22 @@ if ($NoMerge) {
 $prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'open', '--json', 'number', '--limit', '1', '--repo', $repo) -DiscardStderr
 if ($prList.ExitCode -ne 0) { Write-Error "Could not list the PR for '$branch' (is gh logged in?)."; exit 1 }
 $prRecord = Get-ExistingPrRecord -Json ($prList.Output -join "`n")
-if ($null -eq $prRecord) { Write-Error "No open PR to main found for '$branch' after open-pr -- stopping."; exit 1 }
+if ($null -eq $prRecord) {
+    # NO OPEN PR IS TWO DIFFERENT ANSWERS, and until inbound #1077 this line gave the alarming one to
+    # both. A branch whose PR is MERGED reaches here as "none" -- open-pr says so and exits 0 -- and
+    # stopping on it is right, while reporting it as a failure is not: nothing is wrong, the work has
+    # landed, and the run's only news is good. Asked here as well as in open-pr because both scripts are
+    # runnable on their own; a query that fails leaves the old message, which is then the true one.
+    $mergedList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'merged', '--json', 'number,url', '--limit', '1', '--repo', $repo) -DiscardStderr
+    $mergedRecord = if ($mergedList.ExitCode -eq 0) { Get-ExistingPrRecord -Json ($mergedList.Output -join "`n") } else { $null }
+    if ($mergedRecord) {
+        Write-Host "ship-pr: PR #$($mergedRecord.number) for '$branch' is already merged -- nothing to ship. $($mergedRecord.url)" -ForegroundColor Green
+        Write-Host "ship-pr: this checkout is still on '$branch' -- the merge deleted the remote branch, not the local one. 'git checkout main' (or prune-merged) clears it up." -ForegroundColor DarkGray
+        exit 0
+    }
+    Write-Error "No open PR to main found for '$branch' after open-pr -- stopping."
+    exit 1
+}
 $pr = $prRecord.number
 Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 

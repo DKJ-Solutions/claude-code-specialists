@@ -2360,7 +2360,63 @@ function Get-ReleaseAudienceTier { 2 }
 $tierDoc = (Format-Development -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n"
 Assert-True ($tierDoc -match 'For tier 2 audiences') 'a repo that STATES a tier still gets the sentence'
 Assert-True ($tierDoc -match [regex]::Escape(($sg[$pEnd] -replace '^\s*>\s*', '').Trim())) 'and the lines finishing that sentence come with it'
+
 Remove-Item function:Get-ReleaseAudienceTier
+
+# --- Get-FoldedEntryForBranch: one branch, one entry (inbound #1082) -------------------------------
+# The fold folded a second entry for a branch the changelog already carried and reported both runs as a
+# success. This is the read that stops it; the refusal itself is asserted end to end in
+# fold-changelog.tests.ps1, on the real script.
+Write-Host "Get-FoldedEntryForBranch -- the entry a branch already has in the changelog" -ForegroundColor Cyan
+$eH = '#' * (Get-EntryHeadingLevel)
+$md = [char]0x00B7
+$dupLog = @(
+    '# Changelog', '', 'Intro prose.', '',
+    "$eH DEPLOY: ``feat/second-time-v1`` $md 20260210-101500", '',
+    'The newer of the two.', '', '[PR #42](https://example.invalid/pull/42)', '', '---', '',
+    "$eH DEPLOY: ``fix/older-thing-v1`` $md 20260209-090000", '',
+    'An older entry.', '', '[PR #17](https://example.invalid/pull/17)', ''
+) -join "`n"
+
+$hit = Get-FoldedEntryForBranch -ChangelogText $dupLog -Branch 'fix/older-thing-v1'
+Assert-True ($null -ne $hit) 'folded entry: a branch the changelog already carries is found'
+Assert-Equal 17 $hit.PrNumber 'folded entry: with the PR number off its own closing line'
+Assert-True ($hit.Heading -like '*older-thing*') 'folded entry: and the heading that carries the name'
+# THE BLOCK BOUNDARY IS THE POINT OF THAT LAST ONE. Reading forward without stopping at the next entry
+# heading would hand the FIRST entry's number to the second one -- a wrong PR reference in a refusal
+# message, which is the one thing worse than no message.
+$firstHit = Get-FoldedEntryForBranch -ChangelogText $dupLog -Branch 'feat/second-time-v1'
+Assert-Equal 42 $firstHit.PrNumber 'folded entry: each entry gets its OWN number, not its neighbour''s'
+
+Assert-True ($null -eq (Get-FoldedEntryForBranch -ChangelogText $dupLog -Branch 'feat/never-shipped-v1')) `
+    'folded entry: a branch with no entry yields $null, which is what lets the fold proceed'
+# THE VERSION SUFFIX IS WHY A SUBSTRING TEST WILL NOT DO: every branch in this cycle ends in -vN, so
+# 'feat/second-time' is a prefix of the branch above and must NOT answer for it.
+Assert-True ($null -eq (Get-FoldedEntryForBranch -ChangelogText $dupLog -Branch 'feat/second-time')) `
+    'folded entry: matched between the backticks, so a prefix of a branch name is not that branch'
+
+$fencedLog = @(
+    '# Changelog', '', 'Intro prose.', '',
+    "$eH DEPLOY: ``docs/quoting-v1`` $md 20260211-110000", '',
+    'This entry QUOTES a heading in an example:', '', '```markdown',
+    "$eH DEPLOY: ``feat/quoted-only-v1``", '```', '', '[PR #51](https://example.invalid/pull/51)', ''
+) -join "`n"
+Assert-True ($null -eq (Get-FoldedEntryForBranch -ChangelogText $fencedLog -Branch 'feat/quoted-only-v1')) `
+    'folded entry: a heading inside a fence is describing an entry, not being one'
+Assert-Equal 51 (Get-FoldedEntryForBranch -ChangelogText $fencedLog -Branch 'docs/quoting-v1').PrNumber `
+    'folded entry: while the entry around that fence is read normally'
+
+$noPrLog = @('# Changelog', '', "$eH DEPLOY: ``fix/no-pr-v1``", '', 'Folded without a PR.', '') -join "`n"
+Assert-Equal 0 (Get-FoldedEntryForBranch -ChangelogText $noPrLog -Branch 'fix/no-pr-v1').PrNumber `
+    'folded entry: an entry folded without a PR is still found, and reports 0 rather than nothing'
+Assert-True ($null -eq (Get-FoldedEntryForBranch -ChangelogText '' -Branch 'feat/x-v1')) 'folded entry: empty changelog yields $null'
+Assert-True ($null -eq (Get-FoldedEntryForBranch -ChangelogText $dupLog -Branch '')) 'folded entry: an empty branch name matches nothing rather than everything'
+
+# AND THE FOLD ASKS FOR IT. The asserts above prove the read; this one proves the caller uses it, which is
+# the half a reverted call site would leave green.
+$foldText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($foldText -match 'Get-FoldedEntryForBranch -ChangelogText') 'the fold consults this read before it writes'
+Assert-True ($foldText -match '\$alreadyFolded -and -not \$Force') 'and -Force is the only way past it'
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
