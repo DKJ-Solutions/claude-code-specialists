@@ -467,9 +467,27 @@ and `git status` silent.
    **one** line, `` `@.claude/specialists/SPECIALISTS.md` ``, and that file carries the body import, the
    lens import and this repo's roster slot; on the pre-seam path it stays the two imports it always was
    (portable body + repo lens). Creates a minimal `CLAUDE.md` scaffold if it is missing.
-5. **Settings proposal** — writes `.claude/settings.suggested.jsonc` with the recommended
-   `permissions.deny` + a hooks **stub**. It does **not** touch `settings.json`: a JSON merge is
-   repo-specific and risky, so that judgment stays with you.
+5. **Settings proposal** — writes `.claude/settings.suggested.jsonc` with **both** permission halves
+   + a hooks **stub**. It does **not** touch `settings.json`: a JSON merge is repo-specific and
+   risky, so that judgment stays with you.
+
+   **`permissions.allow` is the half that arrived on August 29, 2026
+   ([#1075](https://github.com/DaveKJohn/claude-code-specialists/issues/1075)), and it is filled only
+   when a workflow plugin is enabled** — the three entry points that workflow's cycle is made of
+   (`new-branch`, `open-pr`, `ship-pr`) in both tool shapes, plus the one `gh repo edit` form the
+   workflow assumes. `cut-release` is deliberately not in it: a release is worth a prompt. Enable no
+   workflow and the half is emitted **empty, saying why** — there is no scripted entry point to
+   permit, which is a state rather than an omission.
+
+   Until that half existed, this file carried `deny` alone: a consumer who followed the adoption to
+   the letter got a repo that forbade five things and permitted nothing, and **the one person who
+   may widen a permissions file is you** — a session cannot place these rules for itself, and must
+   not try. That is what makes shipping the lines part of the adoption rather than a convenience.
+
+   **The paths in those rules are wildcarded on purpose, so do not "fix" them into absolute paths.**
+   `${CLAUDE_PLUGIN_ROOT}` resolves to the version-pinned install
+   (`…/cache/<marketplace>/<plugin>/<version>/`), so a rule naming today's root stops matching at
+   your next plugin update — silently, while still reading as covered.
 6. **Register proposal** — prints a paste-ready **connector manifest** for the *workshop* repo: the
    repo name derived from the git remote, plus the lens inventory per plugin (personas included).
    `visibility` and `localCheckout` stay `VUL-IN`, because this script cannot know them — it has no

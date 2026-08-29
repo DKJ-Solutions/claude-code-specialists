@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/suggested-settings-ship-an-allow-half-v1` · 20260829-150555
+
+`specialists-init`'s settings proposal now ships **both** permission halves. It carried `deny`
+alone, so a consumer who followed the adoption to the letter ended up with a repo that forbids the
+five things the workflow must never do and permits nothing it must do -- and the one person who may
+widen a permissions file is the human, who was handed nothing to paste. The `allow` half is filled
+with that workflow's three entry points (`new-branch`, `open-pr`, `ship-pr`, both tool shapes) plus
+the single `gh repo edit --delete-branch-on-merge` the workflow assumes; `cut-release` is
+deliberately absent, because a release is worth a prompt. Enable no workflow and the half is emitted
+**empty and says why**, which is a state rather than an omission.
+
+The paths in those rules are wildcarded, and that is the repair rather than a shortcut: the report
+asked for the resolved plugin root, and `${CLAUDE_PLUGIN_ROOT}` is version-pinned
+(`.../cache/<marketplace>/<plugin>/<version>/`), so a rule carrying today's path would stop matching
+at the consumer's next plugin update -- silently, while still reading as covered.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer meets this file on their first day, and it is the one artifact a session structurally
+cannot repair for them: a permissions file is never agent-editable, so whatever the adoption prints
+is what they get. The reported symptom -- six classifier denials in a day -- was measured on one
+repo and did **not** reproduce on the virgin testrun, so this is not a guaranteed wall; what is
+certain is that the block permitted nothing, and which of the two a consumer gets is not something
+the adoption can predict for them.
+
+**Score:** 3
+
+#### Pull Request
+
+the settings proposal hands the human an allow half, not only a deny half
+
+Plugins: team-alpha
+
+[PR #1087](https://github.com/DaveKJohn/claude-code-specialists/pull/1087)
+
+---
+
 ### DEPLOY: `fix/ship-pr-on-an-already-merged-branch-v1` · 20260829-150218
 
 Re-running `ship-pr` on a branch that had already shipped used to end in a PowerShell error naming
