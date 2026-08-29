@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/orchestrator-skill-is-the-pre-bootstrap-door-v1` · 20260829-201457
+
+A consumer's session can now find the orchestrator during the adoption itself, instead of one restart
+after the moment it needed him.
+
+The `orchestrator` skill has always been the route to Chris where the `@`-import cannot reach — but its
+description offered three situations, and a repo mid-adoption was in none of them: it has a repo, it has
+a `CLAUDE.md`, and its specialists did not arrive in an app. So the one channel that is always in
+context before the bootstrap was telling the one session that needs this skill that it is for somebody
+else. The description now names that repo, and says in one clause what is missing until the bootstrap
+runs: the rules for filing what you find and for verifying a refusal before you obey it.
+
+The page itself gained a closing section for the same reader. It states that the handover to
+`/team-alpha:specialists-init` is still the whole move — the bootstrap writes the owner's `CLAUDE.md`
+and is theirs to authorise — and that loading a persona into one conversation is a different act, not a
+way around it. The three rule-gaps measured in a single pre-bootstrap run are tabled there with what
+each one cost, because the third of them defeated a session that was already filing well: which rule
+goes missing next is not predictable, which is why the repair is the door rather than a selected
+sentence.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Everything a consumer's session finds while adopting — the moment it is least equipped and has the most
+worth reporting — reaches this repo only if that session knows filing needs nobody's permission. It
+costs 39 tokens a session to say where that rule lives, and the alternative is measured: two findings
+held back for an authorisation nobody was going to ask for, and one refusal read as policy and never
+filed at all.
+
+**Score:** 3
+
+#### Pull Request
+
+the orchestrator skill names the un-adopted repo, so a session without Chris can still reach him
+
+Plugins: team-alpha
+
+[PR #1109](https://github.com/DaveKJohn/claude-code-specialists/pull/1109)
+
+---
+
 ### DEPLOY: `fix/internal-note-hard-breaks-v1` · 20260829-195518
 
 `new-internal-note.ps1` ends its `**Date:**` and `**Type:**` lines with a backslash markdown hard break,
