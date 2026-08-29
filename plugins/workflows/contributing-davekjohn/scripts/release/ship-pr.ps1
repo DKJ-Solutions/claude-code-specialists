@@ -25,6 +25,13 @@
     flat changelog (#178), and the fold derives the intro/list boundary from the first entry heading.
 
     Steps, stopping on the first failure (nothing is forced):
+      0. IS 'main' FREE FOR STEP 5 TO CHECK OUT? (issue #1069) git allows one worktree per branch, so a
+         second checkout standing on the trunk locks it for the whole clone -- and step 5 checks it out
+         HERE in order to fold. Until this step existed that lock was met AFTER the merge, which is the
+         worst place in the run to stop: merged, unfolded, and every gate green until a release trips
+         over it (measured on PR #1068). Asked before step 1, the last moment at which refusing is free.
+         It takes the trunk away from nobody -- it names the directory and the two commands that release
+         it -- and an unreadable worktree list warns rather than refuses.
       1. open-pr.ps1 [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
          pushes, and opens the PR. If a gate fails, nothing is pushed and this stops here.
 
@@ -88,6 +95,13 @@
          its paths, so nothing else in the tree can ride along"; that was true of the fold script and
          false of this orchestrator, which is the more commonly used route of the two. An exception is
          only safe while it stays the size it was granted at, and here it was not.
+
+         AND IT GIVES THE TRUNK BACK WHEN THIS IS NOT THE PRIMARY CHECKOUT (step 5b, issue #1069). In
+         the primary, ending on the trunk is deliberate -- it is what makes the session safe to clear.
+         In a worktree lane the identical line takes the clone-wide lock step 0 above exists to report,
+         so a non-primary tree returns to its own branch once the fold has SUCCEEDED. Only on success: a
+         failed fold leaves this tree on main mid-repair, which is where whoever finishes it by hand
+         needs to be standing. It never fails the ship.
       6. Verify the issues the PR declared it closes are actually CLOSED, and close any that are not
          (verify-resolved-issues.ps1 -- its own script, and tested there).
 

@@ -206,6 +206,31 @@ it always ran. Anywhere else: it leaves your checkout alone and folds in a throw
 trunk instead, then takes it down again. The lane is still the better move — it is where you build, and it
 keeps one tree doing one thing — but forgetting it now costs a temporary directory rather than your work.
 
+### And a lane no longer holds the trunk hostage ([#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069))
+
+git allows **one worktree per branch**, so a tree standing on the trunk locks it for the whole clone.
+That is the other half of the same line: step 5 checks the trunk out *in the tree it runs in*, and in
+the primary checkout that is deliberate — a finished chain ends on the trunk, which is what makes the
+session safe to clear. In a lane it meant the lane held the trunk for **every later chain on the
+machine**, nothing warned, and the bill was paid by an unrelated branch after *its* merge had landed.
+Measured on PR #1068: merged, unfolded, changelog still pending.
+
+Three answers, and the order is the point:
+
+| when | what happens |
+|---|---|
+| **before step 1** (step 0) | another worktree holds the trunk → **refuse**, naming that directory and the two commands that release it. Nothing is gated, pushed or merged yet, so this is the one place where stopping is free |
+| **at step 5**, in-place arm | the narrow window step 0 cannot cover — another session took the trunk while CI was being watched. It now prints the same hand-fold instruction the worktree arm always had, including the `-RepoRoot` call that folds from the tree that *does* hold it |
+| **after the fold** (step 5b) | a tree that is **not** the primary checkout returns to its own branch, releasing the lock. Only after a *successful* fold: a failed one leaves you standing on the trunk, which is where a hand repair happens |
+
+**Nothing takes the trunk away from anybody.** The holder may be a lane with work in it, and this script
+does not know what — so both arms name the directory rather than acting on it. Handing a finished lane
+back is still `worktree-lane.ps1 -HandBack`, and it is still the better move than relying on step 5b.
+
+`prune-merged.ps1` was unavailable in exactly this state too, which mattered because it is the script a
+session is told to run *instead of* hand-reading `git ls-remote`. It now names the worktree holding the
+trunk instead of relaying git's message.
+
 **What this deliberately is not.** Two larger shapes were named and declined when the default was written
 down. A *green-and-unmerged reporter* at session start would re-add half of a status reporter the source
 repo had removed on purpose five minutes before #985 was filed. A *detached watcher* that merges when the

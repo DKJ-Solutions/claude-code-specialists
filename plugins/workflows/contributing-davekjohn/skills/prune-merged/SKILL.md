@@ -72,6 +72,11 @@ The script:
 
 1. **Refuses on a dirty working tree.** Switching branches with uncommitted work either fails halfway
    or drags the work across. Commit, `park`, or stash first.
+   And if a **second worktree is standing on the trunk**, the switch below is impossible for the whole
+   clone — git allows one worktree per branch. The refusal names that directory and how to release it
+   ([#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069)), rather than relaying
+   git's own message, because this script is what a session runs *instead of* hand-reading
+   `git ls-remote` — so it was unavailable in exactly the situation that produces stray branches.
 2. Switches to the trunk and fast-forwards it (`git pull --ff-only`). **Fast-forward only** — this
    script may advance the trunk and must never merge anything into it. A non-fast-forward is a
    warning, not a stop: the deletions are then judged against the older trunk, which errs towards
