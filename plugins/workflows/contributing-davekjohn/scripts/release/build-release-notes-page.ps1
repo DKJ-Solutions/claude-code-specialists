@@ -331,12 +331,20 @@ function Test-ReleaseVersionTrimmable {
     <#
         Pure: does EVERY release on this page end in '.0', so the third digit says nothing?
 
-        WHY IT IS ALWAYS ZERO IN PRACTICE (inbound #813). A release can be cut as a patch, but a patch
-        gets no hand-written note -- cut-release drafts one only for the bumps in
-        Get-ReleaseConsumerBumps, whose shipped default is minor and major -- and this page renders the
-        NOTE root. So a patch is structurally absent from the page, and every version it can display
-        therefore ends in '.0'. Measured on one consumer's built page: 40 rows, third digit '0' forty
-        times.
+        WHY IT IS ALWAYS ZERO IN PRACTICE (inbound #813). A release can be cut as a patch, but in a repo
+        whose Get-ReleaseConsumerBumps names minor and major without naming patch, a patch gets no
+        hand-written note -- cut-release drafts one only for the bumps that seam names -- and this page
+        renders the NOTE root. So a patch is structurally absent from the page, and every version it can
+        display therefore ends in '.0'. Measured on one consumer's built page: 40 rows, third digit '0'
+        forty times; that consumer had answered the seam that way.
+
+        AND THAT IS THE CONSUMER'S ANSWER, NOT A SHIPPED DEFAULT, which this docstring claimed until
+        inbound #1070. cut-release's fallback for an unanswered seam is @() -- the tier switched off --
+        so a repo that never answered it drafts a note for no bump at all, and a row here exists only
+        where a note file does: that page has no rows rather than rows that happen to end in '.0'. Either
+        way the conclusion holds, which is why nothing below changed -- the wrong premise sat in the
+        paragraph explaining why the observation holds in practice, and the measurement it cites still
+        stands.
 
         DERIVED FROM THE DATA RATHER THAN FROM THE SEAM, and that is the deciding property.
         Get-ReleaseConsumerBumps is consumer-overridable, so a repo that names 'patch' genuinely needs
