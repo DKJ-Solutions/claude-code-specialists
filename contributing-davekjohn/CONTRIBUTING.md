@@ -625,6 +625,23 @@ names `lint-en-tests` and nothing else, so a red `claude-review` is a finding to
 blocker. On a pull request from a fork it fails by construction — GitHub withholds secrets from fork-triggered
 workflows, which is the safe outcome and not a defect to work around.
 
+**And a red one names its own reason, in the run that produced it — read that before filing anything.**
+`ship-pr` prints it for you: on the path where the merge proceeds it fetches the failing check's annotations
+and relays the sentence that workflow wrote about itself, so the reason lands in the same transcript as the
+warning. Where that sentence reads `out of quota`, the review did not run at all — `CLAUDE_CODE_OAUTH_TOKEN`
+is a subscription credential, its allowance is the one interactive work draws on, and it comes back on the
+clock: hours for a session window, days for a weekly cap. Nothing in the diff repairs it and no re-run helps.
+
+**This is worth a paragraph because reading it wrong is the expensive part.** Eight threads have been filed
+here about `claude-review` red on every PR, and they did not all have the same cause: the early ones were
+credential ([#891](https://github.com/DaveKJohn/claude-code-specialists/issues/891),
+[#942](https://github.com/DaveKJohn/claude-code-specialists/issues/942)), and every one from
+[#966](https://github.com/DaveKJohn/claude-code-specialists/issues/966) onward has been this quota state —
+most recently [#1103](https://github.com/DaveKJohn/claude-code-specialists/issues/1103). #966 is the one that
+cost something: it was filed against a log already reading `api_error_status: 429`, inferred an expired token
+instead, and concluded that a secret needed rotating. So read the reason the run gives before deciding which
+kind of failure it is; where it is the quota, there is nothing to file.
+
 Merge method: **`merge`** — a merge commit, not a squash (`Get-PrMergeMethod`).
 
 ### 3.5. Copy the last DEPLOY into `CHANGELOG.md` under `## [Unreleased]`, newest to oldest
