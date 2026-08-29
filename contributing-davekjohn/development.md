@@ -53,8 +53,10 @@ Repair three inbound defects from the testrun-2 adoption (#1093, #1096, #1097). 
 - [x] Warn about the JSONC boundary where the reader crosses it: the step-3 output, the proposal
       file's own header, and the skill page's step 2.
 - [~] Dropped: the regression guard #1093 offers ("a sync check asserting no message names a
-      barred skill with a bare imperative"). It is a real risk that has not bitten — filed rather
-      than built, per this repo's no-pre-emptive-fixes rule.
+      barred skill with a bare imperative"). A real risk that has not bitten in a way this branch
+      must repair, so it is filed rather than built, per this repo's no-pre-emptive-fixes rule —
+      [#1104](https://github.com/DaveKJohn/claude-code-specialists/issues/1104), which carries the
+      contrast case that would make a naive version of the check wrong on its first run.
 
 ### TEST
 
