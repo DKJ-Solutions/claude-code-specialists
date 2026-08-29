@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/a-retirement-is-tier-2-news-v1` · 20260829-105231
+
+The audience-tier question in `DEVELOPMENT-portable.md` now names the case it was silent on: an entry
+that *retires* something an earlier release note told the reader to adopt is never `N/A` at tier 2. The
+question to apply is "did an earlier note tell them to adopt this?", not "could an end user of a
+published product see it?" -- the second is the tier-1 webshop-customer test, and reaching for it in a
+tier-2 repo is exactly what produced inbound #1061: the entry retiring `/lock` and `/handover` in
+v4.21.0 scored `N/A` on that test, so no audience note carried the removal, while the convention's
+arrival had earned 13 mentions across four earlier notes (one of them the front-of-note item a reader
+had to act on). The rule also states why a retirement is always actionable for the reader: nothing in
+the adoption path reaches into a consumer's tree to clean up, so a retired convention leaves live
+artefacts behind that only the note can flag as stale.
+
+`cut-release/SKILL.md` gets the matching backstop, at the point the consumer section is actually
+assembled rather than at the seven tests that govern its prose: before rewriting, check whether a
+pending entry retires something an earlier note announced, and treat an `N/A` score there as wrong
+rather than working around a page that is missing the item. The seven tests stay at seven -- this is a
+selection question, not a writing one, and folding it into that list would borrow a provenance (five
+dev-tool changelogs, two declined neighbour rules) it does not share and would falsify the count
+wherever it is cited.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This is tier-2 news, not `N/A`, and the branch is itself the demonstration the rule argues for. As of
+v4.21.0, `/lock` and `/handover` are retired: nothing you have written stops working, but if you had
+adopted the convention while it existed, a `.claude/handover.md` still sitting in your repo is a stale
+artefact -- nothing in a plugin update reaches into your tree to remove it, and nothing else in the
+system would have told you it is now dead weight rather than live session context. Measured on the
+consumer side: in a life-hub session on 2026-08-29, two days after the removal, exactly that file was
+read as live context and then updated, because it was still there and no note said the mechanism was
+gone. The tier question that let that pass is repaired now, so the next retirement announces itself in
+the audience note the way this one should have.
+
+**Score:** 3
+
+#### Pull Request
+
+A retirement of something consumers were told to adopt is tier-2 news, and the tier question now says so
+
+Plugins: contributing-davekjohn
+
+[PR #1064](https://github.com/DaveKJohn/claude-code-specialists/pull/1064)
+
+---
+
 ### DEPLOY: `docs/a-wait-longer-than-a-minute-parks-the-branch-v1` · 20260829-104204
 
 A session that has to wait on somebody else's clock now parks the branch and stops, instead of holding the
