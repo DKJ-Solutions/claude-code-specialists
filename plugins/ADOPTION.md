@@ -25,13 +25,32 @@ behind it. This page tells you what to do; that one tells you why it changed.
 
 Three things have to be true, and only the first one might not be:
 
-1. **The plugins are installed and enabled for this repo.** If you installed them yourself, that is
-   [INSTALL.md](../INSTALL.md). If they arrived through your organisation, this is already done — the
-   specialists appear in your session as `@team-alpha:<name>` subagents.
+1. **The plugins are installed *and* enabled for this repo — two acts, not one.** If you installed
+   them yourself, that is [INSTALL.md](../INSTALL.md). If they arrived through your organisation, this
+   is already done — the specialists appear in your session as `@team-alpha:<name>` subagents.
 2. **You have restarted the session since that happened.** A skill that ships inside a plugin only
    becomes available once the session has loaded the plugin.
 3. **`specialists-init` is in your slash list.** That is the check for both of the above at once: if it
    is not there, nothing below will work and the problem is upstream of this page.
+
+> **Read point 1 as two acts, because the half that can be missing leaves no trace** (inbound
+> [#1076](https://github.com/DaveKJohn/claude-code-specialists/issues/1076)). *Enabled* is a key in
+> **your** `.claude/settings.json`; *installed* is a record on the **machine**, in
+> `~/.claude/plugins/installed_plugins.json`, keyed by this repo's path. Set the key and skip the
+> install, and every surface a person can see says the adoption is done while the session has no
+> skills, no subagents and no hooks — measured on a repo that ran that way for a full working day.
+>
+> **Point 3 is the check, and it is deliberately the slash list rather than anything the session says
+> about itself.** Several skills in this family ship with `disable-model-invocation: true` — their page
+> is kept out of the model's context on purpose, and the slash command still works — so a healthy
+> session's own skill listing is *shorter* than what the plugins ship, and a number read off it proves
+> nothing. If `/specialists-init` is missing, the install record is the first thing to check; the
+> plugin-free query for it is [INSTALL.md](../INSTALL.md)'s Step 1, act 6.
+>
+> **Nothing will raise this for you, and that is structural.** The four checks in this family that
+> report *"enabled here but not installed for this path"* all ship **inside** the plugin that is not
+> installed, so the one repo they were written for is the one repo they cannot speak in. A quiet
+> session start is not an all-clear here.
 
 ## What this gives you
 

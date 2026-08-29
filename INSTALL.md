@@ -93,6 +93,36 @@ $root = (Get-Location).Path
 Anything else — empty output, two lines for one plugin, `local`, `PAYLOAD MISSING` — is covered in
 [Connecting in five steps](#connecting--the-install-step), in the adoption half below.
 
+> **Writing `enabledPlugins` is not installing, and a repo can look completely adopted without it**
+> (inbound [#1076](https://github.com/DaveKJohn/claude-code-specialists/issues/1076)). Steps 1–2 above
+> are two separate acts on two separate files: the settings key is **yours**, in your repo; the install
+> record is the **machine's**, in `~/.claude/plugins/installed_plugins.json`, keyed by `projectPath`.
+> Set the key and skip the install and everything a person can see says the adoption is done — the
+> settings file names both plugins, a `CLAUDE.md` written afterwards describes them as project-scoped —
+> while a session gets **no skills, no subagents and no session hooks at all**. Measured on a repo that
+> ran in that state for a full working day, two merged PRs and a release: the only way to drive the
+> workflow was to call the shipped `.ps1` files by absolute path into the plugin cache, which is the
+> shape that then met [#1075](https://github.com/DaveKJohn/claude-code-specialists/issues/1075)'s
+> permission problem. The two compound, and this is the one to fix first.
+>
+> **The query above is the check, precisely because it needs no plugin.** It reads a machine file, so it
+> answers whether the install happened even when nothing else can.
+>
+> **Do not use the session's own skill listing as the check.** Several skills ship with
+> `disable-model-invocation: true`, which is deliberate and removes their page from the model's context
+> while leaving the slash command intact — so a *healthy* session lists fewer skills than the plugin
+> ships, and a count read off that listing means nothing. Ask the **slash-command menu** instead: after
+> the second restart, `/specialists-init` must be in it, and `/new-branch` too if you enabled the
+> workflow. A count of skills is not a durable check for a second reason — the number changes with every
+> release that adds one.
+>
+> **And nothing will tell you.** Four separate detectors in this family report exactly this state —
+> `roster-sessioncheck`, `connector-sessioncheck`, `check-roster-sync` and the bootstrap's own
+> `claude plugin install --scope project` line — and **all four ship inside the plugin that is not
+> installed**. A plugin's SessionStart hook is plugin surface too, so the repo missing the record is
+> precisely the repo where the warning cannot fire. Their silence here is not an all-clear; it is the
+> symptom. That is why this verification is a step you run rather than a check you wait for.
+
 ### Step 2 — run the bootstrap skill
 
 In the new session, invoke `specialists-init`. It places the persona lenses, an empty lens scaffold
