@@ -83,6 +83,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.24.0](audience/4.x/4.24.0.md) | 2026-08-29 | Minor | A fresh repo can walk the adoption path from install to its first release |
 | [4.23.0](audience/4.x/4.23.0.md) | 2026-08-29 | Minor | the first full adoption test run's findings, repaired -- the fresh-repo path and the shipping cycle |
 | [4.22.0](audience/4.x/4.22.0.md) | 2026-08-28 | Minor | Gates that read what merges, notifications that name their sender, and two seams for the Shopify sync |
 | [4.21.0](audience/4.x/4.21.0.md) | 2026-08-27 | Minor | The workflow folder holds this repo's own documents, the branch document becomes development.md, and /lock and /handover are retired |
