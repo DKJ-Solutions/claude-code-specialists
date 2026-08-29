@@ -1,0 +1,20 @@
+{
+  "repo": "DaveKJohn/thumbnail-generator",
+  "visibility": "private",
+  "localCheckout": "../thumbnail-generator",
+  "plugins": [
+    {
+      "id": "team-alpha@claude-code-specialists",
+      "extensions": [
+        "01-01", "02-09", "03-02", "03-07", "04-11", "04-12", "04-13", "04-18",
+        "05-05", "05-06", "05-15", "06-16", "06-17", "06-19", "06-23",
+        "06-24", "06-25", "06-29", "06-30"
+      ]
+    },
+    {
+      "id": "contributing-davekjohn@claude-code-specialists",
+      "extensions": []
+    }
+  ],
+  "notes": "Registered 2026-08-29, the day the repo itself came into being: thumbnail-generator was split out of life-hub as the DJ Cylow thumbnail pipeline's own repo, and adopted the specialists in its own PR #1 the same morning. That PR carried the [UNREGISTERED] finding out as an issue on the consumer (thumbnail-generator#3) rather than silently, so the gap this manifest closes lasted hours instead of the days djcylow-react's did. THE REGISTRATION DELIBERATELY WAITED FOR THAT PR TO MERGE. Its whole install -- .claude/settings.json and all 19 lenses -- lived only on the branch, and check 3 reads the consumer's working tree: a manifest written while main was still empty would have reported 19 registered extensions as missing and turned this entry red on arrival. That is the doctrine in this folder's README from the other side -- the register books what a consumer HAS -- and this is the first entry where the wait was the whole decision rather than a note afterwards. MEASURED AFTER THE MERGE, not taken from the PR: their live .claude/settings.json enables team-alpha@ and contributing-davekjohn@, both under the post-August-26 names, so this record starts with nothing to catch up on. 19 lens files under .claude/specialists/lenses/, against the 15 agents + 4 personas team-alpha ships -- an exact match, the same full adoption as djcylow-react. The four personas (01-01, 03-02, 05-05, 05-06) carry the '> Repo-lens (lens-only persona)' blockquote and no body copy, the life-hub model, so they report LENS-ONLY rather than DRIFTED. contributing-davekjohn ships no agents/, hence the deliberately empty extension list -- the same measured answer as the other four manifests. ONE THING IS KNOWINGLY LEFT OPEN: this machine holds no install record for this checkout, so check 4 reports [NOT-INSTALLED-HERE] until a session actually starts in that repo and Claude Code writes the record itself. That is the machine's state and not this register's, and nothing here can or should write it. VISIBILITY: the repo is private and this repo is public, which is why registering it needed Dave's word rather than a session's judgement -- given 2026-08-29. Same boundary and same answer as life-hub.json: metadata only, no lens content, no absolute paths."
+}
