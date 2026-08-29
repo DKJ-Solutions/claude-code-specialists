@@ -334,6 +334,22 @@ a release for a missing timestamp would be ceremony rather than a guard.
    **It is still a draft, for the reason that never depended on the marker:** the prose is the entry
    bodies, written for whoever reviews the diff.
 
+   **Before rewriting, run the cut's own last-chance check: does any pending entry retire something
+   an earlier note announced?** (inbound [#1061](https://github.com/DaveKJohn/claude-code-specialists/issues/1061)).
+   The selection above trusts the author's tier score, and that score is wrong exactly once in a
+   predictable way — an entry that removes a convention a consumer was told to adopt, scored `N/A`
+   because nothing about the removal itself is visible to an end user, when the reader who adopted
+   the convention very much notices its absence. If a pending entry retires something and was scored
+   `N/A`, that score is wrong and the item belongs on this page, not off it — fix the entry's tier
+   before drafting rather than working around a page that is missing it.
+
+   **This check stays here rather than joining the seven tests below, and that is deliberate.** The
+   seven tests are about *how* an item already on the page is written; this is a *selection* question
+   about which items reach the page at all, and selection happens upstream, at the tier question in
+   `DEVELOPMENT-portable.md`, not in this rewrite step. The seven were measured against five dev-tool
+   changelogs and two declined neighbour rules (below); folding an unrelated check into that list would
+   give it a provenance it does not share, and would falsify the count wherever it is cited.
+
    **Budget for a rewrite rather than a trim.** This document renders the release a *second time*, it does
    not translate it. Turning entries written for someone reviewing a diff into a document for someone
    deciding whether to update is an authoring job. Measured at this repo's v3.2.0, while the draft still

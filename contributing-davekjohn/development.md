@@ -64,12 +64,16 @@ No script, gate or lint check -- a regex cannot tell whether an earlier note ann
   report: `contributing-davekjohn/releases/changelog/4.x/4.21.0.md:1352-1353` carries the quoted
   sentence verbatim; `grep -i handover` over `releases/audience/4.x/{4.13.0,4.14.0,4.15.0,4.16.0,4.21.0,4.22.0}.md`
   reproduces 4/5/1/3/0/0.
-- [x] Every new relative link resolves from its own file's directory -- the `SKILL.md` link to
-  [Rendall's lens](../.claude/specialists/lenses/05-06-extension.md) needed five `../` segments, not
-  four, checked against a neighbouring link in the same file rather than assumed.
-- [x] The seven-tests count is unchanged in both places that cite it -- `cut-release/SKILL.md` and
-  [Rendall's lens](../.claude/specialists/lenses/05-06-extension.md) still say seven; the new check was
-  placed beside the table, not inside it.
+- [x] Checked a link into `.claude/specialists/lenses/05-06-extension.md` added to the shipped
+  `cut-release/SKILL.md` against the one precedent in that file (`SKILL.md:123`, into
+  `plugins/teams/team-alpha/manuals/`, which is plugin payload) and found none: `.claude/specialists/`
+  is this source repo's own directory, not payload, so the same five `../` segments that reach the
+  repo root here resolve to the plugin-cache root in every consumer, where no such file exists -- live
+  in the one tree that can verify it, dead in every tree that actually reads the shipped skill. Removed
+  rather than repointed (Chris, mid-task correction).
+- [x] The seven-tests count clause no longer names which pages cite the count -- made citation-agnostic
+  ("would falsify the count wherever it is cited") instead of pointing a portable page at this repo's
+  lens, since that is the same class of defect the check above exists to catch, applied to itself.
 - [~] No test suite covers prose content in these two files, so there is nothing to run beyond the lint
   gate's dead-link and heading checks at the PR step -- dropped rather than invented, per the repo's
   standing rule against a pre-emptive gate for a risk that has not repeated.

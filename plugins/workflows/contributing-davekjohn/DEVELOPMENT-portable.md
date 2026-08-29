@@ -366,6 +366,28 @@ consumer can observe this at all"* is information, and it survives into the reco
 that — it means both "reaches nobody" and "nobody has got to this yet", and the gate has to be able to tell
 those apart. **The reach is the highest tier with a number**, so an `N/A` costs nothing but a sentence.
 
+**When an entry *retires* something an earlier release note told the reader to start doing, the
+audience tier is never `N/A`.** The test to apply is *"did an earlier note tell them to adopt this?"*,
+not *"could an end user of a published product see it?"* — the second is the tier-1 webshop-customer
+test, and reaching for it in a tier-2 repo is exactly what produced the measured miss (inbound
+[#1061](https://github.com/DaveKJohn/claude-code-specialists/issues/1061)): the entry that retired
+`/lock` and `/handover` in v4.21.0 scored `N/A` with the reasoning *"never anything an end user of a
+published product could see"* — true of a webshop customer, false of the person running this
+workflow, who **is** the tier-2 subscriber here. Measured in this repo's own audience notes: the
+convention's *arrival* earned 13 mentions across four notes (4.13.0 through 4.16.0), one of them the
+front-of-note item a reader had to act on; its *retirement* earned zero, in either the 4.21.0 note
+that removed it or the 4.22.0 note after it. An arrival is news that writes itself — there is
+something new to describe. A retirement leaves nothing behind to describe, which is precisely why it
+needs the explicit test rather than the instinct of "is there anything left to say here."
+
+**And a retirement is actionable for the reader for a reason that holds every time, not only in this
+instance: nothing reaches into a consumer's tree to clean up after a removed convention.** A retired
+skill leaves live artefacts behind on the consumer's side — a file, a `.gitignore` line, a documented
+habit — that nothing in the plugin's adoption path will ever touch, because that path is strictly
+additive. The audience note is the only thing that can tell the reader those artefacts are now
+stale, which is why scoring the retirement `N/A` does not just under-report it; it removes the one
+route the news had.
+
 **The ladder is gone, and with it the second reading it forced.** Until August 12, 2026 a scored tier 2
 *owed* a tier-1 section, and `open-pr` refused an `N/A` there by name. Measured before removing it: of this
 repo's 89 tier-1 sections, **81 existed only because a tier-2 section sat above them** — the same reach
