@@ -76,14 +76,25 @@ Three things were measured rather than assumed, and two of them changed the work
   made on cost rather than on necessity.
 - **The three scripts are byte-identical mirrors** (root and plugin). Each edit was applied to the root
   and copied over, and the identity re-checked afterwards.
+- **`main` reached two of the four sites first, while this branch was open** (August 29, 2026). #1111
+  added a lint rule refusing a printed instruction that names a skill the model cannot invoke, and
+  #1114 followed it; between them they landed the wording for `check-roster-sync.ps1` and
+  `adopt-config.ps1`. Merging `main` in produced four conflicts — those two files and their plugin
+  mirrors — and after resolving them `adopt-config.ps1` has no diff against the trunk at all, while
+  `check-roster-sync.ps1` keeps only the reasoning comment. The DEPLOY section above was corrected to
+  say so: it had claimed all four wordings and a first appearance of `/team-alpha:specialists-init`
+  in a shipped file, and `a6bff813` got there first.
 
 ### DEPLOY: `fix/adoption-handover-and-jsonc-caveat-v1`
 
 Adoption stopped being a path a consumer can only complete by guessing. Four places told the reader to
 run `specialists-init`; that reader is usually the model, and `disable-model-invocation` structurally
 forbids it — while the same flag hides the page documenting the route, so it could not even learn the
-skill exists. All four now name the command and who types it, and `/team-alpha:specialists-init`
-appears in a shipped file for the first time. Separately, the instruction that copies
+skill exists. All four now name the command and who types it — two of those wordings reached `main`
+ahead of this branch, through #1111's lint rule against printing an instruction that names a skill
+the reader is barred from running; this branch carries the remaining two, in
+`check-script-contract.ps1` and `orchestrator/SKILL.md`, and the recorded reasoning behind all four,
+which that rule landed without. Separately, the instruction that copies
 `settings.suggested.jsonc` into strict-JSON `settings.json` now says the `//` lines have to go.
 
 The flag stays, deliberately: dropping it would have loaded this skill's description into every
