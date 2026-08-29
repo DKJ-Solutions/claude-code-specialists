@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/contributing-new-issue-task-chapter-v1` · 20260829-095247
+
+`contributing-davekjohn/CONTRIBUTING.md` opens with a fifth step, written ahead of the four it had:
+`## 1. NEW ISSUE / TASK`, the layer before a branch exists. It carries two headings that are **kinds rather
+than steps** — the only `###` on the page with no number, because neither precedes the other. `### Human` is
+ticket work: a colleague files in Asana, one GitHub issue per ticket carries the analysis, and the gate *do
+we know enough?* decides whether it can be built at all — with the rules pointed at
+`TICKETWORK-portable.md` and this repo's own answer stated, which is that nothing arrives that way here.
+`### Claude` is the filing route: a finding leaves the session as an issue rather than as a question in the
+close-out, what the bar is, how the four labels map onto the branch prefixes, and the six ways an inbound
+report fails on pickup.
+
+The page described the route from the branch onwards and said nothing about where the work came from, so
+the one step a contributor could not look up was the first one. The four steps that were 1–4 are now 2–5,
+with every substep, every in-prose reference and the two anchors pointing in from `README.md` and Derek's
+lens moved with them.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — a contributor-facing page in the source repo. Nothing a subscriber of this system reads or runs
+changes; the workflow plugin ships no new file and no script behaviour moved.
+
+**Score:** N/A
+
+#### Pull Request
+
+A NEW ISSUE / TASK chapter opens CONTRIBUTING.md, and the four steps shift up
+
+[PR #1058](https://github.com/DaveKJohn/claude-code-specialists/pull/1058)
+
+---
+
 ### DEPLOY: `fix/the-429-headline-names-the-wrong-window-v1` · 20260829-093819
 
 The review check's failure annotation told the reader the wrong outage horizon. On a 429 it asserted a
