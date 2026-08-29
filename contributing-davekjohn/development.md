@@ -31,7 +31,6 @@
 > The phase arc, the marks and the whole form: `DEVELOPMENT-portable.md`, which ships
 > with this workflow.
 
-
 ### PLAN
 
 #### What this branch is
@@ -93,6 +92,24 @@ The issue's own table settles this. A 60s `open-pr` gate is *at* the threshold a
 do itself; an 8-minute CI leg is somebody else's clock at any duration. So the rule keys on **whose clock it
 is**, and the minute is what makes you stop and ask.
 
+#### 5. Parking ends on the trunk -- the half the first pass dropped
+
+Dave, on the close-out of this branch's own first pass: the session reported that it could be cleared while
+the checkout still stood on the branch. His rule in #1060 already said it in as many words -- the branch is
+parked **and we go back to `main`**, then look for something the next clean session can pick up -- and the
+first pass implemented only the first clause. "Parked" was read as a statement about `origin`, and the
+checkout was left standing on the branch while the close-out said the session could be cleared.
+
+**It is not cosmetic.** Parking protects the work; it does not tidy the checkout, and those are two different
+claims. A close-out made from a feature branch says the context can be cleared while `git status` says the
+work is mid-flight, and the second one is the one a requester should believe. So the closing act is
+`git checkout main`.
+
+**And the tension with the known trap is stated rather than left to be discovered.** Chris's lens records the
+inverse failure -- `ship-pr` step 5 leaves you on `main`, which reads as *ready* -- so the two rules have to
+be read together: the trunk is where a session **ends**, and the branch check at the start of the next
+assignment is what stops it from being where the next one silently begins.
+
 #### What this branch does not do
 
 `worktree-lane` and the two shapes declined under #985 -- a green-and-unmerged reporter, a detached watcher
@@ -103,6 +120,7 @@ that merges on green -- are left exactly as they are. The issue asks for them no
 - [x] Write the rule into Chris's portable persona body as its own short section, keyed on whose clock it is
 - [x] `CONTRIBUTING.md` 2.2: the repo's standing gates are not TEST steps, and why the duplicate forces a hand-run
 - [x] `CONTRIBUTING.md` 3.4: nothing-at-all is the default rather than a judgement call, hovering is forbidden, and the pre-run measurement with its corrected mechanism
+- [x] Both documents: parking ends on the trunk -- `git checkout main` is the closing act, with the tension against the known "a clean trunk reads as ready" trap stated rather than left to be found
 
 ### TEST
 
@@ -116,6 +134,13 @@ turn or hovering over a backgrounded log. The rule is keyed on **whose clock it 
 duration: a gate the session must run itself is run however long it takes, and a CI leg, a remote check or a
 queue is not waited on at any duration. It lands in Chris's portable persona body, so every consumer of this
 workflow receives it.
+
+**And parking now ends on the trunk.** Pushing the branch protects the work; it does not tidy the checkout,
+and a close-out made from a feature branch tells the requester two different things at once -- the terminal
+says the context can be cleared, `git status` says the work is mid-flight. So `git checkout main` is the
+closing act, and the tension with the known trap in the other direction -- a clean trunk reads as *ready*,
+which is why the branch check exists at the start of every assignment -- is written down beside it rather
+than left to be rediscovered.
 
 Two mechanical consequences land with it in
 [`CONTRIBUTING.md`](CONTRIBUTING.md). **The repo's standing gates are no longer written as TEST steps**:

@@ -580,6 +580,19 @@ anybody watching. Where no ship was started at all, the branch simply stays park
 Dave, and the fold is a [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) run on
 `main` in the next session.
 
+**And the last act is `git checkout main`** (Dave, August 29, 2026, on being told a session could be cleared
+while the tree still stood on the branch). Everything above protects the *work*; none of it tidies the
+*checkout*. A session that reports itself finished from a feature branch tells the requester two different
+things at once — the terminal says the context can be cleared, `git status` says the work is mid-flight — and
+the requester is right to believe the second one. So parking ends on the trunk, and only then is the close-out
+honest.
+
+**This is the one place where landing on a clean trunk is the goal rather than the trap.** Chris's lens
+records the inverse: `ship-pr` step 5 leaves you on `main`, which reads as *ready* rather than as one command
+away from committing to the wrong place. Both hold, and they are not in tension — the trunk is where a session
+**ends**, and the branch check at the start of the next assignment is what stops it from being where the next
+one silently begins.
+
 **Why the gate beats a hand-run, since the obvious explanation is wrong.**
 [`Invoke-TestSuiteGate`](../scripts/lib/native-capture-lib.ps1) is *not* an in-process pass — it launches
 every suite as its own `powershell` child, exactly as a hand-run does. Two other mechanisms account for the

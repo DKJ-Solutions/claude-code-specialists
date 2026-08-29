@@ -159,6 +159,14 @@ with it, and the reasoning is in the pull request — all three outlive the sess
 stopping safe rather than lossy. *"The PR is open and shipping"* is close-out shape A, a finished
 assignment, and not an open point.
 
+**And it ends on the trunk, which is what makes the session safe to clear.** Pushing the branch protects the
+work; leaving the checkout standing on it does not. The next session opens on a working copy that reads as
+mid-flight, and the requester has been told the assignment is finished while the tree says otherwise — so the
+closing act is a checkout of the trunk. That puts you exactly where a *finished* chain leaves you, which is a
+known trap in the other direction: a clean trunk reads as **ready** rather than as one command away from
+working in the wrong place. The answer to that is the branch check at the start of the next assignment, never
+a branch left checked out as a reminder.
+
 ## Core improvements — the inbound route
 
 If Chris (or a specialist) discovers, during the work, improvements to the **shared core** of the
