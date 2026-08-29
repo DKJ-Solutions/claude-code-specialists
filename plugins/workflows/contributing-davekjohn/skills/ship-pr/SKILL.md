@@ -79,6 +79,12 @@ The six steps, stopping on the first failure:
    could never fire and a missing PR arrived as the empty string, so the script would have run
    `gh pr merge ''`. Worth knowing if you are on an older version of the plugin — the symptom is a
    `ship-pr` run that reports no PR number and then fails at the merge with an unhelpful gh error.
+
+   **And then the checkout goes home, before the wait rather than after it (step 2b).** In the primary
+   checkout, on a clean tree, with nobody else holding the trunk, `HEAD` moves to the main branch here —
+   so a backgrounded ship leaves the session where a finished chain leaves it. Never a refusal; a tree
+   that cannot go home stays where it is and says why. See
+   [And stopping now leaves the checkout on the trunk](#and-stopping-now-leaves-the-checkout-on-the-trunk-1073).
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
 4. **Merge** (`gh pr merge`), but first the **step-list gate again**: the phases above the DEPLOY heading in
    `contributing-davekjohn/development.md` must
@@ -190,6 +196,45 @@ things:
   [`worktree-lane` skill](../worktree-lane/SKILL.md); or
 - **stop.** A close-out that says *"PR #N opened, shipping in the background"* is a finished assignment,
   not an open point — nothing about an in-flight ship needs answering before the session can be closed.
+
+### And stopping now leaves the checkout on the trunk ([#1073](https://github.com/DaveKJohn/claude-code-specialists/issues/1073))
+
+**That second move used to be only half true**, and the missing half is the one the owner reads. The
+orchestrator's own body carries two rules about this moment — *"parking is a state, not a promise to come
+back within the turn"* and *"it ends on the trunk, which is what makes the session safe to clear"* — and
+until step 2b existed a backgrounded ship could not satisfy both. `HEAD` did not move until step 5, after
+the CI wait, so at the moment the close-out was written the tree was necessarily still on the branch.
+Following the first rule meant breaking the second. Dave, after being handed exactly that session:
+*"ik wil pas een sessie sluiten als ik terug op de main branch ben. Dat is voor mij het teken dat de sessie
+veilig gesloten kan worden."*
+
+**Step 2b hands the trunk back as soon as the PR exists**, before the wait rather than after it — so the
+close-out can say both things at once. It is available because two earlier repairs already landed: since
+[#970](https://github.com/DaveKJohn/claude-code-specialists/issues/970) both merge gates read
+`refs/heads/<branch>` rather than the working copy, and since
+[#972](https://github.com/DaveKJohn/claude-code-specialists/issues/972) step 5 reads `HEAD` before it moves
+anything. Read together they say something neither one set out to: **nothing after step 2 reads the content
+of the working tree.** Step 3 is `gh` over the network, step 4 is the ref plus `gh`, and step 5 folds
+wherever `HEAD` already is — `main` being one of the two arms it has had all along.
+
+**Three conditions, and it is never a refusal.** A tree that cannot go home stays where it is, says which
+of the three it was, and the ship carries on:
+
+| condition | why, and what skipping it costs |
+|---|---|
+| **the primary checkout only** | a lane taking the trunk here would hold the clone-wide lock of [#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069) for the whole CI wait instead of for the length of a fold — worse than the defect that repair closed. A lane goes home at step 5b instead |
+| **nobody else holds the trunk** | git allows one worktree per branch, so the checkout would simply fail. Asked rather than attempted, because failing here is free |
+| **a clean tree** | #972's two outcomes met one step earlier: a colliding edit makes the checkout exit 1, and a non-colliding one **travels to the trunk**. The branch's own work is committed and pushed by step 1, so anything left here is something else |
+
+**One thing it buys that was not the point.** A concurrent lane-ship that would have collided with the
+primary's step 5 — the narrow window step 0 cannot cover — now meets step 0's own refusal instead, because
+the primary takes the trunk before the wait rather than after it. A post-merge half-state becomes a
+pre-push refusal, which is the trade step 0 was written for.
+
+The decision itself is `Get-TrunkReturnDecision` in `worktree-lib.ps1`, a pure function of the porcelain
+plus `git status --porcelain`, so it is asserted in `worktree-lib.tests.ps1` rather than only exercised by
+a live ship.
+
 
 **Working in the primary anyway used to cost you your checkout, and no longer does.** Step 5 ran
 `git checkout main` in the tree the script was started from, unconditionally, one line after the merge.

@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Regression tests for scripts/lib/worktree-lib.ps1 -- the porcelain reader behind ship-pr.ps1's
-    trunk-lock pre-flight and prune-merged.ps1's error message (issue #1069).
+    trunk-lock pre-flight (issue #1069), its trunk hand-back before the CI wait (issue #1073), and
+    prune-merged.ps1's error message.
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Every function in the lib is pure -- it takes
@@ -29,7 +30,11 @@
       5. the path comparison survives the three ways two spellings of one Windows directory differ:
          separator, case, and a trailing separator;
       6. the empty and malformed inputs answer rather than throw, since every caller reaches this lib
-         with whatever git actually printed.
+         with whatever git actually printed;
+      7. Get-TrunkReturnDecision answers all three of its conditions (issue #1073): the primary
+         checkout only, nobody else holding the trunk, and a clean tree -- and answers rather than
+         throwing on everything git might hand over, because step 2b is not a gate and a decision it
+         cannot make must leave the ship running.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -157,7 +162,6 @@ Assert-Equal '' (Get-WorktreePathKey '') 'an empty path answers empty rather tha
 # handed in with every one of the three differences at once, and the tree must still recognise itself.
 Assert-Equal '' (Get-WorktreeHoldingBranch -PorcelainLines $PorcelainSingleOnTrunk -Branch 'main' -SelfPath 'c:\REPO\') `
     'the self-comparison goes through the key, not through -eq'
-
 Write-Host ""
 Write-Host "5. Input git might actually hand over" -ForegroundColor Cyan
 
@@ -171,6 +175,80 @@ Assert-Equal '0' "$((Get-WorktreeRecords -PorcelainLines @('branch refs/heads/ma
     'lines before the first stanza are ignored rather than throwing'
 Assert-Equal '' (Get-WorktreeHoldingBranch -PorcelainLines @('garbage') -Branch 'main' -SelfPath 'C:/repo') `
     'unparseable output answers "nobody holds it" rather than throwing'
+
+
+Write-Host ""
+Write-Host "6. Get-TrunkReturnDecision -- may this tree go home while the ship runs? (issue #1073)" -ForegroundColor Cyan
+
+# THE ORDINARY RUN: the primary checkout stands on its shipping branch, no lane holds the trunk, and the
+# tree is clean. This is the case the whole repair exists for -- without it the close-out has to choose
+# between "parking is a state" and "it ends on the trunk", and #1073 measured what choosing costs.
+$PorcelainPrimaryOnBranch = @(
+    'worktree C:/repo',
+    'HEAD aaaa',
+    'branch refs/heads/fix/something-v1',
+    ''
+)
+Assert-True (Get-TrunkReturnDecision -PorcelainLines $PorcelainPrimaryOnBranch -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @()).Return `
+    'the primary checkout on a clean tree goes back to the trunk'
+Assert-Equal '' (Get-TrunkReturnDecision -PorcelainLines $PorcelainPrimaryOnBranch -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @()).Reason `
+    'a yes carries no reason -- there is nothing for the reader to be told'
+
+# A LANE MUST NOT TAKE THE TRUNK HERE, and this is the assert that keeps #1069 closed. Step 5b hands a
+# lane back to its own branch AFTER the fold; a lane taking the trunk at step 2b would hold the
+# clone-wide lock for the whole CI wait instead of for the length of a fold -- strictly worse than the
+# defect #1069 repaired, introduced by the repair for #1073.
+$decLane = Get-TrunkReturnDecision -PorcelainLines $PorcelainTwoTrees -SelfPath $LanePath -TrunkBranch 'main' -StatusLines @()
+Assert-True (-not $decLane.Return) 'a lane does not take the trunk at step 2b'
+Assert-True ($decLane.Reason -like '*not the primary checkout*') 'and the reason names the primary checkout'
+Assert-True ($decLane.Reason -like "*$PrimaryPath*") 'and names the directory, so the reader can go there'
+
+# SOMEBODY ELSE HOLDS THE TRUNK: git would refuse the checkout anyway, so this is asked rather than
+# attempted. $PorcelainTwoTrees is the lane-on-main capture, seen from the primary this time.
+$decHeld = Get-TrunkReturnDecision -PorcelainLines $PorcelainTwoTrees -SelfPath $PrimaryPath -TrunkBranch 'main' -StatusLines @()
+Assert-True (-not $decHeld.Return) 'the trunk held by another worktree is not taken from it'
+Assert-True ($decHeld.Reason -like "*$LanePath*") 'and the holder is named'
+
+# A DIRTY TREE IS #972'S TWO OUTCOMES MET ONE STEP EARLIER: a colliding edit makes the checkout exit 1,
+# and a non-colliding one TRAVELS TO THE TRUNK. The branch's own work is committed and pushed by step 1,
+# so anything here is something else -- and something else is what must not ride along.
+$decDirty = Get-TrunkReturnDecision -PorcelainLines $PorcelainPrimaryOnBranch -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @(' M scripts/lib/worktree-lib.ps1')
+Assert-True (-not $decDirty.Return) 'a modified file keeps the tree where it is'
+Assert-True ($decDirty.Reason -like '*not clean*') 'and the reason says so'
+# UNTRACKED COUNTS AS DIRTY ON PURPOSE: `git checkout main` carries an untracked file across too, which
+# is the silent half of #972's second outcome.
+Assert-True (-not (Get-TrunkReturnDecision -PorcelainLines $PorcelainPrimaryOnBranch -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @('?? notes.txt')).Return) `
+    'an untracked file counts as dirty'
+# Blank lines are not dirt. Invoke-NativeCapture's callers trim, and an empty capture can arrive as a
+# single empty string rather than as no elements at all.
+Assert-True (Get-TrunkReturnDecision -PorcelainLines $PorcelainPrimaryOnBranch -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @('', '   ')).Return `
+    'blank status lines are not treated as changes'
+
+# ALREADY ON THE TRUNK: the tree is the primary, holds main itself, and Get-WorktreeHoldingBranch
+# excludes it -- so the answer is yes and step 2b's checkout is the no-op it should be. Asserted because
+# the opposite (a tree reporting itself as its own blocker) is exactly the bug -SelfPath exists for.
+Assert-True (Get-TrunkReturnDecision -PorcelainLines $PorcelainSingleOnTrunk -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @()).Return `
+    'a tree already on the trunk does not report itself as the blocker'
+
+# WHAT GIT MIGHT ACTUALLY HAND OVER. Every one of these answers instead of throwing, because step 2b is
+# not a gate: a decision it cannot make must leave the ship running, never stop it.
+$decEmpty = Get-TrunkReturnDecision -PorcelainLines @() -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @()
+Assert-True (-not $decEmpty.Return) 'an empty porcelain answers no'
+Assert-True ($decEmpty.Reason -like '*no primary checkout*') 'and says the list named no primary checkout'
+Assert-True (-not (Get-TrunkReturnDecision -PorcelainLines $PorcelainPrimaryOnBranch -SelfPath '' -TrunkBranch 'main' -StatusLines @()).Return) `
+    'an unreadable self path answers no'
+Assert-True (-not (Get-TrunkReturnDecision -PorcelainLines @('garbage') -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @()).Return) `
+    'unparseable output answers no rather than throwing'
+# THE TRUNK IS A PARAMETER, NOT 'main': a consumer whose trunk is 'master' or 'trunk' gets the same
+# three conditions. ship-pr passes 'main' because that is this repo's trunk, not because the lib knows it.
+$PorcelainMasterLane = @(
+    'worktree C:/repo', 'HEAD aaaa', 'branch refs/heads/fix/x', '',
+    'worktree C:/lane', 'HEAD bbbb', 'branch refs/heads/master', ''
+)
+Assert-True (-not (Get-TrunkReturnDecision -PorcelainLines $PorcelainMasterLane -SelfPath 'C:/repo' -TrunkBranch 'master' -StatusLines @()).Return) `
+    'the trunk name is the caller''s, not hardcoded'
+Assert-True (Get-TrunkReturnDecision -PorcelainLines $PorcelainMasterLane -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @()).Return `
+    'and a lane on master does not block a repo whose trunk is main'
 
 Write-Host ""
 if ($script:fail -gt 0) {

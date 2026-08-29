@@ -62,6 +62,19 @@ without a lane is what pulls `HEAD` out from under the work in progress, and a l
 saves nothing. `ship-pr` prints the reminder at the moment it begins to wait; the rule itself is in the
 [`ship-pr` skill](../ship-pr/SKILL.md).
 
+**And since [#1073](https://github.com/DaveKJohn/claude-code-specialists/issues/1073) the primary is on the
+trunk while that ship runs, which changes two things here.** `ship-pr.ps1`'s step 2b hands the primary
+checkout back to `main` as soon as the PR exists, rather than at step 5 after the CI wait -- so the session
+that backgrounds a ship is standing on the trunk, which is the state its owner reads as "safe to clear".
+
+- **The lane is now the only place the next branch can go**, and for a plainer reason than before: the
+  primary is on `main`, and no branch is created there. What used to be advice backed by a hazard is advice
+  backed by the branch rule.
+- **A lane cannot ship while the primary's own ship is in flight**, because the primary holds the trunk for
+  the length of the wait and `ship-pr`'s step 0 refuses on exactly that. **This is the good direction.**
+  That pair collided before too -- the lane took `main` at its step 5 and the primary's step 5 then failed,
+  *after* its merge had landed. The collision has moved to the one place stopping is free.
+
 ## Opening a lane
 
 Run the shared script from the **root of the consuming repo**:

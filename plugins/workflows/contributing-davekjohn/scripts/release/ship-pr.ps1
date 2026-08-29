@@ -55,6 +55,15 @@
          --base a consumer's STACKED PR could be the one merged, and the previous inline parse hit the
          5.1 array-flattening pitfall -- its "no open PR" guard was dead code and a missing PR became
          the empty string, so the script would have run `gh pr merge ''`. See the comment at step 2.
+     2b. GIVE THE TRUNK BACK, BEFORE THE WAIT RATHER THAN AFTER IT (issue #1073). Chris's persona says
+         both "parking is a state, not a promise to come back within the turn" -- an in-flight ship is a
+         finished assignment -- and "it ends on the trunk, which is what makes the session safe to
+         clear". A backgrounded ship could not satisfy both, because HEAD did not move until step 5.
+         It can now: since #970 the step-4 gates read refs/heads/<branch> and since #972 step 5 reads
+         HEAD before it moves anything, so NOTHING BELOW THIS POINT READS THE WORKING TREE'S CONTENT.
+         Three conditions, in Get-TrunkReturnDecision and tested there: the primary checkout only, the
+         trunk held by nobody else, and a clean tree. Never a refusal -- a tree that cannot go home
+         stays where it is and says which of the three it was.
       3. Wait for EVERY check the PR has to finish (gh pr checks <pr> --watch), then judge the merge on
          the ones the ruleset REQUIRES. A failing required check stops the run WITHOUT merging; a
          failing check the ruleset does not require prints a loud warning and does not (issue #943 --
@@ -69,8 +78,9 @@
          AND SAY, BEFORE THE WATCH BEGINS, THAT NOBODY HAS TO SIT THROUGH IT (issue #985). Backgrounding
          this run is the default: the merge cannot move before the check is green either way, so the only
          thing the wait buys in the foreground is a second look at a result the local gate already gave.
-         The one condition is printed with it, because the invitation alone is unsafe -- step 5 checks out
-         the trunk in THIS tree, so the session's next move is a lane or nothing.
+         The lane is printed with it, and it is advice rather than the condition it once was: step 2b has
+         already moved this tree to the trunk, so the next branch belongs in a lane because that is where
+         you build, not because staying here would cost you your checkout.
       4. TWO GATES, THEN MERGE. The step-list gate refuses while development.md has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
@@ -346,6 +356,60 @@ if ($null -eq $prRecord) { Write-Error "No open PR to main found for '$branch' a
 $pr = $prRecord.number
 Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 
+# --- Step 2b: give the trunk back BEFORE the wait (issue #1073) -----------------------------------
+# THE RULE THIS EXISTS FOR IS NOT IN A SCRIPT, IT IS IN THE ORCHESTRATOR'S BODY, and it said two things
+# that a backgrounded ship could not both satisfy. "Parking is a state, not a promise to come back
+# within the turn" makes an in-flight ship a FINISHED assignment; "it ends on the trunk, which is what
+# makes the session safe to clear" makes a checkout still standing on the branch an unfinished one. A
+# parked branch composes them (push, checkout, stop). A backgrounded ship could not: HEAD did not move
+# until step 5, after the CI wait, so at the moment the close-out was written the tree was necessarily
+# still on the branch. Dave, August 29, 2026, after being handed a session he could not act on: "ik wil
+# pas een sessie sluiten als ik terug op de main branch ben."
+#
+# THE FIX IS THREE LINES BECAUSE TWO EARLIER ONES DID THE WORK. Since #970 both merge gates read
+# refs/heads/<branch> instead of the working copy, and since #972 step 5 reads HEAD before it moves
+# anything. Read together they say something neither one set out to: NOTHING BELOW THIS POINT READS THE
+# CONTENT OF THE WORKING TREE. Step 3 is gh over the network, step 4 is the ref plus gh, step 5 folds
+# wherever HEAD already is -- and 'main' is one of the two arms it has always had. So the trunk can be
+# handed back here, and step 5 then takes that arm on purpose rather than by luck.
+#
+# WHY HERE AND NOT ONE LINE EARLIER: the PR must exist first. If step 1 or step 2 fails, the session is
+# left on its branch with the work in front of it, which is where a repair happens. Moving HEAD before
+# there is anything to come back to would be trading a real state for a tidy one.
+#
+# THE THREE CONDITIONS ARE IN Get-TrunkReturnDecision, tested, and its header carries what each one
+# costs if skipped. What is decided HERE is only what to do with the answer, and the answer is never a
+# refusal: no gate has been failed, and a tree that cannot go home is a tree that stays where it is.
+# THE REASON IS PRINTED EITHER WAY -- a session told "still on the branch" has to know whether that was
+# a decision or a failure, and the difference is exactly what the reader cannot see from HEAD alone.
+$statusRead = Invoke-NativeCapture -FilePath 'git' -Arguments @('status', '--porcelain')
+$statusLines = if ($statusRead.ExitCode -eq 0) { @($statusRead.Output) } else { @('?? <unreadable>') }
+$wtNow = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
+$trunkReturn = if ($wtNow.ExitCode -eq 0) {
+    Get-TrunkReturnDecision -PorcelainLines $wtNow.Output -SelfPath $repoRoot -TrunkBranch 'main' -StatusLines $statusLines
+} else {
+    # SAME BEST-EFFORT POSTURE AS STEP 0, and for the same reason: an unreadable worktree list says
+    # something about git, not about the trunk. The safe default here is the behaviour every run had
+    # before this step existed -- stay on the branch and let step 5 decide.
+    [pscustomobject]@{ Return = $false; Reason = "'git worktree list' could not be read" }
+}
+if ($trunkReturn.Return) {
+    $back = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', 'main')
+    if ($back.ExitCode -eq 0) {
+        # NOT FAST-FORWARDED HERE, DELIBERATELY. Step 5 fetches and does an explicit ff-only merge of
+        # origin/main after the merge lands, which is when there is something to fast-forward TO. Doing
+        # it twice would only widen the window in which this tree is ahead of what the PR merged into.
+        Write-Host "ship-pr: this checkout is back on 'main' -- the ship runs on PR #$pr from here." -ForegroundColor Green
+    } else {
+        # NOT FATAL: nothing is merged, the branch is pushed, and step 5 reads HEAD for itself. The one
+        # thing that would be wrong is stopping a ship over a checkout that was a convenience.
+        $back.Output | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
+        Write-Host "ship-pr: could not check out 'main' -- staying on '$branch'; step 5 will fold from here as before." -ForegroundColor DarkYellow
+    }
+} else {
+    Write-Host "ship-pr: staying on '$branch' -- $($trunkReturn.Reason)." -ForegroundColor DarkGray
+}
+
 # --- Step 3: wait for the required CI check ------------------------------------------------------
 # The CI checks can lag a few seconds behind the push: `gh pr checks` prints "no checks reported"
 # and exits 0 while none are registered yet -- indistinguishable by exit code from "all passed", so
@@ -377,6 +441,13 @@ Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 # August 23, 2026: the worktree is where you build, the primary checkout is where you ship. Named here
 # rather than left to the docs, because this is the one moment the reader is about to need it.
 #
+# AND SINCE #1073 THE SECOND LINE SAYS WHERE THE TREE ALREADY IS RATHER THAN THAT IT WILL BE LEFT ALONE.
+# Step 2b has just put the primary checkout back on the trunk, which is the state the orchestrator calls
+# safe to clear -- so the reader who backgrounds this run is not being asked to accept a tree standing
+# mid-flight, and the close-out that follows can say both things at once. Where step 2b declined, it said
+# why on the line above this one; the invitation is the same either way, because the wait is somebody
+# else's clock whichever branch this tree is on.
+#
 # A LINE AND NOT A MECHANISM, deliberately. Three shapes were on the table and this is the smallest: a
 # green-and-unmerged reporter would re-add half of what #984 had deliberately removed five minutes before
 # #985 was filed, and a detached watcher would merge and fold onto the trunk with nobody reading the output.
@@ -385,7 +456,7 @@ Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
 $waitBegan = Get-Date
 Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor Cyan
 Write-Host "  Nothing here needs the session -- background this run and the wait costs nothing." -ForegroundColor DarkGray
-Write-Host "  Step 5 leaves this checkout where it is, so nothing is pulled out from under you (#972)." -ForegroundColor DarkGray
+Write-Host "  Step 2b has already put this tree where a finished chain leaves it, so the close-out is honest (#1073)." -ForegroundColor DarkGray
 Write-Host "  The next piece of work still belongs in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
 $maxWaitSec = 180
 $waited = 0
@@ -703,6 +774,12 @@ Write-Host "ship-pr: PR #$pr merged (--$mergeMethod)." -ForegroundColor Green
 # nothing about this step changes, down to the command it runs. HEAD anywhere else (another branch, or
 # detached, which reads as 'HEAD'): the session moved, its checkout is not this script's to touch, and
 # the fold runs in a throwaway worktree instead.
+#
+# 'ALREADY ON main' IS NOW THE ORDINARY ARM RATHER THAN THE ODD ONE (issue #1073). Step 2b puts the
+# primary checkout back on the trunk as soon as the PR exists, so on a normal run this `git checkout
+# main` is a no-op that the script takes on purpose. Nothing here needed changing for that -- the arm
+# has existed since #972 -- and it is written down because the reverse reads as a defect: a reader who
+# meets `-eq 'main'` and knows only the foreground story will think it is unreachable.
 #
 # THE WORKTREE HAS main CHECKED OUT RATHER THAN BEING DETACHED, AND THAT IS FORCED BY TWO MEASUREMENTS.
 # Detached, fold-changelog-entry.ps1's `git push` fails with "fatal: You are not currently on a branch"

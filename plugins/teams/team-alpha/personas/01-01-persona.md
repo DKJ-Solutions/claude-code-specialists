@@ -167,6 +167,18 @@ known trap in the other direction: a clean trunk reads as **ready** rather than 
 working in the wrong place. The answer to that is the branch check at the start of the next assignment, never
 a branch left checked out as a reminder.
 
+**The two hold together, and where a tool makes them fight, the trunk wins and the tool is what changes.**
+Both are about the same moment and they are not a trade: parking says *do not sit through somebody else's
+clock*, ending on the trunk says *do not hand back a tree the requester cannot act on*. A shipping tool that
+only returns you to the trunk after the wait puts them in conflict, and the tempting reading — "the ship is in
+flight, so this one time the branch is fine" — is the one that costs the requester the session. It is not a
+close-out problem to word around: **name it as a defect in the tool, and repair it there.** Measured in this
+system's own source repo on August 29, 2026: a background ship held the checkout on the branch until after
+CI, the close-out said the session could be cleared, and it took three exchanges to unpick. The repair moved
+the tree home the moment the pull request existed — nothing after that point needed it to stand on the branch
+— so both rules now hold at once. Where you cannot reach the trunk, **say which of the two you are in and
+why**, and never claim the other.
+
 ## Core improvements — the inbound route
 
 If Chris (or a specialist) discovers, during the work, improvements to the **shared core** of the

@@ -7,7 +7,7 @@
 
         . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 
-    Supplies the four pure functions below. None of them runs git -- the caller passes the lines
+    Supplies the five pure functions below. None of them runs git -- the caller passes the lines
     `git worktree list --porcelain` produced, so every one of them is testable, which is the whole
     reason this file exists rather than a fourth inline parse.
 
@@ -129,4 +129,85 @@ function Get-WorktreeHoldingBranch {
         return $record.Path
     }
     return ''
+}
+
+# MAY THIS TREE GO BACK TO THE TRUNK NOW, WHILE THE SHIP STILL RUNS? (issue #1073, August 29, 2026.)
+#
+# THE CONTRADICTION IT SETTLES IS IN THE ORCHESTRATOR'S OWN BODY, not in a script. Chris says both
+# "parking is a state, not a promise to come back within the turn" -- so a backgrounded ship is a
+# FINISHED assignment -- and "it ends on the trunk, which is what makes the session safe to clear".
+# For a parked branch those compose: push, check the trunk out, stop. For a BACKGROUNDED ship they
+# could not, because ship-pr.ps1 did not move HEAD until step 5, after the CI wait. At the moment the
+# close-out was written the checkout was necessarily still on the branch, so obeying the first rule
+# broke the second. Dave, the day it cost him three exchanges: "ik wil pas een sessie sluiten als ik
+# terug op de main branch ben."
+#
+# AND THE ANSWER IS AVAILABLE ONLY BECAUSE TWO EARLIER REPAIRS LANDED. Since #970 both merge gates read
+# `refs/heads/<branch>` rather than the working copy, and since #972 step 5 reads HEAD before it moves
+# anything. Together they mean NOTHING AFTER STEP 2 READS THE CONTENT OF THE WORKING TREE -- step 3 is
+# network, step 4 is the ref plus gh, and step 5 folds wherever HEAD already is. So the trunk can be
+# handed back the moment the PR exists, and step 5 then finds HEAD -eq 'main' and folds in place: the
+# arm it has had all along, taken deliberately instead of by accident.
+#
+# THREE CONDITIONS, AND EACH ONE IS A MEASURED DEFECT IF SKIPPED:
+#
+#   - THE PRIMARY CHECKOUT ONLY. A lane that took the trunk here would take the clone-wide lock #1069
+#     exists to prevent, and would do it for the whole CI wait rather than for the length of a fold.
+#     A lane belongs on its own branch; step 5b is what puts it back there.
+#   - NOBODY ELSE HOLDS THE TRUNK. git allows one worktree per branch, so `git checkout main` would
+#     simply fail -- and failing HERE is free (nothing is merged yet), which is why it is asked rather
+#     than attempted. Step 0 has usually already refused this case; this is not a second gate but the
+#     same question asked of a tree that may have changed hands since.
+#   - A CLEAN TREE. This is #972's two outcomes, met one step earlier: an uncommitted edit that
+#     collides makes the checkout exit 1, and one that does not collide TRAVELS TO THE TRUNK with the
+#     session none the wiser. The branch's own work is committed and pushed by step 1, so a dirty tree
+#     here is something else -- and something else is exactly what must not ride along.
+#
+# IT REPORTS A REASON RATHER THAN A BARE $false, because the caller has to say what the reader is
+# looking at either way: a session told "the tree stays on the branch" needs to know which of the three
+# it was, or it will read a deliberate decision as a failure.
+#
+# StatusLines is `git status --porcelain` as the caller captured it. EMPTY MEANS CLEAN, and untracked
+# files count as dirty on purpose: `git checkout main` carries them across too.
+function Get-TrunkReturnDecision {
+    param(
+        [string[]]$PorcelainLines,
+        # ALLOWEMPTYSTRING IS NOT A LOOSENING, IT IS WHAT MAKES THE FIRST GUARD BELOW REACHABLE.
+        # Mandatory on a [string] rejects '' at the binder, so a caller handing over an unreadable path
+        # got a terminating parameter-binding error inside a step whose whole posture is "never a
+        # refusal". Found by the suite the moment the guard was asserted. Still Mandatory: the argument
+        # must be PASSED, it just may be empty, and the function answers instead of throwing.
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$SelfPath,
+        [Parameter(Mandatory = $true)][string]$TrunkBranch,
+        [string[]]$StatusLines
+    )
+    $primary = Get-PrimaryWorktreePath -PorcelainLines $PorcelainLines
+    $selfKey = Get-WorktreePathKey $SelfPath
+    if (-not $selfKey) {
+        return [pscustomobject]@{ Return = $false; Reason = "this tree's own path could not be read" }
+    }
+    if (-not $primary) {
+        return [pscustomobject]@{ Return = $false; Reason = "'git worktree list' named no primary checkout" }
+    }
+    if ((Get-WorktreePathKey $primary) -ne $selfKey) {
+        return [pscustomobject]@{
+            Return = $false
+            Reason = "this is a lane, not the primary checkout ($primary) -- a lane keeps its own branch, and step 5b puts it back"
+        }
+    }
+    $holder = Get-WorktreeHoldingBranch -PorcelainLines $PorcelainLines -Branch $TrunkBranch -SelfPath $SelfPath
+    if ($holder) {
+        return [pscustomobject]@{
+            Return = $false
+            Reason = "'$TrunkBranch' is held by another worktree at $holder"
+        }
+    }
+    $dirty = @(@($StatusLines) | Where-Object { $_ -and "$_".Trim() })
+    if ($dirty.Count -gt 0) {
+        return [pscustomobject]@{
+            Return = $false
+            Reason = "the working tree is not clean ($($dirty.Count) path(s)) -- a checkout would take them to the trunk or fail on them"
+        }
+    }
+    return [pscustomobject]@{ Return = $true; Reason = '' }
 }
