@@ -32,6 +32,34 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/development-step-drops-new-task-v1` · 20260829-102859
+
+Step 2 of `contributing-davekjohn/CONTRIBUTING.md` is now `## 2. DEVELOPMENT` (Dave, August 29, 2026). The
+word `NEW` dated from when this step opened the page and a development task was the first thing that
+happened here; `## 1. NEW ISSUE / TASK` took over the arrival earlier that day, so the two headings had
+started making the same claim two rows apart. One sentence under the new heading records why, because a
+rename with no reason invites the next reader to undo it.
+
+Nothing else moved: `NEW DEVELOPMENT TASK` appeared exactly once in the whole tree -- no anchor, no script,
+no lens, no changelog entry pointed at it -- and the numbering is untouched, so every `step 2.x` reference
+on the page and in `README.md` still resolves.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a heading on a contributor-facing page in the source repo. No shipped file, script or gate reads it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Step 2 is DEVELOPMENT, not NEW DEVELOPMENT TASK
+
+[PR #1059](https://github.com/DaveKJohn/claude-code-specialists/pull/1059)
+
+---
+
 ### DEPLOY: `docs/contributing-new-issue-task-chapter-v1` · 20260829-095247
 
 `contributing-davekjohn/CONTRIBUTING.md` opens with a fifth step, written ahead of the four it had:

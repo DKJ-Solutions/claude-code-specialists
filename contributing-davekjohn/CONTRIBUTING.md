@@ -170,7 +170,12 @@ carries it into [`CHANGELOG.md`](CHANGELOG.md) with the change that closed it.
 
 ---
 
-## 2. NEW DEVELOPMENT TASK
+## 2. DEVELOPMENT
+
+**It was `NEW DEVELOPMENT TASK` until August 29, 2026** (Dave). The word carried its weight while this step
+opened the page and a development task was the first thing that happened here; step 1 has owned the arrival
+since earlier that day, so `NEW` had started claiming what the step above it does. The step numbers did not
+move with the name — every `2.x` on this page and in [`README.md`](README.md) still points where it did.
 
 ### 2.1. Create the branch and the empty `development.md`
 
