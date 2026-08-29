@@ -218,6 +218,31 @@ jobs:
           # with: jq's `split` on an EMPTY string returns `[]`, not `[""]`, so `[][0]` is null and
           # `-r` prints the literal word "null". Measured against a fixture carrying no `result`
           # field, where the annotation then read "... named no API status. null".
+          #
+          # THE 300 AND THE RELAY'S 500 BOUND THE SAME STRING, AND THAT IS DELIBERATE RATHER THAN
+          # OVERLOOKED -- issue #1116, measured and left standing. Since #1110 `ship-pr` relays this
+          # annotation to the operator through `Get-AuthoredFailureNote`, which cuts a message at 500
+          # and appends "...". The headline in front of this reason is 296 characters, so the two caps
+          # allow an annotation of 597 against a relay that carries 500, and the part the relay drops
+          # is the TAIL of the reason -- which is where "resets Aug 31, 7am (UTC)" lives.
+          #
+          # WHY LOWERING THIS 300 IS NOT THE REPAIR IT LOOKS LIKE, which is the measurement worth
+          # leaving behind. 500 - 296 - 1 = 203, so the operator's console shows 203 characters of
+          # reason no matter which end owns the cut. Capping here at 203 would hand that reader the
+          # SAME 203 characters, drop the "..." that tells them something was removed, and cost the
+          # GitHub annotation -- read in the checks UI, where no 500-character bound applies -- up to
+          # 97 characters it currently keeps. It was built and withdrawn on exactly that arithmetic.
+          # Nothing can raise the console's 203 except changing which END the relay cuts from, and
+          # that is the relay's decision to take generically, not this file's to force.
+          #
+          # AND IT HAS NEVER BITTEN. Sampled across all 45 titled failure annotations this workflow
+          # left on August 27-29, 2026: every one a 429, and upstream's `result` first line ran 51 to
+          # 55 characters -- "You've hit your weekly limit ... resets Aug 31, 7am (UTC)" and three
+          # session-limit variants -- with the longest message actually emitted at 341. A reason
+          # would have to reach 204 characters, nearly four times the longest seen, before a reader
+          # lost a word. `scripts/tests/pr-issues.tests.ps1` pins both numbers so neither can move
+          # without this reasoning being read first.
+
           status=$(jq -r '[.[] | select(.type == "result")] | last | (.api_error_status // "") | tostring' "$EXECUTION_FILE")
           reason=$(jq -r '[.[] | select(.type == "result")] | last | (.result // "") | split("\n") | (.[0] // "") | .[0:300]' "$EXECUTION_FILE")
 
