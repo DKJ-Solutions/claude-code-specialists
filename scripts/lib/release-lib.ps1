@@ -1228,7 +1228,9 @@ function Build-ReleaseNotes {
     $summaryBlock = if ($Summary) {
         (($Summary -replace "`r`n", "`n").TrimEnd() + "`n`n---`n`n")
     } else { '' }
-    $header = "# Release notes v$Version`n`n**Date:** $Date  `n**Type:** $Type`n`n$titleLine$summaryBlock"
+    # THE HARD BREAK IS A BACKSLASH, NOT TWO SPACES (inbound #1100) -- see Build-AudienceNote below for the
+    # measurement and why the break itself is kept.
+    $header = "# Release notes v$Version`n`n**Date:** $Date\`n**Type:** $Type`n`n$titleLine$summaryBlock"
     return ($header + $body + "`n")
 }
 
@@ -1425,7 +1427,8 @@ function Build-ConsumerNotes {
 
     $rocket = [char]::ConvertFromUtf32(0x1F680)
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
-    $header = "# Release notes v$Version $rocket`n`n**Date:** $Date  `n**Type:** $Type`n`n$titleLine"
+    # Backslash hard break, not two spaces (inbound #1100) -- see Build-AudienceNote below.
+    $header = "# Release notes v$Version $rocket`n`n**Date:** $Date\`n**Type:** $Type`n`n$titleLine"
 
     return ($header + $body + "`n")
 }
@@ -1577,8 +1580,25 @@ function Build-ReleaseNoteDraft {
     $out = New-Object System.Collections.Generic.List[string]
     $out.Add("# $($w.Title) v$Version $rocket")
     $out.Add('')
-    $out.Add("**Date:** $Date  ")
-    $out.Add("**Type:** $Type  ")
+    # THE MARKDOWN HARD BREAK IS A BACKSLASH HERE AND IN THE TWO HEADERS ABOVE (inbound #1100), and the
+    # break itself is deliberately KEPT. Two trailing spaces are the older spelling of the same thing, and
+    # they made every generated release document fail an ordinary "no trailing whitespace" lint rule --
+    # measured in a consumer whose trunk went red on the next PR, on files it had not written, at the one
+    # moment the tree is least inspectable: after the release was committed, tagged and pushed. The cut runs
+    # its lint gate BEFORE these documents exist, so it cannot catch its own output and everything it prints
+    # is green; the failure then surfaces on the next branch, reading as that branch's problem.
+    #
+    # DROPPING THE BREAK WOULD NOT HAVE BEEN FREE, which is the part worth writing down because the report
+    # proposed it as costing nothing. '**Date:** x' and '**Type:** y' are separated by a single newline, and
+    # a single newline inside a markdown paragraph is a SOFT break -- so removing the two spaces renders the
+    # two labels on one line rather than two. The backslash is the CommonMark spelling of the same hard
+    # break, every renderer GitHub included accepts it, and no trailing-whitespace rule can see it.
+    #
+    # WHAT IT COSTS ON THE READING SIDE, so the next person does not have to find out: Get-MetaLine in
+    # new-internal-note.ps1 reads these two lines back out, and its pattern now tolerates BOTH spellings --
+    # every note already published carries the two-space form and those are records, not files to rewrite.
+    $out.Add("**Date:** $Date\")
+    $out.Add("**Type:** $Type\")
     $out.Add("**$($w.AudienceLabel):** $($w.Audience)")
     $out.Add('')
     if ($Title) { $out.Add($Title); $out.Add('') }

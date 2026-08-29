@@ -115,7 +115,13 @@ function New-FlatEntry {
         [int]$Pr = 0,
         [string]$ExtraBody = ''
     )
-    $lines = @(('#' * (Get-EntryHeadingLevel)) + ' ' + $Heading, '')
+    # THE PARENTHESES AROUND THE HEADING LINE ARE LOAD-BEARING, and this file has now paid for the same
+    # precedence trap twice. '@(A + ' ' + $Heading, '')' does NOT build a two-element array: the comma binds
+    # tighter than '+', so it parses as 'A + ' ' + ($Heading, '')' -- string plus ARRAY, which PowerShell
+    # renders by joining on $OFS. The heading came out with a TRAILING SPACE and the blank line vanished, in
+    # a fixture that reads exactly as intended. Found by the trailing-whitespace assert added for inbound
+    # #1100, which reported it against the generator; the generator was clean and the fixture was not.
+    $lines = @((('#' * (Get-EntryHeadingLevel)) + ' ' + $Heading), '')
     $lines += @((Get-EntrySectionHeading -Key 'What'), '')
     if ($TierLine) { $lines += @($TierLine, '') }
     $lines += $Body
@@ -1028,6 +1034,35 @@ Assert-NoMatch $draft '(?m)^## For ' 'and it does not name its own reader -- the
 Assert-Match $draft '(?m)^### A change with a readable name$' 'its entries sit one level DEEPER than before -- they are under a section now, not under the H1'
 Assert-Match $draft '(?m)^## What it is worth$' "the organisation's value section is present"
 Assert-Match $draft '(?m)^## What was still open at this release$' 'and its open section'
+
+Write-Host "No generated release document carries trailing whitespace (inbound #1100)" -ForegroundColor Cyan
+# WHAT THIS GUARDS, AND WHY NO EXISTING ASSERT COULD SEE IT. The hard break under '**Date:**' was two
+# trailing spaces -- an ordinary "no trailing whitespace" lint violation -- and cut-release runs its lint
+# gate BEFORE these documents exist, so the cut cannot catch its own output and everything it prints is
+# green. Measured in a consumer: the release was committed, tagged and PUSHED, and the failure surfaced on
+# the next branch's gate, on files that branch had not written, reading as that branch's problem.
+#
+# THE BREAK ITSELF IS KEPT. Dropping it is not free -- a single newline inside a markdown paragraph is a
+# SOFT break, so '**Date:**' and '**Type:**' would render on one line. The backslash is CommonMark's other
+# spelling of the same hard break, and no trailing-whitespace rule can see it.
+#
+# ASSERTED OVER THE WHOLE DOCUMENT rather than on the date line alone, deliberately: the defect was a
+# property of the OUTPUT, not of one label, and a per-label assert would have missed '**Type:**' one line
+# below it -- which the report itself did.
+foreach ($doc in @(
+    @{ Name = 'Build-ReleaseNotes';     Text = $notes },
+    @{ Name = 'Build-ConsumerNotes';    Text = $hl },
+    @{ Name = 'Build-ReleaseNoteDraft'; Text = $draft })) {
+    $dirty = @(($doc.Text -split "`n") | Where-Object { $_ -match '[ \t]+$' })
+    Assert-Equal 0 $dirty.Count "$($doc.Name): no generated line ends in whitespace"
+}
+Assert-Match $notes '(?m)^\*\*Date:\*\* 2026-08-05\\$' 'the hard break survives as a backslash rather than being dropped'
+Assert-Match $hl    '(?m)^\*\*Date:\*\* 2026-08-05\\$' 'in the consumer document too'
+# THE HAND-WRITTEN DRAFT IS THE ONE THAT BREAKS BOTH LABELS, and it is asserted separately because the
+# report named three emitting lines where there are four -- '**Type:**' one line below the third was
+# missed, which is the standing lesson that a count in a report is whatever the reporter's search matched.
+Assert-Match $draft '(?m)^\*\*Date:\*\* 2026-08-11\\$' 'the draft breaks after the date'
+Assert-Match $draft '(?m)^\*\*Type:\*\* Minor\\$'      'and after the Type line the report did not name'
 # THE HEADING THAT WAS THE DUPLICATION. 'What is different now' held the same ground as the consumer
 # section, in a second register, in the other document -- the ~365 words the merge measurement found
 # written twice. It is gone rather than moved, and asserted on absence so it cannot grow back.

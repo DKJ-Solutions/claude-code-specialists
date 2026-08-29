@@ -310,10 +310,19 @@ $historyRelFromFolder = if ($historyRelPath -like 'contributing-davekjohn/*') {
 } else {
     "../$historyRelPath"
 }
+#
+# THE HEADING LEVEL IS COMPOSED, NEVER TYPED (inbound #1098). This sentence said `##` while the fold has
+# written `###` ever since the levels shifted, so the one piece of prose a consumer ever reads ABOUT their
+# own changelog contradicted the entry three lines below it. Nothing breaks, which is why it survived: no
+# gate compares the intro against the constant, and the first person to notice is somebody debugging why
+# their hand-written `##` entry did not fold. Reading Get-EntryHeadingLevel (dot-sourced above) is what
+# stops the sentence drifting from the constant again -- and it also answers the repo that legitimately
+# overrode the level, which a corrected literal would not.
+$entryHashes = '#' * (Get-EntryHeadingLevel)
 $changelogIntro = @(
     '# Changelog',
     '',
-    'Everything merged since the last release, newest first: one `##` per change, and under it the',
+    ('Everything merged since the last release, newest first: one `' + $entryHashes + '` per change, and under it the'),
     'sections your own `CONTRIBUTING.md` names for your audience tier. The mechanism itself -- the',
     'branch document a change is written in, the fold that moves it here, and what the release cut does',
     'with this list -- is the plugin''s `CONTRIBUTING-portable.md`, which travels with `contributing-davekjohn`',

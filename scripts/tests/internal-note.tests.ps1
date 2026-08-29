@@ -298,6 +298,24 @@ Assert-True ($doc -match '\*\*Type:\*\* \(fill in\)') 'and so does a missing typ
 Assert-True ($r.Flat -match 'fill in the date by hand') 'and the run warns about it out loud'
 Remove-Item -Recurse -Force -LiteralPath $noMeta -ErrorAction SilentlyContinue
 
+Write-Host "new-internal-note -- BOTH spellings of the markdown hard break (inbound #1100)" -ForegroundColor Cyan
+# release-lib.ps1 ended those two lines with TWO TRAILING SPACES until inbound #1100 and ends them with a
+# BACKSLASH now -- the same markdown hard break, spelled the way no trailing-whitespace lint rule can see.
+# Both have to read, and the failure mode of getting it wrong is the quiet one: Get-MetaLine's old pattern
+# trims whitespace only, so the backslash would have been carried into the published document as part of
+# the date ('2026-08-03\') rather than raising anything. The two-space fixture is asserted a few lines
+# below in the no-entries case; this is the new form, and the old notes it must not stop reading are
+# every note this repo has already published.
+$hardBreak = New-Fixture -Label 'hardbreak' -NotesContent "# Release notes v3.2.0`n`n**Date:** 2026-08-03\`n**Type:** Minor\`n`n### #1 $midDot A title $midDot Feat $midDot 2026-08-03`n`nBody.`n"
+$r = Invoke-Script -Dir $hardBreak
+Assert-Equal 0 $r.Code 'a backslash hard break does not stop the run'
+$doc = [System.IO.File]::ReadAllText((Join-Path $hardBreak 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
+Assert-True (Test-Line -Text $doc -Pattern '\*\*Date:\*\* 2026-08-03') 'the date reads back WITHOUT the backslash'
+Assert-True (Test-Line -Text $doc -Pattern '\*\*Type:\*\* Minor') 'and so does the type'
+Assert-True ($doc -notmatch '2026-08-03\\') 'the break marker is not carried into the published document'
+Assert-True ($r.Flat -notmatch 'fill in the date by hand') 'and nothing falls back to the placeholder'
+Remove-Item -Recurse -Force -LiteralPath $hardBreak -ErrorAction SilentlyContinue
+
 Write-Host "new-internal-note -- notes with no entries at all" -ForegroundColor Cyan
 $noEntries = New-Fixture -Label 'noentries' -NotesContent "# Release notes v3.2.0`n`n**Date:** 2026-08-03  `n**Type:** Patch`n`nNothing structured here.`n"
 $r = Invoke-Script -Dir $noEntries

@@ -56,6 +56,26 @@ Assert-True ($strayBlock.Success -and $strayBlock.Value -match '\$reservedRootMd
     'the override list is still consulted first, as a manual exemption'
 Assert-True ($cutReleaseText.Contains('lib\entry-scaffold-lib.ps1')) `
     'and cut-release.ps1 dot-sources the lib that predicate lives in'
+# INBOUND #1099, THE WIRING HALF: the ROOT scan asks for the narrowed heading read. Asserted here as well
+# as behaviourally below, because the two fail differently -- the predicate can be right while the caller
+# forgets to ask for it, which is the state this repo shipped.
+Assert-True ($strayBlock.Success -and $strayBlock.Value -match '-OpeningHeadingOnly') `
+    'the ROOT scan asks for the opening-heading read (inbound #1099)'
+# AND THE BRANCH DOCUMENT'S OWN GUARD MUST NOT. It sits at a fixed path, it is already known to be a branch
+# document, and the WIDTH of the name test is its idempotency test -- a narrowed read there answers "still
+# in its reset state" for a document somebody has been writing in, and hands the next run permission to
+# overwrite it. Two guards, two questions, and only one of them is about an arbitrary file.
+$branchGuard = [regex]::Match($cutReleaseText, '(?ms)\$cutBranchDeployment\s*=\s*Join-Path.*?^\}')
+Assert-True $branchGuard.Success 'found the branch-document guard in cut-release.ps1'
+Assert-True ($branchGuard.Success -and -not ($branchGuard.Value -match 'OpeningHeadingOnly')) `
+    'and it keeps the WIDE read -- the narrowing is the root scan only'
+# THE REFUSAL COVERS BOTH WAYS THIS GATE FIRES (inbound #1099). "Fold them first" is correct for the case
+# the guard is FOR and destructive for the case it catches by accident, so the message names the seam that
+# settles the other half. A remedy that only covers one of two firings misdirects the other -- the #1081
+# lesson, measured again here.
+$strayError = [regex]::Match($cutReleaseText, '(?ms)^if \(\$strayEntries\.Count.*?exit 1')
+Assert-True ($strayError.Success -and $strayError.Value -match 'Get-ReservedRootMd') `
+    'the refusal names Get-ReservedRootMd, not only the fold'
 
 # 2. The fallback literal still parses, so the override mechanism itself has not silently broken.
 $m = [regex]::Match($cutReleaseText, '\$reservedRootMd\s*=\s*@\(Get-SeamValue[^@]*@\(([^)]*)\)')
@@ -125,6 +145,39 @@ Assert-True (Test-BranchChangelogIsFilled -Text $legacyEntryText) `
 $normalDocText = "# Just a Title`n`nSome body text that is not an entry.`n"
 Assert-True (-not (Test-BranchChangelogIsFilled -Text $normalDocText)) `
     'and an ordinary document (H1 title) does not'
+
+# 5. INBOUND #1099: THE ORDINARY DOC THAT LOOKED LIKE AN ENTRY ANYWAY. The comment this whole inversion
+#    rests on promises that a consumer's own root doc is safe with no configuration "since those open with
+#    a plain # title" -- and the name test does not read only the opening line. It scans EVERY H1-H3, so a
+#    single backticked word in any later heading declares a branch. In a technical repo that is close to
+#    unavoidable: '## Deploying `web`', '## The `build` step'. Measured in a live consumer on a test run's
+#    own log, where '## Step 3 -- `specialists-init` * **PASS**' read as the branch 'specialists-init',
+#    the cut refused, and the remedy it printed -- fold it -- would have pasted a 350-line log into
+#    CHANGELOG.md and deleted the file.
+$backtickedDoc = "# Testrun 2 -- run log`n`nPreamble.`n`n## Step 3 -- ``specialists-init`` * **PASS**`n`nBody.`n"
+Assert-True (-not (Test-BranchChangelogIsFilled -Text $backtickedDoc -OpeningHeadingOnly)) `
+    'a root doc with a backticked word in a LATER heading is not a stray entry (inbound #1099)'
+# The negative half, which is what makes the assert above mean something: the predicate at large is
+# unchanged, and it is the switch that narrows it. Without this, deleting the heading scan outright would
+# pass every assert here.
+Assert-True (Test-BranchChangelogIsFilled -Text $backtickedDoc) `
+    'and the un-narrowed predicate still reads that same document as one -- the switch is what changed'
+
+# 6. NOTHING A REAL ENTRY CAN BE IS LOST TO THE NARROWING. Every shape this predicate reads declares its
+#    branch in the document's OWN first heading, which is exactly what -OpeningHeadingOnly still reads.
+$modernDoc = "## Development: ``fix/x-v1`` * 20260829-180650`n`n### PLAN`n`nSomething.`n"
+Assert-True (Test-BranchChangelogIsFilled -Text $modernDoc -OpeningHeadingOnly) `
+    'a branch document still declares its branch through its opening heading'
+$oldBranchFirst = "# ``feat/older-shape`` progress`n`nSomething.`n"
+Assert-True (Test-BranchChangelogIsFilled -Text $oldBranchFirst -OpeningHeadingOnly) `
+    'and so does the branch-first heading every document carried before August 23, 2026'
+# THE '**Branch:**' FALLBACK IS NOT NARROWED, and it is the one shape that sits BELOW the title -- a
+# pre-split root entry, which is precisely the file this scan exists to catch. Its label is read from the
+# wording rather than typed, for the same reason the predicate reads it that way.
+$branchLabel = (Get-BranchFileWording).BranchLabel
+$legacyLine = "# A title nobody folded`n`n**${branchLabel}:** ``feat/pre-split```n`nBody.`n"
+Assert-True (Test-BranchChangelogIsFilled -Text $legacyLine -OpeningHeadingOnly) `
+    'and the legacy Branch line below the title is still read -- the narrowing is the heading scan only'
 
 Write-Host "cut-release.ps1 -- every planned file is checked before the first one is written" -ForegroundColor Cyan
 # WHY THIS IS A TEXT ASSERT AND NOT A BEHAVIOUR ONE: cut-release.ps1 runs its guardrails on load (it
