@@ -152,16 +152,29 @@ into `CHANGELOG.md` still describes the version that did not ship. Write the sec
 [rule 6](#rules) carries the timing and the one field that is deliberately excepted from it.
 
 **So `- [~]` means "no SUITE", never "no verification".** Those are two different sentences and only the
-first one is ever true of a finished branch. A dropped step still names the check that *was* run and what
-it reported — *"no suite: the lint gate and 36 existing suites cover this, all green"* — because that is
-what a later reader, and any evaluator judging whether this branch is done, can actually use. A TEST phase
-whose content is only *"nothing to test"* is an assertion, not a verification; nothing was checked, and the
-document says so in a way that reads as though something had been.
+first one is ever true of a finished branch. A dropped step still names what stands in for the suite —
+*"no suite: the lint gate and the existing suites cover this, and `open-pr` runs them before the push"* —
+because that is what a later reader, and any evaluator judging whether this branch is done, can actually
+use. A TEST phase whose content is only *"nothing to test"* is an assertion, not a verification; nothing
+was named, and the document says so in a way that reads as though something had been.
 
-**Two shapes are honest and neither is a suite.** Running the gates and reporting the outcome is a
-verification. So is a check the phase cannot make automatic — a rendered page compared by eye, an output
-read against what it should say — as long as the phase records that it was run and what it showed. What is
-*not* a verification is a prediction: a step ticked because the change looks correct. That is the failure
+**Cite a standing gate as COVERAGE, never as an outcome.** Adding *"all green"* to that line looks like the
+stronger answer and is the weaker one: the gates fire at the push, under their own power, so at the moment
+the step is written that result does not exist yet — and the only way to make it exist is to hand-run the
+very suites the push is about to run. The step list is what makes that hand-run compulsory rather than
+merely tempting: `open-pr` refuses to push while any step above DEPLOY is open, so a line claiming a green
+gate cannot be resolved until somebody has run the gate by hand. Measured in the source repo as
+[#1060](https://github.com/DaveKJohn/claude-code-specialists/issues/1060) — the hand-run overran its
+foreground timeout and had to be backgrounded twice, while the gate's own run of the same suites finished
+in under a minute immediately afterwards. Write what the gate covers, which is true at the moment you
+write it.
+
+**Two shapes are honest and neither is a suite.** One reports a result the session has actually seen — a
+check the phase cannot make automatic, a rendered page compared by eye, an output read against what it
+should say — as long as it records that the check was run and what it showed. The other names the standing
+gate that covers the change and stops there, without an outcome, precisely because that gate has not run
+yet. What is *not* a verification is either shape claiming a result nobody has seen: a step ticked because
+the change looks correct, or a gate reported green before it fired. That is the failure
 [rule 3](#rules) already names from the other side, met here at the phase that exists to prevent it.
 
 **Where the cycle is driven by [a goal condition](#driving-the-cycle-to-its-end-a-goal-condition), this is
