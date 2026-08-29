@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-429-headline-names-the-wrong-window-v1` · 20260829-093819
+
+The review check's failure annotation told the reader the wrong outage horizon. On a 429 it asserted a
+**session** quota "which resets on the clock", while the reason string printed beside it in the same
+annotation said `You've hit your weekly limit ... resets Aug 31, 7am (UTC)`. A subscription credential
+draws on both a session window measured in hours and a weekly cap measured in days, both arrive as the
+same 429, and nothing in the status separates them -- only the reason string does. So the headline was
+guessing, and on the eight red runs of August 28, 2026 it guessed wrong by three days.
+
+It now states only what holds for either limit -- out of quota, resets on the clock, a re-run does not
+help -- and points at the reason line for which one it is and when it returns. The prose block above
+the step is corrected in the same movement, because the session-only model it described is what
+produced the headline.
+
+That distinction changes what a reader does: told the window is a session, the reasonable move is to
+wait a while and re-run, which on a weekly cap is three days of waste. Issue #1055 was filed against a
+run whose log already carried the answer -- the second time this diagnostic has been read past, after
+#966 -- so the defect being repaired is legibility, exactly as it was then.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `.github/workflows/claude-code-review.yml` is this repo's own CI and is not plugin payload, so
+nothing here reaches a consumer of the marketplace.
+
+**Score:** N/A
+
+#### Pull Request
+
+The quota annotation stops naming a window its own reason contradicts
+
+[PR #1056](https://github.com/DaveKJohn/claude-code-specialists/pull/1056)
+
+---
+
 ### DEPLOY: `fix/fenced-links-rewritten-by-the-cut-v1` · 20260829-005017
 
 A markdown link written inside a code fence, an inline code span or an html comment is an illustration
