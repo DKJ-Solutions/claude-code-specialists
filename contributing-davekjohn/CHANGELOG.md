@@ -32,6 +32,54 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-status-in-the-annotation-gets-the-same-care-as-the-reason-v1` · 20260829-232217
+
+The annotation a failed `claude-review` leaves behind can no longer be garbled or forged by a field
+this repo does not own.
+
+That step reads upstream's `api_error_status` and puts it on a workflow-command line, where three
+variables meet and only `reason` was escaped. `status` reached the same line twice: through the `*)`
+headline, and through `short`, which lands in the annotation TITLE -- the one place a comma or a `::`
+is command syntax. The comment above the case block already stated that rule, and the only branch
+interpolating a variable there was the only one that could not honour it.
+
+Closed on all three axes -- newline, percent, title -- without asserting anything about upstream. The
+status is single-lined and capped where it is read, the fourth `short` is a literal like its three
+siblings, and `headline` is percent-escaped at both emit sites. The alternative #1118 offered was to
+leave the asymmetry and record why it is safe, which requires claiming `api_error_status` is
+status-shaped by construction; that is a claim about somebody else's field, and #1112 is what such
+claims have already cost here. Three asserts pin the shape, and each was shown to fail against the
+code as it stood.
+
+It also repairs a neighbouring assert that this change turned red. #1119 pinned the reason's
+300-character cap by matching the SHAPE of its jq slice, above a comment predicting that a second
+slice added elsewhere "would go unread here rather than caught". A second slice arrived one line
+above it, and the outcome was worse than unread: being earlier in the file it won the match, so the
+assert reported 32 against a cap nobody had touched. It now binds to `.result`, the status cap has an
+assert of its own, and the two can move independently.
+
+Nothing has broken yet, which is the point: all 45 titled failure annotations this workflow left on
+August 27-29, 2026 came from the `429` branch, whose headline is a literal, so the `*)` branch has not
+been observed running. The failure it prevents is a diagnostic that renders wrong -- or emits a second,
+forged workflow command -- in the one step whose whole job is explaining why a run went red.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+`.github/workflows/claude-code-review.yml` is this repo's own CI and travels in no plugin, so no
+consumer installs it and no subscriber of the service can observe the change.
+
+**Score:** N/A
+
+#### Pull Request
+
+The annotation's status gets the same care as its reason
+
+[PR #1120](https://github.com/DaveKJohn/claude-code-specialists/pull/1120)
+
+---
+
 ### DEPLOY: `fix/adoption-handover-and-jsonc-caveat-v1` · 20260829-231836
 
 Adoption stopped being a path a consumer can only complete by guessing. Four places told the reader to
