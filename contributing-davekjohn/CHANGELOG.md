@@ -32,6 +32,60 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-pr-on-an-already-merged-branch-v1` · 20260829-150218
+
+Re-running `ship-pr` on a branch that had already shipped used to end in a PowerShell error naming
+`gh` authentication -- on a branch that was completely finished, in a run where `gh` had just listed
+PRs, pushed and read the issue list. `open-pr` asked only for an *open* PR, so a merged branch fell
+through to `gh pr create`, and the script then replaced GitHub's own answer with the fixed guess
+`(is gh logged in?)`. Both halves are repaired: an already-merged PR is now its own outcome, reported
+with its number and url and exiting 0 before the gates, the push and the create; and where a create
+does still fail, the message carries gh's own reason, with the login hint kept only for a `gh` that
+printed nothing at all. `ship-pr` reads the same state for itself in its step 2, because both scripts
+are runnable on their own.
+
+The route those two closed had a second end, and it is now guarded too: the fold would write a
+**second** entry for a branch the changelog already carried, and report both runs as a success --
+measured in a consumer as two entries, same branch, same text, two PR numbers. Nothing downstream
+refused them either, so the cut counted the duplicate twice in its tier breakdown and printed it
+twice in the published note. `fold-changelog-entry.ps1` now refuses, naming the PR of the entry
+already there, leaving the entry file on disk and ending the run non-zero; `-Force` folds anyway.
+Refusing is safe *here* for a reason that does not generalise, and the code says so: an entry refused
+for a missing score leaves merged work with no record, while a duplicate refused leaves the record
+already standing.
+
+The branch name is the key and the merge stamp is not -- the fold writes that stamp at fold time, so
+the duplicate carried a different one, which is exactly why nothing matched. The reads behind both
+gates are pure functions in the libs that own the format (`Get-FoldedEntryForBranch`,
+`Get-PrCreateFailureReason`), so a suite asserts them without a remote; the fold's refusal is
+asserted end to end on the real script.
+
+Closes [#1077](https://github.com/DaveKJohn/claude-code-specialists/issues/1077) and
+[#1082](https://github.com/DaveKJohn/claude-code-specialists/issues/1082).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer meets this on the day they re-run `ship-pr` -- after an interrupted wait, from a second
+session, or out of habit on a branch whose local copy survived the merge. Until now that produced a
+message pointing at their `gh` login, their token and their network for a run whose only news was
+good; now it says the work has landed. The duplicate guard is the quieter half and the more
+expensive one: a doubled changelog entry is only repairable by hand, after the branch is gone, in a
+release note that has already been published.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr on an already-merged branch says so, and the fold refuses a second entry for one branch
+
+Plugins: contributing-davekjohn
+
+[PR #1086](https://github.com/DaveKJohn/claude-code-specialists/pull/1086)
+
+---
+
 ### DEPLOY: `fix/prune-merged-gives-the-branch-back-v1` · 20260829-134548
 
 `prune-merged` borrows the checkout for its fast-forward and now gives it back. It used to switch to
