@@ -574,6 +574,38 @@ if ($checks.ExitCode -ne 0) {
     # chasing. Printed as a warning rather than swallowed, so a run that merged past a failing check
     # says which check, in the transcript, where the next reader looks.
     Write-Host "ship-pr: a check FAILED but the merge is not blocked -- $($verdict.Reason)." -ForegroundColor Yellow
+    # AND IT SAYS WHY, WHERE THE OPERATOR IS ALREADY LOOKING -- issue #1103. The line above tells a
+    # reader that a check went red and that chasing it is theirs to do; what it does not carry is the
+    # reason, which sits three levels down -- a step, of a job, of a run. Eight issues have now been
+    # filed in this repo against a red `claude-review` whose own diagnostic step had already printed
+    # the cause (`api_error_status: 429`, the account behind the token out of quota, resetting on the
+    # clock), and one of them concluded that a secret needed rotating. So the sentence the workflow
+    # wrote about itself is fetched and printed beside the warning.
+    #
+    # ONLY THE NOT-REQUIRED FAILURES ARE ASKED ABOUT. A red REQUIRED check is a refusal, and its gate
+    # runs locally before the push -- that reader meets the reason first-hand and does not need it
+    # relayed. This is the path where the merge proceeds and the red mark is left behind, which is
+    # exactly the one nobody was going to read.
+    #
+    # Best-effort by construction, like the stalled-run note on the refusal path above: every read is
+    # guarded and a failure costs this line and nothing else. A check whose link names no job is
+    # skipped -- there is nothing to ask annotations of.
+    $spoken = @()
+    try {
+        foreach ($ref in @(Get-FailedCheckRunRefs -ChecksJson $checkFactsJson)) {
+            if (-not $ref.JobId) { continue }
+            if ($verdict.FailedOther -notcontains $ref.Name) { continue }
+            # -DiscardStderr because this output is PARSED, the same reason the run read above gives.
+            $ann = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                'api', "repos/$repo/check-runs/$($ref.JobId)/annotations")
+            if ($ann.ExitCode -ne 0) { continue }
+            $note = Get-AuthoredFailureNote -AnnotationsJson ($ann.Output -join "`n") -CheckName $ref.Name
+            if ($note) { $spoken += $note }
+        }
+    } catch {
+        $spoken = @()
+    }
+    foreach ($note in $spoken) { Write-Host "  $note" -ForegroundColor Yellow }
     Write-Host "  Continuing to step 4. The failing check is still failing; nothing here fixes it." -ForegroundColor Yellow
 } else {
     Write-Host "ship-pr: CI green." -ForegroundColor Green
