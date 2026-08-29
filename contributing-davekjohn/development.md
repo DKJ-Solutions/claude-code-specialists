@@ -71,6 +71,10 @@ and the existing arm is left exactly as it is.
 - [x] The refusal proved live: a real second worktree on `main`, `ship-pr -NoMerge`, exit 1 before
       step 1 with nothing pushed.
 - [x] `prune-merged` proved live against that same worktree.
+- [x] `prune-merged.tests.ps1` case (e2): a real second worktree on the trunk in the fixture, asserting
+      the refusal names the directory and deletes nothing. It exists for the WIRING rather than the
+      decision -- and it earned its place immediately: the first run of the full gate failed all 40
+      existing asserts at exit 1, because the new lib was dot-sourced but not copied into the fixture.
 - [x] Full suite + lint gate via `open-pr`.
 - [~] No suite for ship-pr itself. It drives live git and gh against a real remote and has never had
       one; that gap is documented in its own header, and the answer to it here is that the decision
