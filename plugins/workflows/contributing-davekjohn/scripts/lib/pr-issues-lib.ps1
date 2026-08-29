@@ -1151,8 +1151,8 @@ function Get-AuthoredFailureNote {
         BOUNDED, BECAUSE THIS IS FREE TEXT A WORKFLOW PRODUCED AND IT IS BEING PASTED INTO A CONSOLE:
         the message is cut to its FIRST LINE and 500 characters. Not the 300 claude-code-review.yml
         writes its own annotation under -- that bounds the REASON it appends, and the headline
-        explaining what the status means sits in front of it, so relaying at 300 drops the reset time
-        and keeps only the part the reader could already guess.
+        explaining what the status means sits in front of it, so relaying at 300 would keep only the
+        headline, which is the part a reader could already guess from the check being red.
 
     .PARAMETER AnnotationsJson
         `gh api repos/<owner>/<repo>/check-runs/<jobId>/annotations` output. Unreadable in, '' out: a
@@ -1186,9 +1186,16 @@ function Get-AuthoredFailureNote {
         $message = @($message -split "`r?`n")[0]
         # 500, NOT the 300 the annotation itself is written under, and measured rather than guessed.
         # That 300 bounds the REASON claude-code-review.yml appends; the headline explaining what the
-        # status means sits in front of it, so relaying at 300 cuts the sentence in half and the half
-        # it drops is the reset time -- the only actionable word in the whole note. Measured on run
-        # 33267175141: 460 characters, ending "resets Aug 31, 7am (UTC)".
+        # status means sits in front of it, so relaying at 300 cuts the sentence in half and keeps
+        # only the half a reader could guess from the red mark. Measured on run 33267175141: 460
+        # characters, ending "resets Aug 31, 7am (UTC)".
+        #
+        # THE RELAY DOES NOT VOUCH FOR WHAT IT RELAYS, and that is the point of the rule -- issue
+        # #1112. That measured 460-character note ended with a reset time roughly 2.5 DAYS later than
+        # the moment the quota actually came back. Nothing is added here to caveat it: this function
+        # repeats what an author wrote and cannot know which authors are reliable, so a hedge here
+        # would hedge every workflow in every consuming repo. An over-claiming sentence is repaired in
+        # the workflow that writes it, which is where #1112 was repaired.
         if ($message.Length -gt 500) { $message = $message.Substring(0, 500).TrimEnd() + '...' }
 
         # NAMED ONCE. A workflow that titles its own annotation usually leads with the job name --

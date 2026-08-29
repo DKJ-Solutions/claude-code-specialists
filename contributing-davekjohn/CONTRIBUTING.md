@@ -629,8 +629,16 @@ workflows, which is the safe outcome and not a defect to work around.
 `ship-pr` prints it for you: on the path where the merge proceeds it fetches the failing check's annotations
 and relays the sentence that workflow wrote about itself, so the reason lands in the same transcript as the
 warning. Where that sentence reads `out of quota`, the review did not run at all — `CLAUDE_CODE_OAUTH_TOKEN`
-is a subscription credential, its allowance is the one interactive work draws on, and it comes back on the
-clock: hours for a session window, days for a weekly cap. Nothing in the diff repairs it and no re-run helps.
+is a subscription credential, its allowance is the one interactive work draws on, and re-running adds none of
+it back. Nothing in the diff repairs it.
+
+**Read the reason for WHICH limit it is — hours for a session cap, days for a weekly one — but do not plan
+around the reset TIME it names.** That half is upstream's, relayed rather than vouched for, and it has been
+measured wrong: on August 29, 2026 a run failed at 18:02 UTC saying the weekly limit reset on August 31, and
+two later runs reviewed successfully at 18:43 and 18:55 the same evening
+([#1112](https://github.com/DaveKJohn/claude-code-specialists/issues/1112)). Why it came back early was not
+measured and should not be guessed at. The practical reading: a stated reset is a ceiling, not a schedule, so
+a later PR may well be reviewed long before it.
 
 **This is worth a paragraph because reading it wrong is the expensive part.** Eight threads have been filed
 here about `claude-review` red on every PR, and they did not all have the same cause: the early ones were
