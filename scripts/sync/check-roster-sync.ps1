@@ -957,6 +957,29 @@ if ($suppressedForBootstrap -gt 0) {
     # repo's own side of the setup has not happened. Counting it as an error would put a red line and
     # exit 1 in every session of a repo whose owner has simply not got round to the bootstrap -- and
     # not shouting at that person is the entire point of issue #225.
+    #
+    # NAME THE COMMAND AND WHO TYPES IT, NOT THE SKILL (inbound #1093 / #1096). This line used to say
+    # "run the 'specialists-init' skill", and the reader it lands on hardest is the MODEL: this is a
+    # SessionStart hook, so on a fresh consumer it is the first thing in context, at the top of every
+    # session until the repo is adopted. That skill carries disable-model-invocation, so a model
+    # following the instruction verbatim is refused by the harness -- and the state it is left in is the
+    # worst available one: told to act, given nothing it can act on, and barred from the page that
+    # documents the route (the flag removes the skill's description from context entirely, so it cannot
+    # even learn the skill exists). What a model does NEXT is the actual cost: bootstrap.ps1 sits in the
+    # plugin cache reachable by absolute path, and this is the moment it is most tempted to substitute.
+    # Measured in the testrun-2 adoption, August 29, 2026, where the run stopped here.
+    #
+    # DUAL AUDIENCE, WHICH IS WHY THIS IS NOT THE REPORT'S LITERAL WORDING. The report proposed
+    # "Ask the user to run ..." -- correct for the model and odd for the OWNER, who reads this same line
+    # on their own terminal and is not a third party to themselves. Naming the command and stating who
+    # must type it serves both: the owner reads an instruction they can follow, the model reads a
+    # handover it can make. The '/team-alpha:' prefix is deliberate and load-bearing -- before this fix
+    # that string appeared in no shipped file in either plugin, so a model that correctly gave up had to
+    # reconstruct the command it was handing over.
+    #
+    # The 'adopt-workflow-folder' line in the contract check stays a bare imperative on purpose: that
+    # skill has no such flag, so its reader CAN comply. The rule is not a phrasing convention -- it is
+    # that a message must not name a skill barred to the reader it addresses.
     Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run /team-alpha:specialists-init to put them in place -- that command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. It is additive and never overwrites anything you have written." -ForegroundColor Yellow
 }
 
