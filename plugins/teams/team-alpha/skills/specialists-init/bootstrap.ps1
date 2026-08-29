@@ -335,6 +335,21 @@ if ($null -ne $enabledPlugins) {
     }
 }
 
+# WHICH MARKETPLACE IS OURS (inbound #1084). The consumer's chain can enable plugins from several
+# marketplaces -- this machine's own does -- and the connector register at the end of this run is
+# THIS family's. Read off this script's own plugin id rather than derived from a path: the id is what
+# the register itself keys on, and the path-derivation this file already warns about twice (#179,
+# #405) yields the marketplace in one layout and the plugin in another. $null where the chain does
+# not name our own plugin, which the notices just below already report as a partial answer.
+$ownMarketplace = if ($pluginIdByName.ContainsKey($ownPluginName)) {
+    ($pluginIdByName[$ownPluginName] -split '@', 2)[1]
+} else { $null }
+function Test-OurMarketplace([string]$PluginName) {
+    if (-not $script:ownMarketplace) { return $true }   # cannot tell -- the caller says so out loud
+    if (-not $script:pluginIdByName.ContainsKey($PluginName)) { return $false }
+    return (($script:pluginIdByName[$PluginName] -split '@', 2)[1] -eq $script:ownMarketplace)
+}
+
 # Say what was NOT considered, and why (inbound #294, proposal 3). The old version only spoke up for an
 # UNREADABLE settings.json, so the one case that actually happened -- a perfectly valid settings.json
 # without the key, while the enable sat in settings.local.json -- passed in complete silence, and the
@@ -386,7 +401,18 @@ foreach ($pluginName in ($pluginNames | Sort-Object -Unique)) {
     }
     $agentsDir = Get-PluginAgentsDir -PluginName $pluginName -OwnPluginRoot $ownPluginRoot
     if ($null -eq $agentsDir) {
-        Write-Host "  [notice] agents directory of plugin '$pluginName' not found -- skipped." -ForegroundColor Yellow
+        # SAY WHAT THE SKIP MEANS, not just what was not found (inbound #1084). Worded as a missing
+        # DIRECTORY, this line read as an error about the plugin's layout, and the consequence a
+        # reader actually acts on -- what the register proposal at the end of this run will say about
+        # that plugin -- was left for them to infer several hundred lines later. For a plugin of this
+        # family that consequence is now "nothing": it reaches the manifest either way. For a plugin
+        # of another marketplace it is real, and the line has to say which of the two this is.
+        $regNote = if (Test-OurMarketplace $pluginName) {
+            "It IS in the register proposal below, with an empty 'extensions' array."
+        } else {
+            "It is not this marketplace's plugin either, so it is not in the register proposal below -- that register is this family's."
+        }
+        Write-Host "  [notice] plugin '$pluginName' has no agents/ directory -- it ships no lenses, so it gets no scaffolds. $regNote" -ForegroundColor Yellow
         continue
     }
     $pluginPad = Split-Path (Get-LensDest -Plugin $pluginName -Id '00-00') -Parent
@@ -1092,17 +1118,51 @@ Write-Host "  5. Register this repo in the workshop's connector register -- past
 # does not know where the workshop checkout sits relative to this repo, and guessing a path is exactly
 # what the register's marker check exists to prevent), so they stay VUL-IN -- the repo's standard
 # fill-in marker.
+#
+# THE ROW SET IS THE ENABLED PLUGINS, NOT THE LENS INVENTORY (inbound #1084). $registerInventory is
+# filled only while walking each plugin's agents/ directory, so a plugin that ships skills, scripts
+# and hooks and NO agents never entered it and could not reach this block -- and the workflow plugin
+# is exactly that shape. A consumer pasting the proposal verbatim then registered a manifest with
+# that row missing, which is not merely terse: check-connectors reports PER PLUGIN off this list, so
+# the repo drops out of the version view for that plugin specifically, and the '[ERROR] machine
+# record is on vX, source on vY' line that exists to catch a stale consumer cannot fire for it.
+# Silently, because a row that is simply absent looks exactly like a plugin that is not enabled
+# there. Every manifest already in connectors/ lists the workflow plugin, so the old proposal
+# disagreed with the register it is a proposal for.
+#
+# An empty "extensions" array is a TRUE statement about a plugin that ships no lenses, and it is what
+# the register's readers already handle: the row records that plugin's version without claiming a
+# lens. The slug filter is the same one the lens loop applies, so a name that is not a plugin name
+# cannot reach the manifest through this path either.
+#
+# AND THE ROWS ARE SCOPED TO THIS MARKETPLACE, which the old accident got right for the wrong reason.
+# Get-PluginAgentsDir only ever looked beside this plugin's own root, so a plugin from ANOTHER
+# marketplace could not enter the inventory either -- and widening the row set to "every enabled
+# plugin" without this filter would have handed the consumer a manifest naming plugins this register
+# knows nothing about. check-connectors classifies such a row as a well-formed name the marketplace
+# no longer declares and reports "this consumer has not migrated to the current names yet", which
+# would be a false statement about a plugin that was never this family's. Test-OurMarketplace makes
+# that call once, up where the enabled ids are read, so this block and the per-plugin notice in the
+# lens loop cannot answer it two different ways -- the drift this file already carries scars from.
 Write-Host ""
 Write-Host "-- connector register proposal (for the WORKSHOP repo, not this one)" -ForegroundColor Cyan
-if ($registerInventory.Keys.Count -eq 0) {
-    Write-Host "  [notice] no lenses found or created -- nothing to register yet." -ForegroundColor Yellow
+if (-not $ownMarketplace) {
+    Write-Host "  [notice] this script's own plugin id is not in the settings chain, so the rows below could not be limited to one marketplace -- drop any plugin that is not part of this family before saving." -ForegroundColor Yellow
+}
+$registerPlugins = @($pluginNames | Sort-Object -Unique |
+    Where-Object { $_ -match '^[a-z0-9][a-z0-9-]*$' } |
+    Where-Object { Test-OurMarketplace $_ })
+if ($registerPlugins.Count -eq 0) {
+    Write-Host "  [notice] no enabled plugin of this marketplace was resolved -- nothing to register yet." -ForegroundColor Yellow
 } else {
     $repoField = if ($derivedRepo) { $derivedRepo } else { 'VUL-IN/repo' }
     $leaf = Split-Path $ConsumerRoot -Leaf
     $pluginBlocks = @()
-    foreach ($pn in ($registerInventory.Keys | Sort-Object)) {
+    foreach ($pn in $registerPlugins) {
         $fullId = if ($pluginIdByName.ContainsKey($pn)) { $pluginIdByName[$pn] } else { "$pn@VUL-IN" }
-        $ids = @($registerInventory[$pn] | Sort-Object) | ForEach-Object { '"' + $_ + '"' }
+        $ids = if ($registerInventory.ContainsKey($pn)) {
+            @($registerInventory[$pn] | Sort-Object) | ForEach-Object { '"' + $_ + '"' }
+        } else { @() }
         $pluginBlocks += @"
     {
       "id": "$fullId",

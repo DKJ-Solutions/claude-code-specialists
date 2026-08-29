@@ -298,17 +298,24 @@ heading, because a checkbox inside an entry's prose is prose. Three marks:
 that stop making sense. A gate offering only "tick it" teaches people to tick boxes for work they did
 not do — and then reports success, which is worse than no gate at all. A dropped step keeps its line and
 its reason on the page, which is the half worth reading later.
-
 - **A step still carrying the scaffold's placeholder is refused, ticked or not.** Ticking the
   scaffolded first step without replacing it reports a plan as finished that was never written — the
-  same shape the scaffold gate above was measured on, one file over.
+  same shape the scaffold gate above was measured on, one file over. **No mark resolves this one**, and
+  the refusal now says so on the finding's own line: the fix is to replace the placeholder text with the
+  step you actually took, or to delete the line if the plan grew past it. Both findings printed the same
+  advice until [inbound #1081](https://github.com/DaveKJohn/claude-code-specialists/issues/1081), which
+  was measured on a virgin repo as a loop — the author followed the marks it offered, was refused again
+  by the same gate, and read "there is no `-Force` for this gate" as *you are stuck* rather than as
+  *you have used the wrong tool for this finding*.
 - **No step list at all is not a finding.** A branch created by hand rather than by `new-branch` has no
   document at all, and so no steps. That is the one-commit typo fix; refusing it would
   make the mechanism ceremony rather than a tool.
 - **Fenced code is excluded**, so a step list that quotes the convention is not accused of following it.
 - **There is no `-Force`**, deliberately, unlike the scaffold gate. `-Force` exists for text somebody
   legitimately wrote and wants to keep; here `- [~]` already is the sanctioned way past a step that
-  should not be done, and a second escape valve would only ever be used to skip the first.
+  should not be done, and a second escape valve would only ever be used to skip the first. That reasoning
+  covers an *open* step; a scaffolded one is not stuck behind a missing escape valve either, it simply
+  needs its text rewritten rather than marked.
 
 `ship-pr` runs this check **again** before the merge. Not belt-and-braces: the requirement is about the
 merge, and a PR opened through `-Force`, by hand on github.com, or days ago and resumed would otherwise

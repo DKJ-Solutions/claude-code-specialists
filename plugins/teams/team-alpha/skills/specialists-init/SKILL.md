@@ -489,7 +489,19 @@ and `git status` silent.
    (`…/cache/<marketplace>/<plugin>/<version>/`), so a rule naming today's root stops matching at
    your next plugin update — silently, while still reading as covered.
 6. **Register proposal** — prints a paste-ready **connector manifest** for the *workshop* repo: the
-   repo name derived from the git remote, plus the lens inventory per plugin (personas included).
+   repo name derived from the git remote, plus one row per **enabled plugin of this marketplace**,
+   carrying that plugin's lens inventory (personas included).
+
+   **Every such plugin, including the ones that ship no `agents/`** — those get `"extensions": []`,
+   a true statement about a plugin that ships no lenses and the shape the register's readers already
+   handle. Until August 29, 2026 the rows were built from the lens inventory instead, so a plugin with
+   no agents could not reach the block at all and the workflow plugin was silently missing from every
+   pasted manifest ([#1084](https://github.com/DaveKJohn/claude-code-specialists/issues/1084)). That
+   is not cosmetic: the register is read **per plugin**, so a missing row takes the consumer out of
+   the version view for that plugin — and an absent row looks exactly like a plugin they never
+   enabled. A plugin from **another** marketplace stays out, and the run says which of the two any
+   skipped plugin is.
+
    `visibility` and `localCheckout` stay `VUL-IN`, because this script cannot know them — it has no
    idea where the workshop checkout sits relative to this repo, and a guessed path is exactly what
    the register's marker check exists to prevent. Printed, never written: the register lives in the
