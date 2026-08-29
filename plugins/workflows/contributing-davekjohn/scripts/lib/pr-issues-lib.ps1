@@ -270,6 +270,39 @@ function Get-ExistingPrRecord {
     return (@($parsed) | Where-Object { $_ -and $_.number } | Select-Object -First 1)
 }
 
+function Get-PrCreateFailureReason {
+    <#
+    .SYNOPSIS
+        The reason `gh pr create` gave for failing, out of its captured output -- or '' when it gave none.
+
+    .DESCRIPTION
+        open-pr.ps1 replaced gh's own message with a fixed guess: "Creating the PR failed (is gh logged
+        in?)". Measured in a consumer (inbound #1077) on a run where gh had just listed PRs, pushed and
+        read the issue list in the same invocation -- so the one hypothesis the loudest line offered was
+        the one thing that was demonstrably fine, while gh's actual answer ("No commits between main and
+        <branch>") sat above it and got read as noise.
+
+        THE LAST NON-EMPTY LINE IS THE REASON, and that is a fact about gh rather than a guess: it writes
+        its progress line first ("Creating pull request for X into main in ...") and its failure last. A
+        run that printed nothing at all -- gh missing, killed, or silent -- returns '', which is the one
+        case where a hint about the environment is all the caller has.
+
+        PURE, so the caller's message can be asserted without a remote. Same move and same reason as
+        Get-ExistingPrRecord above it: the part that is a pure function of a command's answer becomes one.
+    #>
+    param([AllowNull()][string[]]$OutputLines)
+
+    if ($null -eq $OutputLines) { return '' }
+    $reason = ''
+    foreach ($line in ($OutputLines | Where-Object { $_ -ne $null } | ForEach-Object { ([string]$_).Trim() })) {
+        # Walked forwards and kept, rather than walked backwards: '@()' of a single string and of an
+        # array behave differently enough under 5.1 that indexing from the end is the shape this repo has
+        # already been bitten by. Keeping the last match needs no index at all.
+        if ($line) { $reason = $line }
+    }
+    return $reason
+}
+
 function New-ResolvesBlock {
     <#
     .SYNOPSIS

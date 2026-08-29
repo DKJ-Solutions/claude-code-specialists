@@ -74,6 +74,31 @@ The script:
    the changelog entry file. If the branch already had an open PR, the push **is** the update and
    the create is skipped.
 
+## A branch whose PR is already MERGED stops the run, and that is good news
+
+**The lookup above asks for an *open* PR, and until [inbound
+#1077](https://github.com/DaveKJohn/claude-code-specialists/issues/1077) that was the only question
+asked.** For a branch whose PR has been *merged* it answers "none", so the script took the create path
+and GitHub refused it — and what the reader saw was a PowerShell error naming `gh` authentication, on a
+branch that was in fact completely finished. `gh` had just listed PRs, pushed and read the issue list in
+the same run: the one hypothesis offered was the one thing that was demonstrably fine.
+
+So a merged PR is now its own outcome, asked for as a fallback when the open lookup finds nothing:
+
+```text
+PR #9 for 'docs/audience-note-v1' is already merged -- nothing to open. https://github.com/.../pull/9
+A follow-up cycle on the same subject gets its own branch: new-branch completes the name with -v2.
+```
+
+It exits **0** — nothing failed — and it stops **before** the gates, the push and the create, because
+there is nothing to lint, push or open for work that has landed. The state is not exotic: a second
+session, a hand-merge on github.com, or simply re-running `ship-pr` all produce it, and the local branch
+survives a merge because `--delete-branch-on-merge` removes the remote one only.
+
+**And where a create does still fail, the message is gh's own.** The old line replaced it with a fixed
+`(is gh logged in?)` guess; that hint is kept only for the one case it is the best available answer — a
+`gh` that printed nothing at all.
+
 ## Resuming a branch whose PR is already open
 
 **Running this on a branch that already has an open PR is a normal, supported case** — it runs the
