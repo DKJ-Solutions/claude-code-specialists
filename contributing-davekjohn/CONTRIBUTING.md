@@ -237,6 +237,16 @@ to be once it has been looked at rather than guessed at; CREATE is the steps tha
 that prove it. A step is open until it is resolved — `- [x]` done, or `- [~]` dropped **with the reason on the
 line**, which exists so nobody ticks a box for work they did not do.
 
+**The repo's standing gates are NOT written here as steps** (issue
+[#1060](https://github.com/DaveKJohn/claude-code-specialists/issues/1060), August 29, 2026). TEST carries
+what proves *this branch*; the lint gate, the test gate and the link gate fire on their own at 3.1 and
+refuse on their own, so a step reading *"all suites green"* duplicates a gate rather than adding one. And the
+duplicate is not free: `open-pr` **refuses to push while any step above DEPLOY is open**, so such a step can
+only be ticked by running the suites by hand *before* the run that was going to run them anyway. Measured in
+the session that filed #1060 — the hand-run exceeded the 120s foreground timeout and had to be backgrounded
+twice, while `open-pr`'s own gate ran the same 54 suites in **59s** and **60s** immediately afterwards. See
+3.4 for why the gate is the faster of the two, which is not the reason it looks like.
+
 **A section needing its own heading goes in as a `####` under whichever phase owns it.** That is how the four
 top-level headings stay four.
 
@@ -558,6 +568,46 @@ worktree is where you build and the primary checkout is where you ship — or no
 reads *"PR #N opened, shipping in the background"* is a finished assignment, not an open point. Anything else
 started in the primary gets `HEAD` pulled out from under it mid-branch, which is the hazard the two gates in
 3.2.2 and 3.2.4 were hardened against and that step 5 was not.
+
+**And "nothing at all" is the default rather than a judgement call** (Dave, issue
+[#1060](https://github.com/DaveKJohn/claude-code-specialists/issues/1060), August 29, 2026). A lane is for a
+session that has *already been given* the next piece of work; where there is none, the session closes out and
+stops, and Dave merges the moment he sees the check go green. **Hovering is the failure this closes**:
+backgrounding the ship and then polling its log, or re-reading `gh pr view` until the check flips, is the
+same wait wearing a different hat and costs the same 8m 01s. The portable statement of the rule — *ask whose
+clock it is; a gate you must run yourself is run however long it takes, and somebody else's clock is not
+waited on at any duration* — is in Chris's persona body, so every consumer of this workflow receives it.
+
+**Nothing is lost by stopping, and that is the point.** `cycle-autopark` (issue
+[#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900)) has already pushed the branch's
+document to `origin`, the PR carries the reasoning, and a backgrounded `ship-pr` merges and folds without
+anybody watching. Where no ship was started at all, the branch simply stays parked: the PR is left green for
+Dave, and the fold is a [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) run on
+`main` in the next session.
+
+**And the last act is `git checkout main`** (Dave, August 29, 2026, on being told a session could be cleared
+while the tree still stood on the branch). Everything above protects the *work*; none of it tidies the
+*checkout*. A session that reports itself finished from a feature branch tells the requester two different
+things at once — the terminal says the context can be cleared, `git status` says the work is mid-flight — and
+the requester is right to believe the second one. So parking ends on the trunk, and only then is the close-out
+honest.
+
+**This is the one place where landing on a clean trunk is the goal rather than the trap.** Chris's lens
+records the inverse: `ship-pr` step 5 leaves you on `main`, which reads as *ready* rather than as one command
+away from committing to the wrong place. Both hold, and they are not in tension — the trunk is where a session
+**ends**, and the branch check at the start of the next assignment is what stops it from being where the next
+one silently begins.
+
+**Why the gate beats a hand-run, since the obvious explanation is wrong.**
+[`Invoke-TestSuiteGate`](../scripts/lib/native-capture-lib.ps1) is *not* an in-process pass — it launches
+every suite as its own `powershell` child, exactly as a hand-run does. Two other mechanisms account for the
+gap, and both are absent from a hand-run: the pool is **parallel** since issue
+[#512](https://github.com/DaveKJohn/claude-code-specialists/issues/512), so the gate costs its slowest single
+*file* instead of the sum (measured at 27 suites: 510s one at a time against 128-263s parallel), and
+`open-pr` **records the pass** — `Test-GateEvidence` / `Save-GateEvidence` in
+[`gate-lib.ps1`](../scripts/lib/gate-lib.ps1), keyed on a fingerprint of the tree — so a second run over an
+unchanged tree is skipped entirely. A hand-run pays the sum and earns no credit towards the gate that follows
+it.
 
 **Two larger shapes were declined when this was written down**, and #985 stays open as their home. A
 *green-and-unmerged reporter* at session start would have re-added half of the `session-status` reporter that

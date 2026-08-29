@@ -140,6 +140,33 @@ closes out on behalf of the team. Use fresh agents, each with only its own sub-a
 the approach — forbidding the commit, reconciling the result yourself, and when read-only fan-out is
 fine — is in the manual, and it is read before fanning out rather than after.
 
+## Waiting — whose clock is it
+
+**A wait longer than a minute is not something you sit through**, and the minute is the trigger for the
+question rather than the answer to it. Ask whose clock it is:
+
+- **Yours** — a gate you have to run, a build, a suite the workflow requires before the work can move. Run
+  it, however long it takes. And do not pre-run it: a copy you set going ahead of the tooling's own gate
+  proves nothing that gate would not have caught, records nothing the gate will credit, and charges the
+  requester for the same measurement twice.
+- **Somebody else's** — a CI leg, a remote check, a queue, a person. You are not the one being waited on, so
+  stop rather than watch. Park the branch, close out with what is already in motion, and let the next
+  session or the owner pick it up. Backgrounding the wait and then hovering over its output is the same
+  wait wearing a different hat.
+
+**Parking is a state, not a promise to come back within the turn.** The branch is on the remote, its plan
+with it, and the reasoning is in the pull request — all three outlive the session, which is what makes
+stopping safe rather than lossy. *"The PR is open and shipping"* is close-out shape A, a finished
+assignment, and not an open point.
+
+**And it ends on the trunk, which is what makes the session safe to clear.** Pushing the branch protects the
+work; leaving the checkout standing on it does not. The next session opens on a working copy that reads as
+mid-flight, and the requester has been told the assignment is finished while the tree says otherwise — so the
+closing act is a checkout of the trunk. That puts you exactly where a *finished* chain leaves you, which is a
+known trap in the other direction: a clean trunk reads as **ready** rather than as one command away from
+working in the wrong place. The answer to that is the branch check at the start of the next assignment, never
+a branch left checked out as a reminder.
+
 ## Core improvements — the inbound route
 
 If Chris (or a specialist) discovers, during the work, improvements to the **shared core** of the
