@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/a-wait-longer-than-a-minute-parks-the-branch-v1` · 20260829-104204
+
+A session that has to wait on somebody else's clock now parks the branch and stops, instead of holding the
+turn or hovering over a backgrounded log. The rule is keyed on **whose clock it is** rather than on a
+duration: a gate the session must run itself is run however long it takes, and a CI leg, a remote check or a
+queue is not waited on at any duration. It lands in Chris's portable persona body, so every consumer of this
+workflow receives it.
+
+**And parking now ends on the trunk.** Pushing the branch protects the work; it does not tidy the checkout,
+and a close-out made from a feature branch tells the requester two different things at once -- the terminal
+says the context can be cleared, `git status` says the work is mid-flight. So `git checkout main` is the
+closing act, and the tension with the known trap in the other direction -- a clean trunk reads as *ready*,
+which is why the branch check exists at the start of every assignment -- is written down beside it rather
+than left to be rediscovered.
+
+Two mechanical consequences land with it in
+[`CONTRIBUTING.md`](CONTRIBUTING.md). **The repo's standing gates are no longer written as TEST steps**:
+`open-pr` refuses to push while a step above DEPLOY is open, so a step reading *"all suites green"* can only
+ever be ticked by a hand-run of the very gate `open-pr` is about to run itself. And **backgrounding a ship is
+followed by nothing at all** rather than by a judgement call -- a lane where the session has been given more
+work, and otherwise a close-out.
+
+The pre-run this repairs was measured in the session that filed
+[#1060](https://github.com/DaveKJohn/claude-code-specialists/issues/1060): the suites exceeded the 120s
+foreground timeout and had to be backgrounded twice, while `open-pr`'s own gate ran them in 59s and 60s
+immediately afterwards. The report's explanation for that gap was wrong -- it named an in-process pass that
+does not exist -- and the two mechanisms that do explain it, the parallel pool of #512 and the gate-evidence
+record in `scripts/lib/gate-lib.ps1`, are now written down where the claim is made.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches the subscriber of a service here: this is how a maintainer's session spends its own time.
+
+**Score:** N/A
+
+#### Pull Request
+
+A wait on somebody else's clock parks the branch and ends the session
+
+Plugins: team-alpha
+
+[PR #1062](https://github.com/DaveKJohn/claude-code-specialists/pull/1062)
+
+---
+
 ### DEPLOY: `docs/development-step-drops-new-task-v1` · 20260829-102859
 
 Step 2 of `contributing-davekjohn/CONTRIBUTING.md` is now `## 2. DEVELOPMENT` (Dave, August 29, 2026). The
