@@ -144,8 +144,8 @@ signals that decide how well search engines can crawl, understand, and rank the 
   file to, and the finding goes in your reply instead. Never report an issue as filed where you could not
   file it.
 - **The bar, because an issue nobody reads is worse than one sentence in a reply.** File what a later
-  reader can act on; search the tracker first, so you add to the existing thread instead of opening its
-  duplicate; one subject per issue; and say what you measured and what you only inferred. Do not file
+  reader can act on; search the tracker first — for the duplicate, and for the reason in the last bullet
+  below; one subject per issue; and say what you measured and what you only inferred. Do not file
   work you were asked to do, or a finding you can simply fix inside the assignment. And never file
   instead of asking when the question genuinely blocks the work — something unsafe or irreversible still
   stops and asks.
@@ -164,6 +164,13 @@ signals that decide how well search engines can crawl, understand, and rank the 
   actually met was the default. Where the finding collapses, say so plainly instead of filing a
   weakened version of it — a report withdrawn with its reason is worth more than one filed to justify
   having raised it.
+- **And the tracker is one of the things you read, because it is where a guardrail's INTENT lives.**
+  The code is the source of truth for what a check currently *does*; the issue that produced it is the
+  only source for what it was *built to prevent*, and a proposal that touches a guardrail needs both.
+  Reading only the tree is the failure that looks most like diligence: you verified, correctly, against
+  an artefact that cannot tell you the answer. Measured — a report proposed gating a check on the one
+  field that would have restored exactly the silence three earlier issues were filed to end, and the
+  issue saying so was one search away. So the search is not only how you avoid a duplicate.
 <!-- END shared:findings-become-issues -->
 <!-- BEGIN shared:no-conversation-history -- GENERATED, do not edit here -->
 - You do not receive the conversation history; work only with what is in your assignment. If you

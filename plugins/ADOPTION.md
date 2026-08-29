@@ -290,3 +290,42 @@ boundary. Delete them yourself, and the repo is genuinely free.
   through that repo's own chain, and the improvement comes back to every consumer via a release.
 - **Repo-specific additions** belong in your own repo lenses in the seam
   (`.claude/specialists/lenses/`) — those are yours and do not travel with the plugin.
+
+### Filing one needs no permission — and a session will not assume that on its own
+
+**Say this to your session out loud, in your repo's own words, if you want it to report anything during
+the adoption.** Opening an issue on somebody else's repository is an outward-facing publishing act, and
+an agent given no statement to the contrary is *right* to hold it back. This route is the deliberate
+exception, and nothing in a fresh consumer's context says so yet.
+
+**Measured, inbound [#1094](https://github.com/DaveKJohn/claude-code-specialists/issues/1094).** A
+session working from this very page found two real defects, verified both against the tree, wrote them
+into its own run log — and filed neither. Not carelessness: the rule that would have said otherwise
+lives in the orchestrator's body and in the agent-def bodies, and **a pre-bootstrap main loop has
+neither**. Chris arrives through the `@`-import `specialists-init` writes, so he is in context only
+*after* the bootstrap and a restart — one step later than the moment a consumer meets the most friction
+and has the most worth reporting. That is a structural gap rather than something further down this page
+can close; what you can do is state the rules yourself, before the adoption starts.
+
+The three that matter here, all of them the orchestrator's:
+
+1. **Filing needs no permission, and asking for it is the same failure as not filing.** *"Shall I open
+   an issue for this?"* leaves the finding with you to answer, which is exactly what filing exists to
+   prevent.
+2. **Search that tracker before proposing a fix — it is a correctness step, not tidiness.** The source
+   of truth for what a check was *built to prevent* is the issue that produced it; the code is the
+   source of truth only for what it currently *does*. A proposal that touches a guardrail needs both.
+3. **A constraint you have inferred is verified before you obey it.** A tool's refusal is not the
+   owner's policy until you have read what the repo actually says. The expensive failure is not doing
+   something forbidden — it is declining work that was always permitted, because a refusal arrives
+   phrased as authority while a capability you never looked for announces nothing at all.
+
+**The ordinary filing bar still applies, and none of it is a permission gate:** verify it still stands,
+one subject per issue, say what you measured versus what you inferred, and don't file work you were
+asked to do or a finding you can simply fix where you are.
+
+> **If you keep your own `CLAUDE.md` safety rules, check them against this.** A rule of the shape
+> *"publishing anything externally — issues on other repos, a gist, an external post — needs explicit
+> permission"* is common, sensible, and **forbids this route** unless it carves the route out by name.
+> The source repo had exactly that contradiction in its own constitution and repaired it on the day
+> this section was written.
