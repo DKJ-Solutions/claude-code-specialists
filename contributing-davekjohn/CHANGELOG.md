@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-hook-handover-uses-the-owners-own-voice-v1` · 20260829-215113
+
+The two `roster-sessioncheck` hook lines now hand the reader `/team-alpha:sync-roster` in the same words
+the other five repaired sites use -- *"that command must be TYPED by the repo owner"* -- instead of
+*"ask the repo owner to type"*.
+
+Both forms tell a model the right thing. Only one of them also reads correctly to the **owner**, who sees
+this same line on their own terminal and is not a third party to themselves; that is the dual-audience
+reasoning `check-roster-sync.ps1`'s `[BOOTSTRAP]` marker already carries, and PR #1111 applied it to five
+of its seven sites and not to these two. A SessionStart hook is the worst place for the gap: on a fresh
+consumer it is the first thing in context, in every session, until the repo is adopted.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+The repair that introduced the inconsistency was the repair for inconsistent instructions. Check 30 could
+not have caught it -- both forms pass, because both name the command rather than the skill. What the gate
+guarantees is that a message is *followable*; whether it is followable **by the person actually reading
+it** is still a judgement, and this is the second time that particular judgement has had to be made in
+the same file.
+
+**Score:** 1
+
+#### Pull Request
+
+The roster hook's handover speaks to the owner in their own voice, like the other five sites
+
+Plugins: team-alpha
+
+[PR #1114](https://github.com/DaveKJohn/claude-code-specialists/pull/1114)
+
+---
+
 ### DEPLOY: `fix/the-one-script-carrying-a-byte-order-mark-v1` · 20260829-212901
 
 `scripts/tests/internal-note.tests.ps1` loses the UTF-8 byte-order mark PR #1108 wrote into it -- the only
