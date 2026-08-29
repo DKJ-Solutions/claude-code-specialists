@@ -212,6 +212,11 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 # Get-Command and falls back to English defaults when they are absent, so a repo that renamed a heading is
 # read by its own names only while that lib is already in the session. Same plugin-payload sibling.
 . (Join-Path $PSScriptRoot '..\lib\pr-body-lib.ps1')
+# For the trunk-lock pre-flight below and the hand-back at the end of step 5 (issue #1069). Same
+# plugin-payload sibling as the four above, and pure text functions for the reason its own header gives:
+# the decision they carry -- does another worktree hold the trunk? -- is the one part of this repair that
+# CAN be tested, and this file cannot be.
+. (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -233,6 +238,55 @@ if (Get-Command Get-PrMergeMethod -ErrorAction SilentlyContinue) {
 
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a branch."; exit 1 }
+
+# --- Step 0: is 'main' free for step 5 to check out? (issue #1069) --------------------------------
+# THE ORDERING IS THE WHOLE POINT. git allows one worktree per branch, so a tree standing on 'main'
+# locks it for the entire clone -- and step 5 checks 'main' out HERE in order to fold. Until this check
+# existed, that lock was met at step 5: after the merge. The PR was then merged and NOT folded, which is
+# the one state nothing reports (CHANGELOG.md unfolded, the development document still on the trunk,
+# every gate green until a release trips over it). Measured on PR #1068, August 29, 2026.
+#
+# Asked HERE, before step 1, because this is the last moment at which refusing costs nothing: no gate has
+# run, nothing is pushed, no PR exists and nothing is merged. The check itself proves nothing about the
+# CI wait that follows -- another session can take 'main' while step 3 watches -- which is why step 5's
+# in-place arm now carries the full hand-fold instruction as well. This one turns the common case from a
+# half-state into a refusal; that one keeps the rare case readable.
+#
+# NEITHER ARM TAKES 'main' AWAY FROM ANYBODY, and that restraint is deliberate: the holder may be a lane
+# with work in it, and this script does not know what. It names the directory and the two commands that
+# release it.
+#
+# IT ALSO ANSWERS THE SECOND HALF OF #1069, at the end of step 5: whether THIS tree is the primary
+# checkout. Read here rather than there because it is the same porcelain, and because an unreadable list
+# has to fall back to "primary" -- which is the behaviour every run had before this change.
+$shipTreeIsPrimary = $true
+$wtList = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
+if ($wtList.ExitCode -eq 0) {
+    $primaryRoot = Get-PrimaryWorktreePath -PorcelainLines $wtList.Output
+    if ($primaryRoot) {
+        $shipTreeIsPrimary = (Get-WorktreePathKey $primaryRoot) -eq (Get-WorktreePathKey $repoRoot)
+    }
+    $trunkHolder = Get-WorktreeHoldingBranch -PorcelainLines $wtList.Output -Branch 'main' -SelfPath $repoRoot
+    if ($trunkHolder) {
+        Write-Error @"
+'main' is checked out in ANOTHER worktree, so step 5 could not fold after the merge:
+
+  $trunkHolder
+
+Nothing has been pushed or merged -- this is the cheap place to stop. Release the trunk there first,
+then run ship-pr again. If that worktree is a finished lane, hand it back:
+
+  powershell -NoProfile -File "scripts\task\worktree-lane.ps1" -HandBack -Lane "$trunkHolder"
+
+If it is a checkout you still want, move it off the trunk yourself (git -C "$trunkHolder" checkout <its branch>).
+"@
+        exit 1
+    }
+} else {
+    # BEST-EFFORT, never a refusal: an unreadable worktree list says something about git, not about the
+    # trunk, and this script has to keep working in a clone that has never had a second worktree.
+    Write-Warning "could not read 'git worktree list' -- shipping anyway; step 5 will report it if 'main' turns out to be held elsewhere."
+}
 
 # --- Step 1: open the PR (open-pr.ps1 runs the lint + test gate, pushes, opens) ------------------
 # -Title is forwarded ONLY when one was given (#506): passing an empty string would make open-pr warn
@@ -696,7 +750,31 @@ $headNow = if ($headRead.ExitCode -eq 0 -and $headLine) { "$headLine".Trim() } e
 if ($headNow -eq $branch -or $headNow -eq 'main') {
     $co = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', 'main')
     $co.Output | ForEach-Object { Write-Host $_ }
-    if ($co.ExitCode -ne 0) { Write-Error "git checkout main failed."; exit 1 }
+    # A BARE "git checkout main failed" USED TO BE THE WHOLE MESSAGE HERE, and this is the exact line the
+    # merge has already run past -- so it is the one place in the script where a one-line error is most
+    # expensive (issue #1069, measured on PR #1068). Step 0 turns the common cause into a refusal before
+    # anything is pushed; what reaches here is the narrow window it cannot cover, where another session
+    # took 'main' while step 3 watched CI. So say the same thing the worktree arm below says: the state
+    # the repo is actually in, and the two commands that finish the job by hand.
+    if ($co.ExitCode -ne 0) {
+        $foldScript = Join-Path $PSScriptRoot 'fold-changelog-entry.ps1'
+        Write-Error @"
+PR #$pr IS MERGED but NOT folded -- this tree could not check out main.
+
+git's own reason is above. The usual one is that another worktree took main while the CI wait ran
+("fatal: 'main' is already used by worktree at ..."), and this script will not take it away from one.
+
+The PR is merged, the branch document is still in the tree, and every gate stays green until a
+release trips over it. Fold from the tree that HOLDS main -- fold-changelog-entry.ps1 has carried
+-RepoRoot for exactly this since #101:
+
+  git -C <that worktree> fetch --prune origin; git -C <that worktree> merge --ff-only origin/main
+  & "$foldScript" -Branch $branch -RepoRoot <that worktree> -Push
+
+`git worktree list` names it.
+"@
+        exit 1
+    }
 } else {
     $foldTree = Join-Path ([System.IO.Path]::GetTempPath()) "ship-pr-fold-$pr-$PID"
     Write-Host "ship-pr: HEAD is on '$headNow', not '$branch' -- this checkout moved while CI ran." -ForegroundColor Yellow
@@ -809,6 +887,37 @@ $foldExit = $LASTEXITCODE
 Remove-ShipFoldWorktree -Path $foldTree
 
 if ($foldExit -ne 0) { Write-Error "fold-changelog-entry failed -- the fold is NOT committed or NOT pushed. Its own output above says which; do not re-run the fold if it already removed the entry file."; exit 1 }
+
+# --- Step 5b: give the trunk back, if this is not the primary checkout (issue #1069) ---------------
+# THE ROOT CAUSE, AND IT IS ONE LINE ABOVE: the in-place arm leaves this tree standing on 'main'. In the
+# primary checkout that is deliberate and documented -- a finished chain ends on the trunk, which is what
+# makes the session safe to clear. In a LANE it is a global lock: no other worktree can check 'main' out
+# from that moment on, nothing warns, and the bill is paid by an unrelated branch after ITS merge. That is
+# how PR #1068 was merged and left unfolded.
+#
+# SO THE RULE IS NOT "always return", IT IS "return where staying was never the point". Only a
+# non-primary tree hands the trunk back, and only after a SUCCESSFUL fold: a failed one leaves this tree
+# on main mid-repair, which is exactly where whoever finishes it by hand needs to be standing.
+#
+# BACK TO THE BRANCH RATHER THAN DETACHED, so the lane is where its author left it. Detaching is the
+# fallback and not the preference: it always works (nothing can hold a commit) but it hands back a tree
+# whose HEAD reads as nothing in particular. Either way the lock is released, which is the part that
+# matters to every other worktree on the machine.
+if (-not $foldTree -and -not $shipTreeIsPrimary) {
+    Write-Host "ship-pr: this is not the primary checkout -- releasing 'main' so other worktrees can use it." -ForegroundColor Cyan
+    $back = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', $branch)
+    if ($back.ExitCode -ne 0) {
+        $detach = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', '--detach')
+        if ($detach.ExitCode -eq 0) {
+            Write-Host "  '$branch' could not be checked out here, so this tree is detached instead -- 'main' is free." -ForegroundColor Yellow
+        } else {
+            # NEVER FAILS THE SHIP. Everything this script was asked to do has happened by now: merged,
+            # folded, pushed. What is left is a lock on 'main' that the next run's step 0 will report by
+            # name anyway -- so this says it once, here, where it is cheapest to act on.
+            Write-Warning "this tree is still on 'main' and is not the primary checkout, so it holds the trunk for the whole clone. Move it off: git -C `"$repoRoot`" checkout $branch"
+        }
+    }
+}
 
 # --- Step 6: the issues the PR declared it closes are actually closed -----------------------------
 # Its own script, so this state-MUTATING logic (it comments and closes) is testable against a fake gh
