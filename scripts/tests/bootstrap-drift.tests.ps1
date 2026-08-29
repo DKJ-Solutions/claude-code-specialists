@@ -280,6 +280,23 @@ try {
     Assert-True ($rWf.Out -match "(?s)'permissions' block is ready to use as-is.*BOTH halves.*allow.*new-branch") `
         'workflow plugin: step 3 says the block has both halves and what the allow half covers'
 
+    # --- inbound #1084: a plugin that ships no agents still reaches the register proposal ------------
+    # The proposal used to be built from the lens inventory, which is filled ONLY while walking a
+    # plugin's agents/ directory -- so the workflow plugin, which ships skills, scripts and hooks and
+    # no agents, could not enter it. A consumer pasting the block registered a manifest with that row
+    # missing, and check-connectors reports PER PLUGIN off that list: the version-gap [ERROR] that
+    # exists to catch a stale consumer cannot fire for a plugin nobody listed. This fixture is the
+    # exact shape that produced it, which is why the assertion lives here rather than in a fixture
+    # written for it.
+    Assert-True ($rWf.Out -match '(?s)"id":\s*"contributing-davekjohn@claude-code-specialists",\s*\r?\n\s*"extensions":\s*\[\s*\]') `
+        'workflow plugin: the agent-less plugin IS in the register proposal, with an empty extensions array (#1084)'
+    Assert-True ($rWf.Out -match '(?s)"id":\s*"team-alpha@claude-code-specialists",\s*\r?\n\s*"extensions":\s*\["01-01"') `
+        'workflow plugin: and the agent-bearing plugin still carries its ids -- the widening did not flatten the inventory'
+    # The notice is the other half of the repair: it was worded as a missing DIRECTORY, so the reader
+    # had to infer several hundred lines later what it meant for the manifest they were about to paste.
+    Assert-True ($rWf.Out -match "plugin 'contributing-davekjohn' has no agents/ directory.*register proposal below, with an empty") `
+        'workflow plugin: the skip notice names what it means for the manifest, not just what was missing'
+
     $rcText = [System.IO.File]::ReadAllText($rcScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($rcText -match 'VUL-IN') 'repo-config scaffold carries the VUL-IN marker'
     Assert-True ($rcText -match 'function Get-RepoName') 'repo-config scaffold supplies Get-RepoName'
@@ -307,6 +324,32 @@ try {
     Assert-True ($rcText -match "\`$script:LiveStage = ''") 'repo-config scaffold defaults LiveStage to empty (no live stage), not VUL-IN'
     $biText = [System.IO.File]::ReadAllText($biScaffold, [System.Text.Encoding]::UTF8)
     Assert-True ($biText -match '\$script:BranchPrefixTable = @\{\s*\}') 'branch-info scaffold has an EMPTY prefix table (no repo taxonomy baked in)'
+
+    # --- 1c1b. The register proposal is THIS marketplace's, and only this one (inbound #1084) --------
+    #     Its own fixture, because the widening above is what made this reachable: while the row set
+    #     came from the lens inventory, a foreign plugin could not enter it either -- Get-PluginAgentsDir
+    #     only ever looked beside this plugin's own root. So the old behaviour was right by accident,
+    #     and building the rows from "every enabled plugin" removes the accident. A foreign row is not
+    #     merely noise: check-connectors reads a name its marketplace does not declare as RETIRED and
+    #     tells the maintainer "this consumer has not migrated to the current names yet" -- a false
+    #     statement about a plugin that was never this family's. Measured on the machine this suite
+    #     runs on, whose own chain enables figma@claude-plugins-official.
+    Write-Host "bootstrap.ps1 -- the register proposal is scoped to this marketplace (#1084)" -ForegroundColor Cyan
+    $FixtureMp = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-mp-$PID"
+    if (Test-Path -LiteralPath $FixtureMp) { Remove-Item -Recurse -Force -LiteralPath $FixtureMp }
+    New-Item -ItemType Directory -Path (Join-Path $FixtureMp '.claude') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $FixtureMp '.claude\settings.json'),
+        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "contributing-davekjohn@claude-code-specialists": true, "somewidget@some-other-marketplace": true } }', $Utf8NoBom)
+    $rMp = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureMp)
+    Assert-Equal 0 $rMp.Code 'marketplace scope: bootstrap exit 0 with a foreign plugin enabled'
+    Assert-True ($rMp.Out -match 'team-alpha@claude-code-specialists') 'marketplace scope: our own plugins are in the proposal'
+    Assert-True ($rMp.Out -match 'contributing-davekjohn@claude-code-specialists') 'marketplace scope: including the agent-less one (#1084)'
+    Assert-True (-not ($rMp.Out -match 'somewidget@some-other-marketplace')) 'marketplace scope: a plugin of ANOTHER marketplace is NOT in the proposal'
+    # And it says so where the reader is, rather than dropping it in silence -- the same rule the skip
+    # notice above follows: name the consequence for the manifest, not just the missing directory.
+    Assert-True ($rMp.Out -match "plugin 'somewidget' has no agents/ directory.*not this marketplace's plugin") `
+        'marketplace scope: and the run says WHY that plugin is not in it'
+    Remove-Item -Recurse -Force -LiteralPath $FixtureMp -ErrorAction SilentlyContinue
 
     # --- 1c2. THE INVARIANT: the bootstrap's own scaffolds satisfy the plugin's own contract --------
     #     Issue #226. Every function assertion above is a spot-check against a hand-maintained list,
