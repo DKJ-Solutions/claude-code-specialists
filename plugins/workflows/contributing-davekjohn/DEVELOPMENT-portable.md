@@ -21,6 +21,25 @@ as the evidence behind the rules, never as your repo's own record. And links int
 are **absolute** on purpose; the file every adopting repo has of its own is named in code rather than
 linked, because the copy that matters is yours.
 
+**That second convention is not this page's habit — it is what the plugin cache forces on every file a
+plugin ships**, and it is worth stating in full once, here, because nothing about it is visible from
+inside the source repo. An installed plugin is read from
+
+```text
+~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/
+```
+
+so the plugin's **own directory is the root**. Three things that exist in the source tree are simply gone:
+the `plugins/` level, the family level (`teams/`, `workflows/`), and every sibling plugin — each sibling is
+a separate versioned directory, not a neighbour you can reach with `../`. A relative link that walks out of
+the plugin root therefore resolves perfectly where it was written and lands on nothing where it is read.
+**So a relative link in plugin payload must resolve inside its own plugin; anything further away is written
+as an absolute URL.** The source repo enforces this as a gate check of its own rather than trusting the
+convention, and the reason it stopped trusting it is the measurement: seventeen links in five files had
+drifted past the convention, and resolved inside the *installed* copies rather than the source tree, all
+seventeen were dead. Inbound
+[#1066](https://github.com/DaveKJohn/claude-code-specialists/issues/1066).
+
 **There is no template beside it, and there is nothing missing.** Until August 23, 2026 the two files this
 replaces were scaffolded **bare** — headings and nothing else — with a reference copy under
 `branch/templates/` carrying an HTML comment over every field saying what a good answer looks like. Inbound

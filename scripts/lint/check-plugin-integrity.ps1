@@ -2999,6 +2999,135 @@ Write-Coverage -Category 'skill-list-plugin' -Checked $pluginSkillSpanCount `
         "opt-in <!-- skills:plugin --> span(s), each held against the skills/ of the plugin the DOCUMENT ITSELF sits in (resolved via Get-PluginNameForPath, not named in the marker), with $pluginSkillClaimTotal claim(s) read from LINK TARGETS rather than from backticks -- so prose and backticked paths elsewhere in the row cost nothing. Check 10 is the marketplace-wide sibling and cannot serve this: its canonical set spans every plugin"
     })
 
+# --- 30. A plugin-shipped relative link must resolve INSIDE its own plugin ---------------------------
+#
+# WHY CHECK 4 CANNOT SEE THIS, AND IS RIGHT NOT TO. The dead-link scan resolves every link against the
+# tree it is run in, and for a plugin-shipped file that tree is the source repo -- the one place the
+# link is guaranteed to work. It is correct about where the file IS; it has no notion of where the file
+# will be READ. So the single class of link defect that reaches consumers is the one class it is
+# structurally blind to. Inbound #1066, August 29, 2026.
+#
+# WHERE A CONSUMER ACTUALLY READS IT, measured rather than assumed -- this is the whole check:
+#
+#     ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/
+#
+# Every installPath in installed_plugins.json is that shape. The plugin's OWN directory is the root,
+# and three things present in the source tree are gone from it: the 'plugins/' level, the family level
+# ('teams/', 'workflows/'), and every sibling plugin -- each sibling is a separate versioned directory,
+# not a neighbour. A relative link that walks out of the plugin root therefore lands somewhere that
+# does not exist, or worse, somewhere that does and holds something else.
+#
+# THE BOUNDARY IS THE PLUGIN ROOT, NOT 'plugins/', and that distinction is the reason this check is
+# worth having rather than a detail of it. #1066 proposed the rule as "must resolve to a target also
+# under plugins/, because that is the subtree the plugin cache contains". The cache contains no such
+# subtree, and the weaker rule passes the one link that had ALREADY SHIPPED dead: cut-release's
+# SKILL.md line 123 pointed at '../../../../teams/team-alpha/manuals/06-25-manual.md', which stays
+# under plugins/ here and resolves to '<cache>/<marketplace>/teams/team-alpha/...' in a consumer,
+# where the family level does not exist. Verified against the installed v4.22.0 copy on disk, not
+# inferred. The manual it names does travel -- it simply never travels to that path.
+#
+# THE SIZE, RECOUNTED. #1066 reported zero findings and argued from that ("today's expected answer is
+# zero, which is itself the reason not to build it yet"), and added that the defect "never shipped".
+# The real count on the day the check landed was 17 escapes across 5 files, every one passing check 4 --
+# and resolving all 17 inside the INSTALLED copies (team-alpha 4.21.0, contributing-davekjohn 4.22.0)
+# rather than in this tree, all 17 are dead. Not one of them, all of them. That inverts the report's own
+# conclusion instead of qualifying it: the failure mode has bitten, in released payload, so the repo's
+# name-it-and-leave-it rule no longer holds it back.
+#
+# THE CONVENTION THIS ENFORCES IS ALREADY WRITTEN, in DEVELOPMENT-portable.md: "links into the source's
+# script tree are absolute on purpose". It was stated on one portable page, for that page, and enforced
+# nowhere. This is that sentence made checkable for the plugin tree as a whole.
+#
+# PERSONAS ARE EXCLUDED, for check 4's reason and not a new one: a persona template is destined for a
+# consuming repo's .claude/extensions/, so its links are MEANT to resolve outside the plugin root and
+# check 4 already validates them at that destination. Measured when this check was written: no persona
+# carries an escaping link either way, so the exclusion buys correctness rather than silence.
+#
+# THREE FORMS ARE PASSED OVER, each for its own reason: a '${...}' target is the plugin-relative form
+# (${CLAUDE_PLUGIN_ROOT}) rather than a path this check can resolve; a '~/'-relative one points into
+# the marketplace clone deliberately; an absolute URL is the repair this check asks for.
+#
+# A FOURTH, ROOT-RELATIVE FORM ('/path') IS PASSED OVER TOO, and that one is a risk named rather than
+# handled. On GitHub it means the repo root; in a plugin cache it means the filesystem root, so it is a
+# defect of the same family. Measured when this check landed: ZERO of them in plugin payload. The repo's
+# standing rule is to name a risk that has not bitten and leave it, so this stays a comment -- but it is
+# a comment rather than an omission, and the second instance is the argument for widening the rule.
+$pluginLinkFiles = 0
+$pluginLinkChecked = 0
+$pluginLinkEscapes = 0
+$pluginLinkMask = [System.Text.RegularExpressions.MatchEvaluator]{ param($m) ($m.Value -replace '[^\r\n]', ' ') }
+$pluginLinkBlobBase = & {
+    # DOT-SOURCED IN A SCRIPTBLOCK, the idiom checks 16 and 26 established, for their reason: this is
+    # the only value here that repo-config owns, and it is wanted for the SUGGESTION in the message
+    # rather than for the verdict -- so a repo without the seam gets a plainer finding, never a wrong one.
+    $plCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
+    if (Test-Path -LiteralPath $plCfg) { . $plCfg }
+    if (Get-Command Get-RepoBlobUrl -ErrorAction SilentlyContinue) { Get-RepoBlobUrl } else { '' }
+}
+foreach ($plugin in $publishedPlugins) {
+    if (-not (Test-Path -LiteralPath $plugin.Root)) { continue }
+    $pluginRootPrefix = $plugin.Root.TrimEnd('\') + '\'
+    foreach ($pf in (Get-ChildItem -Path $plugin.Root -Recurse -Filter '*.md' -File)) {
+        if ($pf.FullName -match '\\personas\\.*-persona\.md$') { continue }
+        $pluginLinkFiles++
+        $pluginText = [System.IO.File]::ReadAllText($pf.FullName, [System.Text.Encoding]::UTF8)
+        # Masked, not stripped: check 4 removes code and comments outright because it never reports a
+        # line number. This one does, so every mask preserves length and newline positions.
+        $pluginScan = Get-FenceMaskedText -Text $pluginText
+        $pluginScan = [regex]::Replace($pluginScan, '(?s)<!--.*?-->', $pluginLinkMask)
+        $pluginScan = [regex]::Replace($pluginScan, '`[^`\r\n]*`', $pluginLinkMask)
+        $pfRel = $pf.FullName.Replace($RepoRoot, '.')
+        foreach ($m in $linkRegex.Matches($pluginScan)) {
+            $pluginTarget = $m.Groups[1].Value.Trim()
+            if ($pluginTarget -match '^(https?:|mailto:)') { continue }
+            if ($pluginTarget.Contains('${') -or $pluginTarget.StartsWith('~')) { continue }
+            $pluginPathPart = ($pluginTarget -split '#', 2)[0]
+            if (-not $pluginPathPart) { continue }
+            if ([System.IO.Path]::IsPathRooted($pluginPathPart)) { continue }
+            $pluginLinkChecked++
+            $pluginResolved = $null
+            try {
+                $pluginResolved = [System.IO.Path]::GetFullPath(
+                    (Join-Path (Split-Path -Parent $pf.FullName) ($pluginPathPart -replace '/', '\')))
+            } catch { continue }
+            if (($pluginResolved.TrimEnd('\') + '\').StartsWith($pluginRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+            $pluginLinkEscapes++
+            $pluginLineNo = 1 + [regex]::Matches($pluginScan.Substring(0, $m.Index), "`n").Count
+            # The suggestion is built from the target's position IN THIS TREE, which is exactly what the
+            # author meant and exactly what does not travel -- so the message hands over the absolute
+            # form rather than describing it. THE ANCHOR IS CARRIED ALONG: ten of the seventeen found on
+            # the day this landed pointed at a specific heading, and a suggestion that silently drops it
+            # asks the author to re-find the section -- or, likelier, to paste the shorter form and lose it.
+            $pluginSuggestion = ''
+            if ($pluginLinkBlobBase -and $pluginResolved.StartsWith($RepoRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $pluginAnchorPart = ($pluginTarget -split '#', 2)
+                # A DIRECTORY TARGET GETS 'tree/', not 'blob/'. GitHub redirects blob->tree for a
+                # directory, so the blob form is not broken -- it is just not the URL anybody would
+                # write, and a suggestion that has to be corrected before pasting is one the author
+                # stops trusting. Two of the seventeen point at a directory.
+                $pluginIsDir = (Test-Path -LiteralPath $pluginResolved -PathType Container)
+                $pluginBase = if ($pluginIsDir) { $pluginLinkBlobBase -replace '/blob/', '/tree/' } else { $pluginLinkBlobBase }
+                $pluginSuggestion = ' Write it absolute: ' + $pluginBase +
+                    ($pluginResolved.Substring($RepoRoot.Length).Trim('\') -replace '\\', '/') +
+                    $(if ($pluginIsDir) { '/' } else { '' }) +
+                    $(if ($pluginAnchorPart.Count -gt 1) { '#' + $pluginAnchorPart[1] } else { '' })
+            }
+            Add-Error ("[plugin-link] ${pfRel}:${pluginLineNo} -> '$pluginTarget' leaves the '$($plugin.Name)'" +
+                " plugin root. It resolves here, and a consumer reads this file from" +
+                " <cache>/<marketplace>/$($plugin.Name)/<version>/, where everything outside the plugin is gone." +
+                $pluginSuggestion)
+        }
+    }
+}
+Write-Coverage -Category 'plugin-link' -Checked $pluginLinkChecked `
+    -Note $(if ($publishedPlugins.Count -eq 0) {
+        'this repo publishes no plugin, so there is no plugin root for a link to escape -- nothing about consumer-side links is being asserted'
+    } elseif ($pluginLinkChecked -eq 0) {
+        "no relative link in any of the $pluginLinkFiles markdown file(s) under the $($publishedPlugins.Count) published plugin root(s) -- every link is absolute, anchored or plugin-variable-relative, so none can escape"
+    } else {
+        "relative link(s) in $pluginLinkFiles markdown file(s) across $($publishedPlugins.Count) published plugin root(s), each resolved from where it sits and held against its OWN plugin's root rather than against plugins/ -- $pluginLinkEscapes escaping. Check 4 validates the same links against this tree, where they all work; this one asks whether they survive the trip"
+    })
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
