@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/filing-rules-before-the-bootstrap-v1` · 20260829-234205
+
+A consumer's session is now told, on the page it reads before adopting, that filing an inbound issue on
+the source repo needs no permission -- and this repo's own constitution stops saying the opposite.
+
+The rule already existed and was already well written. It was in the orchestrator's body and in the
+agent-def bodies, and neither reaches the one reader who needs it: a pre-bootstrap main loop. Chris
+arrives through the `@`-import `specialists-init` writes, so he is in context only after the bootstrap
+and a restart -- one step later than the moment a consumer meets the most friction and has the most
+worth reporting. Meanwhile `CLAUDE.md` listed *"issues on other repos"* among the acts needing explicit
+permission, with no carve-out, and the bootstrap tells a consumer to expand their own governance from
+the nearest model, which is that file. Both statements are ours and they disagreed about the same act.
+
+So `ADOPTION.md` states all three rules a session needs before it has Chris -- filing needs no
+permission, the tracker search is a correctness step and not tidiness, and an inferred constraint is
+verified before it is obeyed -- says out loud that they are not in session context yet, and tells a
+reader to check their own safety rules for the same contradiction. `CLAUDE.md` names the carve-out. And
+the shared block that 30 agent defs and personas carry now counts the tracker among the things you read
+before proposing a fix, because the code says what a guardrail does and only its issue says what it was
+built to prevent.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Everything a consumer's session finds during adoption -- the moment it is least equipped and most likely
+to find something -- was being held back for a permission nobody was going to ask for. That cost is
+unmeasurable by construction: the findings die in a local file in the consumer's own repo, and the
+source repo never learns they existed. The measured instance is two verified defects in one run, in a
+throwaway repo, that would have gone with it.
+
+**Score:** 4
+
+#### Pull Request
+
+a consumer session is told, before the bootstrap, that filing an inbound issue needs no permission -- and the constitution stops contradicting it
+
+Plugins: team-alpha, team-ecomm, team-lifehub, team-shopify
+
+[PR #1122](https://github.com/DaveKJohn/claude-code-specialists/pull/1122)
+
+---
+
 ### DEPLOY: `fix/the-quotepath-flake-names-its-own-axis-v1` · 20260829-233821
 
 The `sync-main` quotepath flake had nothing to do with character encoding, and cannot happen again.
