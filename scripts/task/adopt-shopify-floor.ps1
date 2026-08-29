@@ -345,7 +345,7 @@ else {
 
 switch ($seamState) {
     'already' { Write-Host "  [skip]   $configRel -- Get-ShopifyLiveThemeId is already answered here" -ForegroundColor DarkGray }
-    'no-lib'  { Write-Host "  [STOP]   $configRel does not exist -- run the 'specialists-init' skill first; it owns that file's existence." -ForegroundColor Yellow }
+    'no-lib'  { Write-Host "  [STOP]   $configRel does not exist -- type /team-alpha:specialists-init first (reserved for explicit user invocation, so an agent hands it to the repo owner); it owns that file's existence." -ForegroundColor Yellow }
     default   {
         $how = if (([string]$LiveThemeId).Trim()) { "answered with $(([string]$LiveThemeId).Trim())" } else { 'commented out, so the session check keeps reporting' }
         Write-Host "  [append] $configRel -- the Shopify seam block, $how" -ForegroundColor Green

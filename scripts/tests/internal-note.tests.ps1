@@ -256,15 +256,46 @@ $r = Invoke-Script -Dir $happy
 Assert-Equal 0 $r.Code 'happy path: exit 0'
 $doc = [System.IO.File]::ReadAllText((Join-Path $happy 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
 Assert-True (Test-Line -Text $doc -Pattern '# Internal summary v3\.2\.0') 'the title names the version'
-Assert-True (Test-Line -Text $doc -Pattern '\*\*Date:\*\* 2026-08-03') 'the date is copied from the developer notes'
-Assert-True (Test-Line -Text $doc -Pattern '\*\*Type:\*\* Minor') 'the type is copied too'
+Assert-True (Test-Line -Text $doc -Pattern '\*\*Date:\*\* 2026-08-03\\') 'the date is copied from the developer notes, and its line ends in a hard break'
+Assert-True (Test-Line -Text $doc -Pattern '\*\*Type:\*\* Minor\\') 'the type is copied too, with the same break'
 Assert-True ($doc -match '(?m)^\*\*For whom:\*\* colleagues and management') 'the audience line states who it is for'
+# THE THREE LABELS EACH GET THEIR OWN RENDERED LINE (inbound #1101, completing inbound #1100). A single
+# newline inside a markdown paragraph is a SOFT break, so without a hard break after the first two the
+# block renders as "Date: ... Type: ... For whom: ..." on ONE line -- while the changelog note, the
+# GitHub Release body and the audience note all render three. The backslash is CommonMark's spelling of
+# that break, chosen over two trailing spaces because the older spelling made every generated release
+# document fail an ordinary no-trailing-whitespace rule (inbound #1100).
+#
+# THE BREAK RIDES ON THE TWO ASSERTS ABOVE rather than getting a pair of its own: Test-Line matches a
+# WHOLE line, so '**Date:** 2026-08-03\' already fails the moment the break is dropped. A separate assert
+# would be the same regex twice.
+#
+# THE LAST LABEL TAKES NO BREAK, and that is the shape rather than an omission -- a blank line follows and
+# ends the paragraph on its own. Asserted, because "add the break to all three" is the natural
+# over-correction and it would put a stray backslash in the rendered output. Build-AudienceNote writes
+# exactly these three lines with exactly these two breaks.
+Assert-True (Test-Line -Text $doc -Pattern '\*\*For whom:\*\* colleagues and management -- what the organisation gets out of this release') 'the last label carries no break -- the blank line already ends the paragraph'
+# The same whole-document guard release-lib.tests.ps1 runs over its three documents, for the same reason:
+# the defect it prevents is a property of the OUTPUT, not of one label.
+# SPLIT ON CRLF, and the '\r' trimmed: this document is written with CRLF (see Test-Line), so
+# splitting on "`n" alone leaves a '\r' at the end of every element and '[ \t]+$' can then never
+# match -- the guard would pass on a document full of trailing spaces. Written the wrong way first.
+$internalDirty = @(($doc -split "`r?`n") | Where-Object { $_ -match '[ \t]+$' })
+Assert-Equal 0 $internalDirty.Count 'no generated line in the internal note ends in whitespace'
 foreach ($h in @('What is different now', 'What it is worth', 'What was still open at this release')) {
     Assert-True (Test-Line -Text $doc -Pattern ('## ' + [regex]::Escape($h))) "the fixed heading '$h' is present"
 }
 Assert-True ($doc -match '(?s)What is different now.*What it is worth.*What was still open at this release') 'the three headings are in order'
 # The third heading is PAST TENSE and names the release, and that is the fix rather than a wording
-# preference: this document is the published GitHub Release body, so it does not move with reality. A
+# preference: this document is a PUBLISHED record of one release, so it does not move with reality. A
+# NOT THE GITHUB RELEASE BODY, corrected with inbound #1101. That line stood here until the one-document
+# reorganisation (Dave, August 10-12, 2026) moved the generated body into its own root, and cut-release
+# has passed 'releases/github/<dir>/<X.Y.Z>.md' to 'gh release create --notes-file' ever since; nothing
+# calls this script in a repo running that flow. The stale claim is worth naming rather than just
+# deleting, because it was repeated verbatim in inbound #1101 as the stake of the repair -- "the one of
+# the three a reader outside the repo actually opens" -- and a wrong reason attached to a correct symptom
+# is exactly what this repo checks for before repairing a report. The repair still stands on its other
+# leg: three documents of one release should not differ in shape.
 # present-tense heading invites lines that go stale in hours -- measured three times on August 4, 2026,
 # once by a line stating the previous release had no public page, published minutes before it got one.
 # Asserted as a negative too, because the old wording is the natural thing to type back in.
@@ -297,6 +328,29 @@ Assert-True ($doc -match '\*\*Date:\*\* \(fill in\)') 'a missing date becomes a 
 Assert-True ($doc -match '\*\*Type:\*\* \(fill in\)') 'and so does a missing type'
 Assert-True ($r.Flat -match 'fill in the date by hand') 'and the run warns about it out loud'
 Remove-Item -Recurse -Force -LiteralPath $noMeta -ErrorAction SilentlyContinue
+
+Write-Host "new-internal-note -- BOTH spellings of the markdown hard break (inbound #1100)" -ForegroundColor Cyan
+# release-lib.ps1 ended those two lines with TWO TRAILING SPACES until inbound #1100 and ends them with a
+# BACKSLASH now -- the same markdown hard break, spelled the way no trailing-whitespace lint rule can see.
+# Both have to read, and the failure mode of getting it wrong is the quiet one: Get-MetaLine's old pattern
+# trims whitespace only, so the backslash would have been carried into the published document as part of
+# the date ('2026-08-03\') rather than raising anything. The two-space fixture is asserted a few lines
+# below in the no-entries case; this is the new form, and the old notes it must not stop reading are
+# every note this repo has already published.
+$hardBreak = New-Fixture -Label 'hardbreak' -NotesContent "# Release notes v3.2.0`n`n**Date:** 2026-08-03\`n**Type:** Minor\`n`n### #1 $midDot A title $midDot Feat $midDot 2026-08-03`n`nBody.`n"
+$r = Invoke-Script -Dir $hardBreak
+Assert-Equal 0 $r.Code 'a backslash hard break does not stop the run'
+$doc = [System.IO.File]::ReadAllText((Join-Path $hardBreak 'contributing-davekjohn\releases\internal\3.x\3.2.0.md'))
+# THE SOURCE'S BREAK MUST NOT REACH THE VALUE -- and since inbound #1101 this document ends those two
+# lines with a break of its OWN, so "no backslash anywhere on the line" is no longer the test. What the
+# regression would look like is a DOUBLE one: Get-MetaLine carries the source's '\' into the value, the
+# skeleton appends its own, and the line reads '**Date:** 2026-08-03\\'. That is what is asserted, and it
+# is the reason these three asserts had to change with #1101 rather than simply pass.
+Assert-True (Test-Line -Text $doc -Pattern '\*\*Date:\*\* 2026-08-03\\') 'the date reads back WITHOUT the source''s backslash (one break, its own)'
+Assert-True (Test-Line -Text $doc -Pattern '\*\*Type:\*\* Minor\\') 'and so does the type'
+Assert-True ($doc -notmatch '2026-08-03\\\\') 'the break marker is not carried into the value on top of the emitted one'
+Assert-True ($r.Flat -notmatch 'fill in the date by hand') 'and nothing falls back to the placeholder'
+Remove-Item -Recurse -Force -LiteralPath $hardBreak -ErrorAction SilentlyContinue
 
 Write-Host "new-internal-note -- notes with no entries at all" -ForegroundColor Cyan
 $noEntries = New-Fixture -Label 'noentries' -NotesContent "# Release notes v3.2.0`n`n**Date:** 2026-08-03  `n**Type:** Patch`n`nNothing structured here.`n"

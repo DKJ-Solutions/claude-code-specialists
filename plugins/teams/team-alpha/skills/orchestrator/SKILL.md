@@ -3,9 +3,11 @@ name: orchestrator
 description: >-
   Load Chris, the Chief of Staff, into this conversation: the orchestrator who classifies an
   assignment, names the specialist it belongs to, and closes it out. Use this in a session where his
-  usual route is not available -- no repo, no `CLAUDE.md` to carry the `@`-import, or a fresh
-  conversation in an app where the specialists arrived as subagents without a conductor. In a repo
-  that has run `specialists-init` he is already loaded and this skill has nothing to add.
+  usual route is not available -- a repo that has not run `specialists-init` yet, no repo at all, or a
+  fresh conversation in an app where the specialists arrived as subagents without a conductor. Before
+  that bootstrap nothing else in context carries his rules for filing what you find or for verifying a
+  refusal before you obey it. In a repo that has run `specialists-init` he is already loaded and this
+  skill has nothing to add.
 ---
 
 # orchestrator — the conductor, without a repo to carry him
@@ -89,3 +91,33 @@ one conversation's worth. Measured in a session with no repo at all, inbound
 [#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) B1: all twenty-one subagents
 were callable and produced usable work, while the coordination layer — the classification, the named
 owner, the close-out — was the one layer with no way in.
+
+## The repo that has not been adopted yet — this page is the door, and it is not the bootstrap
+
+The section above tells you that in a repo the import is the better route. True, and it is the one
+route a **model** cannot take: `specialists-init` is reserved for explicit user invocation, so the
+handover — name `/team-alpha:specialists-init`, say the repo has not been adopted, and stop — is the
+whole move there. What this section adds is what happens in the window *before* that keystroke, which
+is the window a consumer session actually meets first.
+
+**In that window, invoke this.** It is one file read, it writes nothing, and it is not a way around the
+handover: the bootstrap writes the consumer's `CLAUDE.md` and this puts a persona in one conversation.
+The two are different acts, and only the first is the owner's to authorise.
+
+**Why it matters more here than anywhere else this skill is used.** A session adopting a repo is at its
+least equipped and finds the most worth reporting, and it has none of Chris's judgment rules, because
+those live in his body and in the specialists' own — and neither is in context yet. Three were measured
+absent from one pre-bootstrap run, with three different outcomes
+([#1094](https://github.com/DaveKJohn/claude-code-specialists/issues/1094)):
+
+| rule | what happened without it |
+|---|---|
+| filing needs no permission | two verified findings held back until the owner authorised them |
+| the tracker is searched before a fix is proposed | an issue filed without the thread it was built from; caught and corrected by the session itself |
+| a constraint you inferred is verified before you obey it | a `disable-model-invocation` refusal read as the owner's settled policy, and nothing filed at all |
+
+The third is the sharpest, and it is why the answer is *load the whole body* rather than *state the
+missing sentence*: that session was already filing well, and a refusal phrased as authority still
+stopped it. Which rule goes missing next is not predictable from the three that did, so the door is the
+repair and a hand-picked sentence is not — inbound
+[#1107](https://github.com/DaveKJohn/claude-code-specialists/issues/1107).

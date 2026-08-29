@@ -31,3 +31,337 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `fix/the-quota-headline-stops-vouching-for-upstreams-reset-time-v1` · 20260829-220455
+
+A red `claude-review` still tells you the account is out of quota and which limit it hit — but it no longer
+tells you **when work resumes**, because that half is upstream's and has been measured wrong by 2.5 days.
+The headline now names the discrepancy and attributes the time to upstream, so an operator reading `ship-pr`'s
+relayed line does not write off three days that turn out to be forty minutes.
+
+The repair went into the workflow that writes the sentence, not into the relay that carries it: the relay is
+generic on purpose and cannot know which authors are reliable, so a caveat there would caveat every workflow
+in every consuming repo.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the third time a claim about upstream behaviour written into this workflow has been corrected by
+measuring it — a run tally wrong by 3x (#974), the wrong clock entirely (#1055), and now a reset time wrong by
+2.5 days. So the change is not only the sentence: the comment block now carries the rule the three of them
+add up to. **The headline states only what the STATUS proves; everything the `result` STRING says is
+attributed to upstream rather than asserted.** The status proves the account is out of quota and that a re-run
+adds none. It proves nothing at all about when the quota comes back.
+
+**Score:** 2
+
+#### Pull Request
+
+The quota headline stops vouching for upstream's reset time
+
+Plugins: contributing-davekjohn
+
+[PR #1115](https://github.com/DaveKJohn/claude-code-specialists/pull/1115)
+
+---
+
+### DEPLOY: `fix/the-hook-handover-uses-the-owners-own-voice-v1` · 20260829-215113
+
+The two `roster-sessioncheck` hook lines now hand the reader `/team-alpha:sync-roster` in the same words
+the other five repaired sites use -- *"that command must be TYPED by the repo owner"* -- instead of
+*"ask the repo owner to type"*.
+
+Both forms tell a model the right thing. Only one of them also reads correctly to the **owner**, who sees
+this same line on their own terminal and is not a third party to themselves; that is the dual-audience
+reasoning `check-roster-sync.ps1`'s `[BOOTSTRAP]` marker already carries, and PR #1111 applied it to five
+of its seven sites and not to these two. A SessionStart hook is the worst place for the gap: on a fresh
+consumer it is the first thing in context, in every session, until the repo is adopted.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+The repair that introduced the inconsistency was the repair for inconsistent instructions. Check 30 could
+not have caught it -- both forms pass, because both name the command rather than the skill. What the gate
+guarantees is that a message is *followable*; whether it is followable **by the person actually reading
+it** is still a judgement, and this is the second time that particular judgement has had to be made in
+the same file.
+
+**Score:** 1
+
+#### Pull Request
+
+The roster hook's handover speaks to the owner in their own voice, like the other five sites
+
+Plugins: team-alpha
+
+[PR #1114](https://github.com/DaveKJohn/claude-code-specialists/pull/1114)
+
+---
+
+### DEPLOY: `fix/the-one-script-carrying-a-byte-order-mark-v1` · 20260829-212901
+
+`scripts/tests/internal-note.tests.ps1` loses the UTF-8 byte-order mark PR #1108 wrote into it -- the only
+one of 162 tracked `.ps1` files in the tree that had one. `Set-Content -Encoding utf8` means *with* a BOM
+on Windows PowerShell 5.1, which is why every writer in this repo goes through `Write-Utf8NoBom` instead.
+
+Nothing was broken by it and no gate is changed: check 27 strips the BOM before scanning, deliberately and
+with its reason written down, and check 26 is scoped to frontmatter-bearing shipped documents. This is the
+odd file out being brought back in line, not a defect being repaired -- which is also why no new check
+comes with it.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+It is the case where the gate was right to stay quiet and the tree was still wrong. Check 27 excludes a
+BOM on purpose, because on a `.ps1` a BOM *helps* 5.1 rather than hurting it -- so the one thing that
+could have caught this was correctly designed not to. Worth writing down, because the obvious reaction to
+"a defect shipped past the gate" is to widen the gate, and here that would have made it worse.
+
+**Score:** 1
+
+#### Pull Request
+
+The one .ps1 in the tree carrying a byte-order mark loses it
+
+[PR #1113](https://github.com/DaveKJohn/claude-code-specialists/pull/1113)
+
+---
+
+### DEPLOY: `fix/lint-barred-skill-imperatives-v1` · 20260829-210904
+
+The lint gate now refuses a printed instruction that tells its reader to run a skill that reader cannot
+invoke. A skill whose frontmatter carries `disable-model-invocation: true` has its page removed from the
+model's context entirely, so a session told to `run the 'cut-release' skill` is refused by the harness and
+cannot even read the page that would explain the route -- while the reader who *can* run it, the person at
+the keyboard, is never told the line is theirs to type. Check 30 holds every printed script message and
+every shipped markdown line to naming the command and the actor instead.
+
+**Seven sites were named with a bare imperative and are repaired**: both `roster-sessioncheck` hooks,
+two lines in `check-roster-sync.ps1`, `adopt-config.ps1`, `adopt-shopify-floor.ps1` and `INSTALL.md`.
+Two of those are repaired by PR #1105 as well, in its exact wording, so the overlap resolves to identical
+text.
+
+The rule is frontmatter-driven rather than a phrasing convention, which is what lets
+`check-script-contract.ps1` go on naming the unflagged `adopt-workflow-folder` with the same bare
+imperative. Offered as optional by #1093 and deliberately not built there, under this repo's rule that a
+risk which has not bitten gets named rather than repaired -- built now because it bit twice a month apart
+(#731 -> #734, then #1093/#1096 rediscovered from scratch when a consumer adoption stopped on it) with
+nothing connecting the two.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every rule this repo adds to a gate has to be measured over the tree first, and this one shows why: the
+obvious version of the check -- an imperative verb plus a barred skill name -- is **half wrong**, four of
+its eight findings false. The discriminator that fixes it is one word, and the sharpest false finding it
+removes is `run park-cycle by hand`, where `\bpark\b` matches inside a longer name because a hyphen is not
+a word character. Shipped as measured: 11 findings, 7 sites, none of them false.
+
+**Score:** 2
+
+#### Pull Request
+
+The lint gate refuses a printed instruction that names a skill the model cannot invoke
+
+Plugins: contributing-davekjohn, team-alpha, team-shopify
+
+[PR #1111](https://github.com/DaveKJohn/claude-code-specialists/pull/1111)
+
+---
+
+### DEPLOY: `fix/red-check-names-its-reason-in-the-transcript-v1` · 20260829-204558
+
+A failing check that does not block the merge now says **why** it failed, in the same transcript that
+reports it. `ship-pr` reads the failing check's annotations and prints the sentence that workflow wrote
+about itself -- so a red `claude-review` arrives as *"out of quota -- the review did not run ... resets
+Aug 31, 7am (UTC)"* instead of as a red mark with a log to go hunting through.
+
+The rule is generic on purpose: **a failure annotation carrying a title** was written by a workflow
+author, while the Actions runner emits its own untitled (*"Process completed with exit code 1"*). Nothing
+is keyed on a check name, so a consuming repo gets the same relay for workflows this repo has never seen.
+
+Filed as [#1103](https://github.com/DaveKJohn/claude-code-specialists/issues/1103) and, before it, seven
+more threads about the same red check -- one of which concluded that a secret needed rotating, against a
+log already reading `429`. The reason had been printed in the run since #966; what was missing was a
+reader standing where it was printed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It repairs a reporting loop rather than a bug: the eighth issue about a check whose own diagnostic had
+already answered the question. The measurement is the eight threads, and the repair is not a ninth
+explanation but moving the existing one to where the reader lands.
+
+**Score:** 2
+
+#### Pull Request
+
+a failing non-required check names its own reason where ship-pr's operator reads it
+
+Plugins: contributing-davekjohn
+
+[PR #1110](https://github.com/DaveKJohn/claude-code-specialists/pull/1110)
+
+---
+
+### DEPLOY: `docs/orchestrator-skill-is-the-pre-bootstrap-door-v1` · 20260829-201457
+
+A consumer's session can now find the orchestrator during the adoption itself, instead of one restart
+after the moment it needed him.
+
+The `orchestrator` skill has always been the route to Chris where the `@`-import cannot reach — but its
+description offered three situations, and a repo mid-adoption was in none of them: it has a repo, it has
+a `CLAUDE.md`, and its specialists did not arrive in an app. So the one channel that is always in
+context before the bootstrap was telling the one session that needs this skill that it is for somebody
+else. The description now names that repo, and says in one clause what is missing until the bootstrap
+runs: the rules for filing what you find and for verifying a refusal before you obey it.
+
+The page itself gained a closing section for the same reader. It states that the handover to
+`/team-alpha:specialists-init` is still the whole move — the bootstrap writes the owner's `CLAUDE.md`
+and is theirs to authorise — and that loading a persona into one conversation is a different act, not a
+way around it. The three rule-gaps measured in a single pre-bootstrap run are tabled there with what
+each one cost, because the third of them defeated a session that was already filing well: which rule
+goes missing next is not predictable, which is why the repair is the door rather than a selected
+sentence.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Everything a consumer's session finds while adopting — the moment it is least equipped and has the most
+worth reporting — reaches this repo only if that session knows filing needs nobody's permission. It
+costs 39 tokens a session to say where that rule lives, and the alternative is measured: two findings
+held back for an authorisation nobody was going to ask for, and one refusal read as policy and never
+filed at all.
+
+**Score:** 3
+
+#### Pull Request
+
+the orchestrator skill names the un-adopted repo, so a session without Chris can still reach him
+
+Plugins: team-alpha
+
+[PR #1109](https://github.com/DaveKJohn/claude-code-specialists/pull/1109)
+
+---
+
+### DEPLOY: `fix/internal-note-hard-breaks-v1` · 20260829-195518
+
+`new-internal-note.ps1` ends its `**Date:**` and `**Type:**` lines with a backslash markdown hard break,
+so the internal note's three metadata labels render as three lines. They rendered as one: a single
+newline inside a markdown paragraph is a soft break, and this was the one release document that never
+received the break the other three carry. Completes inbound #1100, which established that spelling for
+`release-lib.ps1`'s documents and recorded that dropping it joins the labels; the internal note was
+outside that repair's reach and nothing carried the decision across.
+
+Reported as inbound #1101, whose stated stake -- that this document is the published GitHub Release body
+-- did not survive checking: that body is the generated `releases/github/<dir>/<X.Y.Z>.md`. The wrong
+claim came from a stale comment in `internal-note.tests.ps1`, corrected here.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report offered two repairs and called the choice the owner's. Reading the tree showed it had already
+been made, a day earlier, in the file the report itself quoted -- the #1100 comment states that dropping
+the break joins the labels and that it is deliberately kept. What looked like an open decision was an
+unfinished application of a settled one.
+
+**Score:** 1
+
+#### Pull Request
+
+The internal note's Date/Type labels get the hard break the other release documents already have
+
+Plugins: contributing-davekjohn
+
+[PR #1108](https://github.com/DaveKJohn/claude-code-specialists/pull/1108)
+
+---
+
+### DEPLOY: `fix/record-shape-pathless-arm-v1` · 20260829-193738
+
+`[RECORD-SHAPE]`'s pathless line stops telling most readers a story about their own repo that is not true.
+
+The arm fires on one conjunction -- no install record for this path, and a pathless one exists -- and read
+that as a demotion: *"the shape a SESSION START leaves behind when it demotes a 'project' record"*, *"this
+repo simply no longer has its own record"*, *"Re-install at project scope from this root."* That conjunction
+is equally the resting state of every plugin somebody installed machine-wide on purpose, in every repo that
+never project-installed it. So the line fired at every session start, for a deliberate install shape, and
+closed by instructing the reader to convert it into a per-repo one.
+
+No predicate can separate the two: #323 measured that the demotion writes `scope=user` and drops
+`projectPath`, which is byte-for-byte an ordinary user install. So the arm keeps firing -- a silently lost
+record must not go back to being unreported -- and stops claiming. It states what it can see, then asks the
+one question the reader answers instantly and the register cannot answer at all, with both branches written
+out including the one that says no action is needed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer with a machine-wide plugin install has been reading this line at every session start, in every
+repo, with a re-install instruction that should not be followed. Following it converts a deliberate
+machine-wide install into a per-repo one and adds a record nobody wanted -- so the cost was never only
+attention.
+
+**Score:** 4
+
+#### Pull Request
+
+the pathless-only record-shape line reports what it can see instead of asserting a history it cannot
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1106](https://github.com/DaveKJohn/claude-code-specialists/pull/1106)
+
+---
+
+### DEPLOY: `fix/testrun-2-cut-release-and-adoption-defects-v1` · 20260829-183627
+
+Three defects testrun 2 found in the layer a fresh consumer meets first, all of them in the release cut and
+the folder adoption.
+
+The cut no longer reads an ordinary root document as an unfolded changelog entry. Its branch-name test scans
+every heading, so a single backticked word in any heading below the title declared a branch and stopped the
+release -- which in a technical repo is close to unavoidable. The root scan now reads only the document's
+opening heading, which is where every real entry declares itself. And when it does refuse, it names `Get-ReservedRootMd` alongside the fold,
+because *"fold them first"* is the right remedy for one of the two ways that gate fires and a destructive one
+for the other.
+
+Every release document the cut generates is now free of trailing whitespace. The markdown hard break under
+`**Date:**` was two trailing spaces, which fails an ordinary lint rule -- and the cut runs its gate *before*
+those documents exist, so it cannot catch its own output: the failure surfaced on the next branch, on files
+that branch had not written. The break is kept, spelled as the backslash CommonMark also allows.
+
+And the `CHANGELOG.md` that `adopt-workflow-folder` scaffolds now states the heading level the fold actually
+writes, composed from `Get-EntryHeadingLevel` so the sentence cannot drift from the constant again.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer cutting their first release meets two of these three on that one command: the cut refuses over a
+run log or an `ADOPTION.md` and tells them to fold it -- which would paste that file into their changelog and
+delete it -- and once past that, their trunk fails its own lint gate on files the release wrote, at the one
+moment the tree is least inspectable. Both were measured on a real first release, and the third quietly
+misinforms every consumer about the shape of their own changelog.
+
+**Score:** 4
+
+#### Pull Request
+
+cut-release stops misreading an ordinary root doc, stops leaving the trunk red, and the adopted CHANGELOG intro states the level the fold writes
+
+Plugins: contributing-davekjohn
+
+[PR #1102](https://github.com/DaveKJohn/claude-code-specialists/pull/1102)
+
+---
+

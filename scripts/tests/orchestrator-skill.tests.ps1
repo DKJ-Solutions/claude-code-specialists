@@ -68,7 +68,17 @@ Write-Host "orchestrator skill -- it is model-invocable on purpose" -ForegroundC
 # The opposite decision from specialists-init/teardown/sync-roster, which were locked down on the same
 # day (inbound #669 B2) because they write files through a script. This one reads one file and changes
 # nothing on disk, so a model reaching for it when a conversation needs routing is the intended use.
-Assert-True (-not ($text -match 'disable-model-invocation')) 'no disable-model-invocation -- reading a persona is not a state change'
+#
+# THE SUBJECT IS THE FRONTMATTER KEY, NOT THE WORD. This read the whole page until August 29, 2026, and
+# it cost a false failure the first time the page discussed the flag: the pre-bootstrap section names
+# `disable-model-invocation` because a refusal read as the owner's settled policy is one of the three
+# rule-gaps it tables (inbound #1107). That is the page explaining a neighbouring skill's flag, which is
+# exactly the distinction this repo's [lifecycle] check already draws between a bare mention and a
+# declaration. So the assert reads the frontmatter block alone -- where the key would actually take
+# effect -- and the body is free to talk about it.
+$frontmatter = if ($text -match '(?s)\A---\r?\n(.*?)\r?\n---\r?\n') { $Matches[1] } else { '' }
+Assert-True ($frontmatter -ne '') 'the page has a frontmatter block to hold the flag'
+Assert-True (-not ($frontmatter -match 'disable-model-invocation')) 'no disable-model-invocation in the frontmatter -- reading a persona is not a state change'
 
 Write-Host ""
 if ($script:fail -gt 0) {

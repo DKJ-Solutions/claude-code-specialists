@@ -150,6 +150,55 @@ infrastructure.
   is the ordinary route, and the read-only allowlist above closes the other end. The knob this actually
   turns on is the **Write-role bypass**, whose condition is already stated in the `ci.yml` bullet above:
   safe while there are no external collaborators.
+
+  **A RED `claude-review` HAS ALWAYS NAMED ITS OWN REASON, AND NOBODY WAS READING IT** — issue
+  [#1103](https://github.com/DaveKJohn/claude-code-specialists/issues/1103), August 29, 2026. The
+  **Why the review failed** step in that workflow prints `api_error_status`, writes it as a titled
+  annotation and repeats it in the job summary, and has done so since
+  [#966](https://github.com/DaveKJohn/claude-code-specialists/issues/966). The same class of report kept
+  arriving anyway — eight threads about this check red on every PR, every one of them since #966 the same
+  quota state, and #966 itself filed against a log already reading `429` and concluding that a secret
+  needed rotating. #1103 was filed with *"the actual cause: not measured"*, pointing at the marketplace
+  step, which is where the run happened to be when the error surfaced and not where it came from.
+
+  **The diagnosis was reachable and the reader was not, so the repair moved the sentence rather than
+  writing another one.** `ship-pr.ps1` now reads the failing check's annotations on the path where the
+  merge PROCEEDS and prints what that workflow said about itself, beside the warning naming the check
+  (`Get-FailedCheckRunRefs` + `Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`). The selection
+  rule is **a failure annotation carrying a title**: the Actions runner writes its own with an empty one
+  (*"Process completed with exit code 1"*), while `::error title=X::Y` is a sentence an author left for
+  exactly this reader — so it needs no maintenance and works in a consumer repo whose workflows this repo
+  has never seen, where a rule keyed on the name `claude-review` would report nothing at all. Only the
+  **not-required** failures are asked about: a required one is a refusal, and its gate runs locally where
+  the reader meets the reason first-hand.
+
+  **And the check STAYS RED on a 429** — that decision is unchanged and recorded in the workflow itself. A
+  green tick would hide that this PR got no review, which is exactly what #966 asked not to be silent.
+  What was wrong was the legibility, not the colour.
+
+  **AND THE RELAYED SENTENCE IS ONLY AS GOOD AS ITS AUTHOR** — issue
+  [#1112](https://github.com/DaveKJohn/claude-code-specialists/issues/1112), the day after. The relay works
+  and is the right shape; what was wrong was the sentence going through it. That headline told the reader the
+  reason line names *"when it comes back"*, and on August 29, 2026 run `33267175141` failed at 18:02 UTC
+  reading *"resets Aug 31, 7am (UTC)"* while runs `33268549172` and `33269512129` reviewed successfully at
+  18:43 and 18:55 the same evening — roughly **2.5 days early**, both of them real 1–3 minute reviews rather
+  than the nine-second workflow-validation skip.
+
+  **The repair went into the workflow, not into `Get-AuthoredFailureNote`, and that is the reusable part.**
+  The relay is generic on purpose: it repeats what an author wrote and cannot know which authors are reliable,
+  so a caveat added there would caveat every workflow in every consuming repo — including the ones whose
+  timings are exact. An over-claiming sentence is repaired where it is written. The lib now says so in the
+  comment beside its 500-character bound, which had itself asserted the reset time was *"the only actionable
+  word in the whole note"*.
+
+  **The standing rule that comment block now carries**, after three corrections from measurement —
+  [#974](https://github.com/DaveKJohn/claude-code-specialists/issues/974) (a tally of red runs, wrong by ~3x
+  when typed), [#1055](https://github.com/DaveKJohn/claude-code-specialists/issues/1055) (session versus
+  weekly window) and #1112 (the reset time): **the headline states only what the STATUS proves, and everything
+  the `result` STRING says is attributed to upstream rather than asserted.** The status proves the account is
+  out of quota and that a re-run adds none; it proves nothing about when the quota returns. *Why* it returned
+  early was deliberately not investigated — a rolling window, a session window clearing, an account change are
+  all plausible and none was measured — and the headline reports the discrepancy rather than a mechanism.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and

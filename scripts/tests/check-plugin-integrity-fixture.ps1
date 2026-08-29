@@ -219,7 +219,12 @@ function New-IntegrityFixture {
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
-    $skillBetaMd = "---`nname: skill-beta`ndescription: Fixture skill beta.`n---`n`n# Skill Beta`n"
+    # SKILL-BETA IS THE BARRED ONE (check 30), and skill-alpha above deliberately is not. That pair is
+    # the whole fixture check 30 needs: the same sentence about the two must come out differently, which
+    # is what makes the rule frontmatter-driven rather than a phrasing convention. Adding the line here
+    # rather than in a fifth fixture skill keeps the canonical set at two, which check 10's scenarios
+    # count on.
+    $skillBetaMd = "---`nname: skill-beta`ndescription: Fixture skill beta.`ndisable-model-invocation: true`n---`n`n# Skill Beta`n"
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
     # The depth decoy claims its own name (skill-deep-decoy) in frontmatter -- if check 10 ever
     # regressed to a looser depth match, that name would silently become a 3rd canonical skill.

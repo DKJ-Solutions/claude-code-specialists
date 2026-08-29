@@ -199,7 +199,12 @@ $dev = [System.IO.File]::ReadAllText($devFile, [System.Text.Encoding]::UTF8)
 
 function Get-MetaLine {
     param([string]$Text, [string]$Label)
-    $m = [regex]::Match($Text, "(?m)^\*\*${Label}:\*\*\s*(.+?)\s*$")
+    # BOTH SPELLINGS OF THE MARKDOWN HARD BREAK ARE TRIMMED (inbound #1100): release-lib.ps1 wrote two
+    # trailing spaces until that repair and writes a trailing backslash now, and every note already
+    # published carries the old form. Without the backslash in this class the date would be carried into
+    # the internal note as '2026-08-29\' -- a silently wrong value rather than a loud failure, which is
+    # exactly the shape a parser change has to be checked for.
+    $m = [regex]::Match($Text, "(?m)^\*\*${Label}:\*\*\s*(.+?)[\s\\]*$")
     if ($m.Success) { return $m.Groups[1].Value }
     return ''
 }
@@ -392,8 +397,23 @@ $skeleton =
     # documents of one release sitting side by side should not differ in shape, or the difference becomes
     # something a later reader "fixes" in the wrong place. It is also what markdown linters expect.
     "# $($w.Title) v$verNum$nl$nl" +
-    "**Date:** $date$nl" +
-    "**Type:** $typeLabel$nl" +
+    # THE BACKSLASH IS A MARKDOWN HARD BREAK, and these two lines carry it for the same reason
+    # release-lib.ps1's three documents do (inbound #1101, completing inbound #1100). A single newline
+    # inside a markdown paragraph is a SOFT break, so without it the three labels render as ONE visual
+    # line -- "Date: ... Type: ... For whom: ..." -- while the changelog note, the GitHub Release body
+    # and the audience note render three. That is precisely the difference the comment above says these
+    # documents must not have, sitting four lines below it.
+    #
+    # THE THIRD LABEL TAKES NO BREAK, and that is the shape rather than an omission: it is the last line
+    # of the block and a blank line follows, which ends the paragraph on its own. Build-AudienceNote
+    # writes exactly the same three lines with exactly the same two breaks.
+    #
+    # WHY THE BACKSLASH AND NOT TWO TRAILING SPACES: the older spelling of the same break made every
+    # generated release document fail an ordinary "no trailing whitespace" lint rule, measured in a
+    # consumer whose trunk went red on files it had not written (inbound #1100). Get-MetaLine above
+    # already tolerates both spellings on the way back in.
+    "**Date:** $date\$nl" +
+    "**Type:** $typeLabel\$nl" +
     "**$($w.AudienceLabel):** $($w.Audience)$nl" +
     $nl +
     "<!-- $($w.SkeletonNote)$nl" +
