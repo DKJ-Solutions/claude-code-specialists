@@ -900,7 +900,11 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
             if ($staleName -and $staleName -ne $id) {
                 $current = Get-DisplayName -RawName (Get-AgentName -PluginDir $pluginDir -Id $id) -Fallback $id
                 if ($current -and $staleName -ne $current) {
-                    Write-Info "lens '$id' ($plugIdShown) header still names '$staleName' (agent is now '$current') -- run the sync-roster skill to reconcile the header."
+                    # NAMES THE COMMAND AND WHO TYPES IT (inbound #1104): 'sync-roster' carries
+                    # disable-model-invocation, so a session reading this cannot invoke it and cannot
+                    # read the page that would explain the route. Check 30 holds every printed
+                    # message to this; the reasoning in full is at the [BOOTSTRAP] marker below.
+                    Write-Info "lens '$id' ($plugIdShown) header still names '$staleName' (agent is now '$current') -- type /team-alpha:sync-roster to reconcile the header; that command is reserved for explicit user invocation, so an agent has to hand it to the repo owner."
                 }
             }
         }
@@ -953,7 +957,7 @@ if ($suppressedForBootstrap -gt 0) {
     # repo's own side of the setup has not happened. Counting it as an error would put a red line and
     # exit 1 in every session of a repo whose owner has simply not got round to the bootstrap -- and
     # not shouting at that person is the entire point of issue #225.
-    Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run the 'specialists-init' skill to put them in place: it is additive and never overwrites anything you have written." -ForegroundColor Yellow
+    Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run /team-alpha:specialists-init to put them in place -- that command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. It is additive and never overwrites anything you have written." -ForegroundColor Yellow
 }
 
 if ($suppressedForRosterPending -gt 0) {

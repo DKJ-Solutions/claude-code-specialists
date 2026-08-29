@@ -353,6 +353,110 @@ try {
     $r33c = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r33c.Out -match [regex]::Escape('ZZ-NEWLY-WRITTEN-PAGE.md'))) 'scenario 33: the fixture is left as it was found'
 
+
+    # --- check 30: a printed instruction must not name a skill barred to its reader -------------------
+    # The class #731 -> #734 repaired once and #1093/#1096 rediscovered from scratch a month later. The
+    # fixture's skill-beta carries 'disable-model-invocation: true' and skill-alpha does not, which is
+    # the pair every scenario below turns on: the SAME sentence about the two must come out differently.
+    #
+    # Matched on the error phrase rather than the bare '[barred-skill]' tag -- that tag also prefixes the
+    # coverage line, which is present on every run. Same trap the check 10 and check 11 patterns document.
+    $BarredFindingPattern = "\[barred-skill\].*tells its reader to run the"
+
+    # --- Scenario 42: a printed message naming a BARRED skill fails ----------------------------------
+    Write-Host "check 30 -- a printed instruction naming a barred skill fails" -ForegroundColor Cyan
+    $s42Lines = @(
+        '$ErrorActionPreference = ''Stop'''
+        'Write-Host "  [STOP] nothing is set up here -- run the skill-beta skill first."'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'scripts\probe.ps1'), (($s42Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB42 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $rB42.Code 'scenario 42: exit 1 -- naming a barred skill is an error'
+    Assert-True ($rB42.Out -match [regex]::Escape('probe.ps1:2') + ".*tells its reader to run the 'skill-beta' skill") 'scenario 42: the finding names the file, the line and the skill'
+    Assert-True ($rB42.Out -match '/skill-beta') 'scenario 42: and hands over the slash-command form as the remedy'
+    Assert-True ($rB42.Out -match '\[barred-skill\] checked [1-9]') 'scenario 42: and the set WAS examined -- the failure is not an empty scan'
+
+    # --- Scenario 43: the SAME sentence about an UNFLAGGED skill passes ------------------------------
+    #     The scenario that keeps this from being a phrasing rule. check-script-contract.ps1 names
+    #     'adopt-workflow-folder' with exactly this wording in the real tree and is correct to; a check
+    #     built as a grep for the phrasing would be born with that false finding.
+    Write-Host "check 30 -- the same wording about an UNFLAGGED skill passes" -ForegroundColor Cyan
+    $s43Lines = @(
+        '$ErrorActionPreference = ''Stop'''
+        'Write-Host "  [STOP] nothing is set up here -- run the skill-alpha skill first."'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'scripts\probe.ps1'), (($s43Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB43 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rB43.Out -match $BarredFindingPattern)) 'scenario 43: an unflagged skill may be named with a bare imperative'
+
+    # --- Scenario 44: the DISCRIMINATOR -- an imperative without the word 'skill' passes -------------
+    #     Measured on the real tree: without this, 8 unique sites of which 4 are wrong. Three of the four
+    #     name the SCRIPT rather than the skill, which is a correct instruction to a reader who has just
+    #     run it.
+    Write-Host "check 30 -- naming the script rather than the skill passes" -ForegroundColor Cyan
+    $s44Lines = @(
+        '$ErrorActionPreference = ''Stop'''
+        'Write-Host "  that push failed -- run skill-beta by hand for the reason."'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'scripts\probe.ps1'), (($s44Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB44 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rB44.Out -match $BarredFindingPattern)) 'scenario 44: without the word "skill" it is a script name, not a route to a page'
+
+    # --- Scenario 45: a HYPHENATED continuation is not the barred name ------------------------------
+    #     The false finding the naive rule really produced: '\bpark\b' matches inside 'park-cycle',
+    #     because a hyphen is a non-word character. The check's own boundary is (?![\w-]).
+    Write-Host "check 30 -- a longer hyphenated name is not the barred one" -ForegroundColor Cyan
+    $s45Lines = @(
+        '$ErrorActionPreference = ''Stop'''
+        'Write-Host "  run the skill-beta-helper skill to finish up."'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'scripts\probe.ps1'), (($s45Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB45 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rB45.Out -match $BarredFindingPattern)) 'scenario 45: skill-beta-helper is a different name, not skill-beta with a suffix'
+
+    # --- Scenario 46: a COMMENT carrying the wording passes ------------------------------------------
+    #     The reason this reads the PowerShell parser instead of matching lines: every comment explaining
+    #     the rule -- check 30's own included -- has to quote the wording it forbids.
+    Write-Host "check 30 -- the same wording in a COMMENT is not an instruction" -ForegroundColor Cyan
+    $s46Lines = @(
+        '$ErrorActionPreference = ''Stop'''
+        '# This used to say "run the skill-beta skill", which is the defect this comment records.'
+        'Write-Host "  nothing to do here."'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'scripts\probe.ps1'), (($s46Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB46 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rB46.Out -match $BarredFindingPattern)) 'scenario 46: a comment is not printed output, so it is not a subject'
+
+    # --- Scenario 47: MARKDOWN is a subject too ------------------------------------------------------
+    #     Measured: printed output carried 6 of the 7 real sites and INSTALL.md the seventh -- the one a
+    #     consumer actually reads. An output-only check would have passed straight over it.
+    Write-Host "check 30 -- a shipped markdown page is a subject as well" -ForegroundColor Cyan
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'scripts\probe.ps1'), "`$ErrorActionPreference = 'Stop'`n", $Utf8NoBom)
+    $s47Lines = @(
+        '# Contributing'
+        ''
+        'When the roster drifts, run the `skill-beta` skill to stage the catch-up.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s47Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB47 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 $rB47.Code 'scenario 47: exit 1 -- a shipped page may not name a barred skill either'
+    Assert-True ($rB47.Out -match [regex]::Escape('CONTRIBUTING.md:3') + ".*'skill-beta'") 'scenario 47: the finding names the markdown file and its line'
+
+    # --- Scenario 48: the REPAIRED wording passes ----------------------------------------------------
+    #     The shape every one of the seven real sites was rewritten into, asserted so the check and the
+    #     repair cannot drift apart: name the command, and say who types it.
+    Write-Host "check 30 -- the repaired wording passes" -ForegroundColor Cyan
+    $s48Lines = @(
+        '# Contributing'
+        ''
+        'When the roster drifts, type `/team-alpha:skill-beta` to stage the catch-up -- that command is'
+        'reserved for explicit user invocation, so a session hands it to you rather than running it.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s48Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB48 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rB48.Out -match $BarredFindingPattern)) 'scenario 48: naming the command and the actor is what the check asks for'
+    Remove-Item -LiteralPath (Join-Path $Fixture 'scripts\probe.ps1') -Force -ErrorAction SilentlyContinue
+
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
