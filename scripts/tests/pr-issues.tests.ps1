@@ -828,6 +828,10 @@ foreach ($bad in @('', '   ', 'not json', '[]')) {
 
 # The real payload, trimmed: this is what run 33267175141's job answered on August 29, 2026 -- the
 # authored diagnostic sitting among the runner's own untitled noise and a deprecation warning.
+# KEPT VERBATIM, including a headline the workflow no longer writes. #1112 repaired that sentence --
+# it vouched for the reset time this same payload got wrong by 2.5 days -- but what is under test
+# here is the SELECTION rule, not the wording, and a real captured payload is worth more to it than
+# a re-typed current one. The current headline lives in .github/workflows/claude-code-review.yml.
 $annReal = '[' +
   '{"annotation_level":"warning","title":"","message":"Node.js 20 is deprecated."},' +
   '{"annotation_level":"failure","title":"claude-review -- out of quota -- the review did not run",' +
@@ -839,7 +843,7 @@ Assert-True ($noteQuota -like 'claude-review*') 'the note names the check it bel
 Assert-True ($noteQuota -notlike '*claude-review: claude-review*') 'ONCE -- this repo titles its own annotation with the job name, and prefixing it again stutters'
 Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annReal -CheckName 'other') -like 'other: *') 'a title that does NOT carry the name is prefixed, which is what the parameter is for'
 Assert-True ($noteQuota -like '*out of quota*') 'and carries the title the workflow authored'
-Assert-True ($noteQuota -like '*resets Aug 31*') 'and the message, which is the half that says when it comes back'
+Assert-True ($noteQuota -like '*resets Aug 31*') 'and the message, which is where upstream states a reset time -- relayed, not vouched for (#1112)'
 Assert-True ($noteQuota -notlike '*exit code 1*') 'the runner exit noise is not what gets relayed'
 Assert-True ($noteQuota -notlike '*Node.js 20*') 'and neither is a WARNING -- the run went red, and a deprecation is not why'
 

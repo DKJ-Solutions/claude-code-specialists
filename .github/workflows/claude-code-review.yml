@@ -147,10 +147,33 @@ jobs:
       #
       # That distinction is worth this much prose because it changes what a reader DOES. Told the window
       # is a session, the reasonable move is to wait a while and re-run; on a weekly cap that is three
-      # days of waste and every PR opened in between goes unreviewed. So the headline below states only
-      # what holds for both -- out of quota, resets on the clock, a re-run does not help -- and points at
-      # the reason line for which limit it is. It does not name the window, because the status it is
+      # days of waste and every PR opened in between goes unreviewed. So the headline below points at the
+      # reason line for WHICH limit it is, and does not name the window itself, because the status it is
       # switching on cannot tell.
+      #
+      # BUT IT DOES NOT VOUCH FOR THE TIME THAT SENTENCE NAMES -- issue #1112, and the third correction
+      # this comment block has taken from a measurement. On August 29, 2026 run 33267175141 failed at
+      # 18:02 UTC reading "You've hit your weekly limit ... resets Aug 31, 7am (UTC)", and runs
+      # 33268549172 and 33269512129 REVIEWED SUCCESSFULLY at 18:43 and 18:55 the same evening -- roughly
+      # 2.5 days before the reset the string had named. Both were real reviews of 1-3 minutes, not the
+      # nine-second workflow-validation skip described at the top of this file.
+      #
+      # WHY THAT CHANGES THE HEADLINE RATHER THAN THE RELAY. Since #1110 `ship-pr` prints this annotation
+      # to the operator verbatim, so whatever this sentence claims is what somebody reads as the answer to
+      # WHEN WORK RESUMES. The relay is generic on purpose -- it repeats what an author wrote and cannot
+      # know which authors are reliable -- so a caveat added there would caveat every workflow in every
+      # consuming repo. The over-claim is THIS file's, and it is repaired here.
+      #
+      # WHAT WAS NOT MEASURED, deliberately left unexplained: WHY it came back early. A rolling rather
+      # than calendar weekly window, a separate session window clearing, an account change upstream --
+      # all plausible, none checked. So the headline reports the DISCREPANCY and attributes the time to
+      # upstream; it does not offer a mechanism, and neither should the next editor without measuring one.
+      #
+      # THE STANDING RULE THIS LEAVES BEHIND, since #974 (a tally), #1055 (the window) and now #1112 (the
+      # time) have each corrected a claim written here about upstream behaviour: the headline states only
+      # what the STATUS proves, and everything the `result` STRING says is attributed to upstream rather
+      # than asserted. The status proves the account is out of quota and that a re-run adds none. It
+      # proves nothing at all about when the quota returns.
       #
       # AND THE CHECK STAYS RED ON THAT, deliberately. A 429 means this PR got no review, which is
       # exactly what #966 wanted not to be silent; a green check would hide that better than a red one
@@ -202,7 +225,7 @@ jobs:
           # syntax -- so the short form goes there and the full sentence goes in the message body.
           case "$status" in
             429) short='out of quota -- the review did not run'
-                 headline='The review did not run: the account behind CLAUDE_CODE_OAUTH_TOKEN is out of quota. It resets on the clock and not on a re-run; the reason below names WHICH limit it is and when it comes back, which is hours for a session window and days for a weekly one. Nothing to do with this diff.' ;;
+                 headline='The review did not run: the CLAUDE_CODE_OAUTH_TOKEN account is out of quota; re-running adds none. The reason below names WHICH limit it is -- hours for a session cap, days for a weekly one -- but not WHEN: quota came back 2.5 days before the reset it named (#1112). Nothing to do with this diff.' ;;
             529) short='API overloaded -- the review did not run'
                  headline='The review did not run: the API was overloaded. Nothing to do with this diff.' ;;
             '')  short='the review failed'
