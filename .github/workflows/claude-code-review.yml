@@ -134,9 +134,23 @@ jobs:
       # which an absolute "THE ONE CAUSE" could not.
       #
       # Worth stating plainly, because the mechanism is invisible from the workflow file:
-      # `CLAUDE_CODE_OAUTH_TOKEN` is a SUBSCRIPTION credential, so the session window it draws on is the
-      # same one interactive use draws on. A morning of heavy local work starves the review of every PR
-      # opened in that window, and no amount of retrying inside the run helps: it resets on the clock.
+      # `CLAUDE_CODE_OAUTH_TOKEN` is a SUBSCRIPTION credential, so the allowance it draws on is the same
+      # one interactive use draws on. A morning of heavy local work starves the review of every PR opened
+      # afterwards, and no amount of retrying inside the run helps: it resets on the clock.
+      #
+      # AND THERE IS MORE THAN ONE CLOCK -- which is the half this comment got wrong until issue #1055.
+      # A subscription carries a SESSION window measured in hours AND a WEEKLY cap measured in days, and
+      # both arrive here as the same 429 with the same `is_error: true` shape. Nothing in the status
+      # separates them; only the `result` string does. On August 28, 2026 this check went red on eight
+      # consecutive runs and every one of them read "You've hit your weekly limit ... resets Aug 31, 7am
+      # (UTC)" -- a THREE-DAY outage, not the hours-long one a session window produces.
+      #
+      # That distinction is worth this much prose because it changes what a reader DOES. Told the window
+      # is a session, the reasonable move is to wait a while and re-run; on a weekly cap that is three
+      # days of waste and every PR opened in between goes unreviewed. So the headline below states only
+      # what holds for both -- out of quota, resets on the clock, a re-run does not help -- and points at
+      # the reason line for which limit it is. It does not name the window, because the status it is
+      # switching on cannot tell.
       #
       # AND THE CHECK STAYS RED ON THAT, deliberately. A 429 means this PR got no review, which is
       # exactly what #966 wanted not to be silent; a green check would hide that better than a red one
@@ -188,7 +202,7 @@ jobs:
           # syntax -- so the short form goes there and the full sentence goes in the message body.
           case "$status" in
             429) short='out of quota -- the review did not run'
-                 headline='The review did not run: the account behind CLAUDE_CODE_OAUTH_TOKEN is out of session quota, which resets on the clock and not on a re-run. Nothing to do with this diff.' ;;
+                 headline='The review did not run: the account behind CLAUDE_CODE_OAUTH_TOKEN is out of quota. It resets on the clock and not on a re-run; the reason below names WHICH limit it is and when it comes back, which is hours for a session window and days for a weekly one. Nothing to do with this diff.' ;;
             529) short='API overloaded -- the review did not run'
                  headline='The review did not run: the API was overloaded. Nothing to do with this diff.' ;;
             '')  short='the review failed'
