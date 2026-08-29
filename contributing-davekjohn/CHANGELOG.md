@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/a-lane-must-not-hold-the-trunk-hostage-v1` · 20260829-122920
+
+A finished worktree lane no longer holds the trunk hostage for the rest of the machine, and a chain
+that cannot fold now says so before it merges instead of after.
+
+`ship-pr.ps1`'s step 5 checks `main` out in whatever tree it runs in, so that it can fold. In the
+primary checkout that is deliberate. In a lane it took a lock that is global to the clone -- git
+allows one worktree per branch -- and nothing warned: the bill was paid by an unrelated branch,
+later, at the one moment it costs most. On PR #1068 that produced the half-state the fold script
+exists to prevent, with the merge irreversible and the changelog unfolded.
+
+Three changes, in the order they fire. A **step 0** now asks whether another worktree holds `main`
+and refuses there, before any gate has run and before anything is pushed or merged -- naming the
+directory and the commands that release it. Step 5's **in-place arm** carries the same hand-fold
+instruction its worktree arm always had, for the narrow window step 0 cannot cover (another session
+taking `main` while CI is watched). And **step 5b** gives the trunk back: a tree that is not the
+primary checkout returns to its own branch once the fold has succeeded, which is where the lock was
+being created in the first place. `prune-merged.ps1` -- the branch-hygiene script that was
+unavailable in exactly the situation that produces stray branches -- now names the worktree holding
+the trunk instead of relaying git's message.
+
+The reading behind all four lives in `scripts/lib/worktree-lib.ps1`, a new shared lib, because
+`ship-pr.ps1` drives live git and gh and carries no suite of its own; its own header asks for exactly
+this, and the lib has 26 asserts.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer of the `contributing-davekjohn` workflow runs both scripts, and any consumer using
+worktree lanes was carrying the same trap silently. It arrives by plugin update with no action
+needed. Consumers who do not use lanes see no behaviour change at all.
+
+**Score:** 3
+
+#### Pull Request
+
+A finished lane hands the trunk back, and ship-pr refuses before the merge rather than failing after it
+
+Plugins: contributing-davekjohn
+
+[PR #1072](https://github.com/DaveKJohn/claude-code-specialists/pull/1072)
+
+---
+
 ### DEPLOY: `fix/a-plugin-link-must-stay-inside-its-plugin-v1` · 20260829-115437
 
 The lint gate could not see the one class of dead link that reaches consumers. Check 4 resolves every
