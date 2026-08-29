@@ -32,6 +32,35 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/prune-merged-gives-the-branch-back-v1` · 20260829-134548
+
+`prune-merged` borrows the checkout for its fast-forward and now gives it back. It used to switch to
+the trunk in step 2 and stay there — silently, with a clean tree and nothing in `git status` to show
+for it, so the next commit of that session landed **directly on `main`**. The information to return was
+already in the script: `$startBranch` was captured and spent on one sentence. Two starts cannot be
+returned to and each says so while naming the sha it left: a start branch this same run reaped, and a
+run that started detached.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+The script is plugin payload, so the same silent trunk-switch is in every consumer's `prune-merged`
+skill, and the fix reaches them with the next release. The hazard is the one nothing warns about: the
+run is a success, the tree is clean, and the mistake happens one command later.
+
+**Score:** 3
+
+#### Pull Request
+
+prune-merged gives the checkout back to the branch it borrowed it from
+
+Plugins: contributing-davekjohn
+
+[PR #1080](https://github.com/DaveKJohn/claude-code-specialists/pull/1080)
+
+---
+
 ### DEPLOY: `fix/a-backgrounded-ship-ends-on-the-trunk-v1` · 20260829-130540
 
 A backgrounded ship now hands your checkout back to the trunk before it waits, so the session it hands
