@@ -2,7 +2,7 @@
   "name": "team-shopify",
   "displayName": "Claude Specialists — team Shopify",
   "description": "Add-on team for Shopify store repos (e.g. smartwatchbanden): the subagents Liam, Sandra, and Steven, the domain skill start-task (the branch that opens a task), push-preview (the branch's own unpublished preview theme, created on the first push rather than at branch creation), and an operational floor -- a PreToolUse guard that refuses a theme publish, a theme delete, or an unauthorised push to the live theme, whatever shell wraps the command, plus adopt-shopify-floor to place that floor in a repo (the guard's seams, a starter theme-check config, and the CI workflow over it) and sync-main, the pre-task sync that mirrors the live theme into the trunk without letting live overwrite what the trunk has done since. Deliberately NOT repo-neutral — only a Shopify repo enables this team. Teams stack: this one adds to 'team-alpha', and a commercial Shopify repo typically enables 'team-ecomm' alongside it. The governance layer (CLAUDE.md + the repo lenses) stays separate.",
-  "version": "4.22.0",
+  "version": "4.23.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "team", "claude-code", "shopify", "liquid"]
 }
