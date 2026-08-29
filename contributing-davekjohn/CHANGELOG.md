@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/test-examples-cite-gates-as-coverage-v1` · 20260829-110356
+
+`DEVELOPMENT-portable.md` no longer tells you to report the standing gates as an outcome in TEST. Its
+`- [~]` example asserted *"all green"* and its "two honest shapes" paragraph opened with *"running the
+gates and reporting the outcome"* — both of which can only be answered before the push by hand-running
+the very suites the push is about to run, which is the waste
+[#1060](https://github.com/DaveKJohn/claude-code-specialists/issues/1060) measured and
+[#1062](https://github.com/DaveKJohn/claude-code-specialists/pull/1062) wrote out of `CONTRIBUTING.md`
+2.2. The example now cites the gates as **coverage** — true at the moment the step is written — a new
+paragraph explains why the outcome form is the weaker answer, and the two honest shapes are recut as
+*a result the session has seen* and *a gate named without one*. The point the paragraph existed to make
+is unchanged: `- [~]` means "no suite", never "no verification".
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The page a consumer reads to learn this workflow's TEST convention stops prescribing a step that their
+own `open-pr` would then refuse to push past until they had run their gates by hand. Nothing breaks
+without it; it is a minute of gate time per branch and one contradiction fewer between the portable page
+and the source repo's own guide.
+
+**Score:** 2
+
+#### Pull Request
+
+TEST examples cite the standing gates as coverage instead of as an outcome
+
+Plugins: contributing-davekjohn
+
+[PR #1065](https://github.com/DaveKJohn/claude-code-specialists/pull/1065)
+
+---
+
 ### DEPLOY: `fix/a-retirement-is-tier-2-news-v1` · 20260829-105231
 
 The audience-tier question in `DEVELOPMENT-portable.md` now names the case it was silent on: an entry
