@@ -37,100 +37,119 @@ Issue [#1116](https://github.com/DaveKJohn/claude-code-specialists/issues/1116):
 same string and neither owner can see the other's number. `claude-code-review.yml` caps the **reason**
 it appends at 300; `Get-AuthoredFailureNote` caps the **whole message** it relays at 500. The workflow
 writes `headline + ' ' + reason`, and the 429 headline is 296 characters since #1115 -- so the
-annotation this repo emits can reach 597 while its own relay cuts at 500, and the half it cuts is the
-tail of the reason: the only part naming which limit was hit and when it returns.
+annotation can reach 597 while the relay cuts at 500, and the half it cuts is the tail of the reason:
+where *"resets Aug 31, 7am (UTC)"* lives.
 
-#### The measurement the issue left open, now taken
+The issue offered three answers, called none obviously right, and told whoever picked it up to
+**sample real runs rather than reason from the one it had**. That is what this branch did first, and
+the sampling is what decided the outcome.
 
-The issue asked its picker to sample real runs rather than reason from the one it had. Sampled all 54
-red `claude-code-review` runs available on August 29, 2026 (August 27-29), which carry **45 titled
+#### The measurement
+
+All 54 red `claude-code-review` runs available on August 29, 2026 (August 27-29), carrying **45 titled
 failure annotations**. Every one is a 429, and upstream's `result` first line is one of four strings:
 
 | reason (upstream `result`, first line) | length | n |
 |---|---|---|
-| `You've hit your weekly limit - resets Aug 31, 7am (UTC)` | 54 | 33 |
-| `You've hit your session limit - resets 11:20am (UTC)` | 51 | 4 |
-| `You've hit your session limit - resets 12:20pm (UTC)` | 51 | 1 |
-| `You've hit your session limit - resets 5:10pm (UTC)` | 50 | 7 |
+| `You've hit your weekly limit · resets Aug 31, 7am (UTC)` | 55 | 33 |
+| `You've hit your session limit · resets 11:20am (UTC)` | 52 | 4 |
+| `You've hit your session limit · resets 12:20pm (UTC)` | 52 | 1 |
+| `You've hit your session limit · resets 5:10pm (UTC)` | 51 | 7 |
 
-So the reason has never exceeded **54** characters against a 300 cap, and the longest composed message
-observed is **341**. The mismatch is real and latent, exactly as filed -- it needs a reason of 204
-characters before it bites, roughly four times anything measured.
+The separator is a middot (U+00B7) and that is the source, read back from the annotation payload of
+run `33267175141` as bytes. The captured fixture in `pr-issues.tests.ps1` writes it as a hyphen because
+a `.ps1` in this repo is pure ASCII -- so the fixture is the copy that differs, not the table. Both are
+one character wide, so the lengths hold either way.
 
-#### And the number justifying the 500 is wrong
+The reason has never exceeded **55** characters against a 300 cap, and the longest composed message is
+**341**. A reason must reach 204 characters -- nearly four times the longest ever seen -- before a
+reader loses a word. The mismatch is real and latent, exactly as filed.
 
-`Get-AuthoredFailureNote`'s comment cites run `33267175141` as a **460**-character note, twice. Read
-back through the function itself, that run's note is **400** -- title 55, separator 4, message 341.
-The bound is right; the measurement defending it is off by 60, and #1116 repeats it.
+#### And then the arithmetic said the obvious repair is a net loss
 
-#### The repair, and why not one of the issue's three
+Candidate 2 (lower the workflow's 300 so the sum fits) was **built, measured and withdrawn**. The
+console shows `500 - 296 - 1 = 203` characters of reason whichever end owns the cut, so:
 
-The issue offered three answers and called none obviously right. A fourth dissolves the trilemma: the
-workflow already knows its own headline, so it can budget the reason against the bound the relay
-states rather than against a number chosen independently of it. That keeps the reason whole instead of
-choosing which half to lose, and it is the specific party accommodating the generic one rather than
-the reverse. It costs one mirrored constant, and a test stands over it so the mirror cannot drift
-silently -- which is the defect #1116 actually reports.
+| reason length | today: annotation / console | capped at 203: annotation / console |
+|---|---|---|
+| 55 | 55 / 55 | 55 / 55 |
+| 250 | 250 / 203 + `...` | 203 / 203 |
+| 400 | 300 / 203 + `...` | 203 / 203 |
 
-`claude-code-review.yml` is this repo's own CI and not plugin payload (stated in the 4.20.0 and 4.23.0
-entries), so the coupling is local-to-local and reaches no consumer.
+It hands the console reader the **same 203 characters**, drops the `...` that honestly marks the loss,
+and costs the GitHub annotation -- read in the checks UI, where no 500-character bound applies -- up to
+97 characters it currently keeps. Candidate 3 (cut from the front in the relay) is the only one that
+would give the console *more*, and it is not free either: the relay carries workflows it has never
+seen, and for one whose message is all content and no preamble the front is the part worth keeping.
+
+So the answer is **candidate 1, now on evidence rather than on a shrug**: leave the two bounds, write
+down the arithmetic where each is set, and give the coupling the thing it actually lacked -- an owner.
+
+#### Separately, the number defending the 500 is wrong
+
+`Get-AuthoredFailureNote`'s comment cites run `33267175141` as a **460**-character note, twice, and
+#1116 repeats it. Read back through the function itself, that note is **400**: a 55-character title,
+the 4-character separator and a 341-character message. The bound was never in question; its evidence
+was, by 60.
 
 ### CREATE
 
-- [x] `claude-code-review.yml` budgets the reason against the relay's bound instead of a flat 300:
-      read the status, choose the headline, then trim the reason to `cap - len(headline) - 1` in
-      bash -- not in jq, which this step only exercises on a red run and swallows via continue-on-error
-- [x] Guard a negative budget -- a negative length in a bash substring is not an error, it counts
-      from the end, so an over-long headline would silently mangle the reason rather than fail
-- [x] `pr-issues-lib.ps1`: correct the 460 to the measured 400 in both places, and record that this
-      repo's own workflow now budgets against the bound
+- [x] `claude-code-review.yml`: record beside the 300 what it overlaps with, what lowering it would
+      cost, and the sampled traffic that makes the case hypothetical -- no behaviour change
+- [x] `pr-issues-lib.ps1`: correct the 460 to the measured 400 in both places, and record the same
+      arithmetic beside the 500 from the relay's side
 - [x] Regenerate the plugin mirror via `scripts/sync/build-shared-scripts.ps1`
+- [~] Change either cap -- dropped: built as a flat 203 budget in the workflow, then withdrawn when
+      the arithmetic above showed it costs the annotation up to 97 characters and buys the console none
 
 ### TEST
 
-- [x] `pr-issues.tests.ps1` pins the two numbers to each other: the cap the workflow budgets against
-      equals the cap the relay enforces
-- [x] and that every headline the workflow can choose leaves room for the longest reason measured (54)
+- [x] `pr-issues.tests.ps1` pins all three numbers the arithmetic rests on -- the relay's 500, the
+      workflow's 300, and every literal headline's length -- so none can move without a red test
+      naming the reasoning to read
+- [x] mutation-tested: raising the reason cap, lengthening a headline by 250, and lowering the relay
+      cap each go red, and each names the right one
 - [x] the full suite green through the lint + test gate
 
 ### DEPLOY: `fix/the-annotation-fits-the-relay-that-carries-it-v1`
 
-A red `claude-review` can no longer lose the half of its own explanation that says **when the quota
-comes back**. Two caps bounded the same sentence and each was chosen without seeing the other: the
-workflow capped the reason it appends at 300, `Get-AuthoredFailureNote` caps the whole message it
-relays at 500, and `headline + ' ' + reason` reaches 597. The relay is generic and cannot tell where
-the headline stops, so the part it would cut is always the tail -- *"resets Aug 31, 7am (UTC)"*, the
-only actionable word in the note. The workflow now computes its reason's bound **from** the relay's,
-so what it emits is never something its own relay has to trim, and a test fails the day either
-number moves without the other.
+The two caps that bound a red `claude-review`'s explanation -- the workflow's 300 on the reason it
+appends, `Get-AuthoredFailureNote`'s 500 on the whole message it relays -- now carry the arithmetic
+that relates them, and a test that fails the day either one moves. Neither number changed, and
+that is the finding rather than a shortfall: the annotation can reach 597 against a 500-character
+relay, but `500 - 296 - 1 = 203` is what the operator's console shows **whichever end owns the cut**,
+so lowering the workflow's cap to make the sum fit hands that reader the same 203 characters, drops
+the `...` that marks the loss, and costs the GitHub annotation up to 97 characters no bound applies
+to. It was built that way and withdrawn on the arithmetic.
 
-**The failure it prevents has not happened yet, which is worth naming rather than glossing.**
-[#1116](https://github.com/DaveKJohn/claude-code-specialists/issues/1116) told whoever picked it up
-to sample real runs rather than reason from the one it had, so that is what this branch did first:
-all 54 red runs available, **45 titled failure annotations** across August 27-29, 2026. Every one a
-429; upstream's `result` first line ran **50 to 54** characters against its 300-character cap; the
-longest message actually emitted was **341**. It takes a reason of 204 characters before a reader
-loses a word -- roughly four times anything measured. The mismatch is real, latent, and now closed
-by construction instead of by headroom nobody owned.
+**The measurement #1116 asked for, taken first and decisive:** all 54 red runs available on
+August 29, 2026, carrying **45 titled failure annotations** across August 27-29. Every one a 429, and
+upstream's `result` first line ran **51 to 55** characters against 203 of room, with the longest
+message actually emitted at **341**. A reason must reach 204 characters -- nearly four times the
+longest ever seen -- before a reader loses a word.
 
-**And the number defending the bound was wrong.** The comment justifying the 500 cited run
-`33267175141` as a **460**-character note, twice, and #1116 repeated it. Put back through the
-function, that note is **400** -- a 55-character title, a 4-character separator, a 341-character
-message. The bound was never in question; its evidence was, by 60.
+**What was actually broken is now fixed**: the comment defending the 500 cited run `33267175141` as a
+**460**-character note, twice. Put back through the function, that note is **400** -- a 55-character
+title, a 4-character separator, a 341-character message.
 
 **Score:** 2
 
 #### What makes this deploy extra special
 
-For a repo consuming this workflow the change is in the comment, not in the behaviour:
-`Get-AuthoredFailureNote` still cuts at 500 and still relays whatever an author wrote. What it now
-states is the rule the repair followed, which transfers to any workflow a consumer writes against
-it -- **the party that can see both halves is the one that budgets.** A workflow knows where its own
-headline stops and upstream's text starts; the relay cannot, and raising a generic bound to fit one
-verbose author spends that room in every repo downstream. So the specific party accommodates the
-generic one, and the corrected 400 sits beside it as what that bound was actually measured against.
+**An overlap between two bounds is not automatically a defect, and the change that removes the overlap
+is not automatically the fix.** That is the whole of what travels, and it is a shape rather than a
+number: before tightening one of two caps that bound the same string, work out what the reader on the
+far end actually sees in each case. Here the tighter cap delivered that reader the identical text,
+took away the ellipsis telling them something had been dropped, and spent a second reader's margin to
+do it -- so the overlap stayed and the reasoning was written down beside both numbers instead.
+
+**The second half: a bound is only as good as the measurement cited for it.** The comment defending
+this one named a specific run, and naming it is what let somebody eventually check it and find the
+figure wrong by 60. Cite the run.
 
 **Score:** 1
 
 #### Pull Request
 
+
+The annotation's two caps get an owner, not a tighter number
