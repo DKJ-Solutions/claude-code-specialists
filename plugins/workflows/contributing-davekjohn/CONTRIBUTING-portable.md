@@ -145,6 +145,16 @@ On an error or a failing suite nothing is pushed and no PR is opened. If your re
 CI, the merge waits on whatever status check your branch protection requires; both the workflow and the
 name of that check are yours, and your own page is where they are written down.
 
+**A repo that cannot have a required check is not left open, and this is worth knowing before you go
+looking for the setting.** A private repository on the GitHub Free plan cannot have branch protection at
+all — `gh api ... /branches/main/protection` answers *"Upgrade to GitHub Pro or make this repository
+public to enable this feature"* — and that is the shape most new repos start in. Two things hold there
+without any configuration: `ship-pr` waits for **every** check the PR has rather than only the required
+ones, so the wait works with no ruleset; and where nothing is required, the merge verdict cannot tell
+*"this repo requires nothing"* from *"the required checks have not reported yet"*, so it **refuses** on a
+red check instead of proceeding. The repo without a ruleset is therefore guarded conservatively rather
+than left unguarded — you simply cannot be told which check governed, because no check governs.
+
 Four further gates judge the branch's own paperwork rather than its code, and none of them is advisory —
 the [`open-pr` skill](skills/open-pr/SKILL.md) is the full account of each:
 
