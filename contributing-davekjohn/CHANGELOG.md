@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-one-script-carrying-a-byte-order-mark-v1` · 20260829-212901
+
+`scripts/tests/internal-note.tests.ps1` loses the UTF-8 byte-order mark PR #1108 wrote into it -- the only
+one of 162 tracked `.ps1` files in the tree that had one. `Set-Content -Encoding utf8` means *with* a BOM
+on Windows PowerShell 5.1, which is why every writer in this repo goes through `Write-Utf8NoBom` instead.
+
+Nothing was broken by it and no gate is changed: check 27 strips the BOM before scanning, deliberately and
+with its reason written down, and check 26 is scoped to frontmatter-bearing shipped documents. This is the
+odd file out being brought back in line, not a defect being repaired -- which is also why no new check
+comes with it.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+It is the case where the gate was right to stay quiet and the tree was still wrong. Check 27 excludes a
+BOM on purpose, because on a `.ps1` a BOM *helps* 5.1 rather than hurting it -- so the one thing that
+could have caught this was correctly designed not to. Worth writing down, because the obvious reaction to
+"a defect shipped past the gate" is to widen the gate, and here that would have made it worse.
+
+**Score:** 1
+
+#### Pull Request
+
+The one .ps1 in the tree carrying a byte-order mark loses it
+
+[PR #1113](https://github.com/DaveKJohn/claude-code-specialists/pull/1113)
+
+---
+
 ### DEPLOY: `fix/lint-barred-skill-imperatives-v1` · 20260829-210904
 
 The lint gate now refuses a printed instruction that tells its reader to run a skill that reader cannot
