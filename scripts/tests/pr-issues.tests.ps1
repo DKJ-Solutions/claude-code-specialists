@@ -895,12 +895,22 @@ Assert-Equal $libCaps[0] $libCaps[1] 'and they agree with each other: a message 
 $relayCap = $libCaps[0]
 Assert-Equal 500 $relayCap 'the relay still cuts at the 500 #1116 did its arithmetic against'
 
-# One Match, not Matches, and the needle occurs exactly once in the file today -- checked. A SECOND
-# jq slice added elsewhere would go unread here rather than caught, which is the known edge: the
-# subject is this reason's cap, and a new one would want its own assert either way.
-$wfReason = [regex]::Match($wfText, '\(\.\[0\] // ""\) \| \.\[0:(\d+)\]')
+# THE NEEDLE BINDS TO THE FIELD, not to the shape -- because the edge this comment used to merely
+# predict has since happened. It read: "the needle occurs exactly once in the file today; a SECOND jq
+# slice added elsewhere would go unread here rather than caught." #1118 added that second slice, to
+# `status` one line above, and the outcome was worse than unread: the new slice sits EARLIER in the
+# file, so `Match` returned 32 and this assert went red against a `reason` cap nobody had touched.
+# Anchoring on `.result` is what makes the two independent, and the status cap gets its own assert
+# below rather than sharing this one.
+$wfReason = [regex]::Match($wfText, '\(\.result // ""\)[^\r\n]*\| \.\[0:(\d+)\]')
 Assert-True $wfReason.Success 'the workflow still caps the reason it appends, and this is where'
 Assert-Equal 300 ([int]$wfReason.Groups[1].Value) 'at the same 300 -- raising it widens an overlap that was measured, not overlooked'
+
+# And the status cap, which is a bound on a DIFFERENT thing: not an overlap with the relay, but the
+# length of a value this repo does not own and cannot predict (#1118).
+$wfStatus = [regex]::Match($wfText, '\(\.api_error_status // ""\)[^\r\n]*\| \.\[0:(\d+)\]')
+Assert-True $wfStatus.Success 'and the status it interpolates is capped too, on the line that reads it'
+Assert-True ([int]$wfStatus.Groups[1].Value -lt 300) 'well under the reason cap -- a status is three digits, and the rest is a field this repo does not own'
 
 # THE HEADLINE IS THE THIRD NUMBER, and the one most likely to move: it is prose, and #974, #1055
 # and #1112 each rewrote it. Its length is what turns the other two into 203, so it is read from

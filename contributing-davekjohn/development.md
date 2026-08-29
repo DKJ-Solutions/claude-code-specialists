@@ -59,6 +59,8 @@ edits, so the two merge cleanly; nothing here touches the two caps that PR is ab
 - [x] the `*)` branch's `short` becomes a literal, so no case branch puts a variable in the annotation
       title -- which is what enforces the rule the comment above that block already states
 - [x] both emit sites escape `%` in `headline`, now that it is the variable carrying the status
+- [x] `pr-issues.tests.ps1`: bind #1119's reason-cap assert to `.result` rather than to the slice
+      SHAPE, and give the status cap an assert of its own -- see TEST for why this became necessary
 
 ### TEST
 
@@ -70,7 +72,11 @@ edits, so the two merge cleanly; nothing here touches the two caps that PR is ab
 - [x] the four case branches exercised in bash against a hostile status -- newline, `%0A`, comma and
       `::` -- confirming the title stays clean and the forged command lands mid-line, where it cannot
       count. The jq half inherits the `reason` line's own measurement (jq is not installed locally)
-- [x] full suite green: 328 asserts
+- [x] merged `origin/main` after #1119 landed mid-branch, resolved the single conflict in the workflow
+      by keeping both comment blocks, and re-ran the suite: 340 asserts green
+- [x] found and repaired a collision the merge exposed -- #1119's reason-cap assert matched on the
+      slice shape `(.[0] // "") | .[0:(\d+)]`, and this branch's status slice sits EARLIER in the
+      file, so `Match` returned 32 and the assert went red against a cap nobody had touched
 
 ### DEPLOY: `fix/the-status-in-the-annotation-gets-the-same-care-as-the-reason-v1`
 
@@ -91,19 +97,26 @@ status-shaped by construction; that is a claim about somebody else's field, and 
 claims have already cost here. Three asserts pin the shape, and each was shown to fail against the
 code as it stood.
 
-**Score:** 1
+It also repairs a neighbouring assert that this change turned red. #1119 pinned the reason's
+300-character cap by matching the SHAPE of its jq slice, above a comment predicting that a second
+slice added elsewhere "would go unread here rather than caught". A second slice arrived one line
+above it, and the outcome was worse than unread: being earlier in the file it won the match, so the
+assert reported 32 against a cap nobody had touched. It now binds to `.result`, the status cap has an
+assert of its own, and the two can move independently.
 
 Nothing has broken yet, which is the point: all 45 titled failure annotations this workflow left on
 August 27-29, 2026 came from the `429` branch, whose headline is a literal, so the `*)` branch has not
 been observed running. The failure it prevents is a diagnostic that renders wrong -- or emits a second,
 forged workflow command -- in the one step whose whole job is explaining why a run went red.
 
-#### What makes this deploy extra special
+**Score:** 1
 
-**Score:** N/A
+#### What makes this deploy extra special
 
 `.github/workflows/claude-code-review.yml` is this repo's own CI and travels in no plugin, so no
 consumer installs it and no subscriber of the service can observe the change.
+
+**Score:** N/A
 
 #### Pull Request
 
