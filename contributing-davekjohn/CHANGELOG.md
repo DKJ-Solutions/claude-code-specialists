@@ -32,6 +32,50 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/adoption-handover-and-jsonc-caveat-v1` · 20260829-231836
+
+Adoption stopped being a path a consumer can only complete by guessing. Four places told the reader to
+run `specialists-init`; that reader is usually the model, and `disable-model-invocation` structurally
+forbids it — while the same flag hides the page documenting the route, so it could not even learn the
+skill exists. All four now name the command and who types it — two of those wordings reached `main`
+ahead of this branch, through #1111's lint rule against printing an instruction that names a skill
+the reader is barred from running; this branch carries the remaining two, in
+`check-script-contract.ps1` and `orchestrator/SKILL.md`, and the recorded reasoning behind all four,
+which that rule landed without. Separately, the instruction that copies
+`settings.suggested.jsonc` into strict-JSON `settings.json` now says the `//` lines have to go.
+
+The flag stays, deliberately: dropping it would have loaded this skill's description into every
+session of every consumer, forever, for something that happens once per repo. That decision is now
+written on the skill page rather than left implicit, together with the reason a runbook cannot claim
+to run adoption end to end on its own.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Two failures a consumer could not diagnose from inside their own repo. The first left a fresh session
+told to act with nothing it could act on, one absolute path away from running the bootstrap itself —
+the substitution the refusal exists to prevent. The second is worse for being silent: copying the
+proposal's comments into `settings.json` makes Claude Code discard the **whole** file, so `deny`
+(`git push --force`, `git reset --hard`, `rm -rf`), `allow`, `enabledPlugins` and
+`extraKnownMarketplaces` were all inactive behind one startup line that says *malformed JSON* rather
+than *your safety rules are off*.
+
+**Worth one check on an already-adopted repo:** if `.claude/settings.json` was filled from the
+proposal, confirm it parses. If it does not, nothing in it has ever been in force.
+
+**Score:** 4
+
+#### Pull Request
+
+The adoption path becomes followable: the handover is named, and the JSONC trap is warned about
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1105](https://github.com/DaveKJohn/claude-code-specialists/pull/1105)
+
+---
+
 ### DEPLOY: `fix/the-annotation-fits-the-relay-that-carries-it-v1` · 20260829-230428
 
 The two caps that bound a red `claude-review`'s explanation -- the workflow's 300 on the reason it
