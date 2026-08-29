@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/a-plugin-link-must-stay-inside-its-plugin-v1` · 20260829-115437
+
+The lint gate could not see the one class of dead link that reaches consumers. Check 4 resolves every
+link against the tree it runs in, and for a plugin-shipped file that is this repo -- the single tree
+where the link is guaranteed to work. A consumer reads the same file from
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`, where the `plugins/` level, the family
+level and every sibling plugin are gone, so a relative link that walks out of the plugin root resolves
+here and lands on nothing there.
+
+**Check 30 closes it**, and the boundary is the **plugin root** rather than `plugins/` -- the difference
+is the whole check, because the weaker rule passes a link into a sibling plugin, which is equally dead.
+It reads every `*.md` under each published plugin root, masks fences, inline code and HTML comments
+without shifting line numbers, and hands the author the absolute URL to paste (`tree/main/` for a
+directory, anchors carried along). Personas are excluded for check 4's reason; `${...}`, `~/` and
+absolute targets are passed over.
+
+**Measured on arrival: 17 escapes in 5 files, all repaired here** -- against the report's expected zero,
+and resolved inside the installed copies rather than this tree, all 17 were already dead. The convention
+itself was not new; it was stated on one portable page for that page and enforced nowhere. It is now
+written out with its mechanism and held by a gate.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+All seventeen repaired links sit in payload a consumer reads -- the `specialists-init` and
+`specialists-teardown` skills, the workflow's README and scripts README, and the `cut-release` skill --
+and all seventeen are dead in the copies installed today. Resolved inside
+`~/.claude/plugins/cache/`, `specialists-init` alone had 8 of its 9 relative links landing on nothing.
+They work from the next release onward. `DEVELOPMENT-portable.md` gains the mechanism behind the
+convention, so a consumer authoring their own plugin payload can see why the rule exists rather than
+inheriting it as a habit.
+
+**Score:** 3
+
+#### Pull Request
+
+A plugin-shipped relative link must resolve inside its own plugin
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1068](https://github.com/DaveKJohn/claude-code-specialists/pull/1068)
+
+---
+
 ### DEPLOY: `feat/thumbnail-generator-joins-the-connector-register-v1` · 20260829-115234
 
 `thumbnail-generator` is the sixth connector in the register. The repo was split out of `life-hub`
