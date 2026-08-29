@@ -1,7 +1,7 @@
 # `contributing-davekjohn/scripts/` — the shared workflow scripts (mirror for consumers)
 
 This folder is what a **consumer** of this workflow actually runs. It is a **mirror**, not the source:
-the canonical copy of every script here lives in [`scripts/`](../../../../scripts/) at the root of this
+the canonical copy of every script here lives in [`scripts/`](https://github.com/DaveKJohn/claude-code-specialists/tree/main/) at the root of this
 repository, and that is where development and testing happen. The point of the arrangement is that
 consumers (life-hub, smartwatchbanden, …) no longer keep a duplicate of these scripts per repo. The
 rationale is in [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
@@ -22,7 +22,7 @@ the generator; the lint reports a hand edit as drift.
 ## The shared set
 
 The registry is `Get-SharedScriptPairs` in
-[`scripts/lib/shared-scripts-lib.ps1`](../../../../scripts/lib/shared-scripts-lib.ps1), and it is the
+[`scripts/lib/shared-scripts-lib.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/), and it is the
 only place that knows the answer. **This page deliberately states no count of it**, and the root
 `scripts/README.md` made the same choice on the same day (#897): a prose tally of a machine-held list is wrong
 when typed and wrong again after the next entry. Ask the registry instead — and note the pairs do **not** all
@@ -116,6 +116,6 @@ needed.
 The plugin runs `hooks/connector-sessioncheck.ps1` via `hooks/hooks.json` with `${CLAUDE_PLUGIN_ROOT}` in
 every repo that enables **this** plugin, without registration in the consumer's `settings.json`. (It ran
 in every consumer until August 8, 2026, when it moved out of the core team along with the rest of this
-way of working — see the [connectors README](../../../../connectors/README.md#the-session-check-automatic).)
+way of working — see the [connectors README](https://github.com/DaveKJohn/claude-code-specialists/blob/main/).)
 That hook mechanism is proven; the shared-scripts mirror + skill above extends that same SSOT principle
 to standalone-invokable workflow scripts.

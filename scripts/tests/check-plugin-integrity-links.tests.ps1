@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
     check-plugin-integrity.ps1, part 1 of 4: check 4 (the dead-link scan set), check 10 (the
-    marked <!-- skills:all --> spans), check 28 (the '@'-import targets) and check 29 (the
-    plugin-scoped <!-- skills:plugin --> spans), plus scenario 16 -- a root entry file is scanned
-    before the fold.
+    marked <!-- skills:all --> spans), check 28 (the '@'-import targets), check 29 (the
+    plugin-scoped <!-- skills:plugin --> spans) and check 30 (a plugin-shipped relative link must
+    resolve inside its own plugin), plus scenario 16 -- a root entry file is scanned before the fold.
 
 .DESCRIPTION
     The fixture, the assert helpers and Invoke-Integrity live in check-plugin-integrity-fixture.ps1,
@@ -23,6 +23,15 @@
     third skill in a second plugin so the two canonical sets genuinely differ) and the LINK-versus-
     BACKTICK reading (28). Without the manufactured skill the fixture's two sets coincide and the scope
     assertion is vacuous, which is the failure mode this suite exists to prevent.
+
+    Check 30 is check 4's OTHER sibling, and the one whose scenarios are easiest to write vacuously:
+    it reads the same links and asks a different question of them -- not "does this resolve here" but
+    "does it still resolve once the file has travelled to a consumer's plugin cache". Every link in its
+    six scenarios resolves in the fixture on purpose, so check 4 stays silent and any finding is 30's
+    own; scenario 36 asserts that silence head-on. Scenario 37 is the one that earns the suite -- a link
+    into a SIBLING plugin, which satisfies the boundary inbound #1066 proposed ('stay under plugins/')
+    while still being dead for a consumer, because the cache gives every plugin its own versioned
+    directory and a sibling is not a neighbour.
 
     Check 28 is check 4's sibling -- the same scan set, a different syntax -- and its scenarios pin the
     resolution rule (file-relative, NOT repo-root-relative) separately from both discriminators (a fenced
@@ -906,6 +915,132 @@ try {
     $q35b = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($q35b.Out -match '\[skill-list-plugin\] \.')) 'scenario 35: the fixture is clean again once the plugin README is gone'
 
+
+    # --- Check 30: a plugin-shipped relative link must resolve inside its OWN plugin ---------------
+    #
+    # WHAT THESE SIX SCENARIOS ARE FOR. Check 4 answers "does this link resolve in THIS tree"; check 30
+    # answers "does it still resolve once the file has travelled". The two are independent, and the
+    # fixture makes that visible: every link written below resolves perfectly where it sits, so check 4
+    # stays silent throughout and any finding here is check 30's alone.
+    #
+    # SCENARIO 37 IS THE ONE THAT EARNS THE SUITE. Inbound #1066 proposed the boundary as 'plugins/',
+    # and a link into a SIBLING plugin satisfies that while still being dead for a consumer -- the
+    # cache gives each plugin its own versioned directory, so a sibling is not a neighbour. Without 37
+    # a wrong-but-plausible rule passes every other scenario here.
+    $PluginLinkFindingPattern = '\[plugin-link\] \.'
+    $plNotes = Join-Path $Fixture 'plugins\teams\team-alpha\NOTES.md'
+    # Real targets, so each scenario tests CONTAINMENT and not existence. A dead target would make the
+    # finding appear for the wrong reason and the scenario would keep passing after the rule was broken.
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'README.md'), "# Fixture root`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-shopify\GUIDE.md'), "# Shopify guide`n", $Utf8NoBom)
+
+    Write-Host "check 30 -- a link out of the plugin root is a finding, at the right line" -ForegroundColor Cyan
+    $p36Lines = @(
+        '# team-alpha notes'
+        ''
+        'Line three is prose.'
+        ''
+        'See [the root readme](../../../README.md) for the rest.'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p36Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q36 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q36.Out -match $PluginLinkFindingPattern) 'scenario 36: a link leaving the plugin root is reported'
+    Assert-True ($q36.Out -match 'NOTES\.md:5 ') 'scenario 36: the finding names the line the link is on, not the file'
+    Assert-True ($q36.Out -match "leaves the 'team-alpha' plugin root") 'scenario 36: the finding names the plugin the file belongs to'
+    # The link resolves in this tree, so check 4 has nothing to say about it. Asserted head-on: if this
+    # ever fails, the two checks have started overlapping and 30's findings are no longer its own.
+    Assert-True (-not ($q36.Out -match 'dead link .\.\./\.\./\.\./README\.md')) 'scenario 36: check 4 stays silent -- the link is live HERE, which is the whole premise'
+    # No repo-config in the fixture, so Get-RepoBlobUrl is undefined and the suggestion is dropped. The
+    # designed fallback: a repo without the seam gets a plainer finding, never a wrong one or a crash.
+    Assert-True (-not ($q36.Out -match 'Write it absolute:')) 'scenario 36: without repo-config the suggestion is omitted and the finding still stands'
+
+    Write-Host "check 30 -- a SIBLING plugin is not a neighbour, though it shares plugins/" -ForegroundColor Cyan
+    $p37Lines = @(
+        '# team-alpha notes'
+        ''
+        'See [the shopify guide](../team-shopify/GUIDE.md) for the rest.'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p37Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q37 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q37.Out -match $PluginLinkFindingPattern) 'scenario 37: a link into a sibling plugin is reported, though it never leaves plugins/'
+    Assert-True ($q37.Out -match "leaves the 'team-alpha' plugin root") 'scenario 37: the finding is attributed to the plugin the FILE sits in, not the one it points at'
+
+    Write-Host "check 30 -- a link inside the plugin root is not a finding" -ForegroundColor Cyan
+    $p38Lines = @(
+        '# team-alpha notes'
+        ''
+        'See [skill alpha](skills/skill-alpha/SKILL.md) and [beta](./skills/skill-beta/SKILL.md).'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p38Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q38 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q38.Out -match $PluginLinkFindingPattern)) 'scenario 38: links staying inside the plugin root pass, in both the bare and the ./ form'
+
+    Write-Host "check 30 -- code and comments are masked, and the mask keeps line numbers honest" -ForegroundColor Cyan
+    # All three exclusions in one file, ABOVE a live escape: masking that shortened the text instead of
+    # preserving its length would still suppress these three and then misreport the fourth's line. That is
+    # the failure this scenario is shaped to catch -- a passing absence assert would hide it.
+    $p39Lines = @(
+        '# team-alpha notes'
+        ''
+        '```'
+        'See [fenced](../../../README.md) -- illustration, not a link.'
+        '```'
+        ''
+        'Inline `[code](../../../README.md)` is illustration too.'
+        ''
+        '<!-- [commented](../../../README.md) -->'
+        ''
+        'But [this one](../../../README.md) is real.'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p39Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q39 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 ([regex]::Matches($q39.Out, $PluginLinkFindingPattern).Count) 'scenario 39: exactly one of the four links is live -- fence, inline code and HTML comment are all masked'
+    Assert-True ($q39.Out -match 'NOTES\.md:11 ') 'scenario 39: the surviving finding reports line 11, so the mask preserved length and newlines'
+
+    Write-Host "check 30 -- three forms are passed over rather than reported" -ForegroundColor Cyan
+    $p40Lines = @(
+        '# team-alpha notes'
+        ''
+        'An [absolute URL](https://github.com/DaveKJohn/claude-code-specialists/blob/main/README.md) is the repair, not the defect.'
+        ''
+        'A [plugin-relative path](${CLAUDE_PLUGIN_ROOT}/skills/skill-alpha/SKILL.md) resolves at runtime.'
+        ''
+        'A [marketplace-clone path](~/.claude/plugins/marketplaces/x/README.md) points there deliberately.'
+        ''
+        'A [pure anchor](#team-alpha-notes) never leaves the file.'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p40Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q40 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q40.Out -match $PluginLinkFindingPattern)) 'scenario 40: absolute, ${...}-relative, ~/-relative and pure-anchor targets are all passed over'
+
+    Write-Host "check 30 -- the coverage line counts what was read and what escaped" -ForegroundColor Cyan
+    # Coverage is asserted separately from the findings for Write-Coverage's own reason (#221): "0
+    # escaping" and "checked nothing at all" are the same verdict read two ways, and only the count
+    # tells them apart. So BOTH states are pinned, because the note has a branch for each and the
+    # uninformative one is the branch a reader would otherwise be handed by accident.
+    #
+    # The file left over from scenario 40 carries four links and not one relative path among them, so
+    # this is the zero-checked state -- and the assert is that the gate SAYS so rather than reporting a
+    # bare zero that reads like a clean sweep.
+    $q41 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q41.Out -match '\[plugin-link\] checked 0 --') 'scenario 41: with only passed-over forms, the coverage count is zero'
+    Assert-True ($q41.Out -match 'so none can escape') 'scenario 41: and the note says WHY it is zero, instead of leaving a bare zero to read as a clean sweep'
+
+    # Now the other branch: one link, contained, so something was genuinely resolved and passed.
+    $p41Lines = @(
+        '# team-alpha notes'
+        ''
+        'See [skill alpha](skills/skill-alpha/SKILL.md).'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p41Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q41a = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q41a.Out -match '\[plugin-link\] checked [1-9]') 'scenario 41: a contained relative link is COUNTED, not skipped -- a pass must be a measurement'
+    Assert-True ($q41a.Out -match '0 escaping') 'scenario 41: and it reports zero escaping'
+
+    Remove-Item -LiteralPath $plNotes -Force
+    Remove-Item -LiteralPath (Join-Path $Fixture 'plugins\teams\team-shopify\GUIDE.md') -Force
+    $q41b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q41b.Out -match $PluginLinkFindingPattern)) 'scenario 41: the fixture is clean again once the notes file is gone'
 
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

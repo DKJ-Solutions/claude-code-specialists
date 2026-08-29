@@ -761,6 +761,55 @@ measuring: whole-text matching finds the same **4** claims in the scanned tree a
 the marker tree-wide would find **50** — which is why it is dropped only across the dozen lines of the
 intro, where it was the whole difference between catching the drift and not.
 
+**A link check that WAS built, and the neighbour it had to be told apart from** (August 29, 2026;
+inbound [#1066](https://github.com/DaveKJohn/claude-code-specialists/issues/1066), lint check 30). The
+declined stale-path rule above is the one this had to be measured against, because it looks like the
+same proposal: another rule about paths in plugin-shipped prose, in a repo whose paths mostly describe
+somebody else's tree. It is not the same, and the difference is the whole reason it was built — a path in
+backticks is a *heuristic* about what a string means, while this is a **path comparison** with a
+mechanical answer.
+
+**The gap check 4 cannot close, and is right not to.** The dead-link scan resolves every link against the
+tree it runs in, and for plugin payload that is the source repo — the one tree where the link is
+guaranteed to work. It is correct about where the file *is* and has no notion of where the file will be
+*read*. So the single class of link defect that reaches consumers is the one class it is structurally
+blind to.
+
+**The mechanism, read off disk rather than reasoned about.** Every `installPath` in
+`~/.claude/plugins/installed_plugins.json` has the shape
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`. The plugin's own directory is the root, and
+the `plugins/` level, the family level (`teams/`, `workflows/`) and every sibling plugin are all gone —
+a sibling is a separate versioned directory, not a neighbour. Worth knowing because the **marketplace
+clone** is a full checkout of this repo, `.claude/` included, so a link verified there resolves and
+teaches you the wrong lesson; the clone is where the catalog lives, the cache is where an installed
+plugin is read.
+
+**The report's own boundary was wrong, and its size was wrong in the direction that mattered.** #1066
+proposed the rule as *"must resolve to a target also under `plugins/`, because that is the subtree the
+plugin cache contains."* The cache contains no such subtree, and the weaker rule passes the one link that
+had **already shipped dead** — `cut-release/SKILL.md:123` pointing at
+`../../../../teams/team-alpha/manuals/06-25-manual.md`, verified against the installed v4.22.0 copy. So
+the boundary is the **plugin root**, not `plugins/`, and scenario 37 of
+`check-plugin-integrity-links.tests.ps1` exists to pin exactly that difference. The report also argued
+from an expected count of **zero** (*"which is itself the reason not to build it yet"*) and stated that
+nothing had shipped; the real count was **17 escapes in 5 files**, every one passing check 4, and
+resolved inside the installed copies (`team-alpha` 4.21.0, `contributing-davekjohn` 4.22.0) **all 17 are
+dead**. That inverted its conclusion rather than qualifying it: the repo's name-a-risk-and-leave-it rule
+holds until something bites, and this had bitten seventeen times in released payload.
+
+**The two counts are different measurements and both are worth keeping**, because conflating them is how
+the report went wrong in the first place. *17 escapes* is a property of the source tree, found by asking
+where each link would land. *17 dead* is a property of the plugin cache, found by resolving those same
+links inside `~/.claude/plugins/cache/` — the tree a consumer actually reads. They happen to be equal
+here; nothing guarantees they are, and the second is the one that describes what a consumer meets.
+
+**What it cost to hold to the same bar the declined rule was held to:** 98 relative links read across 83
+markdown files in 5 plugin roots, 17 findings, **17 of them real** — against the stale-path rule's 124
+findings, none real. Personas are excluded for check 4's reason and not a new one (their links are meant
+to resolve at the consumer's `.claude/extensions/`, where check 4 already validates them), and three
+forms are passed over: a `${...}` target is the plugin-relative form, a `~/` one points at the
+marketplace clone deliberately, and an absolute URL is the repair being asked for.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.
