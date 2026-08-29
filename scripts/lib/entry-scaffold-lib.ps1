@@ -5847,7 +5847,7 @@ function Get-BranchProgressTally {
 
 function Get-BranchProgressFindings {
     <#
-        Pure: the reasons this step list is not finished, as an array of objects with Label and Line.
+        Pure: the reasons this step list is not finished, as objects with Label, Line and Remedy.
         Empty means every step has been resolved -- ticked or deliberately dropped.
 
         TWO KINDS OF FINDING, and the second is what stops the gate from being a formality:
@@ -5869,20 +5869,40 @@ function Get-BranchProgressFindings {
         rules was learned from a false accusation. Its docstring carries them; asking it rather than
         preparing the text here is what keeps this gate and the tally beside it from disagreeing about
         what a plan says.
+
+        AND EACH FINDING CARRIES THE ACT THAT RESOLVES IT, in Remedy, because the two are resolved by
+        DIFFERENT acts and both printers used to append one shared paragraph to both. Measured on a virgin
+        repo walking the cycle for the first time (inbound #1081): the author hit 'still open' on the
+        scaffolded line, followed the printed advice exactly -- '- [~]' plus a reason -- and was refused
+        again by the same gate, printing the same four lines that had just failed. A mark is what resolves
+        an open step; the placeholder is resolved by REPLACING the text or deleting the line, and no mark
+        can do it. The advice was a loop, and on a fresh repo the one sentence it was emphatic about
+        ("there is no -Force for this gate") reads as "you are stuck" rather than "you have used the wrong
+        tool for this finding". The labels were already separate in the data; only the advice was shared.
+
+        IT IS BUILT HERE RATHER THAN IN THE PRINTERS for the reason the labels are: two callers print
+        these findings (open-pr's push gate and ship-pr's merge gate), and a remedy composed twice is a
+        remedy that drifts. The marks come from the wording seam, so a repo that translated them gets its
+        own characters back in the sentence.
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     $marks = Get-BranchProgressMarks
     $placeholder = (Get-BranchFileWording).FirstStep
 
+    $openRemedy = "Mark it '$($marks.Done.Trim())' when it is done, or '$($marks.Dropped.Trim())' with the reason it turned out not to be needed."
+    # NOT 'delete it' ALONE, and not 'mark it' at all: the line is the scaffolder's sentence, so the act is
+    # to say what this branch actually did there -- deleting is the answer only when the plan outgrew it.
+    $scaffoldRemedy = "Not resolved by a mark: this line still says what the scaffolder wrote. Replace its text with the step you actually took, or delete the line if the plan grew past it."
+
     $findings = @()
     foreach ($trimmed in (Get-BranchProgressStepLines -Text $Text)) {
         if ($trimmed.StartsWith($marks.Open)) {
-            $findings += [pscustomobject]@{ Label = 'still open'; Line = $trimmed }
+            $findings += [pscustomobject]@{ Label = 'still open'; Line = $trimmed; Remedy = $openRemedy }
         } elseif ($placeholder -and $trimmed.Contains($placeholder)) {
             # Reached only for a ticked or dropped line, since an open one is already reported above --
             # so this says "resolved, but it still says what the scaffold wrote", which is the lie.
-            $findings += [pscustomobject]@{ Label = 'still the scaffolded step'; Line = $trimmed }
+            $findings += [pscustomobject]@{ Label = 'still the scaffolded step'; Line = $trimmed; Remedy = $scaffoldRemedy }
         }
     }
     return $findings
