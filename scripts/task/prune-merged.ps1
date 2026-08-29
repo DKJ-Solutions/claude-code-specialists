@@ -42,6 +42,11 @@
          property: a parked branch (`park-branch.ps1`), unfinished work, or a branch pushed from
          another machine is never lost, because none of them has either proof.
 
+      AND THEN THE CHECKOUT GOES BACK to the branch step 2 borrowed it from (issue #1071), on every
+      path out of this script from the step-3 marker onward, and the closing line says where the
+      checkout ended. Deliberately not a numbered step: it is the exit contract rather than a stage,
+      and the reasoning is under "IT BORROWS THE CHECKOUT" below.
+
     THE REMOTE PASS (`-IncludeRemote`, issue #1042) READS AND CLASSIFIES; IT STILL DELETES NOTHING.
     `git ls-remote --heads` is the only read that surfaces a parked branch, and this script named that
     command in its closing line while interpreting none of its output -- so every head that was not the
@@ -57,6 +62,15 @@
     deletable on the SAME two proofs the local pass uses, so the set this can name is the set the
     permission could not have reached safely; a head with neither proof is reported KEPT with its
     reason, which is the half that stops live parked work being re-investigated per session.
+
+    IT BORROWS THE CHECKOUT; IT DOES NOT MOVE IT (issue #1071). The exit contract above is
+    deliberately NOT ship-pr's. That script ends on the trunk on purpose -- it closes a FINISHED
+    assignment, and ending there is what makes the session safe to clear. This one closes nothing: it
+    is a maintenance command run mid-assignment, and the branch you were standing on is still there.
+    The cost of the old behaviour was measured on the author of the report: a run started from a
+    branch left the session on the trunk, silently, with a clean tree, and its next commit landed
+    directly on `main`. Two cases cannot go back and say so instead of ending in silence -- a start
+    branch this same run reaped, and a run that started detached. Both name the sha they left.
 
     WHAT THIS SCRIPT DOES NOT DO, and why each is a decision:
 
@@ -154,6 +168,66 @@ function Invoke-Git {
     return Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot) + $Arguments)
 }
 
+# WHERE THE RUN ENDS, AND WHY IT IS NOT THE TRUNK (issue #1071). Step 2 borrows the checkout to
+# fast-forward the trunk and, until this existed, never gave it back: $startBranch was captured, spent
+# on one sentence, and discarded. What that cost was measured on the reporter -- a session that ran
+# this while standing on a branch was left on `main`, with a clean tree and nothing in `git status` to
+# say so, and its next commit landed directly on the trunk. There is no signal at all between the
+# switch and the mistake, which is what makes a third line of output the wrong repair: the run has to
+# put the caller back, and say where it ended as its LAST line.
+#
+# THE CONTRACT IS DELIBERATELY NOT ship-pr's. That script ends on the trunk on purpose, because it
+# closes a FINISHED assignment and ending there is what makes the session safe to clear. This one
+# closes nothing -- it is a maintenance command, run mid-assignment (the orchestrator's own lens sends
+# a session here INSTEAD of hand-reading `git ls-remote` output), and the branch it stepped off is
+# still there. So it borrows the checkout rather than moving it, the way worktree-lane.ps1 states the
+# convention at its own one deliberate exception.
+#
+# TWO STARTS CANNOT BE RETURNED TO, and each says so rather than ending in silence:
+#   - a start branch THIS RUN REAPED. Stepping off it in step 2 is what makes that possible at all --
+#     `git branch -d` can never delete the branch HEAD is on -- so it is a state this script creates,
+#     and the report above has already said which branches went. (The reported analysis expected this
+#     case to be impossible for that reason; the checkout in step 2 is what breaks it.)
+#   - a run that started on a DETACHED HEAD. There is no branch to name.
+# Both name the short sha they left, because that is the whole of what makes the position recoverable.
+function Restore-StartCheckout {
+    if (-not $startBranch -or $startBranch -eq $trunk) { return }
+
+    if ($startBranch -eq 'HEAD') {
+        Write-Host "Ending on '$trunk' -- this run started detached, at $startSha." -ForegroundColor DarkGray
+        return
+    }
+
+    $existsRes = Invoke-Git -Arguments @('rev-parse', '--verify', '--quiet', "refs/heads/$startBranch")
+    if ($existsRes.ExitCode -ne 0) {
+        Write-Host "Ending on '$trunk' -- '$startBranch' was reaped by this run (it was at $startSha)." -ForegroundColor DarkGray
+        return
+    }
+
+    $backRes = Invoke-Git -Arguments @('checkout', $startBranch)
+    if ($backRes.ExitCode -eq 0) {
+        Write-Host "Back on '$startBranch' -- '$trunk' was borrowed for the fast-forward only." -ForegroundColor Green
+    } else {
+        # A FAILED HAND-BACK IS LOUD, because this is the one outcome with no signal of its own: the
+        # tree is clean and the checkout is on the trunk, which is exactly the state the report
+        # measured a commit being lost to.
+        Write-Warning "prune-merged could not put this checkout back on '$startBranch' -- it is standing on '$trunk'. Switch back by hand BEFORE you commit. ($(($backRes.Output | Out-String).Trim()))"
+    }
+}
+
+function Complete-Run {
+    <#
+        THE ONLY WAY OUT from the step-3 marker onward, so a path added later cannot forget the
+        hand-back -- the suite asserts that structurally (no bare `exit` below that marker). Step 1
+        and step 2 keep their own bare exits: nothing has moved yet there, and a refusal must leave
+        the caller exactly where it found them.
+    #>
+    param([int]$Code = 0, [string]$ErrorMessage)
+    Restore-StartCheckout
+    if ($ErrorMessage) { Write-Error $ErrorMessage }
+    exit $Code
+}
+
 # --- 1. Pre-flight: a git repo, a known trunk, and a clean tree ------------------------------------
 $headRes = Invoke-Git -Arguments @('rev-parse', '--abbrev-ref', 'HEAD')
 if ($headRes.ExitCode -ne 0) {
@@ -184,6 +258,12 @@ if ($dirty.Count -gt 0) {
 # --- 2. On the trunk, fast-forwarded ---------------------------------------------------------------
 $startBranch = ($headRes.Output | Out-String).Trim()
 if ($startBranch -ne $trunk) {
+    # THE SHA AS WELL AS THE NAME, read before anything moves. It is the whole answer in the two cases
+    # the hand-back cannot serve (a reaped start branch, a detached start), and it costs one rev-parse
+    # on the runs that borrow the checkout -- a run started on the trunk never reaches this line.
+    $shaRes   = Invoke-Git -Arguments @('rev-parse', '--short', 'HEAD')
+    $startSha = if ($shaRes.ExitCode -eq 0) { ($shaRes.Output | Out-String).Trim() } else { 'an unknown commit' }
+
     $coRes = Invoke-Git -Arguments @('checkout', $trunk)
     if ($coRes.ExitCode -ne 0) {
         # WHY THIS ERROR NAMES A DIRECTORY (issue #1069). git allows one worktree per branch, so a second
@@ -232,8 +312,7 @@ if ($fetchRes.ExitCode -ne 0) {
 # --- 4. The branches, and the proof for each -------------------------------------------------------
 $listRes = Invoke-Git -Arguments @('for-each-ref', '--format=%(refname:short)', 'refs/heads')
 if ($listRes.ExitCode -ne 0) {
-    Write-Error "prune-merged could not list the local branches."
-    exit 1
+    Complete-Run -Code 1 -ErrorMessage "prune-merged could not list the local branches."
 }
 $branches = @(($listRes.Output | Out-String) -split '\r?\n' |
     ForEach-Object { $_.Trim() } |
@@ -340,13 +419,13 @@ if (-not $IncludeRemote) {
     # concluding that a clean local list means a clean remote. One line, naming the command that
     # actually answers it -- and now also the switch that answers it here.
     Write-Host "The remote is untouched by design -- verify it with: git ls-remote --heads $Remote (or rerun with -IncludeRemote to have those heads classified here)." -ForegroundColor DarkGray
-    exit 0
+    Complete-Run
 }
 
 $lsRes = Invoke-Git -Arguments @('ls-remote', '--heads', $Remote)
 if ($lsRes.ExitCode -ne 0) {
     Write-Warning "could not read the heads on $Remote -- the remote pass is skipped, and nothing above it is affected. ($(($lsRes.Output | Out-String).Trim()))"
-    exit 0
+    Complete-Run
 }
 
 # ls-remote prints '<sha>\t refs/heads/<name>'. Split on the FIRST run of whitespace only: a branch
@@ -365,7 +444,7 @@ $heads = @(($lsRes.Output | Out-String) -split '\r?\n' |
 
 if ($heads.Count -eq 0) {
     Write-Host "Nothing standing on $Remote beside '$trunk'." -ForegroundColor Green
-    exit 0
+    Complete-Run
 }
 
 $remoteReapable = @()
@@ -414,4 +493,4 @@ if ($remoteReapable.Count -gt 0) {
 
 $remoteSummary = "$($remoteReapable.Count) deletable, $($remoteKept.Count) kept, of $($heads.Count) head$(if ($heads.Count -eq 1) { '' } else { 's' }) on $Remote beside '$trunk'. Nothing on the remote was touched."
 Write-Host $remoteSummary -ForegroundColor Cyan
-exit 0
+Complete-Run

@@ -83,6 +83,17 @@ The script:
    keeping branches.
 3. `git fetch --prune` — drops remote-tracking refs whose remote branch is gone.
 4. Deletes each local branch whose merge can be **proven**, and only those.
+5. **Gives the checkout back** to the branch step 2 borrowed it from, and says where the run ended as
+   its closing line ([#1071](https://github.com/DaveKJohn/claude-code-specialists/issues/1071)).
+
+**It borrows the checkout; it does not move it.** `ship-pr` ends on the trunk deliberately — it closes a
+*finished* assignment, and ending there is what makes the session safe to clear. This script closes
+nothing: it is a tidy-up run mid-assignment, and the branch you were standing on is still there. Leaving
+you on the trunk cost the reporter of #1071 a commit that landed **directly on `main`** — the tree is
+clean and `git status` says nothing unusual, so there is no signal at all between the switch and the
+mistake. Two starts cannot be returned to, and each says so while naming the short sha it left: a start
+branch **this same run reaped** (stepping off it in step 2 is what makes that possible at all — `git
+branch -d` can never delete the branch `HEAD` is on), and a run that started on a **detached HEAD**.
 
 ## The proof, which is the whole safety property
 
