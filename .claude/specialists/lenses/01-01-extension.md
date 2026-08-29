@@ -89,6 +89,11 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
     away from working in the wrong place. The instance that produced this rule, and the shape of the
     trap, are in the
     [specialists handbook](../README.md#the-branch-check-fires-on-the-follow-up-assignment).
+  - **And since [#1073](https://github.com/DaveKJohn/claude-code-specialists/issues/1073) a chain that is
+    still *shipping* leaves you there too.** `ship-pr.ps1`'s step 2b hands the primary checkout back to
+    the trunk as soon as the PR exists, so a backgrounded ship no longer parks you on the branch until
+    CI is done. That widens the trap above rather than narrowing it — a clean trunk now also means
+    "a ship is in flight" — so the branch check matters more, not less, and it is the same check.
 - **Branch PRs to `main` — in one motion, without asking.** Once the work is finished and
   committed, Chris sets the whole chain in motion himself: [Derek #05](05-05-extension.md) opens the
   PR, **waits for the required CI check `lint-en-tests` to go green** (the `main` ruleset blocks the
