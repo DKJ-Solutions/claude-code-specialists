@@ -363,6 +363,22 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # Issue #1069, August 29, 2026. Mirrored because BOTH its callers are: ship-pr.ps1 asks it
+            # whether another worktree holds the trunk (before the merge, and again when handing the trunk
+            # back afterwards), and prune-merged.ps1 asks it which worktree to name when its own checkout
+            # is refused. A consumer whose ship-pr dot-sources a file the mirror does not carry would fail
+            # at the step that has just merged.
+            #
+            # ITS OWN FILE, for the reason park-lib's entry gives one line up: native-capture-lib asks not
+            # to be widened again, and reading `git worktree list --porcelain` is neither a capture helper
+            # nor a park. Nothing in it is repo-owned -- it takes lines and returns strings -- so no
+            # contract row follows.
+            Name    = 'worktree-lib'
+            Source  = 'scripts\lib\worktree-lib.ps1'
+            Plugin = 'contributing-davekjohn'
+            LibOnly = $true
+        },
+        @{
             # The third release tier (August 3, 2026). Its own script rather than part of cut-release, and
             # the reason changed on the way: the source repo kept it separate because cut-release was
             # "temporarily diverged" and must not be extended, which #417 settled. What holds instead is

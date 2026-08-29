@@ -144,6 +144,9 @@ if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
     }
 }
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+# For naming the worktree that holds the trunk when the checkout below fails (issue #1069). Same
+# plugin-payload sibling, same reasoning as native-capture-lib above.
+. (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 $trunk = Get-BranchTrunkName
 
 function Invoke-Git {
@@ -183,7 +186,22 @@ $startBranch = ($headRes.Output | Out-String).Trim()
 if ($startBranch -ne $trunk) {
     $coRes = Invoke-Git -Arguments @('checkout', $trunk)
     if ($coRes.ExitCode -ne 0) {
-        Write-Error "prune-merged could not switch to '$trunk': $(($coRes.Output | Out-String).Trim())"
+        # WHY THIS ERROR NAMES A DIRECTORY (issue #1069). git allows one worktree per branch, so a second
+        # checkout standing on the trunk makes this checkout impossible for the whole clone -- and the raw
+        # git message says only that, without saying what to do. That matters more here than the wording
+        # suggests: this script is what Chris's lens tells a session to run INSTEAD of hand-deriving
+        # `git ls-remote` output, so it is unavailable in exactly the situation that produces stray
+        # branches. Best-effort: an unreadable worktree list falls back to git's own message.
+        $reason = ($coRes.Output | Out-String).Trim()
+        $wtRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
+        $holder = if ($wtRes.ExitCode -eq 0) {
+            Get-WorktreeHoldingBranch -PorcelainLines $wtRes.Output -Branch $trunk -SelfPath $repoRoot
+        } else { '' }
+        if ($holder) {
+            Write-Error "prune-merged could not switch to '$trunk' -- another worktree holds it: $holder. Nothing was changed. Move that tree off the trunk (git -C `"$holder`" checkout <its branch>), or hand it back if it is a finished lane (scripts\task\worktree-lane.ps1 -HandBack -Lane `"$holder`")."
+        } else {
+            Write-Error "prune-merged could not switch to '$trunk': $reason"
+        }
         exit 1
     }
     Write-Host "Switched to '$trunk' (was on '$startBranch')." -ForegroundColor Green

@@ -32,6 +32,11 @@ $NativeCaptureSrc  = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 # And for Get-BranchTrunkName: the trunk comes from the seam rather than a literal, so a fixture
 # without this lib has no script at all.
 $EntryScaffoldSrc  = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# And for naming the worktree that holds the trunk when the checkout is refused (issue #1069). The
+# fixture repo has exactly one worktree, so this lib answers "nobody else holds it" on every case in
+# this suite -- it is copied because a MISSING dot-source is not a degraded answer but no script at
+# all, which is how its absence showed up: every single case failed at exit 1 before the first assert.
+$WorktreeLibSrc    = Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -112,7 +117,7 @@ function Invoke-FixtureGit {
 
 function New-Fixture {
     <#
-        A fresh throwaway git repo with the script and its two libs copied in, an initial commit on
+        A fresh throwaway git repo with the script and its three libs copied in, an initial commit on
         'main', and a bare repo wired up as 'origin' -- pushed, so the fast-forward and the
         fetch --prune have a real remote to succeed against with no auth or network.
     #>
@@ -124,6 +129,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $PruneMergedSrc   -Destination (Join-Path $dir 'scripts\task\prune-merged.ps1')       -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')  -Force
+    Copy-Item -LiteralPath $WorktreeLibSrc   -Destination (Join-Path $dir 'scripts\lib\worktree-lib.ps1')        -Force
 
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
@@ -280,6 +286,32 @@ try {
     Assert-True ($rE.Out -match "no local branch 'main'") 'no trunk: the refusal names the branch it looked for'
     Assert-True ($rE.Out -match 'Get-TrunkBranchName') 'no trunk: and the seam that decides it, so a repo on another trunk knows where to answer'
     Assert-True ((Get-LocalBranches -Dir $dirE) -contains 'feat/orphan') 'no trunk: and it deleted nothing'
+
+    # --- (e2) A second worktree holding the trunk is NAMED, not relayed (issue #1069) ---------------
+    #     git allows one worktree per branch, so a lane standing on the trunk makes step 2's checkout
+    #     impossible for the whole clone -- and this script is what a session is told to run INSTEAD of
+    #     hand-reading `git ls-remote`, so it was unavailable in exactly the situation that produces
+    #     stray branches. The assert is on the DIRECTORY and the way out, because git's own message
+    #     already says the trunk is taken and says nothing about what to do.
+    #
+    #     THIS CASE EXISTS FOR THE WIRING, NOT THE DECISION. worktree-lib.tests.ps1 asserts the reading;
+    #     what only a fixture can prove is that the script REACHES it -- measured the hour this was
+    #     written, when the lib was dot-sourced but not copied into the fixture and all 40 asserts in
+    #     this file failed at exit 1, before the first one ran.
+    Write-Host "prune-merged.ps1 -- another worktree holds the trunk" -ForegroundColor Cyan
+    $dirE2 = New-Fixture -Label 'e2'
+    New-MergedBranch -Dir $dirE2 -Name 'feat/would-have-gone-too'
+    Invoke-FixtureGit -Arguments @('-C', $dirE2, 'checkout', '-q', '-b', 'feat/standing-here')
+    $trunkLane = "$dirE2-lane"
+    if (Test-Path -LiteralPath $trunkLane) { Remove-Item -Recurse -Force -LiteralPath $trunkLane }
+    Invoke-FixtureGit -Arguments @('-C', $dirE2, 'worktree', 'add', '-q', $trunkLane, 'main')
+    $rE2 = Invoke-PruneMerged -Dir $dirE2
+    Assert-Equal 1 $rE2.Code 'trunk held: exit 1'
+    Assert-True ($rE2.Out -match 'another worktree holds it') 'trunk held: the refusal says what is actually wrong'
+    Assert-True ($rE2.Out -match [regex]::Escape((Split-Path -Leaf $trunkLane))) 'trunk held: and names the directory, which git own message does not'
+    Assert-True ($rE2.Out -match 'HandBack') 'trunk held: with the way out, not only the verdict'
+    Assert-True ((Get-LocalBranches -Dir $dirE2) -contains 'feat/would-have-gone-too') 'trunk held: and NOTHING was deleted -- the refusal lands before any branch is judged'
+    Invoke-FixtureGit -Arguments @('-C', $dirE2, 'worktree', 'remove', '--force', $trunkLane)
 
     # --- (f) It never deletes a remote branch -------------------------------------------------------
     #     A deliberate decision rather than an omission: with the remote reaping its own merged heads,
