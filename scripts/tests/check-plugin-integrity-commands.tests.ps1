@@ -457,6 +457,49 @@ try {
     Assert-True (-not ($rB48.Out -match $BarredFindingPattern)) 'scenario 48: naming the command and the actor is what the check asks for'
     Remove-Item -LiteralPath (Join-Path $Fixture 'scripts\probe.ps1') -Force -ErrorAction SilentlyContinue
 
+
+    # --- Scenario 49: a FENCED example is an illustration, not an instruction ------------------------
+    #     How this exclusion was found: the branch that added check 30 quotes the forbidden wording in its
+    #     own plan in order to explain what the check forbids, and the gate refused to push it. A rule that
+    #     cannot be written down in the document introducing it is a rule nobody can explain. Checks 10 and
+    #     11 mask fences for the same reason, and this borrows their Get-FenceMaskedText.
+    Write-Host "check 30 -- a fenced example of the wording is not an instruction" -ForegroundColor Cyan
+    $s49Lines = @(
+        '# Contributing'
+        ''
+        'Do not write this:'
+        ''
+        '```text'
+        'run the skill-beta skill to stage the catch-up'
+        '```'
+        ''
+        'Write the command and say who types it instead.'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s49Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB49 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rB49.Out -match $BarredFindingPattern)) 'scenario 49: a fenced example is masked, so the rule can be written down'
+
+    # --- Scenario 50: HISTORY is excluded ------------------------------------------------------------
+    #     Check 11's exclusion, inherited with its file set: CHANGELOG.md records what was true then and is
+    #     never rewritten, so a released note describing the old wording must not become a finding. Asserted
+    #     rather than assumed, because the set is borrowed and a later narrowing of check 11's would move
+    #     this check in silence.
+    Write-Host "check 30 -- history is not rewritten, so it is not a subject" -ForegroundColor Cyan
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), "# Contributing`n`nNothing here.`n", $Utf8NoBom)
+    $s50Path = Join-Path $Fixture 'contributing-davekjohn\CHANGELOG.md'
+    $s50Prev = if (Test-Path -LiteralPath $s50Path) { [System.IO.File]::ReadAllText($s50Path, [System.Text.Encoding]::UTF8) } else { $null }
+    $s50Lines = @(
+        '# Changelog'
+        ''
+        '## [Unreleased]'
+        ''
+        'The line then read: run the skill-beta skill to stage the catch-up.'
+    )
+    [System.IO.File]::WriteAllText($s50Path, (($s50Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rB50 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rB50.Out -match $BarredFindingPattern)) 'scenario 50: the changelog records the old wording and is never rewritten'
+    if ($null -ne $s50Prev) { [System.IO.File]::WriteAllText($s50Path, $s50Prev, $Utf8NoBom) } else { Remove-Item -LiteralPath $s50Path -Force -ErrorAction SilentlyContinue }
+
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

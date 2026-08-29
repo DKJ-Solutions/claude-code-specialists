@@ -195,9 +195,14 @@
          all 7 correct. Both layers are scanned, also measured -- printed output carries 6 of the 7 and
          INSTALL.md the seventh, so output-only would have passed over the one a consumer reads. Printed
          means a string argument to a writer cmdlet, found through the PARSER, so a comment about the rule
-         is not a subject. The class bit twice a month apart with nothing connecting them (#731 -> #734,
-         then #1093/#1096 rediscovered from scratch when a consumer adoption stopped on it), which is what
-         turned it from a risk into the finding filed as #1104.
+         is not a subject. Markdown reuses CHECK 11's file set and its fence masking, and both matter here:
+         history (CHANGELOG.md, releases/**, RELEASE.md) records the old wording and is never rewritten, the
+         branch document's text is pasted into CHANGELOG.md at the fold, and a FENCED example is an
+         illustration rather than an instruction. Found the hard way -- the branch introducing this check
+         quotes the forbidden wording to explain it, and the gate refused to push it. The class bit twice a
+         month apart with nothing connecting them (#731 -> #734, then #1093/#1096 rediscovered from scratch
+         when a consumer adoption stopped on it), which is what turned it from a risk into the finding
+         filed as #1104.
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .PARAMETER SkipCheck
@@ -3227,6 +3232,10 @@ foreach ($skillsDir in (Get-PluginSubdirs -PluginRoots $publishedPlugins -Leaf '
         }
 }
 
+# Check 11 computed this set (linkFiles, minus history, minus the branch document) and this check wants
+# exactly it; see the loop below for why each exclusion matters here. Named rather than used inline so
+# that the borrowing is visible at the top of the check rather than buried in a foreach.
+$barredMdFiles = $lifecycleFiles
 $barredChecked = 0
 $barredFindings = 0
 if ($barredSkills.Count -gt 0) {
@@ -3269,10 +3278,27 @@ if ($barredSkills.Count -gt 0) {
         }
     }
 
-    foreach ($bsMd in ($linkFiles | Sort-Object -Unique)) {
+    # THE MARKDOWN SET IS CHECK 11'S, REUSED RATHER THAN REBUILT, and it brings two exclusions this check
+    # needs for exactly the reasons check 11 documents at $lifecycleFiles. HISTORY (CHANGELOG.md root and
+    # per-plugin, releases/**, every RELEASE.md) records what was true at the time and is never rewritten,
+    # so a note describing the old wording must not become a finding. And THE BRANCH DOCUMENT is history
+    # in the making: its DEPLOY text is pasted into CHANGELOG.md at the fold, so a finding there would
+    # follow it into the changelog permanently.
+    #
+    # THAT SECOND ONE IS NOT HYPOTHETICAL -- it is how this exclusion was found. The branch that added this
+    # check quotes the forbidden wording in its own PLAN section in order to explain what the check
+    # forbids, and the gate refused to push it. A rule that cannot be written down in the document that
+    # introduces it is a rule nobody can explain.
+    #
+    # AND FENCES ARE MASKED, the same way checks 10 and 11 mask them: a fenced example of the wording is an
+    # illustration a reader compares against, not an instruction they follow. Masking keeps offsets and
+    # newline positions identical, so a line index in the mask still points at the right line in the file.
+    # Without it, the only way to show a reader what NOT to write is to not show them.
+    foreach ($bsMd in ($barredMdFiles | Sort-Object -Unique)) {
         $barredChecked++
         $bsRel = $bsMd.Replace($RepoRoot, '.')
-        $bsLines = [System.IO.File]::ReadAllText($bsMd, [System.Text.Encoding]::UTF8) -split "`r?`n"
+        $bsMasked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($bsMd, [System.Text.Encoding]::UTF8))
+        $bsLines = $bsMasked -split "`r?`n"
         for ($i = 0; $i -lt $bsLines.Count; $i++) {
             foreach ($m in $barredRegex.Matches($bsLines[$i])) {
                 Add-BarredSkillFinding -Rel $bsRel -LineNo ($i + 1) -Skill $m.Groups['skill'].Value -Sample $bsLines[$i]

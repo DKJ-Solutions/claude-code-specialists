@@ -106,8 +106,29 @@ are this branch's alone: both `roster-sessioncheck.ps1` hooks, `check-roster-syn
       **unflagged** name passes (43), the script-not-skill wording passes (44), a hyphenated continuation
       is a different name (45), a comment is not output (46), markdown is a subject (47), and the repaired
       wording passes (48) -- so the check and the repair cannot drift apart.
-- [x] All four gate suites green (53 / 95 / 78 / 108 asserts); the fixture change disturbs none of them.
+- [x] Two more (49, 50) for the exclusions the gate itself forced -- see below.
+- [x] All four gate suites green (55 / 95 / 78 / 108 asserts); the fixture change disturbs none of them.
 - [x] The gate itself: 0 findings, where it reported 11 before the repairs.
+
+#### The check refused to let this branch describe it, which is how it got its last two rules
+
+The first shape of check 30 scanned every markdown line. It then refused to push this branch: **the PLAN
+section above quotes the forbidden wording in order to explain what the check forbids.** A rule that
+cannot be written down in the document introducing it is a rule nobody can explain, and the finding was
+correct on its own terms -- the line really does say it.
+
+Both neighbouring checks had already solved it, so the fix is theirs rather than a new idea:
+
+- **Fences are masked** (`Get-FenceMaskedText`, as checks 10 and 11 do). A fenced example is an
+  illustration a reader compares against, not an instruction they follow.
+- **The markdown set is check 11's `$lifecycleFiles`**, borrowed whole rather than rebuilt, which brings
+  its two exclusions with their reasoning intact: history (`CHANGELOG.md`, `releases/**`, `RELEASE.md`)
+  records what was true then and is never rewritten, and the branch document is history in the making --
+  its DEPLOY text is pasted into `CHANGELOG.md` at the fold, so a finding there would follow it into the
+  changelog permanently.
+
+Scenario 50 asserts the history exclusion rather than trusting it, because the set is borrowed: a later
+narrowing of check 11's set would otherwise move this check in silence.
 
 #### The gate caught two defects in this branch's own work, and one got past it
 
