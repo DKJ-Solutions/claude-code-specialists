@@ -56,8 +56,23 @@ for this repo (the main branch, the lint gate, the fold exception, being public)
   `v4.0.0` cut needed both by hand under an exception nobody had granted.
 - **`git push --force`** (on any branch whatsoever), **`git reset --hard`**, **`git rebase`** on a
   shared branch.
-- **Publishing anything externally** beyond the normal PR flow (issues on other repos, a gist, an
-  external post).
+- **Publishing anything externally** beyond the normal PR flow (a gist, an external post, an issue
+  opened on somebody else's repository).
+
+  **The inbound route is NOT this**, and it is carved out by name because an unstated exception is
+  indistinguishable from a prohibition (inbound
+  [#1094](https://github.com/DaveKJohn/claude-code-specialists/issues/1094), August 29, 2026). Filing
+  an `inbound` issue on the **source repo of a plugin this repo consumes** needs no permission from
+  anyone: it is the one outward-facing act this family asks a session to perform unprompted, and the
+  only way a defect found in a consumer reaches the tree that can repair it. What applies to it is the
+  ordinary filing bar in the orchestrator's body — verify it still stands, search that tracker first,
+  one subject per issue — never a permission gate.
+
+  **It matters most where this file is copied.** A consumer's scaffolded `CLAUDE.md` tells them to
+  *"expand with governance and safety rules for this repo"*, and this document is the nearest model —
+  so without the carve-out, adopting it hands them a rule forbidding the route the plugin they just
+  installed requires of them. Measured in a fresh consumer: two real defects found during its
+  adoption, both verified, neither filed.
 
 ### Never directly on the main branch — via branch + PR
 
