@@ -54,7 +54,7 @@ No script, gate or lint check -- a regex cannot tell whether an earlier note ann
   table: before rewriting, ask whether a pending entry retires something an earlier note announced, and
   fix its tier score if so -- and say why this stays a selection check rather than an eighth test, so
   the seven's own measured provenance (five dev-tool changelogs, two declined neighbour rules) is not
-  diluted and the count both citing pages give stays true.
+  diluted and the count stays true wherever it is cited.
 - [x] Score this branch's own DEPLOY section, tier 2 included -- the branch is itself the case in point,
   since the mechanism being repaired has to deliver the notice 4.21.0's note never did.
 
@@ -96,8 +96,8 @@ assembled rather than at the seven tests that govern its prose: before rewriting
 pending entry retires something an earlier note announced, and treat an `N/A` score there as wrong
 rather than working around a page that is missing the item. The seven tests stay at seven -- this is a
 selection question, not a writing one, and folding it into that list would borrow a provenance (five
-dev-tool changelogs, two declined neighbour rules) it does not share and would falsify the count both
-citing pages give.
+dev-tool changelogs, two declined neighbour rules) it does not share and would falsify the count
+wherever it is cited.
 
 **Score:** 3
 
