@@ -60,18 +60,18 @@ So the order is: if you have a repo, adopt the family with `/team-alpha:speciali
 import do it. If you have no repo, or you are in a conversation that never loaded one, invoke this.
 
 **That command is the owner's to type, and this page is where you learn it — deliberately.**
-`specialists-init` carries `disable-model-invocation`, so the `Skill` tool refuses you, and the same
-flag keeps its page (and the `bootstrap.ps1` route documented on it) out of your context entirely. This
-page has no such flag, which makes it the one place upstream of the barred step that can hand you a
+`specialists-init` is reserved for explicit user invocation: the `Skill` tool refuses you, and the same
+reservation keeps its page out of your context entirely, so you cannot learn the command from it. This
+page carries no such reservation, which makes it the one place upstream of that step able to hand you a
 usable form — the treatment [#734](https://github.com/DaveKJohn/claude-code-specialists/issues/734)
-gave the shipping chain, arriving here late. So the handover is the whole move: say the repo has not
-been adopted, name `/team-alpha:specialists-init` in exactly that spelling, and stop.
+gave the shipping chain, arriving here late.
 
-**A route so you can hand it over, never a licence to get there another way.** The bootstrap sits in
-the plugin cache at an absolute path and is reachable; running it yourself is precisely the
-substitution the refusal exists to prevent, and it writes the consumer's `CLAUDE.md` — the one file an
-owner should watch being changed. Named here because this is the moment the temptation appears:
-inbound [#1093](https://github.com/DaveKJohn/claude-code-specialists/issues/1093) /
+**So the handover is the whole move**: say the repo has not been adopted, name
+`/team-alpha:specialists-init` in exactly that spelling, and stop. A form so you can hand it over,
+never a licence to get there some other way — the adoption writes the consumer's `CLAUDE.md`, which is
+the one file an owner should watch being changed, and reaching around the refusal to do it yourself is
+exactly what the refusal is for. Named here because this is the moment that temptation appears: inbound
+[#1093](https://github.com/DaveKJohn/claude-code-specialists/issues/1093) /
 [#1096](https://github.com/DaveKJohn/claude-code-specialists/issues/1096), measured in the testrun-2
 adoption on August 29, 2026, where this line said *"run `specialists-init`"* and left a model told to
 act with nothing it could act on.
