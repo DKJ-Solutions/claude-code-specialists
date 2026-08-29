@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/enabled-is-not-installed-v1` · 20260829-153748
+
+`INSTALL.md` and `plugins/ADOPTION.md` now say plainly that **enabling a plugin is not installing
+it**, and that a repo can look completely adopted in that state: the settings key is yours, the
+install record is the machine's, and setting the first without the second leaves a session with no
+skills, no subagents and no hooks while every visible surface says the adoption is done.
+
+Both pages name the check, and both name it as the **slash-command menu** rather than as anything
+the session says about itself -- several skills ship `disable-model-invocation: true` on purpose, so
+a healthy session lists fewer than the plugins ship and a count read off that listing means nothing.
+`INSTALL.md` points at the query that needs no plugin at all.
+
+And both say the part that makes this recur: **all four detectors for this state ship inside the
+plugin that is not installed**, so the one repo they were written for is the one repo they cannot
+speak in. Their silence is the symptom, not an all-clear.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This is the root of the day of friction the two sibling reports describe, and it is invisible from
+every angle a consumer can see. It also carries a correction they need: the workflow's model-visible
+skill set is five, not three -- so any verification written against a count was already wrong, and
+the menu is the durable check.
+
+**Score:** 3
+
+#### Pull Request
+
+the adoption says plainly that enabling a plugin is not installing it, and that its own checks are silent in exactly that state
+
+[PR #1090](https://github.com/DaveKJohn/claude-code-specialists/pull/1090)
+
+---
+
 ### DEPLOY: `fix/step-list-remedy-names-the-act-v1` · 20260829-152329
 
 The step-list gate refuses on two different findings and printed one remedy for both. That remedy --
