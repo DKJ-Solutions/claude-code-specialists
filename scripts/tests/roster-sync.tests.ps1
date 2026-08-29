@@ -1188,7 +1188,7 @@ try {
     # and cannot even read the page saying so. So the assert is on the slash-command AND on the handover
     # -- a hint the reader cannot act on is the same failure #225 was about, one layer further in.
     Assert-Match '/team-alpha:sync-roster' $r.Out 'hook orphans-clean: points at the recovery command, not a repo path a consumer lacks'
-    Assert-Match 'cannot start it' $r.Out 'hook orphans-clean: and says whose command it is, since the model reading this may not run it'
+    Assert-Match 'TYPED by the repo owner' $r.Out 'hook orphans-clean: and says whose command it is, since the model reading this may not run it'
     Assert-NotMatch 'scripts/sync/check-roster-sync' $r.Out 'hook orphans-clean: no workshop-shaped path in a consumer-facing message'
 
     # H8. And in the DRIFT branch it travels alongside the errors, rather than being crowded out by them.
