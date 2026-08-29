@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/internal-note-hard-breaks-v1` · 20260829-195518
+
+`new-internal-note.ps1` ends its `**Date:**` and `**Type:**` lines with a backslash markdown hard break,
+so the internal note's three metadata labels render as three lines. They rendered as one: a single
+newline inside a markdown paragraph is a soft break, and this was the one release document that never
+received the break the other three carry. Completes inbound #1100, which established that spelling for
+`release-lib.ps1`'s documents and recorded that dropping it joins the labels; the internal note was
+outside that repair's reach and nothing carried the decision across.
+
+Reported as inbound #1101, whose stated stake -- that this document is the published GitHub Release body
+-- did not survive checking: that body is the generated `releases/github/<dir>/<X.Y.Z>.md`. The wrong
+claim came from a stale comment in `internal-note.tests.ps1`, corrected here.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report offered two repairs and called the choice the owner's. Reading the tree showed it had already
+been made, a day earlier, in the file the report itself quoted -- the #1100 comment states that dropping
+the break joins the labels and that it is deliberately kept. What looked like an open decision was an
+unfinished application of a settled one.
+
+**Score:** 1
+
+#### Pull Request
+
+The internal note's Date/Type labels get the hard break the other release documents already have
+
+Plugins: contributing-davekjohn
+
+[PR #1108](https://github.com/DaveKJohn/claude-code-specialists/pull/1108)
+
+---
+
 ### DEPLOY: `fix/record-shape-pathless-arm-v1` · 20260829-193738
 
 `[RECORD-SHAPE]`'s pathless line stops telling most readers a story about their own repo that is not true.
