@@ -214,12 +214,9 @@ jobs:
           # jq, so each falls through to its `//` default and the empty-status branch below reports
           # that silence as the finding.
           #
-          # `.[0] // ""` after the split is not belt-and-braces, it is the bug this was written
-          # with: jq's `split` on an EMPTY string returns `[]`, not `[""]`, so `[][0]` is null and
-          # `-r` prints the literal word "null". Measured against a fixture carrying no `result`
-          # field, where the annotation then read "... named no API status. null".
+          # THE STATUS IS READ FIRST AND THE REASON LAST, because the reason's own bound is computed
+          # from the headline the status picks -- see the budget below.
           status=$(jq -r '[.[] | select(.type == "result")] | last | (.api_error_status // "") | tostring' "$EXECUTION_FILE")
-          reason=$(jq -r '[.[] | select(.type == "result")] | last | (.result // "") | split("\n") | (.[0] // "") | .[0:300]' "$EXECUTION_FILE")
 
           # The annotation TITLE may hold neither a comma nor '::' -- both are annotation-command
           # syntax -- so the short form goes there and the full sentence goes in the message body.
@@ -234,11 +231,64 @@ jobs:
                  headline="The review failed with API status $status." ;;
           esac
 
+          # THE REASON IS BOUNDED BY WHAT THE RELAY WILL CARRY, NOT BY A NUMBER OF ITS OWN -- issue
+          # #1116. Since #1110 `ship-pr` prints this annotation to the operator through
+          # `Get-AuthoredFailureNote`, which cuts a relayed message at RELAY_MESSAGE_CAP characters
+          # and appends "...". That function is generic and ships to consumers, so it cannot know
+          # where this file's headline stops and upstream's `result` starts -- which means the half
+          # it drops is always the TAIL of the reason, the only part naming which limit was hit and
+          # when it returns. Two caps chosen independently produced a 597-character annotation
+          # against a 500-character relay.
+          #
+          # So the budget is computed here, where BOTH halves are known, instead of guessed at either
+          # end. The number below is the relay's, mirrored on purpose: this workflow is this repo's
+          # own CI and not plugin payload, so the coupling is local-to-local and reaches no consumer,
+          # and `scripts/tests/pr-issues.tests.ps1` fails the moment the two stop matching. Budgeting
+          # in the specific party is the right direction -- raising the generic bound for one verbose
+          # workflow is not.
+          #
+          # AND IT HAS NOT YET BITTEN, which is why it is a guard rather than a repair. Sampled over
+          # all 45 titled failure annotations this workflow left on August 27-29, 2026: every one a
+          # 429, and upstream's `result` first line ran 50 to 54 characters -- "You've hit your weekly
+          # limit ... resets Aug 31, 7am (UTC)" and three session-limit variants. The longest message
+          # actually emitted was 341. The old 300 needed a reason four times longer than anything
+          # measured before it cost the reader a word; this bound needs upstream to grow past the
+          # whole budget before anything is cut at all.
+          RELAY_MESSAGE_CAP=500
+          budget=$(( RELAY_MESSAGE_CAP - ${#headline} - 1 ))
+          # A NEGATIVE LENGTH IS NOT AN ERROR IN A BASH SUBSTRING, it counts from the END --
+          # `${v:0:-5}` is "all but the last five". An over-long headline would therefore silently
+          # mangle the reason rather than fail, which is the one outcome a diagnostic must not
+          # produce. The test named above holds this unreachable; the guard is here because reaching
+          # it would not announce itself.
+          if [ "$budget" -lt 0 ]; then budget=0; fi
+
+          # `.[0] // ""` after the split is not belt-and-braces, it is the bug this was written
+          # with: jq's `split` on an EMPTY string returns `[]`, not `[""]`, so `[][0]` is null and
+          # `-r` prints the literal word "null". Measured against a fixture carrying no `result`
+          # field, where the annotation then read "... named no API status. null".
+          #
+          # THE TRIM IS BASH'S AND NOT JQ'S, deliberately. Passing the budget in as `--argjson` reads
+          # a little tidier and cannot be exercised anywhere but a red run: this step only fires on a
+          # failure, and it carries `continue-on-error`, so a malformed jq program would be swallowed
+          # by the very mechanism that is supposed to explain a silence. A `${var:0:n}` expansion is
+          # plain bash and can be proved on a laptop before it is pushed.
+          reason=$(jq -r '[.[] | select(.type == "result")] | last | (.result // "") | split("\n") | (.[0] // "")' "$EXECUTION_FILE")
+          # Characters, not bytes, on this runner -- ubuntu-latest sets LANG=C.UTF-8, which is what
+          # makes this count the same units the relay's .NET Length does. Under a C locale it would
+          # count bytes and cut EARLIER, which is the harmless direction: the budget is 203 against a
+          # reason that has never exceeded 54.
+          reason=${reason:0:$budget}
+
           # `%` is escaped because the runner percent-DECODES a command's data, so an unescaped
           # `%0A` inside `result` would become a newline in the rendered annotation. It cannot forge
           # a second command -- one only counts at the start of a line, and this message is capped
           # to a single line -- but a diagnostic that renders wrong is the exact failure this step
           # exists to prevent.
+          #
+          # AND THE ESCAPING DOES NOT SPEND THE BUDGET, which is why it is applied after it: the
+          # runner DECODES the data when it stores the annotation, so a reason carrying `%` is one
+          # character longer on the wire and exactly as long again in the payload the relay reads.
           if [ -n "$reason" ]; then
             echo "::error title=claude-review -- ${short}::${headline} ${reason//%/%25}"
           else

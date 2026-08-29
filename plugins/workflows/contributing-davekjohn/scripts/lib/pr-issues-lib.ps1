@@ -1150,9 +1150,11 @@ function Get-AuthoredFailureNote {
 
         BOUNDED, BECAUSE THIS IS FREE TEXT A WORKFLOW PRODUCED AND IT IS BEING PASTED INTO A CONSOLE:
         the message is cut to its FIRST LINE and 500 characters. Not the 300 claude-code-review.yml
-        writes its own annotation under -- that bounds the REASON it appends, and the headline
-        explaining what the status means sits in front of it, so relaying at 300 would keep only the
-        headline, which is the part a reader could already guess from the check being red.
+        used to write its own annotation under -- that bounded the REASON it appends, and the
+        headline explaining what the status means sits in front of it, so relaying at 300 would keep
+        only the headline, which is the part a reader could already guess from the check being red.
+        That workflow now budgets its reason against THIS bound instead (#1116), which is a change in
+        it and not in here: nothing below knows or needs a workflow that does so.
 
     .PARAMETER AnnotationsJson
         `gh api repos/<owner>/<repo>/check-runs/<jobId>/annotations` output. Unreadable in, '' out: a
@@ -1184,18 +1186,31 @@ function Get-AuthoredFailureNote {
         $message = ''
         if ($a.PSObject.Properties['message']) { $message = ([string]$a.message).Trim() }
         $message = @($message -split "`r?`n")[0]
-        # 500, NOT the 300 the annotation itself is written under, and measured rather than guessed.
-        # That 300 bounds the REASON claude-code-review.yml appends; the headline explaining what the
-        # status means sits in front of it, so relaying at 300 cuts the sentence in half and keeps
-        # only the half a reader could guess from the red mark. Measured on run 33267175141: 460
-        # characters, ending "resets Aug 31, 7am (UTC)".
+        # 500, NOT the 300 claude-code-review.yml once wrote its own annotation under, and measured
+        # rather than guessed. That 300 bounded the REASON it appends; the headline explaining what
+        # the status means sits in front of it, so relaying at 300 cuts the sentence in half and
+        # keeps only the half a reader could guess from the red mark. Measured on run 33267175141:
+        # 400 characters, ending "resets Aug 31, 7am (UTC)".
+        #
+        # THAT NUMBER READ 460 UNTIL ISSUE #1116 CHECKED IT. The same run's note, put back through
+        # this function, is 400: a 55-character title, the 4-character separator and a 341-character
+        # message. The bound was never in question, but the measurement defending it was wrong by 60
+        # -- and a comment that cites a run id invites exactly this check, which is the argument for
+        # citing one.
+        #
+        # AND THE 300 IS GONE, in the other direction from the one it looks like -- #1116 again. The
+        # workflow now budgets its reason against THIS number rather than against one of its own, so
+        # the annotation this repo emits is never one its own relay has to cut. That is a repair in
+        # the specific party, not here: raising a generic bound because one verbose workflow needs
+        # the room would spend it in every consuming repo. Nothing in this function changed for it,
+        # and nothing here depends on that workflow existing.
         #
         # THE RELAY DOES NOT VOUCH FOR WHAT IT RELAYS, and that is the point of the rule -- issue
-        # #1112. That measured 460-character note ended with a reset time roughly 2.5 DAYS later than
-        # the moment the quota actually came back. Nothing is added here to caveat it: this function
-        # repeats what an author wrote and cannot know which authors are reliable, so a hedge here
-        # would hedge every workflow in every consuming repo. An over-claiming sentence is repaired in
-        # the workflow that writes it, which is where #1112 was repaired.
+        # #1112. That measured note ended with a reset time roughly 2.5 DAYS later than the moment
+        # the quota actually came back. Nothing is added here to caveat it: this function repeats
+        # what an author wrote and cannot know which authors are reliable, so a hedge here would
+        # hedge every workflow in every consuming repo. An over-claiming sentence is repaired in the
+        # workflow that writes it, which is where #1112 was repaired.
         if ($message.Length -gt 500) { $message = $message.Substring(0, 500).TrimEnd() + '...' }
 
         # NAMED ONCE. A workflow that titles its own annotation usually leads with the job name --

@@ -865,6 +865,57 @@ Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annReal).Length -gt 400)
 $annMulti = '[{"annotation_level":"failure","title":"t","message":"line one\nline two"}]'
 Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annMulti) -notlike '*line two*') 'and cut to its first line, since this is pasted into a console'
 
+# --- The two caps that bound the SAME string are pinned to each other (#1116) ---------------------
+#
+# `claude-code-review.yml` writes `headline + ' ' + reason` into one annotation and this function
+# relays that annotation to the operator. Both bound it, and until #1116 both picked their number
+# alone: a 296-character headline plus a 300-character reason is 597, against a relay that cuts at
+# 500 -- and because the relay cannot see where the headline stops, the half it drops is always the
+# TAIL of the reason, the only part naming which limit was hit and when it returns.
+#
+# The workflow now computes its reason's bound FROM this one. That removes the mismatch and replaces
+# it with a mirrored constant, so what is pinned here is the mirror: the day someone changes either
+# number, this fails and names the other. Nothing about the relay's own value is asserted -- 500 is
+# its choice to make, and these asserts follow it wherever it goes.
+$wfPath = (Join-Path $PSScriptRoot '..\..\.github\workflows\claude-code-review.yml')
+Assert-True (Test-Path -LiteralPath $wfPath) 'the reviewed workflow is where these asserts expect it -- a rename must fail here, not silently pass'
+$wfText = Get-Content -LiteralPath $wfPath -Raw
+
+$libText = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1') -Raw
+$libCaps = @([regex]::Matches($libText, '\$message\.Length -gt (\d+)\)|\$message\.Substring\(0, (\d+)\)') |
+    ForEach-Object { if ($_.Groups[1].Success) { [int]$_.Groups[1].Value } else { [int]$_.Groups[2].Value } })
+Assert-Equal 2 $libCaps.Count 'the relay states its bound twice -- the test and the cut -- and both are read'
+Assert-Equal $libCaps[0] $libCaps[1] 'and they agree with each other: a message cut at one number must be the one tested against it'
+$relayCap = $libCaps[0]
+
+$wfCapMatch = [regex]::Match($wfText, '(?m)^\s*RELAY_MESSAGE_CAP=(\d+)\s*$')
+Assert-True $wfCapMatch.Success 'the workflow budgets against a named cap rather than a number buried in an expression'
+Assert-Equal $relayCap ([int]$wfCapMatch.Groups[1].Value) 'AND IT IS THE RELAY''S OWN NUMBER -- the mirror #1116 left behind, which is what this suite exists to keep honest'
+
+# The reason is sliced by the computed budget, not by a second literal. Without this, the mirror
+# above could stay correct while a hard-coded slice quietly reintroduced the mismatch beside it.
+# Read with .Contains rather than -like: these needles carry a '[' or a '$', which -like reads as
+# a character class and a variable -- so a -notlike over one of them can never fail.
+Assert-True ($wfText.Contains('reason=${reason:0:$budget}')) 'the reason is trimmed to the computed budget'
+Assert-True (-not $wfText.Contains('.[0:300]')) 'and the flat 300 it replaced is gone rather than sitting beside it'
+
+# EVERY HEADLINE LEAVES ROOM FOR A REASON, which is the half a budget could silently spend. Measured
+# across all 45 titled failure annotations this workflow left on August 27-29, 2026: upstream's
+# `result` first line ran 50 to 54 characters. 54 is therefore the floor a headline must leave, and
+# every one of them clears it by roughly 150.
+#
+# The literals are what is checked because they are what an editor writes. The `*)` branch
+# interpolates `$status` and so has no static length -- and needs none: the workflow measures
+# `${#headline}` AFTER the case picks one, so an unexpectedly long status shrinks the budget
+# correctly rather than overrunning it, and the negative guard below that catches the absurd.
+$longestMeasuredReason = 54
+foreach ($m in [regex]::Matches($wfText, "(?m)^\s*headline='([^']*)'")) {
+    $h = $m.Groups[1].Value
+    $budget = $relayCap - $h.Length - 1
+    Assert-True ($budget -ge $longestMeasuredReason) "the $($h.Length)-character headline leaves $budget characters for the reason -- more than the 54 ever measured"
+}
+Assert-True ($wfText.Contains('if [ "$budget" -lt 0 ]; then budget=0; fi')) 'and a negative budget is guarded -- a negative jq slice counts from the END, so it would mangle rather than fail'
+
 # Unreadable in, empty out -- a diagnostic must never be the reason the warning beside it cannot print.
 foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"annotation_level":"failure"}]')) {
     Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson $bad -CheckName 'x') "an unreadable annotations payload ('$bad') costs the note and nothing else"
