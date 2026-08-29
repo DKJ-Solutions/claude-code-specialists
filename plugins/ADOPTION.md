@@ -107,6 +107,24 @@ review). The details of this path are in the
 [root README › Adoption](../README.md#adoption-the-bootstrap-path) — which counts the install as
 "step 0" and this one as "step 1", because it numbers from before the point where this page starts.
 
+> **The adoption commit lands on the trunk, and it is the one exception — it is spent by using it**
+> (inbound [#1085](https://github.com/DaveKJohn/claude-code-specialists/issues/1085)). Everything this
+> step and the next two write — the seam, the lenses, the two script scaffolds, the `@`-import, and the
+> whole `contributing-davekjohn/` folder if you enabled that workflow — is one sizeable commit, and it
+> **cannot** go through the branch-and-PR cycle it is installing. That is not a preference: `new-branch`
+> refuses without `scripts/lib/branch-info.ps1`, which is one of the files this step writes, so before it
+> there is no branch to put the work on. The gates are downstream of the same commit for the same reason
+> — the lint gate needs the `Get-LintScript` your repo answers in step 3, the test gate needs a suite
+> that does not exist yet, and the CI entry gate needs a workflow file step 3 places.
+>
+> So commit it directly, **say so in the commit message**, and let the cycle start with the *next*
+> change. Worth writing down because the documents you are handed on the same day say the opposite as a
+> rule: `contributing-davekjohn`'s contribution page describes a cycle in which every change goes
+> through a branch and a PR, and a `CLAUDE.md` written from this family's scaffolding carries "never
+> directly on `main`" as a safety rule. A reader who takes those literally on day one has a
+> contradiction with two exits, and both are wrong — hand-building a branch and a PR that can meet none
+> of the gates, or hesitating over the only commit that can possibly happen next.
+
 **What it should report, so you can check it rather than trust it** (inbound
 [#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). With only the core `team-alpha`
 plugin enabled, the closing line reads:

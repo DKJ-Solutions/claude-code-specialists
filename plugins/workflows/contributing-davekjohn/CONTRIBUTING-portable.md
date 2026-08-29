@@ -23,6 +23,17 @@ single source for their own flags and behaviour — this page is the connective 
 second description of each one. A repo that keeps a local copy of any of these scripts has taken on a
 second source; [`scripts/README.md`](scripts/README.md) says why that is the one thing to avoid.
 
+**One commit in your repo's history did not come through this cycle, and could not have.** The commit
+that *adopted* this workflow lands directly on the trunk — the seam, the lenses, the script scaffolds
+and this folder, in one go — because `new-branch` refuses without `scripts/lib/branch-info.ps1`, and
+that file is one of the things the adoption writes. Before it there is no branch to put the work on;
+after it, the cycle below applies to everything. The gates are downstream of the same commit for the
+same reason: the lint gate needs the script your repo names, the test gate needs a suite, and the CI
+entry gate needs a workflow file the adoption places. **It is one exception and it is spent by using
+it** — so if your repo's history opens with a trunk commit, that is the one, and every change after it
+belongs on a branch (inbound
+[#1085](https://github.com/DaveKJohn/claude-code-specialists/issues/1085)).
+
 ---
 
 ## The cycle
