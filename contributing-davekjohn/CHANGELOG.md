@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/record-shape-pathless-arm-v1` · 20260829-193738
+
+`[RECORD-SHAPE]`'s pathless line stops telling most readers a story about their own repo that is not true.
+
+The arm fires on one conjunction -- no install record for this path, and a pathless one exists -- and read
+that as a demotion: *"the shape a SESSION START leaves behind when it demotes a 'project' record"*, *"this
+repo simply no longer has its own record"*, *"Re-install at project scope from this root."* That conjunction
+is equally the resting state of every plugin somebody installed machine-wide on purpose, in every repo that
+never project-installed it. So the line fired at every session start, for a deliberate install shape, and
+closed by instructing the reader to convert it into a per-repo one.
+
+No predicate can separate the two: #323 measured that the demotion writes `scope=user` and drops
+`projectPath`, which is byte-for-byte an ordinary user install. So the arm keeps firing -- a silently lost
+record must not go back to being unreported -- and stops claiming. It states what it can see, then asks the
+one question the reader answers instantly and the register cannot answer at all, with both branches written
+out including the one that says no action is needed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer with a machine-wide plugin install has been reading this line at every session start, in every
+repo, with a re-install instruction that should not be followed. Following it converts a deliberate
+machine-wide install into a per-repo one and adds a record nobody wanted -- so the cost was never only
+attention.
+
+**Score:** 4
+
+#### Pull Request
+
+the pathless-only record-shape line reports what it can see instead of asserting a history it cannot
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1106](https://github.com/DaveKJohn/claude-code-specialists/pull/1106)
+
+---
+
 ### DEPLOY: `fix/testrun-2-cut-release-and-adoption-defects-v1` · 20260829-183627
 
 Three defects testrun 2 found in the layer a fresh consumer meets first, all of them in the release cut and
