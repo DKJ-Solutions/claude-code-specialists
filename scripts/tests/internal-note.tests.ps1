@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Regression tests for scripts/release/new-internal-note.ps1 -- the third release tier's skeleton
     generator (releases/internal/<dir>/<X.Y.Z>.md, for colleagues and management).
