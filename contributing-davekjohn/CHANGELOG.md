@@ -32,6 +32,98 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-status-in-the-annotation-gets-the-same-care-as-the-reason-v1` · 20260829-232217
+
+The annotation a failed `claude-review` leaves behind can no longer be garbled or forged by a field
+this repo does not own.
+
+That step reads upstream's `api_error_status` and puts it on a workflow-command line, where three
+variables meet and only `reason` was escaped. `status` reached the same line twice: through the `*)`
+headline, and through `short`, which lands in the annotation TITLE -- the one place a comma or a `::`
+is command syntax. The comment above the case block already stated that rule, and the only branch
+interpolating a variable there was the only one that could not honour it.
+
+Closed on all three axes -- newline, percent, title -- without asserting anything about upstream. The
+status is single-lined and capped where it is read, the fourth `short` is a literal like its three
+siblings, and `headline` is percent-escaped at both emit sites. The alternative #1118 offered was to
+leave the asymmetry and record why it is safe, which requires claiming `api_error_status` is
+status-shaped by construction; that is a claim about somebody else's field, and #1112 is what such
+claims have already cost here. Three asserts pin the shape, and each was shown to fail against the
+code as it stood.
+
+It also repairs a neighbouring assert that this change turned red. #1119 pinned the reason's
+300-character cap by matching the SHAPE of its jq slice, above a comment predicting that a second
+slice added elsewhere "would go unread here rather than caught". A second slice arrived one line
+above it, and the outcome was worse than unread: being earlier in the file it won the match, so the
+assert reported 32 against a cap nobody had touched. It now binds to `.result`, the status cap has an
+assert of its own, and the two can move independently.
+
+Nothing has broken yet, which is the point: all 45 titled failure annotations this workflow left on
+August 27-29, 2026 came from the `429` branch, whose headline is a literal, so the `*)` branch has not
+been observed running. The failure it prevents is a diagnostic that renders wrong -- or emits a second,
+forged workflow command -- in the one step whose whole job is explaining why a run went red.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+`.github/workflows/claude-code-review.yml` is this repo's own CI and travels in no plugin, so no
+consumer installs it and no subscriber of the service can observe the change.
+
+**Score:** N/A
+
+#### Pull Request
+
+The annotation's status gets the same care as its reason
+
+[PR #1120](https://github.com/DaveKJohn/claude-code-specialists/pull/1120)
+
+---
+
+### DEPLOY: `fix/adoption-handover-and-jsonc-caveat-v1` · 20260829-231836
+
+Adoption stopped being a path a consumer can only complete by guessing. Four places told the reader to
+run `specialists-init`; that reader is usually the model, and `disable-model-invocation` structurally
+forbids it — while the same flag hides the page documenting the route, so it could not even learn the
+skill exists. All four now name the command and who types it — two of those wordings reached `main`
+ahead of this branch, through #1111's lint rule against printing an instruction that names a skill
+the reader is barred from running; this branch carries the remaining two, in
+`check-script-contract.ps1` and `orchestrator/SKILL.md`, and the recorded reasoning behind all four,
+which that rule landed without. Separately, the instruction that copies
+`settings.suggested.jsonc` into strict-JSON `settings.json` now says the `//` lines have to go.
+
+The flag stays, deliberately: dropping it would have loaded this skill's description into every
+session of every consumer, forever, for something that happens once per repo. That decision is now
+written on the skill page rather than left implicit, together with the reason a runbook cannot claim
+to run adoption end to end on its own.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Two failures a consumer could not diagnose from inside their own repo. The first left a fresh session
+told to act with nothing it could act on, one absolute path away from running the bootstrap itself —
+the substitution the refusal exists to prevent. The second is worse for being silent: copying the
+proposal's comments into `settings.json` makes Claude Code discard the **whole** file, so `deny`
+(`git push --force`, `git reset --hard`, `rm -rf`), `allow`, `enabledPlugins` and
+`extraKnownMarketplaces` were all inactive behind one startup line that says *malformed JSON* rather
+than *your safety rules are off*.
+
+**Worth one check on an already-adopted repo:** if `.claude/settings.json` was filled from the
+proposal, confirm it parses. If it does not, nothing in it has ever been in force.
+
+**Score:** 4
+
+#### Pull Request
+
+The adoption path becomes followable: the handover is named, and the JSONC trap is warned about
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1105](https://github.com/DaveKJohn/claude-code-specialists/pull/1105)
+
+---
+
 ### DEPLOY: `fix/the-annotation-fits-the-relay-that-carries-it-v1` · 20260829-230428
 
 The two caps that bound a red `claude-review`'s explanation -- the workflow's 300 on the reason it

@@ -284,7 +284,14 @@ $presentLibs = @($contractLibs | Where-Object { Test-Path -LiteralPath (Join-Pat
 if ($contractLibs.Count -gt 0 -and $presentLibs.Count -eq 0) {
     # Same non-counting shape as the roster check's marker, and for the same reason: nothing is
     # broken, the repo-side setup simply has not happened.
-    Write-Host ("  [BOOTSTRAP] this repo has none of the libs the shared workflow scripts expect (" + ($contractLibs -join ', ') + ") -- it has not been set up yet. Nothing is broken: those files are what the 'specialists-init' skill puts down as scaffolds for you to fill in. Run that skill; until then this check reports nothing further, because every required function would otherwise be listed against a file that does not exist yet.") -ForegroundColor Yellow
+    #
+    # NAMES THE COMMAND AND WHO TYPES IT (inbound #1093 / #1096) -- the second of the two SessionStart
+    # hooks that told a fresh consumer's model to "run that skill" while disable-model-invocation
+    # forbids exactly that. Full reasoning at the twin site in check-roster-sync.ps1's [BOOTSTRAP]
+    # marker; the short of it is that the refused model's next move is the absolute path into the
+    # plugin cache, and this line is where that temptation is created. The 'adopt-workflow-folder'
+    # imperative further down is NOT the same case and stays as it is: that skill carries no flag.
+    Write-Host ("  [BOOTSTRAP] this repo has none of the libs the shared workflow scripts expect (" + ($contractLibs -join ', ') + ") -- it has not been set up yet. Nothing is broken: those files are what /team-alpha:specialists-init puts down as scaffolds for you to fill in. That command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. Until then this check reports nothing further, because every required function would otherwise be listed against a file that does not exist yet.") -ForegroundColor Yellow
     Write-CheckSummary
     exit 0
 }
