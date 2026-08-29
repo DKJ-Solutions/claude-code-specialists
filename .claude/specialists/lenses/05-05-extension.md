@@ -392,7 +392,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   collision. The two halves only work together: backgrounding without a lane is what yanks HEAD, and a
   lane with a foreground ship saves nothing. The script now prints both at the moment it begins to wait,
   and the rule with its measurements is in
-  [`contributing-davekjohn/CONTRIBUTING.md`](../../../contributing-davekjohn/CONTRIBUTING.md#24-merge-the-pr)
+  [`contributing-davekjohn/CONTRIBUTING.md`](../../../contributing-davekjohn/CONTRIBUTING.md#34-merge-the-pr)
   and the [`ship-pr` skill](../../../plugins/workflows/contributing-davekjohn/skills/ship-pr/SKILL.md#the-wait-runs-in-the-background-and-that-is-the-default).
   Two bigger shapes were named and declined there rather than overlooked; #985 stays open as their home.
 - **`main` moves under a long branch, and the green gate you ran proves nothing about the merged
