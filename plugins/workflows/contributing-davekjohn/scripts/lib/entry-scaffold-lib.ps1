@@ -3404,6 +3404,70 @@ function Get-EntryHeadingPattern {
     return '^#{' + (Get-EntryHeadingLevel) + '}\s'
 }
 
+function Get-FoldedEntryForBranch {
+    <#
+        Pure: the entry ALREADY IN the changelog whose heading names $Branch, or $null when there is
+        none. Returns Heading (the literal line) and PrNumber (the number on its '[PR #NN](url)' closing
+        line, or 0 when it carries none).
+
+        WHAT IT IS FOR. fold-changelog-entry.ps1 wrote a second entry for a branch that already had one
+        and reported both folds as a success -- measured in a consumer, two entries with the same text
+        and two different PR numbers (inbound #1082). The route in was #1077, and closing that closes
+        this way in; what this function exists for is that the step which actually WRITES the record had
+        nothing to say about writing it twice.
+
+        THE BRANCH NAME IS THE KEY, AND THE STAMP IS NOT. The fold writes the stamp at fold time, so the
+        duplicate carried a different one -- which is exactly why nothing matched. The branch name is
+        sound instead: a second cycle on the same subject is '-v2' by construction (new-branch completes
+        the name and says so), so two entries naming one branch is not a state the cycle can reach
+        legitimately. The entry TEXT is not a key either: two branches may describe the same change in
+        the same words, and refusing that would refuse honest work.
+
+        MATCHED BETWEEN THE BACKTICKS, NOT BY SUBSTRING. '`feat/a-v1`' must not answer for 'feat/a', and
+        a substring test says it does -- so the name is compared to what the heading actually delimits.
+        Headings inside fenced code are skipped for the reason every other reader in this file skips
+        them: a changelog entry quoting a heading in an example is describing one, not being one.
+
+        AND AN ENTRY WHOSE HEADING NAMES NO BRANCH CANNOT BE MATCHED, which is a real limit rather than a
+        gap to close: an entry written before the DEPLOY heading carried the branch has nothing to key on,
+        so the fold folds it exactly as it always did. The guard is as good as the format that carries the
+        name, and every entry written since that heading arrived carries it.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$ChangelogText,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Branch
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ChangelogText) -or [string]::IsNullOrWhiteSpace($Branch)) { return $null }
+
+    $wanted = $Branch.Trim()
+    $lines = ($ChangelogText -replace "`r`n", "`n").Split("`n")
+    $fenced = Get-FencedLineFlags -Lines $lines
+    $headingRx = [regex](Get-EntryHeadingPattern)
+
+    # Two passes in one walk: find the heading, then read forward to the next entry boundary for the PR
+    # line. The first match wins -- the list is newest-first, so it is the most recent of a duplicated
+    # pair, which is the one a reader would be told about.
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($fenced[$i]) { continue }
+        if (-not $headingRx.IsMatch($lines[$i])) { continue }
+        $names = [regex]::Matches($lines[$i], '`([^`]+)`')
+        $isMine = $false
+        foreach ($n in $names) { if ($n.Groups[1].Value.Trim() -eq $wanted) { $isMine = $true } }
+        if (-not $isMine) { continue }
+
+        $pr = 0
+        for ($j = $i + 1; $j -lt $lines.Count; $j++) {
+            if (-not $fenced[$j] -and $headingRx.IsMatch($lines[$j])) { break }
+            $m = [regex]::Match($lines[$j], '\[PR #(\d+)\]')
+            if ($m.Success) { $pr = [int]$m.Groups[1].Value; break }
+        }
+        return [pscustomobject]@{ Heading = $lines[$i]; PrNumber = $pr }
+    }
+
+    return $null
+}
+
 function Get-EntryBlockHeadingLevel {
     <#
         Pure: the level of the heading an entry block OPENS with -- 2 for a block written in the flat

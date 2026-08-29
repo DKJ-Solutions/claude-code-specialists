@@ -439,6 +439,19 @@ before you use this skill.
 
 ## Important
 
+- **Re-running it on a branch that already shipped is safe, and says so.** Step 1 stops on a merged PR
+  and step 2 recognises the same state for itself, so the run ends `PR #N for '<branch>' is already
+  merged -- nothing to ship` on exit 0 rather than on an error naming `gh` authentication ([inbound
+  #1077](https://github.com/DaveKJohn/claude-code-specialists/issues/1077)). The local branch survives a
+  merge — `--delete-branch-on-merge` removes the remote one only — so this is exactly what a second
+  session, an interrupted wait, or a `git checkout <branch>` out of habit sets up. And the *fold* refuses
+  a second entry for a branch the changelog already carries, which is the other half of the same route
+  ([#1082](https://github.com/DaveKJohn/claude-code-specialists/issues/1082)).
+- **Do not redirect this script's stderr.** It runs `open-pr.ps1` as a child process on purpose, and
+  under Windows PowerShell 5.1 a `2>&1` on the parent turns every stderr line the child writes into a
+  `NativeCommandError` record — which collapses the output to a truncated path fragment and hides the
+  one line you need. The child's stderr is normal output here; leave it alone and read it as it comes.
+  Two runs were spent on this before the real message was seen.
 - **Known test gap, stated rather than implied.** Like `open-pr`, this orchestrator drives live `git`
   and `gh` against a real remote and is not covered by an automated suite. The sub-steps it calls are
   each tested on their own — step 6 was extracted into its own script for exactly that reason, being the

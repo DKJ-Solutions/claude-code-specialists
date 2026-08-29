@@ -759,6 +759,45 @@ $idxWatch   = $shipText.IndexOf("'--watch'")
 $idxVerdict = $shipText.IndexOf('Get-MergeBlockVerdict')
 Assert-True ($idxWatch -ge 0 -and $idxVerdict -gt $idxWatch) 'the wait still happens FIRST and the verdict second -- #831 kept the wait, #943 changed only the verdict'
 
+
+# --- Get-PrCreateFailureReason: gh's own answer, not a guess (inbound #1077) -----------------------
+# open-pr replaced gh's message with "Creating the PR failed (is gh logged in?)" on a run where gh had
+# just listed PRs, pushed and read the issue list -- so the loudest line on screen named the one thing
+# that was demonstrably fine, and sent the reader to gh auth status, then to their token, then to their
+# network, for a branch that was in fact completely finished.
+Write-Host "Get-PrCreateFailureReason -- the reason gh actually gave" -ForegroundColor Cyan
+$ghFail = @(
+    'Creating pull request for docs/audience-note-v1 into main in DaveKJohn/thumbnail-generator',
+    '',
+    'pull request create failed: GraphQL: No commits between main and docs/audience-note-v1 (createPullRequest)'
+)
+Assert-Equal 'pull request create failed: GraphQL: No commits between main and docs/audience-note-v1 (createPullRequest)' `
+    (Get-PrCreateFailureReason -OutputLines $ghFail) 'create failure: the reason is gh''s last line, not its progress line'
+Assert-Equal 'boom' (Get-PrCreateFailureReason -OutputLines @('boom', '', '   ')) 'create failure: trailing blank lines are not the reason'
+Assert-Equal 'trimmed' (Get-PrCreateFailureReason -OutputLines @('  trimmed  ')) 'create failure: the line comes back trimmed'
+# EMPTY IS THE ONE CASE THE OLD MESSAGE WAS RIGHT FOR, so it has to be distinguishable: a gh that printed
+# nothing leaves the caller with nothing better than a hint about the environment.
+Assert-Equal '' (Get-PrCreateFailureReason -OutputLines @()) 'create failure: no output yields no reason'
+Assert-Equal '' (Get-PrCreateFailureReason -OutputLines @('', '  ')) 'create failure: blank output yields no reason either'
+Assert-Equal '' (Get-PrCreateFailureReason -OutputLines $null) 'create failure: and $null is not a crash'
+
+# AND OPEN-PR ASKS FOR IT, plus the merged lookup that stops the run ever reaching that failure. Both are
+# call-site asserts for the same reason the ship-pr ones below are: a reverted caller leaves every assert
+# above green while the script behaves exactly as it did before.
+$openPrPath = Join-Path $PSScriptRoot '..\release\open-pr.ps1'
+Assert-True (Test-Path -LiteralPath $openPrPath) 'open-pr.ps1 exists where this suite looks for it'
+$openText = [System.IO.File]::ReadAllText((Resolve-Path $openPrPath).Path, [System.Text.Encoding]::UTF8)
+Assert-True ($openText -like '*Get-PrCreateFailureReason -OutputLines $create.Output*') 'open-pr reports gh''s own reason for a failed create'
+Assert-True ($openText -like "*'--state', 'merged'*") 'open-pr asks whether the branch has an ALREADY-MERGED PR'
+Assert-True ($openText -like '*is already merged -- nothing to open*') 'and says so as its own outcome rather than failing'
+$idxOpenLookup = $openText.IndexOf("'--state', 'open'")
+$idxMergedLookup = $openText.IndexOf("'--state', 'merged'")
+Assert-True ($idxOpenLookup -ge 0 -and $idxMergedLookup -gt $idxOpenLookup) 'the merged lookup is the FALLBACK -- an open PR is still the first answer'
+$idxCreate = $openText.IndexOf("'pr', 'create'")
+Assert-True ($idxCreate -gt $idxMergedLookup) 'and it sits above the create, which is the path it exists to keep the run off'
+
+$shipMergedText = [System.IO.File]::ReadAllText((Resolve-Path (Join-Path $PSScriptRoot '..\release\ship-pr.ps1')).Path, [System.Text.Encoding]::UTF8)
+Assert-True ($shipMergedText -like '*is already merged -- nothing to ship*') 'ship-pr reads the same state for itself, since it is runnable on its own'
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
