@@ -880,6 +880,40 @@ $idxProceed = $shipText.IndexOf('a check FAILED but the merge is not blocked')
 $idxSpoken  = $shipText.IndexOf('Get-AuthoredFailureNote')
 Assert-True ($idxProceed -ge 0 -and $idxSpoken -gt $idxProceed) 'the reason is printed under that warning, where the reader has just landed'
 Write-Host ""
+# --- The PRODUCER of the annotation everything above relays (issue #1118) -------------------------
+# Asserted on the workflow text for exactly the reason cut-release-guardrail gives for asserting on
+# ci.yml: a workflow is the one caller no suite gets to run. Everything above this line tests the
+# CONSUMER -- Get-AuthoredFailureNote reading what the check left behind -- so a regression in what
+# claude-code-review.yml is allowed to PUT there would leave every assert in this file green.
+#
+# Three properties, one per way `status` could reach a workflow command unescaped. It is upstream's
+# field, this repo cannot measure its domain, and #1112 is the standing reminder not to claim
+# otherwise -- so these pin the SHAPE that needs no claim rather than a belief about the value.
+$reviewYmlPath = Join-Path $PSScriptRoot '..\..\.github\workflows\claude-code-review.yml'
+Assert-True (Test-Path -LiteralPath $reviewYmlPath) 'claude-code-review.yml exists where this suite looks for it'
+$reviewYml = [System.IO.File]::ReadAllText((Resolve-Path $reviewYmlPath).Path, [System.Text.Encoding]::UTF8)
+
+Write-Host ""
+Write-Host "claude-code-review.yml -- what may reach the annotation (#1118)" -ForegroundColor Cyan
+
+# 1. The newline axis. A command substitution strips TRAILING newlines and keeps internal ones, and a
+#    workflow command counts at the START of a line -- so an unsplit status is a forgery surface.
+Assert-True ($reviewYml -like '*(.api_error_status // "") | tostring | split(*') 'the status is single-lined where it is read, the same treatment the reason beside it gets'
+
+# 2. The title axis. The comment above the case block states that the annotation TITLE may hold
+#    neither a comma nor a '::' -- and until #1118 the one branch that could not know what it was
+#    putting there was the only one putting a variable there.
+$shortLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -match '\bshort=' })
+Assert-True ($shortLines.Count -ge 4) 'every case branch still sets a short form'
+Assert-True (-not ($shortLines | Where-Object { $_ -like '*$status*' })) 'and none interpolates the status into it -- the short form IS the title, where a comma or a :: is command syntax'
+
+# 3. The percent axis. The runner percent-DECODES a command's data, so an unescaped %0A renders as a
+#    newline. `reason` was escaped from the start; `headline` needs it too now that it carries status.
+$errLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -like '*::error title=claude-review*' })
+Assert-True ($errLines.Count -eq 2) 'the annotation is emitted from exactly two places -- one with a reason, one without'
+Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and BOTH escape the headline, which is the variable the case block interpolates the status into'
+Assert-True (($errLines | Where-Object { $_ -like '*${reason//%/%25}*' }).Count -eq 1) 'while the reason keeps its own escape on the one line that carries it'
+
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1
