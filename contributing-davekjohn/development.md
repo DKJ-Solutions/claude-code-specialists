@@ -33,23 +33,72 @@
 
 ### PLAN
 
-PR #1111 rewrote seven printed instructions. Five say 'run X -- that command must be TYPED by the repo owner'; the two roster-sessioncheck hook lines say 'ask the repo owner to type X', which is the form #1096 measured and rejected: correct for the model, odd for the owner reading it on their own terminal.
+PR #1111 rewrote seven printed instructions so that none of them names a skill barred to its reader.
+Five of the seven came out in one voice and **two came out in another**, and the two are the
+`roster-sessioncheck` hook lines:
+
+| Site | Wording |
+|---|---|
+| `check-roster-sync.ps1` (both), `adopt-config.ps1`, `adopt-shopify-floor.ps1`, `INSTALL.md` | *run X -- that command must be **TYPED by the repo owner*** |
+| `roster-sessioncheck.ps1` (both) | *ask the repo owner to type X* |
+
+#### The second form is the one #1096 measured and rejected
+
+It is not a style preference. `check-roster-sync.ps1`'s `[BOOTSTRAP]` marker carries the reasoning in
+full, written when that line was repaired:
+
+> **DUAL AUDIENCE, WHICH IS WHY THIS IS NOT THE REPORT'S LITERAL WORDING.** The report proposed
+> "Ask the user to run ..." -- correct for the model and **odd for the OWNER**, who reads this same line
+> on their own terminal and is not a third party to themselves.
+
+The hook is exactly the reader that reasoning is about, and the worst place to get it wrong: a
+SessionStart hook is the first thing in context on a fresh consumer, at the top of **every** session
+until the repo is adopted. Dave reading his own terminal is told to ask himself.
+
+#### Why this is a separate branch rather than a fix inside #1111
+
+#1111 was already in CI when this was spotted, and pushing to a branch a background `ship-pr` is
+mid-merge on is how a green run gets merged at the wrong SHA. The wording is not wrong enough to be
+worth that risk; it is wrong enough not to leave.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Both hook lines rewritten into the same form the other five use, with a comment saying why that
+      form and not the other -- pointing at the `[BOOTSTRAP]` marker rather than restating its reasoning.
 
 ### TEST
 
+- [x] `roster-sync.tests.ps1`: 333 asserts pass.
+- [x] **One assert had to move with it**, and it is the assert #1111 itself added. It pinned the literal
+      words `cannot start it`, which this wording no longer contains; it now pins `TYPED by the repo
+      owner`, which is the half that carries the meaning. An assert on the words rather than on the claim
+      is the reason it needed touching twice in two branches.
+- [x] The lint gate is green, check 30 included -- both new lines name the command rather than the skill.
+
 ### DEPLOY: `fix/the-hook-handover-uses-the-owners-own-voice-v1`
 
-**Score:**
+The two `roster-sessioncheck` hook lines now hand the reader `/team-alpha:sync-roster` in the same words
+the other five repaired sites use -- *"that command must be TYPED by the repo owner"* -- instead of
+*"ask the repo owner to type"*.
+
+Both forms tell a model the right thing. Only one of them also reads correctly to the **owner**, who sees
+this same line on their own terminal and is not a third party to themselves; that is the dual-audience
+reasoning `check-roster-sync.ps1`'s `[BOOTSTRAP]` marker already carries, and PR #1111 applied it to five
+of its seven sites and not to these two. A SessionStart hook is the worst place for the gap: on a fresh
+consumer it is the first thing in context, in every session, until the repo is adopted.
+
+**Score:** 1
 
 #### What makes this deploy extra special
 
-**Score:**
+The repair that introduced the inconsistency was the repair for inconsistent instructions. Check 30 could
+not have caught it -- both forms pass, because both name the command rather than the skill. What the gate
+guarantees is that a message is *followable*; whether it is followable **by the person actually reading
+it** is still a judgement, and this is the second time that particular judgement has had to be made in
+the same file.
+
+**Score:** 1
 
 #### Pull Request
 
 The roster hook's handover speaks to the owner in their own voice, like the other five sites
-

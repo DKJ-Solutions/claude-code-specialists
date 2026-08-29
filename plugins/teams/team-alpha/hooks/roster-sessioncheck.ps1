@@ -231,8 +231,14 @@ try {
         # carries disable-model-invocation, which removes the skill's page from context entirely. A
         # session told to run it is refused by the harness and cannot even read what it was refused.
         # Check 30 of check-plugin-integrity.ps1 now holds every printed message to this.
-        Write-Host '  (ask the repo owner to type /team-alpha:sync-roster -- it stages the catch-up, and'
-        Write-Host '   the skill is reserved for explicit user invocation, so an agent cannot start it.)'
+        #
+        # AND THE WORDING IS 'run X -- typed by the owner', NOT 'ask the owner to type X'. Both are
+        # correct for the model and only one is correct for the OWNER, who reads this same line on their
+        # own terminal and is not a third party to themselves. That is the reasoning check-roster-sync's
+        # [BOOTSTRAP] marker carries in full; these two lines are the same message at the hook layer, so
+        # they take the same form rather than a second one.
+        Write-Host '  (run /team-alpha:sync-roster to stage the catch-up -- that command must be TYPED'
+        Write-Host '   by the repo owner, because the skill is reserved for explicit user invocation.)'
     } elseif ($bootstrapLines.Count -gt 0) {
         # Its own verdict, not folded under the in-sync line and not under drift: "not set up yet" is a
         # different situation from both, with a different action. This is the branch that replaces the
@@ -286,10 +292,10 @@ try {
         # still something to know, and it would otherwise be swallowed by exactly that reassurance.
         foreach ($line in $orphanLines) { Write-Host "  $($line.Trim())" }
         if ($orphanLines.Count -gt 0) {
-            # Same handover as the drift branch above, and the same reason: this is a SessionStart hook,
-            # so the reader is the model, and 'sync-roster' is barred to it.
-            Write-Host '  (ask the repo owner to type /team-alpha:sync-roster -- it stages the catch-up,'
-            Write-Host '   and an agent cannot start it: the skill is reserved for explicit user invocation.)'
+            # Same handover as the drift branch above, in the same words and for the same reason: this is
+            # a SessionStart hook, so the reader is the model, and 'sync-roster' is barred to it.
+            Write-Host '  (run /team-alpha:sync-roster to stage the catch-up -- that command must be'
+            Write-Host '   TYPED by the repo owner: the skill is reserved for explicit user invocation.)'
         }
     } else {
         Write-Host "roster-sessioncheck: the roster check could not complete (exit $code)."
