@@ -868,8 +868,16 @@ function Get-RecordShape {
     $hasPathless = [bool]($InstallRecord.PathlessById.ContainsKey($PluginId) -and @($InstallRecord.PathlessById[$PluginId]).Count -gt 0)
 
     if (-not $hasForPath) {
-        # No record for this path. Only a finding when a PATHLESS one exists -- that is the demotion; with
-        # neither, the plugin has no evidence here at all and that belongs to [NOT-INSTALLED-HERE].
+        # No record for this path. Only a finding when a PATHLESS one exists; with neither, the plugin has
+        # no evidence here at all and that belongs to [NOT-INSTALLED-HERE].
+        #
+        # THIS CONJUNCTION IS NOT "THE DEMOTION", and saying so here is what put a false cause into the
+        # reader's line (inbound #1095). It is the demotion AND the resting state of every correctly
+        # user-installed plugin in a repo that never project-installed it -- two states the register cannot
+        # separate, because #323 measured that the demotion writes scope='user' and drops projectPath,
+        # producing byte-for-byte the shape of an ordinary machine-wide install. The shape name is therefore
+        # exactly what it says -- 'pathless-only', an observation -- and the report that consumes it asks
+        # the reader which of the two it is instead of picking one.
         if (-not $hasPathless) { return $null }
 
         $plRecs = @($InstallRecord.PathlessById[$PluginId])
