@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/the-adoption-commit-lands-on-the-trunk-v1` · 20260829-155225
+
+The adoption now says that **the adoption commit itself lands on the trunk**, and why that is not a
+choice: `new-branch` refuses without `scripts/lib/branch-info.ps1`, which is one of the files the
+bootstrap writes, so before it there is no branch to put the work on -- and the lint, test and CI
+gates are all downstream of the same commit. It is one exception, and it is spent by using it.
+
+Written in two places, because the reader meets the contradiction twice: `plugins/ADOPTION.md` at
+the step where the bootstrap runs, and `CONTRIBUTING-portable.md` beside the rule it contradicts, so
+a consumer's own contributors find it a year later without reading the adoption page.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing is broken and nothing needed bridging -- the adoption works, and the very next change on the
+measured repo went through the full cycle. What this costs a consumer is confidence on the first
+day, in a repo where they have no prior for which rules are firm: they are handed a cycle that says
+every change goes through a branch and a PR, and a `CLAUDE.md` that says never directly on `main`,
+and then the only act available to them contradicts both. Both exits from that were wrong, and the
+one that was taken had to write the reason into a commit message by hand.
+
+**Score:** 3
+
+#### Pull Request
+
+the adoption page says that the adoption commit itself cannot travel through the cycle it installs
+
+Plugins: contributing-davekjohn
+
+[PR #1092](https://github.com/DaveKJohn/claude-code-specialists/pull/1092)
+
+---
+
 ### DEPLOY: `docs/a-repo-with-no-required-check-v1` · 20260829-154001
 
 A private repository on the GitHub Free plan cannot have branch protection -- the API answers
