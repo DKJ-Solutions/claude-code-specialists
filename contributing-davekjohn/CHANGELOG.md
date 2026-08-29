@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-quota-headline-stops-vouching-for-upstreams-reset-time-v1` · 20260829-220455
+
+A red `claude-review` still tells you the account is out of quota and which limit it hit — but it no longer
+tells you **when work resumes**, because that half is upstream's and has been measured wrong by 2.5 days.
+The headline now names the discrepancy and attributes the time to upstream, so an operator reading `ship-pr`'s
+relayed line does not write off three days that turn out to be forty minutes.
+
+The repair went into the workflow that writes the sentence, not into the relay that carries it: the relay is
+generic on purpose and cannot know which authors are reliable, so a caveat there would caveat every workflow
+in every consuming repo.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the third time a claim about upstream behaviour written into this workflow has been corrected by
+measuring it — a run tally wrong by 3x (#974), the wrong clock entirely (#1055), and now a reset time wrong by
+2.5 days. So the change is not only the sentence: the comment block now carries the rule the three of them
+add up to. **The headline states only what the STATUS proves; everything the `result` STRING says is
+attributed to upstream rather than asserted.** The status proves the account is out of quota and that a re-run
+adds none. It proves nothing at all about when the quota comes back.
+
+**Score:** 2
+
+#### Pull Request
+
+The quota headline stops vouching for upstream's reset time
+
+Plugins: contributing-davekjohn
+
+[PR #1115](https://github.com/DaveKJohn/claude-code-specialists/pull/1115)
+
+---
+
 ### DEPLOY: `fix/the-hook-handover-uses-the-owners-own-voice-v1` · 20260829-215113
 
 The two `roster-sessioncheck` hook lines now hand the reader `/team-alpha:sync-roster` in the same words
