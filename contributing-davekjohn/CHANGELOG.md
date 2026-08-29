@@ -32,6 +32,52 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/thumbnail-generator-joins-the-connector-register-v1` · 20260829-115234
+
+`thumbnail-generator` is the sixth connector in the register. The repo was split out of `life-hub`
+on August 29, 2026 as the DJ Cylow thumbnail pipeline's own repo, adopted `team-alpha` and
+`contributing-davekjohn` the same morning, and had been running unregistered ever since -- no plugin
+version check, no lens inventory, no agent-def drift check reaching it from here.
+
+Two things about this entry are worth more than the file it adds.
+
+**The `[UNREGISTERED]` marker did the job it was invented for.** It was added on July 28, 2026 after
+a third consumer had been running, and filing inbound issues, unregistered for days before anyone
+noticed. Here the gap lasted hours, and the consumer's session turned it into a written issue on its
+own repo instead of a line in a transcript nobody reads twice.
+
+**The registration deliberately waited for the consumer's own install PR to merge**, and that is the
+first time that wait is the whole decision rather than a note afterwards. Check 3 reads the
+consumer's working tree; registering 19 extensions while their `main` still held none would have
+reported all 19 as missing and put this entry in the report red on the day it was written. The
+plugin-id rule in `connectors/README.md` already says the register books what a consumer HAS rather
+than what it is expected to have next -- this is that rule met from the other end, before the file
+existed rather than after an id went stale.
+
+Measured after their merge and not taken from the PR: `team-alpha@` and `contributing-davekjohn@`
+enabled under their post-August-26 names, 19 lens files against the 15 agents + 4 personas
+`team-alpha` ships, and the four personas on the lens-only model. One thing is left open on purpose
+-- this machine holds no install record for that checkout, so check 4 reports
+`[NOT-INSTALLED-HERE]` until a session actually starts there and Claude Code writes the record
+itself. That is the machine's state, not this register's, and nothing here can write it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing reaches the subscriber of a service here: this is one repo's maintainer regaining sight of
+another repo he owns.
+
+**Score:** N/A
+
+#### Pull Request
+
+thumbnail-generator joins the connector register
+
+[PR #1067](https://github.com/DaveKJohn/claude-code-specialists/pull/1067)
+
+---
+
 ### DEPLOY: `docs/test-examples-cite-gates-as-coverage-v1` · 20260829-110356
 
 `DEVELOPMENT-portable.md` no longer tells you to report the standing gates as an outcome in TEST. Its
