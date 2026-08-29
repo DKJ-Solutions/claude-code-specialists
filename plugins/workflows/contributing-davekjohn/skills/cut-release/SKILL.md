@@ -65,10 +65,24 @@ small there, on one attachment, and nothing said whether it counted.
 
 **AND ON A RELEASE TYPE THAT WRITES NO DOCUMENT, THE REQUIREMENT IS CONDITIONAL — say so rather than
 leaving the figure nowhere to go** (same report). Step 4 states that **a patch writes no document at
-all**, and `Get-ReleaseConsumerBumps` computes `('minor','major')` as its default — so in every repo
-that leaves that seam alone, the release type cut most often has no organisational section for this
-number to land in. The instruction does not fail loudly there; it simply has no object, and the figure
-evaporates into the closing chat report, which the paragraph below names as insufficient.
+all**, and `Get-ReleaseConsumerBumps` is what decides which bumps get one. Its shipped fallback is
+`@()` — *the tier switched off* — so **in a repo that has never answered that seam, no release type has
+an organisational section for this number to land in**, and in a repo that answered it the way this
+source does (`('minor','major')`) the patch is the type left without one. Either way the instruction
+does not fail loudly; it simply has no object, and the figure evaporates into the closing chat report,
+which the paragraph below names as insufficient.
+
+**THIS PARAGRAPH NAMED `('minor','major')` AS THE SHIPPED DEFAULT UNTIL inbound
+[#1070](https://github.com/DaveKJohn/claude-code-specialists/issues/1070)**, which is the source repo's
+own answer in `repo-config.ps1` rather than the fallback in `cut-release.ps1`. The conclusion survived
+the correction and got wider: the sentence was drawing a conditional that, in an unanswered repo, is
+not conditional at all. It is worth the correction because this is the page a reader has open **while**
+they cut — it told a repo in exactly that shape that its minors and majors already produce a draft. The
+repo that reported it had every other half of the arrangement stated (`Get-ReleaseAudienceTier`,
+`Get-ReleaseNoteRoot`, the directory, its contributing page) and only this knob absent, so three places
+said the document existed while one unanswered seam switched it off. `check-script-contract` printed the
+*correct* fallback the whole time — the gate accurate and silent, this page confidently wrong, and
+nothing comparing the two.
 
 Two honest answers, and NOT a third:
 
