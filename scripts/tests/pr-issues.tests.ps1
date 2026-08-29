@@ -759,6 +759,12 @@ $idxWatch   = $shipText.IndexOf("'--watch'")
 $idxVerdict = $shipText.IndexOf('Get-MergeBlockVerdict')
 Assert-True ($idxWatch -ge 0 -and $idxVerdict -gt $idxWatch) 'the wait still happens FIRST and the verdict second -- #831 kept the wait, #943 changed only the verdict'
 
+# THE FALLBACK LINE IS ABOUT THE PAYLOAD, NOT ABOUT THE RULESET (inbound #1083). $line3 above already
+# proves a repo that requires NOTHING still gets a rendered report -- so the fallback is not that repo's
+# line, and wording it as one would send a reader with no ruleset looking for a setting they cannot have.
+Assert-True ($shipText -like '*no readable check facts*') 'ship-pr''s wait-report fallback names the payload it could not read'
+Assert-True ($shipText -notmatch 'which check governed could not be read') 'and no longer words that as a fault about the wait itself'
+
 
 # --- Get-PrCreateFailureReason: gh's own answer, not a guess (inbound #1077) -----------------------
 # open-pr replaced gh's message with "Creating the PR failed (is gh logged in?)" on a run where gh had

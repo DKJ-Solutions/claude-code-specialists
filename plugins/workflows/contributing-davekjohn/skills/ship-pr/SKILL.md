@@ -303,6 +303,27 @@ this chain must not do.
 code. Naming one here would be a claim about the consumer's CI that this script cannot keep — and it
 was the half of the "this is too repo-specific to share" argument that did not survive being read.
 
+### A repo with no required check at all
+
+**A private repository on the GitHub Free plan cannot have branch protection**, so it can have no
+required check — and that is the shape most new repos start in. Nothing here needs configuring for it,
+and two behaviours are worth knowing rather than deducing ([inbound
+#1083](https://github.com/DaveKJohn/claude-code-specialists/issues/1083)):
+
+- **the wait works unchanged**, because step 3 watches every check the PR has rather than a named or
+  required one;
+- **the merge verdict refuses on a red check rather than proceeding.** With nothing required,
+  `gh pr checks --required` exits non-zero, and *"this repo requires nothing"* is indistinguishable from
+  *"the required checks have not reported yet"* — so the verdict blocks. The repo without a ruleset is
+  guarded conservatively rather than left open.
+
+**The wait report is not where you learn whether a ruleset exists.** With nothing required it simply
+omits the required/not-required label and prints the rest of the line. The fallback —
+`waited 2s -- no readable check facts, so nothing to report about the wait` — means something else
+entirely: gh answered nothing, or no check in the payload carried a readable completion time. It used to
+read *"which check governed could not be read"*, which was reported from a fresh repo as sounding like a
+fault; it is a statement about the payload, and never about the ruleset.
+
 ### When the required check never appears at all
 
 After 180 seconds step 3 gives up and says so, without merging. That timeout usually means CI is slow —

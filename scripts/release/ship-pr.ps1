@@ -587,7 +587,14 @@ if ($checkFactsJson) {
 if ($waitReport) {
     Write-Host "  $waitReport" -ForegroundColor DarkGray
 } else {
-    Write-Host "  waited $(Format-CheckDuration -Seconds $waitedSec) -- which check governed could not be read" -ForegroundColor DarkGray
+    # WHAT THIS LINE ACTUALLY MEANS, said plainly since inbound #1083. It fires only when the CHECK FACTS
+    # could not be read -- gh answered nothing, or no check in the payload carries a readable completedAt.
+    # It does NOT mean the repo requires no check: Get-CheckWaitReport omits the required/not-required
+    # label in that case and still renders the line, which is why the report is not the place to learn
+    # whether a ruleset exists. Worth stating because the old wording ("which check governed could not be
+    # read") reads as a fault on a fresh repo whose owner has no prior for which parts of this toolchain
+    # to trust -- and the reporter of #1083 read it as the no-ruleset case, which it is not.
+    Write-Host "  waited $(Format-CheckDuration -Seconds $waitedSec) -- no readable check facts, so nothing to report about the wait" -ForegroundColor DarkGray
 }
 
 # --- Step 4: merge (no --admin: never bypass the CI gate) ----------------------------------------
