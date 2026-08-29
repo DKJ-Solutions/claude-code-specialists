@@ -31,3 +31,46 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `fix/testrun-2-cut-release-and-adoption-defects-v1` · 20260829-183627
+
+Three defects testrun 2 found in the layer a fresh consumer meets first, all of them in the release cut and
+the folder adoption.
+
+The cut no longer reads an ordinary root document as an unfolded changelog entry. Its branch-name test scans
+every heading, so a single backticked word in any heading below the title declared a branch and stopped the
+release -- which in a technical repo is close to unavoidable. The root scan now reads only the document's
+opening heading, which is where every real entry declares itself. And when it does refuse, it names `Get-ReservedRootMd` alongside the fold,
+because *"fold them first"* is the right remedy for one of the two ways that gate fires and a destructive one
+for the other.
+
+Every release document the cut generates is now free of trailing whitespace. The markdown hard break under
+`**Date:**` was two trailing spaces, which fails an ordinary lint rule -- and the cut runs its gate *before*
+those documents exist, so it cannot catch its own output: the failure surfaced on the next branch, on files
+that branch had not written. The break is kept, spelled as the backslash CommonMark also allows.
+
+And the `CHANGELOG.md` that `adopt-workflow-folder` scaffolds now states the heading level the fold actually
+writes, composed from `Get-EntryHeadingLevel` so the sentence cannot drift from the constant again.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer cutting their first release meets two of these three on that one command: the cut refuses over a
+run log or an `ADOPTION.md` and tells them to fold it -- which would paste that file into their changelog and
+delete it -- and once past that, their trunk fails its own lint gate on files the release wrote, at the one
+moment the tree is least inspectable. Both were measured on a real first release, and the third quietly
+misinforms every consumer about the shape of their own changelog.
+
+**Score:** 4
+
+#### Pull Request
+
+cut-release stops misreading an ordinary root doc, stops leaving the trunk red, and the adopted CHANGELOG intro states the level the fold writes
+
+Plugins: contributing-davekjohn
+
+[PR #1102](https://github.com/DaveKJohn/claude-code-specialists/pull/1102)
+
+---
+
