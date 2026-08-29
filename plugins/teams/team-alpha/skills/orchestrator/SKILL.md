@@ -56,8 +56,25 @@ and that route is better in two ways this skill cannot match: it loads Chris at 
 session rather than once you remember to ask, and it brings his **repo lens** with him — the routing
 table, the gatekeepers, the local agreements. This skill gives you the portable half only.
 
-So the order is: if you have a repo, run `specialists-init` and let the import do it. If you have no
-repo, or you are in a conversation that never loaded one, invoke this.
+So the order is: if you have a repo, adopt the family with `/team-alpha:specialists-init` and let the
+import do it. If you have no repo, or you are in a conversation that never loaded one, invoke this.
+
+**That command is the owner's to type, and this page is where you learn it — deliberately.**
+`specialists-init` carries `disable-model-invocation`, so the `Skill` tool refuses you, and the same
+flag keeps its page (and the `bootstrap.ps1` route documented on it) out of your context entirely. This
+page has no such flag, which makes it the one place upstream of the barred step that can hand you a
+usable form — the treatment [#734](https://github.com/DaveKJohn/claude-code-specialists/issues/734)
+gave the shipping chain, arriving here late. So the handover is the whole move: say the repo has not
+been adopted, name `/team-alpha:specialists-init` in exactly that spelling, and stop.
+
+**A route so you can hand it over, never a licence to get there another way.** The bootstrap sits in
+the plugin cache at an absolute path and is reachable; running it yourself is precisely the
+substitution the refusal exists to prevent, and it writes the consumer's `CLAUDE.md` — the one file an
+owner should watch being changed. Named here because this is the moment the temptation appears:
+inbound [#1093](https://github.com/DaveKJohn/claude-code-specialists/issues/1093) /
+[#1096](https://github.com/DaveKJohn/claude-code-specialists/issues/1096), measured in the testrun-2
+adoption on August 29, 2026, where this line said *"run `specialists-init`"* and left a model told to
+act with nothing it could act on.
 
 ## Why it is a skill and not a setting
 

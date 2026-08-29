@@ -986,6 +986,13 @@ $suggestion = @"
 // Copy desired blocks to .claude/settings.json (or settings.local.json) and remove
 // this file afterward. Hooks are a STUB: scripts are repo-specific and do not exist here yet --
 // replace with guards/lints appropriate for this repo (or omit).
+//
+// AND STRIP EVERY '//' LINE ON THE WAY OUT, INCLUDING THIS ONE. This file is JSONC, where comments
+// are legal; settings.json and settings.local.json are strict JSON, where they are not. Claude Code
+// does not partially apply a settings file it cannot parse -- it ignores the whole file -- so one
+// comment carried across silently switches off the deny half below, the allow half, enabledPlugins
+// and extraKnownMarketplaces together. The only signal is a startup line reading "Invalid or
+// malformed JSON", which names a parse error rather than "your safety rules are off" (inbound #1097).
 {
   // Governance: permit what the way of working is made of, block the destructive git actions the
   // safety rules prohibit. Both halves are ready to use as they stand.
@@ -1081,6 +1088,26 @@ $suggestReminder = if ($suggestIgnored -eq $true) { 'it is gitignored here, so g
                    elseif ($suggestIgnored -eq $false) { 'it is not gitignored here, so git status will keep showing it until you do' }
                    else { 'it is gitignored in many repos, so git may not remind you' }
 Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delete proposal ($suggestReminder)." -ForegroundColor Gray
+# AND SAY THAT THE COMMENTS CANNOT COME WITH IT (inbound #1097). The third caveat this one line has
+# needed, and the same shape as the other two: "copy desired parts" is the instruction a reader acts
+# on, and it named no exception. The proposal is .jsonc and its extension ANNOUNCES that comments are
+# legal -- they are, in that file. settings.json is strict JSON, and this line is the only place that
+# can carry the warning across the boundary it invites the reader over.
+#
+# WHY IT EARNS A LINE RATHER THAN A footnote: the failure is silent and TOTAL. Claude Code does not
+# partially apply a settings file it cannot parse -- it ignores the whole file. So one carried-over
+# comment switches off the deny half (git push --force, git reset --hard, rm -rf), the allow half,
+# enabledPlugins and extraKnownMarketplaces together, and the only signal is a startup line naming a
+# parse error rather than "your safety rules are off". Measured in the testrun-2 adoption,
+# August 29, 2026: the copy was otherwise perfect -- no trailing comma, no structural error -- and the
+# six comment lines were the entire defect. Inbound #335 established this same reader model for the
+# QUICKSTART fragment ("the block is labelled jsonc, which suggests comments are fine"); its repair
+# landed there and never reached the instruction that moves the file.
+Write-Host "     Note: $(Split-Path -Leaf $suggestPath) is JSONC and settings.json is strict JSON --" -ForegroundColor Gray
+Write-Host "     strip the '//' lines as you copy. A single one left in makes the WHOLE settings file" -ForegroundColor Gray
+Write-Host "     unparseable, and Claude Code then ignores all of it: permissions, enabledPlugins and" -ForegroundColor Gray
+Write-Host "     extraKnownMarketplaces alike, with one startup line about malformed JSON as the only" -ForegroundColor Gray
+Write-Host "     warning. The same applies to settings.local.json." -ForegroundColor Gray
 # THE CAVEAT BELONGS WHERE THE INVITATION IS (inbound #363). The proposal file says twice that its hooks
 # are a stub, but this line -- "copy desired parts" -- is the instruction a reader actually acts on, and
 # it named no exception. The permissions block is ready to use; the hook block points at a script no

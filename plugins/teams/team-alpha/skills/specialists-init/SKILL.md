@@ -35,6 +35,25 @@ This skill lives inside the `team-alpha` plugin, so it only becomes available on
 is therefore manual, and it is **six acts, in this order** — enable, restart, refresh, install, restart,
 verify — grouped below as `0a` (acts 1 and 2), `0b` (acts 3 and 4) and `0c` (acts 5 and 6).
 
+**And so is the invocation itself — permanently, for every consumer, by decision rather than by
+oversight.** This skill carries `disable-model-invocation`: a session cannot start it, the `Skill` tool
+refuses, and the same flag keeps this page — including the `bootstrap.ps1` route documented further down
+— out of a model's context entirely, so it cannot even learn the skill exists. The owner types
+`/team-alpha:specialists-init`, and there is **no per-repo escape**: `skillOverrides` only ever
+restricts (there is no value meaning *"let the model invoke this after all"*), and it does not reach
+plugin skills at all. Settled on August 29, 2026 (inbound
+[#1096](https://github.com/DaveKJohn/claude-code-specialists/issues/1096)) against the alternative of
+dropping the flag, which would have put this skill's description in every session of every consumer,
+forever, for something that happens once per repo. **The price of keeping it is that no message may
+name this skill with a bare imperative** — the reader those messages address is usually the model, and
+an instruction it is structurally forbidden to follow leaves it with the plugin cache and an absolute
+path as the only remaining move. The two SessionStart hooks, `adopt-config.ps1` and
+`orchestrator/SKILL.md` name the command and the actor for that reason.
+
+> **A runbook that describes itself as executable end to end by a session is wrong about this step**, and
+> that is worth stating once rather than rediscovering it in every testrun: adoption stops here until the
+> owner types the command, by design.
+
 > **The count is deliberately the same six as in the
 > [claude-code-specialists README](https://github.com/DaveKJohn/claude-code-specialists/blob/main/)** (inbound
 > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This page said *three acts* while
@@ -535,6 +554,24 @@ After the script:
 2. **Adopt the settings.** Copy what fits from `.claude/settings.suggested.jsonc` into
    `settings.json` (or `settings.local.json`), adapt the hooks stub to real repo scripts (or leave
    them out), and then remove the proposal file.
+
+   **Strip the `//` lines as you copy.** The proposal is **JSONC** — its extension announces that
+   comments are legal, and in that file they are. `settings.json` and `settings.local.json` are
+   **strict JSON**, where they are not, and this instruction is the only thing standing at the boundary
+   it sends you across.
+
+   **The failure is silent and total, which is why it gets its own paragraph.** Claude Code does not
+   partially apply a settings file it cannot parse — it ignores the whole file. One carried-over comment
+   therefore switches off the `deny` half (`git push --force`, `git reset --hard`, `rm -rf`), the
+   `allow` half, `enabledPlugins` and `extraKnownMarketplaces` together, and the only signal is a single
+   startup line reading `Settings (.claude/settings.json): Invalid or malformed JSON` — a parse error,
+   not *"your safety rules are off"*. Measured in the testrun-2 adoption on August 29, 2026: the copy
+   was otherwise perfect — no trailing comma, no structural error — and six comment lines were the
+   entire defect (inbound
+   [#1097](https://github.com/DaveKJohn/claude-code-specialists/issues/1097)).
+   [#335](https://github.com/DaveKJohn/claude-code-specialists/issues/335) established the same reader
+   model for the QUICKSTART fragment — *"the block is labelled `jsonc`, which suggests comments are
+   fine"* — but its repair landed there and never reached the instruction that moves this file.
 3. **Write the governance.** The `CLAUDE.md` scaffold is bare — fill in the safety rules and the
    working method of this repo (see an existing consumer as a model).
 4. **Enable auto-delete of merged branches (#163).** Turn on the GitHub repo setting

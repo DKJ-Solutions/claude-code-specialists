@@ -37,17 +37,74 @@ Repair three inbound defects from the testrun-2 adoption (#1093, #1096, #1097). 
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Verify all three reports against the tree before touching anything — symptom, reason, repair,
+      size, subject and repo. All three stand; one correction to #1096's reasoning is recorded under
+      TEST.
+- [x] Put the one decision that is not a craft call to Dave: keep the flag and repair the handover,
+      or drop the flag. Answered **keep** (August 29, 2026), which is what makes the wording repair
+      the right one rather than a guess.
+- [x] Name the command and the actor at the three script sites — `check-roster-sync.ps1`,
+      `check-script-contract.ps1`, `adopt-config.ps1` — in both the root copy and the plugin mirror,
+      which are byte-identical and must stay so.
+- [x] Give `orchestrator/SKILL.md` the #734 treatment: it is the one page upstream of the barred
+      step that the model may actually read, framed as a route and explicitly not a licence.
+- [x] Record the decision itself on `specialists-init/SKILL.md`, beside the section that already
+      says step 0 is the owner's, so the premise is settled once instead of rediscovered per testrun.
+- [x] Warn about the JSONC boundary where the reader crosses it: the step-3 output, the proposal
+      file's own header, and the skill page's step 2.
+- [~] Dropped: the regression guard #1093 offers ("a sync check asserting no message names a
+      barred skill with a bare imperative"). It is a real risk that has not bitten — filed rather
+      than built, per this repo's no-pre-emptive-fixes rule.
 
 ### TEST
 
+Lint gate green (`check-plugin-integrity.ps1`, 0 findings over 31 checks); the suites run in the
+push gate rather than twice.
+
+Three things were measured rather than assumed, and two of them changed the work:
+
+- **The files are LF, not CRLF.** A first pass joined the inserted comment blocks with `\r\n` and put
+  mixed endings into two scripts. Reverted and redone against the measured ending. Worth writing down:
+  every `.ps1` in this tree is LF with no BOM, and nothing in the gate would have caught the mixture.
+- **#1096's reasoning is half wrong, and the half that fails is the one that made the decision look
+  forced.** It states that adoption *"has no upstream model-visible page"* — its first step being the
+  barred one — and concludes the #734 treatment cannot reach it. But `orchestrator/SKILL.md` carries no
+  flag, and the two `[BOOTSTRAP]` markers are SessionStart hooks: three model-visible surfaces stand
+  upstream of the barred step. So option B was always fully available, which is what let the decision be
+  made on cost rather than on necessity.
+- **The three scripts are byte-identical mirrors** (root and plugin). Each edit was applied to the root
+  and copied over, and the identity re-checked afterwards.
+
 ### DEPLOY: `fix/adoption-handover-and-jsonc-caveat-v1`
 
-**Score:**
+Adoption stopped being a path a consumer can only complete by guessing. Four places told the reader to
+run `specialists-init`; that reader is usually the model, and `disable-model-invocation` structurally
+forbids it — while the same flag hides the page documenting the route, so it could not even learn the
+skill exists. All four now name the command and who types it, and `/team-alpha:specialists-init`
+appears in a shipped file for the first time. Separately, the instruction that copies
+`settings.suggested.jsonc` into strict-JSON `settings.json` now says the `//` lines have to go.
+
+The flag stays, deliberately: dropping it would have loaded this skill's description into every
+session of every consumer, forever, for something that happens once per repo. That decision is now
+written on the skill page rather than left implicit, together with the reason a runbook cannot claim
+to run adoption end to end on its own.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+Two failures a consumer could not diagnose from inside their own repo. The first left a fresh session
+told to act with nothing it could act on, one absolute path away from running the bootstrap itself —
+the substitution the refusal exists to prevent. The second is worse for being silent: copying the
+proposal's comments into `settings.json` makes Claude Code discard the **whole** file, so `deny`
+(`git push --force`, `git reset --hard`, `rm -rf`), `allow`, `enabledPlugins` and
+`extraKnownMarketplaces` were all inactive behind one startup line that says *malformed JSON* rather
+than *your safety rules are off*.
+
+**Worth one check on an already-adopted repo:** if `.claude/settings.json` was filled from the
+proposal, confirm it parses. If it does not, nothing in it has ever been in force.
+
+**Score:** 4
 
 #### Pull Request
 
