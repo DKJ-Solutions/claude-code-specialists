@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/register-proposal-lists-every-enabled-plugin-v1` · 20260829-152229
+
+`specialists-init`'s paste-ready connector manifest now carries a row for **every enabled plugin of
+this marketplace**, not only the ones that ship an `agents/` directory. It was built from the lens
+inventory, which is filled only while walking that directory, so a plugin shipping skills, scripts
+and hooks and no agents could not reach the block -- and the workflow plugin is exactly that shape.
+A plugin with no lenses gets `"extensions": []`, which is a true statement about it and the shape
+the register's readers already handle.
+
+The `[notice]` that explained the omission was worded as a missing **directory**, hundreds of lines
+above the block it affected; it now names the consequence for the manifest, and distinguishes a
+plugin of this family from one of another marketplace -- which are the two reasons a plugin can be
+skipped and have opposite answers.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The register is the maintainer's only view of which consumer sits on which version, and this failure
+was the quiet kind: a row that is simply absent looks exactly like a plugin the consumer never
+enabled, so the `[ERROR] machine record is on vX, source on vY` line that exists to catch a stale
+consumer could not fire for the workflow plugin at all. The cost landed on the maintainer rather
+than on the consumer, which is why nobody downstream would ever have reported it.
+
+**Score:** 2
+
+#### Pull Request
+
+the bootstrap's connector-register proposal lists every enabled plugin, not only the ones with agents
+
+Plugins: team-alpha
+
+[PR #1089](https://github.com/DaveKJohn/claude-code-specialists/pull/1089)
+
+---
+
 ### DEPLOY: `fix/suggested-settings-ship-an-allow-half-v1` · 20260829-150555
 
 `specialists-init`'s settings proposal now ships **both** permission halves. It carried `deny`
