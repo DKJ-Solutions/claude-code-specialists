@@ -865,6 +865,55 @@ Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annReal).Length -gt 400)
 $annMulti = '[{"annotation_level":"failure","title":"t","message":"line one\nline two"}]'
 Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annMulti) -notlike '*line two*') 'and cut to its first line, since this is pasted into a console'
 
+# --- The two caps that bound the SAME string, pinned so neither moves alone (#1116) ---------------
+#
+# `claude-code-review.yml` writes `headline + ' ' + reason` into one annotation and this function
+# relays that annotation to the operator. Both bound it and neither can see the other: a
+# 296-character headline plus a 300-character reason is 597 against a relay that cuts at 500, and
+# the part the relay drops is the TAIL of the reason -- where "resets Aug 31, 7am (UTC)" lives.
+#
+# #1116 MEASURED THAT OVERLAP AND LEFT IT STANDING, which is why this pins the numbers instead of
+# asserting the sum fits. 500 - 296 - 1 = 203, so the console shows 203 characters of reason
+# whichever end owns the cut; lowering the workflow's 300 to 203 would hand that reader the same
+# text, drop the "..." that marks the loss, and cost the GitHub annotation up to 97 characters no
+# 500 bounds. Sampled traffic makes it hypothetical anyway -- 45 titled failure annotations over
+# August 27-29, 2026, reasons of 51 to 55 characters against 203 of room.
+#
+# So what must not happen silently is a MOVE. A longer headline, a raised reason cap or a lowered
+# relay cap each change that arithmetic, and each is reasonable on its own terms while being wrong
+# against the other file. These asserts fail on any of the three and name the reasoning to read.
+$wfPath = (Join-Path $PSScriptRoot '..\..\.github\workflows\claude-code-review.yml')
+Assert-True (Test-Path -LiteralPath $wfPath) 'the reviewed workflow is where these asserts expect it -- a rename must fail here, not silently pass'
+$wfText = Get-Content -LiteralPath $wfPath -Raw
+
+# Read with .Contains, not -like: the needle carries '[', which -like takes as a character class.
+$libText = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1') -Raw
+$libCaps = @([regex]::Matches($libText, '\$message\.Length -gt (\d+)\)|\$message\.Substring\(0, (\d+)\)') |
+    ForEach-Object { if ($_.Groups[1].Success) { [int]$_.Groups[1].Value } else { [int]$_.Groups[2].Value } })
+Assert-Equal 2 $libCaps.Count 'the relay states its bound twice -- the test and the cut -- and both are read'
+Assert-Equal $libCaps[0] $libCaps[1] 'and they agree with each other: a message cut at one number must be the one tested against it'
+$relayCap = $libCaps[0]
+Assert-Equal 500 $relayCap 'the relay still cuts at the 500 #1116 did its arithmetic against'
+
+# One Match, not Matches, and the needle occurs exactly once in the file today -- checked. A SECOND
+# jq slice added elsewhere would go unread here rather than caught, which is the known edge: the
+# subject is this reason's cap, and a new one would want its own assert either way.
+$wfReason = [regex]::Match($wfText, '\(\.\[0\] // ""\) \| \.\[0:(\d+)\]')
+Assert-True $wfReason.Success 'the workflow still caps the reason it appends, and this is where'
+Assert-Equal 300 ([int]$wfReason.Groups[1].Value) 'at the same 300 -- raising it widens an overlap that was measured, not overlooked'
+
+# THE HEADLINE IS THE THIRD NUMBER, and the one most likely to move: it is prose, and #974, #1055
+# and #1112 each rewrote it. Its length is what turns the other two into 203, so it is read from
+# the file rather than trusted. 296 today; the assert is the arithmetic, not the constant, so a
+# rewrite that keeps the sum honest passes and one that eats the reason's room does not.
+$headlines = @([regex]::Matches($wfText, "(?m)^\s*headline='([^']*)'") | ForEach-Object { $_.Groups[1].Value })
+Assert-True ($headlines.Count -ge 3) 'the literal headlines are readable -- the interpolated *) branch has no static length and needs none'
+$longestMeasuredReason = 55
+foreach ($h in $headlines) {
+    $room = $relayCap - $h.Length - 1
+    Assert-True ($room -ge $longestMeasuredReason) "the $($h.Length)-character headline leaves the console $room characters of reason -- more than the 55 ever measured"
+}
+
 # Unreadable in, empty out -- a diagnostic must never be the reason the warning beside it cannot print.
 foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"annotation_level":"failure"}]')) {
     Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson $bad -CheckName 'x') "an unreadable annotations payload ('$bad') costs the note and nothing else"

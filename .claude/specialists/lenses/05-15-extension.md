@@ -199,6 +199,41 @@ infrastructure.
   out of quota and that a re-run adds none; it proves nothing about when the quota returns. *Why* it returned
   early was deliberately not investigated — a rolling window, a session window clearing, an account change are
   all plausible and none was measured — and the headline reports the discrepancy rather than a mechanism.
+
+  **AND THE SENTENCE HAS TO FIT THE PIPE THAT CARRIES IT** —
+  [#1116](https://github.com/DaveKJohn/claude-code-specialists/issues/1116), and it sits beside the three
+  above rather than among them: they corrected what the headline CLAIMS, this one asked how much of it
+  SURVIVES. Two caps bound the same string and neither owner can see the other: this workflow caps the
+  reason it appends at 300, `Get-AuthoredFailureNote` caps the whole message it relays at 500, and the
+  296-character headline puts the sum at 597. Because the relay cannot see where the headline stops, the
+  half it drops is the **tail of the reason** — where *"resets Aug 31, 7am (UTC)"* lives.
+
+  **Both numbers were left exactly where they were, and that is the finding.** The obvious repair —
+  lower the workflow's 300 so the sum fits — was built and then withdrawn on its own arithmetic:
+  `500 - 296 - 1 = 203` is what the operator's console shows **whichever end owns the cut**, so capping
+  here hands that reader the same 203 characters, drops the `...` that marks the loss, and costs the
+  GitHub annotation — read in the checks UI, where no 500-character bound applies — up to 97 characters
+  it currently keeps. Cutting from the *front* in the relay is the only change that would give the
+  console more, and it is not free either: the relay carries workflows it has never seen, and for one
+  whose message is all content and no preamble the front is the part worth keeping.
+
+  **What the coupling lacked was an owner, not a tighter number**, so `scripts/tests/pr-issues.tests.ps1`
+  now pins all three figures the arithmetic rests on — the relay's 500, the workflow's 300, and every
+  literal headline's length — and mutation-testing confirms each movement goes red naming the right one.
+  The headline is the one most likely to move: it is prose, and #974, #1055 and #1112 each rewrote it.
+
+  **The sampling that decided it, since #1116 explicitly asked for one before a repair.** All 54 red runs
+  available on August 29, 2026, carrying 45 titled failure annotations: every one a 429, upstream's
+  `result` first line **51 to 55** characters against 203 of room, longest message actually emitted
+  **341**. A reason must reach 204 characters — nearly four times the longest ever seen — before a reader
+  loses a word. **The same pass caught the comment defending the 500 citing run `33267175141` as a 460-character
+  note when it is 400** (title 55 + separator 4 + message 341). A comment that names a run id is inviting
+  that check, which is the argument for naming one.
+
+  **The transferable half: an overlap between two bounds is not automatically a defect, and the change
+  that removes the overlap is not automatically the fix.** Here it would have moved the loss from a marked
+  truncation in one reader's view to an unmarked one in another's, and delivered the same text to the
+  reader it was meant to help.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and

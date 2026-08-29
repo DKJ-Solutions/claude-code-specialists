@@ -1152,7 +1152,9 @@ function Get-AuthoredFailureNote {
         the message is cut to its FIRST LINE and 500 characters. Not the 300 claude-code-review.yml
         writes its own annotation under -- that bounds the REASON it appends, and the headline
         explaining what the status means sits in front of it, so relaying at 300 would keep only the
-        headline, which is the part a reader could already guess from the check being red.
+        headline, which is the part a reader could already guess from the check being red. The two
+        bounds overlap and #1116 measured the overlap rather than removing it; the arithmetic is in
+        the comment beside the cut itself.
 
     .PARAMETER AnnotationsJson
         `gh api repos/<owner>/<repo>/check-runs/<jobId>/annotations` output. Unreadable in, '' out: a
@@ -1184,18 +1186,36 @@ function Get-AuthoredFailureNote {
         $message = ''
         if ($a.PSObject.Properties['message']) { $message = ([string]$a.message).Trim() }
         $message = @($message -split "`r?`n")[0]
-        # 500, NOT the 300 the annotation itself is written under, and measured rather than guessed.
-        # That 300 bounds the REASON claude-code-review.yml appends; the headline explaining what the
-        # status means sits in front of it, so relaying at 300 cuts the sentence in half and keeps
-        # only the half a reader could guess from the red mark. Measured on run 33267175141: 460
-        # characters, ending "resets Aug 31, 7am (UTC)".
+        # 500, NOT the 300 claude-code-review.yml writes its own annotation under, and measured
+        # rather than guessed. That 300 bounds the REASON it appends; the headline explaining what
+        # the status means sits in front of it, so relaying at 300 would cut the sentence in half and
+        # keep only the half a reader could guess from the red mark. Measured on run 33267175141:
+        # 400 characters, ending "resets Aug 31, 7am (UTC)".
+        #
+        # THAT NUMBER READ 460 UNTIL ISSUE #1116 CHECKED IT. The same run's note, put back through
+        # this function, is 400: a 55-character title, the 4-character separator and a 341-character
+        # message. The bound was never in question, but the measurement defending it was wrong by 60
+        # -- and a comment that cites a run id invites exactly this check, which is the argument for
+        # citing one.
+        #
+        # THE TWO CAPS DO OVERLAP, AND #1116 LEFT THEM THAT WAY ON PURPOSE. That workflow's headline
+        # is 296 characters, so headline + reason can reach 597 against this 500 and the part cut is
+        # the reason's TAIL. Lowering the workflow's 300 so the sum fits was built and withdrawn on
+        # the arithmetic: 500 - 296 - 1 = 203 either way, so the operator's console gains nothing,
+        # loses the "..." that marks the cut, and the GitHub annotation -- which no 500 bounds --
+        # loses up to 97 characters. The only change that would give the console MORE is cutting
+        # from a different END here, and that is not free either: this function relays workflows it
+        # has never seen, and for one whose message is all content and no preamble, the front is the
+        # part worth keeping. Sampled traffic says the case is hypothetical -- 45 annotations,
+        # reasons of 51 to 55 characters against 203 of room -- so the bound stays where the
+        # measurement put it.
         #
         # THE RELAY DOES NOT VOUCH FOR WHAT IT RELAYS, and that is the point of the rule -- issue
-        # #1112. That measured 460-character note ended with a reset time roughly 2.5 DAYS later than
-        # the moment the quota actually came back. Nothing is added here to caveat it: this function
-        # repeats what an author wrote and cannot know which authors are reliable, so a hedge here
-        # would hedge every workflow in every consuming repo. An over-claiming sentence is repaired in
-        # the workflow that writes it, which is where #1112 was repaired.
+        # #1112. That measured note ended with a reset time roughly 2.5 DAYS later than the moment
+        # the quota actually came back. Nothing is added here to caveat it: this function repeats
+        # what an author wrote and cannot know which authors are reliable, so a hedge here would
+        # hedge every workflow in every consuming repo. An over-claiming sentence is repaired in the
+        # workflow that writes it, which is where #1112 was repaired.
         if ($message.Length -gt 500) { $message = $message.Substring(0, 500).TrimEnd() + '...' }
 
         # NAMED ONCE. A workflow that titles its own annotation usually leads with the job name --

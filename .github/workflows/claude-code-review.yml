@@ -218,19 +218,46 @@ jobs:
           # with: jq's `split` on an EMPTY string returns `[]`, not `[""]`, so `[][0]` is null and
           # `-r` prints the literal word "null". Measured against a fixture carrying no `result`
           # field, where the annotation then read "... named no API status. null".
-          # `status` IS SINGLE-LINED AND CAPPED HERE FOR THE SAME REASON `reason` IS, one line down --
-          # inbound #1118. It reaches the annotation through the `*)` headline, and `tostring` on a JSON
-          # string yields that string verbatim: a command substitution strips TRAILING newlines and keeps
-          # internal ones, so a multi-line value would put text at the START of a line, which is where a
-          # workflow command counts. That is the forgery the `reason` half is single-lined to prevent, and
-          # the two now behave alike. Nothing is lost by capping: the unsanitised value is printed in full
+          #
+          # THE 300 AND THE RELAY'S 500 BOUND THE SAME STRING, AND THAT IS DELIBERATE RATHER THAN
+          # OVERLOOKED -- issue #1116, measured and left standing. Since #1110 `ship-pr` relays this
+          # annotation to the operator through `Get-AuthoredFailureNote`, which cuts a message at 500
+          # and appends "...". The headline in front of this reason is 296 characters, so the two caps
+          # allow an annotation of 597 against a relay that carries 500, and the part the relay drops
+          # is the TAIL of the reason -- which is where "resets Aug 31, 7am (UTC)" lives.
+          #
+          # WHY LOWERING THIS 300 IS NOT THE REPAIR IT LOOKS LIKE, which is the measurement worth
+          # leaving behind. 500 - 296 - 1 = 203, so the operator's console shows 203 characters of
+          # reason no matter which end owns the cut. Capping here at 203 would hand that reader the
+          # SAME 203 characters, drop the "..." that tells them something was removed, and cost the
+          # GitHub annotation -- read in the checks UI, where no 500-character bound applies -- up to
+          # 97 characters it currently keeps. It was built and withdrawn on exactly that arithmetic.
+          # Nothing can raise the console's 203 except changing which END the relay cuts from, and
+          # that is the relay's decision to take generically, not this file's to force.
+          #
+          # AND IT HAS NEVER BITTEN. Sampled across all 45 titled failure annotations this workflow
+          # left on August 27-29, 2026: every one a 429, and upstream's `result` first line ran 51 to
+          # 55 characters -- "You've hit your weekly limit ... resets Aug 31, 7am (UTC)" and three
+          # session-limit variants -- with the longest message actually emitted at 341. A reason
+          # would have to reach 204 characters, nearly four times the longest seen, before a reader
+          # lost a word. `scripts/tests/pr-issues.tests.ps1` pins both numbers so neither can move
+          # without this reasoning being read first.
+          #
+          # `status` IS SINGLE-LINED AND CAPPED FOR THE SAME REASON `reason` IS CUT -- inbound #1118.
+          # It reaches the annotation through the `*)` headline, and `tostring` on a JSON string yields
+          # that string verbatim: a command substitution strips TRAILING newlines and keeps internal
+          # ones, so a multi-line value would put text at the START of a line, which is where a workflow
+          # command counts. That is the forgery the `reason` half is single-lined to prevent, and the
+          # two now behave alike. Nothing is lost by capping: the unsanitised value is printed in full
           # by this step's own `jq` diagnostic above, which is plain stdout rather than a command.
           #
           # AND IT DELIBERATELY ASSERTS NOTHING ABOUT UPSTREAM. #1118 offered the alternative of leaving
           # the asymmetry and recording WHY it is safe -- i.e. that `api_error_status` is status-shaped by
           # construction. That sentence is a claim about somebody else's field, this repo has never been
-          # able to measure its domain, and #1112 is the standing reminder of what such claims cost here.
-          # This shape needs no claim: whatever the field carries, the annotation renders.
+          # able to measure its domain, and the sampling above is 45 observations of one value, not a
+          # domain. #1112 is the standing reminder of what such claims cost here, and this shape needs
+          # none: whatever the field carries, the annotation renders.
+
           status=$(jq -r '[.[] | select(.type == "result")] | last | (.api_error_status // "") | tostring | split("\n") | (.[0] // "") | .[0:32]' "$EXECUTION_FILE")
           reason=$(jq -r '[.[] | select(.type == "result")] | last | (.result // "") | split("\n") | (.[0] // "") | .[0:300]' "$EXECUTION_FILE")
 

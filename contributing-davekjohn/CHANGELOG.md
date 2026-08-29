@@ -32,6 +32,55 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/the-annotation-fits-the-relay-that-carries-it-v1` · 20260829-230428
+
+The two caps that bound a red `claude-review`'s explanation -- the workflow's 300 on the reason it
+appends, `Get-AuthoredFailureNote`'s 500 on the whole message it relays -- now carry the arithmetic
+that relates them, and a test that fails the day either one moves. Neither number changed, and
+that is the finding rather than a shortfall: the annotation can reach 597 against a 500-character
+relay, but `500 - 296 - 1 = 203` is what the operator's console shows **whichever end owns the cut**,
+so lowering the workflow's cap to make the sum fit hands that reader the same 203 characters, drops
+the `...` that marks the loss, and costs the GitHub annotation up to 97 characters no bound applies
+to. It was built that way and withdrawn on the arithmetic.
+
+**The measurement #1116 asked for, taken first and decisive:** all 54 red runs available on
+August 29, 2026, carrying **45 titled failure annotations** across August 27-29. Every one a 429, and
+upstream's `result` first line ran **51 to 55** characters against 203 of room, with the longest
+message actually emitted at **341**. A reason must reach 204 characters -- nearly four times the
+longest ever seen -- before a reader loses a word.
+
+**What was actually broken is now fixed**: the comment defending the 500 cited run `33267175141` as a
+**460**-character note, twice. Put back through the function, that note is **400** -- a 55-character
+title, a 4-character separator, a 341-character message.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**An overlap between two bounds is not automatically a defect, and the change that removes the overlap
+is not automatically the fix.** That is the whole of what travels, and it is a shape rather than a
+number: before tightening one of two caps that bound the same string, work out what the reader on the
+far end actually sees in each case. Here the tighter cap delivered that reader the identical text,
+took away the ellipsis telling them something had been dropped, and spent a second reader's margin to
+do it -- so the overlap stayed and the reasoning was written down beside both numbers instead.
+
+**The second half: a bound is only as good as the measurement cited for it.** The comment defending
+this one named a specific run, and naming it is what let somebody eventually check it and find the
+figure wrong by 60. Cite the run.
+
+**Score:** 1
+
+#### Pull Request
+
+
+The annotation's two caps get an owner, not a tighter number
+
+Plugins: contributing-davekjohn
+
+[PR #1119](https://github.com/DaveKJohn/claude-code-specialists/pull/1119)
+
+---
+
 ### DEPLOY: `fix/the-quota-headline-stops-vouching-for-upstreams-reset-time-v1` · 20260829-220455
 
 A red `claude-review` still tells you the account is out of quota and which limit it hit — but it no longer
