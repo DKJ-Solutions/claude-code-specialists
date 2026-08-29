@@ -623,19 +623,20 @@ Answer them and run again. Shipping it as it stands is -Force.
         $progressText = [System.IO.File]::ReadAllText($progressPath, [System.Text.Encoding]::UTF8)
         $stepFindings = @(Get-BranchProgressFindings -Text $progressText)
         if ($stepFindings.Count -gt 0) {
-            $marks = Get-BranchProgressMarks
-            $stepDetail = ($stepFindings | ForEach-Object { "  - $($_.Label): $($_.Line)" }) -join "`n"
+            # THE REMEDY COMES WITH THE FINDING (inbound #1081). This block used to print one shared
+            # paragraph under both labels, and it was only true for one of them: an author who met
+            # 'still the scaffolded step' and followed the marks it offered was refused again, by the
+            # same gate, printing the same lines that had just failed. Get-BranchProgressFindings owns
+            # the sentence now -- one composer for the two callers that print these.
+            $stepDetail = ($stepFindings | ForEach-Object { "  - $($_.Label): $($_.Line)`n      $($_.Remedy)" }) -join "`n"
             Write-Error @"
 step-list gate: $progressRel still has unresolved steps - nothing pushed, no PR opened.
 
 $stepDetail
 
-A branch reaches a PR when its own plan is finished. Resolve each step:
-  $($marks.Done)done
-  $($marks.Dropped)dropped, and why it turned out not to be needed
-
-A dropped step keeps its line and its reason, which is the half worth reading later. There is no -Force
-for this gate - '$($marks.Dropped.Trim())' is the way past a step that should not be done.
+A branch reaches a PR when its own plan is finished, and each finding above says what resolves it. A
+dropped step keeps its line and its reason, which is the half worth reading later. There is no -Force for
+this gate, and none is needed: every finding here has an act that clears it.
 "@
             exit 1
         }

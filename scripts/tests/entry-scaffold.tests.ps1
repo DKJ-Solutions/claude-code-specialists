@@ -1296,6 +1296,28 @@ $stubFindings = @(Get-BranchProgressFindings -Text $tickedStub)
 Assert-Equal 1 $stubFindings.Count 'a TICKED scaffold placeholder is still a finding'
 Assert-Equal 'still the scaffolded step' $stubFindings[0].Label 'and it is named as the scaffold rather than as an open step'
 
+# THE REMEDY IS PER FINDING, because the two labels are resolved by different acts (inbound #1081). An
+# author who met the scaffolded-step finding and followed the marks the shared advice offered was refused
+# again by the same gate, printing the same lines that had just failed.
+Assert-True ($openFindings[0].Remedy -match [regex]::Escape($marks.Done.Trim())) 'an open step is resolved by a mark, and its remedy says which'
+Assert-True ($openFindings[0].Remedy -match [regex]::Escape($marks.Dropped.Trim())) 'and names the dropped mark beside it'
+Assert-True ($stubFindings[0].Remedy -notmatch [regex]::Escape($marks.Done.Trim())) 'the scaffolded step is NOT resolved by a mark, so its remedy offers none'
+Assert-True ($stubFindings[0].Remedy -match 'Replace its text') 'it asks for the text to be replaced'
+Assert-True ($stubFindings[0].Remedy -match 'delete the line') 'or the line deleted, which is the one-word fix nothing used to say'
+Assert-True ($openFindings[0].Remedy -ne $stubFindings[0].Remedy) 'and the two remedies are not the same sentence, which was the whole defect'
+
+# BOTH PRINTERS EMIT IT. The asserts above prove the sentence exists; these prove it reaches the reader,
+# which is the half a reverted call site would leave green -- and there are two call sites, which is why
+# the sentence is composed here rather than in either of them.
+foreach ($gateScript in @('scripts\release\open-pr.ps1', 'scripts\release\ship-pr.ps1')) {
+    $gateText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot $gateScript), [System.Text.Encoding]::UTF8)
+    Assert-True ($gateText -match '\$\(\$_\.Remedy\)') "$gateScript prints each finding's own remedy"
+    Assert-True ($gateText -match 'each finding above says what resolves it|Each finding above says what resolves it') "$gateScript points at them rather than repeating one shared instruction"
+}
+# AND THE SHARED MARK LIST IS GONE FROM open-pr, not merely supplemented: leaving it would keep offering
+# a mark to the finding no mark can resolve, one paragraph below the line that says so.
+$openGateText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\open-pr.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($openGateText -notmatch 'dropped, and why it turned out not to be needed') 'the step gate no longer prints one mark list for both findings'
 # ...and an UNticked one is reported once, not twice -- it is open, which is the more actionable of the
 # two labels and the one that tells the author what to do.
 $freshScaffold = ((Format-Development -Branch 'feat/fresh') -join "`n")

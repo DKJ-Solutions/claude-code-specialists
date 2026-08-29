@@ -636,15 +636,18 @@ $shipCycleText    = & $shipCycleRead $shipProgressRel
 if ($null -ne $shipCycleText) {
     $shipSteps = @(Get-BranchProgressFindings -Text $shipCycleText)
     if ($shipSteps.Count -gt 0) {
-        $shipMarks  = Get-BranchProgressMarks
-        $shipDetail = ($shipSteps | ForEach-Object { "  - $($_.Label): $($_.Line)" }) -join "`n"
+        # THE REMEDY COMES WITH THE FINDING, same as open-pr's copy of this gate and for the same measured
+        # reason (inbound #1081): the marks resolve an OPEN step and resolve nothing at all for a line that
+        # still carries the scaffolder's text, so offering them to both labels sent an author round the
+        # same refusal twice.
+        $shipDetail = ($shipSteps | ForEach-Object { "  - $($_.Label): $($_.Line)`n      $($_.Remedy)" }) -join "`n"
         Write-Error @"
 step-list gate: $shipProgressRel at $shipCycleRef still has unresolved steps - PR #$pr is NOT merged.
 
 $shipDetail
 
-Resolve each step ($($shipMarks.Done.Trim()) done, $($shipMarks.Dropped.Trim()) dropped with a reason), commit, and re-run. CI has already
-passed, so a re-run picks up from here. There is no -Force for this gate.
+Each finding above says what resolves it. Commit, and re-run. CI has already passed, so a re-run picks
+up from here. There is no -Force for this gate.
 "@
         exit 1
     }
