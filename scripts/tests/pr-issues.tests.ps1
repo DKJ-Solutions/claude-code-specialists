@@ -895,12 +895,22 @@ Assert-Equal $libCaps[0] $libCaps[1] 'and they agree with each other: a message 
 $relayCap = $libCaps[0]
 Assert-Equal 500 $relayCap 'the relay still cuts at the 500 #1116 did its arithmetic against'
 
-# One Match, not Matches, and the needle occurs exactly once in the file today -- checked. A SECOND
-# jq slice added elsewhere would go unread here rather than caught, which is the known edge: the
-# subject is this reason's cap, and a new one would want its own assert either way.
-$wfReason = [regex]::Match($wfText, '\(\.\[0\] // ""\) \| \.\[0:(\d+)\]')
+# THE NEEDLE BINDS TO THE FIELD, not to the shape -- because the edge this comment used to merely
+# predict has since happened. It read: "the needle occurs exactly once in the file today; a SECOND jq
+# slice added elsewhere would go unread here rather than caught." #1118 added that second slice, to
+# `status` one line above, and the outcome was worse than unread: the new slice sits EARLIER in the
+# file, so `Match` returned 32 and this assert went red against a `reason` cap nobody had touched.
+# Anchoring on `.result` is what makes the two independent, and the status cap gets its own assert
+# below rather than sharing this one.
+$wfReason = [regex]::Match($wfText, '\(\.result // ""\)[^\r\n]*\| \.\[0:(\d+)\]')
 Assert-True $wfReason.Success 'the workflow still caps the reason it appends, and this is where'
 Assert-Equal 300 ([int]$wfReason.Groups[1].Value) 'at the same 300 -- raising it widens an overlap that was measured, not overlooked'
+
+# And the status cap, which is a bound on a DIFFERENT thing: not an overlap with the relay, but the
+# length of a value this repo does not own and cannot predict (#1118).
+$wfStatus = [regex]::Match($wfText, '\(\.api_error_status // ""\)[^\r\n]*\| \.\[0:(\d+)\]')
+Assert-True $wfStatus.Success 'and the status it interpolates is capped too, on the line that reads it'
+Assert-True ([int]$wfStatus.Groups[1].Value -lt 300) 'well under the reason cap -- a status is three digits, and the rest is a field this repo does not own'
 
 # THE HEADLINE IS THE THIRD NUMBER, and the one most likely to move: it is prose, and #974, #1055
 # and #1112 each rewrote it. Its length is what turns the other two into 203, so it is read from
@@ -929,6 +939,40 @@ $idxProceed = $shipText.IndexOf('a check FAILED but the merge is not blocked')
 $idxSpoken  = $shipText.IndexOf('Get-AuthoredFailureNote')
 Assert-True ($idxProceed -ge 0 -and $idxSpoken -gt $idxProceed) 'the reason is printed under that warning, where the reader has just landed'
 Write-Host ""
+# --- The PRODUCER of the annotation everything above relays (issue #1118) -------------------------
+# Asserted on the workflow text for exactly the reason cut-release-guardrail gives for asserting on
+# ci.yml: a workflow is the one caller no suite gets to run. Everything above this line tests the
+# CONSUMER -- Get-AuthoredFailureNote reading what the check left behind -- so a regression in what
+# claude-code-review.yml is allowed to PUT there would leave every assert in this file green.
+#
+# Three properties, one per way `status` could reach a workflow command unescaped. It is upstream's
+# field, this repo cannot measure its domain, and #1112 is the standing reminder not to claim
+# otherwise -- so these pin the SHAPE that needs no claim rather than a belief about the value.
+$reviewYmlPath = Join-Path $PSScriptRoot '..\..\.github\workflows\claude-code-review.yml'
+Assert-True (Test-Path -LiteralPath $reviewYmlPath) 'claude-code-review.yml exists where this suite looks for it'
+$reviewYml = [System.IO.File]::ReadAllText((Resolve-Path $reviewYmlPath).Path, [System.Text.Encoding]::UTF8)
+
+Write-Host ""
+Write-Host "claude-code-review.yml -- what may reach the annotation (#1118)" -ForegroundColor Cyan
+
+# 1. The newline axis. A command substitution strips TRAILING newlines and keeps internal ones, and a
+#    workflow command counts at the START of a line -- so an unsplit status is a forgery surface.
+Assert-True ($reviewYml -like '*(.api_error_status // "") | tostring | split(*') 'the status is single-lined where it is read, the same treatment the reason beside it gets'
+
+# 2. The title axis. The comment above the case block states that the annotation TITLE may hold
+#    neither a comma nor a '::' -- and until #1118 the one branch that could not know what it was
+#    putting there was the only one putting a variable there.
+$shortLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -match '\bshort=' })
+Assert-True ($shortLines.Count -ge 4) 'every case branch still sets a short form'
+Assert-True (-not ($shortLines | Where-Object { $_ -like '*$status*' })) 'and none interpolates the status into it -- the short form IS the title, where a comma or a :: is command syntax'
+
+# 3. The percent axis. The runner percent-DECODES a command's data, so an unescaped %0A renders as a
+#    newline. `reason` was escaped from the start; `headline` needs it too now that it carries status.
+$errLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -like '*::error title=claude-review*' })
+Assert-True ($errLines.Count -eq 2) 'the annotation is emitted from exactly two places -- one with a reason, one without'
+Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and BOTH escape the headline, which is the variable the case block interpolates the status into'
+Assert-True (($errLines | Where-Object { $_ -like '*${reason//%/%25}*' }).Count -eq 1) 'while the reason keeps its own escape on the one line that carries it'
+
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1
