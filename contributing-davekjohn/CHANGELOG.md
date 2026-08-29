@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/consumer-bumps-default-is-empty-v1` · 20260829-124506
+
+Two shipped texts stated that `Get-ReleaseConsumerBumps` defaults to `('minor','major')`. It defaults to
+`@()` -- the consumer tier switched off -- so in a repo that has never answered that seam, `cut-release`
+drafts the hand-written note for **no** bump at all. `('minor','major')` is this source repo's own answer
+in `repo-config.ps1`, and both texts had promoted it to the shipped fallback. The `cut-release` skill
+page said it while reasoning that a patch has nowhere for the release-timing figure to land, and
+`Test-ReleaseVersionTrimmable`'s docstring said it while explaining why every version on a built page
+ends in `.0`. Neither computes anything from it — the fallback and the function are unchanged, and the
+repair is the wording, because an unstated seam has to keep meaning what it meant yesterday. Both
+paragraphs now name the real fallback and say what each shape produces, and both record what they
+claimed until [#1070](https://github.com/DaveKJohn/claude-code-specialists/issues/1070).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This is the page a release manager has open **while** they cut, and it told a repo in exactly the wrong
+shape that its minors and majors already produce a draft. `thumbnail-generator` reported it from that
+position: audience tier stated, note root stated, the directory present, its contributing page telling
+the reader where the draft lands — and this one knob never answered, which `adopt-config` legitimately
+marks `decide`. Three places said the document existed; one absent line switched it off, and both
+pending entries carried a scored tier-1 section that would never have reached a note.
+
+**Nothing was going to catch it.** `check-script-contract` reports a missing optional seam together with
+its declared fallback and never judges whether that fallback suits the repo — so it printed the *correct*
+text (`no consumer tier at all`) while the skill page said the opposite. The gate accurate and silent,
+the page confidently wrong, and nothing comparing the two. Any consumer on 4.22.0 reading that page is
+reading it wrong today.
+
+**Score:** 3
+
+#### Pull Request
+
+The Get-ReleaseConsumerBumps default is empty, not minor and major
+
+Plugins: contributing-davekjohn
+
+[PR #1074](https://github.com/DaveKJohn/claude-code-specialists/pull/1074)
+
+---
+
 ### DEPLOY: `fix/a-lane-must-not-hold-the-trunk-hostage-v1` · 20260829-122920
 
 A finished worktree lane no longer holds the trunk hostage for the rest of the machine, and a chain
