@@ -804,7 +804,175 @@ Assert-True ($idxCreate -gt $idxMergedLookup) 'and it sits above the create, whi
 
 $shipMergedText = [System.IO.File]::ReadAllText((Resolve-Path (Join-Path $PSScriptRoot '..\release\ship-pr.ps1')).Path, [System.Text.Encoding]::UTF8)
 Assert-True ($shipMergedText -like '*is already merged -- nothing to ship*') 'ship-pr reads the same state for itself, since it is runnable on its own'
+
+# --- Get-FailedCheckRunRefs / Get-AuthoredFailureNote: the reason, relayed (#1103) ---------------
+#
+# Eight issues have been filed here against a red `claude-review` whose own diagnostic step had
+# already printed the cause -- the last of them #1103, and #966 concluded from the same silence that
+# a secret needed rotating. ship-pr merges past that check by the ruleset and says so; what these
+# asserts pin is the SENTENCE printed beside it.
+
+# The refs are the run read widened by one key, so the run answer above must not have moved.
+$refs = @(Get-FailedCheckRunRefs -ChecksJson $linkChecks)
+Assert-Equal 2 $refs.Count 'both failing checks are returned, and the green one is not'
+Assert-NameSet @('lint-en-tests', 'claude-review') @($refs | ForEach-Object { $_.Name }) 'each ref names its check, which is what the note is titled with'
+Assert-NameSet @('456', '789') @($refs | ForEach-Object { $_.JobId }) 'and its JOB, the key annotations are addressed by -- not the run'
+Assert-NameSet @('123') @($refs | ForEach-Object { $_.RunId } | Sort-Object -Unique) 'while the run id is still read from the same link'
+$runOnly = '[{"bucket":"fail","name":"a","state":"FAILURE","link":"https://github.com/o/r/actions/runs/55"}]'
+Assert-NameSet @('55') (Get-FailedCheckRunIds -ChecksJson $runOnly) 'a link naming a run but no job still answers the run question'
+Assert-Equal '' (@(Get-FailedCheckRunRefs -ChecksJson $runOnly)[0].JobId) 'and simply has no job to ask annotations of'
+Assert-NameSet @() (Get-FailedCheckRunRefs -ChecksJson $extChecks) 'an external status is skipped here too -- it has no annotations either'
+foreach ($bad in @('', '   ', 'not json', '[]')) {
+    Assert-NameSet @() (Get-FailedCheckRunRefs -ChecksJson $bad) "an unreadable checks payload ('$bad') yields no refs"
+}
+
+# The real payload, trimmed: this is what run 33267175141's job answered on August 29, 2026 -- the
+# authored diagnostic sitting among the runner's own untitled noise and a deprecation warning.
+# KEPT VERBATIM, including a headline the workflow no longer writes. #1112 repaired that sentence --
+# it vouched for the reset time this same payload got wrong by 2.5 days -- but what is under test
+# here is the SELECTION rule, not the wording, and a real captured payload is worth more to it than
+# a re-typed current one. The current headline lives in .github/workflows/claude-code-review.yml.
+$annReal = '[' +
+  '{"annotation_level":"warning","title":"","message":"Node.js 20 is deprecated."},' +
+  '{"annotation_level":"failure","title":"claude-review -- out of quota -- the review did not run",' +
+  '"message":"The review did not run: the account behind CLAUDE_CODE_OAUTH_TOKEN is out of quota. It resets on the clock and not on a re-run; the reason below names WHICH limit it is and when it comes back, which is hours for a session window and days for a weekly one. Nothing to do with this diff. You have hit your weekly limit - resets Aug 31, 7am (UTC)"},' +
+  '{"annotation_level":"failure","title":"","message":"Process completed with exit code 1."},' +
+  '{"annotation_level":"failure","title":"","message":"Action failed with error: Claude execution failed: result is_error:true"}]'
+$noteQuota = Get-AuthoredFailureNote -AnnotationsJson $annReal -CheckName 'claude-review'
+Assert-True ($noteQuota -like 'claude-review*') 'the note names the check it belongs to'
+Assert-True ($noteQuota -notlike '*claude-review: claude-review*') 'ONCE -- this repo titles its own annotation with the job name, and prefixing it again stutters'
+Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annReal -CheckName 'other') -like 'other: *') 'a title that does NOT carry the name is prefixed, which is what the parameter is for'
+Assert-True ($noteQuota -like '*out of quota*') 'and carries the title the workflow authored'
+Assert-True ($noteQuota -like '*resets Aug 31*') 'and the message, which is where upstream states a reset time -- relayed, not vouched for (#1112)'
+Assert-True ($noteQuota -notlike '*exit code 1*') 'the runner exit noise is not what gets relayed'
+Assert-True ($noteQuota -notlike '*Node.js 20*') 'and neither is a WARNING -- the run went red, and a deprecation is not why'
+
+# THE ASSERT THAT KEEPS THIS FROM CRYING WOLF, the same one Get-StalledRunNote carries: a job that
+# left no authored sentence must produce no line at all, so the operator's transcript does not gain a
+# reassuring-looking note that says nothing.
+$annBare = '[{"annotation_level":"failure","title":"","message":"Process completed with exit code 1."}]'
+Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson $annBare -CheckName 'x') 'untitled failures only: no note, and the old wording stands alone'
+$annWarnOnly = '[{"annotation_level":"warning","title":"Something","message":"m"}]'
+Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson $annWarnOnly -CheckName 'x') 'a titled WARNING is not a red run explaining itself'
+
+# Order, bounds, and the optional name.
+$annTwo = '[{"annotation_level":"failure","title":"first","message":"a"},{"annotation_level":"failure","title":"second","message":"b"}]'
+Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annTwo) -like 'first*') 'the FIRST titled failure wins -- a workflow diagnoses itself before the runner exits'
+Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annTwo) -notlike '*claude*') 'without a check name the note is the authored sentence alone'
+$annLong = '[{"annotation_level":"failure","title":"t","message":"' + ('x' * 700) + '"}]'
+Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annLong).Length -lt 540) 'the message is capped -- free text from a workflow, going into a console'
+Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annReal).Length -gt 400) 'but not at the 300 the annotation itself uses: that cut off "resets Aug 31", the one actionable word'
+$annMulti = '[{"annotation_level":"failure","title":"t","message":"line one\nline two"}]'
+Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annMulti) -notlike '*line two*') 'and cut to its first line, since this is pasted into a console'
+
+# --- The two caps that bound the SAME string, pinned so neither moves alone (#1116) ---------------
+#
+# `claude-code-review.yml` writes `headline + ' ' + reason` into one annotation and this function
+# relays that annotation to the operator. Both bound it and neither can see the other: a
+# 296-character headline plus a 300-character reason is 597 against a relay that cuts at 500, and
+# the part the relay drops is the TAIL of the reason -- where "resets Aug 31, 7am (UTC)" lives.
+#
+# #1116 MEASURED THAT OVERLAP AND LEFT IT STANDING, which is why this pins the numbers instead of
+# asserting the sum fits. 500 - 296 - 1 = 203, so the console shows 203 characters of reason
+# whichever end owns the cut; lowering the workflow's 300 to 203 would hand that reader the same
+# text, drop the "..." that marks the loss, and cost the GitHub annotation up to 97 characters no
+# 500 bounds. Sampled traffic makes it hypothetical anyway -- 45 titled failure annotations over
+# August 27-29, 2026, reasons of 51 to 55 characters against 203 of room.
+#
+# So what must not happen silently is a MOVE. A longer headline, a raised reason cap or a lowered
+# relay cap each change that arithmetic, and each is reasonable on its own terms while being wrong
+# against the other file. These asserts fail on any of the three and name the reasoning to read.
+$wfPath = (Join-Path $PSScriptRoot '..\..\.github\workflows\claude-code-review.yml')
+Assert-True (Test-Path -LiteralPath $wfPath) 'the reviewed workflow is where these asserts expect it -- a rename must fail here, not silently pass'
+$wfText = Get-Content -LiteralPath $wfPath -Raw
+
+# Read with .Contains, not -like: the needle carries '[', which -like takes as a character class.
+$libText = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1') -Raw
+$libCaps = @([regex]::Matches($libText, '\$message\.Length -gt (\d+)\)|\$message\.Substring\(0, (\d+)\)') |
+    ForEach-Object { if ($_.Groups[1].Success) { [int]$_.Groups[1].Value } else { [int]$_.Groups[2].Value } })
+Assert-Equal 2 $libCaps.Count 'the relay states its bound twice -- the test and the cut -- and both are read'
+Assert-Equal $libCaps[0] $libCaps[1] 'and they agree with each other: a message cut at one number must be the one tested against it'
+$relayCap = $libCaps[0]
+Assert-Equal 500 $relayCap 'the relay still cuts at the 500 #1116 did its arithmetic against'
+
+# THE NEEDLE BINDS TO THE FIELD, not to the shape -- because the edge this comment used to merely
+# predict has since happened. It read: "the needle occurs exactly once in the file today; a SECOND jq
+# slice added elsewhere would go unread here rather than caught." #1118 added that second slice, to
+# `status` one line above, and the outcome was worse than unread: the new slice sits EARLIER in the
+# file, so `Match` returned 32 and this assert went red against a `reason` cap nobody had touched.
+# Anchoring on `.result` is what makes the two independent, and the status cap gets its own assert
+# below rather than sharing this one.
+$wfReason = [regex]::Match($wfText, '\(\.result // ""\)[^\r\n]*\| \.\[0:(\d+)\]')
+Assert-True $wfReason.Success 'the workflow still caps the reason it appends, and this is where'
+Assert-Equal 300 ([int]$wfReason.Groups[1].Value) 'at the same 300 -- raising it widens an overlap that was measured, not overlooked'
+
+# And the status cap, which is a bound on a DIFFERENT thing: not an overlap with the relay, but the
+# length of a value this repo does not own and cannot predict (#1118).
+$wfStatus = [regex]::Match($wfText, '\(\.api_error_status // ""\)[^\r\n]*\| \.\[0:(\d+)\]')
+Assert-True $wfStatus.Success 'and the status it interpolates is capped too, on the line that reads it'
+Assert-True ([int]$wfStatus.Groups[1].Value -lt 300) 'well under the reason cap -- a status is three digits, and the rest is a field this repo does not own'
+
+# THE HEADLINE IS THE THIRD NUMBER, and the one most likely to move: it is prose, and #974, #1055
+# and #1112 each rewrote it. Its length is what turns the other two into 203, so it is read from
+# the file rather than trusted. 296 today; the assert is the arithmetic, not the constant, so a
+# rewrite that keeps the sum honest passes and one that eats the reason's room does not.
+$headlines = @([regex]::Matches($wfText, "(?m)^\s*headline='([^']*)'") | ForEach-Object { $_.Groups[1].Value })
+Assert-True ($headlines.Count -ge 3) 'the literal headlines are readable -- the interpolated *) branch has no static length and needs none'
+$longestMeasuredReason = 55
+foreach ($h in $headlines) {
+    $room = $relayCap - $h.Length - 1
+    Assert-True ($room -ge $longestMeasuredReason) "the $($h.Length)-character headline leaves the console $room characters of reason -- more than the 55 ever measured"
+}
+
+# Unreadable in, empty out -- a diagnostic must never be the reason the warning beside it cannot print.
+foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"annotation_level":"failure"}]')) {
+    Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson $bad -CheckName 'x') "an unreadable annotations payload ('$bad') costs the note and nothing else"
+}
+
+# AND SHIP-PR ASKS FOR IT, on the path where the merge PROCEEDS. Same reasoning as the #1044 call-site
+# assert above: without this, a reverted call site leaves every assert here green while the operator
+# reads the red mark with no reason beside it, which is the whole defect.
+Assert-True ($shipText -like '*Get-AuthoredFailureNote -AnnotationsJson*') 'ship-pr relays what the failing workflow said about itself (#1103)'
+Assert-True ($shipText -like '*check-runs/*/annotations*') 'reading it from the check run, which is where an authored annotation lives'
+Assert-True ($shipText -like '*FailedOther -notcontains*') 'and only for the NOT-REQUIRED failures -- a required one is a refusal, not a merge that walks past'
+$idxProceed = $shipText.IndexOf('a check FAILED but the merge is not blocked')
+$idxSpoken  = $shipText.IndexOf('Get-AuthoredFailureNote')
+Assert-True ($idxProceed -ge 0 -and $idxSpoken -gt $idxProceed) 'the reason is printed under that warning, where the reader has just landed'
 Write-Host ""
+# --- The PRODUCER of the annotation everything above relays (issue #1118) -------------------------
+# Asserted on the workflow text for exactly the reason cut-release-guardrail gives for asserting on
+# ci.yml: a workflow is the one caller no suite gets to run. Everything above this line tests the
+# CONSUMER -- Get-AuthoredFailureNote reading what the check left behind -- so a regression in what
+# claude-code-review.yml is allowed to PUT there would leave every assert in this file green.
+#
+# Three properties, one per way `status` could reach a workflow command unescaped. It is upstream's
+# field, this repo cannot measure its domain, and #1112 is the standing reminder not to claim
+# otherwise -- so these pin the SHAPE that needs no claim rather than a belief about the value.
+$reviewYmlPath = Join-Path $PSScriptRoot '..\..\.github\workflows\claude-code-review.yml'
+Assert-True (Test-Path -LiteralPath $reviewYmlPath) 'claude-code-review.yml exists where this suite looks for it'
+$reviewYml = [System.IO.File]::ReadAllText((Resolve-Path $reviewYmlPath).Path, [System.Text.Encoding]::UTF8)
+
+Write-Host ""
+Write-Host "claude-code-review.yml -- what may reach the annotation (#1118)" -ForegroundColor Cyan
+
+# 1. The newline axis. A command substitution strips TRAILING newlines and keeps internal ones, and a
+#    workflow command counts at the START of a line -- so an unsplit status is a forgery surface.
+Assert-True ($reviewYml -like '*(.api_error_status // "") | tostring | split(*') 'the status is single-lined where it is read, the same treatment the reason beside it gets'
+
+# 2. The title axis. The comment above the case block states that the annotation TITLE may hold
+#    neither a comma nor a '::' -- and until #1118 the one branch that could not know what it was
+#    putting there was the only one putting a variable there.
+$shortLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -match '\bshort=' })
+Assert-True ($shortLines.Count -ge 4) 'every case branch still sets a short form'
+Assert-True (-not ($shortLines | Where-Object { $_ -like '*$status*' })) 'and none interpolates the status into it -- the short form IS the title, where a comma or a :: is command syntax'
+
+# 3. The percent axis. The runner percent-DECODES a command's data, so an unescaped %0A renders as a
+#    newline. `reason` was escaped from the start; `headline` needs it too now that it carries status.
+$errLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -like '*::error title=claude-review*' })
+Assert-True ($errLines.Count -eq 2) 'the annotation is emitted from exactly two places -- one with a reason, one without'
+Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and BOTH escape the headline, which is the variable the case block interpolates the status into'
+Assert-True (($errLines | Where-Object { $_ -like '*${reason//%/%25}*' }).Count -eq 1) 'while the reason keeps its own escape on the one line that carries it'
+
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

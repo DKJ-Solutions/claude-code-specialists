@@ -877,9 +877,23 @@ try {
     $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
     Assert-Match '\[RECORD-SHAPE\]' $r.Out 'pathless record: the marker fires since #323'
     Assert-Match 'no record for this path, only a pathless one' $r.Out 'pathless record: the detail names the shape'
-    Assert-Match 'demotes' $r.Out 'pathless record: and names what produces it -- a session start, not the reader'
     Assert-Match 'prints NOTHING' $r.Out 'pathless record: warns that the prescribed query is silent about it, which is the only visible evidence otherwise'
-    Assert-Match 'Re-install at project scope' $r.Out 'pathless record: the remedy is in the line'
+    # THE LINE STOPPED ASSERTING A CAUSE (inbound #1095), and these four asserts are the repair rather than
+    # a rewording. It used to say the shape is what a session start "leaves behind when it demotes" and that
+    # "this repo simply no longer has its own record" -- both are ONE of two readings stated as fact. The
+    # conjunction this arm fires on is equally the resting state of a plugin installed machine-wide on
+    # purpose, and #323 measured why no predicate can separate them: the demotion writes scope='user' and
+    # drops projectPath, producing the same shape as an ordinary user install. Measured against a real
+    # consumer where the plugin predated the repo by three weeks.
+    #
+    # THE OLD ASSERT WAS 'demotes' AND IT IS REPLACED BY ITS NEGATIVE, deliberately: the word is the claim,
+    # so a test asserting it PINNED the defect. Same for the bare remedy -- 'Re-install at project scope
+    # from this root' is right for one of the two states and destructive advice for the other.
+    Assert-NotMatch 'the shape a SESSION START leaves behind when it demotes' $r.Out 'pathless record: the line no longer states the demotion as fact'
+    Assert-NotMatch 'this repo simply no longer has its own record' $r.Out 'pathless record: nor claims a record this repo may never have had'
+    Assert-Match 'if you installed this plugin at project scope FROM THIS ROOT' $r.Out 'pathless record: the remedy is conditional on the one question only the reader can answer'
+    Assert-Match 'installed machine-wide on purpose, this line is expected and needs no action' $r.Out 'pathless record: and the no-action branch is stated OUT LOUD -- an unstated one reads as a defect to clear'
+    Assert-Match 're-install it at project scope' $r.Out 'pathless record: the #323 remedy is still reachable, on the branch it belongs to'
     # The permissive predicate must stay permissive: a pathless record really does load here.
     Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'pathless record: the OTHER marker stays silent -- it loads machine-wide'
     Assert-Equal 0 $r.Code 'pathless record: exit 0 -- nothing is broken'
@@ -1164,10 +1178,17 @@ try {
     Assert-Match 'in sync' $r.Out 'hook orphans-clean: still reports in sync (no specialist IS missing)'
     Assert-Match '\[ORPHANS\] 1 roster token' $r.Out 'hook orphans-clean: the roll-up reaches the session context'
     Assert-NotMatch "orphan '09-99'" $r.Out 'hook orphans-clean: the per-orphan [INFO] line still stays out'
-    # Points at the recovery SKILL, not at 'scripts/sync/check-roster-sync.ps1' as it used to (#225):
+    # Points at the recovery COMMAND, not at 'scripts/sync/check-roster-sync.ps1' as it used to (#225):
     # that path is repo-relative and a consumer does not have it -- the script ships in the plugin. A
     # remediation hint naming a file the reader cannot open is worse than none.
-    Assert-Match 'sync-roster skill' $r.Out 'hook orphans-clean: points at the recovery skill, not a repo path a consumer lacks'
+    #
+    # NAMING THE SKILL WAS NOT ENOUGH EITHER (inbound #1104). This asserted the words 'sync-roster skill'
+    # until check 30 was added, and that wording is the defect: 'sync-roster' carries
+    # disable-model-invocation, and the reader of a SessionStart hook is the model, which cannot invoke it
+    # and cannot even read the page saying so. So the assert is on the slash-command AND on the handover
+    # -- a hint the reader cannot act on is the same failure #225 was about, one layer further in.
+    Assert-Match '/team-alpha:sync-roster' $r.Out 'hook orphans-clean: points at the recovery command, not a repo path a consumer lacks'
+    Assert-Match 'TYPED by the repo owner' $r.Out 'hook orphans-clean: and says whose command it is, since the model reading this may not run it'
     Assert-NotMatch 'scripts/sync/check-roster-sync' $r.Out 'hook orphans-clean: no workshop-shaped path in a consumer-facing message'
 
     # H8. And in the DRIFT branch it travels alongside the errors, rather than being crowded out by them.

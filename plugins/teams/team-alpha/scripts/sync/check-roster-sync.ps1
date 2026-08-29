@@ -647,7 +647,31 @@ if ($enabledIds.Count -gt 0) {
                 # The shape nothing reported before #323. Named in full, because the reader's own
                 # verification query prints NOTHING for this plugin while it is plainly loading -- so
                 # without this line the only visible evidence is an absence.
-                Write-Host "  [RECORD-SHAPE] '$safeId' has no record for this path, only a pathless one (scope: '$scopeList') -- the shape a SESSION START leaves behind when it demotes a 'project' record and drops its projectPath. The plugin loads machine-wide, so nothing is broken; this repo simply no longer has its own record, and it prints NOTHING in the specialists-init step 0c query while it is plainly loading. Re-install at project scope from this root." -ForegroundColor DarkGray
+                #
+                # IT REPORTS THE OBSERVATION AND ASKS THE READER FOR THE HISTORY (inbound #1095). It used to
+                # state the demotion as fact -- "the shape a SESSION START leaves behind when it demotes",
+                # "this repo simply no longer has its own record" -- and close with a bare
+                # "Re-install at project scope from this root." Both halves are wrong in the common case.
+                # The conjunction this arm fires on (no record for this path, a pathless one exists) is ALSO
+                # the resting state of every correctly user-installed plugin in every repo that has not
+                # project-installed it, so the line fires machine-wide, at every session start, for a
+                # deliberately chosen install shape -- and then instructs the reader to undo it, which
+                # converts a machine-wide install into a per-repo one and adds a record nobody wanted.
+                # Measured in a fresh consumer on August 29, 2026, on a plugin installed machine-wide three
+                # weeks before that repo existed.
+                #
+                # AND THE CAUSE IS NOT RECOVERABLE FROM THE DATA, which is why the fix is the wording rather
+                # than a predicate. The obvious gate -- suppress this for scope 'user' -- was proposed and
+                # withdrawn on the same issue: #323 measured the demotion directly, and it WRITES
+                # scope='user', drops projectPath, and merges away any pre-existing pathless record. A
+                # demoted record is byte-for-byte the shape of an ordinary machine-wide install. Gating on
+                # scope would restore exactly the silence #314/#315/#323 were built to end.
+                #
+                # So the arm keeps firing and stops claiming. The one question that separates the two states
+                # is one the reader answers instantly and the register cannot answer at all: did YOU install
+                # this here at project scope? The remedy is conditional on that, and the no-action branch is
+                # stated out loud -- an unstated "or this is fine" reads as a defect the reader must clear.
+                Write-Host "  [RECORD-SHAPE] '$safeId' has no record for this path, only a pathless one (scope: '$scopeList') -- so it loads from a machine-wide install and prints NOTHING in the specialists-init step 0c query while it is plainly loading. Two states look identical here and the register cannot tell them apart: if you installed this plugin at project scope FROM THIS ROOT, that record is gone (#323) -- re-install it at project scope. If it is installed machine-wide on purpose, this line is expected and needs no action." -ForegroundColor DarkGray
             }
         }
     }
@@ -876,7 +900,11 @@ foreach ($plugId in ($enabledIds | Sort-Object -Unique)) {
             if ($staleName -and $staleName -ne $id) {
                 $current = Get-DisplayName -RawName (Get-AgentName -PluginDir $pluginDir -Id $id) -Fallback $id
                 if ($current -and $staleName -ne $current) {
-                    Write-Info "lens '$id' ($plugIdShown) header still names '$staleName' (agent is now '$current') -- run the sync-roster skill to reconcile the header."
+                    # NAMES THE COMMAND AND WHO TYPES IT (inbound #1104): 'sync-roster' carries
+                    # disable-model-invocation, so a session reading this cannot invoke it and cannot
+                    # read the page that would explain the route. Check 30 holds every printed
+                    # message to this; the reasoning in full is at the [BOOTSTRAP] marker below.
+                    Write-Info "lens '$id' ($plugIdShown) header still names '$staleName' (agent is now '$current') -- type /team-alpha:sync-roster to reconcile the header; that command is reserved for explicit user invocation, so an agent has to hand it to the repo owner."
                 }
             }
         }
@@ -929,7 +957,30 @@ if ($suppressedForBootstrap -gt 0) {
     # repo's own side of the setup has not happened. Counting it as an error would put a red line and
     # exit 1 in every session of a repo whose owner has simply not got round to the bootstrap -- and
     # not shouting at that person is the entire point of issue #225.
-    Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run the 'specialists-init' skill to put them in place: it is additive and never overwrites anything you have written." -ForegroundColor Yellow
+    #
+    # NAME THE COMMAND AND WHO TYPES IT, NOT THE SKILL (inbound #1093 / #1096). This line used to say
+    # "run the 'specialists-init' skill", and the reader it lands on hardest is the MODEL: this is a
+    # SessionStart hook, so on a fresh consumer it is the first thing in context, at the top of every
+    # session until the repo is adopted. That skill carries disable-model-invocation, so a model
+    # following the instruction verbatim is refused by the harness -- and the state it is left in is the
+    # worst available one: told to act, given nothing it can act on, and barred from the page that
+    # documents the route (the flag removes the skill's description from context entirely, so it cannot
+    # even learn the skill exists). What a model does NEXT is the actual cost: bootstrap.ps1 sits in the
+    # plugin cache reachable by absolute path, and this is the moment it is most tempted to substitute.
+    # Measured in the testrun-2 adoption, August 29, 2026, where the run stopped here.
+    #
+    # DUAL AUDIENCE, WHICH IS WHY THIS IS NOT THE REPORT'S LITERAL WORDING. The report proposed
+    # "Ask the user to run ..." -- correct for the model and odd for the OWNER, who reads this same line
+    # on their own terminal and is not a third party to themselves. Naming the command and stating who
+    # must type it serves both: the owner reads an instruction they can follow, the model reads a
+    # handover it can make. The '/team-alpha:' prefix is deliberate and load-bearing -- before this fix
+    # that string appeared in no shipped file in either plugin, so a model that correctly gave up had to
+    # reconstruct the command it was handing over.
+    #
+    # The 'adopt-workflow-folder' line in the contract check stays a bare imperative on purpose: that
+    # skill has no such flag, so its reader CAN comply. The rule is not a phrasing convention -- it is
+    # that a message must not name a skill barred to the reader it addresses.
+    Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run /team-alpha:specialists-init to put them in place -- that command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. It is additive and never overwrites anything you have written." -ForegroundColor Yellow
 }
 
 if ($suppressedForRosterPending -gt 0) {

@@ -173,8 +173,13 @@ if ($missingLibs.Count -gt 0) {
     Write-Host ''
     Write-Host ("  [STOP] this repo has no " + ($missingLibs -join ' and no ') + '.') -ForegroundColor Yellow
     Write-Host '         Those files are the repo-owned seam itself, and creating them is the bootstrap'
-    Write-Host "         job, not this one: run the 'specialists-init' skill first. It lays them down as"
-    Write-Host '         scaffolds, and this command then fills in the answers.'
+    # NAMES THE COMMAND AND WHO TYPES IT (inbound #1093 / #1096 / #1104). Not a SessionStart hook like
+    # the roster check, but the same trap: a model that reached this [STOP] is told to run a skill the
+    # harness will refuse it. Reasoning in full at check-roster-sync.ps1's [BOOTSTRAP] marker.
+    Write-Host '         job, not this one: run /team-alpha:specialists-init first. That command must be'
+    Write-Host '         TYPED by the repo owner -- the skill is reserved for explicit user invocation'
+    Write-Host '         and an agent cannot start it. It lays those files down as scaffolds, and this'
+    Write-Host '         command then fills in the answers.'
     exit 1
 }
 

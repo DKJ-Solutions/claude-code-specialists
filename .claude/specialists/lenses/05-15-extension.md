@@ -150,6 +150,90 @@ infrastructure.
   is the ordinary route, and the read-only allowlist above closes the other end. The knob this actually
   turns on is the **Write-role bypass**, whose condition is already stated in the `ci.yml` bullet above:
   safe while there are no external collaborators.
+
+  **A RED `claude-review` HAS ALWAYS NAMED ITS OWN REASON, AND NOBODY WAS READING IT** — issue
+  [#1103](https://github.com/DaveKJohn/claude-code-specialists/issues/1103), August 29, 2026. The
+  **Why the review failed** step in that workflow prints `api_error_status`, writes it as a titled
+  annotation and repeats it in the job summary, and has done so since
+  [#966](https://github.com/DaveKJohn/claude-code-specialists/issues/966). The same class of report kept
+  arriving anyway — eight threads about this check red on every PR, every one of them since #966 the same
+  quota state, and #966 itself filed against a log already reading `429` and concluding that a secret
+  needed rotating. #1103 was filed with *"the actual cause: not measured"*, pointing at the marketplace
+  step, which is where the run happened to be when the error surfaced and not where it came from.
+
+  **The diagnosis was reachable and the reader was not, so the repair moved the sentence rather than
+  writing another one.** `ship-pr.ps1` now reads the failing check's annotations on the path where the
+  merge PROCEEDS and prints what that workflow said about itself, beside the warning naming the check
+  (`Get-FailedCheckRunRefs` + `Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`). The selection
+  rule is **a failure annotation carrying a title**: the Actions runner writes its own with an empty one
+  (*"Process completed with exit code 1"*), while `::error title=X::Y` is a sentence an author left for
+  exactly this reader — so it needs no maintenance and works in a consumer repo whose workflows this repo
+  has never seen, where a rule keyed on the name `claude-review` would report nothing at all. Only the
+  **not-required** failures are asked about: a required one is a refusal, and its gate runs locally where
+  the reader meets the reason first-hand.
+
+  **And the check STAYS RED on a 429** — that decision is unchanged and recorded in the workflow itself. A
+  green tick would hide that this PR got no review, which is exactly what #966 asked not to be silent.
+  What was wrong was the legibility, not the colour.
+
+  **AND THE RELAYED SENTENCE IS ONLY AS GOOD AS ITS AUTHOR** — issue
+  [#1112](https://github.com/DaveKJohn/claude-code-specialists/issues/1112), the day after. The relay works
+  and is the right shape; what was wrong was the sentence going through it. That headline told the reader the
+  reason line names *"when it comes back"*, and on August 29, 2026 run `33267175141` failed at 18:02 UTC
+  reading *"resets Aug 31, 7am (UTC)"* while runs `33268549172` and `33269512129` reviewed successfully at
+  18:43 and 18:55 the same evening — roughly **2.5 days early**, both of them real 1–3 minute reviews rather
+  than the nine-second workflow-validation skip.
+
+  **The repair went into the workflow, not into `Get-AuthoredFailureNote`, and that is the reusable part.**
+  The relay is generic on purpose: it repeats what an author wrote and cannot know which authors are reliable,
+  so a caveat added there would caveat every workflow in every consuming repo — including the ones whose
+  timings are exact. An over-claiming sentence is repaired where it is written. The lib now says so in the
+  comment beside its 500-character bound, which had itself asserted the reset time was *"the only actionable
+  word in the whole note"*.
+
+  **The standing rule that comment block now carries**, after three corrections from measurement —
+  [#974](https://github.com/DaveKJohn/claude-code-specialists/issues/974) (a tally of red runs, wrong by ~3x
+  when typed), [#1055](https://github.com/DaveKJohn/claude-code-specialists/issues/1055) (session versus
+  weekly window) and #1112 (the reset time): **the headline states only what the STATUS proves, and everything
+  the `result` STRING says is attributed to upstream rather than asserted.** The status proves the account is
+  out of quota and that a re-run adds none; it proves nothing about when the quota returns. *Why* it returned
+  early was deliberately not investigated — a rolling window, a session window clearing, an account change are
+  all plausible and none was measured — and the headline reports the discrepancy rather than a mechanism.
+
+  **AND THE SENTENCE HAS TO FIT THE PIPE THAT CARRIES IT** —
+  [#1116](https://github.com/DaveKJohn/claude-code-specialists/issues/1116), and it sits beside the three
+  above rather than among them: they corrected what the headline CLAIMS, this one asked how much of it
+  SURVIVES. Two caps bound the same string and neither owner can see the other: this workflow caps the
+  reason it appends at 300, `Get-AuthoredFailureNote` caps the whole message it relays at 500, and the
+  296-character headline puts the sum at 597. Because the relay cannot see where the headline stops, the
+  half it drops is the **tail of the reason** — where *"resets Aug 31, 7am (UTC)"* lives.
+
+  **Both numbers were left exactly where they were, and that is the finding.** The obvious repair —
+  lower the workflow's 300 so the sum fits — was built and then withdrawn on its own arithmetic:
+  `500 - 296 - 1 = 203` is what the operator's console shows **whichever end owns the cut**, so capping
+  here hands that reader the same 203 characters, drops the `...` that marks the loss, and costs the
+  GitHub annotation — read in the checks UI, where no 500-character bound applies — up to 97 characters
+  it currently keeps. Cutting from the *front* in the relay is the only change that would give the
+  console more, and it is not free either: the relay carries workflows it has never seen, and for one
+  whose message is all content and no preamble the front is the part worth keeping.
+
+  **What the coupling lacked was an owner, not a tighter number**, so `scripts/tests/pr-issues.tests.ps1`
+  now pins all three figures the arithmetic rests on — the relay's 500, the workflow's 300, and every
+  literal headline's length — and mutation-testing confirms each movement goes red naming the right one.
+  The headline is the one most likely to move: it is prose, and #974, #1055 and #1112 each rewrote it.
+
+  **The sampling that decided it, since #1116 explicitly asked for one before a repair.** All 54 red runs
+  available on August 29, 2026, carrying 45 titled failure annotations: every one a 429, upstream's
+  `result` first line **51 to 55** characters against 203 of room, longest message actually emitted
+  **341**. A reason must reach 204 characters — nearly four times the longest ever seen — before a reader
+  loses a word. **The same pass caught the comment defending the 500 citing run `33267175141` as a 460-character
+  note when it is 400** (title 55 + separator 4 + message 341). A comment that names a run id is inviting
+  that check, which is the argument for naming one.
+
+  **The transferable half: an overlap between two bounds is not automatically a defect, and the change
+  that removes the overlap is not automatically the fix.** Here it would have moved the loss from a marked
+  truncation in one reader's view to an unmarked one in another's, and delivered the same text to the
+  reader it was meant to help.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and

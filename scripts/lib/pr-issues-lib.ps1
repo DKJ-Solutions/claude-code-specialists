@@ -930,32 +930,32 @@ function Get-MergeBlockVerdict {
     }
 }
 
-function Get-FailedCheckRunIds {
+function Get-FailedCheckRunRefs {
     <#
     .SYNOPSIS
-        The GitHub Actions run ids behind the FAILING records of a `gh pr checks --json` payload, in
-        the order they appear and without duplicates. Empty when nothing failed or nothing is readable.
+        The failing records of a `gh pr checks --json` payload that name a GitHub Actions run, as
+        { Name; RunId; JobId }, in payload order. Empty when nothing failed or nothing is readable.
 
     .DESCRIPTION
-        The lookup key for Get-StalledRunNote below. `gh pr checks` reports a check, not the run that
-        produced it, and the fact that separates "the job never started" from "a check went red" lives
-        on the RUN -- so the caller needs an id before it can ask. The only place the payload carries
-        one is the `link` field, whose Actions form is
-        `https://github.com/<owner>/<repo>/actions/runs/<runId>/job/<jobId>`.
+        ONE PARSE, TWO QUESTIONS. Get-FailedCheckRunIds below asks whether the RUN behind a failing
+        check ever started (#1044); Get-AuthoredFailureNote's caller asks what the JOB said about why
+        it went red (#1103). Both keys sit in the same field -- the `link`, whose Actions form is
+        `https://github.com/<owner>/<repo>/actions/runs/<runId>/job/<jobId>` -- so they are read here
+        once rather than by two parsers that would drift apart.
 
-        A LINK THAT IS NOT AN ACTIONS RUN IS SKIPPED, DELIBERATELY. A commit status posted by an
-        external service links wherever that service likes, and it has no run, no jobs and no steps --
-        asking GitHub about a run id scraped out of such a URL would be asking about something else.
-        Skipping it costs the caller nothing: a check with no run is not the failure mode being
-        diagnosed, so there is nothing this diagnosis could have said about it.
+        A LINK THAT IS NOT AN ACTIONS RUN IS SKIPPED, DELIBERATELY, and that restraint is inherited
+        rather than new: a commit status posted by an external service links wherever that service
+        likes and has no run, no job and no annotations, so a key scraped out of such a URL would
+        address something else entirely. A link that names a run but no job is KEPT, with an empty
+        JobId -- the run question can still be asked of it, and the annotation question simply is not.
 
         Failing is read through Get-CheckOutcome, so 'cancel', 'timed out' and 'startup failure' come
-        along for the same reason they do in the verdict above -- none of them is green, and a run that
-        was cancelled before it started is exactly the shape being looked for.
+        along for the same reason they do in the verdict above -- none of them is green.
 
     .PARAMETER ChecksJson
         `gh pr checks <pr> --json name,bucket,state,link` output. Anything that will not parse yields
-        an empty list, because this only ever costs the caller a diagnostic line it can do without.
+        an empty list: every caller of this is a diagnostic, and a diagnostic degrades rather than
+        throws.
     #>
     param([string]$ChecksJson)
 
@@ -966,14 +966,53 @@ function Get-FailedCheckRunIds {
     # same trap the two parses in Get-MergeBlockVerdict walked into.
     $records = @(@($parsed) | Where-Object { $_ })
 
-    $ids = New-Object System.Collections.Generic.List[string]
+    # A plain array rather than a generic List, and that is measured rather than stylistic: in 5.1
+    # `@($list)` on a `List[object]` holding PSCustomObjects throws ArgumentException, while the same
+    # wrap on the `List[string]` Get-FailedCheckRunIds builds below is fine. Two or three records is
+    # not a size that needed a List anyway.
+    $refs = @()
     foreach ($r in $records) {
         if ((Get-CheckOutcome -Record $r) -ne 'fail') { continue }
         if (-not $r.PSObject.Properties['link']) { continue }
         $link = [string]$r.link
         if ($link -notmatch '/actions/runs/(\d+)') { continue }
-        $id = $Matches[1]
-        if (-not $ids.Contains($id)) { $ids.Add($id) | Out-Null }
+        # Read before the second -match: $Matches is overwritten by it, not extended.
+        $runId = $Matches[1]
+        $jobId = ''
+        if ($link -match '/actions/runs/\d+/job/(\d+)') { $jobId = $Matches[1] }
+        $name = ''
+        if ($r.PSObject.Properties['name']) { $name = [string]$r.name }
+        $refs += [pscustomobject]@{ Name = $name; RunId = $runId; JobId = $jobId }
+    }
+    return @($refs)
+}
+
+function Get-FailedCheckRunIds {
+    <#
+    .SYNOPSIS
+        The GitHub Actions run ids behind the FAILING records of a `gh pr checks --json` payload, in
+        the order they appear and without duplicates. Empty when nothing failed or nothing is readable.
+
+    .DESCRIPTION
+        The lookup key for Get-StalledRunNote below. `gh pr checks` reports a check, not the run that
+        produced it, and the fact that separates "the job never started" from "a check went red" lives
+        on the RUN -- so the caller needs an id before it can ask.
+
+        THE READING MOVED UP TO Get-FailedCheckRunRefs (#1103) AND THE ANSWER DID NOT CHANGE WITH IT.
+        The link form, the external-status skip and the failing-outcome rule are all that function's
+        now; this is the run-shaped view of it, and what it still owns is the DEDUPE -- two failing
+        checks from one run are one question about that run, and asking it twice would print the note
+        twice.
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,bucket,state,link` output. Anything that will not parse yields
+        an empty list, because this only ever costs the caller a diagnostic line it can do without.
+    #>
+    param([string]$ChecksJson)
+
+    $ids = New-Object System.Collections.Generic.List[string]
+    foreach ($ref in @(Get-FailedCheckRunRefs -ChecksJson $ChecksJson)) {
+        if (-not $ids.Contains($ref.RunId)) { $ids.Add($ref.RunId) | Out-Null }
     }
     return @($ids)
 }
@@ -1070,4 +1109,123 @@ function Get-StalledRunNote {
         $note += " The run is at $url"
     }
     return $note
+}
+
+function Get-AuthoredFailureNote {
+    <#
+    .SYNOPSIS
+        The sentence a failing workflow wrote about ITSELF, read from a check run's annotations:
+        `<title> -- <message>`, with the check name prefixed where the title does not already carry
+        it. '' when the job left no authored diagnosis behind, which is the ordinary case and the
+        case the caller's existing wording already covers.
+
+    .DESCRIPTION
+        Issue #1103, and the seven threads before it -- #891, #913, #942, #962, #966, #974, #1055.
+        `claude-review` is advisory in this repo, so ship-pr merges past it and prints "a check FAILED
+        but the merge is not blocked ... nothing here fixes it". Both halves are true, and together
+        they hand the reader a red mark and an invitation to go and chase it. What the chaser meets is
+        the action's own `##[error]Claude result reported subtype success with is_error:true`, which
+        names nothing, and a log tail that ends somewhere unrelated to the cause -- so the same
+        signature keeps arriving as a NEW issue against a run whose own diagnostic step had already
+        printed the answer. #966 is the expensive one: it was filed against a log reading
+        `api_error_status: 429`, inferred an expired OAuth token instead, and concluded that a secret
+        needed rotating.
+
+        So the reason is fetched and printed where the operator already is. It adds no information the
+        run did not carry -- the same move claude-code-review.yml itself made when it put its reason in
+        an annotation rather than only in a log body.
+
+        THE SELECTION RULE, AND WHY IT IS NOT A CHECK NAME. A failure annotation carrying a TITLE was
+        written by somebody: the Actions runner emits its own with an EMPTY title ("Process completed
+        with exit code 1", "Action failed with error: ..."), while `::error title=X::Y` is a sentence a
+        workflow author chose to leave for exactly this reader. "Titled failure annotation" therefore
+        needs no maintenance and works in a consumer repo whose workflows this repo has never seen,
+        where a rule keyed on the name `claude-review` would report nothing at all.
+
+        WARNINGS ARE NOT READ, and the first titled failure wins. `annotation_level` is failure /
+        warning / notice; a run is being explained here because it went RED, and the Node-20
+        deprecation warning riding along on every job of this repo is not why. Annotations arrive in
+        the order the job emitted them, and a workflow that diagnoses itself does so before the
+        runner's exit noise.
+
+        BOUNDED, BECAUSE THIS IS FREE TEXT A WORKFLOW PRODUCED AND IT IS BEING PASTED INTO A CONSOLE:
+        the message is cut to its FIRST LINE and 500 characters. Not the 300 claude-code-review.yml
+        writes its own annotation under -- that bounds the REASON it appends, and the headline
+        explaining what the status means sits in front of it, so relaying at 300 would keep only the
+        headline, which is the part a reader could already guess from the check being red. The two
+        bounds overlap and #1116 measured the overlap rather than removing it; the arithmetic is in
+        the comment beside the cut itself.
+
+    .PARAMETER AnnotationsJson
+        `gh api repos/<owner>/<repo>/check-runs/<jobId>/annotations` output. Unreadable in, '' out: a
+        diagnostic must never be the reason the line beside it cannot be printed.
+
+    .PARAMETER CheckName
+        The check the annotations belong to, so the note names it. Optional; left out, the note is the
+        authored sentence alone.
+    #>
+    param(
+        [string]$AnnotationsJson,
+        [string]$CheckName = ''
+    )
+
+    if (-not $AnnotationsJson -or -not $AnnotationsJson.Trim()) { return '' }
+    try { $parsed = $AnnotationsJson | ConvertFrom-Json } catch { return '' }
+    if ($null -eq $parsed) { return '' }
+
+    # Assign first, wrap second -- see the note in Get-FailedCheckRunRefs above.
+    foreach ($a in @(@($parsed) | Where-Object { $_ })) {
+        # A field gh was never handed is absent, and absent is not empty under Set-StrictMode.
+        if (-not $a.PSObject.Properties['annotation_level']) { continue }
+        if (([string]$a.annotation_level).Trim().ToLowerInvariant() -ne 'failure') { continue }
+
+        $title = ''
+        if ($a.PSObject.Properties['title']) { $title = ([string]$a.title).Trim() }
+        if (-not $title) { continue }
+
+        $message = ''
+        if ($a.PSObject.Properties['message']) { $message = ([string]$a.message).Trim() }
+        $message = @($message -split "`r?`n")[0]
+        # 500, NOT the 300 claude-code-review.yml writes its own annotation under, and measured
+        # rather than guessed. That 300 bounds the REASON it appends; the headline explaining what
+        # the status means sits in front of it, so relaying at 300 would cut the sentence in half and
+        # keep only the half a reader could guess from the red mark. Measured on run 33267175141:
+        # 400 characters, ending "resets Aug 31, 7am (UTC)".
+        #
+        # THAT NUMBER READ 460 UNTIL ISSUE #1116 CHECKED IT. The same run's note, put back through
+        # this function, is 400: a 55-character title, the 4-character separator and a 341-character
+        # message. The bound was never in question, but the measurement defending it was wrong by 60
+        # -- and a comment that cites a run id invites exactly this check, which is the argument for
+        # citing one.
+        #
+        # THE TWO CAPS DO OVERLAP, AND #1116 LEFT THEM THAT WAY ON PURPOSE. That workflow's headline
+        # is 296 characters, so headline + reason can reach 597 against this 500 and the part cut is
+        # the reason's TAIL. Lowering the workflow's 300 so the sum fits was built and withdrawn on
+        # the arithmetic: 500 - 296 - 1 = 203 either way, so the operator's console gains nothing,
+        # loses the "..." that marks the cut, and the GitHub annotation -- which no 500 bounds --
+        # loses up to 97 characters. The only change that would give the console MORE is cutting
+        # from a different END here, and that is not free either: this function relays workflows it
+        # has never seen, and for one whose message is all content and no preamble, the front is the
+        # part worth keeping. Sampled traffic says the case is hypothetical -- 45 annotations,
+        # reasons of 51 to 55 characters against 203 of room -- so the bound stays where the
+        # measurement put it.
+        #
+        # THE RELAY DOES NOT VOUCH FOR WHAT IT RELAYS, and that is the point of the rule -- issue
+        # #1112. That measured note ended with a reset time roughly 2.5 DAYS later than the moment
+        # the quota actually came back. Nothing is added here to caveat it: this function repeats
+        # what an author wrote and cannot know which authors are reliable, so a hedge here would
+        # hedge every workflow in every consuming repo. An over-claiming sentence is repaired in the
+        # workflow that writes it, which is where #1112 was repaired.
+        if ($message.Length -gt 500) { $message = $message.Substring(0, 500).TrimEnd() + '...' }
+
+        # NAMED ONCE. A workflow that titles its own annotation usually leads with the job name --
+        # `::error title=claude-review -- out of quota::` is exactly what this repo writes -- and
+        # prefixing that again produces "claude-review: claude-review -- ...". The check name is here
+        # for the payloads that do NOT carry it, so it is added only where it is missing.
+        $note = if ($CheckName -and $title -notlike "$CheckName*") { "${CheckName}: $title" } else { $title }
+        if ($message) { $note += " -- $message" }
+        return $note
+    }
+
+    return ''
 }
