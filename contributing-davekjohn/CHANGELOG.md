@@ -32,6 +32,55 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/a-backgrounded-ship-ends-on-the-trunk-v1` · 20260829-130540
+
+A backgrounded ship now hands your checkout back to the trunk before it waits, so the session it hands
+back is one you can actually close.
+
+`ship-pr` merges and folds on the trunk, and until now it did not go there until step 5 -- after the CI
+wait. Backgrounding the run was already the default, so the ordinary shape of a shipping session was: the
+work is finished, the pull request is open, the close-out says the session can be cleared, and the tree
+is standing on the branch. Chris's own body says both that an in-flight ship is a finished assignment and
+that a chain ends on the trunk, and for this one shape those could not both be true.
+
+**Step 2b hands the trunk back the moment the pull request exists.** It costs nothing, because nothing
+after step 2 reads the working tree any more: since #970 the merge gates read the branch's commit and
+since #972 step 5 reads `HEAD` before it moves anything, so `already on main` is an arm the fold has had
+all along -- now taken on purpose rather than by luck. Three conditions guard it, and none of them
+refuses a ship: the primary checkout only (a lane would hold the clone-wide lock of #1069 for the whole
+wait, which is worse than the defect that repair closed), nobody else holding the trunk, and a clean tree
+(#972's two outcomes, met one step earlier). A tree that cannot go home stays where it is and says which
+of the three it was.
+
+One thing falls out that was not the point: a lane that would have collided with the primary's step 5 --
+the narrow window step 0 cannot cover -- now meets step 0's refusal instead. A post-merge half-state
+becomes a pre-push refusal.
+
+The decision is `Get-TrunkReturnDecision` in `worktree-lib.ps1`, so it is asserted rather than only
+exercised by a live ship: the suite went from 26 to 44 asserts, and found a binder defect in the lib
+while it was being written.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Chris's portable body no longer asks the reader to choose between two of its own rules. It now says what
+to do when a tool makes them fight -- the trunk wins, and the tool is what changes -- which is the
+general form of this repair rather than a note about `ship-pr`. That travels to every consumer, whether
+or not they run this workflow.
+
+**Score:** 3
+
+#### Pull Request
+
+A backgrounded ship gives the trunk back before it waits
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1078](https://github.com/DaveKJohn/claude-code-specialists/pull/1078)
+
+---
+
 ### DEPLOY: `docs/consumer-bumps-default-is-empty-v1` · 20260829-124506
 
 Two shipped texts stated that `Get-ReleaseConsumerBumps` defaults to `('minor','major')`. It defaults to
