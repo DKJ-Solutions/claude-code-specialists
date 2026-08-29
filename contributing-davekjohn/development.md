@@ -51,9 +51,9 @@ step numbers are untouched, so every `step 2.x` reference on the page and in `RE
 
 ### TEST
 
-- [ ] `NEW DEVELOPMENT TASK` survives only as the deliberate note under the new heading -- no second
+- [x] `NEW DEVELOPMENT TASK` survives only as the deliberate note under the new heading -- no second
       heading anywhere, and nothing links to a `#2-new-development-task` anchor
-- [ ] `check-plugin-integrity.ps1` clean and all suites green
+- [x] `check-plugin-integrity.ps1` clean and all suites green
 
 ### DEPLOY: `docs/development-step-drops-new-task-v1`
 
