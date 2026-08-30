@@ -136,9 +136,11 @@
 
     BOTH GATES SAY WHEN THE CHECKOUT MOVED WHILE THEY RAN (issue #1145). They read the WORKING TREE
     for a minute or more, and this checkout is not private to them: ship-pr backgrounds itself so the
-    session can get on with something else, and that session is told by name to run prune-merged.ps1,
-    which borrows the trunk and hands it straight back. Measured on PR #1144 -- one suite of 55 red
-    inside the gate, green standalone on the same commit seconds later. So each gate is asked
+    session can get on with something else, and that session runs maintenance commands beside it --
+    new-branch.ps1 cuts a branch, worktree-lane.ps1 moves the tree. Measured on PR #1144 -- one suite
+    of 55 red inside the gate, green standalone on the same commit seconds later, while
+    prune-merged.ps1 held the trunk in the same checkout; that script stopped taking it in #1147, and
+    the class it belongs to did not go with it. So each gate is asked
     afterwards whether the tree held still (Get-GateTreeMovedNote): a RED then says it is not
     trustworthy instead of reading as a real defect, and a GREEN is reported but NOT recorded as gate
     evidence. Neither is a refusal -- a red still blocks the push, and the remedy is to re-run.
@@ -950,11 +952,11 @@ If the title really does begin with that word, ship it with -Force.
 $gateFingerprint = Get-GateFingerprint -RepoRoot $repoRoot
 
 # AND HOW MANY TIMES HEAD HAS MOVED, read beside it and asked again after each gate (issue #1145). The
-# fingerprint above cannot see a checkout that CAME BACK: prune-merged.ps1 borrows the trunk to
-# fast-forward it and hands the branch back, leaving every byte identical -- and Chris's lens sends a
-# session to that script mid-assignment, which is exactly when a backgrounded ship is sitting inside
-# step 1. The reflog depth is where those two moves are recorded, and it is per-worktree, so a lane
-# moving its own checkout never registers here.
+# fingerprint above cannot see a checkout that CAME BACK -- a command that switches away and switches
+# straight back leaves every byte identical -- and a session runs maintenance commands mid-assignment,
+# which is exactly when a backgrounded ship is sitting inside step 1. The reflog depth is where those
+# two moves are recorded, and it is per-worktree, so a lane moving its own checkout never registers
+# here.
 $gateHeadMoves = Get-GateHeadMoveCount -RepoRoot $repoRoot
 
 # AND THE GATES SAY WHEN THEY RAN AGAINST SOMETHING OTHER THAN HEAD (issue #1026). Both gates below judge
@@ -1024,9 +1026,10 @@ if (-not $SkipTests) {
         Write-Host "test gate: all suites already proved against this exact tree -- skipped." -ForegroundColor DarkGray
     } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the PR')) {
         # THIS IS THE GATE THE MOVEMENT CHECK WAS MEASURED ON (issue #1145). One suite of 55 went red
-        # inside a backgrounded ship while prune-merged.ps1 borrowed the trunk in the same checkout, and
-        # green standalone on the same commit seconds later. A red is expensive to disbelieve on a hunch
-        # and expensive to believe wrongly, so the run says which one this is.
+        # inside a backgrounded ship while prune-merged.ps1 held the trunk in the same checkout, and
+        # green standalone on the same commit seconds later. That script no longer takes the checkout
+        # (#1147); the check stays, because a red is expensive to disbelieve on a hunch and expensive to
+        # believe wrongly, and every other tree-mover in this clone is still there.
         $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
         if ($movedNote) { Write-Warning $movedNote }
         Write-Error "test gate found failing suites - branch not pushed, no PR opened. Fix the tests, or run with -SkipTests to skip the gate."
