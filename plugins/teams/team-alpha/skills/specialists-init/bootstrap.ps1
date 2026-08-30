@@ -43,9 +43,18 @@
          the body from the plugin install (~/.claude/plugins/marketplaces/.../01-01-persona.md) and
          the repo lens (.claude/plugins/<family>/<plugin>/01-01-extension.md). If CLAUDE.md is missing,
          it writes a minimal scaffold; if the imports already exist, it does nothing.
-      3. Writes a proposal snippet (.claude/settings.suggested.jsonc) with recommended
-         permissions.deny + a hooks stub. It DOES NOT touch settings.json -- a JSON merge is
-         repo-specific and risky, so that evaluation is left to the user/Claude.
+      3. Writes TWO settings proposals, and DOES NOT touch settings.json in either case -- the
+         placement is the owner's act, and a session may not widen a permissions file at all.
+         a. .claude/settings.suggested.jsonc -- the ANNOTATED proposal: both permissions halves + a
+            hooks stub, with the reasoning for each rule beside it. Explanation, not a replacement.
+         b. .claude/settings.proposed.json -- the MERGED end result (inbound #1124): the consumer's own
+            .claude/settings.json key for key with those halves folded in, strict JSON, no comments,
+            no hooks stub. So adopting the proposal is 'replace one file with the other' instead of a
+            hand-merge against a destination that already holds enabledPlugins and
+            extraKnownMarketplaces -- the keys a whole-file paste of (a) silently deletes, which lands
+            the reader in #1076's zero-surface state through a file that parses perfectly.
+            Written only when settings.json can be read WHOLE; see the block itself for the three
+            shapes that are refused and why refusing beats writing a lossy file called safe to paste.
 
     Exit code: 0 = done (even if everything was already present). 1 = plugin persona source or
     ConsumerRoot was not found.
@@ -930,7 +939,22 @@ $importBlock
 # widening Get-SettingsChainPaths first.
 $claudeDir = Join-Path $ConsumerRoot '.claude'
 if (-not (Test-Path -LiteralPath $claudeDir)) { New-Item -ItemType Directory -Path $claudeDir -Force | Out-Null }
-$suggestPath = Join-Path $claudeDir 'settings.suggested.jsonc'
+# BOTH artifact names come from Get-SettingsArtifactNames, so this writer and specialists-teardown's
+# remover cannot drift apart -- see that function for why a name typed twice is the shape this repo has
+# already been bitten by three times. The fallback keeps a missing lib from stopping the one script whose
+# job is to set a repo up, exactly as $family does above.
+$settingsArtifacts = if (Get-Command Get-SettingsArtifactNames -ErrorAction SilentlyContinue) {
+    Get-SettingsArtifactNames
+} else {
+    [pscustomobject]@{ Suggested = '.claude\settings.suggested.jsonc'; Proposed = '.claude\settings.proposed.json' }
+}
+$suggestPath  = Join-Path $ConsumerRoot $settingsArtifacts.Suggested
+$proposedPath = Join-Path $ConsumerRoot $settingsArtifacts.Proposed
+# The destination the merged file is built from and replaces. NOT the settings chain: $enabledPlugins
+# above is read from all three layers (user, project, local) and the merge must not flatten somebody's
+# user-scope configuration into their repo. Merging THIS file alone is what makes 'replace it with the
+# merged one' provably lossless whatever the rest of the chain holds.
+$settingsPath = Join-Path $claudeDir 'settings.json'
 
 # THE ALLOW HALF (inbound #1075). Until it existed, this proposal carried exactly one permissions
 # half -- 'deny' -- so a consumer who followed the adoption to the letter got a repo that FORBIDS the
@@ -953,6 +977,35 @@ $suggestPath = Join-Path $claudeDir 'settings.suggested.jsonc'
 # NAMED BY THE PLUGIN THAT IS ACTUALLY ENABLED, not by the current id -- $workflowNameHere, resolved
 # where $hasWorkflowPack is: a consumer still on the migration name 'workflow-davekjohn' has that
 # segment in their cache path, and a rule anchored on the other spelling would match nothing for them.
+# THE RULES ARE DATA, AND THE TWO FILES ARE BOTH RENDERINGS OF IT (inbound #1124). The annotated .jsonc
+# below and the merged .json beside it have to carry the SAME rules -- a proposal explaining why a rule
+# exists next to a pasteable file that does not contain it is worse than either alone. So the rules are
+# declared once here and each file is generated from them; neither can be edited without the other
+# following.
+$allowRules = if ($hasWorkflowPack) {
+    @(
+        "Bash(powershell -NoProfile -File *$workflowNameHere*new-branch.ps1*)",
+        "Bash(powershell -NoProfile -File *$workflowNameHere*open-pr.ps1*)",
+        "Bash(powershell -NoProfile -File *$workflowNameHere*ship-pr.ps1*)",
+        "PowerShell(powershell -NoProfile -File *$workflowNameHere*new-branch.ps1*)",
+        "PowerShell(powershell -NoProfile -File *$workflowNameHere*open-pr.ps1*)",
+        "PowerShell(powershell -NoProfile -File *$workflowNameHere*ship-pr.ps1*)",
+        'Bash(gh repo edit --delete-branch-on-merge*)'
+    )
+} else { @() }
+$denyRules = @(
+    'Bash(git push --force:*)',
+    'Bash(git push -f:*)',
+    'Bash(git reset --hard:*)',
+    'Bash(git rebase:*)',
+    'Bash(rm -rf:*)'
+)
+
+# Rendered at the .jsonc's own indentation (6 spaces inside "permissions"), so the annotated file reads
+# exactly as it did when the rules were typed into the here-string.
+$allowJsonc = ($allowRules | ForEach-Object { '      "' + $_ + '"' }) -join ",`n"
+$denyJsonc  = ($denyRules  | ForEach-Object { '      "' + $_ + '"' }) -join ",`n"
+
 $allowBlock = if ($hasWorkflowPack) {
     @"
     // The workflow's own entry points -- the three commands the documented cycle is made of. Both
@@ -962,13 +1015,7 @@ $allowBlock = if ($hasWorkflowPack) {
     // prompt; and 'gh repo delete' / 'gh repo archive', for the same reason. 'gh repo edit' earns
     // its place in the single form the workflow assumes -- it needs deleteBranchOnMerge on.
     "allow": [
-      "Bash(powershell -NoProfile -File *$workflowNameHere*new-branch.ps1*)",
-      "Bash(powershell -NoProfile -File *$workflowNameHere*open-pr.ps1*)",
-      "Bash(powershell -NoProfile -File *$workflowNameHere*ship-pr.ps1*)",
-      "PowerShell(powershell -NoProfile -File *$workflowNameHere*new-branch.ps1*)",
-      "PowerShell(powershell -NoProfile -File *$workflowNameHere*open-pr.ps1*)",
-      "PowerShell(powershell -NoProfile -File *$workflowNameHere*ship-pr.ps1*)",
-      "Bash(gh repo edit --delete-branch-on-merge*)"
+$allowJsonc
     ],
 "@
 } else {
@@ -983,9 +1030,24 @@ $allowBlock = if ($hasWorkflowPack) {
 
 $suggestion = @"
 // PROPOSAL -- created by specialists-init. This is NOT active configuration.
-// Copy desired blocks to .claude/settings.json (or settings.local.json) and remove
-// this file afterward. Hooks are a STUB: scripts are repo-specific and do not exist here yet --
-// replace with guards/lints appropriate for this repo (or omit).
+// The rules below, with the reasoning for each. To ADOPT them, replace .claude/settings.json with
+// settings.proposed.json beside this file -- that is these same rules already merged into your
+// settings.json -- and then delete both. Copying individual blocks from here into settings.json (or
+// settings.local.json) also works, and the caveats for that route are below. Hooks are a STUB:
+// scripts are repo-specific and do not exist here yet -- replace with guards/lints appropriate for
+// this repo (or omit).
+//
+// THIS FILE IS AN EXPLANATION, NOT A REPLACEMENT -- DO NOT PASTE IT WHOLE (inbound #1124). It holds
+// the permission halves and nothing else, while .claude/settings.json ALREADY HOLDS the two keys
+// that got you this far: "enabledPlugins" and "extraKnownMarketplaces". Overwriting that file with
+// this one deletes both, and the result is a settings file that parses perfectly and loads no
+// plugins at all -- no skills, no subagents, no SessionStart hooks, and no message of any kind
+// saying so (that state, measured: inbound #1076). Whatever you copy from here, those two keys stay.
+//
+// SO USE THE FILE BESIDE THIS ONE. settings.proposed.json is this proposal already merged INTO your
+// settings.json -- strict JSON, every key you had, both halves below folded in. Replacing
+// settings.json with it is one act with nothing to reconstruct by hand. Read on here for WHY each
+// rule is in it.
 //
 // AND STRIP EVERY '//' LINE ON THE WAY OUT, INCLUDING THIS ONE. This file is JSONC, where comments
 // are legal; settings.json and settings.local.json are strict JSON, where they are not. Claude Code
@@ -999,11 +1061,7 @@ $suggestion = @"
   "permissions": {
 $allowBlock
     "deny": [
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(git reset --hard:*)",
-      "Bash(git rebase:*)",
-      "Bash(rm -rf:*)"
+$denyJsonc
     ]
   },
   // Safety hooks: STUB, and the path below is a PLACEHOLDER -- this bootstrap does not create that
@@ -1035,11 +1093,20 @@ $suggestion = $suggestion.TrimEnd("`r", "`n") + "`n"
 # likely case, and the measured v10 repo had none, so the file DID show up in git status and the warning was
 # simply wrong there. check-ignore answers it in one call; git absent or erroring falls back to the honest
 # conditional rather than claiming either way.
-$suggestIgnored = $null
-try {
-    & git -C $ConsumerRoot check-ignore --quiet -- $suggestPath 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { $suggestIgnored = $true } elseif ($LASTEXITCODE -eq 1) { $suggestIgnored = $false }
-} catch { $suggestIgnored = $null }
+#
+# ASKED PER FILE, because the answer differs per file and the merged one carries more. A rule naming
+# '.claude/settings.json' or '.claude/settings.suggested.jsonc' by name -- both real shapes -- covers one
+# of these paths and not the other, so one reading cannot speak for the pair. Three call sites want it,
+# so it is a function rather than the same six lines three times.
+function Test-PathGitIgnored([string]$Root, [string]$Path) {
+    try {
+        & git -C $Root check-ignore --quiet -- $Path 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { return $true }
+        if ($LASTEXITCODE -eq 1) { return $false }
+    } catch { }
+    return $null   # git absent or erroring: say so, rather than claiming either way
+}
+$suggestIgnored = Test-PathGitIgnored -Root $ConsumerRoot -Path $suggestPath
 
 $suggestNote = if ($suggestIgnored -eq $true) {
     'gitignored in this repo, so this path is your only pointer to it'
@@ -1048,7 +1115,233 @@ $suggestNote = if ($suggestIgnored -eq $true) {
 } else {
     'gitignored in many repos, so this path may be your only pointer to it'
 }
-Write-Host "  [create] $suggestPath placed (proposal -- not active; $suggestNote)." -ForegroundColor Green
+Write-Host "  [create] $suggestPath placed (annotated proposal -- not active; $suggestNote)." -ForegroundColor Green
+
+function Format-JsonIndented {
+    <# Re-indent COMPRESSED JSON with two spaces per level. Windows PowerShell 5.1's own pretty-printer
+       aligns each value to the column its key ends at, which is unreadable past two levels and re-flows
+       whole blocks when a key is renamed -- see the caller for why that matters for this file
+       specifically.
+
+       IT IS A SCANNER, NOT A REGEX, and that is the whole design. The characters it acts on -- { } [ ] ,
+       and : -- are all legal INSIDE a JSON string, and a consumer's settings can hold any of them (a hook
+       command with a brace, a permission rule with a comma). So it tracks whether it is inside a string
+       and whether the previous character was a backslash, and touches nothing while it is. Feeding it
+       compressed output is what keeps that the only question it has to answer: no whitespace outside
+       strings to preserve or strip, and no formatting of PowerShell's to second-guess.
+
+       Empty containers stay on one line: '{}' rather than a brace, a blank line and a brace. #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Json,
+        [string]$Indent = '  '
+    )
+    $sb = New-Object System.Text.StringBuilder
+    $depth = 0
+    $inString = $false
+    $escaped = $false
+    for ($i = 0; $i -lt $Json.Length; $i++) {
+        $c = [string]$Json[$i]
+        if ($inString) {
+            [void]$sb.Append($c)
+            if ($escaped)          { $escaped = $false }
+            elseif ($c -eq '\')    { $escaped = $true }
+            elseif ($c -eq '"')    { $inString = $false }
+            continue
+        }
+        switch ($c) {
+            '"' { $inString = $true; [void]$sb.Append($c) }
+            ':' { [void]$sb.Append(': ') }
+            ',' { [void]$sb.Append(",`n" + ($Indent * $depth)) }
+            { $_ -eq '{' -or $_ -eq '[' } {
+                $close = if ($c -eq '{') { '}' } else { ']' }
+                if (($i + 1) -lt $Json.Length -and [string]$Json[$i + 1] -eq $close) {
+                    [void]$sb.Append($c + $close); $i++
+                } else {
+                    $depth++
+                    [void]$sb.Append($c + "`n" + ($Indent * $depth))
+                }
+            }
+            { $_ -eq '}' -or $_ -eq ']' } {
+                $depth--
+                [void]$sb.Append("`n" + ($Indent * $depth) + $c)
+            }
+            default { [void]$sb.Append($c) }
+        }
+    }
+    return $sb.ToString()
+}
+
+# --- 3b. The MERGED end result, as a strict-JSON file that can be pasted in one act (#1124) --------
+# WHY A SECOND FILE RATHER THAN MORE WARNING TEXT. The .jsonc above cannot be copied whole for three
+# independent reasons, and two of them were already warned about: its comments are illegal in the
+# destination (#1097) and its hooks path is a placeholder (#363). The third was not warned about
+# anywhere, and it is the expensive one -- the destination is NOT EMPTY. It carries enabledPlugins and
+# extraKnownMarketplaces, and a whole-file paste deletes them, producing a settings file that parses
+# perfectly and loads nothing: no skills, no subagents, no SessionStart hooks, no message. That is the
+# state #1076 measured (3 -> 0 hooks, 6 -> 0 skills, 15 -> 0 subagents across one restart), reached by a
+# second route.
+#
+# And it lands there in the ONE ACT THIS FAMILY RESERVES FOR THE HUMAN. A session may not widen a
+# permissions file -- team-alpha's own settings manual says so and that boundary is right -- so this
+# paste cannot be delegated: it is performed once per repo, by the person least practised at it, and it
+# fails silently and totally. The instruction that stood here, 'copy what fits', asked that person to
+# invent a hand-merge against a destination the page never mentioned already held something load-bearing.
+# More warning text does not make a file pasteable; a merged file does. Reported from testrun 3 by the
+# repo owner, not the runner: 'if I have to do this myself, I want to be able to copy and paste the whole
+# file with no extra steps.'
+#
+# THE HOOKS STUB IS OMITTED HERE, deliberately and only here. The annotated file keeps it, because there
+# it is an illustration a reader adapts; a file whose whole promise is 'paste this' must not ship a Stop
+# hook pointing at scripts/maintenance/<your-check>.ps1, which nothing creates. The page already offers
+# 'or drop the hooks key' as a legitimate outcome, so this is not a new judgment call. An existing hooks
+# key of the consumer's own is preserved like every other key -- what is skipped is OUR stub.
+$proposedWritten = $false
+# Declared here rather than where it is measured, because the next-steps read it on BOTH paths and
+# StrictMode makes an unset variable a terminating error rather than a blank.
+$proposedIgnored = $null
+
+# Read the destination. An empty or absent file is an ordinary state, not a failure: the enable may sit
+# in the user layer or in settings.local.json, and a settings.json holding only permissions is then a
+# correct and complete answer.
+$existingSettings = [pscustomobject]@{}
+# The reason, not a boolean: the notice below has to name WHICH shape it refused, or it sends a reader
+# hunting for a syntax error in a file that parses perfectly.
+$settingsRefusal = $null
+if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
+    $parsed = $null
+    try {
+        $rawSettings = [System.IO.File]::ReadAllText($settingsPath, [System.Text.Encoding]::UTF8)
+        if ($rawSettings.Trim().Length -gt 0) { $parsed = $rawSettings | ConvertFrom-Json }
+    } catch { $settingsRefusal = 'does not parse as JSON' }
+
+    if (-not $settingsRefusal -and $null -ne $parsed) {
+        # A settings file is a JSON OBJECT. Anything else that happens to parse -- an array, a bare
+        # number -- has no keys to preserve and cannot be merged into.
+        if (-not ($parsed -is [System.Management.Automation.PSCustomObject])) {
+            $settingsRefusal = 'parses, but is not a JSON object'
+        } else {
+            # AND THE SAME QUESTION ONE LEVEL DOWN. The merge replaces 'permissions' wholesale, so a
+            # permissions key that is not an object -- a string, a list -- would be dropped by the very
+            # file advertised as losing nothing. That is the defect this whole block exists to prevent,
+            # arriving through the fix. Refuse instead, exactly as for a root that cannot be read.
+            $permProp = @($parsed.PSObject.Properties | Where-Object { $_.Name -eq 'permissions' })
+            if ($permProp.Count -gt 0 -and -not ($permProp[0].Value -is [System.Management.Automation.PSCustomObject])) {
+                $settingsRefusal = "has a 'permissions' key that is not an object"
+            } else {
+                # AND ONE LEVEL DOWN AGAIN: allow/deny have to be lists of strings, because that is what
+                # the merge concatenates onto. A null is fine and means 'no rules' -- absent and null are
+                # the same statement, so folding one into the other loses nothing. Anything else is not:
+                # an object or a number there would ride into the merged file as a rule that is not a
+                # rule, and a permission list with one nonsense entry in it is worse than a refusal,
+                # because it looks like it was reviewed.
+                foreach ($half in @('allow', 'deny')) {
+                    if ($settingsRefusal -or $permProp.Count -eq 0) { continue }
+                    $existing = @($permProp[0].Value.PSObject.Properties | Where-Object { $_.Name -eq $half })
+                    if ($existing.Count -eq 0 -or $null -eq $existing[0].Value) { continue }
+                    if (@(@($existing[0].Value) | Where-Object { -not ($_ -is [string]) }).Count -gt 0) {
+                        $settingsRefusal = "has a 'permissions.$half' that is not a list of rules"
+                    }
+                }
+                if (-not $settingsRefusal) { $existingSettings = $parsed }
+            }
+        }
+    }
+}
+
+if ($settingsRefusal) {
+    # NO MERGED FILE ON A DESTINATION WE CANNOT ACCOUNT FOR, because composing one from a file we could
+    # not fully read is the very data loss this whole block exists to prevent -- and it would arrive
+    # wearing the label 'safe to paste'. The reader is told what to fix and still has the annotated
+    # proposal, so nothing is taken away from them.
+    Write-Host "  [notice] $settingsPath $settingsRefusal, so no merged proposal was written -- a merge built from a file that cannot be read whole would silently drop part of it. Repair that file and re-run, or copy from the annotated proposal by hand." -ForegroundColor Yellow
+} else {
+    # Every key the consumer already has, in the order they had it; then the two permission halves folded
+    # into whatever 'permissions' they had (their own rules first, ours appended, no duplicates). Any
+    # other permissions sub-key -- ask, defaultMode, additionalDirectories -- rides along untouched.
+    $merged = [ordered]@{}
+    foreach ($prop in $existingSettings.PSObject.Properties) { $merged[$prop.Name] = $prop.Value }
+
+    $permOut = [ordered]@{}
+    if ($merged.Contains('permissions') -and $merged['permissions'] -is [System.Management.Automation.PSCustomObject]) {
+        foreach ($prop in $merged['permissions'].PSObject.Properties) { $permOut[$prop.Name] = $prop.Value }
+    }
+    foreach ($half in @(
+        [pscustomobject]@{ Key = 'allow'; Rules = $allowRules },
+        [pscustomobject]@{ Key = 'deny';  Rules = $denyRules }
+    )) {
+        # NOT '$have = if (...) { @($x) } else { @() }', which is what this was first written as and what
+        # the fixture caught. An if-EXPRESSION returns its block through the output pipeline, and the
+        # pipeline unrolls a one-element array to the bare element -- so a consumer with exactly ONE
+        # existing allow rule got a String here, '+' then concatenated our rules onto it as text, and the
+        # merged file shipped a single rule reading 'Bash(npm run build:*)Bash(powershell...'. Valid JSON,
+        # silently permitting nothing. A plain assignment does not unroll, which is the whole fix.
+        # The null test is not belt-and-braces: '"allow": null' means the KEY EXISTS, so Contains says
+        # yes, and @($null) is an array holding one $null -- which would ship '"allow": [null, ...]'.
+        # Null and absent are the same statement here, so both take the empty path.
+        $have = @()
+        if ($permOut.Contains($half.Key) -and $null -ne $permOut[$half.Key]) { $have = @($permOut[$half.Key]) }
+        $add = @($half.Rules | Where-Object { $have -notcontains $_ })
+        $permOut[$half.Key] = @($have + $add)
+    }
+    $merged['permissions'] = $permOut
+
+    # ConvertTo-Json escapes the four HTML-sensitive characters (& < > ') as \uXXXX on Windows
+    # PowerShell 5.1 -- valid JSON, but this file BECOMES the consumer's settings.json and they read and
+    # edit it forever after, so a hook command reading 'a && b' should not arrive as an escape. Only code
+    # points >= 0x20 are restored: below that, JSON requires the escape. Same treatment, and the same
+    # reason, as publish-to-business.ps1 gives its generated manifest.
+    #
+    # -Compress, THEN INDENT OURSELVES. Windows PowerShell 5.1 pretty-prints JSON by aligning every value
+    # to the column its key ends at, so a settings.json three levels deep arrives with values starting
+    # past column 40 and a key rename re-flows the block. That is tolerable for a generated manifest
+    # nobody opens; it is not what to hand somebody as the file they will edit for the life of the repo.
+    # Compressing first means the indenter's input is canonical -- one line, no whitespace outside
+    # strings -- so it has one job and no formatting of PowerShell's to second-guess.
+    #
+    # AND THE UN-ESCAPE COUNTS THE BACKSLASHES IN FRONT OF IT, which the obvious one-liner does not.
+    # '\\u([0-9a-fA-F]{4})' matches the SECOND backslash of an escaped pair, so a consumer whose hook
+    # command names a Windows path like C:\uadded\check.ps1 -- JSON '"C:\\uadded\\check.ps1"' -- has
+    # '\uadde' folded into one character, leaving an invalid escape behind. Measured: the file no longer
+    # parses, and it is still written and still announced as 'ready to replace settings.json'. That is
+    # this whole feature's own failure mode arriving through its formatting step, which is why the run
+    # of backslashes is counted rather than assumed: an EVEN run means every one of them is itself
+    # escaped, so the 'u' after it is literal text and nothing here is an escape at all. Same reasoning
+    # as Format-JsonIndented being a scanner rather than a regex, applied one line earlier.
+    $proposedJson = ($merged | ConvertTo-Json -Depth 20 -Compress)
+    $proposedJson = [regex]::Replace($proposedJson, '\\+u[0-9a-fA-F]{4}', {
+        param($m)
+        $text = $m.Value
+        $slashes = $text.Substring(0, $text.Length - 5)
+        if ($slashes.Length % 2 -eq 0) { return $text }
+        $code = [int]('0x' + $text.Substring($text.Length - 4))
+        if ($code -lt 0x20) { return $text }
+        return $slashes.Substring(0, $slashes.Length - 1) + [string][char]$code
+    })
+    [System.IO.File]::WriteAllText($proposedPath, ((Format-JsonIndented -Json $proposedJson).TrimEnd("`r", "`n") + "`n"), $Utf8NoBom)
+    $proposedWritten = $true
+
+    # SAY WHICH CASE THIS IS, rather than promising preservation in a repo that had nothing to preserve.
+    # 'your keys are kept' is reassuring and, on a repo whose enable sits in settings.local.json or the
+    # user layer, simply not a statement about anything -- and a reader who trusts it stops checking.
+    $carried = @($existingSettings.PSObject.Properties | ForEach-Object { $_.Name } | Where-Object { $_ -ne 'permissions' })
+    $carriedNote = if ($carried.Count -gt 0) {
+        "your settings.json plus the permissions -- it keeps $($carried -join ', ')"
+    } else {
+        'permissions only -- .claude/settings.json holds nothing else here, so there was nothing to carry over'
+    }
+    Write-Host "  [create] $proposedPath placed (merged, strict JSON, ready to replace settings.json: $carriedNote)." -ForegroundColor Green
+
+    # THE MERGED FILE IS A COPY OF SETTINGS.JSON, SO IT INHERITS WHATEVER THAT FILE WAS HIDING. A repo
+    # that gitignores '.claude/settings.json' by name -- the usual reason being an 'env' block with a
+    # token in it -- has an ignore rule that does NOT match a new neighbouring path, so this run would
+    # otherwise drop an untracked, un-ignored second copy of that secret into the tree and say nothing.
+    # The bootstrap cannot know what is in there and must not guess, so it reports the fact rather than
+    # the risk, and only in the one combination where the two files disagree.
+    $proposedIgnored = Test-PathGitIgnored -Root $ConsumerRoot -Path $proposedPath
+    if ((Test-PathGitIgnored -Root $ConsumerRoot -Path $settingsPath) -eq $true -and $proposedIgnored -eq $false) {
+        Write-Host "  [notice] .claude/settings.json is gitignored here and the merged copy beside it is NOT -- it holds every key that file held. If it was ignored to keep something out of the repo, adopt the file and delete it before you commit, or extend the ignore rule to cover it." -ForegroundColor Yellow
+    }
+}
 
 # --- Report ----------------------------------------------------------------------------------------
 Write-Host ""
@@ -1084,10 +1377,37 @@ if (-not $hasWorkflowPack) {
 } else {
     Write-Host "  2. Want to use the workflow skills (open-pr / fold-changelog)? Fill scripts/repo-config.ps1 (RepoName + LintScript) and scripts/lib/branch-info.ps1 (branch prefix table) -- VUL-IN scaffolds ready." -ForegroundColor Gray
 }
-$suggestReminder = if ($suggestIgnored -eq $true) { 'it is gitignored here, so git will not remind you' }
-                   elseif ($suggestIgnored -eq $false) { 'it is not gitignored here, so git status will keep showing it until you do' }
-                   else { 'it is gitignored in many repos, so git may not remind you' }
-Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delete proposal ($suggestReminder)." -ForegroundColor Gray
+# THE REMINDER HAS TO COVER WHAT THE SENTENCE IT SITS IN NAMES. Step 3 now says "delete BOTH proposals",
+# and this reading was taken for the .jsonc alone -- so where the two files fall on different sides of
+# the ignore rules (a rule naming '.claude/settings.suggested.jsonc', or a '*.jsonc' pattern; both real
+# shapes) the reader was told git would not remind them about a file git will in fact keep showing. So
+# the two readings are combined, and they only claim a definite answer where they agree.
+$bothIgnored = if ($null -eq $proposedIgnored) { $suggestIgnored }
+               elseif ($suggestIgnored -eq $proposedIgnored) { $suggestIgnored }
+               else { $null }   # they disagree -- neither claim is true of both, so make none
+# '{0}' is the pronoun, because the two branches of step 3 delete a different NUMBER of files: the
+# merged path deletes both, the refusal path deletes the one that got written.
+$reminderTemplate = if ($bothIgnored -eq $true) { 'gitignored here, so git will not remind you' }
+                    elseif ($bothIgnored -eq $false) { 'not gitignored here, so git status will keep showing {0} until you do' }
+                    else { 'gitignored in many repos, so git may not remind you' }
+# ONE ACT, NAMED AS ONE (inbound #1124). This line is the instruction a reader acts on, and for three
+# rounds it said "copy desired parts" -- which is a hand-merge, against a destination the step never
+# mentioned already held enabledPlugins and extraKnownMarketplaces. Each round added a caveat to it
+# (#363 the hook stub, #1075 what the permissions block now does, #1097 the comments) and none of them
+# made the file pasteable. Now there IS a pasteable file, so the step names the replacement first and
+# keeps the caveats only for the reader who declines it.
+if ($proposedWritten) {
+    Write-Host "  3. Replace .claude/settings.json with $proposedPath -- one move, no merging. Then delete both proposals ($($reminderTemplate -f 'them'))." -ForegroundColor Gray
+    Write-Host "     That file is your settings.json with the permissions already folded in: strict JSON," -ForegroundColor Gray
+    Write-Host "     no comments to strip, no hooks stub, and every key you had is still in it. The" -ForegroundColor Gray
+    Write-Host "     annotated $(Split-Path -Leaf $suggestPath) stays for WHY each rule is there." -ForegroundColor Gray
+} else {
+    Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delete proposal ($($reminderTemplate -f 'it'))." -ForegroundColor Gray
+    Write-Host "     No merged file was written this run -- see the [notice] above -- so this one IS a" -ForegroundColor Gray
+    Write-Host "     hand-merge. Keep 'enabledPlugins' and 'extraKnownMarketplaces': they are already in" -ForegroundColor Gray
+    Write-Host "     settings.json, they are what makes the plugins load, and the proposal does not" -ForegroundColor Gray
+    Write-Host "     contain them. Overwrite the file with the proposal and you lose both silently." -ForegroundColor Gray
+}
 # AND SAY THAT THE COMMENTS CANNOT COME WITH IT (inbound #1097). The third caveat this one line has
 # needed, and the same shape as the other two: "copy desired parts" is the instruction a reader acts
 # on, and it named no exception. The proposal is .jsonc and its extension ANNOUNCES that comments are
@@ -1103,7 +1423,14 @@ Write-Host "  3. Copy desired parts from $suggestPath to settings.json and delet
 # six comment lines were the entire defect. Inbound #335 established this same reader model for the
 # QUICKSTART fragment ("the block is labelled jsonc, which suggests comments are fine"); its repair
 # landed there and never reached the instruction that moves the file.
-Write-Host "     Note: $(Split-Path -Leaf $suggestPath) is JSONC and settings.json is strict JSON --" -ForegroundColor Gray
+#
+# IT SURVIVES #1124 UNCHANGED, and the scoping line in front of it is the whole edit. The merged file
+# makes hand-copying optional, not impossible -- a reader who wants only the deny half still opens the
+# .jsonc -- so removing this warning would re-open #1097 for exactly the reader who took the harder
+# route. What it gains is a first clause saying WHEN it applies, so the reader who pasted the merged
+# file is not left wondering which comments they were supposed to strip.
+Write-Host "     Note, if you copy from the annotated file by hand instead:" -ForegroundColor Gray
+Write-Host "     $(Split-Path -Leaf $suggestPath) is JSONC and settings.json is strict JSON --" -ForegroundColor Gray
 Write-Host "     strip the '//' lines as you copy. A single one left in makes the WHOLE settings file" -ForegroundColor Gray
 Write-Host "     unparseable, and Claude Code then ignores all of it: permissions, enabledPlugins and" -ForegroundColor Gray
 Write-Host "     extraKnownMarketplaces alike, with one startup line about malformed JSON as the only" -ForegroundColor Gray
@@ -1128,6 +1455,12 @@ if ($hasWorkflowPack) {
 }
 Write-Host "     The 'hooks' block is NOT ready -- its script path is a placeholder this bootstrap does" -ForegroundColor Gray
 Write-Host "     not create. Point it at a real script in this repo or leave the block out." -ForegroundColor Gray
+if ($proposedWritten) {
+    # The merged file settles that question by leaving the stub out, which is worth one line: otherwise
+    # the warning above reads as something the reader still has to act on after pasting, and the honest
+    # answer is that they do not.
+    Write-Host "     The merged file leaves it out entirely, so if you pasted that, this one is done." -ForegroundColor Gray
+}
 Write-Host "  4. Restart Claude Code session to activate new @-imports + config." -ForegroundColor Gray
 Write-Host "  5. Register this repo in the workshop's connector register -- paste-ready block below." -ForegroundColor Gray
 

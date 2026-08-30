@@ -101,9 +101,11 @@ working it already had. Two consequences worth knowing before you enable the one
 purely additively, without overwriting anything — the **lens-only** persona lenses (including
 Chris) + an empty repo-lens scaffold per specialist in **the seam**
 (`.claude/specialists/lenses/`), one `@`-import at the bottom of your `CLAUDE.md` pointing at that
-seam (which in turn imports Chris's portable body from the plugin install + his repo lens), and a
-proposal for safety settings (`settings.suggested.jsonc`, for your own
-review). The details of this path are in the
+seam (which in turn imports Chris's portable body from the plugin install + his repo lens), and
+two proposals for safety settings, for your own review: `settings.suggested.jsonc` (annotated — why
+each rule is there) and `settings.proposed.json` (the same rules already merged into your
+`settings.json`, so adopting them is one replacement rather than a hand-merge). The details of this
+path are in the
 [root README › Adoption](../README.md#adoption-the-bootstrap-path) — which counts the install as
 "step 0" and this one as "step 1", because it numbers from before the point where this page starts.
 

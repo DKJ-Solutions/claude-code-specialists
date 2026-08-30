@@ -953,10 +953,13 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   `.claude/specialists/SPECIALISTS.md` carrying the body import, the lens import and the roster slot,
   and **one** `@`-import at the bottom of `CLAUDE.md` (or a scaffold if there is none). A consumer that
   already has a lens tree on the pre-seam path keeps it, and keeps its two imports — see
-  [The seam, specified](#the-seam-specified). It also writes a `settings.suggested.jsonc` with a
-  `permissions.deny` + hooks **stub**. It does not touch `settings.json` — that merge and filling in the
-  repo lens are manual work afterwards (repo-specific), after which one more **restart** activates the
-  new context.
+  [The seam, specified](#the-seam-specified). It also writes **two** settings proposals: the annotated
+  `settings.suggested.jsonc` (both `permissions` halves + a hooks **stub**), which explains why each rule
+  is there, and `settings.proposed.json` — the same rules already merged into a copy of the repo's own
+  `settings.json`, as strict JSON, so adopting them is *replace one file with the other* rather than a
+  hand-merge. It touches `settings.json` itself in neither case: the placement, and filling in the repo
+  lens, are manual work afterwards (repo-specific), after which one more **restart** activates the new
+  context.
 
   > **The agent defs and manuals still name the pre-seam path** (`.claude/plugins/<family>/<plugin>/…`)
   > when they tell a specialist where its lens lives. That is accurate rather than stale: both layouts
@@ -1050,7 +1053,7 @@ It classifies before it removes, along exactly the three categories below:
 
 | category | what happens |
 |---|---|
-| generated and untouched (a lens still carrying its `VUL-IN` marker, an unfilled script scaffold, the `@`-imports, `settings.suggested.jsonc`) | **removed** |
+| generated and untouched (a lens still carrying its `VUL-IN` marker, an unfilled script scaffold, the `@`-imports, both settings proposals) | **removed** |
 | authored by the owner (a filled-in lens) | **reported, never touched** |
 | owned by the repo anyway (a real `repo-config.ps1`, a filled branch table) | **reported as yours to keep or drop** |
 

@@ -88,6 +88,11 @@ try {
     Assert-Equal $lensesBefore (Get-LensCount) 'dry run: removed NOTHING -- lens count unchanged'
     Assert-Equal 1 (Get-ImportCount) 'dry run: the seam import is still there'
     Assert-True ($r.Out -match 'Re-run with -Apply') 'dry run: tells the reader how to act'
+    # The dry run IS the inventory a reader says yes to, so a file missing from it is a file removed
+    # without consent -- which is why both proposals are asserted here and not only after -Apply.
+    foreach ($artifact in @('settings.suggested.jsonc', 'settings.proposed.json')) {
+        Assert-True ($r.Out -match [regex]::Escape($artifact)) "dry run: $artifact is listed in the preview (#1124)"
+    }
 
     # --- 2. -Apply removes the generated set ---------------------------------------------------------
     $r = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
@@ -96,7 +101,14 @@ try {
     Assert-Equal 0 (Get-ImportCount) 'apply: the seam import is gone from CLAUDE.md'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\repo-config.ps1'))) 'apply: the untouched repo-config scaffold is gone'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture 'scripts\lib\branch-info.ps1'))) 'apply: the untouched branch-info scaffold is gone'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture '.claude\settings.suggested.jsonc'))) 'apply: the settings proposal is gone'
+    # BOTH proposals, and the second one is the point (inbound #1124). The bootstrap now places a merged
+    # settings.proposed.json beside the annotated .jsonc, and an artifact one script writes under a name
+    # the other does not know is an orphan nobody is ever told about: '.claude/*' is gitignored in many
+    # consumers, so it shows up neither in 'git status' nor in this teardown -- the only two places
+    # anyone would look. Both names come from Get-SettingsArtifactNames precisely so that cannot happen,
+    # and this pair of asserts is what proves the second one is actually wired up.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture '.claude\settings.suggested.jsonc'))) 'apply: the annotated settings proposal is gone'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $Fixture '.claude\settings.proposed.json'))) 'apply: the MERGED settings proposal is gone too (#1124)'
     # The owner's own file must survive having two lines cut out of it.
     $md = [System.IO.File]::ReadAllText((Join-Path $Fixture 'CLAUDE.md'), [System.Text.Encoding]::UTF8)
     Assert-True ($md -match 'Feature work goes on a branch') "apply: the owner's own CLAUDE.md prose is intact"

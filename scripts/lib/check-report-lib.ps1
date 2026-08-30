@@ -1280,3 +1280,28 @@ function Get-LensWriteDir {
     }
     return (Get-SeamPaths -RepoRoot $RepoRoot).LensDir
 }
+
+function Get-SettingsArtifactNames {
+    <# The two settings artifacts specialists-init writes into a consumer's .claude/, repo-relative.
+       One source for the writer (bootstrap.ps1) and the remover (teardown.ps1), for exactly the reason
+       Get-ClaudeMdScaffold and Get-OrchestratorNote are one: a literal mirrored by hand across those two
+       scripts is what produced both instances of the accumulation bug, and an artifact the bootstrap
+       writes under a name the teardown does not know is an orphan nobody is told about -- in a directory
+       many consumers gitignore, where git cannot mention it either.
+
+       Suggested -- the ANNOTATED proposal (.jsonc). It explains WHY each rule is there and is the file a
+       reader consults; it is not, and cannot be, pasted whole, because comments are illegal in the
+       destination and because it holds only the two permission halves.
+
+       Proposed -- the MERGED end result (strict .json), added for inbound #1124. It is the consumer's own
+       .claude/settings.json key for key with those halves folded in, so the reader's whole act is
+       'replace one file with the other' instead of a hand-merge they have to invent. That merge was the
+       unwarned trap: the destination is not empty -- it carries enabledPlugins and
+       extraKnownMarketplaces, which is what was holding the adoption up -- and a whole-file paste of the
+       .jsonc silently deletes both, landing the reader in #1076's zero-surface state through a file that
+       parses perfectly. #>
+    [pscustomobject]@{
+        Suggested = '.claude\settings.suggested.jsonc'
+        Proposed  = '.claude\settings.proposed.json'
+    }
+}
