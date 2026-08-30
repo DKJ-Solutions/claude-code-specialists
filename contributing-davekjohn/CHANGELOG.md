@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/contributing-page-points-at-the-release-list-v1` · 20260830-114709
+
+The scaffolded `contributing-davekjohn/CONTRIBUTING.md` no longer claims that `releases/README.md` is the
+release list. It now names the list where it actually lives -- `releases/history.md`, beside it -- says
+that file is the one document the scaffold deliberately does not write, and states the consequence
+outright: a row added by hand to `releases/README.md` is a row the cut will never see.
+
+The verb was simply true until the list moved (#786/#885); the parenthetical `(at <path>)` bolted on
+afterwards was doing a correction's work inside a sentence that still said the opposite. The script's
+own header, its comment at line 122 and the sibling page it writes had all followed the move -- this one
+bullet had not.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer scaffolding the workflow folder reads `CONTRIBUTING.md` as the page that holds the rules, and
+stopping there was enough to send their release rows into a file `cut-release` never reads -- leaving
+`history.md` empty while looking maintained, and the cut warning about a path the reader had been told
+was the wrong one. Nothing refused, which is what made it worth repairing.
+
+**Score:** 3
+
+#### Pull Request
+
+the scaffolded CONTRIBUTING page points at the release list instead of claiming to be it
+
+Plugins: contributing-davekjohn
+
+[PR #1134](https://github.com/DaveKJohn/claude-code-specialists/pull/1134)
+
+---
+
 ### DEPLOY: `docs/pr-template-interface-is-the-placeholder-v1` · 20260830-114603
 
 `CONTRIBUTING-portable.md` told a consumer the PR template's interface was **two lines** — a first heading
