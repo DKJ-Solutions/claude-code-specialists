@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/gate-tree-moved-under-run-v1` · 20260830-144812
+
+A gate whose tree moved while it ran now says so. `open-pr`'s lint and test gates read the working tree for
+a minute or more, and that checkout is not private to them: a backgrounded `ship-pr` hands the session its
+prompt back, and the session is told by name to run `prune-merged.ps1`, which borrows the trunk and hands it
+straight back. Measured on PR #1144 -- one suite of 55 red inside the gate, green standalone on the same
+commit seconds later. A false red is the expensive half, because this repo's own rules tell a session that a
+suite red under the gate is reporting a real defect until proven otherwise.
+
+Each gate is now asked afterwards whether the tree held still: a **red** says it is not trustworthy and
+names the usual cause, and a **green** is reported and NOT recorded as gate evidence, so the next run gates
+for real instead of skipping on a pass nothing judged. Neither is a refusal -- a red still blocks the push,
+and the remedy is to re-run. The check reads two signals because one is blind: a borrowed checkout comes
+back, leaving the fingerprint identical, so `HEAD`'s reflog depth is read beside it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `open-pr` gets the same sentence, and the workflow page now states plainly that the
+primary checkout is single-occupancy while a gate is running -- the one thing neither `ship-pr`'s page nor
+the lens that recommends `prune-merged` had said.
+
+**Score:** 2
+
+#### Pull Request
+
+a gate whose tree moved under it says so, and its pass is not recorded
+
+Plugins: contributing-davekjohn
+
+[PR #1148](https://github.com/DaveKJohn/claude-code-specialists/pull/1148)
+
+---
+
 ### DEPLOY: `fix/park-push-failure-follows-git-v1` · 20260830-144047
 
 `Invoke-GitPark` now **reports what git said about a failed push instead of asserting one cause**. The
