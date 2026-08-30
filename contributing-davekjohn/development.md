@@ -74,6 +74,11 @@ runs are now literally the gates the PR would have run, because they are the sam
 
 - [x] Both edited scripts parse clean.
 - [x] `-GatesOnly` routing smoke-tested on a branch (`-SkipLint -SkipTests` — exit 0, nothing pushed).
+- [x] **And on a branch literally named `main`**, which is the case the issue is about: a throwaway clone
+      carrying this work as `main`, run with `-GatesOnly -SkipLint -SkipTests`, reached the gates and exited 0 —
+      while the SAME tree without the flag still refused with *"You are on main; a PR is created from a
+      branch."* and exited 1. The route opens without the refusal weakening, which is the property worth
+      proving: a flag that reaches the gates by disarming the trunk guard would be a different change.
 - [x] `gate-lib.tests.ps1` extended: the structural cases that introspected `open-pr.ps1` retargeted at the
       extracted function, the ordering property (`-GatesOnly` before the `main` refusal) asserted, and
       behavioural coverage of `Invoke-WorkflowGates` against a real git fixture.
