@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/record-shape-count-enable-provenance-v1` · 20260830-141717
+
+The `[RECORD-SHAPE]` roll-up now counts only the plugins this repo's own settings enable. A plugin
+enabled machine-wide and never installed from this root no longer reaches the headline -- a reader met a
+count there for a state their repo did not create and could not fix from inside itself.
+
+**The count and the headline moved; nothing else did.** Every shape still gets its detail line, with its
+remedy, and those lines are what the session hook forwards. The detail loop turned out to be nested
+inside the roll-up's branch, so it had to be lifted out first -- otherwise this change would have taken
+the remedy away along with the headline.
+
+**It rests on a measurement, which is what #1138 was waiting for**, taken against Claude Code 2.1.251 in
+a throwaway `CLAUDE_CONFIG_DIR` so the live register was never touched. Six shapes -- a bare repo, an
+enable already in the user layer, one already in `settings.local.json`, an explicit `false`, a repair
+re-install after a hand-edit, and an unparseable settings file. All six write the enable into the repo's
+own settings, and the sixth answers more than was asked: when it CANNOT write it, the install fails and
+leaves no register record at all. So a record for this path with no repo-owned enable is not a state the
+CLI can produce, and suppressing the count for one costs no coverage.
+
+**It reads BOTH repo layers, not `settings.json` alone**, which is where it departs from what the issue
+proposed. The install writes `settings.json`, but a person may afterwards move an enable into
+`settings.local.json` -- ordinary, since that is the uncommitted personal layer and Claude Code honours
+it at higher precedence. Gating on `settings.json` alone would go silent on a legitimately
+project-installed plugin whose enable merely moved one file sideways: the exact class of silence this
+marker exists to end.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. The marker and its remedy are unchanged for anyone reading a session; what moved is a count in a
+non-counting roll-up, which no subscriber of a service sees.
+
+**Score:** N/A
+
+#### Pull Request
+
+The [RECORD-SHAPE] count no longer counts a plugin this repo never enabled
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1142](https://github.com/DaveKJohn/claude-code-specialists/pull/1142)
+
+---
+
 ### DEPLOY: `fix/cut-release-tier-comment-v1` · 20260830-141043
 
 The comment introducing `cut-release.ps1`'s tier guardrail now **points at `Test-ReleaseBumpEarned`
