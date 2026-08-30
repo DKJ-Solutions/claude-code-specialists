@@ -20,10 +20,15 @@
 
     THE STEPS, IN ORDER:
 
-      1. Refuse on a dirty tree. Switching branches with uncommitted work either fails halfway or
-         drags the work across; both are worse than stopping with a sentence.
-      2. Switch to the trunk and fast-forward it (`git pull --ff-only`). Fast-forward ONLY: this
-         script is allowed to advance the trunk, never to merge anything into it.
+      1. Refuse on a dirty tree. A run can still have to step off the branch you are standing on
+         (4c below), and doing that with uncommitted work either fails halfway or drags the work
+         across; both are worse than stopping with a sentence.
+      2. Fast-forward the trunk WITHOUT CHECKING IT OUT -- `git fetch <remote> <trunk>:<trunk>`,
+         which advances a local branch ref that HEAD is not on and moves no working tree at all.
+         Fast-forward ONLY: git refuses a non-ff into a local branch ref unless the refspec carries a
+         leading `+`, so this script is allowed to advance the trunk and cannot merge anything into
+         it. A run that already stands on the trunk cannot fetch into its own checked-out ref and
+         uses `git pull --ff-only` instead -- same guarantee, and nothing there moves either.
       3. `git fetch --prune` -- drop remote-tracking refs whose remote branch is gone. This matters
          even when the remote branch was auto-deleted at the merge: the stale `origin/<branch>` refs
          otherwise pile up in the clone until pruned, and a clean local branch list is then no
@@ -38,14 +43,19 @@
               proof that replaces ancestry, which is why the forced delete is safe HERE and nowhere
               else.
 
+           c. and where that branch is the one YOU ARE STANDING ON, step off it onto the trunk first
+              -- `git branch -d` can never delete the branch HEAD is on. This is the only thing in
+              this script that moves a working tree, it happens at most once per run, and it happens
+              only on a branch that has just been PROVEN merged. The run then ends on the trunk,
+              because there is no longer a branch to end on, and says so.
+
          A branch with neither proof is KEPT and reported with the reason. That is the whole safety
          property: a parked branch (`park-branch.ps1`), unfinished work, or a branch pushed from
          another machine is never lost, because none of them has either proof.
 
-      AND THEN THE CHECKOUT GOES BACK to the branch step 2 borrowed it from (issue #1071), on every
-      path out of this script from the step-3 marker onward, and the closing line says where the
-      checkout ended. Deliberately not a numbered step: it is the exit contract rather than a stage,
-      and the reasoning is under "IT BORROWS THE CHECKOUT" below.
+      AND THE CLOSING LINE SAYS WHERE THE CHECKOUT ENDED (issue #1071), on every path out of this
+      script from the step-3 marker onward. Deliberately not a numbered step: it is the exit contract
+      rather than a stage, and the reasoning is under "IT NO LONGER BORROWS THE CHECKOUT" below.
 
     THE REMOTE PASS (`-IncludeRemote`, issue #1042) READS AND CLASSIFIES; IT STILL DELETES NOTHING.
     `git ls-remote --heads` is the only read that surfaces a parked branch, and this script named that
@@ -63,14 +73,31 @@
     permission could not have reached safely; a head with neither proof is reported KEPT with its
     reason, which is the half that stops live parked work being re-investigated per session.
 
-    IT BORROWS THE CHECKOUT; IT DOES NOT MOVE IT (issue #1071). The exit contract above is
-    deliberately NOT ship-pr's. That script ends on the trunk on purpose -- it closes a FINISHED
-    assignment, and ending there is what makes the session safe to clear. This one closes nothing: it
-    is a maintenance command run mid-assignment, and the branch you were standing on is still there.
-    The cost of the old behaviour was measured on the author of the report: a run started from a
-    branch left the session on the trunk, silently, with a clean tree, and its next commit landed
-    directly on `main`. Two cases cannot go back and say so instead of ending in silence -- a start
-    branch this same run reaped, and a run that started detached. Both name the sha they left.
+    IT NO LONGER BORROWS THE CHECKOUT (issue #1147, August 30, 2026). Step 2 used to check the trunk
+    out, fast-forward it, and hand the checkout back (issue #1071's exit contract) -- and a borrow, even
+    one returned within the second, is a tree that moves under whatever else is running in the same
+    checkout. That is the cause measured in #1145: a file present on the branch and absent on the trunk
+    vanished and reappeared under a running test suite, turning a green gate red. #1145 was repaired by
+    DETECTION, which is right for the class (any tree-mover can collide), and this removes the collision
+    for the one script a session is INSTRUCTED to run mid-assignment. Three things went with the borrow:
+    #1069's clone-wide refusal when a second worktree held the trunk (a refspec fetch does not need the
+    trunk checked out anywhere, so that is a WARNING now and the run continues), the hand-back itself,
+    and the pair of starts that could not be returned to.
+
+    THE ONE MOVE THAT SURVIVES, AND WHY IT CANNOT COLLIDE. Step 4c steps off a start branch that has
+    just been proven merged, because `git branch -d` cannot delete the branch HEAD is on. It is not a
+    borrow -- there is nothing to return to -- so the run ends on the trunk and names the sha it left,
+    which is the whole of what makes that position recoverable. A branch under a running gate is
+    UNMERGED by definition, so it never reaches that line; the move can only happen on work that is
+    already finished.
+
+    THE EXIT CONTRACT IS STILL DELIBERATELY NOT ship-pr's. That script ends on the trunk on purpose --
+    it closes a FINISHED assignment, and ending there is what makes the session safe to clear. This one
+    closes nothing: it is a maintenance command run mid-assignment, and the branch you were standing on
+    is still there when the run ends. What #1071 measured on the author of that report -- a run that
+    left the session on `main`, silently, with a clean tree, and whose next commit landed directly on
+    the trunk -- is now structurally impossible rather than repaired after the fact: nothing moves HEAD
+    unless the branch it is on has been deleted.
 
     WHAT THIS SCRIPT DOES NOT DO, and why each is a decision:
 
@@ -96,8 +123,9 @@
 
 .PARAMETER DryRun
     (Optional switch) report what would be deleted and delete nothing. Steps 2 and 3 -- the
-    fast-forward and the prune of remote-tracking refs -- still run: neither loses anything, and
-    without them the branch list this reports on is the stale one.
+    fast-forward and the prune of remote-tracking refs -- still run: neither loses anything, neither
+    touches a working tree, and without them the branch list this reports on is the stale one. Step 4c
+    does NOT run: a look-first run deletes nothing, so it never has to step off anything.
 
 .PARAMETER IncludeRemote
     (Optional switch) additionally read `git ls-remote --heads <remote>` and classify every head that
@@ -158,7 +186,7 @@ if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
     }
 }
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
-# For naming the worktree that holds the trunk when the checkout below fails (issue #1069). Same
+# For naming the worktree that holds the trunk when the fast-forward is refused (issue #1069). Same
 # plugin-payload sibling, same reasoning as native-capture-lib above.
 . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 $trunk = Get-BranchTrunkName
@@ -168,36 +196,27 @@ function Invoke-Git {
     return Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot) + $Arguments)
 }
 
-# WHERE THE RUN ENDS, AND WHY IT IS NOT THE TRUNK (issue #1071). Step 2 borrows the checkout to
-# fast-forward the trunk and, until this existed, never gave it back: $startBranch was captured, spent
-# on one sentence, and discarded. What that cost was measured on the reporter -- a session that ran
-# this while standing on a branch was left on `main`, with a clean tree and nothing in `git status` to
-# say so, and its next commit landed directly on the trunk. There is no signal at all between the
-# switch and the mistake, which is what makes a third line of output the wrong repair: the run has to
-# put the caller back, and say where it ended as its LAST line.
+# DID THIS RUN MOVE HEAD AT ALL? Since #1147 the answer is no on every run but one, and this flag is
+# the whole of the bookkeeping. It is set in exactly one place -- step 4c, stepping off a start branch
+# that has just been proven merged -- because that is the only remaining reason this script has to
+# touch a working tree.
+$steppedOff = $false
+
+# WHERE THE RUN ENDS, AND WHY IT IS ALMOST ALWAYS WHERE IT STARTED (issues #1071, #1147). The original
+# defect was step 2 checking out the trunk and never giving it back: a session that ran this while
+# standing on a branch was left on `main`, with a clean tree and nothing in `git status` to say so, and
+# its next commit landed directly on the trunk. #1071 repaired that with a hand-back; #1147 removed the
+# checkout that needed one, so on a run that reaps nothing underneath itself this function has nothing
+# to report and says nothing.
 #
-# THE CONTRACT IS DELIBERATELY NOT ship-pr's. That script ends on the trunk on purpose, because it
-# closes a FINISHED assignment and ending there is what makes the session safe to clear. This one
-# closes nothing -- it is a maintenance command, run mid-assignment (the orchestrator's own lens sends
-# a session here INSTEAD of hand-reading `git ls-remote` output), and the branch it stepped off is
-# still there. So it borrows the checkout rather than moving it, the way worktree-lane.ps1 states the
-# convention at its own one deliberate exception.
-#
-# TWO STARTS CANNOT BE RETURNED TO, and each says so rather than ending in silence:
-#   - a start branch THIS RUN REAPED. Stepping off it in step 2 is what makes that possible at all --
-#     `git branch -d` can never delete the branch HEAD is on -- so it is a state this script creates,
-#     and the report above has already said which branches went. (The reported analysis expected this
-#     case to be impossible for that reason; the checkout in step 2 is what breaks it.)
-#   - a run that started on a DETACHED HEAD. There is no branch to name.
-# Both name the short sha they left, because that is the whole of what makes the position recoverable.
+# TWO STARTS THAT USED TO NEED A SENTENCE NO LONGER DO. A DETACHED start is simply never moved, so
+# there is nothing to name; a run started ON THE TRUNK never moved either. What remains is the single
+# case below, and it is a state this script deliberately creates.
 function Restore-StartCheckout {
-    if (-not $startBranch -or $startBranch -eq $trunk) { return }
+    if (-not $steppedOff) { return }
 
-    if ($startBranch -eq 'HEAD') {
-        Write-Host "Ending on '$trunk' -- this run started detached, at $startSha." -ForegroundColor DarkGray
-        return
-    }
-
+    # ONE REASON TO BE HERE: step 4c stepped off '$startBranch' in order to delete it. Two outcomes,
+    # and the difference is whether the delete that justified the move actually happened.
     $existsRes = Invoke-Git -Arguments @('rev-parse', '--verify', '--quiet', "refs/heads/$startBranch")
     if ($existsRes.ExitCode -ne 0) {
         Write-Host "Ending on '$trunk' -- '$startBranch' was reaped by this run (it was at $startSha)." -ForegroundColor DarkGray
@@ -206,10 +225,10 @@ function Restore-StartCheckout {
 
     $backRes = Invoke-Git -Arguments @('checkout', $startBranch)
     if ($backRes.ExitCode -eq 0) {
-        Write-Host "Back on '$startBranch' -- '$trunk' was borrowed for the fast-forward only." -ForegroundColor Green
+        Write-Host "Back on '$startBranch' -- the delete it was stepped off for did not happen." -ForegroundColor Green
     } else {
         # A FAILED HAND-BACK IS LOUD, because this is the one outcome with no signal of its own: the
-        # tree is clean and the checkout is on the trunk, which is exactly the state the report
+        # tree is clean and the checkout is on the trunk, which is exactly the state #1071's report
         # measured a commit being lost to.
         Write-Warning "prune-merged could not put this checkout back on '$startBranch' -- it is standing on '$trunk'. Switch back by hand BEFORE you commit. ($(($backRes.Output | Out-String).Trim()))"
     }
@@ -218,9 +237,11 @@ function Restore-StartCheckout {
 function Complete-Run {
     <#
         THE ONLY WAY OUT from the step-3 marker onward, so a path added later cannot forget the
-        hand-back -- the suite asserts that structurally (no bare `exit` below that marker). Step 1
-        and step 2 keep their own bare exits: nothing has moved yet there, and a refusal must leave
-        the caller exactly where it found them.
+        closing line -- the suite asserts that structurally (no bare `exit` below that marker). Step 1
+        keeps its own bare exits: nothing has moved yet there, and a refusal must leave the caller
+        exactly where it found them. Step 2 no longer has any, which is #1147: a fast-forward that
+        cannot happen is now a warning rather than a refusal, because it costs the run nothing but a
+        staler trunk to judge ancestry against.
     #>
     param([int]$Code = 0, [string]$ErrorMessage)
     Restore-StartCheckout
@@ -241,9 +262,9 @@ if ($trunkRes.ExitCode -ne 0) {
     exit 1
 }
 
-# A dirty tree is refused BEFORE anything is touched, not discovered by a failing checkout halfway
-# through: at that point the fetch may already have run and the reader has to work out what did and
-# did not happen.
+# A dirty tree is refused BEFORE anything is touched, not discovered by a failing step-off halfway
+# through: at that point the fetch and some of the deletions have already run, and the reader has to
+# work out what did and did not happen.
 $statusRes = Invoke-Git -Arguments @('status', '--porcelain')
 if ($statusRes.ExitCode -ne 0) {
     Write-Error "prune-merged cannot read the working tree state in $repoRoot."
@@ -251,51 +272,61 @@ if ($statusRes.ExitCode -ne 0) {
 }
 $dirty = @(($statusRes.Output | Out-String) -split '\r?\n' | Where-Object { $_.Trim() })
 if ($dirty.Count -gt 0) {
-    Write-Error "prune-merged refuses on a dirty working tree ($($dirty.Count) change(s)). Switching to '$trunk' would either fail halfway or drag the work across. Commit, park (scripts\task\park-branch.ps1) or stash first."
+    Write-Error "prune-merged refuses on a dirty working tree ($($dirty.Count) change(s)). Reaping the branch you are standing on means stepping off it onto '$trunk', which would either fail halfway or drag the work across. Commit, park (scripts\task\park-branch.ps1) or stash first."
     exit 1
 }
 
-# --- 2. On the trunk, fast-forwarded ---------------------------------------------------------------
+# --- 2. The trunk, fast-forwarded WITHOUT being checked out (issue #1147) ---------------------------
 $startBranch = ($headRes.Output | Out-String).Trim()
-if ($startBranch -ne $trunk) {
-    # THE SHA AS WELL AS THE NAME, read before anything moves. It is the whole answer in the two cases
-    # the hand-back cannot serve (a reaped start branch, a detached start), and it costs one rev-parse
-    # on the runs that borrow the checkout -- a run started on the trunk never reaches this line.
-    $shaRes   = Invoke-Git -Arguments @('rev-parse', '--short', 'HEAD')
-    $startSha = if ($shaRes.ExitCode -eq 0) { ($shaRes.Output | Out-String).Trim() } else { 'an unknown commit' }
 
-    $coRes = Invoke-Git -Arguments @('checkout', $trunk)
-    if ($coRes.ExitCode -ne 0) {
-        # WHY THIS ERROR NAMES A DIRECTORY (issue #1069). git allows one worktree per branch, so a second
-        # checkout standing on the trunk makes this checkout impossible for the whole clone -- and the raw
-        # git message says only that, without saying what to do. That matters more here than the wording
-        # suggests: this script is what Chris's lens tells a session to run INSTEAD of hand-deriving
-        # `git ls-remote` output, so it is unavailable in exactly the situation that produces stray
-        # branches. Best-effort: an unreadable worktree list falls back to git's own message.
-        $reason = ($coRes.Output | Out-String).Trim()
-        $wtRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
-        $holder = if ($wtRes.ExitCode -eq 0) {
-            Get-WorktreeHoldingBranch -PorcelainLines $wtRes.Output -Branch $trunk -SelfPath $repoRoot
-        } else { '' }
-        if ($holder) {
-            Write-Error "prune-merged could not switch to '$trunk' -- another worktree holds it: $holder. Nothing was changed. Move that tree off the trunk (git -C `"$holder`" checkout <its branch>), or hand it back if it is a finished lane (scripts\task\worktree-lane.ps1 -HandBack -Lane `"$holder`")."
-        } else {
-            Write-Error "prune-merged could not switch to '$trunk': $reason"
-        }
-        exit 1
-    }
-    Write-Host "Switched to '$trunk' (was on '$startBranch')." -ForegroundColor Green
+# THE SHA AS WELL AS THE NAME, read before anything can move. It is the whole answer in the one case
+# the hand-back cannot serve -- a start branch this run reaps -- and it costs one rev-parse.
+$shaRes   = Invoke-Git -Arguments @('rev-parse', '--short', 'HEAD')
+$startSha = if ($shaRes.ExitCode -eq 0) { ($shaRes.Output | Out-String).Trim() } else { 'an unknown commit' }
+
+# FAST-FORWARD ONLY, AND WITHOUT MOVING A WORKING TREE. `git fetch <remote> <trunk>:<trunk>` writes a
+# local branch ref that HEAD is not on: no checkout, no tree, nothing for a concurrent gate or suite in
+# this checkout to trip over (#1145). The fast-forward guarantee is the refspec's own -- git refuses a
+# non-ff update into refs/heads/ unless the refspec carries a leading `+`, and this one deliberately
+# does not -- so the old `--ff-only` promise is kept by git rather than by a flag. A merge commit made
+# here would be a change on the trunk that no PR ever carried, and this form cannot produce one.
+#
+# A RUN THAT ALREADY STANDS ON THE TRUNK TAKES THE OTHER BRANCH, because git refuses to fetch into the
+# ref that is checked out here -- and there `git pull --ff-only` moves nothing either: it advances the
+# branch you are already on to a commit the remote has already published.
+if ($startBranch -eq $trunk) {
+    $ffRes = Invoke-Git -Arguments @('pull', '--ff-only', $Remote, $trunk)
+} else {
+    $ffRes = Invoke-Git -Arguments @('fetch', $Remote, "$($trunk):$($trunk)")
 }
 
-# FAST-FORWARD ONLY. This script may advance the trunk and must never merge anything into it -- a
-# merge commit made here would be a change on the trunk that no PR ever carried. A non-fast-forward
-# is reported and does not stop the run: the ancestry the deletions are judged on is then simply the
-# older trunk, which errs towards KEEPING branches.
-$pullRes = Invoke-Git -Arguments @('pull', '--ff-only', $Remote, $trunk)
-if ($pullRes.ExitCode -ne 0) {
-    Write-Warning "'$trunk' could not be fast-forwarded from $Remote -- continuing against the local '$trunk'. Fewer branches will look merged, never more. ($(($pullRes.Output | Out-String).Trim()))"
+# A FAILED FAST-FORWARD IS A WARNING, NEVER A REFUSAL. The ancestry the deletions are judged on is then
+# simply the older trunk, which errs towards KEEPING branches -- so there is nothing here worth
+# stopping a whole run for. That is what #1147 changed about the #1069 case below: when a second
+# worktree held the trunk, the checkout was impossible clone-wide and this script REFUSED, which made
+# it unavailable in exactly the situation that produces stray branches. A refspec fetch is refused in
+# that state too (git will not write a ref that is checked out anywhere), but only the fast-forward is
+# lost, not the run.
+if ($ffRes.ExitCode -ne 0) {
+    $reason = ($ffRes.Output | Out-String).Trim()
+    # WHY THIS NAMES A DIRECTORY (issue #1069). git's own message says the ref is taken and, at best,
+    # where -- never what to do about it. Best-effort: an unreadable worktree list falls back to git's
+    # own message. Only asked on the fetch path; a run standing on the trunk itself holds it.
+    $holder = ''
+    if ($startBranch -ne $trunk) {
+        $wtRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
+        if ($wtRes.ExitCode -eq 0) {
+            $holder = Get-WorktreeHoldingBranch -PorcelainLines $wtRes.Output -Branch $trunk -SelfPath $repoRoot
+        }
+    }
+    if ($holder) {
+        Write-Warning "'$trunk' could not be fast-forwarded -- another worktree holds it: $holder, and git will not write a ref that is checked out. Continuing against the local '$trunk'; fewer branches will look merged, never more. Move that tree off the trunk (git -C `"$holder`" checkout <its branch>), or hand it back if it is a finished lane (scripts\task\worktree-lane.ps1 -HandBack -Lane `"$holder`")."
+    } else {
+        Write-Warning "'$trunk' could not be fast-forwarded from $Remote -- continuing against the local '$trunk'. Fewer branches will look merged, never more. ($reason)"
+    }
 } else {
-    Write-Host "Fast-forwarded '$trunk' from $Remote." -ForegroundColor Green
+    $how = if ($startBranch -eq $trunk) { '' } else { ' -- without checking it out' }
+    Write-Host "Fast-forwarded '$trunk' from $Remote$how." -ForegroundColor Green
 }
 
 # --- 3. Drop stale remote-tracking refs ------------------------------------------------------------
@@ -377,8 +408,32 @@ foreach ($branch in $branches) {
     $proof  = if ($ancestor) { 'ancestor of ' + $trunk } else { 'merged PR' }
 
     if ($DryRun) {
+        # A LOOK-FIRST RUN NEVER STEPS OFF ANYTHING. It deletes nothing, so the one reason to move HEAD
+        # does not arise -- and a dry run that moved the caller would be the #1071 defect wearing a
+        # safer name.
         $deleted += [pscustomobject]@{ Branch = $branch; Proof = $proof; Flag = $flag }
         continue
+    }
+
+    # --- 4c. Stepping off the branch you are standing on ------------------------------------------
+    # THE ONLY LINE IN THIS SCRIPT THAT MOVES A WORKING TREE, and it is reached only for a branch that
+    # the two lines above have just PROVEN merged. `git branch -d` can never delete the branch HEAD is
+    # on, so without this a merged start branch would be reported kept for a reason the caller cannot
+    # act on without a second command. It is not a borrow: there is nothing to return to once the
+    # branch is gone, so the run ends on the trunk and Restore-StartCheckout names the sha it left.
+    #
+    # WHY IT CANNOT COLLIDE WITH A GATE (issue #1147). The borrow this replaced ran on EVERY run, which
+    # is what made a concurrent suite in the same checkout see the tree move (#1145). A branch under a
+    # running gate is unmerged by definition -- that is what the gate is for -- so it can never reach
+    # this line. What is left moves the tree only on work that is already finished.
+    if ($branch -eq $startBranch) {
+        $offRes = Invoke-Git -Arguments @('checkout', $trunk)
+        if ($offRes.ExitCode -ne 0) {
+            $kept += [pscustomobject]@{ Branch = $branch; Why = "you are standing on it and this run could not step off onto '$trunk': $(($offRes.Output | Out-String).Trim())" }
+            continue
+        }
+        $steppedOff = $true
+        Write-Host "Stepped off '$branch' onto '$trunk' -- a branch cannot be deleted from underneath HEAD." -ForegroundColor Green
     }
 
     $delRes = Invoke-Git -Arguments @('branch', $flag, $branch)

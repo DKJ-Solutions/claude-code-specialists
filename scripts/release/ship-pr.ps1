@@ -39,10 +39,12 @@
          CHECKOUT IS SINGLE-OCCUPANCY (issue #1145). Everything from step 2b down reads refs and the
          PR instead, deliberately, which is what lets the tree go home before the CI wait. Step 1
          does not: the lint gate walks the tree and the suites walk it for a minute or more. A second
-         command in the same checkout during that minute -- prune-merged.ps1 borrowing the trunk,
-         new-branch.ps1 cutting a branch -- makes files vanish and reappear under a running suite.
+         command in the same checkout during that minute -- new-branch.ps1 cutting a branch,
+         worktree-lane.ps1 moving the tree -- makes files vanish and reappear under a running suite.
          Measured on PR #1144: one suite of 55 red inside the gate, green standalone on the same
-         commit seconds later. Nothing enforces this: open-pr now SAYS when the tree moved under a
+         commit seconds later, with prune-merged.ps1 holding the trunk beside it; that one stopped
+         taking the checkout in #1147, and the window it exposed is still open to the rest.
+         Nothing enforces this: open-pr now SAYS when the tree moved under a
          gate, so the red is legible rather than mysterious, and the remedy is to re-run. Build the
          next piece of work in a lane (worktree-lane.ps1) rather than here -- which is what step 3
          already advises for its own reason.

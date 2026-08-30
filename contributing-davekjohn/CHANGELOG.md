@@ -31,3 +31,51 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `fix/prune-merged-no-checkout-borrow-v1` · 20260830-152559
+
+`prune-merged` no longer takes the checkout. Step 2 used to `git checkout <trunk>`, `git pull --ff-only`, and
+hand the checkout back -- and a borrow returned within the second is still a tree that moves under whatever
+else is running in the same checkout. That is the cause measured in
+[#1145](https://github.com/DaveKJohn/claude-code-specialists/issues/1145): a file present on the branch and
+absent on the trunk vanished and reappeared under a running test suite, turning a green gate red. It now
+advances the trunk with `git fetch <remote> <trunk>:<trunk>`, which writes a local ref that `HEAD` is not on
+and moves no working tree at all; the fast-forward guarantee is git's own, since it refuses a non-ff into
+`refs/heads/` unless the refspec carries a leading `+`. A run already standing on the trunk keeps
+`git pull --ff-only`, because git will not fetch into the checked-out ref.
+
+**One move survives, and it cannot collide.** `git branch -d` can never delete the branch `HEAD` is on, so a
+start branch that is *provably merged* is stepped off first -- announced where it happens, and the run then
+ends on the trunk naming the sha it left. A branch under a running gate is unmerged by definition, so it
+never reaches that line: what is left moves the tree only on work that is already finished.
+
+**And the [#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069) refusal went with it.**
+A second worktree holding the trunk used to make the checkout impossible clone-wide, so this script refused
+outright -- unavailable in exactly the situation that produces stray branches. git will not write a
+checked-out ref either, but now that costs only the fast-forward: the run continues against the older trunk,
+which errs towards *keeping* branches, and the warning still names the lane and how to release it. #1145's
+detection stays untouched, because it is the right repair for the class and every other tree-mover in the
+clone is still there.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The workflow tells a consumer's session to run `prune-merged` mid-assignment and to background `ship-pr` so
+the session can get on with something else -- two instructions that quietly collided in the shared checkout.
+One of them stops colliding here, so a consumer gets fewer false reds from their own tooling without changing
+anything they do. Their `prune-merged` also works in a state where it used to refuse: with a lane standing on
+the trunk, it now reports instead of stopping.
+
+**Score:** 3
+
+#### Pull Request
+
+prune-merged fast-forwards the trunk without borrowing the checkout
+
+Plugins: contributing-davekjohn
+
+[PR #1149](https://github.com/DaveKJohn/claude-code-specialists/pull/1149)
+
+---
+

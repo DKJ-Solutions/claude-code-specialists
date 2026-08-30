@@ -577,14 +577,23 @@ started in the primary gets `HEAD` pulled out from under it mid-branch, which is
 **And "anything else" includes a tidy-up, which is the half that does not read as starting something** (issue
 [#1145](https://github.com/DaveKJohn/claude-code-specialists/issues/1145), August 30, 2026). Step 1 of the
 ship — `open-pr`'s lint and test gates — is the one step that reads the **working tree**, for a minute or
-more, and a `prune-merged.ps1 -IncludeRemote` run in the same checkout borrows the trunk to fast-forward it
-and hands it straight back. Chris's lens sends a session to that exact command rather than let it classify
-`git ls-remote` output by hand, so the two instructions collide and neither page said so. Measured on
+more, and a second command in the same checkout during that minute moves it under them: `new-branch.ps1`
+cutting a branch, `worktree-lane.ps1` moving the tree. Measured on
 [PR #1144](https://github.com/DaveKJohn/claude-code-specialists/pull/1144): one suite of 55 red inside the
 gate, green standalone on the same commit seconds later, because `contributing-davekjohn/development.md`
 exists on the branch and not on the trunk and the suite walks every `*.md` under that folder. **No gate
 refuses this** — `open-pr` reports it instead: a red whose tree moved says it is not trustworthy, and a green
 whose tree moved is not recorded as gate evidence. Re-run the gate; do not go hunting the failure.
+
+**The script that produced that measurement was repaired at the source** (issue
+[#1147](https://github.com/DaveKJohn/claude-code-specialists/issues/1147), August 30, 2026). It was a
+`prune-merged.ps1 -IncludeRemote` run borrowing the trunk to fast-forward it — and Chris's lens sends a
+session to that exact command rather than let it classify `git ls-remote` output by hand, so the two
+instructions collided and neither page said so. `prune-merged` now advances the trunk with
+`git fetch <remote> <trunk>:<trunk>`, which writes a ref that `HEAD` is not on and moves no tree at all; the
+one move it has left runs only when it reaps the branch you are standing on, and a branch under a gate is
+unmerged by definition. **The detection above stays**, because it is the right repair for the class and
+every other tree-mover in the clone is still there.
 
 **And "nothing at all" is the default rather than a judgement call** (Dave, issue
 [#1060](https://github.com/DaveKJohn/claude-code-specialists/issues/1060), August 29, 2026). A lane is for a

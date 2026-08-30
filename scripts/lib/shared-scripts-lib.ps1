@@ -365,7 +365,7 @@ function Get-SharedScriptPairs {
         @{
             # Issue #1069, August 29, 2026. Mirrored because BOTH its callers are: ship-pr.ps1 asks it
             # whether another worktree holds the trunk (before the merge, and again when handing the trunk
-            # back afterwards), and prune-merged.ps1 asks it which worktree to name when its own checkout
+            # back afterwards), and prune-merged.ps1 asks it which worktree to name when its fast-forward
             # is refused. A consumer whose ship-pr dot-sources a file the mirror does not carry would fail
             # at the step that has just merged.
             #
