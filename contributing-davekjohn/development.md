@@ -70,8 +70,8 @@ Significance` and `## Releases` are the expansions steps 2 and 6 point at.
 
 ### TEST
 
-- [ ] `check-plugin-integrity.ps1` green — the dead-link and anchor scan is what judges this change
-- [ ] All suites green, the shared-scripts drift lint included (the mirrored script is edited in both copies)
+- [x] `check-plugin-integrity.ps1` green — the dead-link and anchor scan is what judges this change
+- [x] All suites green, the shared-scripts drift lint included (the mirrored script is edited in both copies)
 
 ### DEPLOY: `docs/portable-cycle-begins-at-the-issue-v1`
 
