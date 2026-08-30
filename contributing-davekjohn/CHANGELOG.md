@@ -32,6 +32,86 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/contributing-page-points-at-the-release-list-v1` · 20260830-114709
+
+The scaffolded `contributing-davekjohn/CONTRIBUTING.md` no longer claims that `releases/README.md` is the
+release list. It now names the list where it actually lives -- `releases/history.md`, beside it -- says
+that file is the one document the scaffold deliberately does not write, and states the consequence
+outright: a row added by hand to `releases/README.md` is a row the cut will never see.
+
+The verb was simply true until the list moved (#786/#885); the parenthetical `(at <path>)` bolted on
+afterwards was doing a correction's work inside a sentence that still said the opposite. The script's
+own header, its comment at line 122 and the sibling page it writes had all followed the move -- this one
+bullet had not.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer scaffolding the workflow folder reads `CONTRIBUTING.md` as the page that holds the rules, and
+stopping there was enough to send their release rows into a file `cut-release` never reads -- leaving
+`history.md` empty while looking maintained, and the cut warning about a path the reader had been told
+was the wrong one. Nothing refused, which is what made it worth repairing.
+
+**Score:** 3
+
+#### Pull Request
+
+the scaffolded CONTRIBUTING page points at the release list instead of claiming to be it
+
+Plugins: contributing-davekjohn
+
+[PR #1134](https://github.com/DaveKJohn/claude-code-specialists/pull/1134)
+
+---
+
+### DEPLOY: `docs/pr-template-interface-is-the-placeholder-v1` · 20260830-114603
+
+`CONTRIBUTING-portable.md` told a consumer the PR template's interface was **two lines** — a first heading
+and a placeholder — and warned that breaking either silently costs them every PR description. The heading
+half came off on August 24, 2026 with #865, when `-RefreshBody` stopped reading "the first heading" and
+started reading where the placeholder sits. The page never followed, so the paragraph that instructs a
+consumer to *copy the shipped reference and diff against it* described a rule the reference itself breaks:
+that file is one line, an HTML comment, with no heading at all. Every available reading was wrong — add a
+heading the tooling does not want, treat the shipped reference as stale, or go read `open-pr.ps1` to find
+out which of the two documents is lying.
+
+**It demonstrably misled, which is the part worth having.** The testrun plan on #1079 — written by a
+careful reader of exactly this page — states its assert as *"`.github/pull_request_template.md` from
+`${CLAUDE_PLUGIN_ROOT}/templates/`, **with its first heading** and its placeholder line intact"*. That
+assert cannot be satisfied by the file it names, and it sat there unsatisfiable until a run copied the
+file and looked at it.
+
+**The interface is now stated as one line, in all four places that describe it.** The placeholder is the
+whole contract; a template carrying nothing else is the normal shape rather than a broken one; the
+headings you add below it are the form's, and each is a boundary the refresh will not cross. The
+`open-pr` skill gets the mechanism in full — the description sits under the **last** heading *above* the
+placeholder, or is the body's leading section where there is none, and only a **missing** template makes
+`-RefreshBody` warn and change nothing. That skill also stopped claiming the matcher compares against
+*three* built-in strings, which has been twelve for some time and is now described by what the list is
+(every placeholder this family has ever shipped, oldest first) rather than by a count that goes stale in
+silence.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This repo is the source of the plugin, not a subscriber to a service; the reader who gains is the
+consumer adopting `contributing-davekjohn`, and they receive it through the next release rather than from
+anything visible here.
+
+**Score:** N/A
+
+#### Pull Request
+
+the PR template's interface is the placeholder line, and a heading-less template is the normal shape
+
+Plugins: contributing-davekjohn
+
+[PR #1133](https://github.com/DaveKJohn/claude-code-specialists/pull/1133)
+
+---
+
 ### DEPLOY: `fix/settings-proposal-pasteable-v1` · 20260830-112706
 
 `specialists-init` now writes a **second** settings artifact beside the annotated one:

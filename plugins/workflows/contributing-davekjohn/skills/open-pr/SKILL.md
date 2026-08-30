@@ -126,23 +126,31 @@ otherwise the PR keeps describing an earlier version of the work while the merge
 one. The `## Resolved issues` block, anything a reviewer added, and any section your template carries that
 the script did not write — "Type of change" boxes, a checklist — all stay exactly as they are.
 
-**Which heading carries the description is read from your template's first heading line, at any level**,
-so renaming it needs no configuration. One wrinkle worth knowing if you do rename it: a PR opened *before* the rename
-still holds the old heading in its published body. The script therefore falls back to the headings it has
-shipped before (`## What does this change do?` and its Dutch predecessor) when the current one is not
-found, so an older PR stays refreshable instead of silently reporting that it already matches.
+**Renaming a heading in your template needs no configuration** — the rule below reads a position, not a
+name. One wrinkle worth knowing if you do rename one: a PR opened *before* the rename still holds the old
+heading in its published body. The script therefore falls back to the headings it has shipped before
+(`## What does this change do?` and its Dutch predecessor) when the current one is not found, so an older
+PR stays refreshable instead of silently reporting that it already matches.
 
 It is **opt-in** rather than automatic for the reason above: refreshing on every run would overwrite a
 hand-edited body without being asked. And it is a no-op where there is nothing to do — no open PR, no
 description in the entry, or a body that already matches, in which case nothing is sent to GitHub at all.
 
-The heading it replaces under is the **first heading of your PR template, at any level** (`#` through
-`######`), so no extra configuration is needed: that is where the description placeholder sits. If your
-template has no heading at all, the switch warns and changes nothing rather than guessing. It matched
-`## ` exactly until August 9, 2026, which meant a template promoted to `#` silently lost the whole
-feature — worth knowing if your own template starts at a different level than it used to.
+**The placeholder's position decides the description, in both directions.** The heading it replaces under
+is the **last heading above the placeholder**, at any level (`#` through `######`); every heading **below**
+the placeholder belongs to the form and is a boundary the description stops at. Where the placeholder comes
+before any heading — the shipped reference's own shape — there is no description heading at all: the
+description is the body's **leading section**, and every heading in the template is a boundary. Only a
+**missing** template warns and changes nothing; a heading-less one is a supported shape.
 
-## Your PR template — the two promises this script relies on
+**That rule arrived in two steps, and both are worth knowing if your own template's shape has moved.** The
+match was `## ` exactly until August 9, 2026, which meant a template promoted to `#` silently lost the
+whole feature. And the position read was "the first heading" until August 24, 2026
+([#865](https://github.com/DaveKJohn/claude-code-specialists/issues/865)), which agreed with the placeholder
+only while this family's template opened with an H1 — in a template of `<placeholder>` + `## Checklist` it
+would have named the checklist as the description and overwritten it on every refresh.
+
+## Your PR template — the one promise this script relies on
 
 `.github/pull_request_template.md` is **your** file: GitHub reads it only from that path in your own
 repo, so unlike the rest of this workflow it cannot live in the plugin and cannot be `@`-imported. What
@@ -152,18 +160,18 @@ the plugin ships instead is a **reference to copy and to diff against**:
 ${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md
 ```
 
-Everything `open-pr` needs from that file is two lines, and they are the whole interface:
+Everything `open-pr` needs from that file is **one line**, and it is the whole interface: a **placeholder
+line the matcher recognises, verbatim**, which is where the description is inserted when the PR is created
+and what `-RefreshBody` replaces afterwards. Break it and nothing errors — you get a PR whose body has no
+description. Everything else in the file is yours: add sections, checklists and headings freely, and the
+script leaves them exactly as they are.
 
-| the promise | what depends on it |
-|---|---|
-| a **first heading**, at any level | `-RefreshBody` replaces the description under it |
-| a **placeholder line** the matcher recognises, verbatim | the description is inserted there when the PR is created |
+**The reference carries no heading of its own, and that is the shape to copy.** A heading is not part of
+the contract — the lint gate in the source repo stopped requiring one with #865 — so a template that is
+nothing but the placeholder line is correct and complete. What headings you add are the form's, and the
+refresh treats each as a boundary it will not cross.
 
-Break either and nothing errors — you get a PR whose body has no description, or a `-RefreshBody` that
-politely reports it changed nothing. Everything else in the file is yours: add sections, checklists and
-headings freely, and the script leaves them exactly as they are.
-
-**Why the reference is only two lines — read the reasoning, not the answer.** This family's template
+**Why the reference is only that one line — read the reasoning, not the answer.** This family's template
 carried a "Type of change" block and a six-item checklist until August 9, 2026, and they were removed
 after a measurement rather than on taste: over 60 PRs, "Type of change" had exactly one of four boxes
 ticked *every single time* — a fact the changelog entry already states under `### Branch type`, and which
@@ -184,8 +192,9 @@ in every PR body forever, so an empty slot would be a permanent empty section in
 when you have something to put in it.
 
 **If your template's placeholder LINE differs, define `Get-PrDescriptionPlaceholder`.** The description
-is inserted by an exact whole-line match against three built-in strings, so a template one word away
-from one of them gets a PR body with no description at all. Since
+is inserted by an exact whole-line match against the built-in strings — every placeholder this family has
+ever shipped, oldest first, so a consumer who has not migrated keeps working — and a template one word away
+from all of them gets a PR body with no description at all. Since
 [#573](https://github.com/DaveKJohn/claude-code-specialists/issues/573) a run that matched no
 placeholder **warns** and prints the strings it compared against — before that it was silent, and a
 consumer merged 12 of 60 PRs with an empty description before anyone noticed. Your own line is the
