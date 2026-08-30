@@ -261,6 +261,49 @@ try {
     Assert-True (-not ($lastMsg -match [regex]::Escape($scopes['BranchFiles']))) 'and does not claim the narrower scope it did not use'
     Assert-True ($scopes['Everything'] -ne $scopes['BranchFiles']) 'the two scopes are told apart by their words -- the whole point of #507'
 
+    # --- (d3) A REJECTED PUSH IS REPORTED AS A REJECTED PUSH (#1143) --------------------------------
+    # THE DEFECT: Invoke-GitPark wrote one fixed sentence over every failed push -- "is 'origin'
+    # configured and reachable?" -- which was the right question while park-branch.ps1 was the only
+    # caller. Since #900 the push is what new-branch does on every creation and cycle-autopark on every
+    # Stop, so the common failure is a non-fast-forward against a branch already on origin, and the
+    # summary sent the reader to check `git remote -v` for nothing. Nothing here could see it: the suite
+    # only ever staged pushes that SUCCEED.
+    #
+    # The fixture diverges with `git commit --amend` rather than a reset: it rewrites the local tip so it
+    # is no longer a descendant of what origin holds, which is the same rejection with none of the
+    # destructive shape.
+    Write-Host "park-branch.ps1 -- a rejected push says so, and does not blame the remote" -ForegroundColor Cyan
+    $fixtureE = New-Fixture -Label 'e'
+    Checkout-NewBranch -Dir $fixtureE -Name 'fix/diverged'
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        [System.IO.File]::WriteAllText((Join-Path $fixtureE 'first.txt'), "one`n", (New-Object System.Text.UTF8Encoding $false))
+        & git -C $fixtureE add -A 2>$null | Out-Null
+        & git -C $fixtureE commit -q -m 'first' 2>$null | Out-Null
+        & git -C $fixtureE push -q -u origin 'fix/diverged' 2>$null | Out-Null
+        # Rewrite the tip that origin already has: local and origin now share no descendant line.
+        & git -C $fixtureE commit -q --amend -m 'first (rewritten)' 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+    # Something outstanding, so park reaches the push through its normal commit path rather than the
+    # nothing-to-commit shortcut.
+    [System.IO.File]::WriteAllText((Join-Path $fixtureE 'second.txt'), "two`n", (New-Object System.Text.UTF8Encoding $false))
+    $rNff = Invoke-ParkBranch -Dir $fixtureE
+    Assert-Equal 1 $rNff.Code 'rejected push: exit 1 (the caller still stops)'
+    Assert-True ($rNff.Out -match 'origin already has commits this branch does not') 'rejected push: the summary names the real cause'
+    Assert-True (-not ($rNff.Out -match 'configured and reachable')) 'rejected push: and does not send the reader to check the remote'
+
+    # And the three arms from their own text, so a reworded message is a one-place change here too --
+    # asserted on the function rather than by staging three different remote failures.
+    . (Join-Path $RepoRoot 'scripts\lib\park-lib.ps1')
+    $mReject = Get-GitPushFailureMessage -Output " ! [rejected]        fix/x -> fix/x (non-fast-forward)"
+    $mUnreach = Get-GitPushFailureMessage -Output "fatal: 'origin' does not appear to be a git repository"
+    $mUnknown = Get-GitPushFailureMessage -Output "error: something nobody has classified yet"
+    Assert-True ($mReject -match 'rejected')                  'message arms: a non-fast-forward reads as a rejection'
+    Assert-True ($mUnreach -match 'could not be reached')     'message arms: an unusable remote still reads as a remote problem'
+    Assert-True ($mUnknown -match "git's own output is above") 'message arms: an unrecognised failure names no cause at all'
+    Assert-True (($mReject -ne $mUnreach) -and ($mUnreach -ne $mUnknown)) 'message arms: the three are told apart -- the whole point of #1143'
+
     # --- (e) No PR interaction: park never invokes gh / opens a PR ---------------------------------
     Write-Host "park-branch.ps1 -- no PR is opened" -ForegroundColor Cyan
     # (b) already proved a full push; here we assert the source itself carries no PR/gh path, so a
