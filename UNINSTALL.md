@@ -268,9 +268,10 @@ The uninstall clears the *entry*; the keys you added in adoption Step 1 are your
   { "permissions": { "allow": [ "Read(//c/Users/<you>/.claude/plugins/**)" ] } }
   ```
 
-  It is not something this family writes, but `settings.suggested.jsonc` is a plausible route for one to get
-  there, and an allow-rule pointing at a directory you are about to delete is exactly the kind of leftover a
-  teardown is supposed to leave you free of. Check both settings files for `plugins` inside `permissions`.
+  It is not something this family writes, but the settings proposals (`settings.suggested.jsonc` and
+  `settings.proposed.json`) are a plausible route for one to get there, and an allow-rule pointing at a
+  directory you are about to delete is exactly the kind of leftover a teardown is supposed to leave you
+  free of. Check both settings files for `plugins` inside `permissions`.
 
 **Then restart your Claude Code session** — the subagents and the session hooks stay active until the
 entry is gone *and* the session has restarted.

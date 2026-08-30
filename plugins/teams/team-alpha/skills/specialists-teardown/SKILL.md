@@ -77,7 +77,7 @@ the script classifies before it removes:
 
 | category | what it is | what happens |
 |---|---|---|
-| **Generated and untouched** | a lens still carrying its `VUL-IN` marker, an unfilled script scaffold, the `@`-imports, `settings.suggested.jsonc` | **removed** |
+| **Generated and untouched** | a lens still carrying its `VUL-IN` marker, an unfilled script scaffold, the `@`-imports, both settings proposals (`settings.suggested.jsonc` and `settings.proposed.json`) | **removed** |
 | **Authored by the owner** | a filled-in lens -- repo knowledge somebody wrote | **reported, never touched** |
 | **Owned by the repo anyway** | a `repo-config.ps1` with real values, a filled branch table: this repo's own conventions | **reported as yours to keep or drop** |
 
@@ -267,7 +267,7 @@ $text = Get-Content (Join-Path $root 'CLAUDE.md') -Raw
 @($text -split '\r?\n' | Where-Object { $_ -match '^\s*@' }).Count
 ([regex]::Matches($text, '(?<!\r)\n')).Count
 Test-Path scripts\repo-config.ps1; Test-Path scripts\lib\branch-info.ps1
-Test-Path .claude\settings.suggested.jsonc
+Test-Path .claude\settings.suggested.jsonc; Test-Path .claude\settings.proposed.json
 ```
 
 **Read `CLAUDE.md` once, into `$text`, from a path anchored to the repo root — the two lines that skip

@@ -144,8 +144,14 @@ try {
         'the proposed hook path is visibly a placeholder, not a plausible-looking real path (#363)'
     Assert-True (-not ($suggestText -match 'lint-changed-hook\.ps1')) `
         'and the old copyable-looking name is gone'
-    Assert-True ($r1.Out -match "(?s)Copy desired parts.*?'permissions' block is ready to use.*?'hooks' block is NOT") `
-        'step 3 names which block is ready to use and which is not -- the caveat sits where the invitation is'
+    # REWORDED BY #1124, NOT WEAKENED. Step 3 used to open with "Copy desired parts", and it now opens
+    # with the replacement, because there is a merged file to replace WITH -- but both #363 caveats have
+    # to survive that rewording, which is exactly the kind of thing a rewrite drops. So the two halves
+    # are asserted separately: the step names the one-move act, and the block caveat is still printed.
+    Assert-True ($r1.Out -match "(?s)Replace \.claude/settings\.json with.*?one move, no merging") `
+        'step 3 names the one-move replacement, not a hand-merge (#1124)'
+    Assert-True ($r1.Out -match "(?s)'permissions' block is ready to use.*?'hooks' block is NOT") `
+        'step 3 still names which block is ready to use and which is not -- the #363 caveat survived the rewording'
     # Trailing newline. The here-string ends at its closing brace and WriteAllText adds nothing; the
     # #337.2 warning covers CLAUDE.md and not this file, so nothing pointed at it.
     Assert-True ($suggestText.EndsWith("`n")) 'settings.suggested.jsonc ends in a newline (#363)'
@@ -158,6 +164,41 @@ try {
     # is the difference between "nothing to permit" and "we forgot".
     Assert-True ($suggestText -match '"allow"\s*:\s*\[') 'core-only: the proposal has an allow half at all (#1075)'
     Assert-True ($suggestText -match '"allow"\s*:\s*\[\s*\]') 'core-only: and it is empty -- no workflow plugin, so no scripted entry point to permit'
+
+    # --- inbound #1124: the ANNOTATED file must say the destination is not empty ---------------------
+    # Two of this file's three copy traps were warned about (the comments, #1097; the hooks stub, #363).
+    # The third -- that .claude/settings.json ALREADY HOLDS enabledPlugins and extraKnownMarketplaces,
+    # so a whole-file paste deletes them -- was warned about nowhere, and it is the one that lands the
+    # reader in #1076's zero-surface state through a file that parses perfectly. Asserted on the two key
+    # NAMES rather than on prose: a reader needs to know which keys must survive, and a warning that
+    # does not name them cannot be acted on.
+    Assert-True ($suggestText -match 'DO NOT PASTE IT WHOLE') 'the annotated proposal says it is not a whole-file replacement (#1124)'
+    foreach ($key in @('enabledPlugins', 'extraKnownMarketplaces')) {
+        Assert-True ($suggestText -match "(?s)DO NOT PASTE IT WHOLE.*?$key") `
+            "and it names '$key' as a key the destination already holds"
+    }
+    Assert-True ($suggestText -match 'settings\.proposed\.json') 'and it points at the merged file beside it'
+
+    # --- inbound #1124: the MERGED file, on a consumer whose settings.json does not exist ------------
+    # This fixture has no settings.json at all, which is the honest case for a repo whose enable sits in
+    # the user layer or in settings.local.json. What must hold is that the merged file is still written
+    # (replacing an absent file with it is correct and lossless), that it is STRICT json, and that the
+    # announce line does not promise preservation of keys there were none of -- 'your keys are kept' is
+    # reassuring, meaningless here, and stops a reader checking.
+    $proposedCore = Join-Path $Fixture '.claude\settings.proposed.json'
+    Assert-True (Test-Path -LiteralPath $proposedCore) 'core-only: settings.proposed.json placed (#1124)'
+    $proposedCoreText = [System.IO.File]::ReadAllText($proposedCore, [System.Text.Encoding]::UTF8)
+    Assert-True (-not ($proposedCoreText -match '(?m)^\s*//')) 'core-only: the merged file carries NO comments -- it is strict JSON, unlike the .jsonc beside it'
+    Assert-True (-not ($proposedCoreText -match 'scripts/maintenance/<')) 'core-only: and no hooks stub -- a file whose promise is "paste this" must not ship a hook pointing at nothing'
+    Assert-True ($proposedCoreText.EndsWith("`n")) 'core-only: the merged file ends in a newline (#363, one file over)'
+    Assert-True ($r1.Out -match 'nothing to carry over') `
+        'core-only: the announce line says there was nothing to preserve rather than claiming preservation'
+    # It has to PARSE, which is the whole claim the file makes. ConvertFrom-Json is the same reader
+    # Claude Code's own parse failure would stand in for.
+    $proposedCoreObj = $null
+    try { $proposedCoreObj = $proposedCoreText | ConvertFrom-Json } catch { $proposedCoreObj = $null }
+    Assert-True ($null -ne $proposedCoreObj) 'core-only: the merged file parses as strict JSON'
+    Assert-True ($null -ne $proposedCoreObj -and @($proposedCoreObj.permissions.deny).Count -eq 5) 'core-only: and it carries the five deny rules'
     Assert-True ($suggestText -match 'no workflow plugin is enabled here') 'core-only: the empty allow half says WHY it is empty'
 
     # --- 1b. Register proposal: the bootstrap points at the workshop register (gap found 2026-07-28) --
@@ -280,6 +321,58 @@ try {
     Assert-True ($rWf.Out -match "(?s)'permissions' block is ready to use as-is.*BOTH halves.*allow.*new-branch") `
         'workflow plugin: step 3 says the block has both halves and what the allow half covers'
 
+    # --- inbound #1124: the merged file on a POPULATED destination, which is the reported case --------
+    # This fixture's settings.json carries enabledPlugins, which is what the whole-file paste deleted.
+    # Everything below is one claim tested from several sides: replacing settings.json with the merged
+    # file loses nothing. It is asserted through ConvertFrom-Json rather than by matching text, because
+    # what has to hold is what CLAUDE CODE would read back, not what the bytes look like.
+    $proposedWf = Join-Path $FixtureWf '.claude\settings.proposed.json'
+    Assert-True (Test-Path -LiteralPath $proposedWf) 'workflow plugin: settings.proposed.json placed (#1124)'
+    $proposedWfText = [System.IO.File]::ReadAllText($proposedWf, [System.Text.Encoding]::UTF8)
+    $wfObj = $null
+    try { $wfObj = $proposedWfText | ConvertFrom-Json } catch { $wfObj = $null }
+    Assert-True ($null -ne $wfObj) 'workflow plugin: the merged file parses as strict JSON'
+    if ($null -ne $wfObj) {
+        # THE DEFECT ITSELF. Without this the paste produces a valid settings file with no plugin
+        # surface at all -- 3 -> 0 SessionStart hooks, 6 -> 0 skills, 15 -> 0 subagents, and no message
+        # (the state #1076 measured). Both plugins, because losing one is the same failure for that one.
+        foreach ($id in @('team-alpha@claude-code-specialists', 'contributing-davekjohn@claude-code-specialists')) {
+            Assert-True (@($wfObj.enabledPlugins.PSObject.Properties | Where-Object { $_.Name -eq $id }).Count -eq 1) `
+                "workflow plugin: the merged file KEEPS enabledPlugins['$id'] -- the key a whole-file paste deleted (#1124)"
+        }
+        # Both halves actually merged in, not merely mentioned.
+        $wfAllow = @($wfObj.permissions.allow)
+        $wfDeny  = @($wfObj.permissions.deny)
+        Assert-True ($wfAllow.Count -eq 7) 'workflow plugin: the merged file carries all seven allow rules'
+        Assert-True ($wfDeny.Count -eq 5)  'workflow plugin: and the five deny rules'
+        Assert-True (@($wfAllow | Where-Object { $_ -match 'new-branch\.ps1' }).Count -eq 2) `
+            'workflow plugin: new-branch is allowed through both tool shapes -- the array was not flattened into one string'
+        # THE FLATTENING GUARD, and it is here because it actually happened. The merge was first written
+        # with '$have = if (...) { @($x) } else { @() }'; an if-EXPRESSION returns through the output
+        # pipeline, which unrolls a one-element array to the bare element, so '+' concatenated the new
+        # rules onto it as TEXT. The file stayed valid JSON and permitted nothing.
+        Assert-True (@($wfAllow | Where-Object { $_ -match 'new-branch.*open-pr' }).Count -eq 0) `
+            'workflow plugin: no rule is two rules concatenated -- the one-element-array unroll trap'
+        Assert-True (@($wfObj.PSObject.Properties | Where-Object { $_.Name -eq 'hooks' }).Count -eq 0) `
+            'workflow plugin: the merged file omits the hooks STUB -- a paste-this file must not ship a hook pointing at nothing'
+    }
+    Assert-True ($rWf.Out -match 'it keeps .*enabledPlugins') `
+        'workflow plugin: the announce line names the keys it carried over, so the reader can check the claim'
+
+    # --- inbound #1124: rerunning must not duplicate rules, and must not lose the consumer's own ------
+    # A consumer's own rules come first and ours are appended; a second run adds nothing. This matters
+    # because specialists-init is explicitly safe to invoke repeatedly, and a merge that grew on every
+    # run would quietly turn that promise into a defect.
+    [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'), $proposedWfText, $Utf8NoBom)
+    $rWf2 = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureWf)
+    Assert-Equal 0 $rWf2.Code 'workflow plugin: bootstrap exit 0 on the rerun'
+    $wfObj2 = $null
+    try { $wfObj2 = [System.IO.File]::ReadAllText($proposedWf, [System.Text.Encoding]::UTF8) | ConvertFrom-Json } catch { $wfObj2 = $null }
+    Assert-True ($null -ne $wfObj2 -and @($wfObj2.permissions.allow).Count -eq 7) `
+        'workflow plugin: a rerun over the merged result adds no duplicate allow rules'
+    Assert-True ($null -ne $wfObj2 -and @($wfObj2.permissions.deny).Count -eq 5) `
+        'workflow plugin: nor duplicate deny rules'
+
     # --- inbound #1084: a plugin that ships no agents still reaches the register proposal ------------
     # The proposal used to be built from the lens inventory, which is filled ONLY while walking a
     # plugin's agents/ directory -- so the workflow plugin, which ships skills, scripts and hooks and
@@ -350,6 +443,105 @@ try {
     Assert-True ($rMp.Out -match "plugin 'somewidget' has no agents/ directory.*not this marketplace's plugin") `
         'marketplace scope: and the run says WHY that plugin is not in it'
     Remove-Item -Recurse -Force -LiteralPath $FixtureMp -ErrorAction SilentlyContinue
+
+    # --- 1c1b2. The merged file survives the contents a real settings.json can hold (#1124) ----------
+    # Both of these were found by review AFTER the merge worked, and both produced a file that was
+    # written, announced as 'ready to replace settings.json', and broken -- which is this feature's own
+    # failure mode arriving through its formatting step.
+    #
+    # A Windows path like C:\uadded\check.ps1 is 'C:\\uadded\\check.ps1' in JSON, and the un-escape pass
+    # that restores PowerShell 5.1's \u0026-style escapes matched the SECOND backslash of that pair,
+    # folding '\uadde' into one character and leaving an invalid escape behind. Any '\' + 'u' + 4 hex
+    # does it: \uadded, \ubeef, \ucafe. The fix counts the backslash run, so this asserts on the
+    # ROUND TRIP rather than on the bytes -- what has to hold is what Claude Code would read back.
+    #
+    # And '"allow": null' means the key EXISTS with a null value, so a Contains() test says yes and
+    # @($null) is an array holding one $null -- which shipped '"allow": [null, ...]'.
+    Write-Host "bootstrap.ps1 -- a settings.json holding a backslash-u path and a null rule list (#1124)" -ForegroundColor Cyan
+    $FixtureEsc = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-esc-$PID"
+    if (Test-Path -LiteralPath $FixtureEsc) { Remove-Item -Recurse -Force -LiteralPath $FixtureEsc }
+    New-Item -ItemType Directory -Path (Join-Path $FixtureEsc '.claude') -Force | Out-Null
+    $hookCmd = 'powershell -File C:\uadded\check.ps1 && echo <done>'
+    [System.IO.File]::WriteAllText((Join-Path $FixtureEsc '.claude\settings.json'), (@'
+{
+  "enabledPlugins": { "team-alpha@claude-code-specialists": true },
+  "permissions": { "allow": null },
+  "hooks": { "Stop": [ { "hooks": [ { "type": "command", "command": "HOOKCMD" } ] } ] }
+}
+'@ -replace 'HOOKCMD', ($hookCmd -replace '\\', '\\')), $Utf8NoBom)
+    $rEsc = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureEsc)
+    Assert-Equal 0 $rEsc.Code 'escapes: bootstrap exit 0'
+    $proposedEsc = Join-Path $FixtureEsc '.claude\settings.proposed.json'
+    Assert-True (Test-Path -LiteralPath $proposedEsc) 'escapes: the merged file is written'
+    $escObj = $null
+    try { $escObj = [System.IO.File]::ReadAllText($proposedEsc, [System.Text.Encoding]::UTF8) | ConvertFrom-Json } catch { $escObj = $null }
+    Assert-True ($null -ne $escObj) 'escapes: it still PARSES with a backslash-u path in it -- the un-escape counts the backslash run'
+    if ($null -ne $escObj) {
+        Assert-Equal $hookCmd $escObj.hooks.Stop[0].hooks[0].command `
+            "escapes: and the command survives the round trip byte for byte, '&&' and angle brackets included"
+        Assert-True (@(@($escObj.permissions.allow) | Where-Object { $null -eq $_ }).Count -eq 0) `
+            'escapes: a null allow list does not ship as [null, ...] -- null and absent are the same statement'
+    }
+    Remove-Item -Recurse -Force -LiteralPath $FixtureEsc -ErrorAction SilentlyContinue
+
+    # --- 1c1b3. The merged file inherits what settings.json was HIDING, and says so (#1124) ----------
+    # It is a copy of that file, so a repo that gitignores '.claude/settings.json' -- the usual reason
+    # being an 'env' block with a token in it -- gets an untracked, un-ignored second copy of that token
+    # dropped into the tree by an adoption step. The ignore rule names the old path and cannot match the
+    # new one. The bootstrap cannot know what is in there and must not guess, so it reports the FACT and
+    # only in the one combination where the two files disagree; asserted here so the notice cannot be
+    # lost to a later rewording of this block.
+    $FixtureIgn = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-ign-$PID"
+    if (Test-Path -LiteralPath $FixtureIgn) { Remove-Item -Recurse -Force -LiteralPath $FixtureIgn }
+    New-Item -ItemType Directory -Path (Join-Path $FixtureIgn '.claude') -Force | Out-Null
+    & git -C $FixtureIgn init --quiet 2>$null | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.gitignore'), ".claude/settings.json`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.claude\settings.json'),
+        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true }, "env": { "SOME_TOKEN": "x" } }', $Utf8NoBom)
+    $rIgn = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureIgn)
+    Assert-Equal 0 $rIgn.Code 'ignore-gap: bootstrap exit 0'
+    Assert-True ($rIgn.Out -match 'gitignored here and the merged copy beside it is NOT') `
+        'ignore-gap: the run says the merged copy escapes the ignore rule that covered its source (#1124)'
+    Remove-Item -Recurse -Force -LiteralPath $FixtureIgn -ErrorAction SilentlyContinue
+
+    # --- 1c1c. A destination the merge cannot account for gets NO merged file (inbound #1124) --------
+    # The merged file's entire promise is "replace settings.json with this and lose nothing". Composing
+    # one from a destination that cannot be read whole would break exactly that promise while wearing
+    # its label, which is worse than not writing it -- so the bootstrap refuses, says which shape it
+    # refused, and step 3 falls back to the hand-merge wording WITH the trap-2 warning attached.
+    #
+    # Three shapes, because they fail at three different depths and an early return for one would look
+    # like coverage for all: unparseable at all, parseable but not an object, and an object whose
+    # 'permissions' is not one (that last is the merge's own blind spot -- it replaces that key
+    # wholesale, so a non-object value there would be dropped by the fix itself).
+    Write-Host "bootstrap.ps1 -- a destination the merge cannot account for (#1124)" -ForegroundColor Cyan
+    foreach ($bad in @(
+        [pscustomobject]@{ Name = 'trailing-comma'; Body = '{ "enabledPlugins": { "a@b": true }, }'; Says = 'does not parse as JSON' },
+        [pscustomobject]@{ Name = 'array-root';     Body = '[1,2]';                                 Says = 'parses, but is not a JSON object' },
+        [pscustomobject]@{ Name = 'perms-scalar';   Body = '{ "permissions": "nope" }';             Says = "has a 'permissions' key that is not an object" },
+        [pscustomobject]@{ Name = 'allow-object';   Body = '{ "permissions": { "allow": [ { "x": 1 } ] } }'; Says = "has a 'permissions.allow' that is not a list of rules" },
+        [pscustomobject]@{ Name = 'deny-number';    Body = '{ "permissions": { "deny": 7 } }';      Says = "has a 'permissions.deny' that is not a list of rules" }
+    )) {
+        $FixtureBad = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-bad-$($bad.Name)-$PID"
+        if (Test-Path -LiteralPath $FixtureBad) { Remove-Item -Recurse -Force -LiteralPath $FixtureBad }
+        New-Item -ItemType Directory -Path (Join-Path $FixtureBad '.claude') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $FixtureBad '.claude\settings.json'), $bad.Body, $Utf8NoBom)
+        $rBad = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureBad)
+        Assert-Equal 0 $rBad.Code "$($bad.Name): an unmergeable settings.json is not a bootstrap failure"
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $FixtureBad '.claude\settings.proposed.json'))) `
+            "$($bad.Name): no merged file is written from a destination that cannot be read whole"
+        Assert-True (Test-Path -LiteralPath (Join-Path $FixtureBad '.claude\settings.suggested.jsonc')) `
+            "$($bad.Name): and the annotated proposal is still placed -- nothing is taken away from the reader"
+        # The notice NAMES the shape. 'does not parse' sends a reader hunting for a syntax error in a
+        # file that parses perfectly, which is two of these three cases.
+        Assert-True ($rBad.Out -match [regex]::Escape($bad.Says)) `
+            "$($bad.Name): the notice names which shape it refused, not just that it refused"
+        # AND THE WARNING LANDS WHERE THE HAND-MERGE IS NOW UNAVOIDABLE. This is the trap the whole
+        # issue is about, and this path is the only one that still asks the reader to perform it.
+        Assert-True ($rBad.Out -match "(?s)Copy desired parts.*?Keep 'enabledPlugins' and 'extraKnownMarketplaces'") `
+            "$($bad.Name): step 3 falls back to the hand-merge AND names the keys that must survive it"
+        Remove-Item -Recurse -Force -LiteralPath $FixtureBad -ErrorAction SilentlyContinue
+    }
 
     # --- 1c2. THE INVARIANT: the bootstrap's own scaffolds satisfy the plugin's own contract --------
     #     Issue #226. Every function assertion above is a spot-check against a hand-maintained list,

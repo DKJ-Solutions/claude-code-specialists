@@ -486,9 +486,36 @@ and `git status` silent.
    **one** line, `` `@.claude/specialists/SPECIALISTS.md` ``, and that file carries the body import, the
    lens import and this repo's roster slot; on the pre-seam path it stays the two imports it always was
    (portable body + repo lens). Creates a minimal `CLAUDE.md` scaffold if it is missing.
-5. **Settings proposal** — writes `.claude/settings.suggested.jsonc` with **both** permission halves
-   + a hooks **stub**. It does **not** touch `settings.json`: a JSON merge is repo-specific and
-   risky, so that judgment stays with you.
+5. **Settings proposal — two files, and only one of them is meant to be pasted.** It writes
+   `.claude/settings.suggested.jsonc`, the **annotated** proposal, with both permission halves + a
+   hooks **stub**; and beside it `.claude/settings.proposed.json`, the **merged end result** — your
+   own `settings.json` key for key with those halves folded in, as strict JSON with no comments and
+   no hooks stub. Neither touches `settings.json` itself: the placement stays yours.
+
+   **The merged file arrived on August 30, 2026
+   ([#1124](https://github.com/DaveKJohn/claude-code-specialists/issues/1124)), because the annotated
+   one could not be copied in one move and two of the three reasons had already been papered over
+   with warnings.** The comments are illegal in the destination (#1097, warned). The hooks path is a
+   placeholder (#363, warned). And the third, warned about nowhere: **the destination is not empty.**
+   `.claude/settings.json` holds `enabledPlugins` and `extraKnownMarketplaces` — the two keys that got
+   you this far — and the proposal does not contain them, so a whole-file paste deletes both. What you
+   are left with is a settings file that parses perfectly and loads nothing: no skills, no subagents,
+   no SessionStart hooks, and no message of any kind. That is
+   [#1076](https://github.com/DaveKJohn/claude-code-specialists/issues/1076)'s state (3 → 0 hooks,
+   6 → 0 skills, 15 → 0 subagents across one restart), reached by a different route — and reached in
+   **the one act this family reserves for you**, since a session may not widen a permissions file.
+
+   Reported by a repo owner rather than by the runner adopting for them: *"if I have to do this
+   myself, I want to be able to copy and paste the whole file with no extra steps."* That is a fair
+   expectation of a file whose entire purpose is to be copied, and more warning text does not meet it.
+
+   **When no merged file is written, and why that is the right answer.** If `.claude/settings.json`
+   cannot be read whole — it does not parse, it parses to something other than an object, or its
+   `permissions` key is not an object — the bootstrap writes **no** merged file and says which of the
+   three it found. A merge composed from a file that could not be fully read would drop part of it
+   while carrying the label *"safe to paste"*, which is the reported defect arriving through its own
+   fix. The annotated proposal is still placed, and the next-steps then walk you through the hand-merge
+   **naming the two keys that must survive it**.
 
    **`permissions.allow` is the half that arrived on August 29, 2026
    ([#1075](https://github.com/DaveKJohn/claude-code-specialists/issues/1075)), and it is filled only
@@ -551,9 +578,20 @@ After the script:
    deciding to apply, and it named the wrong files. Current versions mark the slot only; a one-time
    sweep for `^#.*\(VUL-IN\)` over your lenses closes it for an older repo
    ([#451](https://github.com/DaveKJohn/claude-code-specialists/issues/451)).
-2. **Adopt the settings.** Copy what fits from `.claude/settings.suggested.jsonc` into
-   `settings.json` (or `settings.local.json`), adapt the hooks stub to real repo scripts (or leave
-   them out), and then remove the proposal file.
+2. **Adopt the settings — replace `.claude/settings.json` with `.claude/settings.proposed.json`.**
+   One move, nothing to reconstruct: that file is already your `settings.json` with the permissions
+   folded in — strict JSON, no comments to strip, no hooks stub, and every key you had still in it.
+   Then delete both proposals.
+
+   **Read the annotated `.jsonc` for *why* each rule is there; do not paste it.** It is an explanation,
+   and it holds the permission halves and nothing else — while `settings.json` already holds
+   `enabledPlugins` and `extraKnownMarketplaces`. Overwrite the file with it and you delete both, and
+   what you get is a settings file that parses perfectly and loads nothing at all (see step 5 above and
+   [#1124](https://github.com/DaveKJohn/claude-code-specialists/issues/1124)).
+
+   **If the run said no merged file was written, this step is a hand-merge and those two keys are what
+   you must carry across.** That happens when `settings.json` cannot be read whole; the notice names
+   which shape it found. Everything below applies to that path.
 
    **Strip the `//` lines as you copy.** The proposal is **JSONC** — its extension announces that
    comments are legal, and in that file they are. `settings.json` and `settings.local.json` are

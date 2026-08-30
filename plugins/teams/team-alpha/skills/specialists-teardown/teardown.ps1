@@ -457,12 +457,25 @@ foreach ($pair in @(
 # fails the emptiness test and is untouched, which is why this can be unconditional.
 $removed += @(& $pruneEmptyDirs -Dirs @((Join-Path $root 'scripts\lib'), (Join-Path $root 'scripts')) -PlannedSoFar $removed)
 
-# --- 4. The settings proposal --------------------------------------------------------------------
-# A proposal the bootstrap prints for the owner to merge. If it is still lying around it was never
-# merged, so it is pure leftover.
-$suggested = Join-Path $root '.claude\settings.suggested.jsonc'
-if (Test-Path -LiteralPath $suggested -PathType Leaf) {
-    Remove-IfApplying -Path $suggested -Label '.claude\settings.suggested.jsonc'
+# --- 4. The settings proposals ---------------------------------------------------------------------
+# Proposals the bootstrap places for the owner to adopt. If either is still lying around it was never
+# adopted, so it is pure leftover.
+#
+# BOTH NAMES COME FROM Get-SettingsArtifactNames, the same function the bootstrap writes them with, so a
+# second artifact cannot be added on one side and forgotten on the other. That is not hypothetical
+# tidiness: '.claude/*' is gitignored in many consumers, so a leftover this script does not know about is
+# invisible to git status AND to the teardown -- the two places anyone would look. The fallback mirrors
+# the bootstrap's own, for the same reason it has one.
+$settingsArtifacts = if (Get-Command Get-SettingsArtifactNames -ErrorAction SilentlyContinue) {
+    Get-SettingsArtifactNames
+} else {
+    [pscustomobject]@{ Suggested = '.claude\settings.suggested.jsonc'; Proposed = '.claude\settings.proposed.json' }
+}
+foreach ($artifact in @($settingsArtifacts.Suggested, $settingsArtifacts.Proposed)) {
+    $artifactPath = Join-Path $root $artifact
+    if (Test-Path -LiteralPath $artifactPath -PathType Leaf) {
+        Remove-IfApplying -Path $artifactPath -Label $artifact
+    }
 }
 
 function Get-InstallRecordState {
