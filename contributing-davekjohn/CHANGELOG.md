@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/cut-release-tier-comment-v1` · 20260830-141043
+
+The comment introducing `cut-release.ps1`'s tier guardrail now **points at `Test-ReleaseBumpEarned`
+instead of restating it**. It existed so a reader would not have to open the function -- and then carried
+the pre-August-7 ladder for three weeks after Dave loosened both of its halves: it claimed any release
+needs a tier-1 entry at minimum (a tier-0-only release cuts as a **patch**, because publishing to no
+audience is what a patch is for) and that a minor needs a tier-2 one (**tier 1 or higher** earns a minor,
+because the version speaks to all stakeholders rather than to consumers alone). A reader who trusted it
+walked away with a stricter model than the gate enforces, in both directions, and one already had.
+
+The replacement gives the outline, sends the reader one dot-source away for the rules, and states the
+drift as the reason it does not restate them -- with the precedent beside it: `release-lib`'s own
+`$notable` counter went stale for the same reason and was cleaned up on August 12, 2026. That copy sat
+*inside* the function and still drifted, which is the argument that a copy at the call site never could
+have held. No behaviour changes: the gate has been doing the right thing throughout and no release was
+mis-cut.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- `cut-release.ps1` does reach a consumer's plugin cache, but this is an internal comment at a call
+site. Nothing they run, read in a skill page, or see in output changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+cut-release's tier guardrail comment points at the function instead of restating it
+
+Plugins: contributing-davekjohn
+
+[PR #1144](https://github.com/DaveKJohn/claude-code-specialists/pull/1144)
+
+---
+
 ### DEPLOY: `fix/new-branch-remote-resume-v1` · 20260830-135427
 
 `new-branch` now resolves *resume or cut* by reading **both** ref namespaces before it acts, so a branch
