@@ -11,15 +11,21 @@
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/config-blueprint.tests.ps1
 
-    THE TWO EXTRACTION BUGS BELOW WERE REAL, both found by reading the first generated artefact rather
-    than by reasoning, and each has its own assert here:
+    THE THREE EXTRACTION BUGS BELOW WERE REAL, none of them found by reasoning -- the first two by
+    reading the first generated artefact, the third by reading a file adopt-config had written in a
+    consumer. Each has its own assert here:
 
       1. a structural walk that stopped only at the previous '}' swept up whatever sat between two
          functions -- Get-LiveStage came out carrying the retirement note of Get-ChangelogTierHeADINGS,
          a comment block about a different, deleted function;
       2. four functions in repo-config.ps1 share ONE assignment block, so three of them extracted
          without the '$script:' value they read -- copied on their own they would have returned $null
-         in the consumer, a silent wrong answer where an absent function gets the documented fallback.
+         in the consumer, a silent wrong answer where an absent function gets the documented fallback;
+      3. the mirror of 2, and the reason it needed its own measurement: the same walk handed the FIRST
+         of those four all four values, so with 2 repaired both records shipped the same assignment and
+         a consumer's placed lib assigned three variables twice, the second silently winning. Nothing
+         errors and the file is correct until somebody edits it -- and these four strings exist to be
+         translated, which is the one act that meets it (inbound #1126, measured in ccs-testrun-3).
 
     Pure ASCII (repo convention for .ps1).
 
@@ -208,6 +214,71 @@ foreach ($rec in @($bp.records | Where-Object { $_.declared -and $_.text })) {
     }
 }
 
+# --- Extraction bug 3: a record must not carry a value belonging to a SIBLING -----------------------
+# The exact mirror of bug 2, and it had to be measured separately (inbound #1126): the contiguous walk
+# that leaves the three LOWER functions valueless hands all four values to the FIRST one. Both records
+# then ship the same assignment, so the repo-config.ps1 adopt-config writes assigns three variables
+# twice with the second silently winning -- and these four strings are precisely the ones a consumer
+# TRANSLATES, so the second assignment quietly puts the English back.
+#
+# ASSIGNMENTS READ THROUGH THE PARSER TOO, not by regex, for the reason the loop above already gives:
+# in prose these names appear as text, and one of these very comment blocks cites a variable that lives
+# in another file. That every record's text parses standalone is asserted first, because on a parse
+# failure all three helpers return nothing and every assert below would pass vacuously.
+#
+# AND THE READS COME FROM THE FUNCTION ALONE, not from Get-ReadVars over the whole text -- the loop for
+# bug 2 asks a different question and its helper cannot answer this one. To the parser the left of
+# '$script:X = 1' is a VariableExpressionAst exactly like a read, so over the whole record every
+# assignment counts as its own justification and the assert below could never fail. Measured: written
+# that way it passed on the unrepaired artefact carrying all three duplicates.
+function Get-FunctionReadVars {
+    param([string]$Text, [string]$Name)
+    $t = $null; $e = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$t, [ref]$e)
+    if ($e -and $e.Count -gt 0) { return @() }
+    $fn = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) |
+        Where-Object { $_.Name -eq $Name })
+    if ($fn.Count -eq 0) { return @() }
+    return @($fn[0].FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true) |
+        Where-Object { $_.VariablePath.UserPath -like 'script:*' } |
+        ForEach-Object { $_.VariablePath.UserPath.Substring(7) } | Sort-Object -Unique)
+}
+
+function Get-AssignedVars {
+    param([string]$Text)
+    $t = $null; $e = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$t, [ref]$e)
+    if ($e -and $e.Count -gt 0) { return @() }
+    return @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true) |
+        ForEach-Object { $_.Left } |
+        Where-Object { $_ -is [System.Management.Automation.Language.VariableExpressionAst] -and $_.VariablePath.UserPath -like 'script:*' } |
+        ForEach-Object { $_.VariablePath.UserPath.Substring(7) } | Sort-Object -Unique)
+}
+
+$assigners = @{}
+foreach ($rec in @($bp.records | Where-Object { $_.declared -and $_.text })) {
+    $t = $null; $e = $null
+    [System.Management.Automation.Language.Parser]::ParseInput($rec.text, [ref]$t, [ref]$e) | Out-Null
+    Assert-True (-not ($e -and $e.Count -gt 0)) "$($rec.function): its text parses on its own -- what a consumer pastes in has to"
+
+    # Its own function must actually exist in the text, or the reads below are empty and every assert
+    # in this loop goes vacuous in the other direction.
+    $reads = Get-FunctionReadVars -Text $rec.text -Name $rec.function
+    Assert-True ($reads.Count -gt 0 -or (Get-AssignedVars -Text $rec.text).Count -eq 0) "$($rec.function): its own definition is in its text and reads at least one `$script: value"
+
+    foreach ($name in (Get-AssignedVars -Text $rec.text)) {
+        Assert-True ($reads -contains $name) "$($rec.function): carries no `$script:$name it never reads"
+        if (-not $assigners.ContainsKey($name)) { $assigners[$name] = @() }
+        $assigners[$name] += $rec.function
+    }
+}
+
+# The cross-record half, and the one that actually names the defect: two 'copy' records that both
+# assign the same variable place it twice in one file.
+$shared = @($assigners.GetEnumerator() | Where-Object { $_.Value.Count -gt 1 })
+$sharedNames = ($shared | ForEach-Object { "$($_.Key) <- $($_.Value -join ' + ')" }) -join '; '
+Assert-Equal 0 $shared.Count "no `$script: variable is assigned by more than one record ($sharedNames)"
+
 # The source leaves seven contract functions at the built-in fallback: the two impact-table seams,
 # Get-TestCommands since inbound #644 (this repo's suites are all PowerShell), Get-EntryGateExemptPrefixes
 # since inbound #789 (this repo runs no mirror branches, so 'sync' being the default IS its answer), and
@@ -299,6 +370,16 @@ Assert-Equal '.claude/specialists/SPECIALISTS.md' $answers.RosterPath 'an adopte
 Assert-Equal 'contributing-davekjohn/releases/history.md' $answers.HistoryPath 'an adopted function answers (in the workflow folder since August 27, 2026, which reverses the August 19 answer: the durability worry that sent the list back to the repo root was answered by #885 making that folder permanent)'
 Assert-Equal 'Chore' $answers.Fallback 'an adopted function answers'
 Assert-True ($null -ne $answers.BodyHolder -and $answers.BodyHolder.Length -gt 0) 'a function that sits below the shared assignment block still answers (extraction bug 2)'
+
+# AND EACH OF THE FOUR IS ASSIGNED EXACTLY ONCE IN THE PLACED FILE (extraction bug 3, inbound #1126).
+# Every assert above passes with the duplicates still in: the two assignments carry the same value, so
+# the function answers correctly either way. That is why this one COUNTS rather than reads, and why it
+# runs here rather than only on the artefact -- the placed lib is the file a consumer opens to
+# translate these four strings, and the second assignment is what would silently undo that.
+foreach ($name in 'EntryTitlePlaceholder', 'EntryBodyHeading', 'EntryBodyPlaceholder', 'EntryFallbackType') {
+    $count = ([regex]::Matches($after, ('(?m)^\s*\$script:' + [regex]::Escape($name) + '\s*='))).Count
+    Assert-Equal 1 $count "apply: `$script:$name is assigned exactly once in the placed lib"
+}
 
 # --- Idempotent -----------------------------------------------------------------------------------
 $r = Invoke-Adopt -ConsumerRoot $Fixture -ScriptArgs @('-Apply')
