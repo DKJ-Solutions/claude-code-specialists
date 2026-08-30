@@ -83,6 +83,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.27.0](audience/4.x/4.27.0.md) | 2026-08-30 | Minor | prune-merged leaves the checkout alone, and the consumer-facing messages name the seam |
 | [4.26.0](audience/4.x/4.26.0.md) | 2026-08-30 | Minor | The gates and their messages name what actually happened instead of an assumed cause |
 | [4.25.0](audience/4.x/4.25.0.md) | 2026-08-30 | Minor | Testrun 3's findings land: four pages that contradicted their own tree, a pasteable settings proposal, and two backslash-aware un-escapes |
 | [4.24.0](audience/4.x/4.24.0.md) | 2026-08-29 | Minor | A fresh repo can walk the adoption path from install to its first release |
