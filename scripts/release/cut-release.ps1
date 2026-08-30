@@ -640,10 +640,25 @@ $tierGroups = @(Get-PullRequestEntriesByTier -Content $changelogRaw)
 $entries = @($tierGroups | ForEach-Object { $_.Entries } | Where-Object { $_ })
 
 # --- Guardrail: has this bump been earned? (the tier model, August 5, 2026) ------------------------
-# The rules live in Test-ReleaseBumpEarned (release-lib, tested): any release needs a tier-1 entry at
-# minimum, a minor needs a tier-2 one, and a major needs enough minors behind it. The version number was
-# always supposed to mean this; until now nothing checked, so the meaning depended on whoever typed the
-# flag.
+# The rules live in Test-ReleaseBumpEarned (release-lib, tested) AND ITS DOCSTRING IS THE STATEMENT OF
+# THEM -- read them there, not here. In outline: THE BUMP FOLLOWS THE HIGHEST TIER PENDING, and a major
+# additionally needs enough minors behind it. The version number was always supposed to mean this; until
+# the tier model nothing checked, so the meaning depended on whoever typed the flag.
+#
+# DELIBERATELY NOT RESTATED, BECAUSE THE RESTATEMENT IS WHAT WENT WRONG (issue #1140, August 30, 2026).
+# These lines summarised the function so a reader would not have to open it -- and then carried the
+# PRE-AUGUST-7 LADDER for three weeks after Dave loosened both of its halves: "any release needs a
+# tier-1 entry at minimum" (a tier-0-only release cuts as a PATCH -- publishing to no audience is what a
+# patch is for) and "a minor needs a tier-2 one" (tier 1 or higher earns a minor -- the version speaks to
+# all stakeholders, not to consumers alone). A reader who trusted this walked away with a STRICTER model
+# than the gate enforces, in both directions, and at least one did: the sentence was copied into a draft
+# assert and caught only by opening Test-ReleaseBumpEarned to check the major rule.
+#
+# IT WAS NOT THE FIRST COPY OF THIS DRIFT, WHICH IS THE ARGUMENT FOR THE POINTER. release-lib's own
+# $notable counter carried a stale tier-2 count for exactly the same reason and was cleaned up on
+# August 12, 2026; the note there says so. That copy sat INSIDE the function and still went stale -- so a
+# copy two files away, at the call site, was never going to hold. The gate is one dot-source away; send
+# the reader there.
 #
 # PLACED WITH THE OTHER GUARDRAILS, BEFORE ANYTHING IS WRITTEN, for the same reason the new-major check
 # is: failing after the notes file exists leaves a release half-cut on main.
