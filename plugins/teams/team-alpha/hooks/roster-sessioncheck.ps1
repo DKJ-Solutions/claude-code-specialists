@@ -284,7 +284,14 @@ try {
         # the one state nothing else on the machine reports would arrive dressed as a clean bill of health.
         # Same argument that gave [BOOTSTRAP] its own line, and the reason the pattern's recipe insists on
         # one rather than folding a new marker under an existing verdict.
-        Write-Host 'roster-sessioncheck: the plugin is installed here, but its record is not the shape the docs assume:'
+        #
+        # IT NAMES THE OBSERVATION AND DEFERS THE VERDICT, exactly as the roll-up beneath it does since
+        # inbound #1130 -- and this is the line that made that repair incomplete on its own. It read "but
+        # its record is not the shape the docs assume", which is the same unconditional claim, one line
+        # ABOVE the roll-up and therefore the first thing a session reader meets. Repairing only the
+        # check's headline would have left the contradiction with the 'pathless-only' arm verbatim in the
+        # output #1130 was actually looking at.
+        Write-Host 'roster-sessioncheck: the plugin is installed here and its install record differs from the shape the docs assume -- the lines below say whether that needs action:'
         foreach ($line in $recordShapeLines) { Write-Host "  $($line.Trim())" }
     } elseif ($code -eq 0) {
         Write-Host 'roster-sessioncheck: roster in sync with the enabled plugins.'

@@ -837,7 +837,7 @@ try {
     $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'local'; Path = $c }) } -Name 'admin-local'
     $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
     Assert-Match '\[RECORD-SHAPE\]' $r.Out "local scope: the marker fires"
-    Assert-Match "1 of 1 enabled plugin\(s\) have an install record for this path that is not the assumed shape" $r.Out 'local scope: the roll-up counts what it stands for'
+    Assert-Match "1 of 1 enabled plugin\(s\) have an install record for this path that differs from the assumed shape" $r.Out 'local scope: the roll-up counts what it stands for'
     Assert-Match "none 'project'" $r.Out 'local scope: the detail line names WHY the shape is wrong'
     Assert-Match 'SESSION START' $r.Out 'local scope: and names what produces it, which is the fact a reader cannot look up anywhere else'
     # The discriminator between the two markers. A record for this path exists, so "not installed here" is
@@ -894,6 +894,17 @@ try {
     Assert-Match 'if you installed this plugin at project scope FROM THIS ROOT' $r.Out 'pathless record: the remedy is conditional on the one question only the reader can answer'
     Assert-Match 'installed machine-wide on purpose, this line is expected and needs no action' $r.Out 'pathless record: and the no-action branch is stated OUT LOUD -- an unstated one reads as a defect to clear'
     Assert-Match 're-install it at project scope' $r.Out 'pathless record: the #323 remedy is still reachable, on the branch it belongs to'
+    # AND THE ROLL-UP ABOVE IT STOPPED CONTRADICTING IT (inbound #1130). #1095 repaired this arm and left
+    # the headline asserting "not the assumed shape" and "what is wrong is the administration" -- so for a
+    # deliberately chosen machine-wide install the reader met a defect verdict FIRST and the "needs no
+    # action" only underneath it. Pinned by their negative for the same reason the four asserts above are:
+    # the words ARE the claim, so a test matching them pins the defect instead of the repair.
+    Assert-NotMatch 'is not the assumed shape' $r.Out 'pathless record: the roll-up no longer calls the shape wrong'
+    Assert-NotMatch 'what is wrong is the administration' $r.Out 'pathless record: nor names a defect it cannot establish'
+    Assert-Match 'the verdict is on the detail lines below rather than here' $r.Out 'pathless record: the roll-up defers to the arm, which is the only line that can answer'
+    # The coverage half was never the defect, so the repair must not quietly drop it: this marker really is
+    # the only thing on the machine that reports the shape, and that is why the line is worth printing.
+    Assert-Match 'nothing else reports this' $r.Out 'pathless record: the roll-up still says why this marker exists at all'
     # The permissive predicate must stay permissive: a pathless record really does load here.
     Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'pathless record: the OTHER marker stays silent -- it loads machine-wide'
     Assert-Equal 0 $r.Code 'pathless record: exit 0 -- nothing is broken'
@@ -1258,7 +1269,7 @@ try {
     Assert-Match 'in sync' $r.Out 'hook installed-fine: the plain in-sync line is unchanged'
     Assert-NotMatch 'NOT-INSTALLED' $r.Out 'hook installed-fine: no install marker'
     Assert-NotMatch 'not installed for this path' $r.Out 'hook installed-fine: no install wording at all'
-    Assert-NotMatch 'not the shape' $r.Out 'hook installed-fine: and no record-shape wording either'
+    Assert-NotMatch 'the shape the docs assume' $r.Out 'hook installed-fine: and no record-shape wording either'
 
     # H11. inbound #314/#315: [RECORD-SHAPE] gets its OWN verdict too, and this is the branch the marker
     #      exists for. On an exit-0 run with no drift the state would otherwise fall through to "roster in
@@ -1266,12 +1277,17 @@ try {
     #      thing the hook can say, because a record administered at 'local' scope is reported by nothing
     #      else on the machine. Same argument that gave [BOOTSTRAP] its own line.
     $stub = New-StubCheck -Name 'stub-record-shape' -ExitCode 0 -OutputLines @(
-        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (team-alpha@claude-code-specialists).",
+        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that differs from the assumed shape (team-alpha@claude-code-specialists).",
         '  [OK]    all present',
         'Summary: 0 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Equal 0 $r.Code 'hook record-shape: exit 0 (the hook never blocks)'
-    Assert-Match 'not the shape the docs assume' $r.Out 'hook record-shape: its own verdict line'
+    Assert-Match 'differs from the shape the docs assume' $r.Out 'hook record-shape: its own verdict line'
+    # THE HEADER DEFERS TOO (inbound #1130). This line is what a session reader meets BEFORE the roll-up,
+    # so repairing only the check would have left the same unconditional claim one line higher, above
+    # forwarded detail lines that may say the state needs no action at all.
+    Assert-Match 'say whether that needs action' $r.Out 'hook record-shape: the verdict is deferred to the lines it forwards'
+    Assert-NotMatch 'its record is not the shape' $r.Out 'hook record-shape: the header no longer asserts a defect on their behalf'
     Assert-Match 'team-alpha@claude-code-specialists' $r.Out 'hook record-shape: the marker reaches the session context, naming the plugin'
     Assert-NotMatch 'in sync' $r.Out 'hook record-shape: NOT reported as in sync -- the whole point of the branch'
     Assert-NotMatch 'drift found' $r.Out 'hook record-shape: NOT reported as drift either'
@@ -1281,7 +1297,7 @@ try {
     #       run -- an [INFO] the hook suppresses is indistinguishable from no finding at all.
     $stub = New-StubCheck -Name 'stub-record-shape-drift' -ExitCode 1 -OutputLines @(
         "  [ERROR]  agent '06-24' has no roster row in CLAUDE.md -- add it to the roster.",
-        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that is not the assumed shape (team-alpha@claude-code-specialists).",
+        "  [RECORD-SHAPE] 1 of 1 enabled plugin(s) have an install record for this path that differs from the assumed shape (team-alpha@claude-code-specialists).",
         'Summary: 1 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Match 'blocking finding\(s\)' $r.Out 'hook record-shape-drift: the drift branch still leads'
@@ -1293,7 +1309,7 @@ try {
     #       swallow the other.
     $stub = New-StubCheck -Name 'stub-both-install-markers' -ExitCode 0 -OutputLines @(
         '  [NOT-INSTALLED-HERE] 1 of 2 enabled plugin(s) have no install record for this path (team-lifehub@claude-code-specialists).',
-        "  [RECORD-SHAPE] 1 of 2 enabled plugin(s) have an install record for this path that is not the assumed shape (team-alpha@claude-code-specialists).",
+        "  [RECORD-SHAPE] 1 of 2 enabled plugin(s) have an install record for this path that differs from the assumed shape (team-alpha@claude-code-specialists).",
         'Summary: 0 error(s), 0 info signal(s).')
     $r = Invoke-Hook @('-CheckScriptOverride', $stub)
     Assert-Match 'not installed for this path' $r.Out 'hook both-markers: the not-installed verdict leads'
