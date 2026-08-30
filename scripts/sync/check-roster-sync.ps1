@@ -618,7 +618,25 @@ if ($enabledIds.Count -gt 0) {
         # Format-SafeToken on every id, same reasoning as the roll-up above (inbound #309): a plugin id is
         # an arbitrary JSON key that may carry newlines, and this line is forwarded into session context.
         $shapeIds = (@($recordShapes | ForEach-Object { Format-SafeToken -Value $_.Id }) -join ', ')
-        Write-Host "  [RECORD-SHAPE] $($recordShapes.Count) of $($enabledIds.Count) enabled plugin(s) have an install record for this path that is not the assumed shape -- exactly one record, scoped 'project' ($shapeIds). The plugin still loads; what is wrong is the administration, and nothing else reports it. Details below." -ForegroundColor Yellow
+        # IT REPORTS THE COUNT AND LEAVES THE VERDICT TO THE ARMS (inbound #1130) -- the same repair #1095
+        # applied one line lower, arriving late at the line the reader meets first. It used to open with
+        # "not the assumed shape" and close with "what is wrong is the administration", both unconditional,
+        # and both contradicted by the 'pathless-only' arm below: since #1095 that arm says in so many words
+        # that the state may be deliberate and needs no action. Two lines about one plugin in one hook
+        # output, saying opposite things, at every session start -- a sharper defect than #1095 reported,
+        # because before that repair the two lines at least agreed.
+        #
+        # THE PREDICATE IS UNCHANGED, and deliberately. The obvious gate -- stop counting a plugin this
+        # repo's own .claude/settings.json never enabled -- reads a field the demotion does not touch, so
+        # unlike the scope gate withdrawn on #1095 it is not disproved by #323. It is simply UNMEASURED:
+        # whether 'claude plugin install --scope project' always writes that enable is the fact it would
+        # rest on, and if it does not, the gate restores exactly the silence #314/#315/#323 were built to
+        # end. The wording needs no measurement, so the wording is what changed.
+        #
+        # "Details below." is gone as a sentence and kept as a promise -- the deferral names the detail
+        # lines, so #324's property (they carry the marker, and therefore reach a session) is still what
+        # makes this line honest rather than a hand-wave.
+        Write-Host "  [RECORD-SHAPE] $($recordShapes.Count) of $($enabledIds.Count) enabled plugin(s) have an install record for this path that differs from the assumed shape -- exactly one record, scoped 'project' ($shapeIds). The plugin still loads, and nothing else reports this; whether it needs action differs per shape, so the verdict is on the detail lines below rather than here." -ForegroundColor Yellow
         # NON-COUNTING per-plugin detail, for the same two reasons as [NOT-INSTALLED-HERE]'s: a permanent
         # info signal would make 'this repo reports 0 signals' unassertable, and the severity must not
         # re-enter through the summary line. Each line names the shape AND its remedy, because they differ:
@@ -627,7 +645,7 @@ if ($enabledIds.Count -gt 0) {
         #
         # THE DETAIL LINES CARRY THE [RECORD-SHAPE] MARKER THEMSELVES, and that is the fix for inbound #324
         # rather than a formatting whim. They used to be [SKIP] lines, and roster-sessioncheck forwards only
-        # lines matching \[RECORD-SHAPE\] -- so in a SESSION the roll-up's closing "Details below." was
+        # lines matching \[RECORD-SHAPE\] -- so in a SESSION the roll-up's closing promise of details was
         # false: the reader was told an administration problem exists, told the details follow, and got
         # neither the detail nor a way to reach it. The remedy lives ONLY in these lines, and the whole
         # point of giving this marker its own verdict line was to make that reader actionable. Marking them
