@@ -1581,6 +1581,14 @@ $majorEarly = Test-ReleaseBumpEarned -BumpType major -TierGroups $g210 -CurrentV
 Assert-Equal $false $majorEarly.Earned 'major at 3.4.0: four minors is not ten'
 Assert-Equal $false $majorEarly.MajorAvailable 'and a major is reported unavailable'
 Assert-Match $majorEarly.Reason 'had 4 of them' 'the reason counts the minors so far'
+# AND IT NAMES THE SEAM, NOT ONLY THE NUMBER (inbound #1151, August 30, 2026). Measured in a fresh
+# consumer: the refusal gave the threshold and the count correctly and then offered two routes out --
+# "cut the minor instead" and -SkipTierGate -- so the repo the seam exists for, one that cuts minors
+# rarely, met a hard refusal with the bypass as the nearest thing to a configuration-shaped answer.
+# Asserted on the function name because that is what a reader searches for; the file path beside it is
+# where a consumer's seam lives.
+Assert-Match $majorEarly.Reason 'Get-ReleaseMajorMinMinors' 'the refusal names the seam that lowers the threshold'
+Assert-Match $majorEarly.Reason 'scripts/repo-config.ps1' 'and where that seam lives'
 $majorReady = Test-ReleaseBumpEarned -BumpType major -TierGroups $g210 -CurrentVersion '3.10.0'
 Assert-Equal $true $majorReady.Earned 'major at 3.10.0: ten minors, so it is allowed'
 Assert-Equal $true $majorReady.MajorAvailable 'and reported available'
