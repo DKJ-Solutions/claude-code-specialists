@@ -285,6 +285,42 @@ function Add-OriginCommits {
     } finally { $ErrorActionPreference = $prevEap }
 }
 
+
+function Add-OriginBranch {
+    <#
+        A branch that exists ONLY on the bare origin, carrying a file nothing else has -- the other
+        device's parked branch, reproduced (#1139). Built through a throwaway clone for the same reason
+        Add-OriginCommits is: $Dir is never touched, so refs/heads/<branch> stays absent there and the
+        fixture is in exactly the state the report describes.
+
+        $MarkerFile is what makes the assert possible at all. Everything else about a resume and a fork
+        looks identical on screen -- same clean run, byte-identical scaffold -- so the only readable
+        difference is whether the branch's WORK arrived.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Bare,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$Branch,
+        [Parameter(Mandatory = $true)][string]$MarkerFile
+    )
+    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-parked.git")
+    if (Test-Path -LiteralPath $clone) { Remove-Item -Recurse -Force -LiteralPath $clone }
+    $script:fixtures += $clone
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        # --branch main for the reason spelled out in Add-OriginCommits: a bare repo's HEAD points at
+        # refs/heads/master and only 'main' was ever pushed, so a plain clone lands on an unborn branch.
+        & git clone -q --branch main $Bare $clone 2>$null | Out-Null
+        & git -C $clone config user.email 'other-device@local.invalid' 2>$null | Out-Null
+        & git -C $clone config user.name 'Other Device' 2>$null | Out-Null
+        & git -C $clone checkout -q -b $Branch 2>$null | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $clone $MarkerFile), "parked elsewhere`n", (New-Object System.Text.UTF8Encoding $false))
+        & git -C $clone add -A 2>$null | Out-Null
+        & git -C $clone commit -q -m "work parked on the other device" 2>$null | Out-Null
+        & git -C $clone push -q origin $Branch 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+}
 function Test-BranchOnRemote {
     <# Is $Ref present in the bare repo $Bare? The push assert, read from the remote rather than from
        the pusher's own output -- "reports it parked" and "actually pushed" are two claims. #>
@@ -1074,6 +1110,88 @@ Write-Output `$t.Type
     Assert-True (Test-Phrase -Text $rU.Out -Phrase 'Base not compared') 'no tracking trunk: says the question could not be asked'
     Assert-True (-not (Test-Phrase -Text $rU.Out -Phrase 'behind origin/main')) 'no tracking trunk: and claims no gap it cannot measure'
     Assert-True (-not (Test-Phrase -Text $rU.Out -Phrase 'Base is current')) 'no tracking trunk: nor a currency it cannot measure either'
+
+    # --- (v) A BRANCH THAT EXISTS ONLY ON ORIGIN IS RESUMED, NOT FORKED (#1139) ----------------------
+    # THE CASE THE REPORT WAS FILED ON, and it is this workflow's own cross-device handoff: #900 pushes
+    # every new branch by default and cycle-autopark keeps it current on origin, so a branch whose only
+    # copy is on the remote is the NORMAL product of the flow rather than an edge case. new-branch asked
+    # refs/heads/<name> alone, read the miss as "create it", and cut a second branch of that name at the
+    # current base.
+    #
+    # WHY THE ASSERT LIST IS SHAPED THE WAY IT IS. Almost nothing on screen could tell the two apart: the
+    # run reads clean because idempotence PROMISES a clean run, and the scaffold written into the fork is
+    # byte-identical to the one on the parked branch because the same script wrote both. What differs is
+    # the branch's WORK -- so the marker file is the assert that could not have passed before, and every
+    # phrase assert below is about the run SAYING which of the three things it did.
+    Write-Host "new-branch.ps1 -- a branch that exists only on origin is resumed, not forked (#1139)" -ForegroundColor Cyan
+    $fixParked  = New-Fixture -Label 'v'
+    $bareParked = New-BareOrigin -Dir $fixParked -Label 'v'
+    Publish-FixtureTrunk -Dir $fixParked
+    # The trunk is left BEHIND on purpose, so the base check has something it would have warned about --
+    # that is what makes the "not warned" assert below mean anything instead of passing on an empty gap.
+    Add-OriginCommits -Bare $bareParked -Label 'v' -Count 3
+    Add-OriginBranch -Bare $bareParked -Label 'v' -Branch 'fix/parked-elsewhere-v1' -MarkerFile 'parked-work.txt'
+
+    # The fixture really is in the reported state: reachable on origin, absent locally. Asserted rather
+    # than assumed -- a helper that quietly failed to push would make every assert below vacuous.
+    Assert-True (Test-BranchOnRemote -Bare $bareParked -Ref 'refs/heads/fix/parked-elsewhere-v1') 'parked branch: it is on origin'
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixParked rev-parse --verify --quiet 'refs/heads/fix/parked-elsewhere-v1' | Out-Null
+        $localMissing = ($LASTEXITCODE -ne 0)
+    } finally { $ErrorActionPreference = $prevEap }
+    Assert-True $localMissing 'parked branch: and this checkout has no local ref for it -- the state the fork happened in'
+
+    $rV = Invoke-NewBranch -Dir $fixParked -Name 'fix/parked-elsewhere-v1' -Title 'Parked elsewhere'
+    Assert-Equal 0 $rV.Code 'parked branch: exit 0'
+    # THE ASSERT THAT MATTERS. The parked work is in the checkout, which is the one thing a fork could
+    # never produce.
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixParked 'parked-work.txt')) 'parked branch: the work parked from the other device is here'
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $upstreamV = ((& git -C $fixParked rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null) | Out-String).Trim()
+    } finally { $ErrorActionPreference = $prevEap }
+    Assert-Equal 'origin/fix/parked-elsewhere-v1' $upstreamV 'parked branch: tracking the remote branch, so the next push continues it rather than colliding'
+    # AND IT SAYS SO. The report rules out a SILENT adoption, not the adoption -- an assignee is a claim
+    # rather than a locked door here, and a script that quietly takes over somebody else's remote branch
+    # makes that claim unreadable. These two asserts are that rule.
+    Assert-True (Test-Phrase -Text $rV.Out -Phrase 'existed ONLY on origin') 'parked branch: names which of the three things it did'
+    Assert-True (Test-Phrase -Text $rV.Out -Phrase 'That is a RESUME, not a new branch') 'parked branch: and says it in the words an operator can act on'
+    # NOT TOLD ABOUT A BASE. The trunk really is 3 behind here, so the pre-#1139 ordering would have
+    # attributed that gap to a branch cut somewhere else entirely.
+    Assert-True (-not (Test-Phrase -Text $rV.Out -Phrase 'behind origin/main')) 'parked branch: not warned about a base it was never cut from'
+    Assert-True (Test-Phrase -Text $rV.Out -Phrase 'Base not compared') 'parked branch: and says why the base was not compared'
+
+    # --- (w) A LOCAL RESUME IS NOT TOLD ITS BASE IS BEHIND EITHER (#1139) ---------------------------
+    # THE SAME FALSEHOOD, ONE CASE OLDER, and it is why the resume question moved in FRONT of the base
+    # check rather than beside it. The gap is HEAD..origin/<trunk> measured before the checkout, so on a
+    # resume it is a reading about whatever the operator happened to be standing on -- the trunk, in the
+    # normal case -- printed with the resumed branch's name attached to it. Nobody can act on that.
+    Write-Host "new-branch.ps1 -- a local resume is not told the trunk's gap is its own (#1139)" -ForegroundColor Cyan
+    $fixResume  = New-Fixture -Label 'w'
+    $bareResume = New-BareOrigin -Dir $fixResume -Label 'w'
+    Publish-FixtureTrunk -Dir $fixResume
+    Add-OriginCommits -Bare $bareResume -Label 'w' -Count 2
+
+    # Run one: a genuine cut, which SHOULD be warned -- the positive control for the assert below.
+    $rW1 = Invoke-NewBranch -Dir $fixResume -Name 'feat/resume-me-v1' -Title 'Resume me'
+    Assert-Equal 0 $rW1.Code 'local resume: the first run (a real cut) exits 0'
+    Assert-True (Test-Phrase -Text $rW1.Out -Phrase '2 behind origin/main') 'local resume: the cut IS warned -- #1046 still holds where a base is being chosen'
+
+    # Back to the trunk, which is where a resume is typed from.
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixResume checkout -q main 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+
+    $rW2 = Invoke-NewBranch -Dir $fixResume -Name 'feat/resume-me-v1' -Title 'Resume me'
+    Assert-Equal 0 $rW2.Code 'local resume: exit 0'
+    Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'already existed -- checked out') 'local resume: reports the resume'
+    Assert-True (-not (Test-Phrase -Text $rW2.Out -Phrase 'behind origin/main')) 'local resume: and is NOT handed the trunk gap under the branch name'
+    Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'Base not compared') 'local resume: says why the base was not compared'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

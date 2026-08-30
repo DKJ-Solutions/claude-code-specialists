@@ -41,11 +41,20 @@ The script:
    branch. A bump is therefore a decision you state by typing `-v2`. The full reasoning, and why this
    is a completion rather than a refusal in the validator, is in
    [`DEVELOPMENT-portable.md`](../../DEVELOPMENT-portable.md#the-version-suffix).
-3. **Measures the base it is about to cut from** and warns if it is behind `origin/<trunk>`, naming the
-   count. It does not refuse and it does not move `HEAD` for you -- see below.
-4. Creates the branch (`git checkout -b`), or checks it out if it already exists -- **idempotent**:
-   running it again on the same branch simply resumes it instead of failing.
-5. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
+3. **Asks whether this is a resume or a cut**, reading *both* ref namespaces -- `refs/heads/<name>` and
+   `refs/remotes/origin/<name>`. That question comes first because the answer decides whether step 4 has
+   a base to talk about at all.
+4. **Measures the base it is about to cut from** and warns if it is behind `origin/<trunk>`, naming the
+   count. It does not refuse and it does not move `HEAD` for you -- see below. Skipped on a resume: the
+   count is `HEAD..origin/<trunk>` and on a resume `HEAD` is whatever you were standing on, so the
+   warning would hand you the trunk's gap under the resumed branch's name.
+5. Creates or resumes the branch -- **idempotent**, in three shapes:
+   - it exists locally -> `git checkout <name>`;
+   - it exists **only on `origin`** -> `git checkout -b <name> --track origin/<name>`, i.e. created **at
+     the remote tip**, carrying the parked work, and the run says in so many words that this is a resume
+     rather than a new branch (issue #1139 -- see below);
+   - neither -> `git checkout -b <name>` from the current base.
+6. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
    document come into existence in a single step. Idempotent: a document that already belongs to this
    branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
    unless it holds uncommitted work, which is kept and reported instead.
@@ -86,6 +95,42 @@ rather than a reading about a trunk it was never cut from. **The local question 
 the remote-tracking ref is read first, which is what keeps the script usable offline and costs nothing in
 a repo that cannot answer. In a lane worktree (detached at `origin/<trunk>`) it reads 0, so the route that
 already handles this hazard is never warned about.
+
+## Resuming a branch that exists only on `origin` (issue #1139)
+
+**A parked branch IS this workflow's cross-device handoff**, which is what makes this more than an
+ordinary local/remote slip. `new-branch` pushes by default so the branch is reachable from another
+device, and the `cycle-autopark` Stop hook keeps it current on `origin` until a PR publishes it -- so the
+flow *actively produces* branches whose only copy is on the remote. Until August 30, 2026 `new-branch`
+asked one ref, `refs/heads/<name>`, and read the miss as *"create it"*: the script documented as
+idempotent, the one you are told to re-run to resume, was the one blind to exactly those branches.
+
+**And neither half of the run looked wrong.** A clean run is what idempotence promises, and the scaffold
+written into the fork is byte-identical to the one already on the parked branch, because the same script
+wrote both -- so even reading `development.md` afterwards shows nothing. What is missing is the branch's
+**work**, and nothing on screen is about work. `worktree-lane.ps1` inherited the whole failure through
+its delegation, with its worktree already detached at `origin/<trunk>`, and reported `Lane open` exactly
+as on a genuine new branch.
+
+Both namespaces are read now, and the run names which of the three things it did:
+
+| what it reads | what it does |
+|---|---|
+| `refs/heads/<name>` exists | `git checkout <name>` -- unchanged |
+| only `refs/remotes/origin/<name>` exists | `git checkout -b <name> --track origin/<name>` -- created **at the remote tip**, with the parked work, reported as a **resume** and not as a new branch |
+| neither | `git checkout -b <name>` from the current base |
+
+**It resumes rather than refusing, and it is loud about it.** Refusing and printing the `git branch
+--track` line would also be honest, but this script is the documented resume tool for a handoff the
+workflow creates on its own, so refusing puts a hand-typed git command on the intended happy path. What
+is ruled out is a *silent* adoption: an assignee is a claim rather than a locked door, and a script that
+quietly takes over somebody else's remote branch makes that claim unreadable. So the run says the name
+was already taken and what to type (`-v2`) if you meant a new branch instead.
+
+**The local question gates the network one here too.** `refs/remotes/origin/<name>` is a remote-*tracking*
+ref, read from disk; nothing is fetched on its account. It is fresh because the base check above has just
+fetched wherever there was an `origin` to fetch from, and where there was not, this reads whatever the
+last fetch left -- so the script stays usable offline.
 
 ## The rest of the chain — the commands, written here because they are readable here
 
