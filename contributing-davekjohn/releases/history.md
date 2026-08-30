@@ -83,6 +83,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.25.0](audience/4.x/4.25.0.md) | 2026-08-30 | Minor | Testrun 3's findings land: four pages that contradicted their own tree, a pasteable settings proposal, and two backslash-aware un-escapes |
 | [4.24.0](audience/4.x/4.24.0.md) | 2026-08-29 | Minor | A fresh repo can walk the adoption path from install to its first release |
 | [4.23.0](audience/4.x/4.23.0.md) | 2026-08-29 | Minor | the first full adoption test run's findings, repaired -- the fresh-repo path and the shipping cycle |
 | [4.22.0](audience/4.x/4.22.0.md) | 2026-08-28 | Minor | Gates that read what merges, notifications that name their sender, and two seams for the Shopify sync |
