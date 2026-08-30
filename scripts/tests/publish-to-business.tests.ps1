@@ -26,8 +26,10 @@
          no filter publishes everything (back-compat), a filter prunes the tree AND rewrites the
          manifest to match, an emptied kind directory goes whole with its README, a keep-list name
          matching nothing is a hard stop (it would otherwise exclude silently), a non-ASCII
-         description survives the manifest rewrite, an undeclared plugin folder is a hard stop, and
-         the list comes from Get-BusinessMarketplacePlugins when -Plugins is not passed.
+         description survives the manifest rewrite, a description holding a '\u'-shaped Windows path
+         round-trips instead of being folded into an invalid escape (#1131), an undeclared plugin
+         folder is a hard stop, and the list comes from Get-BusinessMarketplacePlugins when -Plugins
+         is not passed.
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/publish-to-business.tests.ps1
 
@@ -144,6 +146,13 @@ function New-FilterFixture {
         One description carries an em dash, written as a code point because this file is pure ASCII by
         repo convention. It is the fixture for the encoding regression: the manifest is the one file
         the script reads AND writes, so a wrong decode on the way in becomes permanent on the way out.
+
+        A SECOND description carries a Windows path whose segment begins 'u' + four hex characters
+        (C:\uadded\check.ps1). That is the fixture for the un-escape regression (#1131): the naive
+        '\\u([0-9a-fA-F]{4})' fires on the second backslash of the escaped pair and folds '\uadde' into
+        one character, so the rewritten manifest no longer parses. It is a description here rather than
+        a source because it needs no directory of that name to exercise the same code path -- and a
+        description quoting a path is the likelier of the two shapes anyway.
     #>
     param([string]$Dir)
 
@@ -156,7 +165,7 @@ function New-FilterFixture {
     "owner": { "name": "fixture" },
     "plugins": [
         { "name": "core",  "source": "./plugins/teams/core",      "description": "the core team $emDash always enabled" },
-        { "name": "extra", "source": "./plugins/teams/extra",     "description": "an add-on team" },
+        { "name": "extra", "source": "./plugins/teams/extra",     "description": "an add-on team -- see C:\\uadded\\check.ps1" },
         { "name": "flow",  "source": "./plugins/workflows/flow",  "description": "a way of working" }
     ]
 }
@@ -399,6 +408,29 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     $emDash = [char]0x2014
     Assert-True ($publishedManifest.Contains($emDash)) 'a non-ASCII description survives the manifest rewrite'
     Assert-True (-not $publishedManifest.Contains([char]0x00E2 + [char]0x20AC)) 'and is not double-encoded on the way'
+
+    # 12b. THE UN-ESCAPE REGRESSION (#1131). The rewrite restores 5.1's \uXXXX escapes for the four
+    #      HTML-sensitive characters; the naive expression matched one backslash without asking whether
+    #      it was itself escaped, so an escaped pair followed by 'u' + four hex ('C:\\uadded') had
+    #      '\uadde' folded into one character and the file stopped being JSON.
+    #
+    #      TWO ASSERTS, because neither one is enough on its own. The regression's actual symptom is a
+    #      REFUSAL: Assert-MarketplaceIntegrity parses the rewritten manifest moments later and exits 1,
+    #      so nothing is published and the checkout below still holds the PREVIOUS, unfiltered
+    #      publication -- against which a round-trip assert passes while the defect is present. So the
+    #      run's own output is asserted first, and it is the assert that bites. The round-trip is kept
+    #      beside it because the exit code names nothing about escaping, and because it is what pins the
+    #      path is restored rather than merely left escaped. Parse rather than string-match: an invalid
+    #      escape is a PARSER error, not a visible one.
+    Assert-True ($r.Output -notmatch 'not valid JSON') 'the filtered run does not reject the manifest it just wrote'
+    $reparsed = $null
+    $parsed = $true
+    try { $reparsed = $publishedManifest | ConvertFrom-Json } catch { $parsed = $false }
+    Assert-True $parsed 'the rewritten manifest is still valid JSON'
+    $backslashDesc = if ($parsed) {
+        @($reparsed.plugins | Where-Object { $_.name -eq 'extra' })[0].description
+    } else { '<unparsed>' }
+    Assert-Match $backslashDesc ([regex]::Escape('C:\uadded\check.ps1')) 'a description holding a \u-shaped Windows path round-trips intact'
 
     # 13. a name in the keep-list that matches nothing is a HARD STOP, because the failure it would
     #     otherwise cause is silent: the plugin it meant to keep is simply excluded, and the run

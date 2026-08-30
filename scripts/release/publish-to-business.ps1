@@ -289,15 +289,43 @@ function Write-ManifestJson {
         sequences, so a description reading "Craig (CRO) & Sean" reaches the file as an escape. Valid
         JSON, unreadable in a diff, and a change nobody asked for. Only code points >= 0x20 are
         restored: below that, JSON REQUIRES the escape.
+
+        AND IT COUNTS THE BACKSLASHES IN FRONT OF IT, which the obvious one-liner does not.
+        '\\u([0-9a-fA-F]{4})' matches ONE literal backslash and never asks whether that backslash is
+        itself escaped, so it also fires on the SECOND backslash of an escaped pair: a manifest field
+        holding a Windows path like C:\uadded\check.ps1 -- JSON '"C:\\uadded\\check.ps1"' -- has
+        '\uadde' folded into one character, leaving an invalid escape behind. An EVEN run of
+        backslashes means every one of them is itself escaped, so the 'u' after it is literal text and
+        nothing there is an escape at all; only an ODD run ends in a real '\u'. Same reasoning, and the
+        same repair, as the settings-proposal writer in specialists-init/bootstrap.ps1.
+
+        Measured on 5.1 (issue #1131): any '\' + 'u' + four hex characters triggers it -- \uadded,
+        \ubeef, \ucafe, \uface. The reachable field is a local/path marketplace source, and a
+        description quoting a Windows path reaches it too. What it costs is NOT a corrupt publication:
+        Assert-MarketplaceIntegrity parses the rewritten manifest moments later and hard-stops with
+        "marketplace.json is not valid JSON" -- about a file this script had just written, from a source
+        manifest that was fine. A baffling refusal rather than silent damage, which is why this arrived
+        as a finding and not as an incident.
+
+        THE SAME EXPRESSION, WORD FOR WORD, IS IN specialists-init/bootstrap.ps1, and the two are
+        deliberately separate copies rather than one shared lib. That script ships inside the plugin
+        payload and must run standalone in a consumer's tree -- it dot-sources even check-report-lib.ps1
+        only IF PRESENT, because a missing lib must never stop the script that sets a repo up. The only
+        fallback available for a missing JSON-escape lib is "write the escapes through": a degraded mode
+        with no visible symptom, which is strictly worse than carrying ten lines twice. Change one and
+        change the other.
     #>
     param([string] $Path, $Manifest)
 
     $json = $Manifest | ConvertTo-Json -Depth 20
-    $json = [regex]::Replace($json, '\\u([0-9a-fA-F]{4})', {
+    $json = [regex]::Replace($json, '\\+u[0-9a-fA-F]{4}', {
         param($match)
-        $code = [int]('0x' + $match.Groups[1].Value)
-        if ($code -lt 0x20) { return $match.Value }
-        return [string][char]$code
+        $text = $match.Value
+        $slashes = $text.Substring(0, $text.Length - 5)
+        if ($slashes.Length % 2 -eq 0) { return $text }
+        $code = [int]('0x' + $text.Substring($text.Length - 4))
+        if ($code -lt 0x20) { return $text }
+        return $slashes.Substring(0, $slashes.Length - 1) + [string][char]$code
     })
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
