@@ -438,6 +438,12 @@ function Get-SettingsChainPaths {
        walks this list in order and lets each layer overwrite the previous one ends up with Claude
        Code's precedence (local > project > user) for free.
 
+       RepoOwned marks the layers that live INSIDE $RepoRoot, and it sits here rather than at a call
+       site because this function is the only place that knows which those are. A caller asking "did
+       THIS repo enable it, or did it arrive from the machine?" would otherwise match the labels by
+       hand -- and a label is PROSE, printed in the messages, so it could be reworded without anything
+       noticing that a predicate elsewhere had quietly stopped matching (issue #1138).
+
        -UserHomeOverride is for fixtures. See Get-UserClaudeHome for how the user home resolves. #>
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -448,17 +454,20 @@ function Get-SettingsChainPaths {
     $chain = @()
     if ($userHome) {
         $chain += [pscustomobject]@{
-            Label = 'user ~/.claude/settings.json'
-            Path  = (Join-Path $userHome '.claude\settings.json')
+            Label     = 'user ~/.claude/settings.json'
+            Path      = (Join-Path $userHome '.claude\settings.json')
+            RepoOwned = $false
         }
     }
     $chain += [pscustomobject]@{
-        Label = '.claude/settings.json'
-        Path  = (Join-Path $RepoRoot '.claude\settings.json')
+        Label     = '.claude/settings.json'
+        Path      = (Join-Path $RepoRoot '.claude\settings.json')
+        RepoOwned = $true
     }
     $chain += [pscustomobject]@{
-        Label = '.claude/settings.local.json'
-        Path  = (Join-Path $RepoRoot '.claude\settings.local.json')
+        Label     = '.claude/settings.local.json'
+        Path      = (Join-Path $RepoRoot '.claude\settings.local.json')
+        RepoOwned = $true
     }
     return $chain
 }
@@ -493,6 +502,11 @@ function Get-EnabledPlugins {
                            ORDINALLY (see the sort below -- a culture-dependent order would make this
                            check's output depend on the machine it runs on).
          LayerById      -- hashtable id -> the layer label that DECIDED its value (for messages).
+         RepoEnabledIds -- the subset of Ids whose deciding layer is one of $RepoRoot's OWN settings
+                           files, i.e. the enables THIS REPO makes rather than ones arriving from the
+                           machine. Always a subset of Ids and never larger: a repo layer outranks the
+                           user layer in this chain, so an id enabled in both decides in the repo's
+                           and is counted here. See "WHY RepoEnabledIds EXISTS" below.
          Layers         -- per layer: Label, Path, Exists, Readable, HasKey, TrueCount.
          AnyFileExists  -- did any layer's file exist at all?
          AnyKeyFound    -- did any existing layer carry an 'enabledPlugins' key? A present-but-empty
@@ -518,7 +532,38 @@ function Get-EnabledPlugins {
        from, "so an enable arriving from outside the repo is diagnosable instead of mysterious" -- in the
        one line where the layer is the whole answer. The data was already here (Layers[].HasKey); what was
        missing was a ready-made phrasing, so the fix is a second Summary rather than a filter re-typed at
-       each call site. Same reasoning that put Summary here to begin with. #>
+       each call site. Same reasoning that put Summary here to begin with.
+
+       WHY RepoEnabledIds EXISTS, AND THE MEASUREMENT IT RESTS ON (issue #1138, measured 2026-08-30
+       against Claude Code 2.1.251). check-roster-sync's [RECORD-SHAPE] roll-up counted every enabled id,
+       so a plugin enabled MACHINE-WIDE and never installed here reached the headline a reader meets
+       first -- for a state that repo did not create and cannot fix from inside itself. The obvious gate
+       is to stop counting those, and #1095 had already withdrawn a NEIGHBOURING one: gating on
+       scope == 'user' was disproved by #323, which measured that the demotion writes exactly that scope,
+       so the gate would have restored the silence #314/#315/#323 exist to end.
+       Enable provenance is a different field and the demotion does not touch it, so that objection does
+       not transfer -- but it was UNMEASURED, and one fact decided it: does
+       'claude plugin install --scope project' ALWAYS write the enable into the repo's own settings?
+       Measured in a throwaway CLAUDE_CONFIG_DIR against six shapes, so the live register was never
+       touched. Yes in all six, and the sixth is stronger than a yes:
+         - a bare repo, no settings file           -> writes .claude/settings.json with the enable
+         - already enabled in the USER layer       -> writes it into the repo's file anyway
+         - already enabled in settings.local.json  -> writes it into settings.json anyway
+         - the id present and explicitly 'false'   -> flips it to true, in that same file
+         - a repair re-install after a hand-edit   -> re-writes it, merging beside existing keys
+         - settings.json unparseable               -> THE INSTALL FAILS and NO register record is
+                                                      written. So the settings write is a PRECONDITION
+                                                      of the record, not a side effect of it: there is
+                                                      no state in which a project install record exists
+                                                      while the repo's own settings never carried the
+                                                      enable.
+       WHY THIS READS BOTH REPO LAYERS AND NOT settings.json ALONE, which is what the issue proposed.
+       The install writes settings.json, but a person may afterwards move an enable into
+       settings.local.json -- an ordinary thing to do, since that file is the uncommitted personal layer
+       and Claude Code honours it at HIGHER precedence. Gating on settings.json alone would go silent on
+       a legitimately project-installed plugin whose enable was merely moved one file sideways, which is
+       the exact class of silence this marker exists to end. RepoOwned (Get-SettingsChainPaths) is
+       therefore the predicate, not a label match. #>
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [string]$UserHomeOverride = ''
@@ -526,6 +571,7 @@ function Get-EnabledPlugins {
 
     $decided = @{}          # id -> $true/$false, last layer to speak wins
     $decidedBy = @{}        # id -> layer label
+    $decidedRepo = @{}      # id -> did that deciding layer belong to THIS repo? (issue #1138)
     $layers = @()
     $unreadable = @()
     $consulted = @()
@@ -563,6 +609,7 @@ function Get-EnabledPlugins {
                         foreach ($prop in @($epValue.PSObject.Properties)) {
                             $decided[$prop.Name] = ($prop.Value -eq $true)
                             $decidedBy[$prop.Name] = $layer.Label
+                            $decidedRepo[$prop.Name] = $layer.RepoOwned
                             if ($prop.Value -eq $true) { $trueCount++ }
                         }
                     }
@@ -602,16 +649,17 @@ function Get-EnabledPlugins {
     $keyIn = @($layers | Where-Object { $_.HasKey } | ForEach-Object { $_.Label })
 
     return [pscustomobject]@{
-        Ids           = $ids
-        LayerById     = $decidedBy
-        Layers        = $layers
-        AnyFileExists = @($layers | Where-Object { $_.Exists }).Count -gt 0
-        AnyKeyFound   = $anyKey
-        Unreadable    = $unreadable
-        Consulted     = $consulted
-        Summary       = (Format-LabelList -Labels $consulted -IfEmpty 'no settings file')
-        KeyIn         = $keyIn
-        KeySummary    = (Format-LabelList -Labels $keyIn -IfEmpty 'no settings layer')
+        Ids            = $ids
+        RepoEnabledIds = [string[]]@($ids | Where-Object { $decidedRepo[$_] })
+        LayerById      = $decidedBy
+        Layers         = $layers
+        AnyFileExists  = @($layers | Where-Object { $_.Exists }).Count -gt 0
+        AnyKeyFound    = $anyKey
+        Unreadable     = $unreadable
+        Consulted      = $consulted
+        Summary        = (Format-LabelList -Labels $consulted -IfEmpty 'no settings file')
+        KeyIn          = $keyIn
+        KeySummary     = (Format-LabelList -Labels $keyIn -IfEmpty 'no settings layer')
     }
 }
 

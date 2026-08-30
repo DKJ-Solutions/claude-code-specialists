@@ -111,7 +111,10 @@ function Invoke-Ps {
 # generalising -Records: every existing caller means "one normal project record", and rewriting them all
 # to say so would put the fixture's simplest case at the mercy of a typo in the noisiest one.
 function New-FixtureAdmin {
-    param([hashtable]$Records = @{}, [hashtable]$Scoped = @{}, [string]$Name = 'admin-profile')
+    # -UserSettings: an 'enabledPlugins' block in the profile's OWN ~/.claude/settings.json -- the machine-wide
+    # layer. Combined with a consumer built with -WriteSettings $false it produces the shape issue #1138 is
+    # about: a plugin enabled from outside the repo entirely, which the repo can neither have installed nor fix.
+    param([hashtable]$Records = @{}, [hashtable]$Scoped = @{}, [string]$Name = 'admin-profile', [hashtable]$UserSettings = @{})
     $profileDir = Join-Path $Fixture $Name
     $pluginsDir = Join-Path $profileDir '.claude\plugins'
     if (Test-Path -LiteralPath $profileDir) { Remove-Item -Recurse -Force -LiteralPath $profileDir }
@@ -135,6 +138,11 @@ function New-FixtureAdmin {
     }
     $json = '{ "version": 2, "plugins": { ' + ($blocks -join ', ') + ' } }'
     [System.IO.File]::WriteAllText((Join-Path $pluginsDir 'installed_plugins.json'), $json)
+    if ($UserSettings.Count -gt 0) {
+        $pairs = @($UserSettings.Keys | ForEach-Object { (ConvertTo-Json $_) + ': ' + $(if ($UserSettings[$_]) { 'true' } else { 'false' }) })
+        [System.IO.File]::WriteAllText((Join-Path $profileDir '.claude\settings.json'),
+            '{ "enabledPlugins": { ' + ($pairs -join ', ') + ' } }')
+    }
     return $profileDir
 }
 
@@ -837,7 +845,7 @@ try {
     $adminProfile = New-FixtureAdmin -Scoped @{ $PluginId = @(@{ Scope = 'local'; Path = $c }) } -Name 'admin-local'
     $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
     Assert-Match '\[RECORD-SHAPE\]' $r.Out "local scope: the marker fires"
-    Assert-Match "1 of 1 enabled plugin\(s\) have an install record for this path that differs from the assumed shape" $r.Out 'local scope: the roll-up counts what it stands for'
+    Assert-Match "1 of 1 plugin\(s\) enabled by this repo have an install record for this path that differs from the assumed shape" $r.Out 'local scope: the roll-up counts what it stands for -- and says whose enables it counted (#1138)'
     Assert-Match "none 'project'" $r.Out 'local scope: the detail line names WHY the shape is wrong'
     Assert-Match 'SESSION START' $r.Out 'local scope: and names what produces it, which is the fact a reader cannot look up anywhere else'
     # The discriminator between the two markers. A record for this path exists, so "not installed here" is
@@ -942,6 +950,54 @@ try {
     $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $c, '-CacheRootOverride', $cache) -UserProfile $adminProfile
     Assert-NotMatch '\[RECORD-SHAPE\]' $r.Out 'no scope field: silent -- absence is not a wrong answer'
     Assert-Equal 0 $r.Code 'no scope field: exit 0'
+
+    # --- 11l-2/11l-3. the roll-up counts only what THIS REPO enabled (issue #1138) ------------------
+    #     The reported case: a plugin enabled machine-wide in ~/.claude/settings.json, never installed from
+    #     this root, reaching the headline a reader meets first -- for a state the repo did not create and
+    #     cannot fix from inside itself. The gate rests on a measurement taken against Claude Code 2.1.251
+    #     in a throwaway CLAUDE_CONFIG_DIR (six shapes, all yes; see Get-EnabledPlugins): a project install
+    #     that CANNOT write the enable into the repo's own settings fails outright and leaves no record, so
+    #     a record with no repo-owned enable is not a state the CLI can produce.
+    Write-Host "11l-2. a MACHINE-WIDE enable is not counted -- but still gets its detail line" -ForegroundColor Cyan
+    $cUser = New-FixtureConsumer -RosterIds @('06-16') -SeamLensIds @('06-16') -WriteSettings $false
+    $adminProfile = New-FixtureAdmin -Records @{ $PluginId = '' } -Name 'admin-userwide-enable' -UserSettings @{ $PluginId = $true }
+    # -UserHomeOverride is passed EXPLICITLY here, and it is the point of the case: Invoke-Ps otherwise pins
+    # the user settings layer to a throwaway dir, which is the isolation every other case wants. This case
+    # needs that layer to be the admin profile's own, because a machine-wide enable is what it is about.
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $cUser, '-CacheRootOverride', $cache, '-UserHomeOverride', $adminProfile) -UserProfile $adminProfile
+    # THE ARM STILL FIRES. Suppressing it was never on the table: the detail line is the only place the
+    # remedy lives, and it is what the hook forwards. Only the count and the headline moved.
+    Assert-Match 'no record for this path, only a pathless one' $r.Out 'machine-wide enable: the detail line still fires -- the remedy is not suppressed'
+    Assert-Match 'installed machine-wide on purpose, this line is expected and needs no action' $r.Out 'machine-wide enable: including its no-action branch'
+    # ...and the roll-up above it does not, which is the whole change. Matched on the roll-up's own
+    # sentence rather than on the marker, since the detail line carries that marker too (#324).
+    Assert-NotMatch 'have an install record for this path that differs from the assumed shape' $r.Out 'machine-wide enable: the ROLL-UP is silent -- this repo enabled nothing, so it counts nothing'
+    $shapeLines = @($r.Out -split "`n" | Where-Object { $_ -cmatch '\[RECORD-SHAPE\]' })
+    Assert-Equal 1 $shapeLines.Count 'machine-wide enable: exactly one marked line reaches a session -- the detail, not a headline about it'
+    Assert-Equal 0 $r.Code 'machine-wide enable: exit 0'
+
+    Write-Host "11l-3. a repo-owned enable IS counted, alongside a machine-wide one that is not" -ForegroundColor Cyan
+    #      The discriminator, and the reason 11l-2 alone would not prove the gate: a predicate that simply
+    #      stopped counting everything would pass that case too. Both plugins have the same wrong shape and
+    #      differ only in WHERE their enable comes from, so the numerator, the denominator and the id list
+    #      all have to name exactly one of the two.
+    #      'widgets' is enabled ONLY through the admin profile's own settings.json, so -ExtraEnabledPluginIds
+    #      is deliberately NOT used: that parameter writes into the CONSUMER's settings, which would make it
+    #      repo-enabled and erase the very distinction under test.
+    $mixCache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('06-16') } -Plugin 'team-alpha'
+    $mixCache = New-FixtureCache -VersionAgents @{ '1.11.0' = @('07-07') } -Plugin 'widgets' -KeepExisting
+    $secondId = 'widgets@claude-code-specialists'
+    $cMix = New-FixtureConsumer -RosterIds @('06-16', '07-07') -LensIds @('06-16') `
+        -ExtraLensesByPlugin @{ 'widgets' = @('07-07') }
+    $adminProfile = New-FixtureAdmin -Records @{ $PluginId = ''; $secondId = '' } -Name 'admin-mixed-enable' -UserSettings @{ $secondId = $true }
+    $r = Invoke-Ps -ScriptArgs @('-ConsumerPathOverride', $cMix, '-CacheRootOverride', $mixCache, '-UserHomeOverride', $adminProfile) -UserProfile $adminProfile
+    Assert-Match '1 of 1 plugin\(s\) enabled by this repo have an install record' $r.Out 'mixed: the count AND the denominator are the repo-enabled one, not 2 of 2'
+    Assert-Match "differs from the assumed shape -- exactly one record, scoped 'project' \($([regex]::Escape($PluginId))\)" $r.Out 'mixed: and the roll-up names only that plugin'
+    Assert-NotMatch "scoped 'project' \([^)]*widgets" $r.Out 'mixed: the machine-wide one is absent from the roll-up id list'
+    # Both arms still fire -- two details plus one roll-up.
+    $shapeLines = @($r.Out -split "`n" | Where-Object { $_ -cmatch '\[RECORD-SHAPE\]' })
+    Assert-Equal 3 $shapeLines.Count 'mixed: one roll-up and TWO detail lines -- the arms are ungated'
+    Assert-Equal 0 $r.Code 'mixed: exit 0 -- still non-counting'
 
     # --- 11m-11q. [ROSTER-PENDING]: bootstrapped, nothing filled in yet (inbound #333) --------------
     #     MEASURED ON THE DOCUMENTED HAPPY PATH: the session right after a completely successful
