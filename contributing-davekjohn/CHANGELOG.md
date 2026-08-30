@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/fresh-adoption-note-root-agrees-v1` · 20260830-155244
+
+`adopt-workflow-folder` no longer scaffolds a directory the release cut will not use. It resolves
+`Get-ReleaseNoteRoot` through the seam -- the same treatment the changelog and history roots beside it
+already got -- and **writes the answer into `scripts/repo-config.ps1`** where, and only where, all three
+of these hold: the lib exists, it defines no answer, and no hand-written note sits at the shared
+`releases/notes` fallback. That is the freshly scaffolded repo and nothing else; every other repo is
+reported and left untouched. The `releases/audience/.gitkeep` is gone, its stated premise having turned
+out to be false -- `cut-release.ps1` creates the note's parent directory itself -- and the scaffolded
+pages now name whichever root the seam actually resolves to instead of asserting one flatly.
+
+This is the first `decide` seam any command in this workflow answers on its own, and the three
+conditions are the whole safety argument: `adopt-config` never places one because copying the source's
+answer would assert something about a repo it merely *found*, whereas this run **creates** the folder.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer who adopts the folder and then cuts a release gets their release note inside the folder the
+adoption just built, instead of at `releases/notes/` in the repo root with the history table linking back
+out to reach it -- and without an empty committed directory promising a destination nothing wrote to.
+Reported from a testrun that followed the documented path literally (#1150), where every individual step
+behaved as documented and the two halves of one run still disagreed. Nothing changes for a consumer who
+already answered the seam or already has notes on disk: their answer wins, and nothing is ever moved.
+
+**Score:** 3
+
+#### Pull Request
+
+A fresh adoption's note root and its scaffolded folder now agree
+
+Plugins: contributing-davekjohn
+
+[PR #1153](https://github.com/DaveKJohn/claude-code-specialists/pull/1153)
+
+---
+
 ### DEPLOY: `fix/prune-merged-no-checkout-borrow-v1` · 20260830-152559
 
 `prune-merged` no longer takes the checkout. Step 2 used to `git checkout <trunk>`, `git pull --ff-only`, and
