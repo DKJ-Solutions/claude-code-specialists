@@ -33,23 +33,63 @@
 
 ### PLAN
 
-Issue #1152: 'Both edits belong to this cut' overrides the IF one line above it; a consumer without a pin has one edit. Reword the closing sentence in cut-release.ps1's new-major guardrail, mirror to the plugin, pin it in cut-release-guardrail.tests.ps1.
+Inbound [#1152](https://github.com/DaveKJohn/claude-code-specialists/issues/1152): `cut-release.ps1`'s
+new-major guardrail tells the reader the pin edit is theirs only *IF* this repo pins the targeted major --
+capitalised, deliberately conditional -- and then closes with *"Both edits belong to this cut"*, which
+counts two unconditionally. Reword the closing sentence to inherit the condition, mirror to the plugin,
+and pin it in `cut-release-guardrail.tests.ps1`.
+
+#### Verified before building, not inferred
+
+The sentence stands at `scripts/release/cut-release.ps1:831` (pre-change), and the comment directly above
+it argues for the conditional reading in so many words -- *"a consumer without one reads a sentence that
+does not apply"* -- so the closing sentence contradicts its own stated intent rather than merely reading
+oddly. The lens statement in `.claude/specialists/lenses/05-06-extension.md` that also says "both edits"
+is correct and untouched: it describes THIS repo, which does have the pin.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] The closing sentence carries the section edit unconditionally and the pin conditionally
+- [x] The reasoning above it, beside the paragraph whose intent it was taking back
+- [x] Mirrored to the plugin copy with `scripts/sync/build-shared-scripts.ps1`
 
 ### TEST
 
+- [x] `scripts/tests/cut-release-guardrail.tests.ps1` pins it from both sides -- the count must not come
+      back, and the condition must not be dropped in its place -- and its now-stale block heading and
+      assertion message follow the text: 92 asserts green
+- [x] Built in a lane worktree, so PR [#1154](https://github.com/DaveKJohn/claude-code-specialists/pull/1154)
+      could ship from the primary checkout at the same time
+- [x] The lint gate and every suite run as `open-pr.ps1`'s own gate; nothing is pre-run beside it
+
 ### DEPLOY: `fix/major-advice-inherits-its-condition-v1`
 
-**Score:**
+The new-major guardrail's closing sentence no longer counts an edit a repo may not have. The advice refuses
+a `X.0.0` cut whose history section does not exist yet, prints the heading to add, and then says the pin in
+a test has to be repointed too -- *IF* this repo pins the targeted major, capitalised, because the pin is
+repo-owned. The sentence after it took that back: *"Both edits belong to this cut"* counts two, so a reader
+who had correctly concluded the pin paragraph was not theirs was told one line later to make a second edit,
+and went looking for it. It now reads *"That edit belongs to this cut, and the pin with it if this repo has
+one"*, and two assertions hold it there from both sides -- the count must not return, and the condition must
+not be dropped in its place.
+
+This repo has the pin, so its own maintainers read the sentence that was true. The failure this prevents is
+the one this repo cannot meet: it lands entirely on a consumer, which is why the fix is in the shared script
+rather than in a lens.
+
+**Score:** 1
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer opening their first major meets this refusal at a milestone moment, having just been told the
+step is manual because it is deliberate. Until now the message ended by contradicting its own conditional
+one line earlier, sending a reader with no pin to hunt for a second edit that was never theirs. Measured on
+the documented path in a fresh consumer: after adding the section alone -- one edit, no pin -- the re-run cut
+`v1.0.0` cleanly, so the conditional reading was the correct one and the closing sentence was simply wrong
+for them.
+
+**Score:** 2
 
 #### Pull Request
 
 The new-major advice's closing sentence inherits the pin condition
-
