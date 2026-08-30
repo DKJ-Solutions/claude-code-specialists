@@ -824,12 +824,21 @@ if ($historyContent) {
             # having it. Phrased as a conditional because the pin is repo-owned -- a consumer without one
             # reads a sentence that does not apply, which is strictly better than hitting a red test with no
             # idea it was coming.
+            #
+            # AND THE CLOSING SENTENCE INHERITS THAT CONDITION RATHER THAN OVERRIDING IT (inbound #1152,
+            # August 30, 2026). It read "Both edits belong to this cut", which is true HERE -- a section edit
+            # and a pin edit -- and false in a consumer repo that has no pin, where the sentence before it
+            # said so in capitals. Measured in a fresh consumer (DaveKJohn/ccs-testrun-4, cutting v1.0.0
+            # against v4.26.0): a reader who correctly concluded "that paragraph is not mine" was told one
+            # line later to make two edits, and went looking for the second. The conditional phrasing above
+            # was deliberate for exactly this reader; a closing sentence that counts the edits unconditionally
+            # takes it back, at a milestone moment where the message has just told them to be careful.
             "Add the section first -- directly ABOVE '$targetHeading', at that same heading level:`n`n" +
             "$newHeading`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n" +
             "Then, IF this repo pins the targeted major in a test, repoint that assertion at '$newMajor' and`n" +
             "write down why, next to it -- opening the section is what turns it red, and that is the pin doing`n" +
-            "its job rather than a broken test. Both edits belong to this cut, so they go on the trunk ahead of`n" +
-            "the release commit.`n`n" +
+            "its job rather than a broken test. The section edit belongs to this cut, and the pin with it if`n" +
+            "this repo has one, so each goes on the trunk ahead of the release commit.`n`n" +
             "Then run this again. Opening a new major's section is a deliberate milestone moment, which is why it`n" +
             "is not done for you."
         }

@@ -455,7 +455,7 @@ Assert-True $historyMissing.Success 'found the missing-history warning'
 Assert-True ($historyMissing.Success -and $historyMissing.Value -match '\$historyRelPath') `
     'the missing-history warning names the seam, not the default path'
 
-Write-Host "cut-release.ps1 -- the new-major refusal names BOTH edits a major needs" -ForegroundColor Cyan
+Write-Host "cut-release.ps1 -- the new-major refusal names the section edit, and the pin only conditionally" -ForegroundColor Cyan
 # WHY THIS IS PINNED AT ALL. Opening a new major takes two hand edits, not one: the overview section, and
 # the test that pins which major the overview targets. The refusal used to name only the first, so on
 # August 9, 2026 cutting v4.0.0 meant following advice that read as complete and then hitting a red test
@@ -473,7 +473,17 @@ Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'pins the targe
 # The advice must keep saying WHERE these commits go, because that is the half the safety rules answer:
 # they run on the trunk ahead of the release commit, under the same request that authorised the cut.
 Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'trunk ahead of') `
-    'and that both edits belong to this cut, on the trunk ahead of the release commit'
+    'and that the edit belongs to this cut, on the trunk ahead of the release commit'
+# AND THE CLOSING SENTENCE INHERITS THE PIN CONDITION RATHER THAN OVERRIDING IT (inbound #1152,
+# August 30, 2026). It counted the edits -- "Both edits belong to this cut" -- one line after telling the
+# reader IN CAPITALS that the pin edit is theirs only IF this repo pins the major. True here, where there
+# are two; false in a consumer repo with no pin, where the reader who correctly skipped that paragraph
+# went looking for a second edit that was never theirs. Pinned from both sides: the count must not come
+# back, and the condition must not be dropped in its place.
+Assert-True ($adviceBlock.Success -and $adviceBlock.Value -notmatch 'Both edits') `
+    'the closing sentence does not count two edits for a repo that has one'
+Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'the pin with it if') `
+    'it carries the pin conditionally instead'
 # The milestone sentence is the DECISION not to automate any of this. If it ever disappears, the next
 # reader has a checklist with no reason attached, which is how a deliberate manual step gets "fixed".
 Assert-True ($adviceBlock.Success -and $adviceBlock.Value -match 'deliberate milestone moment') `

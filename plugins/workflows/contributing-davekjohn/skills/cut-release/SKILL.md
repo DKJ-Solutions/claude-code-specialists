@@ -151,7 +151,8 @@ a release for a missing timestamp would be ceremony rather than a guard.
 0. **A MAJOR ONLY — open its section first, and repoint the pin with it.** Skip this for a minor or a
    patch. Cutting `X.0.0` stops before anything is written, because the new row would otherwise be filed
    neatly under the previous major's table and *nothing would error* — the failure this guardrail
-   prevents is silent, not loud. Clearing it takes two edits, made by hand:
+   prevents is silent, not loud. Clearing it takes one edit by hand — and a second if your repo pins
+   the major:
 
    - **the section**: add `#### <X>.x` and its empty table header above the current top section of the
      release overview. The refusal prints the heading to add **at the level your document actually
@@ -160,10 +161,10 @@ a release for a missing timestamp would be ceremony rather than a guard.
      red the moment the section is opened. That is the tripwire working, not a broken test — repoint it
      and write down why, next to the assertion.
 
-   **Neither is done for you, deliberately.** Opening a major is a milestone moment, and the pin is the
-   same fact written a second time so a half-done edit cannot land quietly. Both commits go **directly
+   **Nothing here is done for you, deliberately.** Opening a major is a milestone moment, and a pin is
+   the same fact written a second time so a half-done edit cannot land quietly. Each commit goes **directly
    on the trunk, ahead of the release commit**, covered by the same request that authorised the cut and
-   bounded by it: a major only, those two files only, and only once the cut has been asked for. Outside
+   bounded by it: a major only, the files named above only, and only once the cut has been asked for. Outside
    a cut they are ordinary changes and take the ordinary branch + PR route.
 
 1. **Cut the release.** On a clean main branch:
