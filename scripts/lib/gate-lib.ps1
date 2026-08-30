@@ -472,3 +472,153 @@ function Clear-GateEvidence {
     }
     return $true
 }
+
+function Invoke-WorkflowGates {
+    <#
+        Runs the repo's two gates -- the lint script, then every test suite -- against the working tree,
+        consulting and recording the evidence above so an unchanged tree is not gated twice. Returns
+        $true when both passed (or were skipped) and $false when either failed, having already written
+        the diagnosis; the caller decides what a failure costs and whether to exit.
+
+        WHY IT IS A FUNCTION AT ALL (issue #1156, August 30, 2026). These hundred lines lived inline in
+        open-pr.ps1, which is the ONE documented way to run the gates -- and open-pr refuses on `main`,
+        several hundred lines before it reaches them. So the release-notes commit, made standing on the
+        trunk under the third direct-on-`main` exception, was told to "run the gates exactly as open-pr
+        would have" via a script that will not run there. The repair is -GatesOnly on open-pr, which
+        needs this block reachable before the branch check rather than after it.
+
+        AND THE HAND-ROLLED ALTERNATIVE IS WHY A PROSE ANSWER WAS NOT ENOUGH. The invocation that gets
+        invented in that spot is a fresh process dot-sourcing native-capture-lib and calling
+        Invoke-TestSuiteGate directly. It runs, it goes green, and it is missing two things silently:
+        Get-TestCommands is not in scope, so a consumer whose suites are not all PowerShell has the rest
+        of them skipped without a word (the failure inbound #644 was filed about, and the one this lib's
+        sibling warns ci.yml about by name), and the lint half gets the source repo's script hardcoded
+        instead of the Get-LintScript seam the consumer set. A gate you can only reach by rebuilding it
+        is a gate whose weakest invocation is the one that gets used.
+
+        THE CALLER MUST HAVE DOT-SOURCED TWO MORE THINGS, and this function deliberately does not reach
+        for them itself: scripts\repo-config.ps1 (for Get-LintScript, and for the optional
+        Get-TestCommands that Invoke-TestSuiteGate reads on its own) and native-capture-lib.ps1 (for
+        Invoke-TestSuiteGate). Same contract, and the same reasoning, as Invoke-TestSuiteGate's own --
+        a lib that resolved its caller's repo root would have two answers to that question in one run.
+
+        -ErrorAction Continue ON BOTH FAILURE MESSAGES, and it is not decoration. Every caller of this
+        function runs under $ErrorActionPreference = 'Stop', where Write-Error TERMINATES -- which is
+        harmless in a script that was going to exit 1 on the next line, and a lie in a function that
+        promises a bool. Left terminating, the return value is dead code, the caller's exit never runs, and
+        a test can only observe this function by catching an exception. So the message is emitted
+        non-terminating and the CALLER decides what a red costs.
+
+        THE MESSAGES ARE THE CALLER'S, through -FailureConsequence: what a red costs depends entirely on
+        where in the chain it fired. At the PR nothing is pushed; on a -GatesOnly run nothing else was
+        going to happen anyway. The rest of both sentences is fixed here so the two callers cannot drift
+        into describing the same gate differently.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [switch]$SkipLint,
+        [switch]$SkipTests,
+        # What Invoke-TestSuiteGate calls the thing being gated in its own output ('the PR', 'the gate run').
+        [string]$Context = 'the gate',
+        # What a failure costs at THIS point in the chain, e.g. 'branch not pushed, no PR opened'.
+        [string]$FailureConsequence = 'nothing further ran'
+    )
+
+    # The fingerprint is computed ONCE for both gates -- it hashes HEAD plus every dirty and untracked
+    # file, so asking twice would hash the same tree twice. $null means git could not answer, and every
+    # helper then reports "no evidence", which runs the gates exactly as before.
+    $gateFingerprint = Get-GateFingerprint -RepoRoot $RepoRoot
+
+    # AND HOW MANY TIMES HEAD HAS MOVED, read beside it and asked again after each gate (issue #1145). The
+    # fingerprint above cannot see a checkout that CAME BACK -- a command that switches away and switches
+    # straight back leaves every byte identical -- and a session runs maintenance commands mid-assignment,
+    # which is exactly when a backgrounded ship is sitting inside step 1. The reflog depth is where those
+    # two moves are recorded, and it is per-worktree, so a lane moving its own checkout never registers
+    # here.
+    $gateHeadMoves = Get-GateHeadMoveCount -RepoRoot $RepoRoot
+
+    # AND THE GATES SAY WHEN THEY RAN AGAINST SOMETHING OTHER THAN HEAD (issue #1026). Both gates below
+    # judge the WORKING TREE; a caller that pushes ships HEAD. On a clean tree those are the same thing
+    # and a green result is evidence about what merges. On a dirty one they are not, and nothing said so:
+    # PR #1025's lint run walked a manual with two new rules in it, reported zero errors, and shipped a PR
+    # without them.
+    #
+    # ONE LINE, ABOVE BOTH GATES rather than repeated inside each. It is the same fact about the same tree,
+    # and a warning printed twice is read half as often as one printed once. Said before either gate runs,
+    # so it frames the results that follow instead of trailing them.
+    #
+    # NOT A REFUSAL. A dirty tree mid-flight is ordinary -- open-pr's backing gate is where the one shape
+    # that is genuinely wrong gets stopped. This is here so a green line stops being mistaken for proof.
+    $gateDirtyCount = Get-GateTreeDirtyCount -RepoRoot $RepoRoot
+    if ($null -ne $gateDirtyCount -and $gateDirtyCount -gt 0 -and (-not $SkipLint -or -not $SkipTests)) {
+        Write-Warning "the gates below run against a DIRTY tree - $gateDirtyCount file(s) differ from HEAD, and what lands is HEAD. A green result proves the working copy, not what merges."
+    }
+
+    # Lint gate: catch invalid manifests/frontmatter/dead links before they land on the trunk. The lint
+    # script is repo-specific (via repo-config); errors block. -SkipLint deliberately skips the gate.
+    if (-not $SkipLint) {
+        $lintPath = Join-Path $RepoRoot (Get-LintScript)
+        if (Test-Path $lintPath) {
+            if (Test-GateEvidence -RepoRoot $RepoRoot -Gate 'lint' -Fingerprint $gateFingerprint) {
+                Write-Host "lint gate: already proved against this exact tree -- skipped." -ForegroundColor DarkGray
+            } else {
+                Write-Host "lint gate: integrity check for $Context..." -ForegroundColor Cyan
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
+                if ($LASTEXITCODE -ne 0) {
+                    # A RED IS ONLY A FINDING IF THE TREE HELD STILL FOR IT (issue #1145). Printed before
+                    # the error, so it frames the red rather than trailing it.
+                    $movedNote = Get-GateTreeMovedNote -RepoRoot $RepoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
+                    if ($movedNote) { Write-Warning $movedNote }
+                    Write-Error "lint gate found errors - $FailureConsequence. Fix the errors, or run with -SkipLint to skip the gate." -ErrorAction Continue
+                    return $false
+                }
+                # Recorded only on a real pass. -SkipLint records nothing, deliberately: skipping a gate
+                # proves nothing about the tree, and writing evidence there would make the escape valve
+                # silently suppress the NEXT run's gate too.
+                #
+                # AND ONLY WHEN THE TREE HELD STILL (issue #1145). A pass earned over a tree that moved
+                # mid-run is real for the mixture the gate saw, and that mixture is not the fingerprint it
+                # would be filed under -- so it is reported and not recorded, and the next run gates for real.
+                $movedNote = Get-GateTreeMovedNote -RepoRoot $RepoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves
+                if ($movedNote) {
+                    Write-Warning $movedNote
+                } else {
+                    [void](Save-GateEvidence -RepoRoot $RepoRoot -Gate 'lint' -Fingerprint $gateFingerprint)
+                }
+            }
+        } else {
+            Write-Warning "lint script not found at '$lintPath' - lint gate skipped."
+        }
+    }
+
+    # Test gate: all suites, exactly as CI -- a red suite should already block here, not only at the
+    # PR (a lesson from PR #54). -SkipTests is the deliberate escape valve. A repo whose tests are not
+    # all PowerShell names the rest in the optional Get-TestCommands (repo-config); Invoke-TestSuiteGate
+    # reads it itself, so every call site stays identical (inbound #644).
+    if (-not $SkipTests) {
+        if (Test-GateEvidence -RepoRoot $RepoRoot -Gate 'tests' -Fingerprint $gateFingerprint) {
+            Write-Host "test gate: all suites already proved against this exact tree -- skipped." -ForegroundColor DarkGray
+        } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $RepoRoot 'scripts\tests') -Context $Context)) {
+            # THIS IS THE GATE THE MOVEMENT CHECK WAS MEASURED ON (issue #1145). One suite of 55 went red
+            # inside a backgrounded ship while prune-merged.ps1 held the trunk in the same checkout, and
+            # green standalone on the same commit seconds later. That script no longer takes the checkout
+            # (#1147); the check stays, because a red is expensive to disbelieve on a hunch and expensive to
+            # believe wrongly, and every other tree-mover in this clone is still there.
+            $movedNote = Get-GateTreeMovedNote -RepoRoot $RepoRoot -Gate 'tests' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
+            if ($movedNote) { Write-Warning $movedNote }
+            Write-Error "test gate found failing suites - $FailureConsequence. Fix the tests, or run with -SkipTests to skip the gate." -ErrorAction Continue
+            return $false
+        } else {
+            # Same rule as the lint gate above: recorded only on a real pass, never on -SkipTests -- and
+            # never on a pass whose tree moved underneath it.
+            $movedNote = Get-GateTreeMovedNote -RepoRoot $RepoRoot -Gate 'tests' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves
+            if ($movedNote) {
+                Write-Warning $movedNote
+            } else {
+                [void](Save-GateEvidence -RepoRoot $RepoRoot -Gate 'tests' -Fingerprint $gateFingerprint)
+            }
+        }
+    }
+
+    return $true
+}
