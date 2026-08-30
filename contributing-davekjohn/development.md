@@ -66,7 +66,7 @@ runs are now literally the gates the PR would have run, because they are the sam
       placement is the fix; a block after that check is unreachable from the trunk, which is the defect.
 - [x] The PR path's inline block replaced by one call, so the two routes cannot describe the same tree
       differently.
-- [x] `cut-release` step 4 and the `open-pr` skill page name the command; `CONTRIBUTING.md` Â§4.6 carried
+- [x] `cut-release` step 4 and the `open-pr` skill page name the command; `CONTRIBUTING.md` §4.6 carried
       the same gap (*"the gates still run"*, no route named) and was repaired with it.
 - [x] Plugin mirrors regenerated (`build-shared-scripts.ps1`).
 
@@ -104,7 +104,7 @@ Mechanically, the gate block moved out of `open-pr.ps1` into `Invoke-WorkflowGat
 value is that the two **cannot** reach a different verdict about the same tree. It is not an escape valve: it
 adds a place the gates can run and removes none, `-SkipLint`/`-SkipTests` still mean what they always
 meant, and a green run records gate evidence like any other. `cut-release`'s step 4, the `open-pr` skill
-page and [`CONTRIBUTING.md`](CONTRIBUTING.md) Â§4.6 — which carried the same gap in different words — all
+page and [`CONTRIBUTING.md`](CONTRIBUTING.md) §4.6 — which carried the same gap in different words — all
 name the command now.
 
 **Score:** 3
