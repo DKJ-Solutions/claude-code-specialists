@@ -64,10 +64,26 @@ function New-FixtureConsumer {
         any manifest would do. Issue #998 (August 27, 2026) narrowed it, so the fixture has to say WHAT is
         published, and the two cases are now distinguishable -- which is the whole point.
     #>
-    param([string]$Label, [switch]$AsWorkflowSource, [switch]$AsOtherPluginSource)
+    param(
+        [string]$Label, [switch]$AsWorkflowSource, [switch]$AsOtherPluginSource,
+        # -WithRepoConfig writes the lib the note-root seam is appended to; -NoteRootAnswer puts an answer
+        # in it; -WithFallbackNotes puts a note at the shared 'releases/notes' fallback. Together they are
+        # the three conditions the seam write is gated on (issue #1150), so every branch is reachable here.
+        [switch]$WithRepoConfig, [string]$NoteRootAnswer, [switch]$WithFallbackNotes
+    )
     $root = Join-Path $Fixture "consumer-$Label"
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
     New-Item -ItemType Directory -Path $root -Force | Out-Null
+    if ($WithRepoConfig -or $NoteRootAnswer) {
+        $cfg = "# This repo's own seam answers.`n"
+        if ($NoteRootAnswer) { $cfg += "function Get-ReleaseNoteRoot { '$NoteRootAnswer' }`n" }
+        New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $root 'scripts\repo-config.ps1'), $cfg)
+    }
+    if ($WithFallbackNotes) {
+        New-Item -ItemType Directory -Path (Join-Path $root 'releases\notes\0.x') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $root 'releases\notes\0.x\0.1.0.md'), "# 0.1.0`n")
+    }
     if ($AsWorkflowSource -or $AsOtherPluginSource) {
         $plugin = if ($AsWorkflowSource) { 'contributing-davekjohn' } else { 'some-other-product' }
         $manifest = '{ "name": "fixture", "plugins": [ { "name": "' + $plugin + '", "source": "./x" } ] }'
@@ -106,8 +122,7 @@ function Invoke-Adopt {
 $ExpectedFiles = @(
     'contributing-davekjohn\README.md',
     'contributing-davekjohn\CONTRIBUTING.md',
-    'contributing-davekjohn\releases\README.md',
-    'contributing-davekjohn\releases\audience\.gitkeep'
+    'contributing-davekjohn\releases\README.md'
 )
 
 try {
@@ -138,6 +153,11 @@ try {
     # permanently theirs.
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\development.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\branch'))) '-Apply: and no branch/ directory is placed any more'
+    # NEITHER IS THE AUDIENCE ROOT (issue #1150). It was placed as a .gitkeep on the stated ground that
+    # "the audience root must exist before the first cut writes into it" -- a premise cut-release itself
+    # contradicts: it creates the note's own parent before writing. So the file bought nothing, while what
+    # it did buy was an empty committed directory asserting a destination the unanswered seam did not use.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\releases\audience'))) '-Apply: the audience root is NOT placed -- the first cut creates it'
     # THE FOLDER PAGE MUST NOT CARRY A HISTORY TABLE, and this assert is the regression guard on inbound
     # #786. It did until August 20, 2026: the page was scaffolded with a '## Release history' heading, a
     # table, and a VUL-IN promising that the cut would insert its rows there -- while this same command's
@@ -234,6 +254,68 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-Equal 0 $r6.Code 'no stranded tree: exit 0'
     Assert-Match 'Get-ReleaseChangelogNotesRoot ->' $r6.Flat 'no stranded tree: the resolved roots are still named'
     Assert-True ($r6.Flat -notmatch 'a generated-notes tree is still sitting at') 'no stranded tree: and the warning stays silent'
+
+    # --- 6. The note-root seam: answered for a fresh adoption, never for anybody else (issue #1150) ---
+    # THE CONTRADICTION THIS BLOCK GUARDS. This command scaffolded contributing-davekjohn/releases/audience/
+    # and its own pages said the cut drafts the note there, while Get-ReleaseNoteRoot's shared fallback
+    # writes to releases/notes/ at the repo root. Both statements are produced by the same run, so one
+    # clean adoption plus one clean release left a fresh consumer with an empty committed directory and
+    # their note outside the folder the adoption had just built.
+    #
+    # ALL FOUR BRANCHES ARE ASSERTED, and the three that DECLINE are the half that matters -- the write is
+    # only safe because it is narrow, so a test that covered the write alone would pass while the guard
+    # rotted. Each case also asserts what the SCAFFOLDED PAGE says, because that page naming a destination
+    # the seam does not resolve to is the defect itself rather than a side effect of it.
+    $NoteSentence = 'the cut drafts the hand-written note'
+
+    Write-Host "adopt-workflow-folder -- fresh adoption: the note-root seam is answered" -ForegroundColor Cyan
+    $c7 = New-FixtureConsumer -Label 'seam-fresh' -WithRepoConfig
+    $r7 = Invoke-Adopt -Dir $c7 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r7.Code 'seam fresh: exit 0'
+    $cfg7 = [System.IO.File]::ReadAllText((Join-Path $c7 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
+    Assert-Match 'function Get-ReleaseNoteRoot' $cfg7 'seam fresh: the answer was written into scripts/repo-config.ps1'
+    Assert-Match "'contributing-davekjohn/releases/audience'" $cfg7 'seam fresh: and it points into the folder this run just scaffolded'
+    # THE GENERATED SOURCE IS PARSED, not merely matched. This block writes PowerShell into somebody
+    # else's lib, and the failure mode it already produced once in development is a file that greps
+    # correctly and does not parse -- an array literal splits an unparenthesised 'a' + $x + 'b' into three
+    # elements, so -join wrote the seam's own path across three lines as an unterminated string. A regex
+    # assert passes on that; every later run of every shared script does not.
+    $perr = $null
+    [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $c7 'scripts\repo-config.ps1'), [ref]$null, [ref]$perr) | Out-Null
+    Assert-Equal 0 @($perr).Count 'seam fresh: the lib it wrote into still parses as PowerShell'
+    $con7 = [System.IO.File]::ReadAllText((Join-Path $c7 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match ('`releases/audience/` is where\s+' + $NoteSentence) $con7 'seam fresh: and the scaffolded page names that same destination'
+
+    Write-Host "adopt-workflow-folder -- notes already at the fallback: the seam is left alone" -ForegroundColor Cyan
+    $c8 = New-FixtureConsumer -Label 'seam-hasnotes' -WithRepoConfig -WithFallbackNotes
+    $r8 = Invoke-Adopt -Dir $c8 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r8.Code 'seam has-notes: exit 0 -- declining is never a refusal'
+    $cfg8 = [System.IO.File]::ReadAllText((Join-Path $c8 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
+    Assert-True ($cfg8 -notmatch 'Get-ReleaseNoteRoot') 'seam has-notes: NOTHING was written into their lib'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c8 'releases\notes\0.x\0.1.0.md')) 'seam has-notes: and their existing note was not touched'
+    Assert-Match 'left UNANSWERED' $r8.Flat 'seam has-notes: the run says out loud that it declined'
+    $con8 = [System.IO.File]::ReadAllText((Join-Path $c8 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match ('`releases/notes/` at your repo root is where\s+' + $NoteSentence) $con8 'seam has-notes: and the page names where their notes ACTUALLY go'
+
+    Write-Host "adopt-workflow-folder -- an answer already given always wins" -ForegroundColor Cyan
+    $c9 = New-FixtureConsumer -Label 'seam-answered' -NoteRootAnswer 'my/own/notes'
+    $r9 = Invoke-Adopt -Dir $c9 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r9.Code 'seam answered: exit 0'
+    $cfg9 = [System.IO.File]::ReadAllText((Join-Path $c9 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
+    Assert-Equal 1 ([regex]::Matches($cfg9, 'function Get-ReleaseNoteRoot').Count) 'seam answered: their function was not duplicated or overwritten'
+    Assert-Match 'already answered here' $r9.Flat 'seam answered: the run reports it as left alone'
+    $con9 = [System.IO.File]::ReadAllText((Join-Path $c9 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match ('`my/own/notes/` at your repo root is where\s+' + $NoteSentence) $con9 'seam answered: and the page names THEIR answer, not the source''s'
+
+    # NO LIB TO WRITE INTO. specialists-init owns that file's existence, exactly as adopt-config says when
+    # it stops -- so this run scaffolds the folder and reports the seam instead of half-creating a lib.
+    Write-Host "adopt-workflow-folder -- no repo-config.ps1: the folder still lands, the seam is reported" -ForegroundColor Cyan
+    $c10 = New-FixtureConsumer -Label 'seam-noconfig'
+    $r10 = Invoke-Adopt -Dir $c10 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r10.Code 'seam no-config: exit 0'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c10 'scripts\repo-config.ps1'))) 'seam no-config: no lib was conjured up'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c10 'contributing-davekjohn\README.md')) 'seam no-config: the folder was scaffolded anyway'
+    Assert-Match 'has no scripts/repo-config\.ps1' $r10.Flat 'seam no-config: and the run says why the seam is unanswered'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

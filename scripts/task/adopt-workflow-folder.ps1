@@ -16,8 +16,18 @@
                                  this folder -- one page since #886, not two
           releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is a
                                  second file beside it, not this one; see the closing advice)
-          releases/audience/     where the cut drafts the hand-written note (kept by .gitkeep until then)
+          (releases/audience/ is NOT placed -- the first cut creates it when it writes the note there)
           (development.md is NOT placed -- it lives only while a branch is open)
+
+    AND IT ANSWERS ONE SEAM, FOR A FRESH ADOPTION ONLY (issue #1150). Get-ReleaseNoteRoot's shared
+    fallback is 'releases/notes' at the repo root, and it deliberately does not move -- a repo that
+    answers nothing must keep meaning what it meant yesterday. That argument is about a consumer who
+    ALREADY has notes on disk, and it does not reach a repo this command scaffolded a minute ago: there
+    the scaffolded docs named one destination while the cut wrote to another, so one clean adoption plus
+    one clean release left the note outside the folder the adoption had just built. So where -- and ONLY
+    where -- this repo defines no answer AND has no note of its own at that fallback, the run writes the
+    answer into scripts/repo-config.ps1 rather than printing it as an instruction. Any repo with notes
+    already at the fallback keeps them and is told what to do instead; nothing is ever moved.
 
     AND ONE FILE OUTSIDE IT (inbound #789):
 
@@ -131,6 +141,43 @@ Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $historyRelPat
 $changelogRel = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
 Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel -SeamName 'Get-ChangelogPath'
 
+# WHERE THE HAND-WRITTEN RELEASE NOTE WILL LAND (issue #1150), resolved here for the same reason the two
+# seams above are: the pages below name this path, and naming a destination the cut does not use sends
+# their reader to a directory nothing will ever write. Get-ReleaseNoteRoot was the one root that escaped
+# that rule -- the docs asserted 'releases/audience/' flatly while the fallback wrote to the repo root.
+#
+# THIS IS THE ONE SEAM THIS COMMAND ANSWERS, and the narrowness is the whole safety argument. adopt-config
+# never places a 'decide' record, because copying the source's answer would assert something about a repo
+# it merely found. That reasoning does not hold here: this run CREATES the folder, so for a repo with no
+# answer and no notes it is not describing a tree, it is making one. Three conditions, all required --
+# repo-config.ps1 exists to append to, the seam is unanswered, and no note sits at the fallback -- so the
+# only repo that gets an answer written is the one that cannot have anything to lose by it.
+$noteRootFallback  = 'releases/notes'
+$workflowFolder    = Get-WorkflowFolderName -RepoRoot $repoRoot
+$noteRootIsolated  = "$workflowFolder/releases/audience"
+$noteRootAnswered  = [bool](Get-Command -Name 'Get-ReleaseNoteRoot' -ErrorAction SilentlyContinue)
+# A DIRECTORY IS NOT A NOTE, and the difference is measurable rather than pedantic: cut-release created a
+# stray releases/notes/<X>.x/ at every cut for a fortnight while writing the note elsewhere (see its own
+# comment at the note write). Git tracks no empty directory, so such a tree appears in no commit and would
+# read here as "this repo has notes" if existence were the test. Markdown files are the test.
+$noteRootHasNotes  = $false
+$fallbackAbs = Join-Path $repoRoot ($noteRootFallback -replace '/', '\')
+if (Test-Path -LiteralPath $fallbackAbs -PathType Container) {
+    $noteRootHasNotes = [bool](@(Get-ChildItem -LiteralPath $fallbackAbs -Filter '*.md' -File -Recurse -ErrorAction SilentlyContinue) | Select-Object -First 1)
+}
+$repoConfigExists  = Test-Path -LiteralPath $repoConfig -PathType Leaf
+$writeNoteRootSeam = (-not $noteRootAnswered) -and (-not $noteRootHasNotes) -and $repoConfigExists
+$noteRootRelPath   = if ($noteRootAnswered) { Get-ReleaseNoteRoot }
+                     elseif ($writeNoteRootSeam) { $noteRootIsolated }
+                     else { $noteRootFallback }
+# How the folder README names it: folder-relative while it is inside the folder, and repo-root-relative
+# with the fact said out loud while it is not -- a reader of that page is standing in the folder.
+$noteRootDisplay = if ($noteRootRelPath -eq $workflowFolder -or $noteRootRelPath.StartsWith("$workflowFolder/")) {
+    '`' + $noteRootRelPath.Substring([Math]::Min($workflowFolder.Length + 1, $noteRootRelPath.Length)) + '/`'
+} else {
+    '`' + $noteRootRelPath + '/` at your repo root'
+}
+
 # --- What the folder contains ---------------------------------------------------------------------
 # One list, each entry a repo-relative path plus the content it gets WHEN ABSENT. The docs name their
 # portable halves in code rather than linking them, the same choice DEVELOPMENT-portable.md explains: the
@@ -153,7 +200,10 @@ $folderReadme = @(
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
     '| `development.md` | the branch''s own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog |',
     '| [`CHANGELOG.md`](CHANGELOG.md) | this folder''s own pending-changes list, isolated from any changelog you already keep at your repo root |',
-    '| [`releases/`](releases/) | this repo''s release answers, the release LIST and the published audience notes |',
+    # The third item is conditional for the same reason the sentence further down is (issue #1150): the
+    # hand-written notes are only in this folder where the note-root seam points into it, and claiming
+    # them here regardless is how a scaffolded page ends up describing a tree the repo does not have.
+    ('| [`releases/`](releases/) | this repo''s release answers, the release LIST' + $(if ($noteRootRelPath.StartsWith("$workflowFolder/")) { ' and the published audience notes' } else { ' (the hand-written notes are at `' + $noteRootRelPath + '/`, outside this folder)' }) + ' |'),
     '',
     'Scaffolded by the `adopt-workflow-folder` skill; strictly additive, so everything here past the',
     'VUL-IN markers is this repo''s own writing.'
@@ -205,8 +255,9 @@ $folderContributing = @(
     ('  That list is the separate `' + $historyRelPath + '`, where the cut inserts one row per release --'),
     '  a history that stays with the repo that cut it, and the one document here that nothing scaffolds:',
     '  see this command''s closing advice for what it has to contain before your first cut. A row added by',
-    '  hand to `releases/README.md` is a row the cut will never see. `releases/audience/` is where the cut',
-    '  drafts the hand-written note; `releases/changelog/`, `releases/github/` and `releases/internal/`',
+    ('  hand to `releases/README.md` is a row the cut will never see. ' + $noteRootDisplay + ' is where'),
+    '  the cut drafts the hand-written note -- it appears at the first cut that writes one, since git',
+    '  tracks no empty directory; `releases/changelog/`, `releases/github/` and `releases/internal/`',
     '  hold the generated documents.',
     '',
     '## Specific to this repo',
@@ -341,10 +392,16 @@ $targets = @(
     @{ Rel = 'contributing-davekjohn/README.md';           Content = (($folderReadme -join $nl) + $nl) },
     @{ Rel = 'contributing-davekjohn/CONTRIBUTING.md';     Content = (($folderContributing -join $nl) + $nl) },
     @{ Rel = 'contributing-davekjohn/releases/README.md';  Content = (($releasesReadme -join $nl) + $nl) },
-    @{ Rel = $changelogRel;                            Content = (($changelogIntro -join $nl) + $nl) },
-    # git tracks no empty directory, and the audience root must exist before the first cut writes into
-    # it -- the same reason this repo's own releases tree once carried an invisible empty folder.
-    @{ Rel = 'contributing-davekjohn/releases/audience/.gitkeep'; Content = '' }
+    @{ Rel = $changelogRel;                            Content = (($changelogIntro -join $nl) + $nl) }
+    # NO releases/audience/.gitkeep ANY MORE (issue #1150). It was placed on the stated ground that "the
+    # audience root must exist before the first cut writes into it", and that premise is false: the cut
+    # creates the note's own parent directory before writing it (cut-release.ps1, at the note write --
+    # added there in August 2026 precisely because Write-Utf8NoBom is a bare WriteAllText and makes no
+    # directories). So the file bought nothing the cut needed, and what it did buy was the contradiction
+    # this issue reported -- an empty committed directory asserting a destination the unanswered seam did
+    # not use. The seam answer above replaces it: the destination is now stated where the cut reads it
+    # rather than implied by a placeholder, and the directory appears when there is a note to put in it.
+    #
     # NO development.md, AND THAT IS THE ADOPTION'S HALF OF THE LIFETIME RULE (Dave, August 23, 2026).
     # This placed the document in its reset state so a consumer's first look at the folder was also their
     # reference for what a branch gets. The document is branch-lifetime now -- new-branch creates it, the
@@ -382,6 +439,55 @@ foreach ($t in $targets) {
     }
 }
 
+# --- The one seam this run may answer (issue #1150) ------------------------------------------------
+# APPENDED, NEVER MERGED, and never over a function that is already there -- the same two rules
+# adopt-config places a record under, for the same reason: the file belongs to this repo, and an
+# inserter hunting for "the right place" in it would be rewriting somebody else's file on a guess.
+#
+# EVERY BRANCH BELOW PRINTS, including the ones that write nothing. A run that silently declined to
+# answer the seam is indistinguishable from one that never considered it, and the difference is the
+# whole subject of this issue -- the reader has to be able to tell "your notes stay where they are"
+# from "nobody thought about your notes".
+$noteRootSeamAnswer = @(
+    '',
+    # EVERY CONCATENATED ELEMENT IS PARENTHESISED, and it is load-bearing rather than style: inside an
+    # array literal PowerShell binds the comma tighter than the '+', so an unwrapped 'a' + $x + 'b' becomes
+    # THREE elements and -join $nl then writes them as three lines. This block generates PowerShell source,
+    # so that mistake does not fail here -- it ships a repo-config.ps1 with an unterminated string in it.
+    ('# --- Answered by adopt-workflow-folder.ps1 when it scaffolded ' + $workflowFolder + '/ ---'),
+    'function Get-ReleaseNoteRoot {',
+    '    <#',
+    '        Where the hand-written release note is written and read back from.',
+    '',
+    ('        Written by adopt-workflow-folder.ps1 rather than left to the shared ''' + $noteRootFallback + ''' fallback,'),
+    '        because at the moment that folder was scaffolded this repo defined no answer AND had no note',
+    '        of its own at that fallback -- so there was nothing here for this answer to move, and leaving',
+    '        it unanswered would have put the notes outside the folder the adoption had just built.',
+    '',
+    '        This is this repo''s file now. Edit it freely; nothing overwrites a function already here.',
+    '    #>',
+    ('    ''' + $noteRootIsolated + ''''),
+    '}'
+)
+
+if ($writeNoteRootSeam) {
+    if ($Apply) {
+        $existingConfig = [System.IO.File]::ReadAllText($repoConfig)
+        $appendix = (($noteRootSeamAnswer -join $nl) + $nl)
+        if (-not $existingConfig.EndsWith("`n")) { $appendix = $nl + $appendix }
+        [System.IO.File]::WriteAllText($repoConfig, $existingConfig + $appendix, $Utf8NoBom)
+        Write-Host "  [answered] Get-ReleaseNoteRoot -> '$noteRootIsolated' in scripts/repo-config.ps1" -ForegroundColor Green
+    } else {
+        Write-Host "  [answer]   Get-ReleaseNoteRoot -> '$noteRootIsolated' in scripts/repo-config.ps1" -ForegroundColor Green
+    }
+} elseif ($noteRootAnswered) {
+    Write-Host "  [seam]     Get-ReleaseNoteRoot is already answered here ('$noteRootRelPath') -- left as it is" -ForegroundColor DarkGray
+} elseif ($noteRootHasNotes) {
+    Write-Host "  [seam]     Get-ReleaseNoteRoot left UNANSWERED -- you already have notes at $noteRootFallback/" -ForegroundColor Yellow
+} else {
+    Write-Host '  [seam]     Get-ReleaseNoteRoot left unanswered -- this repo has no scripts/repo-config.ps1' -ForegroundColor Yellow
+}
+
 Write-Host ''
 if ($Apply) {
     Write-Host "Done: $created file(s) created, $kept left as they were." -ForegroundColor Green
@@ -390,10 +496,11 @@ if ($Apply) {
 }
 
 # --- What only this repo can answer, said out loud rather than left to be discovered ---------------
-# One 'decide' seam points the release machinery at the folder; without it the cut keeps writing hand-
-# written notes to the shared default at the repo root, which is a working state but not the one this
-# folder is for. And one 'copy' seam has a stale copy in every repo that adopted before the folder
-# existed.
+# One 'decide' seam points the release machinery at the folder. Since issue #1150 this run ANSWERS it
+# where it safely can -- see the seam block above for the three conditions -- so what is printed below
+# is a report of what happened to it rather than an instruction in every case. Where it was left
+# unanswered the cut keeps writing hand-written notes to the shared default at the repo root, which is a
+# working state but not the one this folder is for.
 
 # RE-ADOPTION MIGRATION NOTE (issue #885): the one transition this run cannot do for you, because it
 # is prose in somebody else's file. Same shape as this repo's own releases/README.md migration advice
@@ -407,14 +514,30 @@ if (Test-Path -LiteralPath (Join-Path $repoRoot 'CHANGELOG.md') -PathType Leaf) 
 }
 
 Write-Host ''
-Write-Host 'Next, in scripts/repo-config.ps1 (a ''decide'' seam -- see adopt-config):' -ForegroundColor Cyan
-Write-Host "  Get-ReleaseNoteRoot     -> 'contributing-davekjohn/releases/audience'"
-Write-Host ''
-Write-Host 'DELIBERATELY NOT IN THAT LIST: its own contract record explains why the shared DEFAULT stays' -ForegroundColor DarkGray
-Write-Host '''releases/notes'' rather than moving with the folder -- a repo that answers nothing must keep' -ForegroundColor DarkGray
-Write-Host 'meaning what it meant yesterday, and only the repo can say whether its notes already live' -ForegroundColor DarkGray
-Write-Host 'somewhere else. The line above is how THIS run isolates a fresh adoption: written explicitly,' -ForegroundColor DarkGray
-Write-Host 'once, rather than by a default that would move under an existing consumer''s feet.' -ForegroundColor DarkGray
+if ($writeNoteRootSeam) {
+    $verb = if ($Apply) { 'is now' } else { 'will be' }
+    Write-Host "Get-ReleaseNoteRoot $verb answered here: $noteRootIsolated." -ForegroundColor Cyan
+    Write-Host 'WRITTEN RATHER THAN PRINTED AS AN INSTRUCTION (issue #1150), and only because this repo had' -ForegroundColor DarkGray
+    Write-Host 'no answer and no note at the shared fallback. Its contract record explains why the shared' -ForegroundColor DarkGray
+    Write-Host 'DEFAULT still stays ''releases/notes'' -- a repo that answers nothing must keep meaning what it' -ForegroundColor DarkGray
+    Write-Host 'meant yesterday -- and that argument is about a repo with notes already on disk, which this' -ForegroundColor DarkGray
+    Write-Host 'one is not. Repoint it if you would rather keep your notes somewhere else; nothing here is' -ForegroundColor DarkGray
+    Write-Host 'rewritten by a later run.' -ForegroundColor DarkGray
+} elseif ($noteRootAnswered) {
+    Write-Host "Get-ReleaseNoteRoot was already answered here ($noteRootRelPath) and was left alone." -ForegroundColor Cyan
+    Write-Host 'Your answer always wins over this command''s, exactly as adopt-config never overwrites one.' -ForegroundColor DarkGray
+} else {
+    Write-Host "Get-ReleaseNoteRoot is UNANSWERED, so your cut writes hand-written notes to $noteRootFallback/" -ForegroundColor Yellow
+    Write-Host 'at your repo root -- outside the folder this command just scaffolded. That is a working state,' -ForegroundColor Yellow
+    Write-Host 'not the one this folder is for. To move it, in scripts/repo-config.ps1:' -ForegroundColor Yellow
+    Write-Host "  Get-ReleaseNoteRoot     -> '$noteRootIsolated'"
+    if ($noteRootHasNotes) {
+        Write-Host ''
+        Write-Host "  AND MOVE THE NOTES YOU ALREADY HAVE. This run refused to answer the seam for you because" -ForegroundColor Yellow
+        Write-Host "  $noteRootFallback/ holds at least one note: repointing the seam without moving them makes the" -ForegroundColor Yellow
+        Write-Host "  cut report 'no release note was found', which reads as a repo that has never cut one."
+    }
+}
 Write-Host ''
 Write-Host "Get-ReleaseHistoryPath IS ALREADY ISOLATED BY DEFAULT NOW (issue #885): $historyRelPath." -ForegroundColor Cyan
 Write-Host 'RE-ADOPTING AN EXISTING CONSUMER, READ THIS: your next cut starts a NEW list here, beside' -ForegroundColor Yellow

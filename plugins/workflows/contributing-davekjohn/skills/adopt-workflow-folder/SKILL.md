@@ -17,7 +17,7 @@ contributing-davekjohn/
   README.md              what this folder is, and where each page's portable half lives
   CONTRIBUTING.md        this repo's answers to CONTRIBUTING-portable.md
   releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not here)
-  releases/audience/     where the cut drafts the hand-written note (a .gitkeep until then)
+  (releases/audience/ is NOT placed -- your first cut creates it when it writes the note there)
   (development.md is NOT placed -- it lives only while a branch is open)
 ```
 
@@ -98,7 +98,7 @@ would rather own the bump.
 merge is a branch-protection setting, which is a repo decision rather than something a scaffolder should
 reach into.
 
-## After the scaffold: one seam to answer, and one to leave alone
+## After the scaffold: the note-root seam, which this run usually answers for you
 
 The release machinery finds the folder through a `decide` seam in your `scripts/repo-config.ps1`
 (the `adopt-config` skill explains the marker):
@@ -106,6 +106,32 @@ The release machinery finds the folder through a `decide` seam in your `scripts/
 ```powershell
 Get-ReleaseNoteRoot     -> 'contributing-davekjohn/releases/audience'
 ```
+
+**Since [#1150](https://github.com/DaveKJohn/claude-code-specialists/issues/1150) the run writes that
+line itself where it safely can, instead of printing it as an instruction** -- and only where all three
+of these hold: your `scripts/repo-config.ps1` exists, it defines no answer of its own, and you have no
+hand-written note at the shared `releases/notes` fallback. That is the fresh adoption and nothing else.
+Whatever the run decides, it says which branch it took and why, so a seam left unanswered is never
+silent.
+
+**Why it is written rather than suggested.** The seam's default deliberately does not move with this
+folder -- *a repo that answers nothing must keep meaning what it meant yesterday* -- and that argument is
+about a consumer with notes **already on disk**. It does not reach a repo this command scaffolded a
+minute ago. Measured in a fresh consumer following the documented path literally: one clean adoption plus
+one clean release produced an empty committed `releases/audience/` and a release note at
+`releases/notes/0.x/0.1.0.md`, outside the folder the adoption had just built, with the history table
+linking back out of the folder to reach it. Every individual step behaved as documented; the two halves
+of one run simply disagreed.
+
+**Nothing is ever moved, and your own answer always wins.** A repo with notes at the fallback keeps them
+and is told what repointing would cost -- the cut reports *"no release note was found"* against an empty
+new root, which reads as a repo that has never cut one. A repo that already defines the function is left
+exactly as it is, the same rule `adopt-config` follows.
+
+**This is the one `decide` seam any command in this workflow answers for you**, and the narrowness is
+the whole argument: `adopt-config` never places a `decide` record, because copying the source's answer
+would assert something about a repo it merely *found*. This run **creates** the folder, so for a repo
+with no answer and no notes it is not describing a tree -- it is making one.
 
 **`Get-ReleaseHistoryPath` is isolated by default now too** (issue #885, group E, reversing the
 August 19, 2026 answer below). That answer kept the list at the repo root on a durability argument:
@@ -117,9 +143,11 @@ the folder is now the safer place for the list, not the riskier one. So a fresh 
 treatment `Get-ChangelogPath` already gets. **A repo that adopted before August 25, 2026 keeps its
 existing list at the root**: the computed default only isolates a *consumer*, and re-adopting an
 existing one starts a *second* list here rather than moving the first one under it silently -- repoint
-the seam back to your root file if you would rather keep one list. `Get-ReleaseNoteRoot` still needs its
-own explicit seam line below, for the separate reason its own contract record gives: it already has real
-consumers relying on its literal fallback, which the three roots and the history path never had.
+the seam back to your root file if you would rather keep one list. `Get-ReleaseNoteRoot` is isolated a
+**different** way, for the separate reason its own contract record gives: it already has real consumers
+relying on its literal fallback, which the three roots and the history path never had. So its *default*
+still stays where it is, and the isolation happens by this run writing the answer into your lib -- an
+explicit line in a file you own, rather than a default moving under an existing consumer's feet.
 
 **So the page this command scaffolds at `contributing-davekjohn/releases/README.md` carries no history
 table**, and until August 20, 2026 it did -- a `## Release history` heading, a table, and a `VUL-IN`
