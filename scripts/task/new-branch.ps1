@@ -41,7 +41,19 @@
     run, because everything this script prints in between buries the first copy. It still creates the
     branch: refusing matches the lane and stays open as a follow-up, but this file reaches consumers by
     plugin update rather than by choice. A repo with no origin/<trunk> ref is not asked and not warned,
-    which is what keeps the script usable offline.
+    which is what keeps the script usable offline. It is measured only where a base is actually being
+    CHOSEN -- see the resume rule below, which settles that question first.
+
+    IT RESUMES A BRANCH THAT EXISTS ONLY ON ORIGIN (issue #1139, August 30, 2026). "Already exists" used
+    to mean refs/heads/<name> and nothing else, so on a machine that had not fetched a parked branch into
+    a local ref the answer was no and `git checkout -b` forked a second branch of that name at the current
+    base -- carrying none of the parked work, printing the same clean run, writing a byte-identical
+    scaffold. That is this workflow's own cross-device handoff (#900 pushes by default, cycle-autopark
+    keeps it current), so the script documented as idempotent was the one blind to it; worktree-lane.ps1
+    inherited it whole through its step-4 delegation. Both namespaces are now read, BEFORE anything is
+    said about a base: local -> check out; origin only -> create AT THE REMOTE TIP with tracking, and say
+    in so many words that this is a resume of parked work rather than a new branch. The remote-tracking
+    ref is read from disk and never fetched for on its own account, so this stays usable offline.
 
 .PARAMETER Name
     The branch name, form <prefix>/<short-name> (e.g. feat/new-plugin).
@@ -280,9 +292,10 @@ if ($Name -notmatch '-v\d+$') {
 # route that already handles this hazard is never warned about.
 $staleBaseNote = ''
 $trackedTrunk  = "refs/remotes/origin/$trunk"
-# Through Invoke-NativeCapture rather than the hand-written EAP dance the branch-exists check below still
-# uses: that dance is exactly what this lib centralizes, and the lib is loaded by the time we get here.
+# Through Invoke-NativeCapture rather than a hand-written EAP dance: that dance is exactly what this lib
+# centralizes, and the lib is loaded by the time we get here.
 $tracked = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', $trackedTrunk) -DiscardStderr
+$fresh   = $false
 if ($tracked.ExitCode -ne 0) {
     Write-Host "Base not compared: this repo has no $trackedTrunk (no origin, or never fetched)." -ForegroundColor DarkGray
 } else {
@@ -291,9 +304,65 @@ if ($tracked.ExitCode -ne 0) {
     # the fetch failed and that the gap may be larger, which is everything a reader can act on.
     $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', 'origin', '--quiet') -DiscardStderr
     $fresh = ($fetch.ExitCode -eq 0)
-    $rev   = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-list', '--count', "HEAD..origin/$trunk") -DiscardStderr
+}
+
+# --- RESUME OR CUT? ASKED BEFORE ANYTHING IS SAID ABOUT A BASE (issue #1139) -----------------------
+#
+# THE BUG THIS ANSWERS. Until August 30, 2026 this script asked ONE ref -- refs/heads/$Name -- and read
+# "no" as "create it". refs/heads/ is the LOCAL namespace, so on a machine that had not yet fetched a
+# parked branch into a local ref the answer was no, and `git checkout -b` cut a second, unrelated branch
+# of the same name at the current base. The parked branch's commits were not in it.
+#
+# WHY THAT IS WORSE HERE THAN AN ORDINARY LOCAL/REMOTE SLIP. The parked branch IS this workflow's
+# cross-device handoff: since #900 this script pushes by default so the branch is reachable from another
+# device, and the cycle-autopark Stop hook keeps it current on origin until a PR publishes it. So the
+# workflow actively produces branches whose only copy is on the remote -- and the script documented as
+# idempotent, the one you are told to re-run to resume, was the one that could not see them.
+#
+# AND NEITHER HALF OF THE RUN LOOKED WRONG. A clean run is what "idempotent" promises, and the scaffold
+# written into the fork is BYTE-IDENTICAL to the one already on the parked branch, because the same
+# script wrote both. What is missing is the branch's WORK, and there is nothing on screen about work.
+# worktree-lane.ps1 inherited the whole failure: its step 4 delegates here with the lane as -RepoRoot,
+# and its step 3 has already added that worktree DETACHED AT origin/<trunk> -- so the fork was based on
+# the trunk and the lane reported 'Lane open' exactly as on a genuine new branch.
+#
+# IT RESUMES AT THE REMOTE TIP AND SAYS SO LOUDLY, rather than refusing and printing the git command.
+# Both are honest and the report left the choice open; resuming is what wins here because this script is
+# the documented resume tool for a handoff the workflow creates on its own, so a refusal would put a
+# hand-typed `git branch --track` on the intended happy path. What the report actually rules out is a
+# SILENT adoption -- an assignee is a claim rather than a locked door in this repo, and a script that
+# quietly adopts somebody else's remote branch makes that claim unreadable. Naming it is what keeps it
+# readable, so the lines below say which of the three things happened and what to type if the operator
+# meant a new branch instead.
+#
+# THE LOCAL QUESTION GATES THE NETWORK ONE, exactly as the base check above does: refs/remotes/origin/
+# $Name is a remote-TRACKING ref, read from disk and never fetched for on its own account. It is fresh
+# here because the base check has just fetched wherever there was an origin to fetch from; where there
+# was not, this reads whatever the last fetch left and the script stays usable offline.
+$localRef  = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', "refs/heads/$Name") -DiscardStderr
+$remoteRef = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', "refs/remotes/origin/$Name") -DiscardStderr
+$branchExists   = ($localRef.ExitCode -eq 0)
+$branchOnOrigin = ((-not $branchExists) -and ($remoteRef.ExitCode -eq 0))
+$resuming       = ($branchExists -or $branchOnOrigin)
+
+# --- HOW FAR BEHIND IS THE BASE? MEASURED ONLY WHEN THERE IS A BASE TO CHOOSE ----------------------
+#
+# SPLIT FROM THE FETCH ABOVE, AND THE ORDER IS THE POINT. The question this block answers is "what is
+# the branch I am about to CUT missing", and it is unanswerable -- worse, it is false -- for a branch
+# that already exists: the count is HEAD..origin/<trunk>, and on a resume HEAD is whatever the operator
+# happened to be standing on, usually the trunk. Attributing the trunk's gap to a branch that was cut
+# somewhere else entirely is a sentence nobody can act on. So the resume question is settled first and
+# this block is skipped when the answer is yes.
+#
+# HEAD..origin/<trunk> RATHER THAN A TRUNK-VS-ORIGIN COMPARISON, deliberately: it answers "what is my base
+# missing", which is the question, and it stays correct when HEAD is NOT the trunk -- a branch deliberately
+# stacked on another branch gets the gap it actually carries instead of a reading about a trunk it was
+# never cut from. In a lane worktree (detached at origin/<trunk> by worktree-lane) it reads 0, so the
+# route that already handles this hazard is never warned about.
+if ($tracked.ExitCode -eq 0 -and -not $resuming) {
+    $rev     = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-list', '--count', "HEAD..origin/$trunk") -DiscardStderr
     $revText = (($rev.Output | Out-String).Trim())
-    $behind = 0
+    $behind  = 0
     if ($rev.ExitCode -eq 0 -and $revText -match '^\d+$') { $behind = [int]$revText }
     if ($behind -gt 0) {
         $against = if ($fresh) { "origin/$trunk" } else { "the origin/$trunk this repo last fetched (git fetch failed -- the real gap may be larger)" }
@@ -306,6 +375,11 @@ if ($tracked.ExitCode -ne 0) {
     } elseif ($fresh) {
         Write-Host "Base is current with origin/$trunk." -ForegroundColor DarkGray
     }
+} elseif ($resuming -and $tracked.ExitCode -eq 0) {
+    # GATED ON THE TRUNK REF AS WELL, so this cannot print a SECOND 'Base not compared' underneath the one
+    # the missing-origin branch above already wrote. Both sentences would be true and neither would be
+    # wrong; two of them in a row just read as a script that has lost track of what it is answering.
+    Write-Host "Base not compared: '$Name' already exists, so nothing is being cut from a base." -ForegroundColor DarkGray
 }
 
 # Note: Test-BranchName above only catches the explicitly named hard rejects (empty/'main'/
@@ -315,27 +389,22 @@ if ($tracked.ExitCode -ne 0) {
 # checkout mechanism (e.g. to `git branch` + a separate `checkout`, or to libgit2), check whether
 # that implicit gate does not silently disappear.
 #
-# Idempotent: if the branch already exists locally, just check it out; otherwise create it.
+# Idempotent, in three shapes: the branch exists locally -> check it out; it exists only on origin ->
+# create it AT THE REMOTE TIP with tracking, which is what a resume means; neither -> create it here.
 # Deliberately `git -C $repoRoot` instead of Set-Location -- this script stays composable and does
 # not mutate the caller's cwd. git sometimes writes progress/errors to stderr; under
 # ErrorActionPreference=Stop, PS 5.1 would promote that to a terminating error before the graceful
 # $LASTEXITCODE handling (the #107 pitfall, see also open-pr.ps1) -- so run under Continue, capture
-# output, and only then judge.
-$prevEap = $ErrorActionPreference
-try {
-    $ErrorActionPreference = 'Continue'
-    $null = & git -C $repoRoot rev-parse --verify --quiet "refs/heads/$Name" 2>&1
-    $existsCode = $LASTEXITCODE
-} finally {
-    $ErrorActionPreference = $prevEap
-}
-$branchExists = ($existsCode -eq 0)
-
+# output, and only then judge. The checkout keeps that hand-written dance rather than moving to
+# Invoke-NativeCapture like the reads above: its stderr is git's own progress text, which is PRINTED
+# rather than judged, and discarding or swallowing it is what the lib is for.
 $prevEap = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'
     if ($branchExists) {
         $checkoutOutput = & git -C $repoRoot checkout $Name 2>&1
+    } elseif ($branchOnOrigin) {
+        $checkoutOutput = & git -C $repoRoot checkout -b $Name --track "origin/$Name" 2>&1
     } else {
         $checkoutOutput = & git -C $repoRoot checkout -b $Name 2>&1
     }
@@ -350,6 +419,11 @@ if ($checkoutCode -ne 0) {
 }
 if ($branchExists) {
     Write-Host "Branch '$Name' already existed -- checked out." -ForegroundColor Yellow
+} elseif ($branchOnOrigin) {
+    Write-Host "Branch '$Name' existed ONLY on origin -- resumed at the remote tip, tracking origin/$Name." -ForegroundColor Yellow
+    Write-Host "  That is a RESUME, not a new branch: it carries work parked from another device or session," -ForegroundColor Yellow
+    Write-Host "  and nothing was cut from this checkout's base. If you meant a NEW branch, this name is taken --" -ForegroundColor Yellow
+    Write-Host "  bump the version suffix ('-v2') and run again." -ForegroundColor Yellow
 } else {
     Write-Host "Branch '$Name' created and checked out." -ForegroundColor Green
 }

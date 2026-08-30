@@ -31,3 +31,43 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `fix/new-branch-remote-resume-v1` · 20260830-135427
+
+`new-branch` now resolves *resume or cut* by reading **both** ref namespaces before it acts, so a branch
+that exists only on `origin` is resumed at the remote tip with tracking instead of being forked at the
+current base. That branch is this workflow's own cross-device handoff -- `new-branch` pushes by default
+and `cycle-autopark` keeps it current on the remote -- so the script documented as idempotent, the one you
+are told to re-run to resume, was the one that could not see the branches the flow produces. Nothing on
+screen said so: the run reads clean because idempotence promises a clean run, and the scaffold written
+into the fork is byte-identical to the one on the parked branch because the same script wrote both. What
+was missing was the branch's work. `worktree-lane.ps1` inherited the whole failure through its
+delegation and reported `Lane open` as on a genuine new branch.
+
+The run now names which of the three things it did, and says the name is taken and to type `-v2` if a new
+branch was meant -- a resume is adopted, never adopted silently. In the same movement the #1046 base
+warning moved behind that question: its count is `HEAD..origin/<trunk>` measured before the checkout, so
+on a resume it was handing over the trunk's gap under the resumed branch's name. A cut is still warned,
+with the count, twice.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+`new-branch.ps1` is mirrored into every consumer's plugin cache, and the parked branch is their
+cross-device handoff too -- so this is the fix arriving where the failure was silent and the work simply
+was not there. The skill page that told them the script is idempotent now states all three shapes it
+actually has.
+
+**Score:** 3
+
+#### Pull Request
+
+new-branch resumes a branch that exists only on origin
+
+Plugins: contributing-davekjohn
+
+[PR #1141](https://github.com/DaveKJohn/claude-code-specialists/pull/1141)
+
+---
+
