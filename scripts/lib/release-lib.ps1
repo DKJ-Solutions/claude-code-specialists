@@ -300,9 +300,28 @@ function Test-ReleaseBumpEarned {
         $result.Reason = "a $BumpType is what somebody outside this repo's own developers gets something out of, and everything pending is tier 0 ($tier0 entry/entries). Cut a patch, or raise the tier of the entry that a colleague or a consumer does notice."
         return $result
     }
+    # AND THE REFUSAL NAMES THE SEAM, NOT ONLY THE NUMBER (inbound #1151, August 30, 2026). It answered
+    # two of a reader's three questions well -- the threshold, and how many minors this line has had --
+    # and left the third with two routes, of which the legitimate one was absent. "Cut the minor instead"
+    # is right where the bump was simply wrong; -SkipTierGate is the bypass, named in full by cut-release.ps1,
+    # which prints this Reason inside its own refusal. Get-ReleaseMajorMinMinors appeared in neither, so the
+    # repo this threshold was NOT measured for -- the one the seam exists to serve, whose own blueprint record
+    # says "a repo that cuts minors rarely sets this lower" -- met a hard refusal with no configuration-shaped
+    # answer on offer and the bypass as the nearest thing to one. That is the worse of the two outcomes: it
+    # overrules a content judgement that was correct, where answering the seam produces a correct release.
+    #
+    # MEASURED IN A FRESH CONSUMER (DaveKJohn/ccs-testrun-4, at v0.1.0 against v4.26.0), not argued. The seam
+    # is discoverable in CONTRIBUTING-portable.md, the cut-release skill page and the contract registry --
+    # and a person meeting a refusal reads the refusal. This is the one class of refusal in this workflow
+    # whose remedy is a configuration value rather than an act on the branch, which is why it is the one
+    # that has to carry the seam's name in the message itself.
+    #
+    # AND THE CLAUSE ITSELF STAYS FLAT. Its first draft nested two --...-- asides inside the sentence and
+    # closed on "to the number that is", which asks a reader meeting a hard refusal to hold a clause from
+    # several words back. The tier-0 refusal directly above stays flat, and so does this one now.
     if ($BumpType -eq 'major' -and $minorsSoFar -lt $MinMinorsForMajor) {
         $result.Earned = $false
-        $result.Reason = "a major recaps the minors before it, and this major line has had $minorsSoFar of them (v$CurrentVersion) -- $MinMinorsForMajor is the threshold. Cut the minor this work earns instead."
+        $result.Reason = "a major recaps the minors before it, and this major line has had $minorsSoFar of them (v$CurrentVersion) -- $MinMinorsForMajor is the threshold. Cut the minor this work earns instead, or, if this repo cuts minors rarely, set Get-ReleaseMajorMinMinors in scripts/repo-config.ps1 to its own cadence."
         return $result
     }
     return $result
