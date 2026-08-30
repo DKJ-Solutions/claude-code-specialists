@@ -1,6 +1,6 @@
 # The contribution cycle — the portable half
 
-This is the cycle the `contributing-davekjohn` scripts run: a branch, its `contributing-davekjohn/development.md`, a Pull
+This is the cycle the `contributing-davekjohn` scripts run: an issue, a branch, its `contributing-davekjohn/development.md`, a Pull
 Request that has to get past its gates, a merge, and a fold. **It is written to be read in any repo that
 enables this plugin**, which is why it names the *seam* wherever a repo owns the answer, rather than stating
 one repo's answer as the rule.
@@ -20,8 +20,10 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/new-branch.ps1" 
 
 Each step below names the **skill** that owns the full detail for its script, and those skills are the
 single source for their own flags and behaviour — this page is the connective tissue between them, not a
-second description of each one. A repo that keeps a local copy of any of these scripts has taken on a
-second source; [`scripts/README.md`](scripts/README.md) says why that is the one thing to avoid.
+second description of each one. **Step 1 names none, and is the only step that does not**: no script runs
+it, which is exactly why it was the step this page went without. A repo that keeps a local copy of any of
+these scripts has taken on a second source; [`scripts/README.md`](scripts/README.md) says why that is the
+one thing to avoid.
 
 **One commit in your repo's history did not come through this cycle, and could not have.** The commit
 that *adopted* this workflow lands directly on the trunk — the seam, the lenses, the script scaffolds
@@ -38,7 +40,54 @@ belongs on a branch (inbound
 
 ## The cycle
 
-### 1. Branch — and its two files come along in the same move
+### 1. New issue or task — where the work comes from
+
+**Nothing runs this step but a person.** Everything else in the cycle has a script behind it; this one
+happens when somebody — a colleague, or an agent that has just found something — decides a thing is worth
+writing down. It is a step because step 2 opens a branch and a branch needs a thing to be *for*: a request
+that only ever existed in a conversation is one that gets built twice, or half.
+
+**Two kinds, and they are kinds rather than sub-steps.** Work reaches a repo running this workflow two
+ways, and the two fail differently. Neither precedes the other, so neither is numbered. **Both end in the
+same place: one issue in the repo the branch will be opened in**, which is what step 2 branches on.
+
+**Human — somebody else's tracker asks.** In a repo that does not choose its own work, the request arrives
+from Asana, Jira, Linear or a shared inbox, written as a desired outcome rather than an instruction. The
+issue in your repo is not a copy of that ticket: it is the layer between the request and the code, and its
+job is to answer *do we know enough?* before a branch exists. **A request with open questions is not
+built** — that is what keeps the discovery in front of the branch instead of halfway inside it. The rules
+for the whole layer are [**Ticket work**](#ticket-work--the-layer-before-the-branch) below. **A repo where
+nothing arrives that way says so and moves on**; that is an answer rather than a gap.
+
+**Claude — a finding becomes an issue, not a question at the end of the turn.** Something real that is
+outside the assignment — a bug, a doc gone stale, a measurement that contradicts what a page claims, a
+decision that is not yours to make — is filed, and then the assignment is finished. Whoever asked for the
+work has to be able to close the session and clear its context without first answering everything found
+along the way, so the close-out names the numbers rather than the findings. **Filing needs no permission,
+and asking for it is the same failure as not filing**: *"shall I open an issue for this?"* leaves the
+finding in the reply for them to answer, which is precisely what filing prevents. **The question to answer
+first is not *may I* but *does it still stand*** — read the code, the script or the output that would have
+to be true for it to hold, and where it collapses say so plainly instead of filing a weakened version. The
+rest of the bar is short: search the tracker so you add to the existing thread rather than open its
+duplicate, one subject per issue, and say what you **measured** and what you only **inferred**.
+
+**Those rules are stated here and owned elsewhere.** They are an orchestrator's, and they ship with the
+`team-alpha` plugin — which this workflow does not depend on, so a repo can run this cycle with none of
+them in context. Where this section and that persona body disagree, the body is the source and this is the
+bug. They are written out anyway because a contributor reading this page has no guarantee of having that
+plugin, and **a route with a step that is only legible to an agent is not a route**.
+
+**Claim an issue before working it**, and read the claim as well as write it — an issue already carrying an
+assignee is somebody's. The tracker is the only thing two sessions share: neither sees the other's branch,
+so an unassigned issue is indistinguishable from an untouched one, which is how the same repair gets built
+twice and discovered at the merge.
+
+**Whether your issue labels line up with your branch prefixes is decided here rather than at step 2.** An
+issue whose label already names the prefix its branch will get reads as work; one that does not is
+classified twice. Your prefixes are your own (step 2) and your labels are your tracker's — **nothing in
+this plugin reads either**, so that alignment is a convention you keep rather than one a gate holds you to.
+
+### 2. Branch — and its two files come along in the same move
 
 [`skills/new-branch/SKILL.md`](skills/new-branch/SKILL.md) · `new-branch.ps1`
 
@@ -113,17 +162,17 @@ so it is never translated.
 **The guidance is in the document** — an HTML comment over every field, saying what a good answer looks
 like. The fold strips comments on the way to your changelog, so leaving one standing is not a defect.
 
-### 2. Work, and keep the plan current
+### 3. Work, and keep the plan current
 
 Write the entry's description as you go, and resolve every step in the step list before the PR: `- [x]`
-done, or `- [~]` dropped with the reason kept on the line. **Steps 3 and 4 both refuse while anything is
+done, or `- [~]` dropped with the reason kept on the line. **Steps 4 and 5 both refuse while anything is
 still `- [ ]`, and there is deliberately no `-Force` for it** — the dropped mark already is the way past a
 step that turned out not to be needed, so nobody is ever pushed into ticking a box for work they did not
 do.
 
 A branch with **no** step list at all is not refused: that is the one-commit typo fix.
 
-### 3. Open the PR
+### 4. Open the PR
 
 [`skills/open-pr/SKILL.md`](skills/open-pr/SKILL.md) · `open-pr.ps1`
 
@@ -173,7 +222,7 @@ the [`open-pr` skill](skills/open-pr/SKILL.md) is the full account of each:
   or tier reason still empty once the guidance comments are stripped. `-Force` is the escape valve here,
   deliberately separate from `-SkipLint`/`-SkipTests`, because it overrules a judgement about content
   rather than skipping a tool;
-- **the step-list gate** — any step still `- [ ]`, as in step 2 above. No `-Force`. It runs a second time at
+- **the step-list gate** — any step still `- [ ]`, as in step 3 above. No `-Force`. It runs a second time at
   the merge, and there it judges the branch's own commit rather than the checkout, because the merge may be
   minutes of CI away from the moment you started it — the [`ship-pr` skill](skills/ship-pr/SKILL.md) has the
   two measurements behind that;
@@ -191,7 +240,7 @@ what the alternative costs — both wrote a gate in shell, and both refused a me
 significance score, which is a refusal this workflow deliberately places at the **release cut** instead.
 The shipped gate reports the significance and merges anyway.
 
-### 4. Merge
+### 5. Merge
 
 [`skills/ship-pr/SKILL.md`](skills/ship-pr/SKILL.md) · `ship-pr.ps1` — open, wait for CI, merge and fold in
 one motion, using the merge method your `Get-PrMergeMethod` names.
@@ -200,7 +249,7 @@ one motion, using the merge method your `Get-PrMergeMethod` names.
 session open for it buys a second look at a result the local gate already gave. Measured in the source repo
 on August 27, 2026: `lint-en-tests` at **11m48s** against the same suites locally at **292s**, and over 65
 blocking runs a median CI leg of **8m 01s** — 9h 45m a week at 73 merged PRs. **One condition comes with it:**
-step 5 checks out the trunk in the tree the script was started from, so the session's next move is either a
+step 6 checks out the trunk in the tree the script was started from, so the session's next move is either a
 lane ([`skills/worktree-lane/SKILL.md`](skills/worktree-lane/SKILL.md)) or nothing at all. Both halves, and
 the two larger shapes that were declined, are in the
 [`ship-pr` skill](skills/ship-pr/SKILL.md#the-wait-runs-in-the-background-and-that-is-the-default).
@@ -211,7 +260,7 @@ a governance decision rather than a configuration value. Write it in your own `C
 `CLAUDE.md` and link it from there; a contributor who has to guess will guess from whichever repo they last
 worked in.
 
-### 5. Fold
+### 6. Fold
 
 [`skills/fold-changelog/SKILL.md`](skills/fold-changelog/SKILL.md) · `fold-changelog-entry.ps1`
 
@@ -232,6 +281,225 @@ they no longer decide is this document's order.
 Where your repo has a plugin tier — declared by `Get-ReleasePluginTier` — the fold also derives a
 `Plugins:` line from the PR's files, which the release documents read. A repo with no plugins never sees
 that line.
+
+---
+
+## Ticket work — the layer before the branch
+
+This is the `Human` half of step 1, in the repos that do not choose their own work: a request arrives from
+somebody else's tracker, written as a desired outcome rather than an instruction, and somebody has to
+decide whether it can be built at all before a branch is worth creating. **Skip this section if nothing
+reaches your repo that way** — nothing else in the cycle depends on it.
+
+**These are rules, not a format.** Every one of them exists because it was got wrong first, and the
+reasoning is the part worth having — a copied checklist would lose exactly the half that makes each rule
+survive contact with a request that does not fit it. Nothing below prescribes a filename, a folder, a
+language, or a set of section headings. Those are yours, and
+[What your repo answers](#what-your-repo-answers) says which.
+
+### Where this comes from, stated rather than discovered in review
+
+**One repo, one day.** The workflow below was built in `BWJ-ecommerce/smartwatchbanden` on
+2026-08-11, over five rounds against six real tickets, and donated upward on Dave's decision. There is no
+second consumer with a ticket folder today, so this arrived **without the duplication that normally earns a
+promotion** — the usual test for moving something into the shared core is that it exists in two places, and
+this existed in one. That was weighed and overruled deliberately.
+
+**What follows from that, for you.** Two things. First, the rules carrying explicit decisions — 2, 4 and 6
+below — are the ones to keep even where they are inconvenient; they are what the five rounds were spent on.
+Second, **the vocabulary has not met a second tracker**, so treat every name in this section as an example of a
+role rather than a term to adopt. If a rule reads as obviously wrong for your tracker, the rule is the thing
+to re-measure — file it back as an inbound issue rather than working around it silently.
+
+---
+
+### The one structural rule: where the provenance boundary is
+
+A ticket file mixes two kinds of statement, and they age completely differently:
+
+- **copied from the tracker** — the request, its priority, its deadline, who filed it. True on the day it
+  was copied and slowly false afterwards, because the tracker keeps moving and the file does not.
+- **our own** — what we worked out, what we measured, what we decided, what we are doing next. Written once
+  and still true later.
+
+**So the file states, once, the date the copied half was last checked against the tracker.** One date for
+the whole block, not one per field — a per-field date invites nobody to update any of them. Everything above
+that line is a snapshot; everything below it does not rot.
+
+This is the rule that makes the rest safe, and it is the one most likely to be skipped as bookkeeping.
+Measured in the originating repo before it existed: **30 undated copies of tracker state across six files**,
+with no way to tell which were current and no gate on any of them.
+
+Beyond that boundary, a ticket file needs to answer four things in some order — what we know, whether we
+know enough, what happens next, and what has happened so far. The rules below are about how each of those is
+answered. How you name them is your business.
+
+---
+
+### The rules
+
+#### 1. The decision is a section, not a mood
+
+"Do we know enough to build this?" is answered **in one word, with the reason underneath** — and what hangs
+below it follows from that answer. A reader who needs only the decision is done after one section, and does
+not have to infer it from the length of the notes.
+
+The reason is not optional. A one-word answer with no reason is the thing a later reader cannot check, in
+exactly the way an unexplained score is.
+
+#### 2. The test is *can we build what they ask* — not *is it a good idea*
+
+Two different questions, and only the first is ours to answer before starting. Conflating them is what turns
+a buildable request into a blocked one: the request is perfectly clear, we are simply unconvinced, and
+"unconvinced" gets written down in the place reserved for "unclear".
+
+**Measured: three of six tickets flipped from blocked to buildable** on this rule alone, one of them after
+seven weeks of sitting still.
+
+An explicit decision, and the one to keep when it feels wrong.
+
+#### 3. Six kinds of question are not gaps
+
+A gap is something whose absence stops us. These six get mistaken for gaps and are not — each learned the
+hard way:
+
+| not a gap | why |
+|---|---|
+| **verification** | needed to *prove* the fix afterwards, not to know what to do now |
+| **an offer of ours** | widening a request that was already complete — ours to propose, not theirs to answer |
+| **a caveat** | belongs with the notices (rule 4) and never needs an answer at all |
+| **our own unfamiliarity** | a name or tool *we* do not recognise is something to ask internally |
+| **work that is ours** | nobody supplies what we are paid to produce |
+| **anything measurable on the product itself** | see rule 5 |
+
+Two of those have sharp edges worth stating. **Unfamiliarity**: a "who is X" question was nearly sent out
+about a colleague the requester works with daily — which reads as though we have not been paying attention,
+and costs more than looking it up. **Work that is ours** has a real border rather than a bright line:
+translating a *label* is ours, supplying *content* is theirs. A UI string in five languages is never a
+question; a page of copy in five languages is.
+
+#### 4. A gap and a notice look identical and do the opposite
+
+*I cannot continue* and *I can continue, and you should know this* are the same shape on the page and
+opposite in effect. Mixed into one list, every caveat reads as a blocker and buildable work sits still.
+Keep them apart, structurally.
+
+**And the attitude inside a notice is mandated: we build what is asked.** Whether the request is wise is not
+our call — we state the risk and stop. That means *"flagging X; say the word and I build it as described"*
+and specifically **not** *"can you explain how that relates?"*, which hands the burden back and converts a
+notice into a blocker while sounding more collaborative.
+
+An explicit decision.
+
+#### 5. Measure the product before writing down a gap — and measure more than one instance
+
+If the request is about something a user can see, **look at it first**. Most questions about observable
+behaviour are answerable in less time than it takes to write the question, and a question sent out is at
+minimum a day of latency and at worst a ticket that stops for weeks.
+
+**Measured: two gaps that had blocked a ticket since 24 June** — which text block, and whether it contains
+headings — were both answered with `curl` and `grep` in the time it took to ask.
+
+**The sub-lesson is the expensive half.** The first measurement there was *wrong*, because it keyed on a
+class that happened to exist on the one page checked (an artefact of content pasted out of Word). One
+instance is an anecdote: **measure the structure, not what the first example happens to contain.** A
+confident wrong measurement is worse than an open question, because nobody re-checks it.
+
+#### 6. At a *yes*, the questions leave the reply entirely
+
+If we know enough, we need nothing, so we **ask nothing**. The reply carries notices and nothing else.
+
+Where a choice is genuinely still open, **make it, state the default, and say it is reversible** — *"the
+same section appears on product pages; I am including those unless you say otherwise"*. A question in a
+message reads as a request to wait even when it is not meant that way, and the requester cannot tell the
+difference between "blocked on you" and "just checking".
+
+An explicit decision.
+
+#### 7. The heading never carries a status
+
+A heading like *"the reply that was sent"* is written when the reply is **finished** — which is precisely
+the moment nobody has sent it yet. So it is false on creation, and because it reads as done, nobody comes
+back past it. **All six files in the originating repo were wrong this way on day one.**
+
+State lives in a **field with a closed vocabulary**, not in prose and not in a heading. Closed is the
+operative word: if a value needs a qualifying clause appended to cover the later stages, the vocabulary has
+too few words in it, and the qualifier is where the lying starts.
+
+Your stages are yours. The originating repo runs eight, from *draft* through *question sent* and *answer
+received* to *buildable*, *building*, *delivered* and *closed*.
+
+#### 8. One list, with the answer under the gap it unblocks
+
+Gaps and the questions in the outgoing message are the same things said twice, and two lists of the same
+thing diverge. Measured: **31 items against 29**, together **66% of all words in the folder**, already out
+of step in a way no gate could catch.
+
+Keep **one** list. Each gap points at the question that carries it, or says why it has none. The message
+keeps its own numbering, because it is a message to a person and has to read like one.
+
+**And an incoming answer lands under the gap it answers**, with its date and author. This is the rule that
+pays off longest: in a tracker, the answer arrives in the same feed as the question and both scroll away,
+so the file is the only place the pair stays together.
+
+#### 9. The log is append-only, newest first, and holds references rather than descriptions
+
+What was decided, what was rejected and why, when a question went out — and once built, a **reference**:
+the PR it was built in, the version it shipped in. Never a fourth description of a change that the changelog
+and the release documents already carry (see
+[step 6](#6-fold) for the three that exist already).
+
+**A log cannot rot dishonestly**, which is the structural argument for having one: a log with no recent
+entries correctly says nothing has happened. That is exactly where a status field lies.
+
+#### 10. The index carries only what you need to pick a file
+
+Two things: what state each ticket is in, and whose move it is. Nothing else.
+
+Anything else copied into an index is a third copy of something that already has a home, and it drifts from
+the file below it. Measured: priority and "waiting on" were both copied up, and both drifted.
+
+---
+
+### What your repo answers
+
+Nothing in this section is configurable through a seam, because none of it is read by a script. It is a set of
+rules a person applies, so adopting it means writing your own answers next to it — the same split the rest
+of this plugin uses:
+
+| yours to decide | notes |
+|---|---|
+| **which tracker, and where the boundary is** | the whole page assumes the request originates somewhere you do not control |
+| **the folder, and the file naming** | including where research material sits relative to the tickets |
+| **the language of the form** | section names, field names, the state vocabulary — one answer per repo |
+| **the language of the outgoing message** | not one answer per repo; see below |
+| **every section and field name** | the roles above are the rule; the names are not |
+| **the state vocabulary** | rule 7 requires it to be *closed*, not to be these eight values |
+| **whether there is an index at all** | rule 10 applies if you have one |
+
+**The language is two questions, and only the first has one answer per repo.** The **form** — the section
+names, the field names, the state vocabulary — is workflow rather than subject matter, so a repo picks a
+language once and is done; the argument for picking English is that a colleague who does not read your prose
+can still open a file and recognise its structure without translating every heading first. These pages are
+English because the plugin is — the plugin's answer to its own version of the question, not yours. The
+**outgoing message** — the reply of rules 6 and 8 — is the opposite: it is verbatim what a person receives,
+so its language is a property of **whoever filed the ticket**, and it can differ from one file to the next.
+The instruction is therefore *look up who filed it before you write*, not *write in language X*.
+
+**Measured in the originating repo, 2026-08-12.** It had answered "Dutch" for the whole file, on a reason
+that reads as sound: the outgoing message goes to colleagues, and those colleagues are Dutch-speaking.
+**Some of them are not** — the rule had quietly generalised from the requesters seen so far to every
+requester there will ever be. One answer per repo is the shape that fails here, and it fails silently:
+nothing is wrong until the first request arrives from somebody who cannot read the message.
+
+### What deliberately is not here
+
+**No template file, and no scaffolding script.** Both were offered and declined for now. A template fixes
+the shape, and the shape is the half that has met exactly one tracker; a skill would wrap a script, and
+this layer has none — every other skill in this plugin exists because a `.ps1` needed documenting.
+
+Those are the pieces to build **once a second repo runs this**, at which point there is something real to
+generalise from rather than one repo's five hours. Until then, the rules travel and the shape stays local.
 
 ---
 
