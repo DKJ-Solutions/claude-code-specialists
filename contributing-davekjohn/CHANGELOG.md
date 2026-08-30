@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/major-advice-inherits-its-condition-v1` · 20260830-163736
+
+The new-major guardrail's closing sentence no longer counts an edit a repo may not have. The advice refuses
+a `X.0.0` cut whose history section does not exist yet, prints the heading to add, and then says the pin in
+a test has to be repointed too -- *IF* this repo pins the targeted major, capitalised, because the pin is
+repo-owned. The sentence after it took that back: *"Both edits belong to this cut"* counts two, so a reader
+who had correctly concluded the pin paragraph was not theirs was told one line later to make a second edit,
+and went looking for it. It now reads *"The section edit belongs to this cut, and the pin with it if this
+repo has one"* -- naming the edit rather than pointing back at one, and taking the plural with it -- and two
+assertions hold it there from both sides: the count must not return, and the condition must not be dropped
+in its place. **The `cut-release` skill page carried the same contradiction** around its own conditional
+bullet, and it is repaired in the same movement.
+
+This repo has the pin, so its own maintainers read the sentence that was true. The failure this prevents is
+the one this repo cannot meet: it lands entirely on a consumer, which is why the fix is in the shared script
+rather than in a lens.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+A consumer opening their first major meets this refusal at a milestone moment, having just been told the
+step is manual because it is deliberate. Until now the message ended by contradicting its own conditional
+one line earlier, sending a reader with no pin to hunt for a second edit that was never theirs. Measured on
+the documented path in a fresh consumer: after adding the section alone -- one edit, no pin -- the re-run cut
+`v1.0.0` cleanly, so the conditional reading was the correct one and the closing sentence was simply wrong
+for them.
+
+**Score:** 2
+
+#### Pull Request
+
+The new-major advice's closing sentence inherits the pin condition
+
+Plugins: contributing-davekjohn
+
+[PR #1155](https://github.com/DaveKJohn/claude-code-specialists/pull/1155)
+
+---
+
 ### DEPLOY: `fix/major-refusal-names-the-seam-v1` · 20260830-161529
 
 The release cut's major refusal now names the seam that lowers its threshold. It always answered two of the
