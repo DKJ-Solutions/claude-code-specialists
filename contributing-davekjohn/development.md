@@ -52,6 +52,12 @@ is correct and untouched: it describes THIS repo, which does have the pin.
 - [x] The closing sentence carries the section edit unconditionally and the pin conditionally
 - [x] The reasoning above it, beside the paragraph whose intent it was taking back
 - [x] Mirrored to the plugin copy with `scripts/sync/build-shared-scripts.ps1`
+- [x] The same contradiction one file over, in the consumer-facing `cut-release` skill page: *"Clearing it
+      takes two edits"*, *"Neither is done for you"*, *"Both commits go directly on the trunk"* and
+      *"those two files only"* all counted two around a bullet that says *"the pin, if your repo has one"*.
+      Raised by the code review on this diff and repaired here rather than filed -- it is the same defect
+      for the same reader, and a script that has stopped over-counting beside a page that has not is worse
+      than either alone
 
 ### TEST
 
@@ -69,9 +75,11 @@ a `X.0.0` cut whose history section does not exist yet, prints the heading to ad
 a test has to be repointed too -- *IF* this repo pins the targeted major, capitalised, because the pin is
 repo-owned. The sentence after it took that back: *"Both edits belong to this cut"* counts two, so a reader
 who had correctly concluded the pin paragraph was not theirs was told one line later to make a second edit,
-and went looking for it. It now reads *"That edit belongs to this cut, and the pin with it if this repo has
-one"*, and two assertions hold it there from both sides -- the count must not return, and the condition must
-not be dropped in its place.
+and went looking for it. It now reads *"The section edit belongs to this cut, and the pin with it if this
+repo has one"* -- naming the edit rather than pointing back at one, and taking the plural with it -- and two
+assertions hold it there from both sides: the count must not return, and the condition must not be dropped
+in its place. **The `cut-release` skill page carried the same contradiction** around its own conditional
+bullet, and it is repaired in the same movement.
 
 This repo has the pin, so its own maintainers read the sentence that was true. The failure this prevents is
 the one this repo cannot meet: it lands entirely on a consumer, which is why the fix is in the shared script

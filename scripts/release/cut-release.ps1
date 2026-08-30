@@ -837,8 +837,8 @@ if ($historyContent) {
             "$newHeading`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n`n" +
             "Then, IF this repo pins the targeted major in a test, repoint that assertion at '$newMajor' and`n" +
             "write down why, next to it -- opening the section is what turns it red, and that is the pin doing`n" +
-            "its job rather than a broken test. That edit belongs to this cut, and the pin with it if this repo`n" +
-            "has one, so they go on the trunk ahead of the release commit.`n`n" +
+            "its job rather than a broken test. The section edit belongs to this cut, and the pin with it if`n" +
+            "this repo has one, so each goes on the trunk ahead of the release commit.`n`n" +
             "Then run this again. Opening a new major's section is a deliberate milestone moment, which is why it`n" +
             "is not done for you."
         }
