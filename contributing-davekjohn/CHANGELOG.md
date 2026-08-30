@@ -32,6 +32,68 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/settings-proposal-pasteable-v1` · 20260830-112706
+
+`specialists-init` now writes a **second** settings artifact beside the annotated one:
+`.claude/settings.proposed.json`, the merged end result. It is the consuming repo's own
+`.claude/settings.json` key for key with both `permissions` halves folded in — strict JSON, no
+comments to strip, and no hooks stub. Adopting the proposal becomes *replace one file with the other*
+instead of a hand-merge the reader has to invent. `specialists-teardown` removes it alongside the
+`.jsonc`, both names coming from one new `Get-SettingsArtifactNames` so the writer and the remover
+cannot drift apart.
+
+The annotated `.jsonc` stays, and gains the warning it never had: **it must not be pasted whole**,
+because the destination is not empty. `.claude/settings.json` already holds `enabledPlugins` and
+`extraKnownMarketplaces` — the two keys that got the adoption this far — and the proposal contains
+neither, so overwriting the file with it deletes both. The result is a settings file that parses
+perfectly and loads nothing at all: no skills, no subagents, no SessionStart hooks, and no message of
+any kind. That is [#1076](https://github.com/DaveKJohn/claude-code-specialists/issues/1076)'s
+zero-surface state (3 → 0 hooks, 6 → 0 skills, 15 → 0 subagents across one restart), reached without
+ever touching an install record — and reached in the one act this family reserves for the human, since
+a session may not widen a permissions file.
+
+Two of that file's three copy traps were already papered over with warnings (the comments, #1097; the
+hooks stub, #363) and the third was warned about nowhere. It is the third that costs the adoption, and
+it is the one no amount of further warning text closes: the instruction was *"copy what fits"*, which
+is a merge, and the fix is to do the merge.
+
+**The merged file is not written when the destination cannot be read whole** — it does not parse, it
+parses to something other than an object, its `permissions` key is not an object, or `permissions.allow`
+/ `permissions.deny` is not a list of rules. The run says which shape it found, and the next-steps fall
+back to the hand-merge *naming the two keys that must survive it*. Composing a merge from a file that
+could not be fully read would drop part of it while wearing the label "safe to paste", which is the
+reported defect arriving through its own fix.
+
+Two smaller guarantees fall out of the same principle. The JSON is re-indented by a **scanner** and its
+`\uXXXX` un-escape **counts the run of backslashes**, so a hook command naming a Windows path survives
+byte for byte instead of shipping an invalid escape. And where `.claude/settings.json` is gitignored
+while the merged copy beside it is not, the run says so: the copy holds every key that file held, and
+the ignore rule that was hiding them names the old path.
+
+The permission rules are now declared once as data and rendered into both files, so the proposal that
+explains a rule and the file that carries it cannot disagree.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer adopting the specialists follows this step exactly once per repo, by hand, and until now it
+could silently switch off everything they had just installed — with a valid settings file and no error
+to read. From this release the same step is a single file replacement, and the file that must not be
+pasted says so and names what it would destroy.
+
+**Score:** 4
+
+#### Pull Request
+
+the settings proposal ships a pasteable merged file, and the proposal itself names the keys that must survive
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1132](https://github.com/DaveKJohn/claude-code-specialists/pull/1132)
+
+---
+
 ### DEPLOY: `fix/blueprint-record-carries-only-its-own-value-v1` · 20260830-111440
 
 The config blueprint's generator handed the first function under a shared assignment block every value
