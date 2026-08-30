@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/blueprint-record-carries-only-its-own-value-v1` · 20260830-111440
+
+The config blueprint's generator handed the first function under a shared assignment block every value
+in that block, while each of the block's other functions already shipped its own. Three variables
+therefore arrived in a consumer's `scripts/repo-config.ps1` assigned twice, the second assignment
+silently winning. `Get-FunctionBlock` now trims its walk back to the values the function itself reads,
+asked of that function's own AST rather than of the assembled text -- where an assignment target is
+indistinguishable from a read.
+
+Nothing errored and a fresh adoption behaved correctly, because the duplicate values agreed. The cost
+lands on the next reader: these four strings are the entry-scaffold wording, and they exist to be
+translated (#410). A consumer editing them under the comment that explains them would have had an
+assignment three lines further down -- one they had no reason to read past -- put the English back,
+after which `new-branch` writes English stubs and `open-pr`'s body-heading gate goes on recognising
+only the English marker, with nothing anywhere saying why.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is only visible in a file `adopt-config` has written. The source repo's own `repo-config.ps1`
+assigns each of these variables exactly once, so no amount of reading this tree shows the defect --
+which is why the regression test asserts on the placed consumer lib and not only on the artefact.
+
+The measurement that mattered was not the fix but the test: the natural way to write the per-record
+assert passes against the broken artefact, because the parser cannot distinguish an assignment target
+from a read. Running the new asserts against the old generator is what caught it.
+
+**Score:** N/A
+
+#### Pull Request
+
+a blueprint record carries only the values its own function reads
+
+Plugins: contributing-davekjohn
+
+[PR #1129](https://github.com/DaveKJohn/claude-code-specialists/pull/1129)
+
+---
+
 ### DEPLOY: `docs/portable-cycle-begins-at-the-issue-v1` · 20260830-102958
 
 **The portable half of the cycle began at `new-branch`.** This repo's own page has opened at
