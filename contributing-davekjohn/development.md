@@ -77,7 +77,7 @@ placeholder strings at three where the list holds twelve.
 ### TEST
 
 - [x] `check-plugin-integrity.ps1` green -- 0 errors, 303 links scanned
-- [ ] All suites green
+- [x] All suites green -- every scripts/tests/*.tests.ps1, 0 failing
 
 ### DEPLOY: `docs/pr-template-interface-is-the-placeholder-v1`
 

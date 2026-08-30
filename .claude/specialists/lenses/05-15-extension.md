@@ -828,8 +828,11 @@ path in the consumer's own repo — so what ships is a reference to copy and dif
 `open-pr.ps1`, which meant **nothing outside that script could read them**: the reference could not be
 held against the list that has to recognise it, and that gap is the defect the issue reported. They now
 live in `pr-body-lib.ps1`, and lint check 24 holds both files — the shipped reference byte for byte,
-this repo's own template only to the contract (a first heading, a recognised placeholder), because that
-one is genuinely repo-owned and a byte rule would refuse a correct change the day it grows a section.
+this repo's own template only to the contract, which since #865 is a recognised placeholder line and
+nothing else: `open-pr` reads where the placeholder sits rather than the first heading, so a heading-less
+template — the shape this repo actually ships — is supported and the gate must not refuse one. The second
+file is held weakly because it is genuinely repo-owned, and a byte rule would refuse a correct change the
+day it grows a section.
 
 **The gate reaches `CHANGELOG.md`'s intro, and getting it there took two independent repairs** (August 8,
 2026; [#525](https://github.com/DaveKJohn/claude-code-specialists/pull/525)). The check was born
