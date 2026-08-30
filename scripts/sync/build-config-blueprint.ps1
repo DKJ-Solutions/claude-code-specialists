@@ -57,6 +57,25 @@ $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git
 # This generator is the SOURCE's own tool and is deliberately not mirrored, so the sibling is always here.
 . (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
 
+function Get-ScriptVarNames {
+    <#
+        The bare '$script:' variable names appearing anywhere under an AST node ('LiveStage'), sorted
+        and unique.
+
+        AN ASSIGNMENT TARGET COUNTS AS AN OCCURRENCE, because the parser draws no distinction: the left
+        of '$script:X = 1' is a VariableExpressionAst exactly like the '$script:X' in a return. That is
+        not a defect to work around here -- it is why the CALLER has to be careful which node it hands
+        in, and Get-FunctionBlock is where that matters.
+    #>
+    param([Parameter(Mandatory = $true)][System.Management.Automation.Language.Ast]$Ast)
+
+    $vars = $Ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true)
+    return @($vars |
+        Where-Object { $_.VariablePath.UserPath -like 'script:*' } |
+        ForEach-Object { $_.VariablePath.UserPath.Substring('script:'.Length) } |
+        Sort-Object -Unique)
+}
+
 function Get-ScriptVarReferences {
     <#
         The '$script:' variables a piece of PowerShell actually READS, via the parser -- comments and
@@ -71,11 +90,28 @@ function Get-ScriptVarReferences {
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$errors)
     if ($errors -and $errors.Count -gt 0) { return @() }
 
-    $vars = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true)
-    return @($vars |
-        Where-Object { $_.VariablePath.UserPath -like 'script:*' } |
-        ForEach-Object { $_.VariablePath.UserPath.Substring('script:'.Length) } |
-        Sort-Object -Unique)
+    return (Get-ScriptVarNames -Ast $ast)
+}
+
+function Get-StatementEndIndex {
+    <#
+        The index of the last line of the statement starting at $Start: follows it down until its
+        brackets balance, so an array or hashtable literal is taken whole rather than by its first
+        line. Falls back to the last line of the input when they never balance.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Lines,
+        [Parameter(Mandatory = $true)][int]$Start
+    )
+
+    $depth = 0
+    for ($j = $Start; $j -lt $Lines.Count; $j++) {
+        $line = $Lines[$j]
+        $depth += ([regex]::Matches($line, '[\(\[\{]')).Count
+        $depth -= ([regex]::Matches($line, '[\)\]\}]')).Count
+        if ($depth -le 0) { return $j }
+    }
+    return ($Lines.Count - 1)
 }
 
 function Get-ScriptVarAssignment {
@@ -91,17 +127,35 @@ function Get-ScriptVarAssignment {
 
     for ($i = 0; $i -lt $Lines.Count; $i++) {
         if ($Lines[$i] -notmatch ('^\s*\$script:' + [regex]::Escape($Name) + '\s*=')) { continue }
-
-        $depth = 0
-        for ($j = $i; $j -lt $Lines.Count; $j++) {
-            $line = $Lines[$j]
-            $depth += ([regex]::Matches($line, '[\(\[\{]')).Count
-            $depth -= ([regex]::Matches($line, '[\)\]\}]')).Count
-            if ($depth -le 0) { return (($Lines[$i..$j]) -join "`n") }
-        }
-        return (($Lines[$i..($Lines.Count - 1)]) -join "`n")
+        return (($Lines[$i..(Get-StatementEndIndex -Lines $Lines -Start $i)]) -join "`n")
     }
     return ''
+}
+
+function Remove-ForeignAssignments {
+    <#
+        Drops every '$script:X = ...' statement whose X is not in -Keep, taking each one whole (a
+        hashtable literal included). Comments, blank lines and the function body are returned untouched:
+        this removes VALUES that belong to somebody else, never reasoning.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Lines,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Keep
+    )
+
+    $kept = @()
+    $i = 0
+    while ($i -lt $Lines.Count) {
+        # -and short-circuits, so $Matches is only read on a line that actually matched.
+        if ($Lines[$i] -match '^\s*\$script:([A-Za-z0-9_]+)\s*=' -and $Matches[1] -notin $Keep) {
+            $i = (Get-StatementEndIndex -Lines $Lines -Start $i) + 1
+            continue
+        }
+        $kept += $Lines[$i]
+        $i++
+    }
+    # Comma, so a single surviving line comes back as a one-element array rather than a bare string.
+    return ,$kept
 }
 
 function Get-FunctionBlock {
@@ -121,14 +175,19 @@ function Get-FunctionBlock {
         A comment-only scan would not do either: the value lives in the assignment line BETWEEN the
         comment and the function, so stopping at the first non-comment line ships the reasoning without
         the answer.
+
+        THE WALK IS THEN TRIMMED BACK TO THE VALUES THIS FUNCTION READS, which is the other half of the
+        same problem and was measured separately (inbound #1126). See the comment at the trim below.
     #>
     param(
         # AllowEmptyString, because the array IS the file and a file has blank lines: PowerShell's
         # mandatory validation rejects an empty element inside a [string[]] without it.
         [Parameter(Mandatory = $true)][AllowEmptyString()][string[]]$Lines,
-        [Parameter(Mandatory = $true)][int]$StartLine,   # 1-based, from the parser
-        [Parameter(Mandatory = $true)][int]$EndLine      # 1-based, inclusive
+        [Parameter(Mandatory = $true)][System.Management.Automation.Language.FunctionDefinitionAst]$FunctionAst
     )
+
+    $StartLine = $FunctionAst.Extent.StartLineNumber   # 1-based, from the parser
+    $EndLine   = $FunctionAst.Extent.EndLineNumber     # 1-based, inclusive
 
     $first = $StartLine - 1   # to 0-based
     $i = $first - 1
@@ -145,13 +204,35 @@ function Get-FunctionBlock {
     $blockStart = $i + 1
     while ($blockStart -lt $first -and $Lines[$blockStart].Trim() -eq '') { $blockStart++ }
 
-    $block = ($Lines[$blockStart..($EndLine - 1)]) -join "`n"
+    # TRIM THE BLOCK BACK TO THE VALUES THIS FUNCTION READS. The contiguous walk is exactly right for a
+    # function with its own value directly above it, and OVER-INCLUSIVE for the first of several that
+    # share one assignment block: repo-config.ps1 puts all four entry-scaffold assignments above
+    # Get-EntryTitlePlaceholder, so that record shipped the other three as well -- while each of those
+    # three also ships its own, via the back-fill below. In the repo-config.ps1 that adopt-config then
+    # writes, three variables end up assigned twice, the second assignment silently winning.
+    #
+    # Nothing errors and the placed file is correct until somebody EDITS it, which is what makes it
+    # worth repairing: these four strings exist to be translated (inbound #410), and a consumer doing
+    # exactly that changes them under the comment that explains them, only for an assignment further
+    # down -- one they had no reason to read past -- to put the English back. new-branch then writes
+    # English stubs and open-pr's body-heading gate goes on recognising only the English marker, with
+    # nothing anywhere saying why. Measured in ccs-testrun-3 (inbound #1126).
+    #
+    # ASKED OF THE FUNCTION'S OWN AST, not of the assembled block. In the block a preamble assignment
+    # appears as a VariableExpressionAst exactly like a genuine read does, so a scan of the whole thing
+    # cannot tell "this function uses this value" from "this line happens to sit above it". The extent
+    # the file parser already handed us carries no such ambiguity, and needs no parse of its own -- so
+    # there is no failure mode in which a fragment does not parse and every value is dropped. A variable
+    # the function assigns in its OWN body sits under that same extent, so it is kept too.
+    $used  = @(Get-ScriptVarNames -Ast $FunctionAst)
+    $block = ((Remove-ForeignAssignments -Lines @($Lines[$blockStart..($EndLine - 1)]) -Keep $used) -join "`n")
 
-    # COMPLETE THE BLOCK WITH THE VALUES IT READS BUT DOES NOT CARRY. Four of this file's functions
-    # share one assignment block (the entry-scaffold wording), so the contiguous run above the FIRST of
-    # them holds all four values and the other three hold none. Copied on its own, such a function
-    # returns $null in the consumer -- a silent wrong answer where an absent function would have got the
-    # documented fallback. So any $script: variable the block reads without assigning is pulled in.
+    # COMPLETE THE BLOCK WITH THE VALUES IT READS BUT DOES NOT CARRY -- the mirror image of the trim
+    # above, and the reason both are needed. Four of this file's functions share one assignment block
+    # (the entry-scaffold wording), so the contiguous run above the FIRST of them carries the values and
+    # the other three carry none. Copied on its own, such a function returns $null in the consumer -- a
+    # silent wrong answer where an absent function would have got the documented fallback. So any
+    # $script: variable the block reads without assigning is pulled in.
     # READ THROUGH THE PARSER, NOT BY REGEX, for the same reason check 19 was rewritten that way: a
     # text scan cannot tell code from prose. Measured here -- Get-EntryTitlePlaceholder's comment block
     # points the reader at '$script:EntryScaffoldDefaults in entry-scaffold-lib.ps1', a variable that
@@ -173,9 +254,12 @@ function Get-FunctionBlock {
 }
 
 function Get-LibFunctions {
-    <# Every function definition in a file, by name, with its extent -- read through the PowerShell
+    <# Every function definition in a file, by name, as its parser AST -- read through the PowerShell
        parser rather than by regex. A regex over 'function X' matches the word in a docstring too,
-       which is how check 19 was first measured wrong. #>
+       which is how check 19 was first measured wrong.
+
+       THE AST RATHER THAN ONLY ITS TWO LINE NUMBERS, because Get-FunctionBlock has to ask what the
+       function itself reads, and the node it needs for that has already been parsed here. #>
     param([Parameter(Mandatory = $true)][string]$Path)
 
     $tokens = $null
@@ -187,10 +271,7 @@ function Get-LibFunctions {
 
     $map = @{}
     foreach ($fn in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
-        $map[$fn.Name] = @{
-            StartLine = $fn.Extent.StartLineNumber
-            EndLine   = $fn.Extent.EndLineNumber
-        }
+        $map[$fn.Name] = $fn
     }
     return $map
 }
@@ -223,8 +304,7 @@ foreach ($rec in $contract) {
     # silently shorter blueprint is not.
     $text = ''
     if ($declared) {
-        $ext = $lib.Functions[$rec.Function]
-        $text = Get-FunctionBlock -Lines $lib.Lines -StartLine $ext.StartLine -EndLine $ext.EndLine
+        $text = Get-FunctionBlock -Lines $lib.Lines -FunctionAst $lib.Functions[$rec.Function]
     }
 
     $records += [ordered]@{
