@@ -273,8 +273,10 @@ does not know what — so both arms name the directory rather than acting on it.
 back is still `worktree-lane.ps1 -HandBack`, and it is still the better move than relying on step 5b.
 
 `prune-merged.ps1` was unavailable in exactly this state too, which mattered because it is the script a
-session is told to run *instead of* hand-reading `git ls-remote`. It now names the worktree holding the
-trunk instead of relaying git's message.
+session is told to run *instead of* hand-reading `git ls-remote`. It **runs** in this state now
+([#1147](https://github.com/DaveKJohn/claude-code-specialists/issues/1147)): it advances the trunk with a
+refspec fetch rather than a checkout, so a held trunk costs it the fast-forward and nothing else — and the
+warning still names the worktree holding it instead of relaying git's message.
 
 **What this deliberately is not.** Two larger shapes were named and declined when the default was written
 down. A *green-and-unmerged reporter* at session start would re-add half of a status reporter the source

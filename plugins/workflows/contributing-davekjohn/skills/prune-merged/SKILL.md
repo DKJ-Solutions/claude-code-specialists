@@ -70,30 +70,47 @@ report-only remote pass described in the next section.
 
 The script:
 
-1. **Refuses on a dirty working tree.** Switching branches with uncommitted work either fails halfway
-   or drags the work across. Commit, `park`, or stash first.
-   And if a **second worktree is standing on the trunk**, the switch below is impossible for the whole
-   clone — git allows one worktree per branch. The refusal names that directory and how to release it
-   ([#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069)), rather than relaying
-   git's own message, because this script is what a session runs *instead of* hand-reading
-   `git ls-remote` — so it was unavailable in exactly the situation that produces stray branches.
-2. Switches to the trunk and fast-forwards it (`git pull --ff-only`). **Fast-forward only** — this
-   script may advance the trunk and must never merge anything into it. A non-fast-forward is a
-   warning, not a stop: the deletions are then judged against the older trunk, which errs towards
-   keeping branches.
+1. **Refuses on a dirty working tree.** A run can still have to step off the branch you are standing
+   on (4c), and doing that with uncommitted work either fails halfway or drags the work across.
+   Commit, `park`, or stash first.
+2. **Fast-forwards the trunk without checking it out** — `git fetch <remote> <trunk>:<trunk>`, which
+   writes a local branch ref that `HEAD` is not on and moves no working tree at all
+   ([#1147](https://github.com/DaveKJohn/claude-code-specialists/issues/1147)). **Fast-forward only**
+   — git refuses a non-ff update into `refs/heads/` unless the refspec carries a leading `+`, and this
+   one does not, so the guarantee is git's rather than a flag's. A non-fast-forward is a warning, not
+   a stop: the deletions are then judged against the older trunk, which errs towards keeping branches.
+   A run that already **stands on** the trunk cannot fetch into its own checked-out ref and uses
+   `git pull --ff-only` instead — same guarantee, and nothing moves there either.
+   And if a **second worktree is standing on the trunk**, git will not write that ref either. That
+   used to make the run impossible clone-wide; since #1147 it costs only the fast-forward, and the
+   warning still names the directory and how to release it
+   ([#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069)) rather than relaying
+   git's own message — this script is what a session runs *instead of* hand-reading `git ls-remote`,
+   so it was unavailable in exactly the situation that produces stray branches.
 3. `git fetch --prune` — drops remote-tracking refs whose remote branch is gone.
-4. Deletes each local branch whose merge can be **proven**, and only those.
-5. **Gives the checkout back** to the branch step 2 borrowed it from, and says where the run ended as
-   its closing line ([#1071](https://github.com/DaveKJohn/claude-code-specialists/issues/1071)).
+4. Deletes each local branch whose merge can be **proven**, and only those — and where that branch is
+   the one you are **standing on**, steps off it onto the trunk first, because `git branch -d` can
+   never delete the branch `HEAD` is on.
+5. Says where the run ended as its closing line
+   ([#1071](https://github.com/DaveKJohn/claude-code-specialists/issues/1071)) — which, on every run
+   that did not reap the branch underneath itself, is exactly where it started.
 
-**It borrows the checkout; it does not move it.** `ship-pr` ends on the trunk deliberately — it closes a
-*finished* assignment, and ending there is what makes the session safe to clear. This script closes
-nothing: it is a tidy-up run mid-assignment, and the branch you were standing on is still there. Leaving
-you on the trunk cost the reporter of #1071 a commit that landed **directly on `main`** — the tree is
-clean and `git status` says nothing unusual, so there is no signal at all between the switch and the
-mistake. Two starts cannot be returned to, and each says so while naming the short sha it left: a start
-branch **this same run reaped** (stepping off it in step 2 is what makes that possible at all — `git
-branch -d` can never delete the branch `HEAD` is on), and a run that started on a **detached HEAD**.
+**It does not borrow the checkout, and since #1147 it does not take one.** Step 2 used to switch to the
+trunk and switch back; a borrow returned within the second is still a tree that moves under whatever
+else is running in the same checkout, which is the collision measured in
+[#1145](https://github.com/DaveKJohn/claude-code-specialists/issues/1145) — a `ship-pr` gate reading the
+working tree for a minute while this command ran beside it. The one move left is step 4c, and it can
+only happen on a branch that has just been **proven merged**: a branch under a running gate is unmerged
+by definition, so it never reaches that line. There is nothing to hand back once the branch is gone, so
+the run then ends on the trunk and names the short sha it left.
+
+**The exit contract is still deliberately not `ship-pr`'s.** That script ends on the trunk on purpose —
+it closes a *finished* assignment, and ending there is what makes the session safe to clear. This one
+closes nothing: it is a tidy-up run mid-assignment, and the branch you were standing on is still there
+when it ends. Leaving you on the trunk cost the reporter of #1071 a commit that landed **directly on
+`main`** — the tree is clean and `git status` says nothing unusual, so there is no signal at all between
+the switch and the mistake. That is now structurally impossible rather than repaired after the fact:
+nothing moves `HEAD` unless the branch it was on has been deleted.
 
 ## The proof, which is the whole safety property
 

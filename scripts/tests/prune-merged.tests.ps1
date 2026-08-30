@@ -297,12 +297,14 @@ try {
     Assert-True ($rE.Out -match 'Get-TrunkBranchName') 'no trunk: and the seam that decides it, so a repo on another trunk knows where to answer'
     Assert-True ((Get-LocalBranches -Dir $dirE) -contains 'feat/orphan') 'no trunk: and it deleted nothing'
 
-    # --- (e2) A second worktree holding the trunk is NAMED, not relayed (issue #1069) ---------------
-    #     git allows one worktree per branch, so a lane standing on the trunk makes step 2's checkout
-    #     impossible for the whole clone -- and this script is what a session is told to run INSTEAD of
-    #     hand-reading `git ls-remote`, so it was unavailable in exactly the situation that produces
-    #     stray branches. The assert is on the DIRECTORY and the way out, because git's own message
-    #     already says the trunk is taken and says nothing about what to do.
+    # --- (e2) A second worktree holding the trunk is NAMED -- and no longer STOPS the run -----------
+    #     git allows one worktree per branch, and it will not write a ref that is checked out anywhere
+    #     in the clone. Under #1069 that made step 2's checkout impossible clone-wide and this script
+    #     REFUSED -- so it was unavailable in exactly the situation that produces stray branches. Since
+    #     #1147 the fast-forward is a refspec fetch, which is refused in the same state but costs only
+    #     the fast-forward: the run continues against the local trunk, which errs towards KEEPING
+    #     branches, and the lane is still named with the way out. THE PAIR IS THE POINT -- the naming
+    #     without the exit code, and the reaping that used to be collateral damage of the refusal.
     #
     #     THIS CASE EXISTS FOR THE WIRING, NOT THE DECISION. worktree-lib.tests.ps1 asserts the reading;
     #     what only a fixture can prove is that the script REACHES it -- measured the hour this was
@@ -316,11 +318,12 @@ try {
     if (Test-Path -LiteralPath $trunkLane) { Remove-Item -Recurse -Force -LiteralPath $trunkLane }
     Invoke-FixtureGit -Arguments @('-C', $dirE2, 'worktree', 'add', '-q', $trunkLane, 'main')
     $rE2 = Invoke-PruneMerged -Dir $dirE2
-    Assert-Equal 1 $rE2.Code 'trunk held: exit 1'
-    Assert-True ($rE2.Out -match 'another worktree holds it') 'trunk held: the refusal says what is actually wrong'
+    Assert-Equal 0 $rE2.Code 'trunk held: exit 0 -- a fast-forward that cannot happen is not worth losing the run over'
+    Assert-True ($rE2.Out -match 'another worktree holds it') 'trunk held: the warning says what is actually wrong'
     Assert-True ($rE2.Out -match [regex]::Escape((Split-Path -Leaf $trunkLane))) 'trunk held: and names the directory, which git own message does not'
     Assert-True ($rE2.Out -match 'HandBack') 'trunk held: with the way out, not only the verdict'
-    Assert-True ((Get-LocalBranches -Dir $dirE2) -contains 'feat/would-have-gone-too') 'trunk held: and NOTHING was deleted -- the refusal lands before any branch is judged'
+    Assert-True (-not ((Get-LocalBranches -Dir $dirE2) -contains 'feat/would-have-gone-too')) 'trunk held: and the run STILL REAPED -- the held trunk costs the fast-forward, not the tidy-up'
+    Assert-Equal 'feat/standing-here' (Get-HeadName -Dir $dirE2) 'trunk held: with the caller left exactly where it was -- nothing was ever checked out'
     Invoke-FixtureGit -Arguments @('-C', $dirE2, 'worktree', 'remove', '--force', $trunkLane)
 
     # --- (f) It never deletes a remote branch -------------------------------------------------------
@@ -396,35 +399,46 @@ try {
     Assert-True ($rH2.Out -notmatch 'git push origin --delete') 'clean local: without the switch nothing about the remote is classified'
     Assert-True ($rH2.Out -match '-IncludeRemote') 'clean local: the closing line names the switch that would classify it, rather than only the raw command'
 
-    # --- (i) The checkout is borrowed, not moved ----------------------------------------------------
-    #     Issue #1071. Step 2 switches to the trunk to fast-forward it and used to leave the caller
-    #     there -- silently, with a clean tree and nothing in `git status` to show for it, so the next
-    #     commit of that session landed directly on the trunk. THE ASSERT IS ON HEAD, not on the
-    #     sentence: the message is what a reader gets, the ref is what the next commit obeys. The
-    #     merged sibling is in the fixture on purpose -- the hand-back must not cost the reaping, which
-    #     is a script that returns too early rather than too late.
-    Write-Host "prune-merged.ps1 -- the checkout is given back" -ForegroundColor Cyan
+    # --- (i) The checkout is never taken at all (issues #1071, #1147) -------------------------------
+    #     Step 2 used to switch to the trunk to fast-forward it. #1071 made it hand the checkout back;
+    #     #1147 removed the switch, because a borrow returned within the second is still a tree that
+    #     moved under whatever else is running in the same checkout (#1145). THE ASSERT IS ON HEAD, not
+    #     on the sentence: the message is what a reader gets, the ref is what the next commit obeys.
+    #     The merged sibling is in the fixture on purpose -- not moving must not cost the reaping, and
+    #     the reachability of the REF is the whole claim of the refspec fetch.
+    #
+    #     AND ON THE ABSENCE OF THE OLD LINES, which is the half a passing HEAD assert cannot prove: a
+    #     script that switched and switched back would satisfy the first assert and fail these.
+    Write-Host "prune-merged.ps1 -- the checkout is never taken" -ForegroundColor Cyan
     $dirI = New-Fixture -Label 'i'
     New-MergedBranch   -Dir $dirI -Name 'feat/landed-while-i-watched'
     New-UnmergedBranch -Dir $dirI -Name 'feat/where-i-was'
     Invoke-FixtureGit -Arguments @('-C', $dirI, 'checkout', '-q', 'feat/where-i-was')
+    $headBeforeI = ((& git -C $dirI rev-parse HEAD) | Out-String).Trim()
     $rI = Invoke-PruneMerged -Dir $dirI
-    Assert-Equal 0 $rI.Code 'hand-back: exit 0'
-    Assert-Equal 'feat/where-i-was' (Get-HeadName -Dir $dirI) 'hand-back: HEAD is back on the branch the run started from -- the next commit cannot land on the trunk by accident'
-    Assert-True ($rI.Out -match 'Back on') 'hand-back: and the run says so, as its own line rather than as an inference'
-    Assert-True (-not ((Get-LocalBranches -Dir $dirI) -contains 'feat/landed-while-i-watched')) 'hand-back: the merged sibling is still reaped -- returning does not cut the run short'
-    #     -DryRun borrows the checkout just as hard: steps 2 and 3 run in full, only the deletions are
-    #     skipped. A look-first run that moved you would be the same defect wearing a safer name.
-    Invoke-FixtureGit -Arguments @('-C', $dirI, 'checkout', '-q', 'feat/where-i-was')
+    Assert-Equal 0 $rI.Code 'no borrow: exit 0'
+    Assert-Equal 'feat/where-i-was' (Get-HeadName -Dir $dirI) 'no borrow: HEAD is on the branch the run started from -- the next commit cannot land on the trunk by accident'
+    Assert-True ($rI.Out -notmatch 'Switched to') 'no borrow: and it never switched, so there is no switch line'
+    Assert-True ($rI.Out -notmatch 'Back on') 'no borrow: nor a hand-back line, because nothing was handed back'
+    Assert-True ($rI.Out -match 'without checking it out') 'no borrow: the fast-forward says how it was done, which is the whole repair'
+    Assert-True (-not ((Get-LocalBranches -Dir $dirI) -contains 'feat/landed-while-i-watched')) 'no borrow: the merged sibling is still reaped -- staying put does not cut the run short'
+    #     THE TRUNK REALLY DID ADVANCE, and that is what a fetch-without-checkout has to prove: the
+    #     fixture's main is already current here, so the assert that carries weight is the working
+    #     tree's -- HEAD's commit is untouched, which a checkout-and-back could not leave true if it
+    #     had failed halfway.
+    Assert-Equal $headBeforeI (((& git -C $dirI rev-parse HEAD) | Out-String).Trim()) 'no borrow: and the commit under the working tree is the same one it started on'
+    #     -DryRun moves nothing either, and never did anything else since #1147: steps 2 and 3 run in
+    #     full and neither touches a tree.
     $rI2 = Invoke-PruneMerged -Dir $dirI -DryRun
-    Assert-Equal 'feat/where-i-was' (Get-HeadName -Dir $dirI) 'hand-back: -DryRun gives it back too -- it moves HEAD in step 2 like every other run'
+    Assert-Equal 'feat/where-i-was' (Get-HeadName -Dir $dirI) 'no borrow: -DryRun stays put too'
 
-    # --- (j) The one start that cannot be returned to, and it says which ----------------------------
-    #     A branch this same run REAPS. The report expected this to be impossible ("the branch you are
-    #     standing on cannot be deleted anyway") and step 2 is what breaks that: `git branch -d` cannot
-    #     touch the branch HEAD is on, but by then HEAD has been moved to the trunk. So it is a state
-    #     this script creates, and ending on the trunk is then correct -- the assert is that it says so
-    #     and names the sha, which is the whole of what makes the position recoverable.
+    # --- (j) The one move that survives, and it says why -------------------------------------------
+    #     A branch this same run REAPS -- step 4c, and since #1147 the ONLY thing in this script that
+    #     moves a working tree. `git branch -d` cannot touch the branch HEAD is on, so a merged start
+    #     branch is reapable only if the run steps off it first; it is not a borrow, because there is
+    #     nothing to return to once the branch is gone. The asserts are that it happens, that it says
+    #     so BEFORE it happens, and that the closing line names the sha -- the whole of what makes that
+    #     position recoverable.
     Write-Host "prune-merged.ps1 -- the start branch this run reaped" -ForegroundColor Cyan
     $dirJ = New-Fixture -Label 'j'
     New-MergedBranch -Dir $dirJ -Name 'feat/finished-here'
@@ -433,49 +447,82 @@ try {
     $rJ = Invoke-PruneMerged -Dir $dirJ
     Assert-Equal 0 $rJ.Code 'reaped start: exit 0'
     Assert-Equal 'main' (Get-HeadName -Dir $dirJ) 'reaped start: the run ends on the trunk, because there is no longer a branch to end on'
-    Assert-True (-not ((Get-LocalBranches -Dir $dirJ) -contains 'feat/finished-here')) 'reaped start: and it was still reaped -- standing on it does not save it once step 2 has stepped off'
+    Assert-True (-not ((Get-LocalBranches -Dir $dirJ) -contains 'feat/finished-here')) 'reaped start: and it was still reaped -- standing on a merged branch does not save it'
+    Assert-True ($rJ.Out -match 'Stepped off') 'reaped start: the move is announced where it happens, not inferred from the closing line'
     Assert-True ($rJ.Out -match 'was reaped by this run') 'reaped start: the closing line says WHY it did not go back, rather than ending in silence'
     Assert-True ($rJ.Out -match [regex]::Escape($shaJ)) 'reaped start: and names the sha it left, which is the whole of what makes that position recoverable'
+    #     AND THE LOOK-FIRST RUN DOES NOT DO IT. Same fixture shape, -DryRun: the branch is reported
+    #     reapable and the caller is still standing on it afterwards. Without this, a dry run that
+    #     stepped off would be the #1071 defect wearing a safer name.
+    $dirJ2 = New-Fixture -Label 'j2'
+    New-MergedBranch -Dir $dirJ2 -Name 'feat/finished-here-too'
+    Invoke-FixtureGit -Arguments @('-C', $dirJ2, 'checkout', '-q', 'feat/finished-here-too')
+    $rJ2 = Invoke-PruneMerged -Dir $dirJ2 -DryRun
+    Assert-Equal 'feat/finished-here-too' (Get-HeadName -Dir $dirJ2) 'reaped start: -DryRun never steps off -- it deletes nothing, so it has no reason to move HEAD'
+    Assert-True ($rJ2.Out -match 'Would delete feat/finished-here-too') 'reaped start: and it still reports the branch as reapable'
+    Assert-True ($rJ2.Out -notmatch 'Stepped off') 'reaped start: with no step-off line, because there was none'
 
-    # --- (k) A run started on the trunk borrows nothing ---------------------------------------------
-    #     The normal case, and the one where a hand-back line would be noise: nothing was borrowed, so
-    #     there is nothing to report. Worth an assert because the cheapest wrong implementation is one
-    #     that checks out the trunk it is already on and announces it.
+    # --- (k) A run started on the trunk cannot fetch into its own ref --------------------------------
+    #     The trunk IS checked out here, so the refspec fetch of step 2 is the one form git refuses;
+    #     this run takes `git pull --ff-only` instead, which moves nothing either -- it advances the
+    #     branch you are already on to a commit the remote has already published. Worth an assert
+    #     because the cheapest wrong implementation is one that fetches into the checked-out ref and
+    #     turns the whole run into a warning.
     Write-Host "prune-merged.ps1 -- started on the trunk" -ForegroundColor Cyan
     $dirK = New-Fixture -Label 'k'
     New-UnmergedBranch -Dir $dirK -Name 'feat/somebody-elses'
     $rK = Invoke-PruneMerged -Dir $dirK
     Assert-Equal 'main' (Get-HeadName -Dir $dirK) 'trunk start: still on the trunk'
-    Assert-True ($rK.Out -notmatch 'Back on') 'trunk start: and says nothing about a hand-back, because nothing was borrowed'
-    Assert-True ($rK.Out -notmatch 'Switched to') 'trunk start: nor about a switch it never made'
+    Assert-True ($rK.Out -match "Fast-forwarded 'main'") 'trunk start: the fast-forward SUCCEEDED -- the pull path, not a refused fetch into the checked-out ref'
+    Assert-True ($rK.Out -notmatch 'could not be fast-forwarded') 'trunk start: so there is no warning about it'
+    Assert-True ($rK.Out -notmatch 'without checking it out') 'trunk start: and it does not claim the fetch form it did not use'
+    Assert-True ($rK.Out -notmatch 'Back on') 'trunk start: nothing to hand back'
+    Assert-True ($rK.Out -notmatch 'Stepped off') 'trunk start: and nothing to step off -- the trunk is never a candidate'
 
-    # --- (l) A detached start is named, not silently converted to a branch --------------------------
-    #     There is no branch to go back to, so the sha is the whole answer. Without this the run would
-    #     hand a detached checkout a branch it never asked for.
+    # --- (l) A detached start is simply left alone --------------------------------------------------
+    #     Before #1147 step 2 moved a detached HEAD onto the trunk and could not put it back, so the
+    #     run had to name the sha it had left. Nothing moves it now: there is no borrow, and a detached
+    #     HEAD is not a branch this run can be asked to reap. The assert is that the position survives
+    #     the run untouched, which is stronger than the sentence it replaces.
     Write-Host "prune-merged.ps1 -- started detached" -ForegroundColor Cyan
     $dirL = New-Fixture -Label 'l'
     New-UnmergedBranch -Dir $dirL -Name 'feat/not-where-i-am'
-    $shaL = ((& git -C $dirL rev-parse --short HEAD) | Out-String).Trim()
+    $shaL = ((& git -C $dirL rev-parse HEAD) | Out-String).Trim()
     Invoke-FixtureGit -Arguments @('-C', $dirL, 'checkout', '-q', '--detach', 'HEAD')
     $rL = Invoke-PruneMerged -Dir $dirL
     Assert-Equal 0 $rL.Code 'detached start: exit 0'
-    Assert-True ($rL.Out -match 'started detached') 'detached start: the run says the position it could not restore'
-    Assert-True ($rL.Out -match [regex]::Escape($shaL)) 'detached start: with the sha, since there is no branch name to give'
+    Assert-Equal 'HEAD' (Get-HeadName -Dir $dirL) 'detached start: STILL detached -- the run does not hand it a branch it never asked for'
+    Assert-Equal $shaL (((& git -C $dirL rev-parse HEAD) | Out-String).Trim()) 'detached start: on the same commit, because nothing moved it'
+    Assert-True ($rL.Out -notmatch 'Switched to') 'detached start: and it says nothing about a move it did not make'
 
-    # --- (m) The hand-back is structural, not a habit -----------------------------------------------
+    # --- (m) The closing line is structural, not a habit --------------------------------------------
     #     Every path out of the script below the step-3 marker goes through Complete-Run, so a path
     #     added later cannot forget it -- the failure mode of the original defect exactly, where the
-    #     information to return was present and simply never used. Steps 1 and 2 keep their own bare
-    #     exits on purpose: nothing has moved yet there, and a refusal must leave the caller where it
-    #     found them. Asserted on the source rather than by driving every one of those paths, because
-    #     what is being tested is that no FUTURE path can miss it.
-    Write-Host "prune-merged.ps1 -- no exit below step 3 skips the hand-back" -ForegroundColor Cyan
+    #     information to return was present and simply never used. Step 1 keeps its own bare exits on
+    #     purpose: nothing has moved yet there, and a refusal must leave the caller where it found
+    #     them. Asserted on the source rather than by driving every one of those paths, because what is
+    #     being tested is that no FUTURE path can miss it.
+    Write-Host "prune-merged.ps1 -- no exit below step 3 skips the closing line" -ForegroundColor Cyan
     $srcLines = [System.IO.File]::ReadAllLines($PruneMergedSrc)
     $step3 = 0
     for ($i = 0; $i -lt $srcLines.Count; $i++) { if ($srcLines[$i] -match '^# --- 3\. ') { $step3 = $i; break } }
     Assert-True ($step3 -gt 0) 'structural: the step-3 marker this assert is anchored on is still in the source'
     $bareExits = @(for ($i = $step3; $i -lt $srcLines.Count; $i++) { if ($srcLines[$i] -match '^\s*exit\b') { "line $($i + 1): $($srcLines[$i].Trim())" } })
     Assert-Equal 0 $bareExits.Count "structural: no bare 'exit' below the step-3 marker -- every path out goes through Complete-Run$(if ($bareExits.Count) { " (found: $($bareExits -join '; '))" })"
+
+    # --- (n) The fast-forward takes no checkout, structurally (issue #1147) -------------------------
+    #     Case (i) proves the RUN leaves HEAD alone; this proves the SOURCE cannot take it back. Step 2
+    #     is the block between its own marker and step 3's, and a `git checkout` written anywhere in it
+    #     is the defect returning -- a borrow handed back within the second still moves the tree under a
+    #     concurrent gate (#1145), which is exactly the behaviour a fixture assert on the final HEAD
+    #     cannot distinguish from no borrow at all. Matched on the quoted argument form, the shape a
+    #     git call actually takes here, so the prose above and below step 2 is not a finding.
+    Write-Host "prune-merged.ps1 -- step 2 contains no checkout" -ForegroundColor Cyan
+    $step2 = 0
+    for ($i = 0; $i -lt $srcLines.Count; $i++) { if ($srcLines[$i] -match '^# --- 2\. ') { $step2 = $i; break } }
+    Assert-True ($step2 -gt 0 -and $step2 -lt $step3) 'structural: the step-2 marker is still in the source, above step 3'
+    $step2Checkouts = @(for ($i = $step2; $i -lt $step3; $i++) { if ($srcLines[$i] -match "'checkout'") { "line $($i + 1): $($srcLines[$i].Trim())" } })
+    Assert-Equal 0 $step2Checkouts.Count "structural: step 2 makes no 'checkout' call -- the trunk is advanced by refspec fetch, never borrowed$(if ($step2Checkouts.Count) { " (found: $($step2Checkouts -join '; '))" })"
 } finally {
     foreach ($f in $script:fixtures) {
         if ($f -and (Test-Path -LiteralPath $f)) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

@@ -216,12 +216,19 @@ function Get-GateHeadMoveCount {
         $null when git cannot answer, which every caller treats as "not measured".
 
         WHY A DEPTH AND NOT A SHA (issue #1145). The thing this has to notice is a checkout that CAME
-        BACK: scripts\task\prune-merged.ps1 borrows the trunk to fast-forward it and hands the branch
-        back in the same run, so HEAD, the branch name and every tracked file are byte-identical
-        before and after. A sha read at each end sees nothing at all; the reflog is where the two
-        moves are recorded, and its depth grows by one per move whether or not the second one undoes
-        the first. Measured in a fixture: a borrow-and-return takes the depth from 2 to 4 with the sha
-        unchanged.
+        BACK -- a second command that switches away and switches straight back, leaving HEAD, the
+        branch name and every tracked file byte-identical before and after. A sha read at each end
+        sees nothing at all; the reflog is where the two moves are recorded, and its depth grows by
+        one per move whether or not the second one undoes the first. Measured in a fixture: a
+        borrow-and-return takes the depth from 2 to 4 with the sha unchanged.
+
+        THE SCRIPT THIS WAS MEASURED ON NO LONGER DOES IT (issue #1147), and the reading stands
+        anyway. scripts\task\prune-merged.ps1 borrowed the trunk to fast-forward it until August 30,
+        2026; it advances the ref without a checkout now, so the collision this function was built for
+        cannot come from that direction any more. Removing the depth would be the wrong conclusion:
+        new-branch.ps1 and worktree-lane.ps1 still move this checkout, a hand-typed pair of git
+        commands still can, and a borrow-and-return is exactly the shape the fingerprint alone is
+        blind to. What changed is which script to name in the finding, not whether to look.
 
         PER-WORKTREE, WHICH IS EXACTLY THE SCOPE THAT MATTERS. git keeps HEAD's reflog in the
         worktree's own git directory, so a lane moving its own checkout does not register here -- and
@@ -247,12 +254,13 @@ function Get-GateTreeMovedNote {
         WHY A GATE NEEDS THIS AT ALL (issue #1145). Get-GateFingerprint is taken BEFORE the gates and
         spent on the skip decision; until this function existed nothing looked again afterwards. But
         the gates read the WORKING TREE for a minute or more, and the primary checkout is not private
-        to them: the same session is told by name to run scripts\task\prune-merged.ps1 mid-assignment,
-        and ship-pr backgrounds itself precisely so the session can get on with something else.
-        Measured on PR #1144 -- one suite of 55 went red inside a backgrounded ship's gate and green
-        standalone on the same commit seconds later, while that borrow was in flight. The suite walks
-        every *.md under contributing-davekjohn/, and development.md exists on the branch and not on
-        the trunk, so a file in the walked set vanished and reappeared mid-run.
+        to them: a session is told by name to run maintenance commands mid-assignment, and ship-pr
+        backgrounds itself precisely so the session can get on with something else. Measured on
+        PR #1144 -- one suite of 55 went red inside a backgrounded ship's gate and green standalone on
+        the same commit seconds later, while prune-merged.ps1 had the trunk checked out beside it. The
+        suite walks every *.md under contributing-davekjohn/, and development.md exists on the branch
+        and not on the trunk, so a file in the walked set vanished and reappeared mid-run. That one
+        script stopped taking the checkout in #1147; the class it belongs to did not.
 
         TWO SIGNALS, BECAUSE ONE OF THEM CANNOT SEE THE MEASURED CASE. The fingerprint answers "is the
         tree still what it was" and catches a change that PERSISTED past the gate; a borrow that hands
@@ -303,7 +311,7 @@ function Get-GateTreeMovedNote {
 
     $lead = "$Gate gate: the checkout CHANGED while the gate ran -- HEAD or a file under it moved, so the run did not judge one settled tree."
     if ($Failed) {
-        return "$lead This red is therefore NOT trustworthy: re-run the gate before hunting the failure. The usual cause is a second command in the same checkout (prune-merged.ps1 borrows the trunk and hands it back, new-branch.ps1 and worktree-lane.ps1 move it) -- the primary checkout is single-occupancy while a gate is running."
+        return "$lead This red is therefore NOT trustworthy: re-run the gate before hunting the failure. The usual cause is a second command in the same checkout (new-branch.ps1 and worktree-lane.ps1 move it; prune-merged.ps1 moves it only when it reaps the branch you are standing on) -- the primary checkout is single-occupancy while a gate is running."
     }
     return "$lead This pass is therefore NOT recorded as gate evidence, so the next run gates the tree as it then stands."
 }

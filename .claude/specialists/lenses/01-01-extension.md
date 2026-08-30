@@ -50,7 +50,9 @@ product: agent defs, manuals, docs, and tooling.
   around it. **Do not classify that `ls-remote` output by hand — run
   `scripts/task/prune-merged.ps1 -IncludeRemote` instead**: it puts every head through the same two
   proofs the local pass uses, prints the paste-ready delete command for a merged leftover and
-  `Kept ... -- live work` for everything else, and touches nothing. Hand-derivation was itself the
+  `Kept ... -- live work` for everything else, and touches nothing — including the working tree, since
+  [#1147](https://github.com/DaveKJohn/claude-code-specialists/issues/1147), so running it mid-assignment
+  can no longer move the tree under a gate. Hand-derivation was itself the
   defect ([#1042](https://github.com/DaveKJohn/claude-code-specialists/issues/1042)), measured three
   times in two days. **The instance behind each of the three modes is in the
   [specialists handbook](../README.md#the-three-ways-a-briefing-fails-measured-here)** — the rule stays
