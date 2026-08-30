@@ -100,12 +100,17 @@ the missing pieces go back to the requester and the work waits. **A ticket with 
 built** — that is the standing agreement, and it is what keeps the discovery in front of the branch instead
 of inside it.
 
-**The rules are portable and travel with this plugin**, in
-[`TICKETWORK-portable.md`](../plugins/workflows/contributing-davekjohn/TICKETWORK-portable.md): where the
-provenance boundary between a copied field and our own judgement sits, how to tell a gap from a notice, why
-six kinds of question are not gaps, and what the log carries. **A repo that receives ticket work writes the
-other half itself** — its tracker, its language, the form of a ticket, its closed `State` vocabulary, and the
-border with its own research documents — as a local `TICKETWORK.md` beside this page. `smartwatchbanden` is
+**The rules are portable and travel with this plugin**, as this step's own section in
+[`CONTRIBUTING-portable.md`](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch):
+where the provenance boundary between a copied field and our own judgement sits, how to tell a gap from a
+notice, why six kinds of question are not gaps, and what the log carries. **They were a page of their own,
+`TICKETWORK-portable.md`, until August 30, 2026** — the portable cycle began at the branch, so the rules for
+its first step sat outside the document that describes it and nothing in that document pointed at them
+([#1123](https://github.com/DaveKJohn/claude-code-specialists/issues/1123)).
+
+**A repo that receives ticket work writes the other half itself** — its tracker, its language, the form of a
+ticket, its closed `State` vocabulary, and the border with its own research documents — as a local
+`TICKETWORK.md` beside this page. `smartwatchbanden` is
 the worked example.
 
 **This half is a no-op in this repo, and that is an answer rather than an omission.** Nothing is filed into

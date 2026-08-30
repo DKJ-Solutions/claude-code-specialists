@@ -33,11 +33,16 @@ offered a consumer was a 404, while the sentence around it still told them to pu
 page unconditionally. The source keeps its floor in `contributing-davekjohn/CONTRIBUTING.md` now, and which
 file carries yours is your answer to make.
 
-**And if your work arrives from somebody else's tracker, the cycle starts earlier than `new-branch`.**
-[`TICKETWORK-portable.md`](TICKETWORK-portable.md) covers that layer: how to tell a request that cannot be
-built from one we are merely unconvinced by, which six kinds of question are not blockers, and why a status
-in a heading is always false. Rules only, no template — it comes from one repo and one day, which the page
-says out loud.
+**And if your work arrives from somebody else's tracker, that layer is step 1 of the cycle rather than a
+page of its own.** [The ticket-work section](CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch)
+carries it: how to tell a request that cannot be built from one we are merely unconvinced by, which six
+kinds of question are not blockers, and why a status in a heading is always false. Rules only, no template —
+they come from one repo and one day, which the section says out loud.
+
+**It was a fourth portable page, `TICKETWORK-portable.md`, until August 30, 2026.** What retired it was not
+its size but its reach: the cycle document began at the branch and never mentioned it, so a reader following
+that cycle end to end met neither the section nor the step it described
+([#1123](https://github.com/DaveKJohn/claude-code-specialists/issues/1123)).
 
 The full reasoning — the tier model, why the fold rewrites nothing, what a release must earn — ships with
 this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release workflow and
@@ -51,7 +56,6 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) | the contribution cycle in prose, seam-named — the human-facing half, meant to be read alongside your own repo's answers |
 | [`RELEASES-portable.md`](RELEASES-portable.md) | the release workflow: the tier model, what a release must earn, the release documents, and how one is cut — your own `contributing-davekjohn/releases/README.md` holds your answers and your release list |
 | [`DEVELOPMENT-portable.md`](DEVELOPMENT-portable.md) | the document a branch works in: its two halves, the dossier form, the three step marks, the version suffix, its branch-long lifetime, and what the fold does at the merge |
-| [`TICKETWORK-portable.md`](TICKETWORK-portable.md) | the rules for the layer *before* a branch, in a repo whose work arrives from somebody else's tracker: whether a request can be built as written, and how the answer is recorded. Rules and reasoning only — no template and no script, deliberately |
 | [`skills/`](skills/) | the skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
 | [`hooks/`](hooks/) | two read-only SessionStart checks that never block, both belonging to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck` — plus one **Stop** hook that acts rather than reports: `cycle-autopark` pushes the branch's `development.md` to `origin` after every turn, until a PR publishes it (#900) |

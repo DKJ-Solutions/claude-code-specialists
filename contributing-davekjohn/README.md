@@ -2,8 +2,9 @@
 
 Everything portable about the `contributing-davekjohn` workflow gathers here, so the workflow occupies one
 folder in the repo root instead of scattering through it (Dave, August 14, 2026). The conventions
-themselves travel with the plugin as four portable pages; each page in this folder is **this repo's own
-set of answers** to them.
+themselves travel with the plugin as three portable pages; each page in this folder is **this repo's own
+set of answers** to them. **There were four until August 30, 2026**, when `TICKETWORK-portable.md` folded
+into the cycle page as its first step — the layer this repo has no work in, and describes anyway.
 
 | here | what it holds | portable half |
 |---|---|---|
