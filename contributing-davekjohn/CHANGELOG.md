@@ -32,6 +32,34 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/manifest-unescape-not-backslash-aware-v1` · 20260830-120957
+
+The published marketplace manifest's un-escape now counts the run of backslashes in front of a `\u`
+sequence, so a manifest field holding a Windows path no longer has that path folded into an invalid
+escape. Before this, a filtered publish whose manifest carried such a path stopped with
+*"marketplace.json is not valid JSON"* -- about a file `publish-to-business.ps1` had just written
+itself, from a source manifest that was fine. The expression is now identical to the one
+`specialists-init/bootstrap.ps1` has carried since inbound #1124, and the docstring says why the two
+stay separate copies rather than one shared lib: the bootstrap must run standalone in a consumer's
+tree, and the only fallback for a missing JSON-escape lib is a degraded mode with no visible symptom.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this is release tooling for publishing a marketplace subset to a business repo. No consumer of
+the plugins runs it, and nothing about what they install changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+the published manifest's un-escape counts the backslashes in front of it
+
+[PR #1136](https://github.com/DaveKJohn/claude-code-specialists/pull/1136)
+
+---
+
 ### DEPLOY: `fix/contributing-page-points-at-the-release-list-v1` · 20260830-114709
 
 The scaffolded `contributing-davekjohn/CONTRIBUTING.md` no longer claims that `releases/README.md` is the
