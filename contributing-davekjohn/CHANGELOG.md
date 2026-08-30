@@ -31,3 +31,51 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `docs/portable-cycle-begins-at-the-issue-v1` · 20260830-102958
+
+**The portable half of the cycle began at `new-branch`.** This repo's own page has opened at
+`## 1. NEW ISSUE / TASK` since August 29, 2026 ([PR #1058](https://github.com/DaveKJohn/claude-code-specialists/pull/1058)),
+so for a day the document every consumer reads described a cycle starting one step later than the cycle it
+describes — and the step it was missing is the one that says where the work comes from.
+
+`CONTRIBUTING-portable.md` now opens at `### 1. New issue or task`, with `Human` and `Claude` as **kinds
+rather than sub-steps** — neither precedes the other, both end in one issue in the repo the branch will be
+opened in — and Branch through Fold renumbered 2 to 6, in-page back-references included. It is the only step
+that names no skill, and that is stated on the page: no script runs it, which is exactly why it was the step
+the page went without.
+
+**`TICKETWORK-portable.md` is gone, folded in whole** as `## Ticket work — the layer before the branch`,
+which step 1's `Human` half points at. It had been a fourth portable page for three weeks, and what retired
+it was reach rather than size: the cycle document never mentioned it once, and the plugin README framed it as
+an optional extra — so a reader following the cycle end to end met neither the section nor the step it
+belonged to. Nothing was dropped in the move; the ten rules keep their own headings one level down, and the
+framing that makes them survivable (one repo, one day, rules rather than a format) travels with them.
+
+Its four live references follow it: the plugin README's pointer paragraph and its table row, the folder
+README both copies of `adopt-workflow-folder.ps1` scaffold, and this repo's own step 1. The two archived
+`4.5.0` documents that linked to the file are **de-linked rather than repointed** — the dead-link scan reads
+`releases/` recursively, and an archived note should keep saying what was true on its day rather than
+pointing at a page whose name it does not carry.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+**A consumer's route no longer has a hole at the front.** The cycle they read starts where their work
+actually starts, and the ticket-work rules are reachable from it instead of from a page the cycle never
+named. Nothing to run and nothing to migrate: no script, gate or seam changed, and a repo where nothing
+arrives from an upstream tracker skips that section exactly as it skipped the page.
+
+**Score:** 3
+
+#### Pull Request
+
+The portable cycle begins where the local one does, and ticketwork moves into its first step
+
+Plugins: contributing-davekjohn
+
+[PR #1125](https://github.com/DaveKJohn/claude-code-specialists/pull/1125)
+
+---
+
