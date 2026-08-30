@@ -183,14 +183,16 @@ about what the change is called.
 **The body comes from your own `.github/pull_request_template.md`, and that one file cannot travel with
 the plugin.** GitHub reads it only from that path in your repo, so unlike everything else in this cycle it
 has to be a copy rather than an import. The plugin ships the reference to copy and to diff against at
-`${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md`, and the whole interface is two lines: a
-**first heading** (any level — `-RefreshBody` replaces the description under it) and a **placeholder
-line** the script recognises verbatim, which is where the description is inserted. Break either and
-nothing errors; you get PRs whose body has no description. The
-[`open-pr` skill](skills/open-pr/SKILL.md) carries both promises, the recognised strings, the
+`${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md`, and **the whole interface is one line: the
+placeholder** the script recognises verbatim, which is where the description is inserted. Break it and
+nothing errors; you get PRs whose body has no description. **The shipped reference is that one line and
+no heading at all, which is the normal shape rather than a broken one** — `-RefreshBody` reads where the
+placeholder sits, so with nothing above it the description is the body's leading section. Everything you
+add below it is the form's, and every heading there is a boundary the refresh will not cross. The
+[`open-pr` skill](skills/open-pr/SKILL.md) carries that promise, the recognised strings, the
 `Get-PrDescriptionPlaceholder` seam for a line of your own, and — worth reading before you copy the
-two-line default — the measurement behind why it *is* two lines, which is a method to re-run on your own
-history rather than an answer to inherit.
+reference — the measurement behind why nothing else survives in it, which is a method to re-run on your
+own history rather than an answer to inherit.
 
 Before anything is pushed the script runs two gates:
 
