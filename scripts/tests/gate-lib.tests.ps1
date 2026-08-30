@@ -299,6 +299,61 @@ try {
     # Said BEFORE either gate runs, so it frames the results instead of trailing them.
     Assert-True ($openPr.IndexOf('Get-GateTreeDirtyCount') -lt $openPr.IndexOf('if (-not $SkipLint)')) 'the warning is printed above the lint gate, not after it'
 
+    # --- 12. the checkout that moved WHILE the gate ran (issue #1145) --------------------------
+    # The fingerprint above is taken before the gates and spent on the skip decision. Asked again
+    # afterwards it answers a second question -- did the gates judge one settled tree -- and it
+    # answers it INCOMPLETELY, which is the property this case exists to pin. A borrowed checkout
+    # comes back: prune-merged.ps1 fast-forwards the trunk and returns the branch, so HEAD, the
+    # branch name and every tracked file are identical at both ends. Measured on PR #1144, where one
+    # suite of 55 went red inside a ship's gate and green standalone on the same commit.
+    Write-Host "`n== 12. a tree that moved under a gate ==" -ForegroundColor Cyan
+    $r12 = New-GitFixture
+    $f12 = Get-GateFingerprint -RepoRoot $r12
+    $h12 = Get-GateHeadMoveCount -RepoRoot $r12
+    Assert-True ($null -ne $h12 -and $h12 -ge 1) 'a repository with a commit has a reflog depth'
+    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12)) 'a tree that held still reports nothing'
+
+    # THE BORROW, AND THE BLIND SPOT IT PROVES. Both asserts matter: the second says the fingerprint
+    # alone would have seen NOTHING here, which is why the reflog depth is read beside it.
+    Invoke-FixtureGit -Dir $r12 'checkout' '-q' '-b' 'borrowed'
+    Invoke-FixtureGit -Dir $r12 'checkout' '-q' '-'
+    Assert-Equal ($h12 + 2) (Get-GateHeadMoveCount -RepoRoot $r12) 'a borrow-and-return costs two reflog entries'
+    Assert-Equal $f12 (Get-GateFingerprint -RepoRoot $r12) 'and leaves the fingerprint identical -- the blind spot'
+
+    $red12 = Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12 -Failed
+    Assert-True ([bool]$red12) 'so the borrow is still reported'
+    Assert-True ($red12 -match 'NOT trustworthy') 'a red says the verdict cannot be relied on'
+    $green12 = Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12
+    Assert-True ($green12 -match 'NOT recorded as gate evidence') 'a green says it will not be filed as proof'
+    Assert-True ($green12 -notmatch 'trustworthy') 'and does not borrow the red sentence'
+
+    # The other half: content that changed and stayed changed, with HEAD never moving.
+    $r12b = New-GitFixture
+    $f12b = Get-GateFingerprint -RepoRoot $r12b
+    $h12b = Get-GateHeadMoveCount -RepoRoot $r12b
+    Set-FixtureFile -Dir $r12b -Name 'tracked.txt' -Content "changed mid-gate`n"
+    Assert-Equal $h12b (Get-GateHeadMoveCount -RepoRoot $r12b) 'an edit moves no reflog entry'
+    Assert-True ([bool](Get-GateTreeMovedNote -RepoRoot $r12b -Gate 'lint' -Fingerprint $f12b -HeadMoves $h12b)) 'and the fingerprint catches it instead'
+
+    # NEITHER SIGNAL MEASURED IS NOT MOVEMENT. A caller whose readings failed gets silence, never a
+    # warning it cannot act on -- the same direction every other error path in this lib takes.
+    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests')) 'with neither reading, nothing is claimed'
+    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $FixtureRoot -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12)) 'outside a repository, nothing is claimed'
+    Assert-True ($null -eq (Get-GateHeadMoveCount -RepoRoot $FixtureRoot)) 'and the depth itself is $null there, never 0'
+
+    # And open-pr has to ASK, on both gates and on both verdicts -- the lib being right proves
+    # nothing about it being reached.
+    Assert-Equal 1 ([regex]::Matches($openPr, 'Get-GateHeadMoveCount').Count) 'open-pr reads the reflog depth once, beside the fingerprint'
+    Assert-Equal 4 ([regex]::Matches($openPr, 'Get-GateTreeMovedNote -RepoRoot \$repoRoot').Count) 'both gates ask, on both verdicts'
+    Assert-Equal 2 ([regex]::Matches($openPr, 'Get-GateTreeMovedNote[^\r\n]*-Failed').Count) 'and only the two red paths ask as a failure'
+    Assert-True ($openPr.IndexOf('Get-GateHeadMoveCount') -lt $openPr.IndexOf('if (-not $SkipLint)')) 'the depth is read before the first gate, not after it'
+    # THE PASS PATH IS THE ONE WITH TEETH: a green over a moved tree must not be filed as evidence,
+    # or the next run skips a gate on a tree nothing ever judged.
+    Assert-True ($lintBlock.IndexOf('$movedNote') -lt $lintBlock.IndexOf('Save-GateEvidence')) 'the lint pass is recorded only after the movement question'
+    Assert-True ($testBlock.IndexOf('$movedNote') -lt $testBlock.IndexOf('Save-GateEvidence')) 'the tests pass is recorded only after the movement question'
+    Assert-True ($lintBlock -match '\} else \{[^\}]*Save-GateEvidence') 'the lint save sits in the else of that question'
+    Assert-True ($testBlock -match '\} else \{[^\}]*Save-GateEvidence') 'the tests save sits in the else of that question'
+
 } finally {
     if (Test-Path -LiteralPath $FixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $FixtureRoot -ErrorAction SilentlyContinue

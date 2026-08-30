@@ -574,6 +574,18 @@ reads *"PR #N opened, shipping in the background"* is a finished assignment, not
 started in the primary gets `HEAD` pulled out from under it mid-branch, which is the hazard the two gates in
 3.2.2 and 3.2.4 were hardened against and that step 5 was not.
 
+**And "anything else" includes a tidy-up, which is the half that does not read as starting something** (issue
+[#1145](https://github.com/DaveKJohn/claude-code-specialists/issues/1145), August 30, 2026). Step 1 of the
+ship — `open-pr`'s lint and test gates — is the one step that reads the **working tree**, for a minute or
+more, and a `prune-merged.ps1 -IncludeRemote` run in the same checkout borrows the trunk to fast-forward it
+and hands it straight back. Chris's lens sends a session to that exact command rather than let it classify
+`git ls-remote` output by hand, so the two instructions collide and neither page said so. Measured on
+[PR #1144](https://github.com/DaveKJohn/claude-code-specialists/pull/1144): one suite of 55 red inside the
+gate, green standalone on the same commit seconds later, because `contributing-davekjohn/development.md`
+exists on the branch and not on the trunk and the suite walks every `*.md` under that folder. **No gate
+refuses this** — `open-pr` reports it instead: a red whose tree moved says it is not trustworthy, and a green
+whose tree moved is not recorded as gate evidence. Re-run the gate; do not go hunting the failure.
+
 **And "nothing at all" is the default rather than a judgement call** (Dave, issue
 [#1060](https://github.com/DaveKJohn/claude-code-specialists/issues/1060), August 29, 2026). A lane is for a
 session that has *already been given* the next piece of work; where there is none, the session closes out and

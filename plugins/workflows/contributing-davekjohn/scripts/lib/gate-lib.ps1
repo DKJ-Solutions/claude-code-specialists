@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Gate evidence: record what the gates proved, and against which exact working state.
+    Gate evidence: record what the gates proved, against which exact working state -- and notice
+    when that state moved while they ran.
 
 .DESCRIPTION
     The gates (lint + test suites) are expensive and are frequently asked to prove the same thing
@@ -46,6 +47,13 @@
         suites do without changing a byte in the tree. That is what the age bound below is for --
         not a safety property of the content, but an honest limit on how long "nothing moved" is
         allowed to stand in for "nothing changed".
+
+    AND THE SAME FINGERPRINT ANSWERS A SECOND QUESTION, ASKED AT THE OTHER END OF THE RUN (issue
+    #1145). Before the gates it decides whether they may be skipped; after them, compared with a
+    fresh reading, it says whether the tree the gates judged is still the tree in front of you. It
+    does not answer that one alone -- a checkout borrowed and handed back leaves the fingerprint
+    identical -- so Get-GateHeadMoveCount reads HEAD's reflog depth beside it, and
+    Get-GateTreeMovedNote is what the callers actually ask.
 
     THE STATE LIVES IN THE GIT DIRECTORY, deliberately. It is guaranteed present, guaranteed local,
     guaranteed never committed, and per-worktree -- so a linked worktree cannot inherit the trunk's
@@ -200,6 +208,104 @@ function Get-GateTreeDirtyCount {
     $statusLines = Invoke-GitRead -RepoRoot $RepoRoot -GitArgs @('-c', 'core.quotePath=true', 'status', '--porcelain', '--untracked-files=all')
     if ($null -eq $statusLines) { return $null }
     return @($statusLines | Where-Object { "$_".Trim() }).Count
+}
+
+function Get-GateHeadMoveCount {
+    <#
+        How many times HEAD has moved in THIS worktree, ever -- the depth of its reflog. Returns
+        $null when git cannot answer, which every caller treats as "not measured".
+
+        WHY A DEPTH AND NOT A SHA (issue #1145). The thing this has to notice is a checkout that CAME
+        BACK: scripts\task\prune-merged.ps1 borrows the trunk to fast-forward it and hands the branch
+        back in the same run, so HEAD, the branch name and every tracked file are byte-identical
+        before and after. A sha read at each end sees nothing at all; the reflog is where the two
+        moves are recorded, and its depth grows by one per move whether or not the second one undoes
+        the first. Measured in a fixture: a borrow-and-return takes the depth from 2 to 4 with the sha
+        unchanged.
+
+        PER-WORKTREE, WHICH IS EXACTLY THE SCOPE THAT MATTERS. git keeps HEAD's reflog in the
+        worktree's own git directory, so a lane moving its own checkout does not register here -- and
+        it should not: a lane has its own tree and cannot disturb this one. What registers is a second
+        command in THIS checkout, which is the collision the gates are exposed to.
+    #>
+    param([Parameter(Mandatory)][string]$RepoRoot)
+
+    # `reflog show` on a repository with no commits yet exits non-zero, which Invoke-GitRead returns
+    # as $null -- "not measured" rather than 0, so a later reading cannot look like growth.
+    $lines = Invoke-GitRead -RepoRoot $RepoRoot -GitArgs @('reflog', 'show', 'HEAD')
+    if ($null -eq $lines) { return $null }
+    return @($lines | Where-Object { "$_".Trim() }).Count
+}
+
+function Get-GateTreeMovedNote {
+    <#
+        Did the checkout move WHILE THE GATE RAN, and what does that make the result worth? Returns
+        the sentence to print, or $null when nothing moved -- and also when the question cannot be
+        answered, because a "the tree may have moved" line printed on every unreadable repository is
+        a line nobody reads.
+
+        WHY A GATE NEEDS THIS AT ALL (issue #1145). Get-GateFingerprint is taken BEFORE the gates and
+        spent on the skip decision; until this function existed nothing looked again afterwards. But
+        the gates read the WORKING TREE for a minute or more, and the primary checkout is not private
+        to them: the same session is told by name to run scripts\task\prune-merged.ps1 mid-assignment,
+        and ship-pr backgrounds itself precisely so the session can get on with something else.
+        Measured on PR #1144 -- one suite of 55 went red inside a backgrounded ship's gate and green
+        standalone on the same commit seconds later, while that borrow was in flight. The suite walks
+        every *.md under contributing-davekjohn/, and development.md exists on the branch and not on
+        the trunk, so a file in the walked set vanished and reappeared mid-run.
+
+        TWO SIGNALS, BECAUSE ONE OF THEM CANNOT SEE THE MEASURED CASE. The fingerprint answers "is the
+        tree still what it was" and catches a change that PERSISTED past the gate; a borrow that hands
+        the checkout back leaves it identical. The reflog depth answers "did HEAD move at all" and
+        catches exactly that. Either one is enough to make the verdict untrustworthy.
+
+        BOTH VERDICTS ARE WORTH LESS, IN OPPOSITE DIRECTIONS:
+          - A RED is not trustworthy, and that is the expensive half. A false red reads as a real
+            defect -- this repo's own language-layers rule tells a session in so many words that a
+            suite which is red under the gate is reporting a REAL defect until proven otherwise -- so
+            whoever meets one has a documented reason to go hunting for a bug that is not there.
+          - A GREEN is not evidence. The pass is real for whatever mixture of trees the run saw, and
+            that mixture is not the fingerprint the caller is about to record it under. So the caller
+            skips Save-GateEvidence rather than storing a pass against a tree nothing judged.
+
+        IT IS NOT A REFUSAL, deliberately. A red still blocks the push exactly as before -- what
+        changes is that the reader is told which of the two results they are holding. Refusing would
+        turn a concurrency the workflow invites into a hard stop, and re-running the gate is the
+        remedy either way.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][ValidateSet('lint', 'tests')][string]$Gate,
+        # What the tree fingerprinted as, and how deep its reflog was, when the run started. Both are
+        # optional in the sense that a $null one simply cannot report movement -- a caller that could
+        # not measure one of them still gets the other.
+        [string]$Fingerprint,
+        [object]$HeadMoves,
+        # The gate's verdict, because the two sentences say different things.
+        [switch]$Failed
+    )
+
+    $moved = $false
+
+    if ($Fingerprint) {
+        $current = Get-GateFingerprint -RepoRoot $RepoRoot
+        # UNPROVABLE IS NOT MOVED. $null means git could not answer just now; the gate has already
+        # run, and a warning the reader cannot act on is worse than silence.
+        if ($current -and $current -ne $Fingerprint) { $moved = $true }
+    }
+
+    if (-not $moved -and $null -ne $HeadMoves) {
+        $now = Get-GateHeadMoveCount -RepoRoot $RepoRoot
+        if ($null -ne $now -and [int]$now -ne [int]$HeadMoves) { $moved = $true }
+    }
+
+    if (-not $moved) { return $null }
+
+    $lead = "$Gate gate: the checkout CHANGED while the gate ran -- HEAD or a file under it moved, so the run did not judge one settled tree."
+    if ($Failed) {
+        return "$lead This red is therefore NOT trustworthy: re-run the gate before hunting the failure. The usual cause is a second command in the same checkout (prune-merged.ps1 borrows the trunk and hands it back, new-branch.ps1 and worktree-lane.ps1 move it) -- the primary checkout is single-occupancy while a gate is running."
+    }
+    return "$lead This pass is therefore NOT recorded as gate evidence, so the next run gates the tree as it then stands."
 }
 
 function Get-GateEvidencePath {

@@ -134,6 +134,15 @@
     test suites run (scripts/tests/*.tests.ps1), exactly as CI does. A failing suite blocks the
     push and the PR. Use -SkipTests to deliberately skip this gate (escape valve).
 
+    BOTH GATES SAY WHEN THE CHECKOUT MOVED WHILE THEY RAN (issue #1145). They read the WORKING TREE
+    for a minute or more, and this checkout is not private to them: ship-pr backgrounds itself so the
+    session can get on with something else, and that session is told by name to run prune-merged.ps1,
+    which borrows the trunk and hands it straight back. Measured on PR #1144 -- one suite of 55 red
+    inside the gate, green standalone on the same commit seconds later. So each gate is asked
+    afterwards whether the tree held still (Get-GateTreeMovedNote): a RED then says it is not
+    trustworthy instead of reading as a real defect, and a GREEN is reported but NOT recorded as gate
+    evidence. Neither is a refusal -- a red still blocks the push, and the remedy is to re-run.
+
     Resolves gate (a lesson from PRs #341-#343): a PR that repairs an issue must say so with a
     CLOSING KEYWORD, or the issue stays open after the merge. Those three PRs each referenced their
     issues as a plain mention (`#332`), GitHub therefore auto-closed nothing, and the manual
@@ -940,6 +949,14 @@ If the title really does begin with that word, ship it with -Force.
 # helper then reports "no evidence", which runs the gates exactly as before.
 $gateFingerprint = Get-GateFingerprint -RepoRoot $repoRoot
 
+# AND HOW MANY TIMES HEAD HAS MOVED, read beside it and asked again after each gate (issue #1145). The
+# fingerprint above cannot see a checkout that CAME BACK: prune-merged.ps1 borrows the trunk to
+# fast-forward it and hands the branch back, leaving every byte identical -- and Chris's lens sends a
+# session to that script mid-assignment, which is exactly when a backgrounded ship is sitting inside
+# step 1. The reflog depth is where those two moves are recorded, and it is per-worktree, so a lane
+# moving its own checkout never registers here.
+$gateHeadMoves = Get-GateHeadMoveCount -RepoRoot $repoRoot
+
 # AND THE GATES SAY WHEN THEY RAN AGAINST SOMETHING OTHER THAN HEAD (issue #1026). Both gates below judge
 # the WORKING TREE; the push a few lines further down ships HEAD. On a clean tree those are the same thing
 # and a green result is evidence about the PR. On a dirty one they are not, and nothing said so: PR #1025's
@@ -968,13 +985,26 @@ if (-not $SkipLint) {
             Write-Host "lint gate: integrity check for the PR..." -ForegroundColor Cyan
             & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
             if ($LASTEXITCODE -ne 0) {
+                # A RED IS ONLY A FINDING IF THE TREE HELD STILL FOR IT (issue #1145). Printed before
+                # the error, so it frames the red rather than trailing it.
+                $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
+                if ($movedNote) { Write-Warning $movedNote }
                 Write-Error "lint gate found errors - branch not pushed, no PR opened. Fix the errors, or run with -SkipLint to skip the gate."
                 exit 1
             }
             # Recorded only on a real pass. -SkipLint records nothing, deliberately: skipping a gate
             # proves nothing about the tree, and writing evidence there would make the escape valve
             # silently suppress the NEXT run's gate too.
-            [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint)
+            #
+            # AND ONLY WHEN THE TREE HELD STILL (issue #1145). A pass earned over a tree that moved
+            # mid-run is real for the mixture the gate saw, and that mixture is not the fingerprint it
+            # would be filed under -- so it is reported and not recorded, and the next run gates for real.
+            $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves
+            if ($movedNote) {
+                Write-Warning $movedNote
+            } else {
+                [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint)
+            }
         }
     } else {
         Write-Warning "lint script not found at '$lintPath' - lint gate skipped."
@@ -993,11 +1023,23 @@ if (-not $SkipTests) {
     if (Test-GateEvidence -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint) {
         Write-Host "test gate: all suites already proved against this exact tree -- skipped." -ForegroundColor DarkGray
     } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the PR')) {
+        # THIS IS THE GATE THE MOVEMENT CHECK WAS MEASURED ON (issue #1145). One suite of 55 went red
+        # inside a backgrounded ship while prune-merged.ps1 borrowed the trunk in the same checkout, and
+        # green standalone on the same commit seconds later. A red is expensive to disbelieve on a hunch
+        # and expensive to believe wrongly, so the run says which one this is.
+        $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
+        if ($movedNote) { Write-Warning $movedNote }
         Write-Error "test gate found failing suites - branch not pushed, no PR opened. Fix the tests, or run with -SkipTests to skip the gate."
         exit 1
     } else {
-        # Same rule as the lint gate above: recorded only on a real pass, never on -SkipTests.
-        [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint)
+        # Same rule as the lint gate above: recorded only on a real pass, never on -SkipTests -- and
+        # never on a pass whose tree moved underneath it.
+        $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves
+        if ($movedNote) {
+            Write-Warning $movedNote
+        } else {
+            [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint)
+        }
     }
 }
 

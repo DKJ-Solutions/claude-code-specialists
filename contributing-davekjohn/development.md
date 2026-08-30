@@ -33,21 +33,69 @@
 
 ### PLAN
 
-Issue #1145: detect a checkout that moves during open-pr's lint/test gate.
+Issue #1145: a suite went red inside a backgrounded ship's test gate and green standalone on the same
+commit seconds later, while `prune-merged.ps1` borrowed the trunk in the same checkout. The report filed
+the measurement and named three candidate remedies without choosing one.
+
+#### Which of the three, and why
+
+- **Refuse when `HEAD` has moved** -- taken, as a REPORT rather than a refusal. A red still blocks the
+  push; what changes is that the reader is told the red is untrustworthy.
+- **A checkout lock for the duration** -- dropped. It needs a protocol across six tree-moving scripts plus
+  stale-lock handling, to prevent a collision the workflow itself invites (`prune-merged` is what Chris's
+  lens tells a session to run mid-assignment). Detection costs two git reads.
+- **Say it where the ship is documented** -- taken as well, because the two documented instructions
+  genuinely collide and neither page said so.
+
+#### What the fingerprint alone could not do
+
+`Get-GateFingerprint` already exists and is taken before the gates. Compared again afterwards it would have
+seen NOTHING in the measured case: a borrow hands the checkout back, so HEAD, the branch and every tracked
+file are identical at both ends. The reflog depth is where the two moves are recorded, so the check reads
+both.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `gate-lib.ps1`: `Get-GateHeadMoveCount` (HEAD's reflog depth, per-worktree) and
+      `Get-GateTreeMovedNote` (fingerprint + depth -> the sentence, or `$null`)
+- [x] `open-pr.ps1`: read the depth once beside the fingerprint; ask on both gates and both verdicts --
+      a red warns, a green warns AND is not recorded as gate evidence
+- [x] `ship-pr.ps1`: step 1 states that it is the only step reading the working tree, and therefore the
+      one window in which this checkout is single-occupancy
+- [x] `contributing-davekjohn/CONTRIBUTING.md`: the collision named where backgrounding is documented
+- [x] mirrors rebuilt (`build-shared-scripts.ps1`)
 
 ### TEST
 
+- [x] `gate-lib.tests.ps1` case 12: the borrow is caught, the fingerprint provably is not enough on its
+      own, both verdicts word themselves differently, an unmeasurable reading claims nothing, and open-pr
+      asks on all four paths with the save in the `else`
+- [x] full suite green, lint green
+
 ### DEPLOY: `fix/gate-tree-moved-under-run-v1`
 
-**Score:**
+A gate whose tree moved while it ran now says so. `open-pr`'s lint and test gates read the working tree for
+a minute or more, and that checkout is not private to them: a backgrounded `ship-pr` hands the session its
+prompt back, and the session is told by name to run `prune-merged.ps1`, which borrows the trunk and hands it
+straight back. Measured on PR #1144 -- one suite of 55 red inside the gate, green standalone on the same
+commit seconds later. A false red is the expensive half, because this repo's own rules tell a session that a
+suite red under the gate is reporting a real defect until proven otherwise.
+
+Each gate is now asked afterwards whether the tree held still: a **red** says it is not trustworthy and
+names the usual cause, and a **green** is reported and NOT recorded as gate evidence, so the next run gates
+for real instead of skipping on a pass nothing judged. Neither is a refusal -- a red still blocks the push,
+and the remedy is to re-run. The check reads two signals because one is blind: a borrowed checkout comes
+back, leaving the fingerprint identical, so `HEAD`'s reflog depth is read beside it.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer running `open-pr` gets the same sentence, and the workflow page now states plainly that the
+primary checkout is single-occupancy while a gate is running -- the one thing neither `ship-pr`'s page nor
+the lens that recommends `prune-merged` had said.
+
+**Score:** 2
 
 #### Pull Request
 

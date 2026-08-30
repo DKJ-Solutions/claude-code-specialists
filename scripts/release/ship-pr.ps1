@@ -35,6 +35,18 @@
       1. open-pr.ps1 [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
          pushes, and opens the PR. If a gate fails, nothing is pushed and this stops here.
 
+         AND IT IS THE ONE STEP THAT READS THE WORKING TREE, so it is the one window in which THIS
+         CHECKOUT IS SINGLE-OCCUPANCY (issue #1145). Everything from step 2b down reads refs and the
+         PR instead, deliberately, which is what lets the tree go home before the CI wait. Step 1
+         does not: the lint gate walks the tree and the suites walk it for a minute or more. A second
+         command in the same checkout during that minute -- prune-merged.ps1 borrowing the trunk,
+         new-branch.ps1 cutting a branch -- makes files vanish and reappear under a running suite.
+         Measured on PR #1144: one suite of 55 red inside the gate, green standalone on the same
+         commit seconds later. Nothing enforces this: open-pr now SAYS when the tree moved under a
+         gate, so the red is legible rather than mysterious, and the remedy is to re-run. Build the
+         next piece of work in a lane (worktree-lane.ps1) rather than here -- which is what step 3
+         already advises for its own reason.
+
          RESUMES A BRANCH WHOSE PR IS ALREADY OPEN. open-pr.ps1 skips only the `gh pr create` in that
          case and still runs the gates and the push, so this orchestrator carries straight on to
          step 2. Until August 4, 2026 it could not: `gh pr create` was unconditional, a duplicate
