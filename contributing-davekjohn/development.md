@@ -82,7 +82,18 @@ runs are now literally the gates the PR would have run, because they are the sam
 - [x] `gate-lib.tests.ps1` extended: the structural cases that introspected `open-pr.ps1` retargeted at the
       extracted function, the ordering property (`-GatesOnly` before the `main` refusal) asserted, and
       behavioural coverage of `Invoke-WorkflowGates` against a real git fixture.
-- [x] Lint gate and all suites green.
+- [x] **The review caught a defect the extraction had introduced, and it is the reason this branch has
+      a second commit.** The lint gate ran as a bare `& powershell -File $lintPath` call — safe as a
+      top-level statement, unsafe inside a function whose return value the caller consumes, because the
+      child's stdout comes back on the success stream and joins the return. A **failing** lint gate read
+      as green. Reproduced against a fake lint script before repairing it, and repaired with
+      `Start-Process -NoNewWindow -Wait`. The regression guard counts the elements returned, because an
+      assert on the bool alone passes under both the broken and the fixed code.
+- [x] Lint gate and all suites green — run through this branch's own `-GatesOnly` flag: lint clean,
+      55 suites, 0 fail.
+- [x] That run printed its runtime as `2.182s` for 2182 seconds, because `{N0}` formats in the
+      operator's locale. Outside this branch's subject, so filed as
+      [#1159](https://github.com/DaveKJohn/claude-code-specialists/issues/1159) rather than widened into it.
 
 ### DEPLOY: `fix/named-gate-entry-point-v1`
 
