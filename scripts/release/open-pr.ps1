@@ -233,7 +233,8 @@
 
 .PARAMETER GatesOnly
     Run this repo's lint and test gates against the working tree and stop there -- no branch check, no
-    push, no PR, nothing written. Exit 0 when both are green, 1 when either is not.
+    push, no PR. Exit 0 when both are green, 1 when either is not. It writes nothing to the working
+    tree and nothing to GitHub; the one thing it does record is gate evidence, below.
 
     IT EXISTS FOR THE COMMITS THAT ARE MADE ON THE TRUNK (issue #1156, August 30, 2026). Three changes
     land directly on `main` under named exceptions -- the fold, the release commit, and the release
@@ -342,6 +343,21 @@ if ($repo -match 'VUL-IN' -or (Get-LintScript) -match 'VUL-IN') {
 # that describe the consequence differing. That is the whole point of the flag: a second way to reach
 # the gates that cannot reach a different verdict.
 if ($GatesOnly) {
+    # SAY WHAT IS BEING IGNORED, rather than dropping it. Everything below this block is about a
+    # branch, a push or a PR, so a PR-shaped parameter passed alongside -GatesOnly has no effect --
+    # and a flag that quietly does nothing is the same class of failure as the invocation this whole
+    # change exists to replace. Named, not refused: the run is still exactly what was asked for.
+    $ignored = @()
+    if ($Title)       { $ignored += '-Title' }
+    if ($Body)        { $ignored += '-Body' }
+    if ($Resolves)    { $ignored += '-Resolves' }
+    if ($NoResolves)  { $ignored += '-NoResolves' }
+    if ($Force)       { $ignored += '-Force' }
+    if ($RefreshBody) { $ignored += '-RefreshBody' }
+    if ($ignored.Count -gt 0) {
+        Write-Warning ("-GatesOnly runs the gates and nothing else, so these were ignored: " + ($ignored -join ', ') + ".")
+    }
+
     if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context 'the gate run' -FailureConsequence 'nothing else ran, nothing was written')) {
         exit 1
     }

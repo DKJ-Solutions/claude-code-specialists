@@ -81,12 +81,13 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" 
 ```
 
 Runs step 4 above — the repo's lint gate, then every test suite — against the **working tree**, and stops
-there. No branch check, no push, no PR, nothing written. Exit 0 when both are green, 1 when either is not.
+there. No branch check, no push, no PR. Exit 0 when both are green, 1 when either is not. It writes
+nothing to the working tree and nothing to GitHub -- the one thing it records is gate evidence, below.
 `-SkipLint` / `-SkipTests` still work and still mean what they mean everywhere else.
 
 **It exists for the commits that are made on the trunk**
 ([#1156](https://github.com/DaveKJohn/claude-code-specialists/issues/1156), August 30, 2026). Three changes
-land directly on `main` under named exceptions — the fold, the release commit, and the release notes --
+land directly on `main` under named exceptions — the fold, the release commit, and the release notes —
 and the first two are made by scripts that gate themselves. The third is typed by hand, and the
 `cut-release` page told its reader to run the gates *"exactly as `open-pr` would have run them for you"*.
 They could not: **this script refuses on `main`**, six hundred lines before it reaches a gate. So the

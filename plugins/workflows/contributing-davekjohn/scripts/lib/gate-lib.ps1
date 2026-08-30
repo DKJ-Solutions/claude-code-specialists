@@ -563,8 +563,31 @@ function Invoke-WorkflowGates {
                 Write-Host "lint gate: already proved against this exact tree -- skipped." -ForegroundColor DarkGray
             } else {
                 Write-Host "lint gate: integrity check for $Context..." -ForegroundColor Cyan
-                & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
-                if ($LASTEXITCODE -ne 0) {
+                # START-PROCESS AND NOT `& powershell`, AND THE DIFFERENCE IS THE FUNCTION BOUNDARY.
+                # As a top-level statement in open-pr.ps1 the bare call operator was safe: the child's
+                # stdout went to the console and only $LASTEXITCODE was read. Inside a function whose
+                # return value the caller consumes -- `if (-not (Invoke-WorkflowGates ...))` -- every
+                # uncaptured line the child prints becomes part of what this function RETURNS, because
+                # stream type does not survive a process boundary and arrives as plain strings on the
+                # success stream. PowerShell then coerces the resulting multi-element array to $true
+                # unconditionally, so `-not` is $false and A FAILING LINT GATE READS AS GREEN.
+                #
+                # REPRODUCED before it was repaired (August 30, 2026): a fake lint script printing two
+                # lines and exiting 1 made this function return @('line', 'line', $false), and the
+                # caller's exit never fired. It is invisible on the happy path -- a green run pollutes
+                # the return identically and the truthy answer happens to be correct -- which is why it
+                # would have survived any test that only ever passes.
+                #
+                # Start-Process -NoNewWindow -Wait emits NOTHING to the pipeline and hands the child this
+                # console, so the lint output stays live and coloured rather than being buffered or
+                # stripped by a pipe -- the same choice, for the same reason, that Invoke-TestSuiteGate
+                # makes for the suites. -WorkingDirectory is NOT optional: Start-Process starts the child
+                # in [Environment]::CurrentDirectory, which does not follow Set-Location, so the caller's
+                # own location has to be passed for the child to see the tree the bare call gave it.
+                $lintRun = Start-Process -FilePath 'powershell' `
+                    -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $lintPath + '"')) `
+                    -NoNewWindow -Wait -PassThru -WorkingDirectory (Get-Location).Path
+                if ($lintRun.ExitCode -ne 0) {
                     # A RED IS ONLY A FINDING IF THE TREE HELD STILL FOR IT (issue #1145). Printed before
                     # the error, so it frames the red rather than trailing it.
                     $movedNote = Get-GateTreeMovedNote -RepoRoot $RepoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed

@@ -431,7 +431,7 @@ a release for a missing timestamp would be ceremony rather than a guard.
    powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -GatesOnly
    ```
 
-   **In the source repo, run its own copy instead** -- `scripts/release/open-pr.ps1 -GatesOnly` — for the
+   **In the source repo, run its own copy instead** — `scripts/release/open-pr.ps1 -GatesOnly` — for the
    reason given at the top of this page.
 
    **This line replaced *"exactly as `open-pr` would have run them for you"* on August 30, 2026
