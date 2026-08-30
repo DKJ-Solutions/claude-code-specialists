@@ -35,19 +35,66 @@
 
 Issue #1143. Invoke-GitPark's push-failure line asserts a misconfigured remote; since #900 the common case is a non-fast-forward. Make the summary follow $pushRes.Output, and repair the docstring at line 84 that quotes the old wording.
 
+#### Verified before it was repaired
+
+All six inbound checks pass against the tree. The symptom stands (`park-lib.ps1:442`); the reason stands
+(#900 made the push a default -- `new-branch.ps1:700` and the `cycle-autopark` Stop hook); the proposed
+repair names a mechanism that exists (`Invoke-NativeCapture` merges stderr at `native-capture-lib.ps1:116`,
+so git's `[rejected]` line really is in `$pushRes.Output`); subject, size and repo are all as reported.
+
+One thing the report did **not** name, found by reading the file: the docstring at line 84 quotes the old
+sentence **verbatim**, so the repair leaves it stale. Same file, so it is inside this branch rather than a
+finding of its own.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add `Get-GitPushFailureMessage` to `scripts/lib/park-lib.ps1` -- three arms, chosen from what git
+      said: a rejection, an unreachable remote, and a fallback that names no cause at all.
+- [x] Point the failure branch at line 442 at it, flattening `$pushRes.Output` with `Out-String` first
+      (`-match` against an array returns the matching elements, not a boolean).
+- [x] Repair the two now-stale sentences in `Test-GitOriginConfigured`'s docstring -- the verbatim quote
+      and the "Invoke-GitPark is deliberately NOT changed" line above it.
+- [x] Regenerate the plugin mirror (`scripts/sync/build-shared-scripts.ps1`).
 
 ### TEST
 
+- [x] New section (d3) in `scripts/tests/park-branch.tests.ps1`: a fixture that diverges with
+      `git commit --amend` (the same rejection, none of the destructive shape of a reset), asserting the
+      run still exits 1, that the summary names the real cause, and that it no longer sends the reader to
+      check the remote -- plus the three message arms asserted on the function directly.
+- [x] Proven to fail against the pre-fix lib: both end-to-end asserts go red and the arm asserts cannot
+      resolve the function. A regression test that passes both ways is worth nothing.
+- [x] Full local gate: `check-plugin-integrity.ps1` + every suite.
+
 ### DEPLOY: `fix/park-push-failure-follows-git-v1`
 
-**Score:**
+`Invoke-GitPark` now **reports what git said about a failed push instead of asserting one cause**. The
+single sentence it used to write -- `park: git push failed (is 'origin' configured and reachable?)` -- was
+the right question while `park-branch.ps1` was the only caller: you had *asked* for a park, so the
+interesting failure was that there was nowhere to push to. #900 changed the caller and not the message.
+`new-branch.ps1` pushes on every branch creation and `cycle-autopark` pushes on every Stop, so the common
+failure is now a **non-fast-forward against a branch already on origin** -- and the summary sat underneath
+git's own `! [rejected] ... (non-fast-forward)` asserting something else. Nothing landed wrong: the push
+really did fail and the run really did exit non-zero. Only the line a reader trusts over the raw text --
+which is what a summary is for -- pointed at `git remote -v`.
+
+`Get-GitPushFailureMessage` now picks from three arms: the rejection (*origin already has commits this
+branch does not; pull or rebase first*), a remote that is named but unusable (*origin could not be
+reached*), and, where neither shape matches, *git's own output is above* -- naming no cause on purpose,
+because the run does not know one and a guess reads as a finding. It is a function rather than an inline
+`if` so a test can assert the arms from their text instead of staging three different remote failures,
+the same reason `Get-GitParkScopes` is one.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+`park-lib.ps1` is mirrored into every consumer's plugin cache, and this message is one of the few things
+this workflow says when something goes wrong on the remote. A consumer meeting the old line has no context
+for `origin` being fine: they have a branch that will not park and a sentence telling them to go and check
+their remote configuration. They now get the sentence that matches what happened.
+
+**Score:** 3
 
 #### Pull Request
 

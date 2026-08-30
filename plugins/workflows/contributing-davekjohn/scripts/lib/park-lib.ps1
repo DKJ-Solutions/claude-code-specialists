@@ -81,14 +81,16 @@ function Test-GitOriginConfigured {
 
         WHY THE AUTOMATIC CALLERS NEED THIS AND THE DELIBERATE ONE DOES NOT (#900, August 26, 2026). A
         repo with no remote is a legitimate repo, and until this was the DEFAULT nobody met the case: you
-        asked for a park, so `park: git push failed (is 'origin' configured and reachable?)` was the right
-        answer to give you. Once new-branch pushes on its own, that same failure arrives unasked -- and it
-        would exit 1 out of branch CREATION in every remote-less repo, turning "there is nowhere to push"
-        into "your branch could not be made". Found by the suite, whose fixtures deliberately configure no
-        remote to assert that new-branch stayed local.
+        asked for a park, so a push failure naming the remote was the right answer to give you. Once
+        new-branch pushes on its own, that same failure arrives unasked -- and it would exit 1 out of
+        branch CREATION in every remote-less repo, turning "there is nowhere to push" into "your branch
+        could not be made". Found by the suite, whose fixtures deliberately configure no remote to assert
+        that new-branch stayed local.
 
-        So Invoke-GitPark is deliberately NOT changed: park-branch.ps1 must keep reporting the failure it
-        always did. This is the question its two automatic callers ask FIRST, and skip on.
+        So Invoke-GitPark still REPORTS every failed push and park-branch.ps1 still stops on it. This is
+        the question its two automatic callers ask FIRST, and skip on -- so a remote-less repo never
+        reaches the push at all. What that report SAYS stopped being one fixed sentence in #1143, for the
+        other half of the same shift: see Get-GitPushFailureMessage.
     #>
     param([Parameter(Mandatory)][string]$RepoRoot)
 
@@ -358,6 +360,48 @@ function Format-GitParkBacking {
     return ($lines -join "`n")
 }
 
+function Get-GitPushFailureMessage {
+    <#
+        The one sentence Invoke-GitPark writes over a failed `git push`, CHOSEN FROM WHAT GIT SAID rather
+        than asserting a single cause (issue #1143, August 30, 2026). $Output is the push's own captured
+        output: Invoke-NativeCapture is called there WITHOUT -DiscardStderr, so git's own diagnosis is in
+        it and on the screen already -- what was wrong was only the summary sitting underneath it.
+
+        WHY IT STOPPED BEING ONE SENTENCE. `park: git push failed (is 'origin' configured and reachable?)`
+        was the right question while park-branch.ps1 was the only caller: you had ASKED for a park, so the
+        interesting failure was that there was nowhere to push to. Since #900 the push is what new-branch
+        does on every branch creation and what cycle-autopark does on every Stop, so the common failure is
+        now a NON-FAST-FORWARD against a branch that is already on origin -- and a reader who trusts the
+        summary over the raw text above it (which is what a summary is for) goes and checks `git remote -v`
+        for nothing. park-branch.tests.ps1 section (d3) stages exactly that push and holds this function to
+        it; before this change both of its end-to-end asserts were red.
+
+        THE LAST ARM NAMES NO CAUSE ON PURPOSE. Where neither shape matches, the run does not know why the
+        push failed, and pointing at the output it has already printed is worth more than a guess that
+        reads as a finding.
+
+        Exposed rather than inlined so a test can assert the three arms from their text, instead of having
+        to stage three different remote failures -- the same reason Get-GitParkScopes is a function.
+    #>
+    param([string]$Output)
+
+    # -match, NOT -like: '[rejected]' is a character class to BOTH operators, so the brackets have to be
+    # escaped either way, and a regex is the form that can carry the alternation as well. 'fetch first' is
+    # git's own advice line on the same rejection, kept so the hint alone is still recognised.
+    if ($Output -match '\[rejected\]|non-fast-forward|fetch first') {
+        return "park: git push was rejected -- origin already has commits this branch does not (see the '[rejected]' line above). Bring the branch up to date first (git pull --rebase), then park again."
+    }
+
+    # There is nowhere to push TO -- the question the old single sentence asked. Test-GitOriginConfigured
+    # answers the 'no remote at all' half before either automatic caller reaches a push, so what arrives
+    # here is a remote that is named but unusable: gone, renamed, offline, or refusing this account.
+    if ($Output -match 'does not appear to be a git repository|Could not read from remote repository|Repository not found|Permission denied|Authentication failed|unable to access') {
+        return "park: git push failed -- origin could not be reached (see git's message above). Check the remote and your access to it."
+    }
+
+    return "park: git push failed -- git's own output is above."
+}
+
 function Invoke-GitPark {
     <#
         Parks $Branch: stages what $Scope says, commits it when there is something staged, and pushes with
@@ -439,7 +483,13 @@ function Invoke-GitPark {
     # No PR: push != PR (the PR rule stays intact and separate).
     $pushRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'push', '-u', 'origin', $Branch)
     $pushRes.Output | ForEach-Object { Write-Host $_ }
-    if ($pushRes.ExitCode -ne 0) { Write-Error "park: git push failed (is 'origin' configured and reachable?)."; return $false }
+    if ($pushRes.ExitCode -ne 0) {
+        # Flattened before it is matched: with stderr merged in (2>&1) the captured output is an ARRAY that
+        # can hold ErrorRecords as well as strings, and -match against an array returns the matching
+        # elements rather than a boolean -- which an if() then reads as true for any non-empty result.
+        Write-Error (Get-GitPushFailureMessage -Output ($pushRes.Output | Out-String))
+        return $false
+    }
 
     Write-Host "Branch '$Branch' parked on origin -- $($script:GitParkScopes[$Scope]) (pushed, no PR)." -ForegroundColor Green
     return $true
