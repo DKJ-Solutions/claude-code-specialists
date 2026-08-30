@@ -22,6 +22,15 @@
     the fake. Each fixture is a genuine `git init` under the temp directory, keyed on $PID so
     concurrent suites cannot collide (the gate runs these in parallel).
 
+    SINCE AUGUST 30, 2026 (issue #1156) THIS FILE ALSO COVERS Invoke-WorkflowGates, THE FUNCTION AT
+    THE BOTTOM OF gate-lib.ps1. It is the block that used to live inline in open-pr.ps1 -- the
+    dirty-tree warning, the fingerprint, the reflog depth, both Test-GateEvidence consults, both
+    Save-GateEvidence records, all four Get-GateTreeMovedNote calls -- pulled out so a second caller
+    (open-pr's own -GatesOnly short-circuit, needed for the release-notes commit made standing on
+    main) can reach it without rebuilding it by hand. Cases 8, 12 and 13 are the structural asserts
+    that used to read $openPr and now read the function's own source; case 9 is what is left of
+    open-pr's part; cases 14-16 are new for the move itself.
+
     Dependency-free (no Pester), same style as the rest of the suite.
 #>
 $ErrorActionPreference = 'Stop'
@@ -222,26 +231,60 @@ try {
     Assert-True (-not (Test-GateEvidence -RepoRoot $r7 -Gate 'tests')) 'and the skip is gone with it'
     Assert-True ([bool](Clear-GateEvidence -RepoRoot $r7)) 'clearing an absent record is not an error'
 
-    # --- 8. open-pr wires it in, and only on a real pass ---------------------------------------
-    # The lib being right proves nothing about it being REACHED -- the lesson pr-issues-lib cost:
-    # a pure decision table proves the decision, never that it is reached.
-    Write-Host "`n== 8. open-pr.ps1 consults and records ==" -ForegroundColor Cyan
-    $openPr = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\open-pr.ps1'))
-    Assert-True ($openPr -match "lib\\gate-lib\.ps1") 'open-pr dot-sources gate-lib'
-    Assert-True ($openPr -match 'Get-GateFingerprint -RepoRoot \$repoRoot') 'it computes the fingerprint once'
-    Assert-Equal 1 ([regex]::Matches($openPr, 'Get-GateFingerprint').Count) 'exactly once, not per gate'
-    Assert-Equal 2 ([regex]::Matches($openPr, 'Test-GateEvidence').Count) 'both gates consult the record'
-    Assert-Equal 2 ([regex]::Matches($openPr, 'Save-GateEvidence').Count) 'and both record their own pass'
+    # The raw text of both files, read once here and reused across the structural cases below --
+    # extracting the same text twice would be two chances to read it differently.
+    $libText = [System.IO.File]::ReadAllText($LibPath)
+    $openPr  = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\open-pr.ps1'))
+
+    # Invoke-WorkflowGates is the LAST function in gate-lib.ps1 (verified by case 8 below), so a
+    # greedy match from its declaration to the last '}' in the file lands exactly on its own closing
+    # brace and cannot cross into another function -- the same reasoning the old $lintBlock/$testBlock
+    # extraction against $openPr relied on when that code lived at the top level of that file.
+    $gatesFuncBody = [regex]::Match($libText, '(?s)function Invoke-WorkflowGates \{.*\}').Value
+
+    # --- 8. Invoke-WorkflowGates wires the evidence in, and only on a real pass ----------------
+    # RETARGETED HERE ON AUGUST 30, 2026 (issue #1156). This block -- the dirty-tree warning, the
+    # fingerprint, both Test-GateEvidence consults, both Save-GateEvidence records -- used to live
+    # inline in open-pr.ps1 and is asserted there in the suite's history. It now lives inside this
+    # function, so the SAME asserts (same counts, same "the escape valves must record nothing"
+    # property) are asked of gate-lib.ps1's own text instead. Case 9 covers what is left in open-pr.
+    #
+    # The lib being right proves nothing about it being REACHED -- the lesson pr-issues-lib cost: a
+    # pure decision table proves the decision, never that it is reached.
+    Write-Host "`n== 8. Invoke-WorkflowGates consults and records ==" -ForegroundColor Cyan
+    Assert-True ([bool]$gatesFuncBody) 'Invoke-WorkflowGates is found, and is the last function in the file'
+    Assert-True ($gatesFuncBody -match 'Get-GateFingerprint -RepoRoot \$RepoRoot') 'it computes the fingerprint once'
+    Assert-Equal 1 ([regex]::Matches($gatesFuncBody, 'Get-GateFingerprint').Count) 'exactly once, not per gate'
+    Assert-Equal 2 ([regex]::Matches($gatesFuncBody, 'Test-GateEvidence').Count) 'both gates consult the record'
+    Assert-Equal 2 ([regex]::Matches($gatesFuncBody, 'Save-GateEvidence').Count) 'and both record their own pass'
 
     # The escape valves must record nothing: a skipped gate proves nothing about the tree, and
     # evidence written there would make -SkipTests suppress the NEXT run's gate as well.
-    $lintBlock = [regex]::Match($openPr, '(?s)if \(-not \$SkipLint\).*?\n\}').Value
-    $testBlock = [regex]::Match($openPr, '(?s)if \(-not \$SkipTests\).*?\n\}').Value
+    #
+    # '\n    \}' (four spaces, nothing else on the line) rather than '\n\}': this code is now
+    # INDENTED one level inside the function, so the top-level-code pattern the suite used while this
+    # lived in open-pr.ps1 would run straight past the nested if/else braces underneath it and stop
+    # at the wrong place. The outer if's own close is the only line at exactly this indent within
+    # each block (verified against the fixture: every inner close sits at eight spaces or deeper).
+    $lintBlock = [regex]::Match($gatesFuncBody, '(?s)if \(-not \$SkipLint\) \{.*?\n    \}').Value
+    $testBlock = [regex]::Match($gatesFuncBody, '(?s)if \(-not \$SkipTests\) \{.*?\n    \}').Value
+    Assert-True ([bool]$lintBlock) 'the -SkipLint guard is found as a single block'
+    Assert-True ([bool]$testBlock) 'the -SkipTests guard is found as a single block'
     Assert-True ($lintBlock -match 'Save-GateEvidence') 'the lint save sits INSIDE the -SkipLint guard'
     Assert-True ($testBlock -match 'Save-GateEvidence') 'the tests save sits INSIDE the -SkipTests guard'
 
-    # --- 9. the pair is registered and mirrored ------------------------------------------------
-    Write-Host "`n== 9. the lib travels to the consumer ==" -ForegroundColor Cyan
+    # --- 9. open-pr's own part shrank to two call sites (issue #1156) --------------------------
+    # The whole point of the move was that open-pr keeps no second copy of the gate logic and no
+    # second way to reach it: one dot-source, two calls into the shared function, nothing else.
+    Write-Host "`n== 9. open-pr reaches the gates through Invoke-WorkflowGates alone ==" -ForegroundColor Cyan
+    Assert-True ($openPr -match "lib\\gate-lib\.ps1") 'open-pr still dot-sources gate-lib'
+    Assert-Equal 2 ([regex]::Matches($openPr, 'Invoke-WorkflowGates -RepoRoot \$repoRoot').Count) 'exactly two call sites -- the PR path and -GatesOnly'
+    Assert-True ($openPr -notmatch 'Save-GateEvidence') 'no inline Save-GateEvidence left behind'
+    Assert-True ($openPr -notmatch 'Get-GateFingerprint') 'no inline Get-GateFingerprint left behind'
+    Assert-True ($openPr -notmatch 'Test-GateEvidence') 'no inline Test-GateEvidence left behind'
+
+    # --- 10. the pair is registered and mirrored ------------------------------------------------
+    Write-Host "`n== 10. the lib travels to the consumer ==" -ForegroundColor Cyan
     . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
     $pairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot)
     $gatePair = @($pairs | Where-Object { $_.Name -eq 'gate-lib' })
@@ -254,105 +297,246 @@ try {
         Assert-Equal $srcText.Length $mirText.Length 'source and mirror are byte-identical in length'
     }
 
-    # --- 10. CI must never consult a local record ----------------------------------------------
+    # --- 11. CI must never consult a local record ----------------------------------------------
     # A fresh checkout has no state file, so this holds today by construction. The assert exists so
     # that stays true if somebody later teaches ci.yml to reuse open-pr's gate wiring.
-    Write-Host "`n== 10. CI is unaffected ==" -ForegroundColor Cyan
+    Write-Host "`n== 11. CI is unaffected ==" -ForegroundColor Cyan
     $ci = [System.IO.File]::ReadAllText((Join-Path $RepoRoot '.github\workflows\ci.yml'))
     Assert-True ($ci -notmatch 'Test-GateEvidence') 'ci.yml does not consult gate evidence'
     Assert-True ($ci -notmatch 'gate-lib') 'ci.yml does not load gate-lib at all'
 
-    # --- 11. the dirty-tree statement (issue #1026) --------------------------------------------
+    # --- 12. the dirty-tree statement (issue #1026) --------------------------------------------
     # The fingerprint answers "same tree as last time" and CANNOT answer "is this tree HEAD" -- it
     # hashes the distinction away. That second question is the one a gate RESULT depends on, because
     # the gates judge the working tree while the PR ships HEAD. Measured on PR #1025: a lint run
     # walked a manual with two new rules in it, reported zero errors, and the rules were not in the PR.
-    Write-Host "`n== 11. how far the tree is from HEAD ==" -ForegroundColor Cyan
-    $r11 = New-GitFixture
-    Assert-Equal 0 (Get-GateTreeDirtyCount -RepoRoot $r11) 'a clean tree is zero files from HEAD'
+    Write-Host "`n== 12. how far the tree is from HEAD ==" -ForegroundColor Cyan
+    $r12dirty = New-GitFixture
+    Assert-Equal 0 (Get-GateTreeDirtyCount -RepoRoot $r12dirty) 'a clean tree is zero files from HEAD'
 
-    Set-FixtureFile -Dir $r11 -Name 'tracked.txt' -Content "two`n"
-    Assert-Equal 1 (Get-GateTreeDirtyCount -RepoRoot $r11) 'a modified tracked file counts'
+    Set-FixtureFile -Dir $r12dirty -Name 'tracked.txt' -Content "two`n"
+    Assert-Equal 1 (Get-GateTreeDirtyCount -RepoRoot $r12dirty) 'a modified tracked file counts'
 
     # --untracked-files=all, for the same reason park-lib forces it: git's default collapses an
     # untracked DIRECTORY to one entry naming the directory, so a new suite inside a new folder would
     # count as a single file -- or as none, once the folder is the thing being reported.
-    New-Item -ItemType Directory -Path (Join-Path $r11 'fresh') -Force | Out-Null
-    Set-FixtureFile -Dir $r11 -Name 'fresh\a.txt' -Content "a`n"
-    Set-FixtureFile -Dir $r11 -Name 'fresh\b.txt' -Content "b`n"
-    Assert-Equal 3 (Get-GateTreeDirtyCount -RepoRoot $r11) 'untracked files inside a NEW directory are counted individually'
+    New-Item -ItemType Directory -Path (Join-Path $r12dirty 'fresh') -Force | Out-Null
+    Set-FixtureFile -Dir $r12dirty -Name 'fresh\a.txt' -Content "a`n"
+    Set-FixtureFile -Dir $r12dirty -Name 'fresh\b.txt' -Content "b`n"
+    Assert-Equal 3 (Get-GateTreeDirtyCount -RepoRoot $r12dirty) 'untracked files inside a NEW directory are counted individually'
 
     # Committing clears it: that is the whole point -- a clean tree is what makes a green gate
     # evidence about the PR rather than about the working copy.
-    Invoke-FixtureGit -Dir $r11 'add' '-A'
-    Invoke-FixtureGit -Dir $r11 'commit' '-qm' 'second'
-    Assert-Equal 0 (Get-GateTreeDirtyCount -RepoRoot $r11) 'committing the lot brings it back to zero'
+    Invoke-FixtureGit -Dir $r12dirty 'add' '-A'
+    Invoke-FixtureGit -Dir $r12dirty 'commit' '-qm' 'second'
+    Assert-Equal 0 (Get-GateTreeDirtyCount -RepoRoot $r12dirty) 'committing the lot brings it back to zero'
 
     # NOT MEASURED is not ZERO. Zero is the reassuring answer, and handing it back for "git could not
     # answer" would print an all-clear over an unknown.
     Assert-True ($null -eq (Get-GateTreeDirtyCount -RepoRoot $FixtureRoot)) 'outside a repository the count is $null, never 0'
 
-    # And open-pr has to actually SAY it -- the lib being right proves nothing about it being reached.
-    Assert-True ($openPr -match 'Get-GateTreeDirtyCount -RepoRoot \$repoRoot') 'open-pr measures the distance from HEAD'
-    Assert-Equal 1 ([regex]::Matches($openPr, 'Get-GateTreeDirtyCount').Count) 'exactly once, above both gates rather than inside each'
-    Assert-True ($openPr -match 'DIRTY tree') 'and warns in words a reader can act on'
+    # And Invoke-WorkflowGates has to actually SAY it -- the lib being right proves nothing about it
+    # being reached. Retargeted at gate-lib.ps1's own function body on August 30, 2026 (issue #1156):
+    # this used to be asked of $openPr, at the top level of that file, while the measurement lived
+    # there inline.
+    Assert-True ($gatesFuncBody -match 'Get-GateTreeDirtyCount -RepoRoot \$RepoRoot') 'Invoke-WorkflowGates measures the distance from HEAD'
+    Assert-Equal 1 ([regex]::Matches($gatesFuncBody, 'Get-GateTreeDirtyCount').Count) 'exactly once, above both gates rather than inside each'
+    Assert-True ($gatesFuncBody -match 'DIRTY tree') 'and warns in words a reader can act on'
     # Said BEFORE either gate runs, so it frames the results instead of trailing them.
-    Assert-True ($openPr.IndexOf('Get-GateTreeDirtyCount') -lt $openPr.IndexOf('if (-not $SkipLint)')) 'the warning is printed above the lint gate, not after it'
+    Assert-True ($gatesFuncBody.IndexOf('Get-GateTreeDirtyCount') -lt $gatesFuncBody.IndexOf('if (-not $SkipLint)')) 'the warning is printed above the lint gate, not after it'
 
-    # --- 12. the checkout that moved WHILE the gate ran (issue #1145) --------------------------
+    # --- 13. the checkout that moved WHILE the gate ran (issue #1145) --------------------------
     # The fingerprint above is taken before the gates and spent on the skip decision. Asked again
     # afterwards it answers a second question -- did the gates judge one settled tree -- and it
     # answers it INCOMPLETELY, which is the property this case exists to pin. A borrowed checkout
     # comes back: prune-merged.ps1 fast-forwards the trunk and returns the branch, so HEAD, the
     # branch name and every tracked file are identical at both ends. Measured on PR #1144, where one
     # suite of 55 went red inside a ship's gate and green standalone on the same commit.
-    Write-Host "`n== 12. a tree that moved under a gate ==" -ForegroundColor Cyan
-    $r12 = New-GitFixture
-    $f12 = Get-GateFingerprint -RepoRoot $r12
-    $h12 = Get-GateHeadMoveCount -RepoRoot $r12
-    Assert-True ($null -ne $h12 -and $h12 -ge 1) 'a repository with a commit has a reflog depth'
-    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12)) 'a tree that held still reports nothing'
+    Write-Host "`n== 13. a tree that moved under a gate ==" -ForegroundColor Cyan
+    $r13moved = New-GitFixture
+    $f13 = Get-GateFingerprint -RepoRoot $r13moved
+    $h13 = Get-GateHeadMoveCount -RepoRoot $r13moved
+    Assert-True ($null -ne $h13 -and $h13 -ge 1) 'a repository with a commit has a reflog depth'
+    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $r13moved -Gate 'tests' -Fingerprint $f13 -HeadMoves $h13)) 'a tree that held still reports nothing'
 
     # THE BORROW, AND THE BLIND SPOT IT PROVES. Both asserts matter: the second says the fingerprint
     # alone would have seen NOTHING here, which is why the reflog depth is read beside it.
-    Invoke-FixtureGit -Dir $r12 'checkout' '-q' '-b' 'borrowed'
-    Invoke-FixtureGit -Dir $r12 'checkout' '-q' '-'
-    Assert-Equal ($h12 + 2) (Get-GateHeadMoveCount -RepoRoot $r12) 'a borrow-and-return costs two reflog entries'
-    Assert-Equal $f12 (Get-GateFingerprint -RepoRoot $r12) 'and leaves the fingerprint identical -- the blind spot'
+    Invoke-FixtureGit -Dir $r13moved 'checkout' '-q' '-b' 'borrowed'
+    Invoke-FixtureGit -Dir $r13moved 'checkout' '-q' '-'
+    Assert-Equal ($h13 + 2) (Get-GateHeadMoveCount -RepoRoot $r13moved) 'a borrow-and-return costs two reflog entries'
+    Assert-Equal $f13 (Get-GateFingerprint -RepoRoot $r13moved) 'and leaves the fingerprint identical -- the blind spot'
 
-    $red12 = Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12 -Failed
-    Assert-True ([bool]$red12) 'so the borrow is still reported'
-    Assert-True ($red12 -match 'NOT trustworthy') 'a red says the verdict cannot be relied on'
-    $green12 = Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12
-    Assert-True ($green12 -match 'NOT recorded as gate evidence') 'a green says it will not be filed as proof'
-    Assert-True ($green12 -notmatch 'trustworthy') 'and does not borrow the red sentence'
+    $red13 = Get-GateTreeMovedNote -RepoRoot $r13moved -Gate 'tests' -Fingerprint $f13 -HeadMoves $h13 -Failed
+    Assert-True ([bool]$red13) 'so the borrow is still reported'
+    Assert-True ($red13 -match 'NOT trustworthy') 'a red says the verdict cannot be relied on'
+    $green13 = Get-GateTreeMovedNote -RepoRoot $r13moved -Gate 'tests' -Fingerprint $f13 -HeadMoves $h13
+    Assert-True ($green13 -match 'NOT recorded as gate evidence') 'a green says it will not be filed as proof'
+    Assert-True ($green13 -notmatch 'trustworthy') 'and does not borrow the red sentence'
 
     # The other half: content that changed and stayed changed, with HEAD never moving.
-    $r12b = New-GitFixture
-    $f12b = Get-GateFingerprint -RepoRoot $r12b
-    $h12b = Get-GateHeadMoveCount -RepoRoot $r12b
-    Set-FixtureFile -Dir $r12b -Name 'tracked.txt' -Content "changed mid-gate`n"
-    Assert-Equal $h12b (Get-GateHeadMoveCount -RepoRoot $r12b) 'an edit moves no reflog entry'
-    Assert-True ([bool](Get-GateTreeMovedNote -RepoRoot $r12b -Gate 'lint' -Fingerprint $f12b -HeadMoves $h12b)) 'and the fingerprint catches it instead'
+    $r13content = New-GitFixture
+    $f13b = Get-GateFingerprint -RepoRoot $r13content
+    $h13b = Get-GateHeadMoveCount -RepoRoot $r13content
+    Set-FixtureFile -Dir $r13content -Name 'tracked.txt' -Content "changed mid-gate`n"
+    Assert-Equal $h13b (Get-GateHeadMoveCount -RepoRoot $r13content) 'an edit moves no reflog entry'
+    Assert-True ([bool](Get-GateTreeMovedNote -RepoRoot $r13content -Gate 'lint' -Fingerprint $f13b -HeadMoves $h13b)) 'and the fingerprint catches it instead'
 
     # NEITHER SIGNAL MEASURED IS NOT MOVEMENT. A caller whose readings failed gets silence, never a
     # warning it cannot act on -- the same direction every other error path in this lib takes.
-    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $r12 -Gate 'tests')) 'with neither reading, nothing is claimed'
-    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $FixtureRoot -Gate 'tests' -Fingerprint $f12 -HeadMoves $h12)) 'outside a repository, nothing is claimed'
+    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $r13moved -Gate 'tests')) 'with neither reading, nothing is claimed'
+    Assert-True ($null -eq (Get-GateTreeMovedNote -RepoRoot $FixtureRoot -Gate 'tests' -Fingerprint $f13 -HeadMoves $h13)) 'outside a repository, nothing is claimed'
     Assert-True ($null -eq (Get-GateHeadMoveCount -RepoRoot $FixtureRoot)) 'and the depth itself is $null there, never 0'
 
-    # And open-pr has to ASK, on both gates and on both verdicts -- the lib being right proves
-    # nothing about it being reached.
-    Assert-Equal 1 ([regex]::Matches($openPr, 'Get-GateHeadMoveCount').Count) 'open-pr reads the reflog depth once, beside the fingerprint'
-    Assert-Equal 4 ([regex]::Matches($openPr, 'Get-GateTreeMovedNote -RepoRoot \$repoRoot').Count) 'both gates ask, on both verdicts'
-    Assert-Equal 2 ([regex]::Matches($openPr, 'Get-GateTreeMovedNote[^\r\n]*-Failed').Count) 'and only the two red paths ask as a failure'
-    Assert-True ($openPr.IndexOf('Get-GateHeadMoveCount') -lt $openPr.IndexOf('if (-not $SkipLint)')) 'the depth is read before the first gate, not after it'
+    # And Invoke-WorkflowGates has to ASK, on both gates and on both verdicts -- the lib being right
+    # proves nothing about it being reached. Retargeted at gate-lib.ps1's own function body on
+    # August 30, 2026 (issue #1156), same reasoning as case 12 above.
+    Assert-Equal 1 ([regex]::Matches($gatesFuncBody, 'Get-GateHeadMoveCount').Count) 'Invoke-WorkflowGates reads the reflog depth once, beside the fingerprint'
+    Assert-Equal 4 ([regex]::Matches($gatesFuncBody, 'Get-GateTreeMovedNote -RepoRoot \$RepoRoot').Count) 'both gates ask, on both verdicts'
+    Assert-Equal 2 ([regex]::Matches($gatesFuncBody, 'Get-GateTreeMovedNote[^\r\n]*-Failed').Count) 'and only the two red paths ask as a failure'
+    Assert-True ($gatesFuncBody.IndexOf('Get-GateHeadMoveCount') -lt $gatesFuncBody.IndexOf('if (-not $SkipLint)')) 'the depth is read before the first gate, not after it'
     # THE PASS PATH IS THE ONE WITH TEETH: a green over a moved tree must not be filed as evidence,
     # or the next run skips a gate on a tree nothing ever judged.
     Assert-True ($lintBlock.IndexOf('$movedNote') -lt $lintBlock.IndexOf('Save-GateEvidence')) 'the lint pass is recorded only after the movement question'
     Assert-True ($testBlock.IndexOf('$movedNote') -lt $testBlock.IndexOf('Save-GateEvidence')) 'the tests pass is recorded only after the movement question'
     Assert-True ($lintBlock -match '\} else \{[^\}]*Save-GateEvidence') 'the lint save sits in the else of that question'
     Assert-True ($testBlock -match '\} else \{[^\}]*Save-GateEvidence') 'the tests save sits in the else of that question'
+
+    # --- 14. -GatesOnly reaches the trunk it was built for (issue #1156) ------------------------
+    # The flag exists because open-pr refuses on main hundreds of lines below where the gates used to
+    # sit -- so the one property that actually matters is WHERE in the file the short-circuit sits: a
+    # block placed after the branch check is unreachable from the trunk it was built to serve, which
+    # is exactly the defect this issue reports. Everything else about the flag is secondary to that.
+    Write-Host "`n== 14. -GatesOnly sits before the branch check, not after it ==" -ForegroundColor Cyan
+    $idxGateLibSource  = $openPr.IndexOf('\lib\gate-lib.ps1')
+    $idxVulInPreflight = $openPr.IndexOf('repo -match ''VUL-IN''')
+    $idxGatesOnly      = $openPr.IndexOf('if ($GatesOnly) {')
+    $idxBranchCheck    = $openPr.IndexOf('if ($branch -eq ''main'')')
+    Assert-True ($idxGateLibSource -ge 0 -and $idxVulInPreflight -ge 0 -and $idxGatesOnly -ge 0 -and $idxBranchCheck -ge 0) 'all four landmarks are found'
+    Assert-True ($idxGateLibSource -lt $idxGatesOnly) '-GatesOnly sits after gate-lib is dot-sourced, so Invoke-WorkflowGates is already in scope'
+    Assert-True ($idxVulInPreflight -lt $idxGatesOnly) '-GatesOnly sits after the VUL-IN pre-flight, so it never runs on an unfilled scaffold'
+    Assert-True ($idxGatesOnly -lt $idxBranchCheck) 'and -GatesOnly sits BEFORE the branch-eq-main refusal -- the whole reason it can run on the trunk'
+
+    $gatesOnlyBlock = [regex]::Match($openPr, '(?s)if \(\$GatesOnly\) \{.*?\n\}').Value
+    Assert-True ([bool]$gatesOnlyBlock) 'the -GatesOnly block is found as a single top-level if'
+    Assert-True ($gatesOnlyBlock -match 'exit 0') 'and exits 0 on success rather than falling through into the branch/push/PR code below it'
+
+    # The two call sites must describe DIFFERENT points in the chain, or the reader cannot tell from
+    # the message alone which run they are looking at.
+    $callSites = @([regex]::Matches($openPr, 'Invoke-WorkflowGates -RepoRoot \$repoRoot[^\r\n]*'))
+    Assert-Equal 2 $callSites.Count 'exactly two call sites to compare'
+    if ($callSites.Count -eq 2) {
+        $contexts     = @($callSites | ForEach-Object { [regex]::Match($_.Value, "-Context '([^']*)'").Groups[1].Value })
+        $consequences = @($callSites | ForEach-Object { [regex]::Match($_.Value, "-FailureConsequence '([^']*)'").Groups[1].Value })
+        Assert-True ($contexts[0] -and $contexts[1] -and $contexts[0] -ne $contexts[1]) '-Context differs between the two call sites'
+        Assert-True ($consequences[0] -and $consequences[1] -and $consequences[0] -ne $consequences[1]) '-FailureConsequence differs between the two call sites'
+    }
+
+    # --- 15. Invoke-WorkflowGates itself, against a real fixture (issue #1156) -------------------
+    # Cases 8-14 prove the SHAPE of the function and of its two callers; this case runs the function
+    # for real, because a decision table (and a shape) proves the decision and proves nothing about
+    # what actually happens when it executes.
+    Write-Host "`n== 15. Invoke-WorkflowGates runs for real ==" -ForegroundColor Cyan
+
+    # 15a. Both gates skipped: no seam is needed at all, nothing is recorded, and the call succeeds.
+    # This is the case every existing branch in flight exercises today (-SkipLint -SkipTests), so it
+    # is the one that must never regress.
+    $r15 = New-GitFixture
+    Assert-True (Invoke-WorkflowGates -RepoRoot $r15 -SkipLint -SkipTests -Context 'test' -FailureConsequence 'x') '-SkipLint -SkipTests returns true without touching either seam'
+    Assert-True (-not (Test-GateEvidence -RepoRoot $r15 -Gate 'lint'))  'and records no lint evidence'
+    Assert-True (-not (Test-GateEvidence -RepoRoot $r15 -Gate 'tests')) 'nor test evidence'
+
+    # 15b. THE CONTRACT ITSELF -- Get-LintScript and Invoke-TestSuiteGate are read from the CALLER's
+    # scope, not embedded in this file (the docstring's "the caller must have dot-sourced two more
+    # things"). Proven by their absence: with -SkipTests but NOT -SkipLint, and no Get-LintScript
+    # defined anywhere in this process, the call must fail LOUDLY -- a command-not-found -- rather
+    # than silently skip the gate it cannot run.
+    $threwNoSeam = $false
+    try { [void](Invoke-WorkflowGates -RepoRoot $r15 -SkipTests -Context 'test' -FailureConsequence 'x') }
+    catch { $threwNoSeam = $true }
+    Assert-True $threwNoSeam 'without a caller-supplied Get-LintScript the lint gate fails loudly, not silently'
+
+    # From here on the suite supplies its own Get-LintScript, exactly as open-pr's dot-sourced
+    # repo-config.ps1 would. Invoke-TestSuiteGate is deliberately left undefined for the rest of this
+    # case -- every remaining call passes -SkipTests, so the test gate is never reached and the
+    # suite does not have to fake a second seam it is not exercising.
+    $script:FixtureLintScript = ''
+    function Get-LintScript { return $script:FixtureLintScript }
+
+    # 15c. A failing lint script: THE RETURN VALUE IS THE ANSWER, NOT AN EXCEPTION (August 30, 2026).
+    # Both Write-Error calls inside the function run -ErrorAction Continue precisely so this is true --
+    # every caller of this function runs under $ErrorActionPreference = 'Stop', where a plain
+    # Write-Error would terminate, the `return $false` below it would be dead code, and a test could
+    # only observe a failure by catching an exception instead of reading the bool this function
+    # promises. So both halves are asserted: the call does not throw, AND it returns $false.
+    #
+    # 2>$null on the call, not -ErrorAction on the call: the two Write-Error lines inside the function
+    # hardcode their OWN -ErrorAction Continue, which is an explicit per-cmdlet override and is not
+    # overridden in turn by an -ErrorAction the caller passes in. Redirecting stream 2 is what actually
+    # keeps the (expected, non-terminating) error record out of this suite's console output.
+    $r15fail = New-GitFixture
+    $script:FixtureLintScript = 'fixture-lint.ps1'
+    Set-FixtureFile -Dir $r15fail -Name $script:FixtureLintScript -Content "exit 1`n"
+    $threwOnFail = $false
+    $resultFail = $null
+    try { $resultFail = Invoke-WorkflowGates -RepoRoot $r15fail -SkipTests -Context 'test' -FailureConsequence 'x' 2>$null }
+    catch { $threwOnFail = $true }
+    Assert-True (-not $threwOnFail) 'a failing lint script is reported through the return value, not by throwing'
+    Assert-True (-not $resultFail) 'and the call returns $false'
+    Assert-True (-not (Test-GateEvidence -RepoRoot $r15fail -Gate 'lint')) 'recording nothing for the gate that failed'
+
+    # 15d. A passing lint script records ONLY the lint gate -- -SkipTests must not vouch for the other,
+    # the same separation case 1 already proved for Save-GateEvidence/Test-GateEvidence directly.
+    $r15pass = New-GitFixture
+    Set-FixtureFile -Dir $r15pass -Name $script:FixtureLintScript -Content "exit 0`n"
+    Assert-True (Invoke-WorkflowGates -RepoRoot $r15pass -SkipTests -Context 'test' -FailureConsequence 'x') 'a passing lint script makes the call return true'
+    Assert-True (Test-GateEvidence -RepoRoot $r15pass -Gate 'lint') 'and records the lint pass'
+    Assert-True (-not (Test-GateEvidence -RepoRoot $r15pass -Gate 'tests')) 'but -SkipTests records no test evidence -- the escape valve proves nothing about the tree'
+
+    # 15e. THE SHAPE OF THE RETURN VALUE ITSELF -- a CRITICAL regression found in code review and
+    # fixed the same day (August 30, 2026). A lint gate invoked as `& powershell -File $lintPath`
+    # was safe as a top-level statement in open-pr.ps1: the child's stdout went straight to the
+    # console and only $LASTEXITCODE was read. Moved inside a function whose return value the caller
+    # consumes -- `if (-not (Invoke-WorkflowGates ...))` -- every line the child printed on its own
+    # stdout came back as a plain String on the SUCCESS stream (stream type does not survive a
+    # process boundary), ahead of this function's own `return $false`. PowerShell coerces a
+    # MULTI-ELEMENT array to $true unconditionally, so `-not` read $false and A FAILING LINT GATE
+    # CAME BACK GREEN. Reproduced with a fake lint script printing two lines and exiting 1, then
+    # repaired with Start-Process -NoNewWindow -Wait -PassThru, which emits nothing to the pipeline.
+    #
+    # A CASE ASSERTING ONLY THE RETURN VALUE IN ISOLATION PASSES UNDER BOTH THE BROKEN AND THE FIXED
+    # CODE -- cases 15c/15d above never printed anything from their fixture scripts, so they could
+    # not have caught this. The property that actually regressed is the COUNT of what comes back, so
+    # that is what @(...) and .Count are asked here, on scripts that print exactly the way the
+    # reported repro did.
+    $r15shapeFail = New-GitFixture
+    Set-FixtureFile -Dir $r15shapeFail -Name $script:FixtureLintScript -Content "'line one'`n'line two'`nexit 1`n"
+    $shapeFail = @(Invoke-WorkflowGates -RepoRoot $r15shapeFail -SkipTests -Context 'test' -FailureConsequence 'x' 2>$null)
+    Assert-Equal 1 $shapeFail.Count 'a lint script that PRINTS two lines before failing still returns exactly one element'
+    Assert-True ($shapeFail.Count -eq 1 -and $shapeFail[0] -is [bool] -and $shapeFail[0] -eq $false) 'and that one element is the boolean $false, not a polluted array coerced to $true'
+    # Written exactly as every real caller writes it, so this exercises the actual expression that
+    # read green in the reported bug rather than a paraphrase of it.
+    Assert-True (-not (Invoke-WorkflowGates -RepoRoot $r15shapeFail -SkipTests -Context 'test' -FailureConsequence 'x' 2>$null)) "the caller's own idiom -- '-not (Invoke-WorkflowGates ...)' -- reads this failure as true"
+
+    # The happy path pollutes identically -- a passing script that prints is indistinguishable from a
+    # failing one by return value alone, which is exactly why only the element COUNT catches this.
+    $r15shapePass = New-GitFixture
+    Set-FixtureFile -Dir $r15shapePass -Name $script:FixtureLintScript -Content "'line one'`n'line two'`nexit 0`n"
+    $shapePass = @(Invoke-WorkflowGates -RepoRoot $r15shapePass -SkipTests -Context 'test' -FailureConsequence 'x' 2>$null)
+    Assert-Equal 1 $shapePass.Count 'a lint script that PRINTS two lines before passing ALSO returns exactly one element'
+    Assert-True ($shapePass.Count -eq 1 -and $shapePass[0] -is [bool] -and $shapePass[0] -eq $true) 'and that one element is the boolean $true'
+
+    # --- 16. the mirror carries Invoke-WorkflowGates too ------------------------------------------
+    Write-Host "`n== 16. the function travels to the plugin mirror ==" -ForegroundColor Cyan
+    $mirrorLibPath    = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\scripts\lib\gate-lib.ps1'
+    $mirrorOpenPrPath = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\scripts\release\open-pr.ps1'
+    Assert-True (Test-Path -LiteralPath $mirrorLibPath) 'the mirrored gate-lib.ps1 exists'
+    Assert-True (Test-Path -LiteralPath $mirrorOpenPrPath) 'the mirrored open-pr.ps1 exists'
+    if ((Test-Path -LiteralPath $mirrorLibPath) -and (Test-Path -LiteralPath $mirrorOpenPrPath)) {
+        $mirrorLibText    = [System.IO.File]::ReadAllText($mirrorLibPath)
+        $mirrorOpenPrText = [System.IO.File]::ReadAllText($mirrorOpenPrPath)
+        Assert-True ($mirrorLibText -match 'function Invoke-WorkflowGates') 'the mirrored gate-lib.ps1 carries Invoke-WorkflowGates'
+        Assert-Equal 2 ([regex]::Matches($mirrorOpenPrText, 'Invoke-WorkflowGates -RepoRoot \$repoRoot').Count) 'the mirrored open-pr.ps1 calls it at both sites'
+    }
 
 } finally {
     if (Test-Path -LiteralPath $FixtureRoot) {

@@ -424,8 +424,26 @@ a release for a missing timestamp would be ceremony rather than a guard.
    **Two things the change does not touch.** The tag still holds the *draft* — the cut commits and tags in
    one motion, so the written version lands in the commit after the tag either way, and dropping the PR
    moves where the editing happens rather than what `vX.Y.Z` points at. And the gates are not skipped by
-   being off a branch: run the repo's lint and test gates before this commit, exactly as `open-pr` would
-   have run them for you.
+   being off a branch — there is a named way to run them from the trunk:
+
+   ```powershell
+   # from the repo root, standing on main -- the lint gate, then every suite. Nothing is pushed.
+   powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -GatesOnly
+   ```
+
+   **In the source repo, run its own copy instead** — `scripts/release/open-pr.ps1 -GatesOnly` — for the
+   reason given at the top of this page.
+
+   **This line replaced *"exactly as `open-pr` would have run them for you"* on August 30, 2026
+   ([#1156](https://github.com/DaveKJohn/claude-code-specialists/issues/1156)), and the old sentence was
+   right about the rule and wrong about the route.** `open-pr` refuses on `main` several hundred lines
+   before it reaches a gate, so at this exact point in the cut it could not be run at all — and what a
+   reader does with an unreachable instruction is rebuild it. The invented invocation is the actual
+   hazard, because it goes green while missing things: `Get-TestCommands` is not in scope, so a repo
+   whose suites are not all PowerShell has the rest of them skipped **without a word**, and the lint half
+   gets a hardcoded script instead of the repo's own `Get-LintScript`. `-GatesOnly` runs the same
+   function the PR path runs, through the same seams, so the answer here is the answer the PR would have
+   given. It is not an escape valve: it adds a place the gates can run and removes none.
 
 5. **Publish the GitHub Release — still after step 4, and the reason has changed.** The body no longer
    comes from step 4, so publishing early would no longer publish a body that does not exist. What it

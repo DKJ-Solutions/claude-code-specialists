@@ -231,6 +231,28 @@
     exactly this. In the last case nothing is sent to GitHub at all, so a rerun produces no PR activity.
     Ignored on a fresh PR, where the body is generated from the template anyway.
 
+.PARAMETER GatesOnly
+    Run this repo's lint and test gates against the working tree and stop there -- no branch check, no
+    push, no PR. Exit 0 when both are green, 1 when either is not. It writes nothing to the working
+    tree and nothing to GitHub; the one thing it does record is gate evidence, below.
+
+    IT EXISTS FOR THE COMMITS THAT ARE MADE ON THE TRUNK (issue #1156, August 30, 2026). Three changes
+    land directly on `main` under named exceptions -- the fold, the release commit, and the release
+    notes -- and the first two are made by scripts that gate themselves. The third is typed by hand, and
+    `cut-release`'s step 4 told its reader to run the gates "exactly as open-pr would have run them for
+    you". They cannot: this script refuses on `main` several hundred lines before it reaches a gate.
+
+    So the instruction was right and unreachable, and what a reader does with an unreachable instruction
+    is rebuild it. That hand-rolled invocation is the actual hazard, and it is quiet rather than loud --
+    it misses `Get-TestCommands`, so a consumer whose suites are not all PowerShell has the rest of them
+    skipped without a word, and it hardcodes a lint script instead of reading `Get-LintScript`. This
+    flag runs the same `Invoke-WorkflowGates` the PR path runs, through the same seams, so the answer it
+    gives is the answer the PR would have given.
+
+    NOT AN ESCAPE VALVE, and the opposite of one: it adds a place the gates can run, it removes none.
+    `-SkipLint` / `-SkipTests` still work here and still mean what they mean everywhere else. A green
+    run also records gate evidence like any other, so a later `open-pr` on the identical tree skips what
+    this already proved.
 .EXAMPLE
     ./scripts/release/open-pr.ps1
 
@@ -246,7 +268,8 @@ param(
     [string]$Resolves = '',
     [switch]$NoResolves,
     [switch]$Force,
-    [switch]$RefreshBody
+    [switch]$RefreshBody,
+    [switch]$GatesOnly
 )
 $ErrorActionPreference = 'Stop'
 
@@ -308,6 +331,38 @@ $repo = Get-RepoName
 if ($repo -match 'VUL-IN' -or (Get-LintScript) -match 'VUL-IN') {
     Write-Error "open-pr cannot run -- scripts\repo-config.ps1 still contains VUL-IN placeholders. Fill in Get-RepoName and Get-LintScript with this repo's values and run again."
     exit 1
+}
+
+# -GatesOnly: the gates, and nothing else (issue #1156). Placed HERE deliberately -- after both
+# pre-flights, which are exactly the conditions the gates need (repo-config present, and filled in
+# rather than still at VUL-IN), and BEFORE the branch check just below it, which is the one thing
+# standing between a trunk commit and its gates. Everything below this point is about a branch, a push
+# or a PR, and none of it applies.
+#
+# Invoke-WorkflowGates is the same function the PR path calls further down, with only the two strings
+# that describe the consequence differing. That is the whole point of the flag: a second way to reach
+# the gates that cannot reach a different verdict.
+if ($GatesOnly) {
+    # SAY WHAT IS BEING IGNORED, rather than dropping it. Everything below this block is about a
+    # branch, a push or a PR, so a PR-shaped parameter passed alongside -GatesOnly has no effect --
+    # and a flag that quietly does nothing is the same class of failure as the invocation this whole
+    # change exists to replace. Named, not refused: the run is still exactly what was asked for.
+    $ignored = @()
+    if ($Title)       { $ignored += '-Title' }
+    if ($Body)        { $ignored += '-Body' }
+    if ($Resolves)    { $ignored += '-Resolves' }
+    if ($NoResolves)  { $ignored += '-NoResolves' }
+    if ($Force)       { $ignored += '-Force' }
+    if ($RefreshBody) { $ignored += '-RefreshBody' }
+    if ($ignored.Count -gt 0) {
+        Write-Warning ("-GatesOnly runs the gates and nothing else, so these were ignored: " + ($ignored -join ', ') + ".")
+    }
+
+    if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context 'the gate run' -FailureConsequence 'nothing else ran, nothing was written')) {
+        exit 1
+    }
+    Write-Host "gates green -- nothing was pushed and no PR was opened (-GatesOnly)." -ForegroundColor Green
+    exit 0
 }
 
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
@@ -946,104 +1001,15 @@ If the title really does begin with that word, ship it with -Force.
 # hand with -SkipLint -SkipTests on every run. That flag is correct only while the commit is
 # unchanged, and nothing checked that; the repair is to make the unchanged case not need it.
 #
-# The fingerprint is computed ONCE for both gates -- it hashes HEAD plus every dirty and untracked
-# file, so asking twice would hash the same tree twice. $null means git could not answer, and every
-# helper then reports "no evidence", which runs the gates exactly as before.
-$gateFingerprint = Get-GateFingerprint -RepoRoot $repoRoot
-
-# AND HOW MANY TIMES HEAD HAS MOVED, read beside it and asked again after each gate (issue #1145). The
-# fingerprint above cannot see a checkout that CAME BACK -- a command that switches away and switches
-# straight back leaves every byte identical -- and a session runs maintenance commands mid-assignment,
-# which is exactly when a backgrounded ship is sitting inside step 1. The reflog depth is where those
-# two moves are recorded, and it is per-worktree, so a lane moving its own checkout never registers
-# here.
-$gateHeadMoves = Get-GateHeadMoveCount -RepoRoot $repoRoot
-
-# AND THE GATES SAY WHEN THEY RAN AGAINST SOMETHING OTHER THAN HEAD (issue #1026). Both gates below judge
-# the WORKING TREE; the push a few lines further down ships HEAD. On a clean tree those are the same thing
-# and a green result is evidence about the PR. On a dirty one they are not, and nothing said so: PR #1025's
-# lint run walked a manual with two new rules in it, reported zero errors, and shipped a PR without them.
-#
-# ONE LINE, ABOVE BOTH GATES rather than repeated inside each. It is the same fact about the same tree, and
-# a warning printed twice is read half as often as one printed once. Said before either gate runs, so it
-# frames the results that follow instead of trailing them.
-#
-# NOT A REFUSAL. A dirty tree mid-flight is ordinary -- the backing gate above is where the one shape that
-# is genuinely wrong gets stopped. This is here so a green line stops being mistaken for proof.
-$gateDirtyCount = Get-GateTreeDirtyCount -RepoRoot $repoRoot
-if ($null -ne $gateDirtyCount -and $gateDirtyCount -gt 0 -and (-not $SkipLint -or -not $SkipTests)) {
-    Write-Warning "the gates below run against a DIRTY tree - $gateDirtyCount file(s) differ from HEAD, and the PR ships HEAD. A green result proves the working copy, not what merges."
-}
-
-# Lint gate: catch invalid manifests/frontmatter/dead links before they land on main via a PR.
-# The lint script is repo-specific (via repo-config); errors block (exit code 1). -SkipLint
-# deliberately skips the gate.
-if (-not $SkipLint) {
-    $lintPath = Join-Path $repoRoot (Get-LintScript)
-    if (Test-Path $lintPath) {
-        if (Test-GateEvidence -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint) {
-            Write-Host "lint gate: already proved against this exact tree -- skipped." -ForegroundColor DarkGray
-        } else {
-            Write-Host "lint gate: integrity check for the PR..." -ForegroundColor Cyan
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath
-            if ($LASTEXITCODE -ne 0) {
-                # A RED IS ONLY A FINDING IF THE TREE HELD STILL FOR IT (issue #1145). Printed before
-                # the error, so it frames the red rather than trailing it.
-                $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
-                if ($movedNote) { Write-Warning $movedNote }
-                Write-Error "lint gate found errors - branch not pushed, no PR opened. Fix the errors, or run with -SkipLint to skip the gate."
-                exit 1
-            }
-            # Recorded only on a real pass. -SkipLint records nothing, deliberately: skipping a gate
-            # proves nothing about the tree, and writing evidence there would make the escape valve
-            # silently suppress the NEXT run's gate too.
-            #
-            # AND ONLY WHEN THE TREE HELD STILL (issue #1145). A pass earned over a tree that moved
-            # mid-run is real for the mixture the gate saw, and that mixture is not the fingerprint it
-            # would be filed under -- so it is reported and not recorded, and the next run gates for real.
-            $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves
-            if ($movedNote) {
-                Write-Warning $movedNote
-            } else {
-                [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'lint' -Fingerprint $gateFingerprint)
-            }
-        }
-    } else {
-        Write-Warning "lint script not found at '$lintPath' - lint gate skipped."
-    }
-}
-
-# Test gate: all suites, exactly as CI -- a red suite should already block here, not only at the
-# PR (a lesson from PR #54). -SkipTests is the deliberate escape valve. A repo whose tests are not
-# all PowerShell names the rest in the optional Get-TestCommands (repo-config); the shared gate
-# reads it itself, so this call site stays identical to the cut's (inbound #644).
-# THE LOOP ITSELF MOVED TO Invoke-TestSuiteGate (native-capture-lib.ps1) on August 7, 2026, when
-# cut-release.ps1 needed the same gate -- see issue #510. Copying fifteen lines into the cut would have
-# been two copies of one rule, free to drift. What stays here is the half that is open-pr's own: the
-# escape valve and what a failure costs at THIS point in the chain (nothing pushed, no PR).
-if (-not $SkipTests) {
-    if (Test-GateEvidence -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint) {
-        Write-Host "test gate: all suites already proved against this exact tree -- skipped." -ForegroundColor DarkGray
-    } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the PR')) {
-        # THIS IS THE GATE THE MOVEMENT CHECK WAS MEASURED ON (issue #1145). One suite of 55 went red
-        # inside a backgrounded ship while prune-merged.ps1 held the trunk in the same checkout, and
-        # green standalone on the same commit seconds later. That script no longer takes the checkout
-        # (#1147); the check stays, because a red is expensive to disbelieve on a hunch and expensive to
-        # believe wrongly, and every other tree-mover in this clone is still there.
-        $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
-        if ($movedNote) { Write-Warning $movedNote }
-        Write-Error "test gate found failing suites - branch not pushed, no PR opened. Fix the tests, or run with -SkipTests to skip the gate."
-        exit 1
-    } else {
-        # Same rule as the lint gate above: recorded only on a real pass, never on -SkipTests -- and
-        # never on a pass whose tree moved underneath it.
-        $movedNote = Get-GateTreeMovedNote -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves
-        if ($movedNote) {
-            Write-Warning $movedNote
-        } else {
-            [void](Save-GateEvidence -RepoRoot $repoRoot -Gate 'tests' -Fingerprint $gateFingerprint)
-        }
-    }
+# BOTH GATES MOVED TO Invoke-WorkflowGates (gate-lib.ps1) on August 30, 2026, issue #1156 -- the same
+# move Invoke-TestSuiteGate made for its inner loop on August 7, one step further out. This script is
+# the ONE documented way to run the gates, and it refuses on `main` six hundred lines ABOVE this point,
+# so the release-notes commit -- made standing on the trunk -- had no reachable route to them at all.
+# -GatesOnly (handled near the top, right after the pre-flights) is that route, and what it runs is
+# THIS function rather than a second copy of it: the whole value of the flag is that the two cannot
+# describe the tree differently.
+if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context 'the PR' -FailureConsequence 'branch not pushed, no PR opened')) {
+    exit 1
 }
 
 # git push writes its 'remote:' progress to stderr, which under EAP=Stop would die as a terminating

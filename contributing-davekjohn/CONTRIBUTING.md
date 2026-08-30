@@ -812,7 +812,12 @@ that decided it.
 
 **What does not change with the route.** The tag still holds the *draft*: the cut commits and tags in one
 motion, so the written version lands in the following commit either way. And the gates still run — being off a
-branch skips `open-pr`, not the lint and the suites.
+branch skips the PR, not the lint and the suites. `open-pr.ps1 -GatesOnly` is how you run them from the
+trunk:
+
+```powershell
+powershell -NoProfile -File scripts/release/open-pr.ps1 -GatesOnly
+```
 
 **The `releases/history.md` in this folder is the living index** — the cut inserts its own row, so never add
 one by hand for a release a script will write. Its

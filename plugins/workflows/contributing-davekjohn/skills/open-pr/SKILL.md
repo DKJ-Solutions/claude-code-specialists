@@ -74,6 +74,39 @@ The script:
    the changelog entry file. If the branch already had an open PR, the push **is** the update and
    the create is skipped.
 
+## Just the gates, and nothing else: `-GatesOnly`
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -GatesOnly
+```
+
+Runs step 4 above — the repo's lint gate, then every test suite — against the **working tree**, and stops
+there. No branch check, no push, no PR. Exit 0 when both are green, 1 when either is not. It writes
+nothing to the working tree and nothing to GitHub -- the one thing it records is gate evidence, below.
+`-SkipLint` / `-SkipTests` still work and still mean what they mean everywhere else.
+
+**It exists for the commits that are made on the trunk**
+([#1156](https://github.com/DaveKJohn/claude-code-specialists/issues/1156), August 30, 2026). Three changes
+land directly on `main` under named exceptions — the fold, the release commit, and the release notes —
+and the first two are made by scripts that gate themselves. The third is typed by hand, and the
+`cut-release` page told its reader to run the gates *"exactly as `open-pr` would have run them for you"*.
+They could not: **this script refuses on `main`**, six hundred lines before it reaches a gate. So the
+instruction was right about the rule and unreachable as a route.
+
+**What made that expensive is not the missing flag but the invocation that replaces it.** With no named
+entry point, the reader assembles one — a fresh process dot-sourcing `native-capture-lib.ps1` and calling
+`Invoke-TestSuiteGate` directly. It runs, it goes green, and it is quietly missing two things:
+`Get-TestCommands` is not in scope, so a repo whose suites are not all PowerShell has the rest of them
+skipped **without a word** (the failure [#644](https://github.com/DaveKJohn/claude-code-specialists/issues/644)
+was filed about), and the lint half gets a hardcoded script rather than the repo's own `Get-LintScript`.
+A consumer meets both harder than the source does. `-GatesOnly` calls the same `Invoke-WorkflowGates`
+the PR path calls, through the same seams — the point of the flag is that the two **cannot** reach a
+different verdict about the same tree.
+
+**A green run records gate evidence like any other**, so a later `open-pr` on the identical tree skips what
+this already proved. And it is placed *after* both pre-flights and *before* the branch check, deliberately:
+everything below that check is about a branch, a push or a PR, and none of it applies here.
+
 ## A branch whose PR is already MERGED stops the run, and that is good news
 
 **The lookup above asks for an *open* PR, and until [inbound
