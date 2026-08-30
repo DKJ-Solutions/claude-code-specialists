@@ -163,13 +163,20 @@ $noteRootAnswered  = [bool](Get-Command -Name 'Get-ReleaseNoteRoot' -ErrorAction
 $noteRootHasNotes  = $false
 $fallbackAbs = Join-Path $repoRoot ($noteRootFallback -replace '/', '\')
 if (Test-Path -LiteralPath $fallbackAbs -PathType Container) {
-    $noteRootHasNotes = [bool](@(Get-ChildItem -LiteralPath $fallbackAbs -Filter '*.md' -File -Recurse -ErrorAction SilentlyContinue) | Select-Object -First 1)
+    # Streamed, not collected: Select-Object -First 1 stops the enumeration, while wrapping the call in
+    # @() would walk the whole tree first to answer a question that one file settles.
+    $noteRootHasNotes = $null -ne (Get-ChildItem -LiteralPath $fallbackAbs -Filter '*.md' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1)
 }
 $repoConfigExists  = Test-Path -LiteralPath $repoConfig -PathType Leaf
 $writeNoteRootSeam = (-not $noteRootAnswered) -and (-not $noteRootHasNotes) -and $repoConfigExists
-$noteRootRelPath   = if ($noteRootAnswered) { Get-ReleaseNoteRoot }
+# COERCED TO A STRING AND FALLBACK-GUARDED. This value comes out of a function in somebody else's file,
+# so it can be $null or empty however carefully the contract is worded -- and every use below is a string
+# operation that would throw under this script's strict mode rather than report anything useful.
+$noteRootRelPath   = if ($noteRootAnswered) { [string](Get-ReleaseNoteRoot) }
                      elseif ($writeNoteRootSeam) { $noteRootIsolated }
                      else { $noteRootFallback }
+if ([string]::IsNullOrWhiteSpace($noteRootRelPath)) { $noteRootRelPath = $noteRootFallback }
+$noteRootRelPath = ($noteRootRelPath -replace '\\', '/').TrimEnd('/')
 # How the folder README names it: folder-relative while it is inside the folder, and repo-root-relative
 # with the fact said out loud while it is not -- a reader of that page is standing in the folder.
 $noteRootDisplay = if ($noteRootRelPath -eq $workflowFolder -or $noteRootRelPath.StartsWith("$workflowFolder/")) {
@@ -472,10 +479,16 @@ $noteRootSeamAnswer = @(
 
 if ($writeNoteRootSeam) {
     if ($Apply) {
+        # APPENDED WITH AppendAllText RATHER THAN REWRITTEN, and the difference is not style. Reading the
+        # file and writing it back re-encodes it: ReadAllText strips a byte-order mark and a NoBom write
+        # does not put it back, so a consumer whose repo-config.ps1 carries one -- which on a .ps1 is the
+        # FIX rather than the defect, since Windows PowerShell 5.1 otherwise decodes it as the system ANSI
+        # code page -- would have it silently removed by a command that was only meant to add a function.
+        # Appending leaves every existing byte exactly where it is.
         $existingConfig = [System.IO.File]::ReadAllText($repoConfig)
         $appendix = (($noteRootSeamAnswer -join $nl) + $nl)
-        if (-not $existingConfig.EndsWith("`n")) { $appendix = $nl + $appendix }
-        [System.IO.File]::WriteAllText($repoConfig, $existingConfig + $appendix, $Utf8NoBom)
+        if ($existingConfig.Length -gt 0 -and -not $existingConfig.EndsWith("`n")) { $appendix = $nl + $appendix }
+        [System.IO.File]::AppendAllText($repoConfig, $appendix, $Utf8NoBom)
         Write-Host "  [answered] Get-ReleaseNoteRoot -> '$noteRootIsolated' in scripts/repo-config.ps1" -ForegroundColor Green
     } else {
         Write-Host "  [answer]   Get-ReleaseNoteRoot -> '$noteRootIsolated' in scripts/repo-config.ps1" -ForegroundColor Green

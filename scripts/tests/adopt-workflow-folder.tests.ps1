@@ -78,7 +78,10 @@ function New-FixtureConsumer {
         $cfg = "# This repo's own seam answers.`n"
         if ($NoteRootAnswer) { $cfg += "function Get-ReleaseNoteRoot { '$NoteRootAnswer' }`n" }
         New-Item -ItemType Directory -Path (Join-Path $root 'scripts') -Force | Out-Null
-        [System.IO.File]::WriteAllText((Join-Path $root 'scripts\repo-config.ps1'), $cfg)
+        # WRITTEN WITH A BOM, deliberately -- it is the harder path and the realistic one. On a .ps1 a BOM
+        # is the FIX rather than the defect (Windows PowerShell 5.1 otherwise decodes a non-ASCII byte as
+        # the system ANSI code page), so a command that only meant to add a function must not strip it.
+        [System.IO.File]::WriteAllText((Join-Path $root 'scripts\repo-config.ps1'), $cfg, (New-Object System.Text.UTF8Encoding($true)))
     }
     if ($WithFallbackNotes) {
         New-Item -ItemType Directory -Path (Join-Path $root 'releases\notes\0.x') -Force | Out-Null
@@ -283,6 +286,11 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $perr = $null
     [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $c7 'scripts\repo-config.ps1'), [ref]$null, [ref]$perr) | Out-Null
     Assert-Equal 0 @($perr).Count 'seam fresh: the lib it wrote into still parses as PowerShell'
+    # THE APPEND MUST NOT RE-ENCODE THEIR FILE. Read-modify-write would strip the BOM the fixture wrote,
+    # silently, in a command whose whole job here is to ADD one function -- and on a .ps1 that BOM is what
+    # keeps 5.1 from decoding the file as the system ANSI code page.
+    $head7 = [System.IO.File]::ReadAllBytes((Join-Path $c7 'scripts\repo-config.ps1'))[0..2]
+    Assert-Equal '239-187-191' ($head7 -join '-') 'seam fresh: their file''s byte-order mark survived the append'
     $con7 = [System.IO.File]::ReadAllText((Join-Path $c7 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Match ('`releases/audience/` is where\s+' + $NoteSentence) $con7 'seam fresh: and the scaffolded page names that same destination'
 
