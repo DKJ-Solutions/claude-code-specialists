@@ -82,7 +82,9 @@
         well". See Get-InstallRecord in check-report-lib.ps1.
       - plugin enabled AND recorded for this path, but the record is not the shape the documents assume
         (exactly one, scoped 'project') -> one [RECORD-SHAPE] roll-up (non-counting) plus a non-counting
-        detail line per plugin naming the shape and its remedy (inbound #314/#315). Two measured shapes: a
+        detail line per plugin naming the shape and its remedy (inbound #314/#315). The roll-up counts
+        only the plugins THIS REPO's own settings enable (issue #1138); the detail lines fire for every
+        shape regardless, since they are what carry the remedy. Two measured shapes: a
         record scoped 'local', which is what a SESSION START leaves behind, and more than one record for
         one path, which the prescribed repair install produces. Round v8 established why this marker is
         needed at all: the session start CREATES a missing record before any hook can look, so
@@ -614,10 +616,16 @@ if ($enabledIds.Count -gt 0) {
     # record with none for this path. That last case is the one both markers used to stay silent about,
     # each correctly by its own rule.
     $recordShapes = @($enabledIds | ForEach-Object { Get-RecordShape -InstallRecord $installRecord -PluginId $_ } | Where-Object { $_ })
-    if ($recordShapes.Count -gt 0) {
+    # THE COUNT IS GATED ON ENABLE PROVENANCE; THE ARMS ARE NOT (issue #1138). $countedShapes drives the
+    # roll-up alone -- the loop below still walks $recordShapes, so every shape keeps its detail line and
+    # its remedy. Suppressing a detail was never on the table: those lines are the only place the remedy
+    # lives, which is the whole point #324 gave them the marker for.
+    $repoEnabledIds = @($enabled.RepoEnabledIds)
+    $countedShapes = @($recordShapes | Where-Object { $repoEnabledIds -contains $_.Id })
+    if ($countedShapes.Count -gt 0) {
         # Format-SafeToken on every id, same reasoning as the roll-up above (inbound #309): a plugin id is
         # an arbitrary JSON key that may carry newlines, and this line is forwarded into session context.
-        $shapeIds = (@($recordShapes | ForEach-Object { Format-SafeToken -Value $_.Id }) -join ', ')
+        $shapeIds = (@($countedShapes | ForEach-Object { Format-SafeToken -Value $_.Id }) -join ', ')
         # IT REPORTS THE COUNT AND LEAVES THE VERDICT TO THE ARMS (inbound #1130) -- the same repair #1095
         # applied one line lower, arriving late at the line the reader meets first. It used to open with
         # "not the assumed shape" and close with "what is wrong is the administration", both unconditional,
@@ -626,71 +634,83 @@ if ($enabledIds.Count -gt 0) {
         # output, saying opposite things, at every session start -- a sharper defect than #1095 reported,
         # because before that repair the two lines at least agreed.
         #
-        # THE PREDICATE IS UNCHANGED, and deliberately. The obvious gate -- stop counting a plugin this
-        # repo's own .claude/settings.json never enabled -- reads a field the demotion does not touch, so
-        # unlike the scope gate withdrawn on #1095 it is not disproved by #323. It is simply UNMEASURED:
-        # whether 'claude plugin install --scope project' always writes that enable is the fact it would
-        # rest on, and if it does not, the gate restores exactly the silence #314/#315/#323 were built to
-        # end. The wording needs no measurement, so the wording is what changed.
+        # AND SINCE #1138 IT COUNTS ONLY WHAT THIS REPO ENABLED. The gate #1095 left standing -- stop
+        # counting a plugin the repo's own settings never enabled -- reads a field the demotion does not
+        # touch, so unlike the scope gate withdrawn there it was never disproved by #323; it was merely
+        # UNMEASURED. The measurement is now taken and it says yes, more strongly than the question asked:
+        # 'claude plugin install --scope project' does not merely usually write the enable into the repo's
+        # own settings, it REFUSES TO INSTALL AT ALL when it cannot, leaving no register record behind. So
+        # a record for this path with no repo-owned enable is not a state the CLI can produce, and
+        # suppressing the count for one costs no coverage. Get-EnabledPlugins carries the six shapes that
+        # were measured and why the predicate reads BOTH repo layers rather than settings.json alone.
+        #
+        # ONLY THE COUNT AND THE HEADLINE MOVED. Every shape still gets its detail line below, because the
+        # remedy lives only there and the reader this marker exists for is the one who needs it.
         #
         # "Details below." is gone as a sentence and kept as a promise -- the deferral names the detail
         # lines, so #324's property (they carry the marker, and therefore reach a session) is still what
         # makes this line honest rather than a hand-wave.
-        Write-Host "  [RECORD-SHAPE] $($recordShapes.Count) of $($enabledIds.Count) enabled plugin(s) have an install record for this path that differs from the assumed shape -- exactly one record, scoped 'project' ($shapeIds). The plugin still loads, and nothing else reports this; whether it needs action differs per shape, so the verdict is on the detail lines below rather than here." -ForegroundColor Yellow
-        # NON-COUNTING per-plugin detail, for the same two reasons as [NOT-INSTALLED-HERE]'s: a permanent
-        # info signal would make 'this repo reports 0 signals' unassertable, and the severity must not
-        # re-enter through the summary line. Each line names the shape AND its remedy, because they differ:
-        # a wrong scope is removed at that scope, a duplicate by dropping the stale one, a demotion by
-        # re-installing at project scope.
-        #
-        # THE DETAIL LINES CARRY THE [RECORD-SHAPE] MARKER THEMSELVES, and that is the fix for inbound #324
-        # rather than a formatting whim. They used to be [SKIP] lines, and roster-sessioncheck forwards only
-        # lines matching \[RECORD-SHAPE\] -- so in a SESSION the roll-up's closing promise of details was
-        # false: the reader was told an administration problem exists, told the details follow, and got
-        # neither the detail nor a way to reach it. The remedy lives ONLY in these lines, and the whole
-        # point of giving this marker its own verdict line was to make that reader actionable. Marking them
-        # makes the promise true in both contexts and needs no change in the hook's filter. Still plain
-        # Write-Host, NOT Write-Info: carrying the marker must not smuggle the severity back in through the
-        # counting summary.
-        foreach ($shape in $recordShapes) {
-            $safeId = Format-SafeToken -Value $shape.Id
-            $scopeList = (@($shape.Scopes | ForEach-Object { Format-SafeToken -Value $_ }) -join ', ')
-            if ($shape.Shapes -contains 'no-project-scope') {
-                Write-Host "  [RECORD-SHAPE] '$safeId' has $($shape.Count) record(s) for this path, scoped '$scopeList' and none 'project' -- the shape a SESSION START leaves behind (it creates a missing record and flips 'project' to 'local'). Remove it at that scope, then re-install at project scope from this root." -ForegroundColor DarkGray
-            }
-            if ($shape.Shapes -contains 'duplicate') {
-                Write-Host "  [RECORD-SHAPE] '$safeId' has $($shape.Count) records for this path (scopes: $scopeList) -- the stray second record specialists-init step 0c warns about, which a repair install at a DIFFERENT scope produces rather than prevents. Remove the stale one at ITS scope; one 'project' record must remain." -ForegroundColor DarkGray
-            }
-            if ($shape.Shapes -contains 'pathless-only') {
-                # The shape nothing reported before #323. Named in full, because the reader's own
-                # verification query prints NOTHING for this plugin while it is plainly loading -- so
-                # without this line the only visible evidence is an absence.
-                #
-                # IT REPORTS THE OBSERVATION AND ASKS THE READER FOR THE HISTORY (inbound #1095). It used to
-                # state the demotion as fact -- "the shape a SESSION START leaves behind when it demotes",
-                # "this repo simply no longer has its own record" -- and close with a bare
-                # "Re-install at project scope from this root." Both halves are wrong in the common case.
-                # The conjunction this arm fires on (no record for this path, a pathless one exists) is ALSO
-                # the resting state of every correctly user-installed plugin in every repo that has not
-                # project-installed it, so the line fires machine-wide, at every session start, for a
-                # deliberately chosen install shape -- and then instructs the reader to undo it, which
-                # converts a machine-wide install into a per-repo one and adds a record nobody wanted.
-                # Measured in a fresh consumer on August 29, 2026, on a plugin installed machine-wide three
-                # weeks before that repo existed.
-                #
-                # AND THE CAUSE IS NOT RECOVERABLE FROM THE DATA, which is why the fix is the wording rather
-                # than a predicate. The obvious gate -- suppress this for scope 'user' -- was proposed and
-                # withdrawn on the same issue: #323 measured the demotion directly, and it WRITES
-                # scope='user', drops projectPath, and merges away any pre-existing pathless record. A
-                # demoted record is byte-for-byte the shape of an ordinary machine-wide install. Gating on
-                # scope would restore exactly the silence #314/#315/#323 were built to end.
-                #
-                # So the arm keeps firing and stops claiming. The one question that separates the two states
-                # is one the reader answers instantly and the register cannot answer at all: did YOU install
-                # this here at project scope? The remedy is conditional on that, and the no-action branch is
-                # stated out loud -- an unstated "or this is fine" reads as a defect the reader must clear.
-                Write-Host "  [RECORD-SHAPE] '$safeId' has no record for this path, only a pathless one (scope: '$scopeList') -- so it loads from a machine-wide install and prints NOTHING in the specialists-init step 0c query while it is plainly loading. Two states look identical here and the register cannot tell them apart: if you installed this plugin at project scope FROM THIS ROOT, that record is gone (#323) -- re-install it at project scope. If it is installed machine-wide on purpose, this line is expected and needs no action." -ForegroundColor DarkGray
-            }
+        Write-Host "  [RECORD-SHAPE] $($countedShapes.Count) of $($repoEnabledIds.Count) plugin(s) enabled by this repo have an install record for this path that differs from the assumed shape -- exactly one record, scoped 'project' ($shapeIds). The plugin still loads, and nothing else reports this; whether it needs action differs per shape, so the verdict is on the detail lines below rather than here." -ForegroundColor Yellow
+    }
+    # OUTSIDE THE ROLL-UP'S BRANCH, not merely after it (issue #1138). These lines used to be nested in it,
+    # which was invisible while the two fired together -- gating the count on enable provenance made the
+    # nesting a silencer: a machine-wide plugin would have lost its remedy along with its headline, which is
+    # the one outcome this change must not produce. The loop walks $recordShapes; only the roll-up above
+    # reads $countedShapes.
+    #
+    # NON-COUNTING per-plugin detail, for the same two reasons as [NOT-INSTALLED-HERE]'s: a permanent
+    # info signal would make 'this repo reports 0 signals' unassertable, and the severity must not
+    # re-enter through the summary line. Each line names the shape AND its remedy, because they differ:
+    # a wrong scope is removed at that scope, a duplicate by dropping the stale one, a demotion by
+    # re-installing at project scope.
+    #
+    # THE DETAIL LINES CARRY THE [RECORD-SHAPE] MARKER THEMSELVES, and that is the fix for inbound #324
+    # rather than a formatting whim. They used to be [SKIP] lines, and roster-sessioncheck forwards only
+    # lines matching \[RECORD-SHAPE\] -- so in a SESSION the roll-up's closing promise of details was
+    # false: the reader was told an administration problem exists, told the details follow, and got
+    # neither the detail nor a way to reach it. The remedy lives ONLY in these lines, and the whole
+    # point of giving this marker its own verdict line was to make that reader actionable. Marking them
+    # makes the promise true in both contexts and needs no change in the hook's filter. Still plain
+    # Write-Host, NOT Write-Info: carrying the marker must not smuggle the severity back in through the
+    # counting summary.
+    foreach ($shape in $recordShapes) {
+        $safeId = Format-SafeToken -Value $shape.Id
+        $scopeList = (@($shape.Scopes | ForEach-Object { Format-SafeToken -Value $_ }) -join ', ')
+        if ($shape.Shapes -contains 'no-project-scope') {
+            Write-Host "  [RECORD-SHAPE] '$safeId' has $($shape.Count) record(s) for this path, scoped '$scopeList' and none 'project' -- the shape a SESSION START leaves behind (it creates a missing record and flips 'project' to 'local'). Remove it at that scope, then re-install at project scope from this root." -ForegroundColor DarkGray
+        }
+        if ($shape.Shapes -contains 'duplicate') {
+            Write-Host "  [RECORD-SHAPE] '$safeId' has $($shape.Count) records for this path (scopes: $scopeList) -- the stray second record specialists-init step 0c warns about, which a repair install at a DIFFERENT scope produces rather than prevents. Remove the stale one at ITS scope; one 'project' record must remain." -ForegroundColor DarkGray
+        }
+        if ($shape.Shapes -contains 'pathless-only') {
+            # The shape nothing reported before #323. Named in full, because the reader's own
+            # verification query prints NOTHING for this plugin while it is plainly loading -- so
+            # without this line the only visible evidence is an absence.
+            #
+            # IT REPORTS THE OBSERVATION AND ASKS THE READER FOR THE HISTORY (inbound #1095). It used to
+            # state the demotion as fact -- "the shape a SESSION START leaves behind when it demotes",
+            # "this repo simply no longer has its own record" -- and close with a bare
+            # "Re-install at project scope from this root." Both halves are wrong in the common case.
+            # The conjunction this arm fires on (no record for this path, a pathless one exists) is ALSO
+            # the resting state of every correctly user-installed plugin in every repo that has not
+            # project-installed it, so the line fires machine-wide, at every session start, for a
+            # deliberately chosen install shape -- and then instructs the reader to undo it, which
+            # converts a machine-wide install into a per-repo one and adds a record nobody wanted.
+            # Measured in a fresh consumer on August 29, 2026, on a plugin installed machine-wide three
+            # weeks before that repo existed.
+            #
+            # AND THE CAUSE IS NOT RECOVERABLE FROM THE DATA, which is why the fix is the wording rather
+            # than a predicate. The obvious gate -- suppress this for scope 'user' -- was proposed and
+            # withdrawn on the same issue: #323 measured the demotion directly, and it WRITES
+            # scope='user', drops projectPath, and merges away any pre-existing pathless record. A
+            # demoted record is byte-for-byte the shape of an ordinary machine-wide install. Gating on
+            # scope would restore exactly the silence #314/#315/#323 were built to end.
+            #
+            # So the arm keeps firing and stops claiming. The one question that separates the two states
+            # is one the reader answers instantly and the register cannot answer at all: did YOU install
+            # this here at project scope? The remedy is conditional on that, and the no-action branch is
+            # stated out loud -- an unstated "or this is fine" reads as a defect the reader must clear.
+            Write-Host "  [RECORD-SHAPE] '$safeId' has no record for this path, only a pathless one (scope: '$scopeList') -- so it loads from a machine-wide install and prints NOTHING in the specialists-init step 0c query while it is plainly loading. Two states look identical here and the register cannot tell them apart: if you installed this plugin at project scope FROM THIS ROOT, that record is gone (#323) -- re-install it at project scope. If it is installed machine-wide on purpose, this line is expected and needs no action." -ForegroundColor DarkGray
         }
     }
 }

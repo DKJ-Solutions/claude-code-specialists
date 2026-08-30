@@ -205,6 +205,11 @@ try {
     # for free. This order IS the contract -- reversing it silently inverts every precedence below.
     $chain = @(Get-SettingsChainPaths -RepoRoot $chainRoot -UserHomeOverride $userHome)
     Assert-Equal 3 $chain.Count 'chain: three layers (user, project, local)'
+    # RepoOwned is the predicate behind RepoEnabledIds, and it lives on the chain rather than at the call
+    # site so that no caller has to match a LABEL -- a label is prose and may be reworded (issue #1138).
+    Assert-True (-not $chain[0].RepoOwned) 'chain: the user layer is NOT repo-owned'
+    Assert-True $chain[1].RepoOwned 'chain: .claude/settings.json is'
+    Assert-True $chain[2].RepoOwned 'chain: and so is .claude/settings.local.json -- BOTH repo layers count'
     Assert-Equal $userFile  $chain[0].Path 'chain: the user layer comes first (lowest precedence)'
     Assert-Equal $projFile  $chain[1].Path 'chain: .claude/settings.json second'
     Assert-Equal $localFile $chain[2].Path 'chain: .claude/settings.local.json last (highest precedence)'
@@ -240,6 +245,45 @@ try {
     [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "team-lifehub@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
     Assert-Equal 'team-alpha@claude-code-specialists,team-lifehub@claude-code-specialists' ($e.Ids -join ',') 'merge: layers combine per plugin id, they do not replace each other'
+
+    # --- RepoEnabledIds: which enables are THIS REPO's (issue #1138) ------------------------------
+    #     The gate behind check-roster-sync's [RECORD-SHAPE] count. It rests on a measurement against
+    #     Claude Code 2.1.251: 'claude plugin install --scope project' writes the enable into the repo's
+    #     own settings in all six shapes tried, and where it CANNOT write it the install fails and leaves
+    #     no register record -- so the write is a precondition of the record, not a side effect of it.
+    #     Asserted here rather than only through the check, because "which enables are the repo's" is a
+    #     question about this helper and every consumer of it inherits the answer.
+    #     Both repo layers still carry an enable at this point (project: team-alpha, local: team-lifehub).
+    Assert-Equal 'team-alpha@claude-code-specialists,team-lifehub@claude-code-specialists' ($e.RepoEnabledIds -join ',') 'repo-enabled: both REPO layers count -- settings.local.json is the repo''s too, not the machine''s'
+
+    # The case the gate exists for: the enable lives ONLY in the user layer. It is still enabled -- the
+    # session really does load that plugin -- but it is not something this repo asked for or can fix from
+    # inside itself, which is the whole distinction.
+    [System.IO.File]::WriteAllText($userFile,  '{ "enabledPlugins": { "widgets@claude-code-specialists": true } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-True ($e.Ids -contains 'widgets@claude-code-specialists') 'machine-wide: it IS enabled -- the plugin loads'
+    Assert-True (-not ($e.RepoEnabledIds -contains 'widgets@claude-code-specialists')) 'machine-wide: but it is not one of THIS repo''s enables'
+
+    # Precedence carries through: a repo layer outranks the user layer, so an id enabled in both decides in
+    # the repo's and counts. Getting this backwards would suppress a repo enable that also happens to exist
+    # machine-wide -- a false silence rather than a false alarm, which is the direction that must not fail.
+    [System.IO.File]::WriteAllText($userFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-True ($e.RepoEnabledIds -contains 'team-alpha@claude-code-specialists') 'enabled in both: the repo layer decides, so it counts as the repo''s'
+
+    # And it is never larger than Ids: an id switched OFF in a repo layer is not enabled at all, so it must
+    # appear in neither list. The predicate may narrow the set; it may not invent a member.
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": false } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
+    Assert-True (-not ($e.Ids -contains 'team-alpha@claude-code-specialists')) 'repo false: not enabled'
+    Assert-True (-not ($e.RepoEnabledIds -contains 'team-alpha@claude-code-specialists')) 'repo false: and therefore not repo-enabled either'
+    Assert-Equal 0 (@($e.RepoEnabledIds | Where-Object { $e.Ids -notcontains $_ }).Count) 'repo-enabled is always a SUBSET of Ids'
+
+    # Restore the state the cases below inherit.
+    [System.IO.File]::WriteAllText($userFile,  '{ }')
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "team-lifehub@claude-code-specialists": true } }')
+    $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
 
     # THE ORDINAL SORT, ON A PAIR THAT ACTUALLY DISCRIMINATES. The helper sorts ordinally rather than by
     # culture, and the measurement behind that choice was taken on 'team-alpha@m' vs
