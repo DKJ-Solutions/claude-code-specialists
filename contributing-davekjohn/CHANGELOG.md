@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/park-push-failure-follows-git-v1` · 20260830-144047
+
+`Invoke-GitPark` now **reports what git said about a failed push instead of asserting one cause**. The
+single sentence it used to write -- `park: git push failed (is 'origin' configured and reachable?)` -- was
+the right question while `park-branch.ps1` was the only caller: you had *asked* for a park, so the
+interesting failure was that there was nowhere to push to. #900 changed the caller and not the message.
+`new-branch.ps1` pushes on every branch creation and `cycle-autopark` pushes on every Stop, so the common
+failure is now a **non-fast-forward against a branch already on origin** -- and the summary sat underneath
+git's own `! [rejected] ... (non-fast-forward)` asserting something else. Nothing landed wrong: the push
+really did fail and the run really did exit non-zero. Only the line a reader trusts over the raw text --
+which is what a summary is for -- pointed at `git remote -v`.
+
+`Get-GitPushFailureMessage` now picks from three arms: the rejection (*origin already has commits this
+branch does not; pull or rebase first*), a remote that is named but unusable (*origin could not be
+reached*), and, where neither shape matches, *git's own output is above* -- naming no cause on purpose,
+because the run does not know one and a guess reads as a finding. It is a function rather than an inline
+`if` so a test can assert the arms from their text instead of staging three different remote failures,
+the same reason `Get-GitParkScopes` is one.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+`park-lib.ps1` is mirrored into every consumer's plugin cache, and this message is one of the few things
+this workflow says when something goes wrong on the remote. A consumer meeting the old line has no context
+for `origin` being fine: they have a branch that will not park and a sentence telling them to go and check
+their remote configuration. They now get the sentence that matches what happened.
+
+**Score:** 3
+
+#### Pull Request
+
+park's push failure reports what git said instead of naming one cause
+
+Plugins: contributing-davekjohn
+
+[PR #1146](https://github.com/DaveKJohn/claude-code-specialists/pull/1146)
+
+---
+
 ### DEPLOY: `fix/record-shape-count-enable-provenance-v1` · 20260830-141717
 
 The `[RECORD-SHAPE]` roll-up now counts only the plugins this repo's own settings enable. A plugin
