@@ -32,6 +32,33 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/review-quota-headline-not-just-timescale-v1` · 20260831-145901
+
+The `claude-review` 429 headline no longer promises the failure reason names a timescale. A third
+kind of 429 -- an individual spend limit an account admin has to raise, measured on three PRs on
+August 31, 2026 (#1164) -- resets on no clock, so "wait hours" / "wait days" is the wrong read. The
+headline now points at the upstream reason string for WHICH of the three limits it is (session
+window, weekly cap, or spend limit) and asserts none itself; the diagnostic comment block, the
+`pr-issues` test that pins the caps, and the operator-facing note in `CONTRIBUTING.md` are updated to
+match. No behaviour change: the check still goes red on a 429, because the PR still got no review.
+
+**Score:** 2 -- a red `claude-review` is read by whoever is shipping a PR; the headline they land on
+now covers the spend-limit case instead of sending them to wait out a reset that will not come.
+
+#### What makes this deploy extra special
+
+Nothing. Comment/prose accuracy in a CI diagnostic plus its pinned test, no runtime change.
+
+**Score:** N/A
+
+#### Pull Request
+
+The out-of-quota review headline stops promising the reason names a timescale
+
+[PR #1167](https://github.com/DaveKJohn/claude-code-specialists/pull/1167)
+
+---
+
 ### DEPLOY: `docs/deploy-links-folder-relative-v1` · 20260831-142156
 
 Section 2.5 of `contributing-davekjohn/CONTRIBUTING.md` still told a DEPLOY author to write links
