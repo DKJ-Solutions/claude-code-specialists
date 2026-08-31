@@ -41,6 +41,17 @@
     BOM-less UTF-8 file as ANSI) is a long record of decoded-text arithmetic producing well-formed wrong
     answers, and a byte count sidesteps the question entirely.
 
+    AND THE BYTE COUNT IS THE WORKING COPY, LINE ENDINGS AND ALL. `Get-Item .Length` is the file as it
+    sits on disk, which is the copy a session actually loads -- so that is the figure to report, and
+    reading it is not the bug. But on a CRLF checkout (Windows, `core.autocrlf`, a consumer with no
+    `.gitattributes` pinning `eol=lf`) that is one byte per LINE above the LF form the repository
+    stores. A reader who takes a baseline from a fresh checkout (CRLF) and a later reading from an
+    editor-rewritten (LF) copy is then silently comparing two units -- ~1.4% on a 1,346-line file,
+    plausible and wrong. So each row also carries CrlfLines and LfBytes, and the caller names the LF
+    size beside the on-disk one wherever they differ: the same treatment this lib gives a tree/clone
+    divergence, for the same reason -- it is the number the next reader will compare against, not noise
+    to smooth away. Inbound issue #1162.
+
     THIS FILE IS PURE ASCII, per the [script-ascii] gate.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script, which is
@@ -326,6 +337,27 @@ function Get-TreeCounterpart {
     return [System.IO.Path]::GetFullPath($candidate)
 }
 
+function Get-CrlfPairCount {
+    <#
+        The number of CR-LF pairs in a file: how many bytes its on-disk form carries ABOVE the same
+        content stored with LF line endings. Zero on a file already LF.
+
+        Counts a 0x0D only when it immediately precedes a 0x0A, so a lone CR (old-Mac, or a CR inside
+        content) is not mistaken for a line ending. Works on the raw byte array, like the rest of this
+        lib -- a decoded-text scan would meet the ANSI-misread class the docstring warns about.
+
+        See Get-AlwaysOnDocuments and the byte-count note in this file's docstring for why the caller
+        reports LfBytes = Bytes - (this) beside the on-disk Bytes. Inbound issue #1162.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $pairs = 0
+    for ($i = 1; $i -lt $bytes.Length; $i++) {
+        if ($bytes[$i] -eq 0x0A -and $bytes[$i - 1] -eq 0x0D) { $pairs++ }
+    }
+    return $pairs
+}
+
 function Get-AlwaysOnDocuments {
     <#
         Walks the always-on document path from a root document and returns every document on it, in load
@@ -343,7 +375,9 @@ function Get-AlwaysOnDocuments {
 
         Each row carries Hop, ImportedBy and Source ('tree' or 'external'), plus the tree counterpart and
         its size where the loaded copy came from a marketplace clone -- the queued cost this repo's own
-        rule requires be named rather than smoothed away.
+        rule requires be named rather than smoothed away. It also carries CrlfLines and LfBytes: Bytes is
+        the working copy on disk (CRLF and all), LfBytes is what it would be stored LF, and the caller
+        names the difference wherever it is non-zero -- inbound issue #1162.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$RootDocument,
@@ -366,7 +400,11 @@ function Get-AlwaysOnDocuments {
 
         $exists = Test-Path -LiteralPath $item.Path -PathType Leaf
         $bytes = [int64]0
-        if ($exists) { $bytes = (Get-Item -LiteralPath $item.Path).Length }
+        $crlfLines = [int64]0
+        if ($exists) {
+            $bytes = (Get-Item -LiteralPath $item.Path).Length
+            $crlfLines = [int64](Get-CrlfPairCount -Path $item.Path)
+        }
 
         $inTree = $item.Path.StartsWith($repo, [System.StringComparison]::OrdinalIgnoreCase)
         $counterpart = $null
@@ -394,6 +432,8 @@ function Get-AlwaysOnDocuments {
             Target          = $item.Target
             Exists          = $exists
             Bytes           = $bytes
+            CrlfLines       = $crlfLines
+            LfBytes         = $bytes - $crlfLines
             Source          = $sourceKind
             TreeCounterpart = $counterpart
             TreeBytes       = $counterpartBytes
