@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/workflow-bwj-plugin-v1` · 20260831-200309
+
+A new opt-in workflow plugin, [`workflow-bwj`](../plugins/workflows/workflow-bwj/README.md), lands in
+[`plugins/workflows/`](../plugins/workflows/README.md) beside `contributing-davekjohn`. It packages
+one rule for BWJ's two Shopify store repos (`smartwatchbanden` and `xoxowildhearts`) so they cannot
+drift on it: a discovered issue is filed on **GitHub first** (source of truth, the `team-alpha`
+filing bar unchanged), then mirrored to **Asana** as a colleague-facing variant on a fixed
+plain-language skeleton, cross-linked both ways with a machine-readable
+`<!-- asana-task: <gid> -->` marker on the issue. Closing the GitHub issue **resolves the Asana task
+automatically** via `templates/asana-mirror.yml` + `asana-mirror.ps1`, a GitHub Actions workflow each
+repo copies into its own `.github/` (reopen un-resolves; a daily sweep repairs missed events). Two
+skills: `report-issue` (the create side, over `gh` + the Asana MCP) and `adopt-bwj-asana` (one-time
+consumer setup). No specialists, no hooks.
+
+It is an **additive** workflow -- it extends only the ticket-work step and decides nothing about
+branch naming, the pre-PR bar, or releases -- so it is the first deliberate answer to the
+"second workflow" note left after
+[#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886). `marketplace.json`, both
+skill-enumeration spans and the plugin table in [`README.md`](../README.md), the workflows README and
+`contributing-davekjohn`'s own README + `CONTRIBUTING-portable.md` are updated to record that reading.
+`requires` `team-alpha` and `contributing-davekjohn`.
+
+**Not in this branch, by design:** connector registration in
+[`connectors/`](../connectors/README.md) (waits for each consumer's own settings PR to merge) and the
+consumer-side adoption (their repos, their PRs). The one-vs-two Asana projects question is
+`Get-AsanaProjectGid`'s to answer per repo.
+
+**Score:** 2 -- a new shared, opt-in capability. It reaches the two BWJ store repos as one
+drift-proof ticket procedure with automatic Asana resolution, noticed the first time a maintainer
+there files an issue after adopting it; nothing changes in any repo until that adoption PR and its
+`ASANA_PAT` secret land. In this source repo it is one more marketplace plugin.
+
+#### What makes this deploy extra special
+
+**Score:** N/A -- workflow tooling for two internal store repos; it never reaches a store's
+customer, and it is not enabled anywhere on merge.
+
+#### Pull Request
+
+Add the workflow-bwj plugin: shared Asana-ticket handling for the two BWJ Shopify stores
+
+Plugins: contributing-davekjohn, workflow-bwj
+
+[PR #1170](https://github.com/DaveKJohn/claude-code-specialists/pull/1170)
+
+---
+
 ### DEPLOY: `docs/claim-rule-covers-resume-and-strong-claim-v1` · 20260831-200301
 
 Chris's "Picking up an issue" rule now covers a resumed session and names the strong claim. The
