@@ -1194,6 +1194,47 @@ $tableFindings = @(Get-EntryImpactFindings -EntryText $tableNoWhy)
 Assert-Equal 1 $tableFindings.Count 'table shape: still reported'
 Assert-True ($tableFindings[0] -match "no 'Why'") 'table shape: and in its own wording, which the new branch must not have swallowed'
 
+Write-Host "A reason that TRAILS on the score line is read for its value and named as misplaced (issue #1172)" -ForegroundColor Cyan
+# THE DEFECT THIS GUARDS. The value was captured as '(\S*)' immediately before '\s*$', so it only matched
+# when it was the last token on the line. '**Score:** N/A -- <reason>' matched NOTHING, the tier read back
+# as unanswered (score 0, NOT N/A), and an audience-tier entry written '**Score:** 3 -- <reason>' would
+# have had its score dropped, resolved to tier 0, and under-bumped a release from minor to patch.
+$trailNa      = "$sectH Significance`n`n$tierH Tier 0`n`nmatters here`n`n$scoreLabel 3`n`n" +
+                "$tierH Tier 2`n`n$scoreLabel $naLabel -- workflow tooling for two internal store repos, no subscriber sees it`n"
+$trailNaRow   = @((Resolve-EntryImpact -EntryText $trailNa).Rows | Where-Object { $_.Tier -eq 2 })[0]
+Assert-Equal $true ([bool]$trailNaRow.NotApplicable) 'trailing N/A: the value is read from the first token, so the tier is N/A rather than unanswered'
+Assert-Equal 0 ([int]$trailNaRow.Score) 'trailing N/A: and the score is 0, the fail-safe direction'
+Assert-Equal '' ([string]$trailNaRow.Why) 'trailing N/A: the trailing text is NOT the Why -- it sat on the wrong side of the score'
+Assert-Equal '-- workflow tooling for two internal store repos, no subscriber sees it' ([string]$trailNaRow.WhyBelowScore) 'trailing N/A: but it is kept, so the refusal can name the real defect'
+
+# THE UNDER-BUMP THE ISSUE FORECLOSES. A scored value trailing a reason on the line is read, so the reach
+# follows the number rather than collapsing to 0.
+$trailScored  = "$sectH Significance`n`n$tierH Tier 0`n`nabove, correctly`n`n$scoreLabel 2`n`n" +
+                "$tierH Tier 1`n`n$scoreLabel 3 -- the colleague-facing reason, trailed on the line`n"
+$trailImpact  = Resolve-EntryImpact -EntryText $trailScored
+Assert-Equal 1 $trailImpact.Tier 'trailing score: the value is read, so the entry reaches tier 1 rather than resolving to 0'
+$trailRow     = @($trailImpact.Rows | Where-Object { $_.Tier -eq 1 })[0]
+Assert-Equal 3 ([int]$trailRow.Score) 'trailing score: and the number itself is the one the author wrote'
+Assert-Equal '-- the colleague-facing reason, trailed on the line' ([string]$trailRow.WhyBelowScore) 'trailing score: the reason lands in the below-score bucket verbatim, not the Why'
+
+# BOTH GATES NAME THE PLACEMENT rather than asking for a Why that is already written -- the #596 treatment,
+# and the 'BELOW' substring the two #596 asserts above match on is kept so the wording covers both shapes.
+$trailRankFindings = @(Get-EntryImpactFindings -EntryText $trailScored)
+Assert-Equal 1 $trailRankFindings.Count 'trailing score: the ranking gate reports the tier once'
+Assert-True ($trailRankFindings[0] -match 'BELOW') 'trailing score: and keeps the shared placement wording'
+Assert-True ($trailRankFindings[0] -match 'trails') 'trailing score: which now also names the on-the-line case'
+$trailScaffold = @(Get-EntryScaffoldFindings -EntryText $trailScored -Wording (Get-EntryScaffoldWording) |
+    Where-Object { $_.Marker -match 'Tier' })
+Assert-Equal 1 $trailScaffold.Count 'trailing score: the scaffold gate faults the tier too'
+Assert-True ($trailScaffold[0].Label -match 'BELOW') 'trailing score: in the shared placement wording'
+Assert-True ($trailScaffold[0].Label -match 'trails') 'trailing score: extended to the on-the-line case'
+
+# REGRESSION GUARD: a bare 'N/A' with nothing after it is unchanged -- N/A, no below-score text.
+$bareNa    = "$sectH Tier 1`n`nno colleague can observe it`n`n$scoreLabel $naLabel`n"
+$bareNaRow = @((Resolve-EntryImpact -EntryText $bareNa).Rows | Where-Object { $_.Tier -eq 1 })[0]
+Assert-Equal $true ([bool]$bareNaRow.NotApplicable) 'bare N/A: still read as N/A'
+Assert-Equal '' ([string]$bareNaRow.WhyBelowScore) 'bare N/A: and carries no trailing text'
+
 Write-Host ""
 Write-Host "Every refusal is worded in the shape the entry uses, not in the one it replaced" -ForegroundColor Cyan
 

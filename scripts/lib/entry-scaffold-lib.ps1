@@ -1237,8 +1237,17 @@ function Get-EntryScorePattern {
         ONE PATTERN, BUILT FROM THE KEY, so the two decorations can never become two separately-maintained
         literals. The asterisks are optional on each side independently rather than as a pair -- a
         half-bolded '**Score:' costs the entry its ranking if it is not read, and reading it costs nothing.
+
+        TWO GROUPS: the value is the FIRST non-whitespace token, and anything after it on the line is a
+        second, optional group -- a reason the author trailed on the score line instead of writing it
+        above (issue #1172). The value used to be '(\S*)' immediately before '\s*$', so a line carrying
+        a trailing reason -- '**Score:** N/A -- <reason>' -- matched nothing at all, and the tier read
+        back as unanswered rather than as the N/A it declared. Reading the first token keeps the score,
+        and Read-EntryTierSections routes group 2 to the below-score bucket so the #596 diagnostic names
+        it as misplaced. '(\S*)' still allows an empty value, so a freshly scaffolded '**Score:**' with
+        nothing after it matches exactly as before.
     #>
-    return '^\s*(?:\*\*)?' + [regex]::Escape($script:EntryScoreKey) + ':(?:\*\*)?\s*(\S*)\s*$'
+    return '^\s*(?:\*\*)?' + [regex]::Escape($script:EntryScoreKey) + ':(?:\*\*)?\s*(\S*)(?:\s+(\S.*?))?\s*$'
 }
 
 $script:EntrySignificanceWordingDefaults = [ordered]@{
@@ -2153,13 +2162,20 @@ function Read-EntryTierSections {
         # is what lets the refusal tell "you wrote nothing" apart from "you wrote it one line too low" --
         # the second is the easy mistake, because the scaffold leaves a single blank line on BOTH sides of
         # the score and nothing says which one is read.
+        # A REASON THAT TRAILS ON THE SCORE LINE ITSELF goes in the same bucket (issue #1172). The pattern's
+        # second group is whatever followed the value; it is text on the wrong side of the score exactly as
+        # a line written under it is, so the #596 diagnostic reads it from the same place and gives the same
+        # advice -- move it above the line.
         $whyLines = New-Object System.Collections.Generic.List[string]
         $belowScoreLines = New-Object System.Collections.Generic.List[string]
         $scoreCell = $null
         while ($i -lt $Lines.Count) {
             $line = $Lines[$i]
             if ($line -match $boundary) { break }
-            if ($null -eq $scoreCell -and $line -match $scoreRx) { $scoreCell = $Matches[1] }
+            if ($null -eq $scoreCell -and $line -match $scoreRx) {
+                $scoreCell = $Matches[1]
+                if ($Matches[2]) { $belowScoreLines.Add([string]$Matches[2]) }
+            }
             elseif ($null -eq $scoreCell) { $whyLines.Add($line) }
             else { $belowScoreLines.Add($line) }
             $i++
@@ -2513,10 +2529,11 @@ function Get-EntryImpactFindings {
             # THE SAME MISDIAGNOSIS LIVES HERE, and this gate is the one that refuses a RELEASE. #596 was
             # reported against the scaffold gate, but the emptiness is read from the same row, so a reason
             # written below its score reaches the cut with the same unactionable wording -- days later,
-            # when whoever wrote it is no longer the one reading the refusal.
+            # when whoever wrote it is no longer the one reading the refusal. #1172 added the second
+            # placement -- a reason trailing on the score line itself -- to the same bucket.
             $below = if ($row[0].PSObject.Properties['WhyBelowScore']) { [string]$row[0].WhyBelowScore } else { '' }
             if ($below) {
-                $findings += "tier $tier scores $($row[0].Score) and its reason sits BELOW the $($script:EntryScoreLabel) line, where nothing reads it -- move the text above that line. Everything up to the score is the reason; everything after it is discarded."
+                $findings += "tier $tier scores $($row[0].Score) and its reason sits BELOW the $($script:EntryScoreLabel) line, or trails after the value on it -- either way nothing reads it. Move the text to its own line above the score. Everything up to the score is the reason; everything after it is discarded."
             } else {
                 $fill = if ($isTable) { 'fill in the third column' } else { "write it above that tier's $($script:EntryScoreLabel) line" }
                 $findings += "tier $tier scores $($row[0].Score) with no 'Why' -- $fill. The rubric says which band; the why says why THIS change is in it, and that is the half a later reader can check."
@@ -4740,10 +4757,11 @@ function Get-EntryScaffoldFindings {
                 # the gate rather than to move the text. Measured there: three tiers, all three answered,
                 # all three reported as unanswered, and it took reading this file line by line to find out
                 # why. The data to tell them apart was already in hand; it just was not being kept.
+                # #1172 folds in the second placement -- a reason trailing on the score line itself.
                 $below = if ($row.PSObject.Properties['WhyBelowScore']) { [string]$row.WhyBelowScore } else { '' }
                 $findings += [pscustomobject]@{
                     Label  = if ($below) {
-                        "a tier whose reason sits BELOW its $($script:EntryScoreLabel) line -- move it above"
+                        "a tier whose reason sits BELOW its $($script:EntryScoreLabel) line, or trails on it -- move it above"
                     } else {
                         'a tier with no reason'
                     }
