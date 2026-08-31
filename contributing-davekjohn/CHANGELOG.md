@@ -32,6 +32,33 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/deploy-links-folder-relative-v1` · 20260831-142156
+
+Section 2.5 of `contributing-davekjohn/CONTRIBUTING.md` still told a DEPLOY author to write links
+root-relative (`scripts/x.ps1`) "because the DEPLOY section lands at the repo root". That has been the
+wrong instruction since issue
+[#1041](https://github.com/DaveKJohn/claude-code-specialists/issues/1041): when `CHANGELOG.md` moved into
+`contributing-davekjohn/`, `check-plugin-integrity.ps1` was repaired to judge a branch document's
+DEPLOY-section links against the changelog's own directory, so `../scripts/x.ps1` is the form that
+survives the fold and `scripts/x.ps1` is the one the link gate now refuses. The section's example and its
+"root-relative" framing are rewritten to folder-relative, matching `development.md`'s own header
+boilerplate. Docs only; the lint gate enforces the rule the prose now describes.
+
+**Score:** 2 — noticed by the next author who writes a DEPLOY section and cross-checks the guide against
+the gate; harmless until then because the gate already enforces the correct form.
+
+#### What makes this deploy extra special
+
+**Score:** N/A — internal contributor-guide wording; does not reach a subscriber of any consuming repo.
+
+#### Pull Request
+
+CONTRIBUTING.md 2.5: DEPLOY links resolve folder-relative to contributing-davekjohn/, not root-relative
+
+[PR #1166](https://github.com/DaveKJohn/claude-code-specialists/pull/1166)
+
+---
+
 ### DEPLOY: `fix/gate-seconds-invariant-v1` · 20260831-134801
 
 `Invoke-TestSuiteGate` (the test gate `open-pr.ps1`, `cut-release.ps1` and CI all run) now formats
