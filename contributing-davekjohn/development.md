@@ -46,15 +46,15 @@ the inline form, which the issue records as currently harmless.
 
 ### CREATE
 
-- [ ] `Get-EntryScorePattern`: capture the value as the first token, with an optional trailing reason as a second group
-- [ ] `Read-EntryTierSections`: send that trailing reason into the below-score bucket so the #596 diagnostic fires
-- [ ] widen the two #596 finding messages so they also name a reason that trails on the score line
-- [ ] mirror the change to the plugin copy via `scripts/sync/build-shared-scripts.ps1`
+- [x] `Get-EntryScorePattern`: capture the value as the first token, with an optional trailing reason as a second group
+- [x] `Read-EntryTierSections`: send that trailing reason into the below-score bucket so the #596 diagnostic fires
+- [x] widen the two #596 finding messages so they also name a reason that trails on the score line
+- [x] mirror the change to the plugin copy via `scripts/sync/build-shared-scripts.ps1`
 
 ### TEST
 
-- [ ] tests for the trailing-reason line: value read, `WhyBelowScore` carries the trailing text, both gates name the placement
-- [ ] lint + tests green, then PR + merge + fold
+- [x] tests for the trailing-reason line: value read, `WhyBelowScore` carries the trailing text, both gates name the placement -- 15 asserts added, `entry-scaffold.tests.ps1` at 669
+- [x] lint + tests green, then PR + merge + fold -- `check-plugin-integrity` 0 errors, all 33 suites green
 
 ### DEPLOY: `fix/score-line-trailing-reason-v1`
 
