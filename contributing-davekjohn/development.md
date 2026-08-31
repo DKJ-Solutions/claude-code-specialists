@@ -89,5 +89,3 @@ and need a correcting PR. They receive the label and the LF column through the p
 
 measure-always-on: name the line-ending unit of the byte column
 
-Plugins: contributing-davekjohn
-
