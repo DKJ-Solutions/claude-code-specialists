@@ -303,9 +303,17 @@ language, or a set of section headings. Those are yours, and
 
 **One repo, one day.** The workflow below was built in `BWJ-ecommerce/smartwatchbanden` on
 2026-08-11, over five rounds against six real tickets, and donated upward on Dave's decision. There is no
-second consumer with a ticket folder today, so this arrived **without the duplication that normally earns a
+second consumer running a ticket layer today, so this arrived **without the duplication that normally earns a
 promotion** — the usual test for moving something into the shared core is that it exists in two places, and
 this existed in one. That was weighed and overruled deliberately.
+
+**And a second harvest, from the same repo, on 2026-08-31.** Rules 11 to 13 were written down there from
+2026-08-12 onwards — in the page holding that repo's *answers*, not its rules — and only came up here when
+that page was folded into its contributing page and every paragraph had to be sorted into one half or the
+other. None of the three names a tracker, so they were always craft rather than answers. **That they sat on
+the wrong side of the seam for three weeks is the point worth keeping:** an inbound issue is filed when
+something is *wrong*, and a rule in the wrong file is not wrong, so nothing was ever going to report it.
+Reading a consumer's answers page occasionally is the only thing that finds this class.
 
 **What follows from that, for you.** Two things. First, the rules carrying explicit decisions — 2, 4 and 6
 below — are the ones to keep even where they are inconvenient; they are what the five rounds were spent on.
@@ -460,6 +468,62 @@ Two things: what state each ticket is in, and whose move it is. Nothing else.
 
 Anything else copied into an index is a third copy of something that already has a home, and it drifts from
 the file below it. Measured: priority and "waiting on" were both copied up, and both drifted.
+
+
+#### 11. The judgment lives at the gate, not with the evidence
+
+The section that gathers what you know **collects and does not conclude**; the section that decides opens
+with the decision. Keeping the two apart is what makes rule 1 checkable — a verdict written at the foot of
+the evidence reads as a summary of it, and a summary is exactly what a gate must not be.
+
+The originating repo reached this after two wrong shapes in a single day: first a section per question with
+the verdict inside each one, then one question-section ending in a `### Conclusion`. Both put the decision
+where a reader had to have read everything to find it.
+
+**The split is by role, not by topic.** Our own measurements are evidence however much work they took, and
+they belong with what we know; what is left at the gate is the judgment plus the questions only the
+requester can answer. Naming that section is the same rule once more — name it after the research and our
+own work migrates into it, name it after the questions and it describes only the *no* case, when a ticket
+that passes with no question at all still passes through it.
+
+#### 12. Every message lives at its own gate, and the closing one carries no question
+
+There are exactly two moments at which something goes out: **the question**, while there is not enough to
+build on, and **the closing**, once what was asked has been delivered. Between them no message is due, and
+the two are never the same shape.
+
+**The closing message carries no question at all** — not an open offer, not a *"let me know if…"*, not a
+*"would you like me to also…"*. A question there hands the ball back at the exact moment the requester needs
+to do nothing, and it makes a statement conditional: the reader concludes somebody is waiting on them. If
+something really does need answering it is a gap — it opens a new round at the gate and the decision returns
+to *no*. If it is not worth that, it is not worth the sentence.
+
+**Searching for a question mark does not check this.** Measured over six tickets: **five asked a question in
+their delivery message**, two of them with no question mark anywhere (*"let me know"*, *"if you want those
+included as well, just say"*), while two of the question marks that were present turned out to be `?page=`
+and `?sort_by=` inside a URL. Read the message instead, and ask of each paragraph whether the requester has
+to **do** anything with it.
+
+This is rule 6 seen from the other end of the work: there a *yes* empties the reply, here the delivery does.
+
+#### 13. Three rules for a message to a person
+
+The outgoing text is read by a colleague rather than by us, and each of these was got wrong first:
+
+1. **Claim only what is on your own screen** — what the code does, what a live page's source contains, what
+   the ticket or an earlier reply says. Not what a search engine wants and not what is customary in a field
+   that is not ours: neither can be defended in the exchange that follows, and both take the answer out of
+   the hands of the specialist you are writing to. Where the concern is real it is a notice, and rule 4's
+   attitude governs it — **report the risk and stop**, without asking them to justify it.
+2. **No disclaimer about your own level of knowledge.** Said once it is honest; repeated across tickets it
+   reads as apologising, and it invites the reader to discount everything after it. Put the question as a
+   choice that is theirs to make.
+3. **Never refer to a number the reader cannot find.** The numbering is ours — rule 8 keeps it that way
+   deliberately — and the requester has never seen that list. Measured: a reply opened with *"I can already
+   answer your second question"* when the colleague had asked no numbered questions at all, but had answered
+   three of ours. Worse, two numberings were running in that ticket, and under the reading he would have
+   picked, the sentence promised something that was not delivered. **A number is a reference to us and a
+   guess to him** — name the question instead.
 
 ---
 
