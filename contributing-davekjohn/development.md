@@ -61,7 +61,7 @@ rotation #942 turned out not to need; reported on the issue.
 - [x] `scripts/tests/pr-issues.tests.ps1` -- 340 asserts pass; the headline is read from the file at
       296 chars, room 203 >= 121.
 - [x] `scripts/lint/check-plugin-integrity.ps1` -- 0 errors (mojibake, dead-link, entry-shape all green).
-- [ ] Full `Invoke-TestSuiteGate` over `scripts/tests/` -- green.
+- [x] Full `Invoke-TestSuiteGate` over `scripts/tests/` -- all 55 suites passed in 479s.
 
 ### DEPLOY: `fix/review-quota-headline-not-just-timescale-v1`
 
