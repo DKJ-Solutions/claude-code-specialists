@@ -142,6 +142,10 @@ function Get-ProjectIncompleteTasks {
 function Test-GitHubIssueClosed {
     param([Parameter(Mandatory = $true)][string]$IssueRef)
     $parts = $IssueRef -split '#'
+    # EAP=Continue for the redirect below: under 'Stop' a successful `gh` that writes any progress to
+    # stderr raises a terminating NativeCommandError, so the 2>$null would throw instead of discard.
+    # Reverts at function exit. This template ships standalone, so it cannot use Invoke-NativeCapture.
+    $ErrorActionPreference = 'Continue'
     $state = (& gh issue view $parts[1] --repo $parts[0] --json state --jq '.state') 2>$null
     return ($LASTEXITCODE -eq 0 -and $state -eq 'CLOSED')
 }
