@@ -169,11 +169,26 @@ jobs:
       # all plausible, none checked. So the headline reports the DISCREPANCY and attributes the time to
       # upstream; it does not offer a mechanism, and neither should the next editor without measuring one.
       #
-      # THE STANDING RULE THIS LEAVES BEHIND, since #974 (a tally), #1055 (the window) and now #1112 (the
-      # time) have each corrected a claim written here about upstream behaviour: the headline states only
-      # what the STATUS proves, and everything the `result` STRING says is attributed to upstream rather
-      # than asserted. The status proves the account is out of quota and that a re-run adds none. It
-      # proves nothing at all about when the quota returns.
+      # THE STANDING RULE THIS LEAVES BEHIND, since #974 (a tally), #1055 (the window), #1112 (the time)
+      # and now #1164 (a third KIND of limit) have each corrected a claim written here about upstream
+      # behaviour: the headline states only what the STATUS proves, and everything the `result` STRING
+      # says is attributed to upstream rather than asserted. The status proves the account is out of
+      # quota and that a re-run adds none. It proves nothing at all about when -- or whether -- the
+      # quota returns on its own.
+      #
+      # A THIRD KIND OF 429 -- issue #1164, and why the headline no longer promises the reason names a
+      # timescale at all. On August 31, 2026 this check went red on three consecutive runs
+      # (33384724875, 33387305049, 33390012681), each `api_error_status: 429` with the result string
+      # "You've hit your individual spend limit -- ask your admin to raise it at
+      # claude.ai/settings/usage". That is neither window #1055 named: a spend cap does not reset on a
+      # clock, an admin or the billing cycle lifts it, so "wait hours" and "wait days" are both the
+      # wrong move. #1164 was filed reading the same is_error/$0/sub-second shape as an EXPIRED OAuth
+      # token and a recurrence of #966/#942 -- the exact misread #913's diagnostic step exists to catch,
+      # and the annotation on all three runs already named the real cause. So the 429 headline now
+      # points at the upstream string for WHICH of the three it is (session window, weekly cap, or a
+      # spend limit an admin lifts) and asserts none of them itself. What a session CANNOT do from here
+      # is raise that limit -- that is an account-settings action, like the rotation #942 turned out not
+      # to need.
       #
       # AND THE CHECK STAYS RED ON THAT, deliberately. A 429 means this PR got no review, which is
       # exactly what #966 wanted not to be silent; a green check would hide that better than a red one
@@ -238,10 +253,11 @@ jobs:
           # AND IT HAS NEVER BITTEN. Sampled across all 45 titled failure annotations this workflow
           # left on August 27-29, 2026: every one a 429, and upstream's `result` first line ran 51 to
           # 55 characters -- "You've hit your weekly limit ... resets Aug 31, 7am (UTC)" and three
-          # session-limit variants -- with the longest message actually emitted at 341. A reason
-          # would have to reach 204 characters, nearly four times the longest seen, before a reader
-          # lost a word. `scripts/tests/pr-issues.tests.ps1` pins both numbers so neither can move
-          # without this reasoning being read first.
+          # session-limit variants -- with the longest message actually emitted at 341. The
+          # spend-limit string #1164 surfaced on August 31 is the longest reason seen so far at 121,
+          # still well under the 204 a reason has to reach before the console relay drops a word.
+          # `scripts/tests/pr-issues.tests.ps1` pins both numbers so neither can move without this
+          # reasoning being read first.
           #
           # `status` IS SINGLE-LINED AND CAPPED FOR THE SAME REASON `reason` IS CUT -- inbound #1118.
           # It reaches the annotation through the `*)` headline, and `tostring` on a JSON string yields
@@ -265,7 +281,7 @@ jobs:
           # syntax -- so the short form goes there and the full sentence goes in the message body.
           case "$status" in
             429) short='out of quota -- the review did not run'
-                 headline='The review did not run: the CLAUDE_CODE_OAUTH_TOKEN account is out of quota; re-running adds none. The reason below names WHICH limit it is -- hours for a session cap, days for a weekly one -- but not WHEN: quota came back 2.5 days before the reset it named (#1112). Nothing to do with this diff.' ;;
+                 headline='The review did not run: the CLAUDE_CODE_OAUTH_TOKEN account is out of quota; re-running adds none. The reason below is upstream text and names one of three -- a session window (hours), a weekly cap (days), or a spend limit an admin lifts -- not proof of WHEN (#1112). Nothing to do with the diff.' ;;
             529) short='API overloaded -- the review did not run'
                  headline='The review did not run: the API was overloaded. Nothing to do with this diff.' ;;
             '')  short='the review failed'

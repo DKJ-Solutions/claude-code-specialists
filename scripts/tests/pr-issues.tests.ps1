@@ -877,7 +877,8 @@ Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annMulti) -notlike '*lin
 # whichever end owns the cut; lowering the workflow's 300 to 203 would hand that reader the same
 # text, drop the "..." that marks the loss, and cost the GitHub annotation up to 97 characters no
 # 500 bounds. Sampled traffic makes it hypothetical anyway -- 45 titled failure annotations over
-# August 27-29, 2026, reasons of 51 to 55 characters against 203 of room.
+# August 27-29, 2026 with reasons of 51 to 55 characters, and the longest since (#1164's spend-limit
+# string, August 31) at 121 -- all against 203 of room.
 #
 # So what must not happen silently is a MOVE. A longer headline, a raised reason cap or a lowered
 # relay cap each change that arithmetic, and each is reasonable on its own terms while being wrong
@@ -912,16 +913,16 @@ $wfStatus = [regex]::Match($wfText, '\(\.api_error_status // ""\)[^\r\n]*\| \.\[
 Assert-True $wfStatus.Success 'and the status it interpolates is capped too, on the line that reads it'
 Assert-True ([int]$wfStatus.Groups[1].Value -lt 300) 'well under the reason cap -- a status is three digits, and the rest is a field this repo does not own'
 
-# THE HEADLINE IS THE THIRD NUMBER, and the one most likely to move: it is prose, and #974, #1055
-# and #1112 each rewrote it. Its length is what turns the other two into 203, so it is read from
-# the file rather than trusted. 296 today; the assert is the arithmetic, not the constant, so a
+# THE HEADLINE IS THE THIRD NUMBER, and the one most likely to move: it is prose, and #974, #1055,
+# #1112 and #1164 each rewrote it. Its length is what turns the other two into 203, so it is read
+# from the file rather than trusted. 296 today; the assert is the arithmetic, not the constant, so a
 # rewrite that keeps the sum honest passes and one that eats the reason's room does not.
 $headlines = @([regex]::Matches($wfText, "(?m)^\s*headline='([^']*)'") | ForEach-Object { $_.Groups[1].Value })
 Assert-True ($headlines.Count -ge 3) 'the literal headlines are readable -- the interpolated *) branch has no static length and needs none'
-$longestMeasuredReason = 55
+$longestMeasuredReason = 121  # #1164's spend-limit string, August 31 2026 -- the session/weekly ones ran 51-55
 foreach ($h in $headlines) {
     $room = $relayCap - $h.Length - 1
-    Assert-True ($room -ge $longestMeasuredReason) "the $($h.Length)-character headline leaves the console $room characters of reason -- more than the 55 ever measured"
+    Assert-True ($room -ge $longestMeasuredReason) "the $($h.Length)-character headline leaves the console $room characters of reason -- more than the $longestMeasuredReason ever measured"
 }
 
 # Unreadable in, empty out -- a diagnostic must never be the reason the warning beside it cannot print.
