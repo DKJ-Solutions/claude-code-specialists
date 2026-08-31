@@ -275,9 +275,14 @@ dropped with the reason on the line); `` ### DEPLOY: `<branch>` `` **is** the ch
 intention, and no gate holds it against what landed. A checkbox inside that section is prose, and no gate
 reads it as a step.
 
-**Its links are written root-relative, the whole document**, because the DEPLOY section lands at the repo
-root. `scripts/x.ps1`, never `../scripts/x.ps1` — the second reads correctly here and is dead once it lands,
-and `open-pr`'s link gate refuses it.
+**Its links are written folder-relative to `contributing-davekjohn/`, the whole document**, because the
+DEPLOY section folds into `CHANGELOG.md`, which sits there — and so does this file, so a link that resolves
+here resolves there too. `../scripts/x.ps1`, never `scripts/x.ps1` — the second resolves to
+`contributing-davekjohn/scripts/x.ps1`, which does not exist, so it reads correctly on the branch and is dead
+once it lands, and `open-pr`'s link gate refuses it. This is what `development.md`'s own header boilerplate
+means by *"Relative links in that text resolve FROM THIS DIRECTORY."* (It was root-relative until issue
+[#1041](https://github.com/DaveKJohn/claude-code-specialists/issues/1041), which moved the gate's base to the
+changelog's own directory when `CHANGELOG.md` moved off the repo root.)
 
 **The audience tier is `2` here, so the entry asks two questions rather than four.** Tier 0 needs no heading —
 the `` ### DEPLOY: `<branch>` `` line is its section and its answer goes directly underneath — and the one
