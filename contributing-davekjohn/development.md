@@ -33,9 +33,53 @@
 
 ### PLAN
 
+**Goal.** Turn the four loose ends [#1168](https://github.com/DaveKJohn/claude-code-specialists/issues/1168)
+carries into a durable, searchable record, so #1157 and #1168 can both close without losing anything —
+and surface the one call that is Dave's (teardown). The testrun series has **no repo-doc home** today: it
+lives entirely in GitHub issues, so its residue currently survives only as comments on closed issues.
+
+#### The four items and how this branch handles each
+
+1. **The residue probe (permission-classifier A/B).** Not resolvable from the source repo — it needs a
+   Claude Code session opened *inside* `DaveKJohn/ccs-testrun-4`, out of auto mode, with the runner
+   denying the next two commands (`adopt-config.ps1` under the deny-everything protocol). This branch
+   only *records* the protocol durably; it cannot execute it. It is "a tightening, not a gate" — both
+   halves of the classifier already read PASS.
+2. **Teardown of `ccs-testrun-1..5`.** Recommendation below; Dave ticks. The deletions themselves are
+   irreversible / outward-facing, so they wait for Dave's explicit word and run separately via `gh`.
+3. **[`ccs-testrun-3#5`](https://github.com/DaveKJohn/ccs-testrun-3/issues/5).** Resolved as a
+   consequence of item 2: if `ccs-testrun-3` is deleted it goes with it; if it is kept, a one-line
+   correction comment on that issue closes it.
+4. **The step-4 amendment** (name both permission layers and say they differ; measure by denying, not by
+   asking). Currently only in [#1157's plan comment](https://github.com/DaveKJohn/claude-code-specialists/issues/1157#issuecomment-5470132039).
+   This branch lifts it into the tree so the next step-4 runbook author finds it without spelunking a
+   closed issue.
+
+#### Teardown recommendation (item 2 — Dave's call)
+
+| repo | recommendation | reason |
+|---|---|---|
+| `ccs-testrun-1` | **delete** | no references anywhere |
+| `ccs-testrun-2` | **keep** | cited several times by `runlog-3.md`; deleting it breaks those citations |
+| `ccs-testrun-3` | **delete** | #1127/#1128/#1130 closed; its tier-1 note already recorded in `runlog-4.md`. Takes item 3 with it |
+| `ccs-testrun-4` | **keep** | only place the residue probe (item 1) can be measured; deliberately not a connector |
+| `ccs-testrun-5` | **delete** once `runlog-5.md` has been read | no findings, cited by nothing; deliberately not a connector |
+
+#### Open decision — the durable home for items 1 and 4
+
+- **Option A (minimal, no new files).** Record the residue protocol and the step-4 amendment verbatim in
+  this branch's DEPLOY section, so they fold into `CHANGELOG.md` (permanent, searchable). Then close
+  #1157, and leave #1168 open tracking *only* the residue probe until a `ccs-testrun-4` session takes it.
+- **Option B (new retrospective doc).** Add a short `contributing-davekjohn/testrun-series.md` capturing
+  the series arc (runs 1–5, the exit criterion met at v4.27.0), the carried-forward residue protocol, and
+  the step-4 amendment. Close both #1157 and #1168. Costs a new doc pattern the repo does not have yet.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] Dave picks Option A or Option B for the durable home (see PLAN), and confirms / adjusts the
+      teardown recommendation
+- [ ] Write the carried-forward record accordingly (DEPLOY section for A; new doc for B)
+- [ ] Reflect the outcome in the changelog entry (DEPLOY below)
 
 ### TEST
 
