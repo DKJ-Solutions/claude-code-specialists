@@ -22,7 +22,7 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Resolve on issue close / reopen
         if: github.event_name == 'issues'
