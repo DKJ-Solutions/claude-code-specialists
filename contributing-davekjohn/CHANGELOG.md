@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/measure-line-ending-unit-v1` · 20260831-131056
+
+`measure-always-on.ps1` now names the unit of its byte column. The column is still `Get-Item .Length`
+— the working copy on disk, the copy a session actually loads — but on a CRLF checkout (Windows,
+`core.autocrlf`, no `.gitattributes` pinning `eol=lf`) that is one byte per line above the LF form the
+repository stores. The always-present provenance line says so, and where any document on the path is
+CRLF a new block prints the LF size beside the on-disk one, per document and as a total, with the note
+that the LF column is the number the next reader will compare against. Reading the working copy is
+unchanged; only the unit is now labelled. Inbound #1162.
+
+This repo's own always-on path is LF (its `.gitattributes` pins `* text=auto eol=lf`), so the new
+block never fires here — it is a latent clarification for the source tree and a real one for a
+consumer on a CRLF checkout.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer runs this tool via the `contributing-davekjohn` plugin skill against their own `CLAUDE.md`,
+and a Windows consumer with no `eol=lf` in `.gitattributes` is exactly who hit this: a byte series
+that mixed a fresh-checkout (CRLF) baseline with an editor-rewritten (LF) reading overstated one step
+by one byte per line — ~1.4% on a 1,346-line file, plausible enough to reach a folded changelog entry
+and need a correcting PR. They receive the label and the LF column through the plugin update.
+
+**Score:** 3
+
+#### Pull Request
+
+measure-always-on: name the line-ending unit of the byte column
+
+Plugins: contributing-davekjohn
+
+[PR #1163](https://github.com/DaveKJohn/claude-code-specialists/pull/1163)
+
+---
+
 ### DEPLOY: `docs/ticket-rules-that-stayed-in-the-consumer-v1` · 20260831-104153
 
 `CONTRIBUTING-portable.md`'s ticket-work section gains **rules 11, 12 and 13** — the judgment living at the
