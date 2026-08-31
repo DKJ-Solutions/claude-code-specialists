@@ -14,10 +14,12 @@ splitting them is in the root README under
 | Folder | What it is |
 |---|---|
 | [`contributing-davekjohn/`](contributing-davekjohn/) | **DaveKJohn's own branch-and-entry model, packaged so a repo can choose it.** The branch, PR, changelog and release skills, the shared scripts behind them, the session hooks that belong to running this across several repos, and a config blueprint holding the source's own answers to the repo-owned seam. It has [its own README](contributing-davekjohn/README.md). |
+| [`workflow-bwj/`](workflow-bwj/) | **BWJ's shared rule for handling Asana tickets** across its two Shopify store repos (smartwatchbanden, xoxowildhearts): file on GitHub first, mirror to Asana as a colleague-friendly variant, resolve the Asana task from the GitHub issue's close via a CI template. Two skills, no specialists, no hooks. **Additive to `contributing-davekjohn`** — it extends only the ticket-work step and contradicts nothing that workflow decides. It has [its own README](workflow-bwj/README.md). |
 
-**One folder, and the name is a statement rather than vanity:** it carries an owner's name because it is
-*his* branch discipline and not a standard, which is exactly why a repo has to choose it rather than
-receive it.
+**`contributing-davekjohn` carries an owner's name because it is *his* branch discipline and not a
+standard**, which is exactly why a repo has to choose it rather than receive it. `workflow-bwj` sits
+here because it too is a way of working rather than a team — a deliberately narrow one, scoped to one
+step and one pair of repos.
 
 ## There is no default workflow, and that is the answer rather than a gap
 
@@ -47,6 +49,14 @@ plugin is ever added here, nothing will notice two of them being enabled at once
 will again get two answers with nothing saying which is this repo's. The guard is retired on the state
 of the tree, not on a proof that the failure is impossible — so adding a second workflow means
 answering this question again, deliberately, rather than discovering that the check quietly went away.
+
+**`workflow-bwj` is that second workflow, added August 31, 2026, and the question was answered on the
+merits.** It does **not** disagree with `contributing-davekjohn` about anything: it extends only the
+*ticket-work* step (how a discovered issue is filed and mirrored to Asana in BWJ's two store repos)
+and decides nothing about branch naming, the pre-PR bar, or releases. Two workflows collide when they
+answer one question two ways; these answer different questions, so both stay enabled. The retired
+guard's reasoning is still the test for any *further* workflow — and it would fail for one that
+overlapped either of these.
 
 ## The name is load-bearing, and so is sitting here
 
