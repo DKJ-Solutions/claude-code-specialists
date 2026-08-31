@@ -39,6 +39,23 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+$script:NativeCaptureInvariant = [System.Globalization.CultureInfo]::InvariantCulture
+
+function Format-GateSeconds {
+    <#
+        The elapsed-seconds figure Invoke-TestSuiteGate prints, FORMATTED INVARIANTLY -- and that is not
+        a style choice (issue #1159). PowerShell's '-f' formats in the current culture: on a Dutch
+        machine '{0:N0}' renders 2182 as '2.182', which an English reader of this repo reads as 2.182
+        seconds -- off by a factor of a thousand and still plausible. It only misformats above 1000s,
+        which is exactly the runs worth noticing, so nothing looked wrong until a slow run produced one.
+        Same reasoning measure-skill-lib.ps1's Format-* helpers state at length: a figure must not
+        depend on the machine that printed it. Repo content is English (CLAUDE.md, Language), and a
+        number whose meaning depends on regional settings is the same defect as an untranslated string.
+    #>
+    param([Parameter(Mandatory = $true)][double]$Seconds)
+    return [string]::Format($script:NativeCaptureInvariant, '{0:N0}', $Seconds)
+}
+
 function ConvertTo-NativeArgumentToken {
     <#
         One argument, quoted the way CreateProcess parses it back apart. Start-Process joins
@@ -540,11 +557,12 @@ function Invoke-TestSuiteGate {
     # in the same order. The elapsed line is deliberate too -- the whole point of this function's shape is
     # a number, and one it reports at every run cannot go stale in a document. The count includes the
     # Get-TestCommands entries: each is a suite of the repo's own stack, judged by the same exit-code rule.
+    $elapsed = Format-GateSeconds $sw.Elapsed.TotalSeconds
     if ($failedNames.Count -eq 0) {
-        Write-Host ("test gate: all {0} suites passed in {1:N0}s." -f $total, $sw.Elapsed.TotalSeconds) -ForegroundColor Green
+        Write-Host ("test gate: all {0} suites passed in {1}s." -f $total, $elapsed) -ForegroundColor Green
         return $true
     }
     $namesInOrder = @($failedNames | Sort-Object) -join ', '
-    Write-Host ("test gate: {0} of {1} suites FAILED in {2:N0}s: {3}" -f $failedNames.Count, $total, $sw.Elapsed.TotalSeconds, $namesInOrder) -ForegroundColor Red
+    Write-Host ("test gate: {0} of {1} suites FAILED in {2}s: {3}" -f $failedNames.Count, $total, $elapsed, $namesInOrder) -ForegroundColor Red
     return $false
 }

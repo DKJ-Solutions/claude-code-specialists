@@ -95,6 +95,25 @@ try {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path $Fixture -Force | Out-Null
 
+    # --- 0. The elapsed figure is formatted INVARIANTLY (issue #1159) ------------------------------
+    #
+    # '-f' formats in the current culture: on a Dutch machine '{0:N0}' renders 2182 as '2.182', which an
+    # English reader of this repo reads as 2.182 seconds -- a factor of a thousand off and still
+    # plausible. It only misformats above 1000s, i.e. exactly the slow runs worth noticing, so a bare
+    # -f went unnoticed for the gate's whole life. Format-GateSeconds routes through InvariantCulture;
+    # this asserts it under nl-NL, where a regression would go green in en-US (measure-skill's lesson).
+    Write-Host "the elapsed figure does not shift meaning with the operator's locale" -ForegroundColor Cyan
+    . $LibPath
+    $prevCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+    try {
+        [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo('nl-NL')
+        Assert-Equal '2,182' (Format-GateSeconds 2182.4) 'Format-GateSeconds: 2182s is 2,182 even under nl-NL (not 2.182)'
+        Assert-Equal '249'   (Format-GateSeconds 249)    'Format-GateSeconds: a sub-1000 figure carries no separator'
+        Assert-Equal '0'     (Format-GateSeconds 0.4)    'Format-GateSeconds: rounds to whole seconds'
+    } finally {
+        [System.Threading.Thread]::CurrentThread.CurrentCulture = $prevCulture
+    }
+
     # The driver dot-sources the REAL lib -- not a copy. A fixture copy would let the lib change without
     # this suite noticing, which is the whole failure mode it exists to catch.
     $script:Driver = Join-Path $Fixture 'drive-gate.ps1'
