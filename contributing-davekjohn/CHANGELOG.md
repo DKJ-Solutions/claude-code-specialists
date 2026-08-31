@@ -32,6 +32,32 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/shopify-floor-checkout-v5-consistency-v1` · 20260831-225420
+
+`adopt-shopify-floor.ps1` scaffolded `theme-check.yml` with `actions/checkout@v7`, the one pin in the
+repo not on `@v5` after the #1175 sweep. Both mirrored copies now pin `@v5`, and the test suite
+asserts the scaffolded version so it cannot drift again.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer adopting the Shopify floor gets a `theme-check.yml` whose checkout pin now matches every
+other workflow in the tree; no functional change while `@v7` still resolves, but the inconsistency is
+gone. N/A — no service subscriber notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+Shopify floor scaffolds actions/checkout@v5, matching the rest of the repo
+
+Plugins: team-shopify
+
+[PR #1178](https://github.com/DaveKJohn/claude-code-specialists/pull/1178)
+
+---
+
 ### DEPLOY: `fix/checkout-v5-node20-deprecation-v1` · 20260831-223457
 
 `actions/checkout@v4` targets Node 20, which GitHub now force-runs on Node 24 while emitting a
