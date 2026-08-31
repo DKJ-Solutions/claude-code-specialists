@@ -125,6 +125,7 @@ try {
 
     $wf = Get-Content -LiteralPath (Join-Path $plain '.github\workflows\theme-check.yml') -Raw
     Assert-True ($wf -match 'Shopify/theme-check-action@v2') 'CI workflow: the action both consumers run'
+    Assert-True ($wf -match 'actions/checkout@v5') 'CI workflow: checkout pinned at v5 -- the version every other pin in this repo carries'
     Assert-True ($wf -match '--fail-level error') 'CI workflow: at error level -- the two enabled checks are declared at error severity'
     Assert-True ($wf -match 'pull_request') 'CI workflow: on every PR rather than on a push'
 

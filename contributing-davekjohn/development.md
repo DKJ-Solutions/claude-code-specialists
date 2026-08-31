@@ -33,19 +33,39 @@
 
 ### PLAN
 
+Reported as [#1177](https://github.com/DaveKJohn/claude-code-specialists/issues/1177). The report's
+stated reason — `actions/checkout@v7` does not exist — has since expired: `git ls-remote --tags
+https://github.com/actions/checkout` now shows `v6` and `v7` (`v7.0.0`, `v7.0.1`) as real tags, so the
+"Unable to resolve action" symptom is gone. What remains is the inconsistency the report also names:
+one pin at `@v7` while every other `actions/checkout` pin in the repo carries `@v5` after #1175. The
+repair is the one the report proposed, for the consistency reason rather than the broken-tag one.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/task/adopt-shopify-floor.ps1:308` — `actions/checkout@v7` → `@v5`
+- [x] `plugins/teams/team-shopify/scripts/task/adopt-shopify-floor.ps1:308` — same edit; the two files stay byte-identical
+- [x] `scripts/tests/adopt-shopify-floor.tests.ps1` — assert the scaffolded workflow pins `actions/checkout@v5`
 
 ### TEST
 
+- [x] `scripts/tests/adopt-shopify-floor.tests.ps1` — 37 passed, 0 failed
+- [x] `git diff` confirms the two scaffolder copies are byte-identical
+
 ### DEPLOY: `fix/shopify-floor-checkout-v5-consistency-v1`
 
-**Score:**
+`adopt-shopify-floor.ps1` scaffolded `theme-check.yml` with `actions/checkout@v7`, the one pin in the
+repo not on `@v5` after the #1175 sweep. Both mirrored copies now pin `@v5`, and the test suite
+asserts the scaffolded version so it cannot drift again.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer adopting the Shopify floor gets a `theme-check.yml` whose checkout pin now matches every
+other workflow in the tree; no functional change while `@v7` still resolves, but the inconsistency is
+gone. N/A — no service subscriber notices this.
+
+**Score:** N/A
 
 #### Pull Request
 
