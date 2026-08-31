@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/claim-rule-covers-resume-and-strong-claim-v1` · 20260831-200301
+
+Chris's "Picking up an issue" rule now covers a resumed session and names the strong claim. The
+opening line reads "before you start on an issue — or resume one —" and carries the read command
+(`gh issue view <n> --json assignees`) beside the write one; a new **Resuming is picking up**
+paragraph says a crash, a `--continue` or a clone that finds a pushed branch with no PR is a pickup
+even though nothing announces it; and the weak-claim paragraph is replaced by
+**An assignee that is not this session's own account stops the work — that is not a judgement call**,
+which keeps the one-account/no-branch/no-activity case as the named exception and states its inverse.
+Prose only, in the always-loaded persona body; +6 lines.
+
+**Score:** 2 — read by any session picking up or resuming an issue; closes a silent failure that
+otherwise lands at the merge (a resumed branch merging another session's work under this session's
+name).
+
+#### What makes this deploy extra special
+
+**Score:** N/A — governance text for the specialists system; does not reach a subscriber of any
+consuming service.
+
+#### Pull Request
+
+the claim rule covers a resumed session and names the strong claim, not only the weak one
+
+Plugins: team-alpha
+
+[PR #1171](https://github.com/DaveKJohn/claude-code-specialists/pull/1171)
+
+---
+
 ### DEPLOY: `fix/review-quota-headline-not-just-timescale-v1` · 20260831-145901
 
 The `claude-review` 429 headline no longer promises the failure reason names a timescale. A third
