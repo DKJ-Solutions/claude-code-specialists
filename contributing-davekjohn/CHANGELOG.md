@@ -31,3 +31,30 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: `fix/score-line-trailing-reason-v1` · 20260831-211004
+
+`**Score:** N/A -- <reason>` written on one line used to parse as *unanswered* (score 0, not N/A)
+because the value has to be the last token on the line; a reason trailing on the score line now reads
+the value and is named as a misplaced reason, the way one written below the line already was. Names
+the failure it forecloses: an audience-tier entry written as `**Score:** 3 -- <reason>` would have
+had its score ignored, resolved to tier 0, and silently under-bumped a release from minor to patch.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Internal changelog-tooling fix; no subscriber of the service observes it.
+
+**Score:** N/A
+
+#### Pull Request
+
+The score-line parser reads the value when a reason trails on the same line
+
+Plugins: contributing-davekjohn
+
+[PR #1174](https://github.com/DaveKJohn/claude-code-specialists/pull/1174)
+
+---
+
