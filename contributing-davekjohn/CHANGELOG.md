@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/checkout-v5-node20-deprecation-v1` · 20260831-223457
+
+`actions/checkout@v4` targets Node 20, which GitHub now force-runs on Node 24 while emitting a
+deprecation notice on every run. This bumps every `@v4` pin in the repo's shared workflow surface to
+`@v5` (Node 24 native): the `workflow-bwj` `asana-mirror.yml` template a consumer copies, the repo's
+own `ci.yml` and `branch-entry.yml`, and the `branch-entry.yml` body `adopt-workflow-folder.ps1`
+scaffolds into a consumer (both the script and its plugin mirror). Behaviour is unchanged; the
+Actions log loses the deprecation line.
+
+**Score:** 1
+
+Cosmetic today -- the runs still succeed. It forecloses one failure: when GitHub retires the Node 24
+fallback for actions still targeting Node 20, every `@v4` `checkout` step stops running, and every
+`asana-mirror` run plus this repo's CI would break until someone traced it to the pin.
+
+#### What makes this deploy extra special
+
+A `workflow-bwj` consumer who has copied `asana-mirror.yml` sees the deprecation line drop out of
+their own Actions log (the reporter, BWJ-ecommerce/smartwatchbanden, filed it for exactly that), and
+inherits the same foreclosed future break. Still cosmetic for them until that fallback is retired.
+
+**Score:** 1
+
+#### Pull Request
+
+Bump actions/checkout@v4 to @v5 across shared workflow templates and CI
+
+Plugins: contributing-davekjohn, workflow-bwj
+
+[PR #1176](https://github.com/DaveKJohn/claude-code-specialists/pull/1176)
+
+---
+
 ### DEPLOY: `fix/score-line-trailing-reason-v1` · 20260831-211004
 
 `**Score:** N/A -- <reason>` written on one line used to parse as *unanswered* (score 0, not N/A)
