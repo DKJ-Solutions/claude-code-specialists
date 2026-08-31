@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/gate-seconds-invariant-v1` · 20260831-134801
+
+`Invoke-TestSuiteGate` (the test gate `open-pr.ps1`, `cut-release.ps1` and CI all run) now formats
+its elapsed-seconds figure invariantly. `-f "{...:N0}s"` formats in the operator's culture, so on a
+`nl-NL` machine a run over 1000s printed `test gate: all 55 suites passed in 2.182s.` for a run that
+took 2182 seconds -- a factor of a thousand off and still plausible, and latent below 1000s, which is
+exactly where every figure this gate had ever printed sat. The new `Format-GateSeconds` helper routes
+the figure through `InvariantCulture` (the position `measure-skill-lib.ps1` already took and stated at
+length for its own Format-* helpers), so the two summary lines now read `2,182s` on any machine.
+Inbound #1159.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer runs this gate through the `contributing-davekjohn` plugin skill (`open-pr` / `ship-pr`),
+from the mirrored copy of this lib. A consumer on a European locale -- where `.` is the thousands
+separator -- with a test suite slow enough to cross 1000s would have been handed a runtime that looked
+a thousand times better than it was, at the one moment (a slow run) the number is worth reading. They
+receive the invariant formatting through the plugin update.
+
+**Score:** 2
+
+#### Pull Request
+
+Format the test gate's elapsed seconds invariantly
+
+Plugins: contributing-davekjohn
+
+[PR #1165](https://github.com/DaveKJohn/claude-code-specialists/pull/1165)
+
+---
+
 ### DEPLOY: `fix/measure-line-ending-unit-v1` · 20260831-131056
 
 `measure-always-on.ps1` now names the unit of its byte column. The column is still `Get-Item .Length`
