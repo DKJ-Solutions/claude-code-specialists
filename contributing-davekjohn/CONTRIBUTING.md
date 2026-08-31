@@ -663,23 +663,29 @@ warning. Where that sentence reads `out of quota`, the review did not run at all
 is a subscription credential, its allowance is the one interactive work draws on, and re-running adds none of
 it back. Nothing in the diff repairs it.
 
-**Read the reason for WHICH limit it is — hours for a session cap, days for a weekly one — but do not plan
-around the reset TIME it names.** That half is upstream's, relayed rather than vouched for, and it has been
-measured wrong: on August 29, 2026 a run failed at 18:02 UTC saying the weekly limit reset on August 31, and
-two later runs reviewed successfully at 18:43 and 18:55 the same evening
+**Read the reason for WHICH of three limits it is — a session cap (hours), a weekly one (days), or an
+individual spend limit an account admin has to raise — but do not plan around any reset TIME it names.** The
+spend-limit case has no clock at all: it was measured on August 31, 2026, three runs reading "You've hit your
+individual spend limit — ask your admin to raise it"
+([#1164](https://github.com/DaveKJohn/claude-code-specialists/issues/1164)), and neither "wait hours" nor
+"wait days" is the move there. Where a reset time *is* named, that half is upstream's, relayed rather than
+vouched for, and it has been measured wrong: on August 29, 2026 a run failed at 18:02 UTC saying the weekly
+limit reset on August 31, and two later runs reviewed successfully at 18:43 and 18:55 the same evening
 ([#1112](https://github.com/DaveKJohn/claude-code-specialists/issues/1112)). Why it came back early was not
 measured and should not be guessed at. The practical reading: a stated reset is a ceiling, not a schedule, so
 a later PR may well be reviewed long before it.
 
-**This is worth a paragraph because reading it wrong is the expensive part.** Eight threads have been filed
+**This is worth a paragraph because reading it wrong is the expensive part.** Nine threads have been filed
 here about `claude-review` red on every PR, and they did not all have the same cause: the early ones were
 credential ([#891](https://github.com/DaveKJohn/claude-code-specialists/issues/891),
 [#942](https://github.com/DaveKJohn/claude-code-specialists/issues/942)), and every one from
 [#966](https://github.com/DaveKJohn/claude-code-specialists/issues/966) onward has been this quota state —
-most recently [#1103](https://github.com/DaveKJohn/claude-code-specialists/issues/1103). #966 is the one that
+most recently [#1164](https://github.com/DaveKJohn/claude-code-specialists/issues/1164). #966 is the one that
 cost something: it was filed against a log already reading `api_error_status: 429`, inferred an expired token
-instead, and concluded that a secret needed rotating. So read the reason the run gives before deciding which
-kind of failure it is; where it is the quota, there is nothing to file.
+instead, and concluded that a secret needed rotating — and #1164 made the same read again, "looks expired,
+recurrence of #966/#942", against three runs whose annotation already named an individual spend limit. So
+read the reason the run gives before deciding which kind of failure it is; where it is the quota, there is
+nothing to file.
 
 Merge method: **`merge`** — a merge commit, not a squash (`Get-PrMergeMethod`).
 
