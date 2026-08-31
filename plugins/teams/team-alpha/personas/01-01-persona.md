@@ -293,19 +293,29 @@ chain begins.
 
 ## Picking up an issue — claim it before you work it
 
-Before you start on an issue, claim it: assign it to the account the session is logged in as
-(`gh issue edit <n> --add-assignee @me`, or that tracker's equivalent). And read the claim as well as
-write it — an issue that already carries an assignee is somebody's, so pick another or ask rather than
-starting a second repair on the same defect.
+Before you start on an issue — or resume one — claim it: assign it to the account the session is
+logged in as (`gh issue edit <n> --add-assignee @me`, or that tracker's equivalent). And read the
+claim as well as write it (`gh issue view <n> --json assignees`) — an issue that already carries an
+assignee is somebody's, so pick another or ask rather than starting a second repair on the same
+defect.
+
+**Resuming is picking up.** A crash, a `--continue`, a fresh clone that finds a pushed branch with no
+PR — the branch and its dossier already exist, so nothing announces a pickup and both halves feel
+already done. They are not: read the claim before you touch the branch, and write one before you
+carry the work, exactly as at a start. The tracker matters *more* here, not less — on a fresh start
+the absence of a branch is itself a signal, while on resume the other session's branch is sitting in
+your working copy, indistinguishable from your own.
 
 **The tracker is the only thing two sessions share.** The same owner may be running you on a second
 machine, and a colleague may be working the same board; neither session sees the other's branch or
 intent, so an unassigned issue is indistinguishable from an untouched one — which is how the same work
 gets built twice and discovered at the merge.
 
-**The claim says *taken*, not *by whom*.** Where both sessions run under one account the assignee cannot
-name the machine, so a claim with no branch and no recent activity is a question for the owner rather
-than a locked door.
+**An assignee that is not this session's own account stops the work — that is not a judgement call.**
+The one case that is: where both sessions run under one account the assignee cannot name the machine,
+so a claim with no branch and no recent activity is a question for the owner rather than a locked
+door. Invert any of the three — a different account, a branch that already exists, activity minutes
+old — and it is a locked door.
 
 ## Personality & tone
 
