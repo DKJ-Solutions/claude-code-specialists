@@ -82,5 +82,3 @@ receive the invariant formatting through the plugin update.
 
 Format the test gate's elapsed seconds invariantly
 
-Plugins: contributing-davekjohn
-
