@@ -33,19 +33,44 @@
 
 ### PLAN
 
+#### Approach (issue #1172)
+
+The issue lists two candidate fixes: capture the first token and ignore the rest, or raise a parse
+error for trailing text. Taking the second, in the shape #596 already established for a reason on
+the wrong side of the score: read the value from the first token so the score is never lost (which
+closes the latent under-bump), AND route the trailing text into the below-score bucket so the same
+#596 diagnostic tells the author to move it above the line -- rather than the silent "unanswered"
+today, or a silent accept of a form `development.md` already discourages. A hard parse error was
+rejected: it would make the next `cut-release` refuse over the 3 pending CHANGELOG entries that use
+the inline form, which the issue records as currently harmless.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] `Get-EntryScorePattern`: capture the value as the first token, with an optional trailing reason as a second group
+- [ ] `Read-EntryTierSections`: send that trailing reason into the below-score bucket so the #596 diagnostic fires
+- [ ] widen the two #596 finding messages so they also name a reason that trails on the score line
+- [ ] mirror the change to the plugin copy via `scripts/sync/build-shared-scripts.ps1`
 
 ### TEST
 
+- [ ] tests for the trailing-reason line: value read, `WhyBelowScore` carries the trailing text, both gates name the placement
+- [ ] lint + tests green, then PR + merge + fold
+
 ### DEPLOY: `fix/score-line-trailing-reason-v1`
 
-**Score:**
+`**Score:** N/A -- <reason>` written on one line used to parse as *unanswered* (score 0, not N/A)
+because the value has to be the last token on the line; a reason trailing on the score line now reads
+the value and is named as a misplaced reason, the way one written below the line already was. Names
+the failure it forecloses: an audience-tier entry written as `**Score:** 3 -- <reason>` would have
+had its score ignored, resolved to tier 0, and silently under-bumped a release from minor to patch.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+Internal changelog-tooling fix; no subscriber of the service observes it.
+
+**Score:** N/A
 
 #### Pull Request
 
