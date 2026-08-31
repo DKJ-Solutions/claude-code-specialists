@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/ticket-rules-that-stayed-in-the-consumer-v1` · 20260831-104153
+
+`CONTRIBUTING-portable.md`'s ticket-work section gains **rules 11, 12 and 13** — the judgment living at the
+gate rather than with the evidence, every message living at its own gate with no question in the closing
+one, and the three rules for a message to a person. All three were already in daily use, in
+`BWJ-ecommerce/smartwatchbanden`'s local *answers* page, and none of them names a tracker: they were craft
+sitting on the answers side of the seam, which is the one defect an inbound issue never reports, because a
+rule in the wrong file is not wrong.
+
+Each arrives with the measurement that produced it, in the style the ten around them already use. The one
+worth reading twice is rule 12's: over six tickets, **five asked a question in their delivery message**, two
+of them without a question mark anywhere, while two of the question marks that were present were `?page=`
+and `?sort_by=` in a URL — so the check people reach for first does not work, and the rule says why.
+
+**They are three rules rather than five lessons on purpose.** A message at the wrong gate and a question in
+a delivery message share one subject, and splitting them would have restated rule 6 from the other end.
+Rules 12 and 13 name rules 6 and 8 instead of repeating them.
+
+`Where this comes from` records the second harvest beside the first, so the provenance of this section stays
+stated rather than discovered later, and the same paragraph drops `ticket folder`: that repo has run its
+ticket layer in GitHub issues since 2026-08-28.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running a ticket layer gets three rules they did not have, one of which changes what a delivery
+message may contain. It reaches no other consumer at all — the seam is unchanged, nothing is renamed, and a
+repo whose work does not arrive from somebody else's tracker reads none of this section.
+
+**Score:** 3
+
+#### Pull Request
+
+The ticket-work rules that never left the consumer
+
+Plugins: contributing-davekjohn
+
+[PR #1161](https://github.com/DaveKJohn/claude-code-specialists/pull/1161)
+
+---
+
 ### DEPLOY: `fix/named-gate-entry-point-v1` · 20260830-193334
 
 `open-pr.ps1` gains **`-GatesOnly`**: run this repo's lint gate and every test suite against the working
