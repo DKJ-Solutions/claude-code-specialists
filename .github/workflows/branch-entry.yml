@@ -37,7 +37,7 @@ jobs:
   branch-entry:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Changelog entry written, and the DEPLOY section still matches the PR
         shell: powershell
