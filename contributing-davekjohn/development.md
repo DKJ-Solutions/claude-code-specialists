@@ -65,31 +65,80 @@ lives entirely in GitHub issues, so its residue currently survives only as comme
 | `ccs-testrun-4` | **keep** | only place the residue probe (item 1) can be measured; deliberately not a connector |
 | `ccs-testrun-5` | **delete** once `runlog-5.md` has been read | no findings, cited by nothing; deliberately not a connector |
 
-#### Open decision — the durable home for items 1 and 4
+#### Decision (Dave, August 31, 2026)
 
-- **Option A (minimal, no new files).** Record the residue protocol and the step-4 amendment verbatim in
-  this branch's DEPLOY section, so they fold into `CHANGELOG.md` (permanent, searchable). Then close
-  #1157, and leave #1168 open tracking *only* the residue probe until a `ccs-testrun-4` session takes it.
-- **Option B (new retrospective doc).** Add a short `contributing-davekjohn/testrun-series.md` capturing
-  the series arc (runs 1–5, the exit criterion met at v4.27.0), the carried-forward residue protocol, and
-  the step-4 amendment. Close both #1157 and #1168. Costs a new doc pattern the repo does not have yet.
+- **Durable home: Option A** — record the residue protocol and the step-4 amendment verbatim in the
+  DEPLOY section, so they fold into `CHANGELOG.md`. Close #1157; leave #1168 open tracking *only* the
+  residue probe until a `ccs-testrun-4` session takes it. No new doc pattern.
+- **Teardown: agreed** — `ccs-testrun-1`, `-3` (takes `ccs-testrun-3#5` with it) and `-5` are deleted;
+  `-2` and `-4` are kept. The deletions need the `delete_repo` gh scope, which this session's token
+  does not carry — so they are run by Dave (or after a `gh auth refresh -s delete_repo`), not on this
+  branch. This branch records the decision.
 
 ### CREATE
 
-- [ ] Dave picks Option A or Option B for the durable home (see PLAN), and confirms / adjusts the
-      teardown recommendation
-- [ ] Write the carried-forward record accordingly (DEPLOY section for A; new doc for B)
-- [ ] Reflect the outcome in the changelog entry (DEPLOY below)
+- [x] Dave picks Option A / confirms teardown — done, see PLAN
+- [x] Write the carried-forward record in DEPLOY (Option A)
+- [x] DEPLOY reflects the outcome
+- [~] Execute the three repo deletions — dropped from this branch: the gh token lacks `delete_repo`
+      scope. Carried forward as a note on #1168, run by Dave.
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` clean (dead-link scan covers the new issue links) — run by `open-pr`
+- [x] All test suites green — run by `open-pr`
+- [~] No behavioural test — this branch is a docs/record change only
+
 ### DEPLOY: `docs/testrun-series-tail-1168-v1`
 
-**Score:**
+Close out the end-to-end testrun series ([#1135] → [#1157] → [#1168]). Run 5 met the series exit
+criterion for the first time — **0 HARD, 0 FRICTION against `v4.27.0`, no inbound issue needed** — so
+the series ends here. The residue the closed issues would otherwise have carried only as comments is
+recorded below instead, in the changelog, where a future runbook author will find it.
+
+**The one open measurement — the permission-classifier residue probe.** The same-shape A/B on the
+permission classifier is one probe short. Both halves of the classifier already read PASS; this probe
+only excludes *command shape* as an alternative explanation for one contrast. It is a tightening, not a
+gate.
+
+- **What:** `adopt-config.ps1` under the deny-everything protocol — deny the next two commands; a denial
+  arrives back in the session, an `allow`-covered command simply runs.
+- **Where:** a Claude Code session opened **inside `DaveKJohn/ccs-testrun-4`**, out of auto mode. A
+  session in the source repo is structurally the wrong instrument — a model observes results, not
+  prompts, so "asked and approved" and "never asked" are one event from its side unless the run is
+  inside the consumer with the runner denying.
+- **Status:** stays open on [#1168]. `ccs-testrun-4` is kept standing as the only place it can be
+  measured.
+
+**The amendment for the next step-4 runbook.** Run 5 did not walk step 4. Whenever step 4 is next
+walked, it inherits this rather than re-deriving it:
+
+1. **Name both permission layers and say they are different.** `permissions.defaultMode` in
+   `settings.json` decides what a session **starts** in; the shift+tab toggle (*manual mode /
+   auto-accept edits / plan mode*, where `default` is only the internal name for the first) is a
+   separate layer. A runner who reads "manual" off the status line has recorded a true fact about the
+   second and nothing about the first.
+2. **Measure by denying, not by asking.** Asking the runner whether a prompt appeared does not work —
+   where there are many prompts they get approved on autopilot. Deny everything for the next two
+   commands and the outcomes become distinguishable with nothing resting on recollection: a denial
+   arrives back in the session; a command covered by `allow` simply runs.
+
+**Teardown of the test repos** (decision by Dave, August 31, 2026): `ccs-testrun-1`, `ccs-testrun-3`
+(which takes [`ccs-testrun-3#5`](https://github.com/DaveKJohn/ccs-testrun-3/issues/5) with it) and
+`ccs-testrun-5` are deleted; `ccs-testrun-2` (cited by `runlog-3.md`) and `ccs-testrun-4` (the residue
+probe) are kept. The deletions are run outside this branch — they need the `delete_repo` gh scope.
+
+[#1135]: https://github.com/DaveKJohn/claude-code-specialists/issues/1135
+[#1157]: https://github.com/DaveKJohn/claude-code-specialists/issues/1157
+[#1168]: https://github.com/DaveKJohn/claude-code-specialists/issues/1168
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A — internal QA bookkeeping; no subscriber of any consuming repo notices this.
+
+**Score:** N/A
 
 #### Pull Request
 
