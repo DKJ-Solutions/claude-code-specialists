@@ -231,6 +231,53 @@ try {
     Assert-Equal 'gone.md' $deadRow.Target 'the missing import names the target as written'
 
     Write-Host ''
+    Write-Host 'The byte column names its line-ending unit (inbound #1162)' -ForegroundColor Cyan
+
+    # New-Fixture always writes LF. A CRLF copy of the same content is written by hand, because the
+    # whole point of #1162 is that Bytes is the on-disk form and on a CRLF checkout that is one byte
+    # per line above the LF the repository stores.
+    function New-CrlfFixture {
+        param([string]$RelPath, [string[]]$Lines)
+        $full = Join-Path $Fixture $RelPath
+        $dir = Split-Path -Parent $full
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        [System.IO.File]::WriteAllText($full, (($Lines -join "`r`n") + "`r`n"), $Utf8NoBom)
+        return $full
+    }
+
+    $lfDoc = New-Fixture 'eol\lf.md' @('# Title', 'body one', 'body two', 'body three')
+    Assert-Equal 0 (Get-CrlfPairCount -Path $lfDoc) 'an LF file has no CRLF pairs'
+
+    $crlfLines = @('# Title', 'body one', 'body two', 'body three')
+    $crlfDoc = New-CrlfFixture 'eol\crlf.md' $crlfLines
+    Assert-Equal $crlfLines.Count (Get-CrlfPairCount -Path $crlfDoc) 'a CRLF file has one pair per line'
+
+    # A lone CR that is not a line ending must not be counted: 0x0D followed by a letter, not 0x0A.
+    $loneCr = Join-Path $Fixture 'eol\lonecr.md'
+    [System.IO.File]::WriteAllText($loneCr, "# Title`nbody with a`rbare CR`n", $Utf8NoBom)
+    Assert-Equal 0 (Get-CrlfPairCount -Path $loneCr) 'a bare CR is not a CRLF line ending'
+
+    $eolWalk = @(Get-AlwaysOnDocuments -RootDocument $crlfDoc -RepoRoot $Fixture)
+    $eolRow = $eolWalk[0]
+    Assert-Equal ((Get-Item $crlfDoc).Length) $eolRow.Bytes 'Bytes is still the on-disk length'
+    Assert-Equal $crlfLines.Count $eolRow.CrlfLines 'the row carries the CRLF line count'
+    Assert-Equal ($eolRow.Bytes - $eolRow.CrlfLines) $eolRow.LfBytes 'LfBytes is Bytes minus one per CRLF line'
+    Assert-Equal ((Get-Item $lfDoc).Length) $eolRow.LfBytes 'LfBytes equals the same content stored LF'
+
+    $lfRow = @(Get-AlwaysOnDocuments -RootDocument $lfDoc -RepoRoot $Fixture)[0]
+    Assert-Equal 0 $lfRow.CrlfLines 'an LF document reports no CRLF lines'
+    Assert-Equal $lfRow.Bytes $lfRow.LfBytes 'an LF document has LfBytes equal to Bytes'
+
+    $crlfOut = ((& powershell -NoProfile -ExecutionPolicy Bypass -File $Script -RepoRoot $Fixture -Root $crlfDoc -Documents 2>&1) | Out-String)
+    Assert-True ($crlfOut -match 'working copy on disk') 'the always-present note names the unit of the byte column'
+    Assert-True ($crlfOut -match 'CRLF line-ends') 'a CRLF document triggers the CRLF-vs-LF block'
+    Assert-True ($crlfOut -match 'stored LF') 'the CRLF block names the LF size beside the on-disk one'
+
+    $lfOut = ((& powershell -NoProfile -ExecutionPolicy Bypass -File $Script -RepoRoot $Fixture -Root $lfDoc -Documents 2>&1) | Out-String)
+    Assert-True ($lfOut -match 'working copy on disk') 'the unit note is present on an all-LF path too'
+    Assert-True ($lfOut -notmatch 'it is CRLF here') 'an all-LF path does not print the CRLF-vs-LF block'
+
+    Write-Host ''
     Write-Host 'The script runs on this repo and agrees with the lib' -ForegroundColor Cyan
 
     $docs = @(Get-AlwaysOnDocuments -RootDocument (Join-Path $RepoRoot 'CLAUDE.md') -RepoRoot $RepoRoot)

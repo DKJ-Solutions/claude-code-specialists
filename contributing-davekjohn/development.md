@@ -37,19 +37,57 @@ The byte column reports the working copy as it sits on disk (Get-Item.Length); o
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/measure-context-lib.ps1`: add `Get-CrlfPairCount` (raw byte scan, counts a 0x0D
+  only when it precedes 0x0A). `Get-AlwaysOnDocuments` rows now carry `CrlfLines` and
+  `LfBytes` (`Bytes - CrlfLines`); `Bytes` is unchanged — still `Get-Item .Length`, the copy that
+  loads. Docstring gains the byte-count / line-ending note.
+- [x] `scripts/maintenance/measure-always-on.ps1`: the always-present provenance line now reads
+  "a MEASUREMENT of the working copy on disk"; a new block prints, per document and (for >1) as a
+  total, `N B on disk, M B stored LF` wherever `CrlfLines > 0`, with a note that reading the working
+  copy is correct and the LF column is what the next reader compares against. Nothing prints on an
+  all-LF path.
+- [x] Mirror both to `plugins/workflows/contributing-davekjohn/scripts/**` via
+  `scripts/sync/build-shared-scripts.ps1`.
 
 ### TEST
 
+- [x] `scripts/tests/measure-always-on.tests.ps1`: new section — `Get-CrlfPairCount` (LF → 0, CRLF →
+  one per line, a lone CR not counted), the new row fields (`Bytes` still on-disk, `LfBytes =
+  Bytes - CrlfLines`, `LfBytes` equals the same content stored LF), and the script's CRLF-vs-LF
+  block firing on a crafted CRLF fixture / absent on an all-LF path. Suite: 61 passed, 0 failed.
+- [x] `scripts/lint/check-plugin-integrity.ps1`: 0 errors — `[script-ascii]`, `[shared-script]`
+  mirror sync, `[import]` parser all green.
+- [x] Full test-suite gate (`Invoke-TestSuiteGate`, all `scripts/tests/*.tests.ps1`): green.
+
 ### DEPLOY: `fix/measure-line-ending-unit-v1`
 
-**Score:**
+`measure-always-on.ps1` now names the unit of its byte column. The column is still `Get-Item .Length`
+— the working copy on disk, the copy a session actually loads — but on a CRLF checkout (Windows,
+`core.autocrlf`, no `.gitattributes` pinning `eol=lf`) that is one byte per line above the LF form the
+repository stores. The always-present provenance line says so, and where any document on the path is
+CRLF a new block prints the LF size beside the on-disk one, per document and as a total, with the note
+that the LF column is the number the next reader will compare against. Reading the working copy is
+unchanged; only the unit is now labelled. Inbound #1162.
+
+This repo's own always-on path is LF (its `.gitattributes` pins `* text=auto eol=lf`), so the new
+block never fires here — it is a latent clarification for the source tree and a real one for a
+consumer on a CRLF checkout.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer runs this tool via the `contributing-davekjohn` plugin skill against their own `CLAUDE.md`,
+and a Windows consumer with no `eol=lf` in `.gitattributes` is exactly who hit this: a byte series
+that mixed a fresh-checkout (CRLF) baseline with an editor-rewritten (LF) reading overstated one step
+by one byte per line — ~1.4% on a 1,346-line file, plausible enough to reach a folded changelog entry
+and need a correcting PR. They receive the label and the LF column through the plugin update.
+
+**Score:** 3
 
 #### Pull Request
 
 measure-always-on: name the line-ending unit of the byte column
+
+Plugins: contributing-davekjohn
 

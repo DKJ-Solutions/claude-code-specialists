@@ -156,7 +156,7 @@ Write-Host ''
 
 # --------------------------------------------------- provenance, stated up front
 
-Write-Host '  The byte column is a MEASUREMENT. The token column is an ESTIMATE.' -ForegroundColor DarkGray
+Write-Host '  The byte column is a MEASUREMENT of the working copy on disk. The token column is an ESTIMATE.' -ForegroundColor DarkGray
 $fx = Format-MeasuredNumber -Value $factor.Value -Format '{0:0.00}'
 Write-Host ("    factor {0} chars/token, calibrated {1} -- {2}" -f $fx, $factor.Calibrated, $factor.Basis) -ForegroundColor DarkGray
 Write-Host ("    n={0}, min {1}, median {2}, max {3}. {4}" -f `
@@ -167,6 +167,33 @@ Write-Host ("    n={0}, min {1}, median {2}, max {3}. {4}" -f `
     $factor.Caveat) -ForegroundColor DarkGray
 Write-Host '    This omits the plugin listings, which ARE API-priced -- run measure-skill for those.' -ForegroundColor DarkGray
 Write-Host ''
+
+# ------------------------------------------- the unit of the byte column: CRLF vs LF
+
+# Bytes above are the working copy on disk -- correct, it is what the session loads. But on a CRLF
+# checkout (Windows, core.autocrlf, a consumer with no .gitattributes pinning eol=lf) that is one byte
+# per line above the LF form the repository stores, and a series that mixes a fresh-checkout baseline
+# with an editor-rewritten reading is off by exactly that. Named, not smoothed away -- inbound #1162.
+$crlf = @($docs | Where-Object { $_.Exists -and $_.CrlfLines -gt 0 })
+if ($crlf.Count -gt 0) {
+    Write-Host '  The byte column is the working copy AS IT SITS ON DISK -- and it is CRLF here' -ForegroundColor Cyan
+    foreach ($d in $crlf) {
+        Write-Host ("    {0}" -f $d.Display) -ForegroundColor Yellow
+        Write-Host ("      {0} B on disk, {1} B stored LF -- {2} CRLF line-ends, {2} B over" -f `
+            (Format-MeasuredBytes $d.Bytes), (Format-MeasuredBytes $d.LfBytes), (Format-MeasuredBytes $d.CrlfLines)) -ForegroundColor Yellow
+    }
+    if ($crlf.Count -gt 1) {
+        $crlfDisk = ($crlf | Measure-Object -Property Bytes -Sum).Sum
+        $crlfLf = ($crlf | Measure-Object -Property LfBytes -Sum).Sum
+        Write-Host ('      across those {0}: {1} B on disk, {2} B stored LF' -f `
+            $crlf.Count, (Format-MeasuredBytes $crlfDisk), (Format-MeasuredBytes $crlfLf)) -ForegroundColor DarkGray
+    }
+    Write-Host '    Reading the working copy is CORRECT -- it is the copy the session loads. But the' -ForegroundColor DarkGray
+    Write-Host '    repository stores LF, so compare like with like: a fresh-checkout baseline is CRLF, an' -ForegroundColor DarkGray
+    Write-Host '    editor-rewritten file is often LF, and mixing the two overstates a step by one byte per' -ForegroundColor DarkGray
+    Write-Host '    line. The LF column above is the number the next reader will compare against.' -ForegroundColor DarkGray
+    Write-Host ''
+}
 
 # ------------------------------------------- the copy that loads, and what is queued
 
