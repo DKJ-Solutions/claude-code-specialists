@@ -121,7 +121,7 @@ Plugins: team-shopify
 
 `actions/checkout@v4` targets Node 20, which GitHub now force-runs on Node 24 while emitting a
 deprecation notice on every run. This bumps every `@v4` pin in the repo's shared workflow surface to
-`@v5` (Node 24 native): the `workflow-bwj` `asana-mirror.yml` template a consumer copies, the repo's
+`@v5` (Node 24 native): the `bwj-codex` `asana-mirror.yml` template a consumer copies, the repo's
 own `ci.yml` and `branch-entry.yml`, and the `branch-entry.yml` body `adopt-workflow-folder.ps1`
 scaffolds into a consumer (both the script and its plugin mirror). Behaviour is unchanged; the
 Actions log loses the deprecation line.
@@ -134,7 +134,7 @@ fallback for actions still targeting Node 20, every `@v4` `checkout` step stops 
 
 #### What makes this deploy extra special
 
-A `workflow-bwj` consumer who has copied `asana-mirror.yml` sees the deprecation line drop out of
+A `bwj-codex` consumer who has copied `asana-mirror.yml` sees the deprecation line drop out of
 their own Actions log (the reporter, BWJ-ecommerce/smartwatchbanden, filed it for exactly that), and
 inherits the same foreclosed future break. Still cosmetic for them until that fallback is retired.
 
@@ -144,7 +144,7 @@ inherits the same foreclosed future break. Still cosmetic for them until that fa
 
 Bump actions/checkout@v4 to @v5 across shared workflow templates and CI
 
-Plugins: contributing-davekjohn, workflow-bwj
+Plugins: contributing-davekjohn, bwj-codex
 
 [PR #1176](https://github.com/DaveKJohn/claude-code-specialists/pull/1176)
 

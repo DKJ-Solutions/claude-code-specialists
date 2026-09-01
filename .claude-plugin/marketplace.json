@@ -1,6 +1,6 @@
 {
   "name": "claude-code-specialists",
-  "description": "The Claude Specialists system by Dave (DaveKJohn): a team of specialized Claudes under one Chief of Staff. Every plugin here is either a TEAM — who the specialists are — or a WORKFLOW — how work moves through the repo they land in. Teams stack: enable the core team plus whichever add-on teams fit the repo. Workflows mostly do not — two that answered the same question differently would collide — so there is one general workflow, plus a deliberately narrow additive one that only extends the ticket-work step. One product, one repository, one marketplace.",
+  "description": "The Claude Specialists system by Dave (DaveKJohn): a team of specialized Claudes under one Chief of Staff. Every plugin here is either a TEAM — who the specialists are — or a WORKFLOW — how work moves through the repo they land in. Teams stack: enable the core team plus whichever add-on teams fit the repo. Workflows mostly do not — two that answered the same question differently would collide — so there is one general workflow, plus bwj-codex, a deliberately narrow additive layer that today extends only the ticket-work step. One product, one repository, one marketplace.",
   "owner": { "name": "Dave (DaveKJohn)" },
   "plugins": [
     {
@@ -29,9 +29,9 @@
       "description": "DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. A workflow is not a team but a method, and the name says whose it is — a consuming repo has its own way of working, and the specialists adapt to it. Enable this only if you want THIS one. Requires team-alpha."
     },
     {
-      "name": "workflow-bwj",
-      "source": "./plugins/workflows/workflow-bwj",
-      "description": "BWJ's shared way of handling Asana tickets for its two Shopify stores (smartwatchbanden and xoxowildhearts), so both repos run one identical procedure and cannot drift on it. An ADDITIVE add-on to contributing-davekjohn — it extends only the ticket-work layer before a branch and contradicts nothing that workflow decides. Its rule: a discovered issue is filed on GitHub first, then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue resolves the Asana task via a CI workflow the plugin ships as a template. Carries no specialists. Requires team-alpha and contributing-davekjohn. Enable this only in BWJ's two store repos."
+      "name": "bwj-codex",
+      "source": "./plugins/workflows/bwj-codex",
+      "description": "BWJ's codex — the binding rules the working environment of BWJ's two Shopify store repos (smartwatchbanden and xoxowildhearts) operates under, so both run one identical procedure and cannot drift. An ADDITIVE add-on to contributing-davekjohn — it extends only the ticket-work layer before a branch and contradicts nothing that workflow decides. Today it carries one rule: a discovered issue is filed on GitHub first, then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue resolves the Asana task via a CI workflow the plugin ships as a template. Carries no specialists. Requires team-alpha and contributing-davekjohn. Enable this only in BWJ's two store repos."
     }
   ]
 }

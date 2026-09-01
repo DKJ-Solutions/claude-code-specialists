@@ -300,7 +300,7 @@ language, or a set of section headings. Those are yours, and
 [What your repo answers](#what-your-repo-answers) says which.
 
 **A repo may layer a stricter, tracker-specific rule on top of this step, packaged as its own
-workflow.** `workflow-bwj` is the worked example: it fixes, for BWJ's two Shopify store repos, that a
+workflow.** `bwj-codex` is the worked example: it fixes, for BWJ's two Shopify store repos, that a
 discovered issue is filed on GitHub first and mirrored to Asana as a colleague-facing variant, with
 the Asana task resolved automatically from the GitHub issue's close. Such an add-on **extends** this
 step — it does not replace the cycle around it — which is what keeps a second workflow plugin from

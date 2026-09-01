@@ -1,5 +1,5 @@
 {
-  "name": "workflow-bwj",
+  "name": "bwj-codex",
   "displayName": "Claude Specialists - BWJ shared ticket workflow",
   "description": "The shared way of handling Asana tickets for BWJ's two Shopify stores (smartwatchbanden and xoxowildhearts), packaged so both repos run one identical procedure and cannot drift on it. It is an ADDITIVE add-on to 'contributing-davekjohn', not a replacement: it extends only the ticket-work layer that sits before a branch, and says nothing about branch naming, what a change owes before a PR, or what a release is. Its rule: a discovered issue is created on GitHub first (GitHub is the source of truth), then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue resolves the Asana task automatically via a CI workflow the plugin ships as a template. Requires the core team 'team-alpha' and 'contributing-davekjohn'. Enable this only in BWJ's two Shopify store repos.",
   "version": "4.28.0",
