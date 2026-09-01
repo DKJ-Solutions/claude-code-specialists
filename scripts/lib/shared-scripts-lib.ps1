@@ -320,6 +320,40 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE MERGED-PR PROOF (issue #1194, September 1, 2026) -- was THIS ref merged, or only a
+            # branch that once wore its name? A THIRD lib with a reader in more than one plugin, and it
+            # arrived the way the argument for sharing is usually only made in hindsight: the same
+            # mechanism was repaired TWICE on one day, in two neighbouring scripts, by two branches that
+            # were open at the same time and did not know about each other -- inbound #1190 in
+            # team-shopify's sync-main.ps1 and #1191 in the workflow plugin's prune-merged.ps1. Both
+            # repairs were correct. By the evening the copies had already diverged, over the comparer the
+            # map is keyed with: one ordinal with a comment saying why git refs are case-sensitive, the
+            # other a bare '@{}'. That is #81's and #815's argument arriving from the inside, so it is
+            # registered rather than left as two.
+            #
+            # THE TRANSPORT STAYS WITH EACH CALLER and only the map and the test are here -- see the lib's
+            # header for why neither caller's gh transport is the other's. Read check-report-lib-workflow's
+            # two banners above for why this is a SECOND ENTRY rather than a list of mirrors, and why the
+            # second entry carries its plugin in its name; nothing about that needs restating.
+            Name    = 'merged-pr-lib'
+            Source  = 'scripts\lib\merged-pr-lib.ps1'
+            Plugin  = 'contributing-davekjohn'
+            LibOnly = $true
+        },
+        @{
+            # The second mirror of merged-pr-lib. team-shopify and contributing-davekjohn are separately
+            # versioned and separately installed, and a Shopify consumer may run the first without the
+            # second, so reaching into the workflow plugin's cache would be a dependency a version
+            # mismatch breaks silently -- the same reason native-capture-lib is registered twice five
+            # lines up. sync-main.ps1's dot-source is UNGUARDED for the matching reason: a payload
+            # missing this file must fail at load, not fall through to a guard that then reports nothing
+            # standing.
+            Name    = 'merged-pr-lib-shopify'
+            Source  = 'scripts\lib\merged-pr-lib.ps1'
+            Plugin  = 'team-shopify'
+            LibOnly = $true
+        },
+        @{
             # Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): the one definition
             # cut-release.ps1, new-internal-note.ps1 and fold-changelog-entry.ps1 all read an optional
             # repo-config seam through now, where two of them used to carry their own private copy of the

@@ -787,22 +787,23 @@ try {
     Assert-True ($netRun.Out -match 'UNKNOWN') 'net/ls-remote: naming the answer it does not have, rather than assuming one'
     Assert-True ($netRun.Out -notmatch 'none on origin') 'net/ls-remote: it no longer reads an unreachable origin as ''no predecessor'''
 
-    # --- the merged test proves the REF, not its name (inbound #1190) --------------------------------
+    # --- the merged test proves the REF, not its name (inbound #1190, shared by issue #1194) ---------
     # WHAT THIS PROTECTS CANNOT BE DRIVEN FROM THIS SUITE AT ALL, which is why it is asserted statically
     # rather than left uncovered. The fixture's origin is a local bare repo, so 'gh pr list' has no
     # GitHub repository to answer for -- every guard case above therefore runs on the ancestry half, and
     # that is precisely the half that was already correct. The decision itself is unit-tested in
-    # sync-rules.tests.ps1, where it is pure; what these asserts pin is that THIS script still routes
-    # into it, and asks gh for the one field the decision cannot be made without.
+    # merged-pr-lib.tests.ps1, where it is pure and where prune-merged.ps1's copy of it now lands too
+    # (issue #1194); what these asserts pin is that THIS script still routes into it, and asks gh for the
+    # one field the decision cannot be made without.
     Assert-True ($src -match [regex]::Escape("'--json', 'headRefName,headRefOid'")) `
         'oid: gh is asked for the tip each merged PR carried, not only for its branch name'
     Assert-True ($src -match [regex]::Escape('[.headRefName, .headRefOid] | @tsv')) `
         'oid: as a tab-separated row, so no branch name is split by a character of its own'
-    Assert-True ($src -match [regex]::Escape('$mergedTips = Get-SyncMergedRefTips -Lines @($prList.Output)')) `
+    Assert-True ($src -match [regex]::Escape('$mergedTips = Get-MergedPrTipsFromTsv -Lines @($prList.Output)')) `
         'oid: and those rows are parsed by the lib rather than re-read here'
     Assert-True ($src -match [regex]::Escape("'rev-parse', '--verify', '--quiet',")) `
         'oid: the loop reads the standing ref''s current tip'
-    Assert-True ($src -match [regex]::Escape('Test-SyncRefMergedByPr -Name $name -Tip $tip -MergedTips $mergedTips')) `
+    Assert-True ($src -match [regex]::Escape('Test-RefMergedByPr -Name $name -Tip $tip -MergedTips $mergedTips')) `
         'oid: and asks the two-part question with it'
     Assert-True ($src -notmatch [regex]::Escape('$mergedHeads -contains')) `
         'oid: the bare-name match that let a merged name vouch for a re-created branch is gone'

@@ -197,6 +197,13 @@ if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
 # For naming the worktree that holds the trunk when the fast-forward is refused (issue #1069). Same
 # plugin-payload sibling, same reasoning as native-capture-lib above.
 . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
+# THE MERGED-PR PROOF, SHARED WITH team-shopify's sync-main.ps1 (issue #1194). This script's proof (b)
+# was repaired as inbound #1191 on the same day the identical mechanism was repaired in that script as
+# #1190 -- neither branch knew about the other, and by the evening the mechanism existed twice and the
+# copies had already diverged: the map here was a bare '@{}', whose comparer is case-insensitive, where
+# the other keyed its map ordinally and said why. It is one file now, mirrored into both plugins. Same
+# plugin-payload sibling as the three above.
+. (Join-Path $PSScriptRoot '..\lib\merged-pr-lib.ps1')
 $trunk = Get-BranchTrunkName
 
 function Invoke-Git {
@@ -389,11 +396,16 @@ if ($branches.Count -eq 0) {
 # merged twice has two, and each is a real proof for the branch that ended on it. The test below is
 # name AND tip, which is what makes the local pass resolve its own tip to compare.
 #
+# THE MAP AND THE TEST COME FROM merged-pr-lib.ps1 (issue #1194), and only the transport below is this
+# script's. That split is what the lib's header argues for: the normalising, the sha-shape validation
+# and -- the one that had already gone wrong -- the ORDINAL comparer the map is keyed with are decided
+# in one place for both callers, so the second copy cannot quietly be the one without the guard.
+#
 # NO --jq, AND THAT IS THE CHEAP HALF. Two fields want a jq expression carrying an interpolation and a
 # separator, quoted through PowerShell into gh on Windows; ConvertFrom-Json is already in this shell
 # and needs no quoting at all. A body that will not parse is treated exactly as a non-zero exit --
 # unknown, warn, keep -- because the one thing this lookup must never do is half-answer.
-$mergedTips = @{}
+$mergedTips = Get-MergedPrTips
 $ghKnown = $false
 if ($branches.Count -gt 0 -or $IncludeRemote) {
     $ghCmd = Get-Command 'gh' -ErrorAction SilentlyContinue
@@ -409,13 +421,13 @@ if ($branches.Count -gt 0 -or $IncludeRemote) {
                 # merged PR" rather than "could not be checked" -- which is the difference between a
                 # fact and a gap.
                 $rows = if ($body) { @($body | ConvertFrom-Json) } else { @() }
-                foreach ($row in $rows) {
-                    $name = ([string]$row.headRefName).Trim()
-                    $oid  = ([string]$row.headRefOid).Trim()
-                    if (-not $name -or -not $oid) { continue }
-                    if (-not $mergedTips.ContainsKey($name)) { $mergedTips[$name] = @() }
-                    $mergedTips[$name] += $oid
-                }
+                # gh's field names in, the lib's shape out. Everything the rows still need doing to them
+                # -- trimming, dropping a null name or oid, refusing an oid that is not an object name,
+                # de-duplicating -- happens once inside Get-MergedPrTips, for this transport and
+                # sync-main's TSV one alike.
+                $mergedTips = Get-MergedPrTips -Pairs @($rows | ForEach-Object {
+                    [pscustomobject]@{ Name = $_.headRefName; Tip = $_.headRefOid }
+                })
                 $ghKnown = $true
             } catch {
                 Write-Warning "gh's merged-PR list could not be read as JSON -- a squash-merged branch cannot be proven merged and will be kept. ($($_.Exception.Message))"
@@ -442,14 +454,21 @@ function Get-MergedProof {
 
         An empty $Tip resolves to 'recycled' where the name is known, which is the safe direction: a
         tip this run could not read is a tip it cannot match.
+
+        THE TWO QUESTIONS ARE THE LIB'S, THE THREE SENTENCES ARE THIS SCRIPT'S (issue #1194).
+        Test-RefMergedByPr is the proof and Test-MergedPrNameKnown is the middle answer; deciding which
+        of the two failures the caller is looking at, and what to print for it, stays here because only
+        this script has an output. Asking the proof FIRST is deliberate: a name-known check that ran
+        first and short-circuited would be a name-only proof again, which is the whole of #1191.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Branch,
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Tip
     )
-    if (-not $mergedTips.ContainsKey($Branch)) { return $null }
-    if ($Tip -and (@($mergedTips[$Branch]) -contains $Tip)) { return 'merged PR' }
-    return 'recycled'
+    if (-not $Branch) { return $null }
+    if (Test-RefMergedByPr -Name $Branch -Tip $Tip -MergedTips $mergedTips) { return 'merged PR' }
+    if (Test-MergedPrNameKnown -Name $Branch -MergedTips $mergedTips) { return 'recycled' }
+    return $null
 }
 
 $deleted = @()
