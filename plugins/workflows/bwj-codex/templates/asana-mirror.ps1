@@ -1,26 +1,33 @@
 <#
 .SYNOPSIS
-    Resolve (or un-resolve) the Asana task mirrored from a GitHub issue -- the CI half of the
-    bwj-codex rule. Copied into a BWJ store repo as .github/scripts/asana-mirror.ps1 and driven
-    by .github/workflows/asana-mirror.yml.
+    Post an update on the Asana task mirrored from a GitHub issue -- the CI half of the bwj-codex
+    rule. Copied into a BWJ store repo as .github/scripts/asana-mirror.ps1 and driven by
+    .github/workflows/asana-mirror.yml.
 
 .DESCRIPTION
+    IT NEVER COMPLETES A TASK, AND THERE IS NO CODE PATH THAT CAN (Dave, September 1, 2026). Closing
+    a GitHub issue says the work is built; it does not say the colleague who asked for it has seen it
+    work. Only that person resolves their own ticket, after testing. So this script writes exactly one
+    kind of thing into Asana -- a comment -- and the 'completed' field is not written anywhere in it.
+
     Two modes:
 
       -Mode event      One issue changed. -Event is 'closed' or 'reopened'; -IssueBody is the issue
                        body (the Asana task is resolved from it, see below); -IssueRef is
-                       'owner/repo#n' for the Asana comment. 'closed' completes the task, 'reopened'
-                       re-opens it. A body linking no task, or several different ones, is logged and
-                       skipped, never guessed.
+                       'owner/repo#n'. Both events post a comment: 'closed' says the work is ready to
+                       test, 'reopened' says to hold off. An event ALWAYS comments -- it is a real
+                       state change, and a second close after a reopen is news again.
 
-      -Mode reconcile  Two sweeps, for events that never arrived:
+      -Mode reconcile  Two sweeps, for events that never arrived, and the only place de-duplication
+                       applies:
                        (a) Asana -> GitHub: the project's incomplete tasks, reading a GitHub issue
-                           URL from each task's notes and completing the task when that issue is
-                           closed. Covers a task this workflow created.
+                           URL from each task's notes and commenting when that issue is closed.
                        (b) GitHub -> Asana: this repo's issues closed in the last -SinceDays days,
-                           resolving each body's Asana task and completing it when it is still open.
-                           Covers a ticket that came the other way -- imported FROM Asana, whose
-                           task carries no back-link for (a) to find.
+                           resolving each body's Asana task and commenting on it. Covers a ticket
+                           that came the other way -- imported FROM Asana, whose task carries no
+                           back-link for (a) to find.
+                       Both skip a task that is already complete (a person resolved it -- leave it
+                       alone) and a task that already carries this issue's close update.
 
     How the Asana task is found -- Resolve-AsanaTaskRef, three matchers tried in this order:
 
@@ -38,10 +45,15 @@
     (from the ASANA_PROJECT_GID / ASANA_WORKSPACE_GID variables). Sweep (b) additionally needs
     -Repo (GITHUB_REPOSITORY) and `gh` on PATH.
 
+    The comment text is English, like everything else this repo ships. It is the workflow speaking,
+    not the subject -- the same boundary a BWJ store repo already draws when it keeps its ticket
+    headings English while the analysis under them follows whoever filed the ticket.
+
     The pure helpers (Resolve-AsanaTaskRef, Get-AsanaTaskGid, Get-AsanaGidsFromText,
-    New-AsanaCompleteRequest, Get-IssueRefFromNotes) take no network and are what the source repo's
-    scripts/tests/bwj-codex.tests.ps1 exercises. The script runs its main flow only when invoked
-    directly; dot-sourcing it loads the helpers and does nothing else.
+    New-MirrorComment, Get-MirrorCommentMarker, New-AsanaCommentRequest, Get-IssueRefFromNotes) take
+    no network and are what the source repo's scripts/tests/bwj-codex.tests.ps1 exercises. The script
+    runs its main flow only when invoked directly; dot-sourcing it loads the helpers and does nothing
+    else.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -157,23 +169,57 @@ function Get-IssueRefFromNotes {
     return ('{0}#{1}' -f $m.Groups[1].Value, $m.Groups[2].Value)
 }
 
-function New-AsanaCompleteRequest {
+function Get-MirrorCommentMarker {
     <#
-        Pure: describe the PUT that completes or re-opens a task. No network.
+        The opening sentence of a close update, which doubles as its de-duplication key. It names the
+        issue, so two issues mirrored onto the same task never mask each other. Pure.
+
+        Deliberately a readable sentence rather than an invisible token: this comment is read by a
+        colleague, and a machine marker in it would be clutter they cannot act on.
+    #>
+    param([Parameter(Mandatory = $true)][string]$IssueRef)
+
+    return "GitHub issue $IssueRef is closed"
+}
+
+function New-MirrorComment {
+    <#
+        The comment text for one event. Pure -- no network.
+
+        'closed'   the work is built and ready for the person who asked for it to test.
+        'reopened' it is being worked on again; do not test yet.
+
+        Neither text claims the ticket is done, and neither asks anybody to hurry: this script has no
+        say over when a ticket is resolved.
     #>
     param(
-        [Parameter(Mandatory = $true)][string]$Gid,
-        [Parameter(Mandatory = $true)][bool]$Completed
+        [Parameter(Mandatory = $true)][string]$IssueRef,
+        [Parameter(Mandatory = $true)][ValidateSet('closed', 'reopened')][string]$Event
     )
-    if ($Gid -notmatch '^[0-9]+$') { throw "Refusing to build a request for a non-numeric task GID: '$Gid'." }
-    [pscustomobject]@{
-        Method = 'PUT'
-        Uri    = "$script:AsanaApiBase/tasks/$Gid"
-        Body   = (ConvertTo-Json @{ data = @{ completed = $Completed } } -Compress -Depth 5)
+
+    $parts = $IssueRef -split '#'
+    $url = "https://github.com/$($parts[0])/issues/$($parts[1])"
+
+    if ($Event -eq 'closed') {
+        return @(
+            (Get-MirrorCommentMarker -IssueRef $IssueRef) + ': the work behind this ticket is built and ready to test.',
+            $url,
+            '',
+            'This ticket stays open on purpose. Tick it off yourself once you have checked that it does what you meant.'
+        ) -join "`n"
     }
+
+    return @(
+        "GitHub issue $IssueRef has been reopened: it is being worked on again, so hold off on testing.",
+        $url
+    ) -join "`n"
 }
 
 function New-AsanaCommentRequest {
+    <#
+        Pure: describe the POST that adds a comment to a task. No network. This is the only write
+        this script knows how to build.
+    #>
     param(
         [Parameter(Mandatory = $true)][string]$Gid,
         [Parameter(Mandatory = $true)][string]$Text
@@ -195,11 +241,22 @@ function Invoke-AsanaRequest {
     return Invoke-RestMethod -Method $Request.Method -Uri $Request.Uri -Headers $headers -Body $Request.Body
 }
 
+function Add-AsanaComment {
+    param(
+        [Parameter(Mandatory = $true)][string]$Gid,
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Pat
+    )
+    Invoke-AsanaRequest -Request (New-AsanaCommentRequest -Gid $Gid -Text $Text) -Pat $Pat | Out-Null
+}
+
 function Get-AsanaTaskState {
     <#
         Read a task's 'completed' flag. Returns $null when the task cannot be read -- it was deleted,
         or it lives in a workspace this PAT has no access to. That is reported and skipped rather
         than thrown, so one unreachable ticket cannot end a sweep over all of them.
+
+        Read-only. The flag is never written back: see the .DESCRIPTION.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Gid,
@@ -216,16 +273,34 @@ function Get-AsanaTaskState {
     }
 }
 
-function Set-AsanaTaskCompleted {
+function Test-MirrorUpdatePosted {
+    <#
+        Has this task already been told that this issue is closed? Reads the task's comments and
+        looks for the marker sentence. Used by the sweeps only -- an event always comments.
+
+        An unreadable task answers $true, so a sweep that cannot check does not comment blindly.
+    #>
     param(
         [Parameter(Mandatory = $true)][string]$Gid,
-        [Parameter(Mandatory = $true)][bool]$Completed,
-        [Parameter(Mandatory = $true)][string]$Pat,
-        [string]$Comment = ''
+        [Parameter(Mandatory = $true)][string]$IssueRef,
+        [Parameter(Mandatory = $true)][string]$Pat
     )
-    Invoke-AsanaRequest -Request (New-AsanaCompleteRequest -Gid $Gid -Completed $Completed) -Pat $Pat | Out-Null
-    if ($Comment) {
-        Invoke-AsanaRequest -Request (New-AsanaCommentRequest -Gid $Gid -Text $Comment) -Pat $Pat | Out-Null
+    if ($Gid -notmatch '^[0-9]+$') { throw "Refusing to read a non-numeric task GID: '$Gid'." }
+    $marker = Get-MirrorCommentMarker -IssueRef $IssueRef
+    $uri = "$script:AsanaApiBase/tasks/$Gid/stories" + '?opt_fields=text,type&limit=100'
+    try {
+        $seen = $false
+        while ($uri) {
+            $resp = Invoke-RestMethod -Method GET -Uri $uri -Headers @{ Authorization = "Bearer $Pat" }
+            foreach ($s in @($resp.data)) {
+                if ([string]$s.text -and ([string]$s.text).Contains($marker)) { $seen = $true }
+            }
+            $uri = if ($resp.next_page -and $resp.next_page.uri) { $resp.next_page.uri } else { $null }
+        }
+        return $seen
+    } catch {
+        Write-Host "  Comments of Asana task $Gid are not readable ($($_.Exception.Message)) -- skipped rather than commented on blindly."
+        return $true
     }
 }
 
@@ -290,10 +365,31 @@ function Invoke-EventMode {
         }
         return
     }
-    $completed = ($Event -eq 'closed')
-    $comment = if ($completed) { "Resolved via GitHub $IssueRef" } else { "Reopened via GitHub $IssueRef" }
-    Set-AsanaTaskCompleted -Gid $ref.Gid -Completed $completed -Pat $AsanaPat -Comment $comment
-    Write-Host "Asana task $($ref.Gid) set completed=$completed (from $IssueRef, matched by $($ref.Source))."
+    # No de-duplication here on purpose: an event is a real state change, so a close after a reopen
+    # is news again and gets said again.
+    Add-AsanaComment -Gid $ref.Gid -Text (New-MirrorComment -IssueRef $IssueRef -Event $Event) -Pat $AsanaPat
+    Write-Host "Asana task $($ref.Gid) updated: $IssueRef $Event (matched by $($ref.Source)). The task was NOT completed -- that is the requester's call."
+}
+
+function Update-MirroredTask {
+    <#
+        The sweeps' shared step: comment on a task for a closed issue, unless a person has already
+        resolved it or the update is already there. Returns 1 when it commented, 0 otherwise.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Gid,
+        [Parameter(Mandatory = $true)][string]$IssueRef,
+        [string]$MatchedBy = ''
+    )
+    $task = Get-AsanaTaskState -Gid $Gid -Pat $AsanaPat
+    if ($null -eq $task) { return 0 }
+    if ($task.completed) { return 0 }
+    if (Test-MirrorUpdatePosted -Gid $Gid -IssueRef $IssueRef -Pat $AsanaPat) { return 0 }
+
+    Add-AsanaComment -Gid $Gid -Text (New-MirrorComment -IssueRef $IssueRef -Event 'closed') -Pat $AsanaPat
+    $how = if ($MatchedBy) { " (matched by $MatchedBy)" } else { '' }
+    Write-Host "  Updated: Asana task $Gid told that $IssueRef is closed$how."
+    return 1
 }
 
 function Invoke-ReconcileFromAsana {
@@ -303,51 +399,44 @@ function Invoke-ReconcileFromAsana {
         return 0
     }
     $tasks = Get-ProjectIncompleteTasks -ProjectGid $ProjectGid -Pat $AsanaPat
-    $fixed = 0
+    $done = 0
     foreach ($t in $tasks) {
         $ref = Get-IssueRefFromNotes -Notes ([string]$t.notes)
         if (-not $ref) { continue }
-        if (Test-GitHubIssueClosed -IssueRef $ref) {
-            Set-AsanaTaskCompleted -Gid $t.gid -Completed $true -Pat $AsanaPat -Comment "Resolved via GitHub $ref (reconciliation sweep)"
-            Write-Host "  Reconciled: Asana task $($t.gid) completed for closed issue $ref."
-            $fixed++
-        }
+        if (-not (Test-GitHubIssueClosed -IssueRef $ref)) { continue }
+        $done += Update-MirroredTask -Gid ([string]$t.gid) -IssueRef $ref
     }
-    Write-Host "Asana-side sweep: $($tasks.Count) incomplete task(s) examined, $fixed completed."
-    return $fixed
+    Write-Host "Asana-side sweep: $($tasks.Count) open task(s) examined, $done updated."
+    return $done
 }
 
 function Invoke-ReconcileFromGitHub {
     <#
         Sweep (b): this repo's recently closed issues, matched forward to Asana through their bodies.
         This is the half that reaches a ticket imported FROM Asana -- its task was written by a
-        colleague and carries no GitHub back-link, so sweep (a) is blind to it.
+        colleague and carries no GitHub back-link for the Asana -> GitHub pass to find.
     #>
     if (-not $Repo) {
         Write-Host 'GITHUB_REPOSITORY is not set -- the GitHub-side sweep is skipped.'
         return 0
     }
     $issues = Get-ClosedIssues -Repo $Repo -SinceDays $SinceDays
-    $fixed = 0
+    $done = 0
     foreach ($i in $issues) {
         $ref = Resolve-AsanaTaskRef -IssueBody ([string]$i.body)
         if (-not $ref.Gid) { continue }
-        $task = Get-AsanaTaskState -Gid $ref.Gid -Pat $AsanaPat
-        if ($null -eq $task -or $task.completed) { continue }
-        Set-AsanaTaskCompleted -Gid $ref.Gid -Completed $true -Pat $AsanaPat -Comment "Resolved via GitHub $Repo#$($i.number) (reconciliation sweep)"
-        Write-Host "  Reconciled: Asana task $($ref.Gid) completed for closed issue $Repo#$($i.number) (matched by $($ref.Source))."
-        $fixed++
+        $done += Update-MirroredTask -Gid $ref.Gid -IssueRef "$Repo#$($i.number)" -MatchedBy $ref.Source
     }
-    Write-Host "GitHub-side sweep: $($issues.Count) closed issue(s) examined, $fixed completed."
-    return $fixed
+    Write-Host "GitHub-side sweep: $($issues.Count) closed issue(s) examined, $done updated."
+    return $done
 }
 
 function Invoke-ReconcileMode {
     if (-not $AsanaPat) { throw 'ASANA_PAT is not set.' }
-    $fixed = 0
-    $fixed += Invoke-ReconcileFromAsana
-    $fixed += Invoke-ReconcileFromGitHub
-    Write-Host "Reconciliation done -- $fixed task(s) completed."
+    $done = 0
+    $done += Invoke-ReconcileFromAsana
+    $done += Invoke-ReconcileFromGitHub
+    Write-Host "Reconciliation done -- $done task(s) updated, 0 completed (this script completes nothing)."
 }
 
 function Invoke-Main {

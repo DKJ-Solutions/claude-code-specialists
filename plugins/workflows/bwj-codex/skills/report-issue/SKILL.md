@@ -6,8 +6,9 @@ description: >-
   ways. Use this in BWJ-ecommerce/smartwatchbanden or BWJ-ecommerce/xoxowildhearts whenever a real
   finding needs tracking: a bug, a broken customer-facing behaviour, a stale doc, a decision that is
   not yours to make. The GitHub issue always gets created
-  even if Asana is unreachable, so the source-of-truth guarantee holds. It does NOT resolve tickets --
-  closing the GitHub issue does that, via the asana-mirror CI workflow.
+  even if Asana is unreachable, so the source-of-truth guarantee holds. Nothing here resolves a ticket
+  and nothing downstream does either: closing the GitHub issue only makes the asana-mirror CI workflow
+  post an update saying the work is ready to test, and the colleague who filed it ticks it off.
 ---
 
 # report-issue -- the BWJ GitHub-first, Asana-mirrored filing procedure
@@ -94,8 +95,10 @@ stop. The issue can be mirrored later by re-running this skill's steps 2-3.
 
 ## Step 4 -- report
 
-Give both URLs and stop. Do not resolve anything: when the GitHub issue is closed, the
-`asana-mirror` CI workflow completes the Asana task on its own.
+Give both URLs and stop. **Do not resolve anything, and do not promise that anything else will.**
+When the GitHub issue is closed, the `asana-mirror` CI workflow posts an update on the Asana task
+saying the work is ready to test; the task stays open until the colleague who filed it ticks it off.
+Nothing in this chain -- not you, not the CI -- completes a task.
 
 **Name the type and the tier you chose, and why.** You infer both rather than asking for them -- the
 reach question is answerable from the finding itself, and the whole backfill of 135 issues was

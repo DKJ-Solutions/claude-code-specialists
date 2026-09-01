@@ -1,6 +1,7 @@
 # Copied from bwj-codex/templates/asana-mirror.yml into .github/workflows/asana-mirror.yml.
-# Resolves the mirrored Asana task when its GitHub issue is closed (and re-opens it on reopen),
-# with a daily reconciliation sweep (both directions) for missed events. See bwj-codex/WORKFLOW-portable.md.
+# Posts an update on the mirrored Asana task when its GitHub issue is closed (and the counterpart on
+# reopen), with a daily reconciliation sweep (both directions) for missed events. It never completes a
+# task -- the colleague who filed the ticket does that, after testing. See bwj-codex/WORKFLOW-portable.md.
 name: asana-mirror
 
 on:
@@ -24,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Resolve on issue close / reopen
+      - name: Update the task on issue close / reopen
         if: github.event_name == 'issues'
         shell: pwsh
         env:

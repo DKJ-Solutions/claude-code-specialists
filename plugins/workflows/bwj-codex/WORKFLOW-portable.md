@@ -140,18 +140,34 @@ matches on it:
 - **On the Asana task** -- the `Tracked on GitHub:` line of the skeleton already carries the issue
   URL. Nothing else is required there.
 
-### 4. Close the GitHub issue -> the Asana task resolves itself
+### 4. Close the GitHub issue -> the Asana task gets an update
 
-**Closing the GitHub issue is the signal.** A GitHub Actions workflow in the repo
-(`.github/workflows/asana-mirror.yml`, copied from this plugin's `templates/`) does the rest:
+**Closing the GitHub issue is the signal that the work is BUILT, not that the ticket is DONE.** A
+GitHub Actions workflow in the repo (`.github/workflows/asana-mirror.yml`, copied from this plugin's
+`templates/`) carries that news across:
 
 | GitHub event | what happens in Asana |
 |---|---|
-| issue **closed** | the linked task is marked complete, with a comment `Resolved via GitHub <repo>#<n>` |
-| issue **reopened** | the linked task is set back to incomplete |
-| daily schedule | a reconciliation sweep in **both** directions, for events that never arrived: incomplete tasks in the mirror project whose GitHub issue is closed, and issues closed in the last 30 days whose Asana task is still open |
+| issue **closed** | a comment on the linked task: the work is built and ready to test, with the issue URL. The task stays open |
+| issue **reopened** | a comment saying it is being worked on again, so hold off on testing |
+| daily schedule | a reconciliation sweep in **both** directions, for events that never arrived: open tasks in the mirror project whose GitHub issue is closed, and issues closed in the last 30 days whose task has not been told yet |
 
-No one resolves the Asana task by hand.
+**The task is never completed by any of this, and the script has no code path that can do it**
+(Dave, September 1, 2026). Closing a GitHub issue is a statement by whoever built the thing; resolving
+the ticket is a statement by whoever asked for it, and only that person can make it -- after they have
+tested it. An automation that ticks the box takes the one decision the ticket exists to record and
+replaces it with a guess, and it does so silently, so nobody can tell an accepted change from an
+unverified one afterwards.
+
+This is the shape after a measured mistake, and the mistake is worth the sentence: on
+September 1, 2026 the sweep that had just learned to read imported tickets completed **six** Asana
+tasks it should only have commented on -- five of them belonging to colleagues who had never been
+asked whether the work was any good.
+
+**The de-duplication is the update's own opening sentence**, `GitHub issue <repo>#<n> is closed`, which
+names the issue. Sweeps look for it and stay silent when it is already there; **an event never
+de-duplicates**, because a close after a reopen is news again. A task somebody has already ticked off
+is left alone by both.
 
 **Which task an issue belongs to is answered by three matchers, tried in order** -- 'tier' is the reach
 label above and means nothing here -- because a repo has two kinds of issue and only one of them was ever
@@ -183,8 +199,10 @@ settle it is to add a marker.
 - **A token that can reach the tickets.** `ASANA_PAT` is a *user* token: it can only see the
   workspaces that user is a member of. An imported ticket often lives in the requester's own Asana
   organisation rather than in the one the mirror project sits in, and a task the token cannot read is
-  logged and skipped rather than failing the run -- so a sweep that reports `0 completed` with a line
+  logged and skipped rather than failing the run -- so a sweep that reports `0 updated` with a line
   per unreadable task is telling you about the token, not about the tickets.
+- **Resolving the ticket. That is the whole point of the previous section**: the colleague who filed
+  it ticks it off once they have tested the change, and nothing in this workflow will do it for them.
 - **The Asana project answer:** whether both stores mirror into one shared project or one project
   each is a BWJ decision. `Get-AsanaProjectGid` returns whatever each repo sets, so either works --
   but the two repos must make the *same* kind of choice, or this page's promise of "identical" is
@@ -199,8 +217,12 @@ settle it is to add a marker.
   Asana is the window the rest of BWJ looks through, not the workbench.
 - **A translation, not a copy**, because a mirrored task that is just the issue body helps nobody: a
   non-technical colleague cannot act on a stack trace, and a technical reader already has the issue.
-- **CI, not a session**, for the resolve step, because it must happen every time an issue closes
+- **CI, not a session**, for the update step, because it must happen every time an issue closes
   whether or not anyone is running Claude, and because a workflow file is version-controlled and
   reviewable where an Asana-side automation rule is not.
-- **A reconciliation sweep**, because a single webhook can be missed and a task stuck open in Asana
-  is exactly the drift this plugin exists to prevent.
+- **A reconciliation sweep**, because a single webhook can be missed and a colleague waiting on a
+  ticket nobody told them about is exactly the drift this plugin exists to prevent.
+- **An update and not a tick**, because the two are different claims by different people. The build
+  is finished when the person who built it says so; the request is finished when the person who made
+  it says so. A tracker that lets one stand in for the other cannot afterwards tell you which of its
+  closed tickets anybody actually looked at.
