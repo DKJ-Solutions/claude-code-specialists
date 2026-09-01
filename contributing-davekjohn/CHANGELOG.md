@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/sync-guard-merged-by-oid-v1` · 20260901-152556
+
+The pre-task sync's standing-predecessor guard now proves that the *ref* was merged, not merely that
+something once carried its name. Branch names are date-stamped and get reused, so a `sync/live-<date>`
+branch that merged and was deleted used to vouch for the brand-new, unmerged branch that took its name
+later the same day: the guard reported `all merged`, found nothing standing, and pushed a `-2` branch onto
+exactly the pile it exists to prevent. It now compares the standing ref's current tip against the tip the
+merged PR carried (`headRefOid`), which also declines a branch somebody pushed one more commit to after
+its PR landed, and still recognises the squash-merged ref that lingers on a repo without
+`delete_branch_on_merge` -- the case the name match was added for.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running the pre-task sync gets a guard that fires on the case it was silently missing, so
+unmerged sync branches stop stacking behind a name collision. The failure needed no unusual setup -- two
+syncs on one day, which is what a busy live theme produces -- and it was invisible from the outside, since
+a run that misses a predecessor looks exactly like a run that had none. Measured in
+BWJ-ecommerce/xoxowildhearts on September 1, 2026: `4.27.0` reported `1 found on origin, all merged` while
+that branch had an open PR. It also unblocks that repo's own issue #57, the retirement of the local
+`sync-main.ps1` fork it has been carrying as a bridge.
+
+**Score:** 4
+
+#### Pull Request
+
+The standing-predecessor guard proves the ref was merged, not just its name
+
+Plugins: team-shopify
+
+[PR #1192](https://github.com/DaveKJohn/claude-code-specialists/pull/1192)
+
+---
+
 ### DEPLOY: `fix/sync-main-checks-poll-bounded-v1` · 20260901-134631
 
 `sync-main.ps1`'s `gh pr checks` polling loop -- the last network call in that script outside
