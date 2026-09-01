@@ -32,6 +32,55 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/merged-pr-proof-shared-v1` · 20260901-164752
+
+The proof that a merged PR is about **this ref** and not merely about a branch that once wore its
+name now lives once, in `scripts/lib/merged-pr-lib.ps1`, and both scripts that need it call it.
+
+It had lived twice since September 1, 2026, when two branches open at the same time repaired the
+same defect class independently and correctly -- inbound #1190 in team-shopify's `sync-main.ps1`,
+#1191 in the workflow plugin's `prune-merged.ps1`. The copies diverged the same day, on the guard
+that is easiest to leave out because nothing fails without it yet: one keyed its lookup with
+`[System.StringComparer]::Ordinal` and wrote down why git refs are case-sensitive, the other used a
+bare `@{}`, whose comparer is not. A merged `Sync/live-x` could therefore be found under a standing
+`sync/live-x` in one script and not in the other.
+
+The lib carries the map, the sha-shape validation, the ordinal comparer and the two-part test; each
+caller keeps its own gh transport, because each has a written reason for the one it uses that does
+not travel to the other. It is registered twice in `Get-SharedScriptPairs` and mirrored into both
+plugins rather than reached across between them -- they are separately versioned and separately
+installed, so a cross-plugin path is a dependency a version mismatch breaks silently.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+It is #81's and #815's argument arriving from the inside, with a date on it. The case for a single
+source is normally made in hindsight, about a copy that drifted over months; this one drifted in
+hours, between two branches that were both right, and the half that went missing was the half whose
+absence changes nothing today. That is the shape worth recording: duplication does not announce
+itself by failing.
+
+The behavioural change in this repo is one sentence in one report. In `prune-merged.ps1` a
+case-differing merged name was *found* under the default comparer and the tip comparison then
+failed, so the branch was kept with the reason *"the name was recycled"* rather than *"no merged
+PR"* -- a wrong sentence, not a wrong action, and a false delete would additionally have needed two
+branches differing only in case sitting on the same commit, where nothing is lost. Neither case was
+constructed; the comparer difference was verified directly, and it is now pinned by a test on both
+transports.
+
+**Score:** 1
+
+#### Pull Request
+
+The merged-PR proof lives once, in a lib both plugins mirror
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1195](https://github.com/DaveKJohn/claude-code-specialists/pull/1195)
+
+---
+
 ### DEPLOY: `fix/prune-merged-proof-by-oid-v1` · 20260901-155946
 
 `prune-merged.ps1` proved a merge by branch **name**, so a name that had been merged once and then
