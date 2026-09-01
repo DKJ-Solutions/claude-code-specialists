@@ -959,10 +959,17 @@ if ($Commit) {
     Write-Host "Committed: $message" -ForegroundColor Green
 
     if ($Push) {
-        $pushRun = Invoke-NativeCapture -FilePath 'git' -Arguments @('push')
+        # BOUNDED (inbound #1179). The state this flag exists to avoid -- committed on main and not
+        # pushed -- is exactly what a hang produces, except a hang does not REPORT it: it reads as a
+        # push still in progress, and the fold commit sits on the trunk unnoticed. The lib's
+        # non-interactive environment closes the measured credential-prompt cause; the bound makes any
+        # other stall land in the branch below, which already says the right thing.
+        $pushRun = Invoke-NativeCapture -FilePath 'git' -Arguments @('push') `
+                                        -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
         if ($pushRun.ExitCode -ne 0) {
             Write-Host ($pushRun.Output -join "`n") -ForegroundColor Red
-            Write-Host "Committed locally but NOT pushed (git push exited $($pushRun.ExitCode)) -- the state this flag exists to avoid. Push by hand." -ForegroundColor Red
+            $why = if ($pushRun.TimedOut) { "git push did not answer within $NativeCaptureNetworkTimeoutSeconds seconds; see the [timeout] lines above" } else { "git push exited $($pushRun.ExitCode)" }
+            Write-Host "Committed locally but NOT pushed ($why) -- the state this flag exists to avoid. Push by hand." -ForegroundColor Red
             exit 1
         }
         Write-Host "Pushed." -ForegroundColor Green

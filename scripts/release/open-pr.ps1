@@ -1015,9 +1015,25 @@ if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTest
 # git push writes its 'remote:' progress to stderr, which under EAP=Stop would die as a terminating
 # NativeCommandError before the exit-code check even though git gave exit 0 (the #96/#97/#107
 # pitfall). Invoke-NativeCapture runs it under EAP=Continue and hands back output + $LASTEXITCODE.
-$push = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin', $branch)
+#
+# AND IT IS BOUNDED (inbound #1179). This is the push that hung: measured on DAVE-KOK-BWJ, git spawned
+# `git credential-manager get`, that child opened a prompt nothing was listening to, and the call never
+# returned -- with the lint + test gate directly above it already paid for and about to be discarded.
+# The lib now also runs every child with GIT_TERMINAL_PROMPT=0 and GCM_INTERACTIVE=never, which is what
+# closes the measured cause; the bound is what makes ANY other stall here report itself instead of
+# reading as "still pushing". The gate above is exactly why this call is worth bounding and not merely
+# guarding: a hang at this line is the most expensive hang in the script.
+$push = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin', $branch) `
+                             -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
 $push.Output | ForEach-Object { Write-Host $_ }
-if ($push.ExitCode -ne 0) { Write-Error "git push failed."; exit 1 }
+if ($push.ExitCode -ne 0) {
+    if ($push.TimedOut) {
+        Write-Error "git push did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above. The branch is NOT on origin and no PR was opened; the gates passed, so re-running after fixing the credential costs only the gate time."
+    } else {
+        Write-Error "git push failed."
+    }
+    exit 1
+}
 
 # --- Which template lines are the description placeholder ------------------------------------------
 # #101: the description placeholder(s) are overridable via an optional repo-config function, so a

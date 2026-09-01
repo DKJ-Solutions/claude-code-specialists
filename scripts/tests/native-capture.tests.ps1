@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/lib/native-capture-lib.ps1 -- the -Utf8 capture path (issue #907).
+    Regression tests for scripts/lib/native-capture-lib.ps1 -- the -Utf8 capture path (issue #907) and
+    the non-interactive environment + bounded wait (inbound #1179).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Exit code 0 if everything passes, 1 on a
@@ -14,6 +15,19 @@
     UTF-8; on a cp850 console the two sides were decoded differently and the lock refused a PR whose
     body was intact, naming a line that reads as correct -- in a gate with no -Force (issue #907,
     measured on PR #906).
+
+    WHAT THE #1179 SECTIONS ARE FOR, since they test a different property of the same file. A git call
+    the workflow makes can block on a credential helper that opens a prompt nothing will answer: on
+    DAVE-KOK-BWJ a `git push` and the `git credential-manager get` it spawned were both still running
+    fifteen minutes later, and the ship reported it as still shipping. Two guards answer that, and each
+    is pinned separately because either one alone leaves a hole -- the environment closes the measured
+    cause, the bound closes the class. The kill is asserted against a GRANDCHILD, because the process
+    that actually blocked was the grandchild and a kill that misses it buys nothing.
+
+    Those sections cost this suite roughly fifteen seconds of deliberate waiting. That is the subject:
+    a bound can only be tested by outlasting it, and a fixture that stalls for less than the bound
+    proves nothing. The suites run in parallel under the gate, so it costs wall-clock only if this is
+    the slowest one.
 
     THE ENCODING ASSERTS RUN IN A CHILD PROCESS WITH ITS OWN CONSOLE, and that is the whole reason
     this suite is shaped the way it is. [Console]::OutputEncoding's setter is SetConsoleOutputCP,
@@ -124,6 +138,137 @@ try {
     # The newline that ENDS the last line is a terminator, not an empty line after it. A stray ''
     # here would become an extra element in every caller's -join.
     Assert-Equal 'c' (@($three.Output)[-1]) 'no phantom empty line is appended from the trailing newline'
+
+    # ---------------------------------------------------------------------------------------------
+    Write-Host 'Invoke-NativeCapture -- the child runs non-interactively (inbound #1179)' -ForegroundColor Cyan
+
+    # THE ASSERTS BELOW MUTATE THIS PROCESS'S ENVIRONMENT, and that is safe here for the reason the
+    # code-page asserts further down are NOT: Invoke-TestSuiteGate starts every suite as its own
+    # Start-Process child, so a process-scope environment variable cannot reach a sibling suite. The
+    # console is what is shared, not the environment.
+    #
+    # And every assert starts by DELETING both names rather than assuming they are unset. The machine
+    # that produced #1179 may well carry them as a hand-placed bridge, and an assert that reads
+    # "restored to absent" while the machine set it to '0' would pass on a laptop and fail in CI.
+    function Reset-GuardEnv {
+        foreach ($n in 'GIT_TERMINAL_PROMPT', 'GCM_INTERACTIVE') {
+            [Environment]::SetEnvironmentVariable($n, $null, 'Process')
+        }
+    }
+
+    Reset-GuardEnv
+    $seen = Invoke-NativeCapture -FilePath 'cmd' -Arguments @('/c', 'echo GTP=%GIT_TERMINAL_PROMPT% GCM=%GCM_INTERACTIVE%')
+    $seenText = (@($seen.Output) -join '')
+    # BOTH NAMES, ASSERTED SEPARATELY. They stop different things -- git's own terminal prompt and the
+    # credential manager's window -- and setting only GIT_TERMINAL_PROMPT leaves the measured hang
+    # exactly in place, so an assert on the pair as one string would pass with the real defect present.
+    Assert-True ($seenText -like '*GTP=0*')      'the child sees GIT_TERMINAL_PROMPT=0 -- git will not prompt on a terminal'
+    Assert-True ($seenText -like '*GCM=never*')  'the child sees GCM_INTERACTIVE=never -- the credential manager fails instead of drawing a window'
+
+    Reset-GuardEnv
+    $seen8 = Invoke-NativeCapture -Utf8 -FilePath 'cmd' -Arguments @('/c', 'echo GTP=%GIT_TERMINAL_PROMPT% GCM=%GCM_INTERACTIVE%')
+    # The Start-Process arm is a DIFFERENT launcher, so it inherits nothing from the assert above. Both
+    # arms are exercised because ship-pr.ps1 reaches gh through one and git through the other.
+    Assert-True ((@($seen8.Output) -join '') -like '*GTP=0*') 'the Start-Process arm guards its child too, not only the & arm'
+
+    Reset-GuardEnv
+    $null = Invoke-NativeCapture -FilePath 'cmd' -Arguments @('/c', 'exit', '0')
+    # ABSENT IS NOT '': git reads a defined-but-empty GIT_TERMINAL_PROMPT differently from an undefined
+    # one, so a restore that writes '' would leave every script that ran one git call in a state it did
+    # not start in. This is the assert that catches `$env:NAME = $null`, which does exactly that.
+    Assert-True ($null -eq [Environment]::GetEnvironmentVariable('GIT_TERMINAL_PROMPT', 'Process')) 'a variable that was ABSENT is restored to absent, not to the empty string'
+
+    [Environment]::SetEnvironmentVariable('GIT_TERMINAL_PROMPT', 'callers-own', 'Process')
+    $null = Invoke-NativeCapture -FilePath 'cmd' -Arguments @('/c', 'exit', '0')
+    Assert-Equal 'callers-own' ([Environment]::GetEnvironmentVariable('GIT_TERMINAL_PROMPT', 'Process')) "a caller's own value is handed back, not ours"
+
+    Reset-GuardEnv
+    try { $null = Invoke-NativeCapture -FilePath 'a-command-that-does-not-exist-1179' -Arguments @() } catch { }
+    # The restore is in a finally, and this is what proves it: a command that cannot even be launched
+    # must not leave the guard behind for the rest of the script.
+    Assert-True ($null -eq [Environment]::GetEnvironmentVariable('GIT_TERMINAL_PROMPT', 'Process')) 'the guard is restored even when the call throws instead of running'
+
+    Reset-GuardEnv
+
+    # ---------------------------------------------------------------------------------------------
+    Write-Host 'Invoke-NativeCapture -TimeoutSeconds -- a stall fails loudly (inbound #1179)' -ForegroundColor Cyan
+
+    # WHAT THIS PINS is the property the report asked for: the call RETURNS. Before the bound, a child
+    # that never exits held the script forever and the workflow reported it as still working -- the
+    # fifteen-minute hang on DAVE-KOK-BWJ. So the assert is on the elapsed time as much as on the
+    # verdict: a wait that answered correctly after 30 seconds would be the defect, not the fix.
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $stalled = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -TimeoutSeconds 2
+    $sw.Stop()
+    Assert-True  ($sw.Elapsed.TotalSeconds -lt 25)  'a child that would run for 30s is given up on, not waited out'
+    Assert-True  $stalled.TimedOut                  'TimedOut says so, so a caller does not have to recognise an exit code'
+    Assert-Equal 124 $stalled.ExitCode              'the exit code is the timeout code, not whatever the kill left behind'
+    # THE DIAGNOSIS IS IN Output BECAUSE THAT IS WHERE CALLERS LOOK: every bounded site pipes Output to
+    # Write-Host and then judges ExitCode. Without this line the three of them report a stall as a bare
+    # non-zero exit, which is the "hang presented as something else" the report was about.
+    Assert-True  ((@($stalled.Output) -join ' ') -like '*[[]timeout[]]*') 'Output carries a [timeout] line, so an unchanged caller still prints the reason'
+
+    # A BOUND THAT DOES NOT EXPIRE CHANGES NOTHING. This is the assert that keeps the bound from
+    # becoming a second failure mode of its own: the exit code still comes back exactly, which is the
+    # #907 empty-ExitCode trap the Start-Process arm has to keep clearing.
+    $inTime = Invoke-NativeCapture -FilePath 'cmd' -Arguments @('/c', 'exit', '7') -TimeoutSeconds 30
+    Assert-Equal 7 $inTime.ExitCode   'a bounded call that finishes in time reports its own exit code'
+    Assert-True  (-not $inTime.TimedOut) 'and does not claim to have timed out'
+
+    # TimedOut IS PRESENT ON EVERY RETURN, from both arms, so no caller has to know which arm answered.
+    $plain = Invoke-NativeCapture -FilePath 'cmd' -Arguments @('/c', 'exit', '0')
+    Assert-True (-not $plain.TimedOut) 'an unbounded call on the & arm still carries TimedOut = $false'
+    $plain8 = Invoke-NativeCapture -Utf8 -FilePath 'cmd' -Arguments @('/c', 'exit', '0')
+    Assert-True (-not $plain8.TimedOut) 'and so does an unbounded call on the Start-Process arm'
+
+    # ---------------------------------------------------------------------------------------------
+    Write-Host 'Stop-NativeProcessTree -- the GRANDCHILD dies too (inbound #1179)' -ForegroundColor Cyan
+
+    # THIS IS THE MEASURED SHAPE, and it is the reason taskkill /T is used rather than Stop-Process. In
+    # the report the process that blocked was not `git.exe push` (PID 11372) but the
+    # `git credential-manager get` it spawned (PID 27176). Killing only the parent leaves that one
+    # holding the prompt -- the hang survives the timeout, and the bound buys nothing.
+    #
+    # The fixture writes TWO markers: 'started' the moment the grandchild runs, 'survived' only after it
+    # outlives the kill. Both are needed. Asserting the absence of 'survived' alone passes just as
+    # happily when the grandchild never launched at all, which would be a test that cannot fail.
+    #
+    # BOTH HALVES OF THE FIXTURE ARE FILES, not -Command strings, and that is this suite's own subject
+    # biting back: Start-Process joins -ArgumentList on spaces and quotes NOTHING, so a -Command string
+    # carrying the sandbox path would arrive at the grandchild torn into pieces -- the grandchild would
+    # never launch, and the survival assert would pass for the wrong reason. -File plus parameters means
+    # the only quoting that has to be right is ConvertTo-NativeArgumentToken's, which is under test
+    # sixty lines above.
+    $started  = Join-Path $sandbox 'grandchild-started.txt'
+    $survived = Join-Path $sandbox 'grandchild-survived.txt'
+
+    $gcScript = Join-Path $sandbox 'grandchild.ps1'
+    Set-Content -LiteralPath $gcScript -Encoding Ascii -Value @(
+        'param([string]$Started, [string]$Survived)'
+        'Set-Content -LiteralPath $Started -Value started'
+        'Start-Sleep -Seconds 6'
+        'Set-Content -LiteralPath $Survived -Value survived'
+    )
+
+    # The outer quotes the grandchild's arguments itself, for the same Start-Process reason.
+    $outerScript = Join-Path $sandbox 'grandchild-parent.ps1'
+    Set-Content -LiteralPath $outerScript -Encoding Ascii -Value @(
+        'param([string]$Child, [string]$Started, [string]$Survived)'
+        '$quoted = @($Child, $Started, $Survived) | ForEach-Object { ''"'' + $_ + ''"'' }'
+        'Start-Process -FilePath powershell -NoNewWindow -ArgumentList (@(''-NoProfile'', ''-ExecutionPolicy'', ''Bypass'', ''-File'') + $quoted)'
+        'Start-Sleep -Seconds 30'
+    )
+
+    $tree = Invoke-NativeCapture -FilePath 'powershell' -Arguments @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $outerScript, $gcScript, $started, $survived
+    ) -TimeoutSeconds 3
+    Assert-True $tree.TimedOut 'the fixture stalled as intended, so the kill under test actually ran'
+    Assert-True (Test-Path -LiteralPath $started) 'the grandchild really launched -- without this the next assert could not fail'
+
+    # Long enough that a SURVIVING grandchild would have written its second marker (it sleeps 6s from a
+    # start that precedes the 3s bound), with margin for a loaded machine.
+    Start-Sleep -Seconds 9
+    Assert-True (-not (Test-Path -LiteralPath $survived)) 'the grandchild was killed with its parent -- taskkill /T, not Stop-Process'
 
     # ---------------------------------------------------------------------------------------------
     Write-Host 'Invoke-NativeCapture -Utf8 -- the code page cannot reach the answer (issue #907)' -ForegroundColor Cyan
