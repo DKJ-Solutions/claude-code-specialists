@@ -32,6 +32,65 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/testrun-series-tail-1168-v1` · 20260901-084902
+
+Close out the end-to-end testrun series ([#1135] → [#1157] → [#1168]). Run 5 met the series exit
+criterion for the first time — **0 HARD, 0 FRICTION against `v4.27.0`, no inbound issue needed** — so
+the series ends here. The residue the closed issues would otherwise have carried only as comments is
+recorded below instead, in the changelog, where a future runbook author will find it.
+
+**The one open measurement — the permission-classifier residue probe.** The same-shape A/B on the
+permission classifier is one probe short. Both halves of the classifier already read PASS; this probe
+only excludes *command shape* as an alternative explanation for one contrast. It is a tightening, not a
+gate.
+
+- **What:** `adopt-config.ps1` under the deny-everything protocol — deny the next two commands; a denial
+  arrives back in the session, an `allow`-covered command simply runs.
+- **Where:** a Claude Code session opened **inside `DaveKJohn/ccs-testrun-4`**, out of auto mode. A
+  session in the source repo is structurally the wrong instrument — a model observes results, not
+  prompts, so "asked and approved" and "never asked" are one event from its side unless the run is
+  inside the consumer with the runner denying.
+- **Status:** stays open on [#1168]. `ccs-testrun-4` is kept standing as the only place it can be
+  measured.
+
+**The amendment for the next step-4 runbook.** Run 5 did not walk step 4. Whenever step 4 is next
+walked, it inherits this rather than re-deriving it:
+
+1. **Name both permission layers and say they are different.** `permissions.defaultMode` in
+   `settings.json` decides what a session **starts** in; the shift+tab toggle (*manual mode /
+   auto-accept edits / plan mode*, where `default` is only the internal name for the first) is a
+   separate layer. A runner who reads "manual" off the status line has recorded a true fact about the
+   second and nothing about the first.
+2. **Measure by denying, not by asking.** Asking the runner whether a prompt appeared does not work —
+   where there are many prompts they get approved on autopilot. Deny everything for the next two
+   commands and the outcomes become distinguishable with nothing resting on recollection: a denial
+   arrives back in the session; a command covered by `allow` simply runs.
+
+**Teardown of the test repos** (decision by Dave, August 31, 2026): `ccs-testrun-1`, `ccs-testrun-3`
+(which takes [`ccs-testrun-3#5`](https://github.com/DaveKJohn/ccs-testrun-3/issues/5) with it) and
+`ccs-testrun-5` are deleted; `ccs-testrun-2` (cited by `runlog-3.md`) and `ccs-testrun-4` (the residue
+probe) are kept. The deletions are run outside this branch — they need the `delete_repo` gh scope.
+
+[#1135]: https://github.com/DaveKJohn/claude-code-specialists/issues/1135
+[#1157]: https://github.com/DaveKJohn/claude-code-specialists/issues/1157
+[#1168]: https://github.com/DaveKJohn/claude-code-specialists/issues/1168
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — internal QA bookkeeping; no subscriber of any consuming repo notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+Testrun series tail: closeout plan for the #1168 residue
+
+[PR #1173](https://github.com/DaveKJohn/claude-code-specialists/pull/1173)
+
+---
+
 ### DEPLOY: `fix/shopify-floor-checkout-v5-consistency-v1` · 20260831-225420
 
 `adopt-shopify-floor.ps1` scaffolded `theme-check.yml` with `actions/checkout@v7`, the one pin in the
