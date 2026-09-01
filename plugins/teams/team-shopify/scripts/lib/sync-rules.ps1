@@ -109,9 +109,13 @@ function Get-SyncReferencePoint {
         so an operator who sees 'tag' knows the window is wide rather than that something went wrong.
 
         RETURNS $null WHEN THERE IS NO REFERENCE POINT AT ALL, and the caller must refuse rather than
-        default to "sync everything". Without a floor every file looks untouched by the trunk and the
-        exclusion rule silently passes everything through -- which is precisely the failure it exists to
-        stop, arriving as a green run.
+        default to "sync everything". WHAT A MISSING FLOOR COSTS IS ONE UNREPORTED CONFLICT, NOT A
+        WHOLESALE OVERWRITE, and this docstring used to state the second -- the consequence the time window
+        had before inbound #807 replaced it with the content rule. The floor decides no file's winner now:
+        Get-SyncFileVerdict consults it in exactly ONE cell, live's content is foreign AND the trunk moved
+        the same path, and there it can only ever escalate to a human. So without a floor that
+        both-sides-moved case is decided as 'take-live' instead of reported -- the conflict is taken
+        silently, which is the failure this refusal exists to stop, arriving as a green run.
 
         '--no-merges' IS LOAD-BEARING, NOT TIDINESS, and it is the repair for the worst version of that
         same failure -- the one that arrives green while a floor IS reported. '--grep' matches any line
@@ -123,9 +127,10 @@ function Get-SyncReferencePoint {
             sync: mirror the overlay in sections/media-with-text.liquid from live into main
 
         So the merge matches the pattern. Right after a sync PR lands that merge is HEAD, the floor
-        becomes HEAD, Test-MainTouchedSince answers $false for every path, and the rule keeps NOTHING
-        back -- with 'Reference point: <sha> (the previous sync commit)' printed above it. The seam
-        cannot help: no --grep pattern separates a subject from a body line.
+        becomes HEAD, Test-MainTouchedSince answers $false for every path, and every both-sides-moved
+        conflict is taken as 'take-live' rather than reported -- with 'Reference point: <sha> (the
+        previous sync commit)' printed above it. The seam cannot help: no --grep pattern separates a
+        subject from a body line.
 
         Measured in a consumer on 2026-08-21 (inbound #801): the next sync was about to delete 41 lines
         of translations across two locale files, revert two '| raw' removals, and resurrect 23 locale

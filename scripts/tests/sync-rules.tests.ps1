@@ -158,12 +158,12 @@ try {
     # A MERGED SYNC BRANCH, WHICH IS THE WORST CASE THIS SUITE HOLDS (inbound #801). '--grep' matches any
     # LINE of a message, and a merge commit carries the merged commit's subject in its body -- so the
     # merge matches the pattern, and right after a sync PR lands that merge is HEAD. A floor on HEAD makes
-    # Test-MainTouchedSince answer $false for every path and the exclusion rule keeps NOTHING back, while
-    # printing a reference point as though all were well. Both halves are asserted: that the shipped
-    # lookup skips the merge, AND that the old '--grep' lookup genuinely picks it -- so that shape
-    # cannot come back later as a cheaper equivalent. What EXCLUDES the merge changed with #819: the
-    # subject-anchored lookup does it, because a merge's own subject is 'merge:'. See ref/chatty below
-    # for the case '--no-merges' never reached.
+    # Test-MainTouchedSince answer $false for every path, so every both-sides-moved conflict is taken as
+    # 'take-live' rather than reported, while printing a reference point as though all were well. Both
+    # halves are asserted: that the shipped lookup skips the merge, AND that the old '--grep' lookup
+    # genuinely picks it -- so that shape cannot come back later as a cheaper equivalent. What EXCLUDES
+    # the merge changed with #819: the subject-anchored lookup does it, because a merge's own subject is
+    # 'merge:'. See ref/chatty below for the case '--no-merges' never reached.
     $merged = New-GitTree -Label 'merged'
     Add-Commit -Dir $merged -Message 'initial' -Write @{ 'a.txt' = 'a1' } | Out-Null
     $prevEap = $ErrorActionPreference
