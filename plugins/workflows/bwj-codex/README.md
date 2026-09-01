@@ -33,11 +33,16 @@ type (Bug / Feature / Task), plus the `tier-1` label where management and the co
 it, both set at creation so nobody has to classify a tracker by hand a second time. It is then
 **mirrored to Asana** as a colleague-friendly variant: plain language, outcome-framed, no code or
 repo jargon, so any BWJ colleague can read it. The two are **cross-linked both ways**. When the
-**GitHub issue is closed, the Asana task is resolved automatically** -- by a small GitHub Actions
-workflow this plugin ships as a template for each repo to copy into its own `.github/`. Reopening
-the issue un-resolves the task; a daily reconciliation sweep repairs anything a missed event left
-behind. **A ticket that came the other way -- filed in Asana and copied into an issue for analysis --
-is covered too:** the workflow reads the Asana link in such an issue's header row when it carries no
+**GitHub issue is closed, the Asana task gets an update** saying the work is built and ready to test,
+naming the pull request that closed it
+-- by a small GitHub Actions workflow this plugin ships as a template for each repo to copy into its
+own `.github/`. Reopening the issue posts the counterpart; a daily reconciliation sweep carries over
+anything a missed event left behind, without ever saying the same thing twice.
+
+**It never ticks the task off, and it has no code path that could** (Dave, September 1, 2026): closing
+the issue says the work is *built*, and only the colleague who asked for it can say it is *good*.
+**A ticket that came the other way -- filed in Asana and copied into an issue for analysis -- is
+covered too:** the workflow reads the Asana link in such an issue's header row when it carries no
 machine marker of its own.
 
 The whole rule, with the field-by-field shape of the Asana variant and the cross-link markers, is in

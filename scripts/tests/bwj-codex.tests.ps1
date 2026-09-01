@@ -138,22 +138,67 @@ Assert-True ($null -eq (Get-AsanaTaskGid -IssueBody 'board: https://app.asana.co
 # a non-numeric task GID can never reach a request URL
 Assert-Throws { Get-AsanaTaskState -Gid 'abc' -Pat 'x' } 'Get-AsanaTaskState throws on a non-numeric GID'
 
-# request building -- closed vs reopened
-$put = New-AsanaCompleteRequest -Gid '123' -Completed $true
-Assert-Equal 'PUT' $put.Method 'complete request is a PUT'
-Assert-Equal 'https://app.asana.com/api/1.0/tasks/123' $put.Uri 'complete request URI carries the GID'
-Assert-True  ($put.Body -match '"completed":true') 'closed -> completed:true'
-$reopen = New-AsanaCompleteRequest -Gid '123' -Completed $false
-Assert-True  ($reopen.Body -match '"completed":false') 'reopened -> completed:false'
+# THE CENTRAL GUARANTEE (Dave, 2026-09-01): automation never resolves a mirrored ticket -- the
+# colleague who filed it does, after testing. So the script must carry no way to write 'completed'
+# at all. This is asserted over the source text rather than over behaviour, because the guarantee is
+# the ABSENCE of a code path and no call can demonstrate an absence.
+$mirrorSrc = Get-Content -LiteralPath (Join-Path $PluginRoot 'templates\asana-mirror.ps1') -Raw
+Assert-True (-not (Get-Command -Name 'New-AsanaCompleteRequest' -ErrorAction SilentlyContinue)) 'no request builder for completing a task exists'
+Assert-True (-not (Get-Command -Name 'Set-AsanaTaskCompleted'   -ErrorAction SilentlyContinue)) 'no helper for completing a task exists'
+Assert-True ($mirrorSrc -notmatch "completed\s*=\s*\`$(true|false)") 'the script never builds a completed=true/false payload'
+Assert-True ($mirrorSrc -notmatch "(?m)^\s*[^#]*-Method\s+PUT")      'the script issues no PUT at all -- the only write it knows is a comment'
 
-# a non-numeric GID never reaches a request
-Assert-Throws { New-AsanaCompleteRequest -Gid '123; rm -rf /' -Completed $true } 'New-AsanaCompleteRequest throws on a non-numeric GID'
-Assert-Throws { New-AsanaCommentRequest  -Gid 'abc' -Text 'x' }                 'New-AsanaCommentRequest throws on a non-numeric GID'
-
-# comment request
-$c = New-AsanaCommentRequest -Gid '123' -Text 'Resolved via GitHub owner/repo#7'
+# comment request -- the only write this script builds
+Assert-Throws { New-AsanaCommentRequest -Gid 'abc' -Text 'x' }             'New-AsanaCommentRequest throws on a non-numeric GID'
+Assert-Throws { New-AsanaCommentRequest -Gid '123; rm -rf /' -Text 'x' }   'and on a GID carrying a shell payload'
+$c = New-AsanaCommentRequest -Gid '123' -Text 'GitHub issue owner/repo#7 is closed'
 Assert-Equal 'POST' $c.Method 'comment request is a POST'
 Assert-True  ($c.Uri.EndsWith('/tasks/123/stories')) 'comment request posts to the stories endpoint'
+
+# the update text -- what a colleague actually reads
+$pr = [pscustomobject]@{ number = 434; url = 'https://github.com/BWJ-ecommerce/smartwatchbanden/pull/434'; title = 'fix: close the delivery-date element' }
+$closed = New-MirrorComment -IssueRef 'BWJ-ecommerce/smartwatchbanden#388' -Event 'closed' -ClosedBy @($pr) -StateReason 'completed'
+Assert-True ($closed -match 'ready to test')                'the close update says the work is ready to test'
+Assert-True ($closed -match 'stays open on purpose')        'and says the ticket deliberately stays open'
+Assert-True ($closed -match 'Tick it off yourself')         'and puts the resolving in the requester hands'
+Assert-True ($closed -match 'https://github\.com/BWJ-ecommerce/smartwatchbanden/issues/388') 'and carries the issue URL'
+Assert-True ($closed -notmatch '(?i)resolved|completed|done\b') 'and never claims the ticket itself is resolved'
+
+# the closing pull request -- the first thing somebody about to test wants
+Assert-True ($closed -match 'Closed by pull request:')   'the close update names the pull request that closed the issue'
+Assert-True ($closed -match '#434')                      'by number'
+Assert-True ($closed -match 'close the delivery-date element') 'with its title'
+Assert-True ($closed -match 'https://github\.com/BWJ-ecommerce/smartwatchbanden/pull/434') 'and its URL, so it is one click away'
+
+$two = New-MirrorComment -IssueRef 'o/r#1' -Event 'closed' -StateReason 'completed' -ClosedBy @(
+    [pscustomobject]@{ number = 1; url = 'https://github.com/o/r/pull/1'; title = 'a' },
+    [pscustomobject]@{ number = 2; url = 'https://github.com/o/r/pull/2'; title = 'b' })
+Assert-True ($two -match 'Closed by pull requests:') 'two closing PRs are announced in the plural'
+Assert-True ($two -match '#1' -and $two -match '#2')  'and both are listed'
+
+# closed by hand -- say so rather than imply a PR that is not there
+$byHand = New-MirrorComment -IssueRef 'o/r#1' -Event 'closed' -StateReason 'completed'
+Assert-True ($byHand -match 'Closed by hand')            'an issue with no linked PR says it was closed by hand'
+Assert-True ($byHand -notmatch '/pull/' -and $byHand -notmatch 'Closed by pull request') 'and links none, rather than inventing a reference'
+Assert-True ($byHand -match 'ready to test')             'while still saying the ticket is ready to test'
+
+# closed as not planned -- the opposite update, because nothing was built
+$notPlanned = New-MirrorComment -IssueRef 'o/r#1' -Event 'closed' -StateReason 'not_planned'
+Assert-True ($notPlanned -match 'as not planned')        'a not-planned close says so'
+Assert-True ($notPlanned -match 'nothing to test')       'and tells the requester there is nothing to test'
+Assert-True ($notPlanned -notmatch 'ready to test')      'rather than asking them to test something that was never built'
+Assert-True ($notPlanned.StartsWith((Get-MirrorCommentMarker -IssueRef 'o/r#1'))) 'and it still carries the de-duplication marker'
+
+$reopened = New-MirrorComment -IssueRef 'BWJ-ecommerce/smartwatchbanden#388' -Event 'reopened'
+Assert-True ($reopened -match 'reopened')            'the reopen update says so'
+Assert-True ($reopened -match 'hold off on testing') 'and tells the requester not to test yet'
+
+# the de-duplication key is the close update's own opening sentence, and it names the issue --
+# so two issues mirrored onto one task never mask each other
+$marker = Get-MirrorCommentMarker -IssueRef 'BWJ-ecommerce/smartwatchbanden#388'
+Assert-True ($closed.StartsWith($marker)) 'the marker is the first thing the close update says'
+Assert-True ($marker -match '#388')       'and it names the issue'
+Assert-True ($marker -ne (Get-MirrorCommentMarker -IssueRef 'BWJ-ecommerce/smartwatchbanden#390')) 'two issues get two different markers'
 
 # issue-ref parsing for the reconciliation sweep
 Assert-Equal 'BWJ-ecommerce/smartwatchbanden#42' (Get-IssueRefFromNotes -Notes 'see https://github.com/BWJ-ecommerce/smartwatchbanden/issues/42 for detail') 'Get-IssueRefFromNotes pulls owner/repo#n from a GitHub URL'
