@@ -722,6 +722,122 @@ function Get-SyncBranchNamesFromRefs {
     return @($names)
 }
 
+function Get-SyncMergedRefTips {
+    <#
+    .SYNOPSIS
+        The merged-PR rows 'gh pr list' produced, as a lookup from branch name to the tip commit that
+        branch carried when a PR of that name was merged.
+
+    .DESCRIPTION
+        A BRANCH NAME IS NOT AN IDENTITY, and that is the whole reason this returns tips rather than the
+        list of names it replaces (inbound #1190). Sync branch names are date-stamped, so a run on a day
+        whose branch has already been merged AND DELETED picks the same name again -- and that second
+        branch is a genuine, unmerged predecessor wearing the merged one's name. Matching on the bare name
+        reads it as merged, the guard reports nothing standing, and the run pushes a '-2' branch on top of
+        it: the exact pile the guard exists to prevent, reached through the guard's own answer. Measured in
+        a consumer on September 1, 2026 -- 'sync/live-2026-09-01' merged as PR #141 and deleted, re-created
+        the same day with open PR #159, and the shipped guard reported '1 found on origin, all merged'.
+
+        THE TIP IS 'headRefOid', NEVER 'mergeCommit.oid'. The report proposed the merge commit and it would
+        never match anything: a squash or a rebase merge writes a NEW commit onto the trunk, so
+        mergeCommit.oid is not a commit the head branch ever pointed at, and every branch would read as
+        standing forever. headRefOid is what the head ref held at the moment the PR merged, which is the
+        one thing a still-standing ref can be compared against.
+
+        AND IT ANSWERS THE CASE THE BARE NAME WAS ADDED FOR, which is why the caller keeps its ancestry
+        half as well rather than instead. A merge-commit PR leaves the branch an ancestor of the trunk and
+        ancestry settles it. A squash or rebase merge does not -- and on a repo WITHOUT
+        delete_branch_on_merge that ref lingers at exactly headRefOid, so this test still recognises it and
+        the consumer is not refused forever. What it no longer does is accept a ref that has MOVED since
+        that merge, which is both the reused name above and a branch somebody pushed one more commit to.
+
+        WHAT IS DROPPED, and each of them appears in real output: blank lines, a row whose tip is empty
+        (@tsv writes a null headRefOid as an empty field), and any line that is not '<name> TAB <sha>'. A
+        gh status or progress line carries no tab and so cannot survive that shape -- which is the other
+        half of why the caller discards stderr, and a stronger filter than the name-only parse it
+        replaces, where any stray word was a candidate row.
+
+        PURE: it parses text. The caller runs gh.
+
+    .PARAMETER Lines
+        The raw output lines of 'gh pr list --state merged --json headRefName,headRefOid --jq ".[] |
+        [.headRefName, .headRefOid] | @tsv"', one '<name> TAB <sha>' row each.
+
+        TAB RATHER THAN A SPACE, for the reason Get-SyncBranchNamesFromRefs reads ls-remote the same way:
+        a ref name cannot contain one, so no name is ever split by one of its own characters. It also
+        keeps the jq expression free of double quotes, which is one less thing for the argument quoting
+        between here and the CLI to have to get right.
+    #>
+    param([string[]]$Lines = @())
+
+    # ORDINAL, because git refs are case-sensitive and a hashtable's default comparer is not. A name
+    # differing only in case names a different branch, and reading the two as one would let a merged
+    # 'Sync/live-x' vouch for a standing 'sync/live-x'. Same choice, same reason, as the report below.
+    $tips = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::Ordinal)
+
+    foreach ($line in @($Lines)) {
+        if ($null -eq $line) { continue }
+        $text = ([string]$line).Trim()
+        if (-not $text) { continue }
+        $tab = $text.IndexOf("`t")
+        if ($tab -lt 1) { continue }
+        $name = $text.Substring(0, $tab).Trim()
+        $tip  = $text.Substring($tab + 1).Trim().ToLowerInvariant()
+        if (-not $name) { continue }
+        # A tip that is not an object name is not a tip. Liberal on length (a sha256 repo names 64) and
+        # exact on the comparison in Test-SyncRefMergedByPr, so anything odd fails toward 'not merged'.
+        if ($tip -notmatch '^[0-9a-f]{7,64}$') { continue }
+        if (-not $tips.ContainsKey($name)) { $tips[$name] = New-Object System.Collections.ArrayList }
+        if (-not $tips[$name].Contains($tip)) { [void]$tips[$name].Add($tip) }
+    }
+
+    return $tips
+}
+
+function Test-SyncRefMergedByPr {
+    <#
+    .SYNOPSIS
+        Whether a merged PR proves THIS ref was merged -- its name AND the commit it points at now.
+
+    .DESCRIPTION
+        BOTH HALVES, OR THE ANSWER IS NO. The name says a PR of that name once merged; the tip says it was
+        this ref. Only the pair is a proof, and requiring the pair is the whole repair in inbound #1190 --
+        see Get-SyncMergedRefTips for what the name alone cost.
+
+        AN UNKNOWN TIP READS AS 'NOT MERGED', which is the caller's own direction rather than a new rule: a
+        run that cannot be proven safe is refused, loudly, naming its override. So an empty tip -- a
+        rev-parse that failed, a ref that vanished between the ls-remote and the read -- is a refusal and
+        never a pass. A refusal costs nothing; a false pass is the stacked pile.
+
+        PURE: it compares strings. The caller runs git to find the tip.
+
+    .PARAMETER Name
+        The branch name, exactly as the ref names it.
+
+    .PARAMETER Tip
+        The commit that ref points at now. Empty means unknown, which is not merged.
+
+    .PARAMETER MergedTips
+        The lookup Get-SyncMergedRefTips returned. $null means gh could not answer, which is not merged.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$Name,
+        [string]$Tip = '',
+        $MergedTips = $null
+    )
+
+    if ($null -eq $MergedTips) { return $false }
+    $tip = ([string]$Tip).Trim().ToLowerInvariant()
+    if (-not $tip) { return $false }
+    if (-not $MergedTips.ContainsKey($Name)) { return $false }
+
+    foreach ($known in @($MergedTips[$Name])) {
+        if (([string]$known).Trim().ToLowerInvariant() -eq $tip) { return $true }
+    }
+
+    return $false
+}
+
 function Get-SyncPredecessorReport {
     <#
     .SYNOPSIS

@@ -107,7 +107,9 @@
     same drift onto a new branch, and so does the one after that -- and each of those runs succeeds and
     looks like it. Measured in a consumer: four branches in seven days, the newest a strict superset of
     all three, two of them byte-identical duplicates, and a dry run naming the fifth. So step [3/6] asks
-    'git ls-remote' whether a branch under the prefix is still standing, and refuses if one is.
+    'git ls-remote' whether a branch under the prefix is still standing, and refuses if one is. 'Merged'
+    is proven PER REF -- its ancestry, or its current tip against the tip a merged PR carried -- never by
+    its name alone: these names are date-stamped, so the same one comes round again (inbound #1190).
 
     REFUSING RATHER THAN WARNING, BECAUSE REFUSING COSTS NOTHING. The drift a refused run would have
     captured is already sitting on the predecessor; the trunk lacks it either way. All the push adds is a
@@ -597,12 +599,24 @@ if ($candidates.Count -eq 0) {
         exit 1
     }
 
-    # THE MERGED TEST IS THE TWO-PART ONE prune-merged.ps1 ALREADY USES, and both parts are needed here
-    # rather than one. On a repo with delete_branch_on_merge a merged branch's ref is gone from origin, so
-    # ls-remote never lists it and ancestry alone would do -- but that setting is the CONSUMER's, not this
-    # script's, and a repo without it keeps the ref of every squash-merged branch forever. Reading the
-    # setting would be one more thing to get wrong; doing both halves is what prune-merged settled on for
-    # the same question.
+    # THE MERGED TEST IS TWO-PART, and both parts are needed here rather than one. On a repo with
+    # delete_branch_on_merge a merged branch's ref is gone from origin, so ls-remote never lists it and
+    # ancestry alone would do -- but that setting is the CONSUMER's, not this script's, and a repo without
+    # it keeps the ref of every squash-merged branch forever. Reading the setting would be one more thing
+    # to get wrong; doing both halves is what prune-merged settled on for the same question.
+    #
+    # ITS SECOND PART PROVES THE REF, NOT ITS NAME, and until inbound #1190 it proved the name -- which is
+    # still what prune-merged.ps1 does, tracked as #1191 rather than swept along here, because there the
+    # same miss hands over a DELETE command and the repair belongs in that plugin's own lib. It is worth
+    # knowing that the two are one defect in two places: fixing this one does not fix that one.
+    # These names are date-stamped, so a day whose branch has already merged AND been
+    # deleted hands the next run the same name -- and a name-match then vouches for a brand-new, unmerged
+    # predecessor. The guard reported 'all merged', found nothing standing, and pushed a '-2' branch onto
+    # the pile it exists to prevent: the failure arriving through the guard's own answer. Measured in a
+    # consumer on September 1, 2026 -- 'sync/live-2026-09-01' merged as PR #141 and deleted, re-created
+    # the same day with open PR #159, and 4.27.0 reported '1 found on origin, all merged'. So the tip is
+    # asked for too; Get-SyncMergedRefTips carries the rest, including why the merge commit the report
+    # proposed instead would never have matched a single branch.
     #
     # AND WHERE gh CANNOT ANSWER, THE BRANCH READS AS STANDING. That is the opposite of prune-merged's
     # fallback and the same principle: each errs toward doing nothing. There, a branch that cannot be
@@ -613,24 +627,26 @@ if ($candidates.Count -eq 0) {
     # exists to own, so the bracket is gone rather than left standing beside it. The report expected to
     # find that dance at all four sites; measured, the other three had no bracket at all.
     #
-    # -DiscardStderr BECAUSE THE OUTPUT IS DATA the loop below compares branch names against, not
-    # progress: a gh status line merged into it becomes a $mergedHeads entry that matches nothing, and
-    # -- worse -- an entry that matches a real branch would read as merged.
+    # -DiscardStderr BECAUSE THE OUTPUT IS DATA the loop below compares refs against, not progress: a gh
+    # status line merged into it becomes a row that matches nothing, and -- worse -- one that matched a
+    # real branch would read as merged. The '<name> TAB <sha>' shape is a stronger filter than the
+    # name-only parse it replaces, where any stray word was a candidate row.
     #
     # A STALL HERE READS AS 'NO MERGED PRS', which is the expensive direction, and the existing shape
     # already handles it. $ghKnown stays $false on a timeout exactly as on any other non-zero exit, so
     # the guard falls through to its own refusal -- loudly, naming -AllowStacking -- rather than letting
     # a branch it could not judge pass as merged. The Yellow line says which of the two happened.
-    $mergedHeads = @()
-    $ghKnown     = $false
+    $mergedTips = $null
+    $ghKnown    = $false
     if (Get-Command 'gh' -ErrorAction SilentlyContinue) {
         $prList  = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr `
                                         -Arguments @('pr', 'list', '--state', 'merged', '--limit', '200',
-                                                     '--json', 'headRefName', '--jq', '.[].headRefName') `
+                                                     '--json', 'headRefName,headRefOid',
+                                                     '--jq', '.[] | [.headRefName, .headRefOid] | @tsv') `
                                         -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
         $ghKnown = ($prList.ExitCode -eq 0)
         if ($ghKnown) {
-            $mergedHeads = @($prList.Output | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+            $mergedTips = Get-SyncMergedRefTips -Lines @($prList.Output)
         } elseif ($prList.TimedOut) {
             Write-Host "  'gh pr list' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- the merged set reads as unknown." -ForegroundColor Yellow
         }
@@ -640,7 +656,14 @@ if ($candidates.Count -eq 0) {
         Invoke-SyncGitQuiet @('merge-base', '--is-ancestor',
             "refs/remotes/origin/$name", "refs/remotes/origin/$trunk") | Out-Null
         if ($LASTEXITCODE -eq 0) { continue }
-        if ($mergedHeads -contains $name) { continue }
+
+        # THE TIP IS READ OFF THE SAME REF THE ANCESTRY TEST JUST USED, deliberately: two proofs reading
+        # two different objects can disagree about which branch they are judging, and the fetch above has
+        # already made this one current. An unreadable ref leaves it empty, which Test-SyncRefMergedByPr
+        # reads as 'not merged' -- the refusal direction, as everywhere else in this step.
+        $tip = ([string](@(Invoke-SyncGitQuiet @('rev-parse', '--verify', '--quiet',
+            "refs/remotes/origin/$name")) | Select-Object -First 1)).Trim()
+        if (Test-SyncRefMergedByPr -Name $name -Tip $tip -MergedTips $mergedTips) { continue }
 
         # What that branch captured. Three dots: the branch side of the merge base, which for a sync
         # branch is exactly the file set the run behind it decided to take. An unreadable diff leaves
