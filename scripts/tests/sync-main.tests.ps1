@@ -648,11 +648,12 @@ try {
     Assert-True ($cleanRun.Out -match 'none on origin') 'guard/none: the step reports that it looked'
     Assert-True ($cleanRun.Out -notmatch 'Standing sync branches, measured') 'guard/none: and prints no verdict table for branches that do not exist'
 
-    # --- the network guard (inbound #1181) ----------------------------------------------------------
-    # WHAT THESE CASES PROTECT is a failure with no error message: a git call that reaches the network,
+    # --- the network guard (inbound #1181, gh half #1184) -------------------------------------------
+    # WHAT THESE CASES PROTECT is a failure with no error message: a call that reaches the network,
     # blocks on a credential prompt nothing can answer, and reads as a run still in progress. Inbound
     # #1179 closed that class inside Invoke-NativeCapture -- the non-interactive environment plus an
-    # opt-in bound -- and this script was not a caller, so its five network calls sat outside it.
+    # opt-in bound -- and this script was not a caller, so its nine network calls sat outside it: five
+    # git (#1181) and, filed beside them rather than ridden along, four gh (#1184).
     #
     # FOUR OF THE FIVE ARE ALREADY DRIVEN FOR REAL by the cases above, against the fixture's local bare
     # origin: the trunk pull at [1/6], the ls-remote and the fetch at [3b/6], and the push on the drift
@@ -684,15 +685,62 @@ try {
     Assert-True ($src -notmatch 'Invoke-SyncGitQuiet\s+@\(\s*''(pull|push|fetch|ls-remote)''') `
         'net: and none goes back through the stderr-swallowing wrapper'
 
-    # EVERY Invoke-NativeCapture HERE CARRIES THE SHARED BOUND, and the count is pinned at five so a
-    # sixth network call added without one fails this assert rather than passing unnoticed. The number
-    # rather than a ratio: 5 == 5 would also hold if somebody deleted a call and its bound together.
+    # NO BARE gh NETWORK VERB LEFT EITHER (inbound #1184). Named verbs rather than a ban on '& gh', for
+    # the same reason as the git assert above and one more: 'gh pr checks' is deliberately still bare,
+    # so a blanket ban would have to carve it out and would then pass for any OTHER call added bare.
+    Assert-True ($src -notmatch '&\s*gh\s+pr\s+(list|create|view|merge)\b') `
+        'net: no bare ''& gh'' call reaches the network any more'
+
+    # AND THE POLLING LOOP IS STILL BARE, ON PURPOSE. This is the assert that stops the next reader from
+    # "finishing the job": 'gh pr checks' is bounded across the loop by -ChecksTimeoutMinutes, and its
+    # hand-rolled bracket must SWALLOW the stderr a pending run writes while still reading states. A bound
+    # per call is the mistake native-capture-lib warns about by name. If it is ever routed, that is a
+    # deliberate change and this assert is where it announces itself.
+    Assert-True ($src -match 'gh pr checks \$pr --json state') `
+        'net: the gh pr checks poll is deliberately left outside the lib'
+    Assert-True ($src -match [regex]::Escape('# THE ''gh pr checks'' POLLING LOOP IS DELIBERATELY NOT AMONG THEM')) `
+        'net: and the banner says so, so the exclusion reads as a decision rather than an oversight'
+
+    # EVERY Invoke-NativeCapture HERE CARRIES THE SHARED BOUND, and the count is pinned at nine so a
+    # tenth network call added without one fails this assert rather than passing unnoticed. The number
+    # rather than a ratio: 9 == 9 would also hold if somebody deleted a call and its bound together.
     # '-FilePath' IS PART OF THE PATTERN rather than the bare function name, because the banner at the
     # top of the script names the function in prose -- and a bare-name count read 6 against 5 real calls.
+    # WAS FIVE UNTIL #1184 added the four gh calls; the git half is unchanged.
     $calls  = @([regex]::Matches($src, 'Invoke-NativeCapture\s+-FilePath\b')).Count
     $bounds = @([regex]::Matches($src, [regex]::Escape('-TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds'))).Count
-    Assert-True ($calls -eq 5) "net: five network calls go through the lib (found $calls)"
-    Assert-True ($bounds -eq 5) "net: and all five pass the shared bound (found $bounds)"
+    Assert-True ($calls -eq 9) "net: nine network calls go through the lib (found $calls)"
+    Assert-True ($bounds -eq 9) "net: and all nine pass the shared bound (found $bounds)"
+
+    # THE FOUR gh CALLS BY NAME, because the count above is blind to WHICH nine they are: it would still
+    # read 9 if a gh call went back to being bare and a git call were split in two.
+    foreach ($verb in @('list', 'create', 'view', 'merge')) {
+        Assert-True ($src -match "Invoke-NativeCapture -FilePath 'gh'(?s).{0,400}?'pr', '$verb'") `
+            "net: gh pr $verb goes through the lib"
+    }
+
+    # -DiscardStderr ON THE TWO --json READS AND NOT ON THE TWO WRITES, which is the half a count cannot
+    # see. The reads are parsed -- a merged gh status line becomes a branch name or a PR number that
+    # .Trim() returns happily -- while the writes are progress whose stderr carries the PR URL.
+    Assert-True ($src -match "Invoke-NativeCapture -FilePath 'gh' -DiscardStderr(?s).{0,400}?'pr', 'list'") `
+        'net: the merged-PR read discards stderr, so a status line cannot become a branch name'
+    Assert-True ($src -match "Invoke-NativeCapture -FilePath 'gh' -DiscardStderr(?s).{0,400}?'pr', 'view'") `
+        'net: and the PR-number read discards stderr, so a status line cannot become the number'
+
+    # THE EXIT-CODE CHECK ON 'gh pr view', WHICH IS THE DEFECT #1184 DID NOT REPORT. The old line piped
+    # the output straight into .Trim(), so a failed read produced an EMPTY $pr and no message -- and the
+    # checks loop then polled with no PR number for the whole of -ChecksTimeoutMinutes before telling the
+    # operator to run 'gh pr merge  --squash'. The PR was open and green throughout.
+    Assert-True ($src -notmatch [regex]::Escape('([string](& gh pr view')) `
+        'net: gh pr view no longer pipes an unjudged read into .Trim()'
+    Assert-True ($src -match [regex]::Escape('if ($prView.ExitCode -ne 0 -or -not $pr) {')) `
+        'net: and an unreadable PR number now exits instead of polling with an empty one'
+
+    # THE HAND-ROLLED EAP BRACKET IS GONE FROM THE ONE gh CALL THAT HAD IT. The report expected to find
+    # that dance at all four sites; measured, only 'gh pr list' carried it, and the lib owns that half.
+    # Exactly one bracket is left in the script -- the checks loop's -- so the count is what is pinned.
+    $eap = @([regex]::Matches($src, [regex]::Escape('$prevEap = $ErrorActionPreference'))).Count
+    Assert-True ($eap -eq 1) "net: one hand-rolled EAP bracket left, the checks loop's (found $eap)"
 
     # THE LIB TRAVELS IN team-shopify's OWN PAYLOAD. Without this entry the mirrored script dot-sources a
     # file that is not in the mirror, and it fails at load in a consumer that installed team-shopify
