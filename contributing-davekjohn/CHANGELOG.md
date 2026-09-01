@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/sync-rules-floor-consequence-v1` · 20260901-213401
+
+`Get-SyncReferencePoint`'s docstring is what a reader consults to decide how much a wrong or missing floor
+costs, and it overstated that cost in the direction that misdescribes the guardrail: *"the exclusion rule
+silently passes everything through"* is the **time-window** consequence inbound #807 retired. Under the
+content rule the floor decides no file's winner -- `Get-SyncFileVerdict` consults it in exactly one cell,
+live's content is foreign AND the trunk moved the same path, where it can only ever escalate to a human. So
+a missing floor costs **one silently-taken conflict**, not a wholesale overwrite. The refusal itself was
+always correct; only its stated reason was stale.
+
+Repaired in both byte-identical mirrors and in the suite comment for the same case, which carried the
+identical wording. Nothing executable changed: 111 asserts, the same 111. The dated measurements of inbound
+#801 and #819 are left alone -- they describe what the old rule was about to do, and that is history rather
+than drift.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a PowerShell docstring and a test comment inside the sync lib. No subscriber of any service reaches
+this text, and nothing about the sync's behaviour changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+Get-SyncReferencePoint's docstring states what a missing floor actually costs under the content rule
+
+Plugins: team-shopify
+
+[PR #1204](https://github.com/DaveKJohn/claude-code-specialists/pull/1204)
+
+---
+
 ### DEPLOY: `feat/bwj-issue-type-tier-label-v1` · 20260901-212620
 
 `report-issue` filed every BWJ issue with a title and a body and nothing else, so each one arrived with
