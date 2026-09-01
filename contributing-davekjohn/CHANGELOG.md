@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/sync-main-gh-calls-bounded-v1` · 20260901-124921
+
+`sync-main.ps1`'s four `gh` network calls -- `pr list`, `pr create`, `pr view`, `pr merge` -- now run
+through `Invoke-NativeCapture` with the shared 120-second bound, so each one gets the non-interactive
+environment (`GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`) and a stall is killed and reported as
+exit 124 instead of sitting there looking like a run still in progress. That makes the lib's own claim --
+every git *and* gh call comes through this one function -- true in this script for the first time. The
+`gh pr checks` polling loop is deliberately untouched.
+
+The repair also closed a defect the report did not name: `gh pr view` had no exit-code check, so an
+unreadable PR number became an empty string and the checks loop then polled with no PR for the whole
+timeout before handing the operator a `gh pr merge` line with no number in it.
+
+**Score:** 3
+
+A consumer running `sync-main.ps1` is the reader here, and the change is invisible until the day a `gh`
+call stalls -- at which point it is the difference between a 120-second error naming the call and a run
+that never returns. The `gh pr view` half is a real failure that could already happen: the PR opens, the
+script waits out the full `-ChecksTimeoutMinutes`, and the instruction it prints is unusable.
+
+#### What makes this deploy extra special
+
+That the report was wrong in three places and still worth acting on. Its symptom stood, its line numbers
+had moved, its size was overstated by four to one, its stated reason was weaker than the real one, and
+its one explicit exclusion was correct for the wrong reason. Repairing to the report would have produced
+a change that satisfies it and misses the actual defect -- the unjudged `gh pr view` -- which nothing in
+the report mentions.
+
+**Score:** 2
+
+Method rather than payload: it is `triage-inbound`'s recount discipline applied to a report this repo
+filed against itself an hour earlier, and it went wrong in three of six dimensions even then.
+
+#### Pull Request
+
+sync-main.ps1's four gh network calls go through Invoke-NativeCapture
+
+Plugins: team-shopify
+
+[PR #1186](https://github.com/DaveKJohn/claude-code-specialists/pull/1186)
+
+---
+
 ### DEPLOY: `fix/sync-main-network-calls-bounded-v1` · 20260901-121405
 
 `sync-main.ps1` — the pre-task sync `team-shopify` ships to the Shopify consumers — reached the network
