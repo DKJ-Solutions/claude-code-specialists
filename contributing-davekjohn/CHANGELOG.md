@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/sync-seam-grep-dialect-v1` · 20260901-215412
+
+The two seam tables that document `Get-ShopifySyncReferencePattern` -- in the `sync-main` skill page
+and in `team-shopify`'s README -- no longer call it *"the `--grep` pattern"*. Both rows now say what
+the lookup actually does: the pattern is matched against the commit **subject**, read as its own
+field, and is therefore a **.NET** regex rather than git's POSIX basic regex. `Get-SyncReferencePoint`
+stopped passing `--grep` on inbound #819; the tables had kept the old label, and the skill page
+contradicted its own row ten lines below it.
+
+**Score:** 1
+
+Nothing in this repo reads those two tables to decide anything -- the rule itself has been correct
+since #819, and the suite pins it. What it prevents is a maintainer answering a consumer's question
+from the summary row rather than from the long note under it.
+
+#### What makes this deploy extra special
+
+This is the row a consumer reads immediately before writing their own `Get-ShopifySyncReferencePattern`,
+and it is the only place that tells them which regex dialect their answer is judged in. `--grep` says
+git BRE; the truth is .NET. A pattern that works in one and not the other does not fail loudly: it
+fails as **a floor that is silently too recent**, so the exclusion rule protects fewer files and the
+run still reports a reference point and goes green -- the failure mode the surrounding pages spend the
+most words on, and the reason `Get-SyncReferencePoint` deliberately kept no `--grep` prefilter.
+
+**Score:** 2
+
+#### Pull Request
+
+the sync seam tables name the subject match and its regex dialect instead of `--grep`
+
+Plugins: team-shopify
+
+[PR #1207](https://github.com/DaveKJohn/claude-code-specialists/pull/1207)
+
+---
+
 ### DEPLOY: `fix/asana-mirror-intake-link-v1` · 20260901-215159
 
 The Asana mirror now recognises a ticket that came FROM Asana. It only ever matched the
