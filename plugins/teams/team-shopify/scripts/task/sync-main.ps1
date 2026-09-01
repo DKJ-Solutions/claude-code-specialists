@@ -229,6 +229,17 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 
 . (Join-Path $PSScriptRoot '..\lib\sync-rules.ps1')
 
+# THE MERGED-PR PROOF, SHARED WITH prune-merged.ps1 (issue #1194). Not in sync-rules.ps1, which is this
+# plugin's alone: the same mechanism repaired here as inbound #1190 was repaired in the workflow plugin's
+# prune-merged.ps1 as #1191 -- on the same day, independently, and the two copies diverged over the
+# comparer their map is keyed with while both were one day old. One file, mirrored into BOTH plugins
+# rather than reached across from one to the other: they are separately versioned and separately
+# installed, so a cross-plugin path is a dependency a version mismatch breaks silently.
+#
+# UNGUARDED, for the reason the native-capture dot-source below states: a payload missing this file must
+# fail at LOAD, not fall through to a guard that then quietly reports nothing standing.
+. (Join-Path $PSScriptRoot '..\lib\merged-pr-lib.ps1')
+
 # THE NETWORK GUARD (inbound #1181, #1184 and #1187, September 1, 2026). Every git AND gh call in this
 # script that reaches the network goes through Invoke-NativeCapture, which runs its child with
 # GIT_TERMINAL_PROMPT=0 and GCM_INTERACTIVE=never and -- where the call is given -TimeoutSeconds --
@@ -605,17 +616,18 @@ if ($candidates.Count -eq 0) {
     # it keeps the ref of every squash-merged branch forever. Reading the setting would be one more thing
     # to get wrong; doing both halves is what prune-merged settled on for the same question.
     #
-    # ITS SECOND PART PROVES THE REF, NOT ITS NAME, and until inbound #1190 it proved the name -- which is
-    # still what prune-merged.ps1 does, tracked as #1191 rather than swept along here, because there the
-    # same miss hands over a DELETE command and the repair belongs in that plugin's own lib. It is worth
-    # knowing that the two are one defect in two places: fixing this one does not fix that one.
+    # ITS SECOND PART PROVES THE REF, NOT ITS NAME, and until inbound #1190 it proved the name. So did
+    # prune-merged.ps1, where the same miss hands over a DELETE command instead of a refusal; it was
+    # tracked as #1191 rather than swept along here, repaired the same day, and the two repairs are now
+    # ONE -- merged-pr-lib.ps1, which both scripts call (issue #1194). What is left here is the transport
+    # and the direction to err in, both of which are genuinely this script's.
     # These names are date-stamped, so a day whose branch has already merged AND been
     # deleted hands the next run the same name -- and a name-match then vouches for a brand-new, unmerged
     # predecessor. The guard reported 'all merged', found nothing standing, and pushed a '-2' branch onto
     # the pile it exists to prevent: the failure arriving through the guard's own answer. Measured in a
     # consumer on September 1, 2026 -- 'sync/live-2026-09-01' merged as PR #141 and deleted, re-created
     # the same day with open PR #159, and 4.27.0 reported '1 found on origin, all merged'. So the tip is
-    # asked for too; Get-SyncMergedRefTips carries the rest, including why the merge commit the report
+    # asked for too; Get-MergedPrTips carries the rest, including why the merge commit the report
     # proposed instead would never have matched a single branch.
     #
     # AND WHERE gh CANNOT ANSWER, THE BRANCH READS AS STANDING. That is the opposite of prune-merged's
@@ -646,7 +658,7 @@ if ($candidates.Count -eq 0) {
                                         -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
         $ghKnown = ($prList.ExitCode -eq 0)
         if ($ghKnown) {
-            $mergedTips = Get-SyncMergedRefTips -Lines @($prList.Output)
+            $mergedTips = Get-MergedPrTipsFromTsv -Lines @($prList.Output)
         } elseif ($prList.TimedOut) {
             Write-Host "  'gh pr list' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- the merged set reads as unknown." -ForegroundColor Yellow
         }
@@ -659,11 +671,11 @@ if ($candidates.Count -eq 0) {
 
         # THE TIP IS READ OFF THE SAME REF THE ANCESTRY TEST JUST USED, deliberately: two proofs reading
         # two different objects can disagree about which branch they are judging, and the fetch above has
-        # already made this one current. An unreadable ref leaves it empty, which Test-SyncRefMergedByPr
+        # already made this one current. An unreadable ref leaves it empty, which Test-RefMergedByPr
         # reads as 'not merged' -- the refusal direction, as everywhere else in this step.
         $tip = ([string](@(Invoke-SyncGitQuiet @('rev-parse', '--verify', '--quiet',
             "refs/remotes/origin/$name")) | Select-Object -First 1)).Trim()
-        if (Test-SyncRefMergedByPr -Name $name -Tip $tip -MergedTips $mergedTips) { continue }
+        if (Test-RefMergedByPr -Name $name -Tip $tip -MergedTips $mergedTips) { continue }
 
         # What that branch captured. Three dots: the branch side of the merge base, which for a sync
         # branch is exactly the file set the run behind it decided to take. An unreadable diff leaves

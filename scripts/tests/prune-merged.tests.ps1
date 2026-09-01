@@ -44,6 +44,11 @@ $EntryScaffoldSrc  = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # this suite -- it is copied because a MISSING dot-source is not a degraded answer but no script at
 # all, which is how its absence showed up: every single case failed at exit 1 before the first assert.
 $WorktreeLibSrc    = Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1'
+# And for the merged-PR proof itself (issue #1194): the map and the two-part test every proof-(b) case
+# below is decided by, shared with team-shopify's sync-main.ps1 since the same mechanism turned out to
+# have been repaired twice in one day. Same reason as worktree-lib above -- and it was rediscovered the
+# same way the moment the dot-source was added and this line was not.
+$MergedPrLibSrc    = Join-Path $RepoRoot 'scripts\lib\merged-pr-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -137,6 +142,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')  -Force
     Copy-Item -LiteralPath $WorktreeLibSrc   -Destination (Join-Path $dir 'scripts\lib\worktree-lib.ps1')        -Force
+    Copy-Item -LiteralPath $MergedPrLibSrc   -Destination (Join-Path $dir 'scripts\lib\merged-pr-lib.ps1')       -Force
 
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
@@ -671,6 +677,27 @@ try {
     Assert-True ($rQ.Out -match 'Kept origin/sync/live-recycled') '-IncludeRemote recycled: it is labelled kept instead'
     Assert-True ($rQ.Out -match 'the name was recycled') '-IncludeRemote recycled: with the reason, so the reader is not left to re-derive it'
     Assert-True ($rQ.Out -match 'git push origin --delete sync/live-finished') '-IncludeRemote recycled: and the head that IS proven still gets its paste-ready command -- the pass is not simply refusing everything'
+
+    # --- (r) The proof is the shared lib's, not a second copy of it (issue #1194) --------------------
+    #     ASSERTED STRUCTURALLY, because nothing above can see the difference. Every case (o) to (q)
+    #     passed with the private copy too -- the divergence was the ORDINAL comparer, and reproducing
+    #     it needs two branch names differing only in case, which a fixture on Windows cannot reliably
+    #     create as two loose refs. So the behaviour is unit-tested where it is pure
+    #     (merged-pr-lib.tests.ps1) and what is pinned here is that this script routes into it: a bare
+    #     '@{}' coming back is exactly how the two copies drifted apart the first time, silently and
+    #     with every existing assert still green.
+    Write-Host "prune-merged.ps1 -- the merged-PR proof comes from the shared lib" -ForegroundColor Cyan
+    $srcR = [System.IO.File]::ReadAllText($PruneMergedSrc)
+    Assert-True ($srcR -match [regex]::Escape("'..\lib\merged-pr-lib.ps1'")) `
+        'shared: the lib carrying the proof is dot-sourced'
+    Assert-True ($srcR -match [regex]::Escape('$mergedTips = Get-MergedPrTips')) `
+        'shared: and the map is built by it, not by a hashtable literal this script keys itself'
+    Assert-True ($srcR -notmatch [regex]::Escape('$mergedTips = @{}')) `
+        'shared: the bare @{} -- whose comparer is case-insensitive, which is how the two copies diverged -- is gone'
+    Assert-True ($srcR -match [regex]::Escape('Test-RefMergedByPr -Name $Branch -Tip $Tip -MergedTips $mergedTips')) `
+        'shared: the proof itself is the lib''s two-part test'
+    Assert-True ($srcR -match [regex]::Escape('Test-MergedPrNameKnown -Name $Branch -MergedTips $mergedTips')) `
+        'shared: and so is the middle answer that earns the recycled-name sentence'
 } finally {
     foreach ($f in $script:fixtures) {
         if ($f -and (Test-Path -LiteralPath $f)) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
