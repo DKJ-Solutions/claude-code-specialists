@@ -79,7 +79,7 @@ accurately describes the ticket workflow, which stays one part of the plugin.
 - [x] `powershell -NoProfile -File ./scripts/lint/check-plugin-integrity.ps1` -- `0 error(s)`, no
       findings.
 - [x] All 56 test suites via `Invoke-TestSuiteGate` (the shared gate `open-pr`, `cut-release` and CI
-      run) -- `all 56 suites passed in 76s`. `bwj-codex.tests.ps1` passes all 15 asserts.
+      run) -- `all 56 suites passed in 76s`. `bwj-codex.tests.ps1` passes all 30 asserts.
 
 ### DEPLOY: `feat/bwj-codex-rename-v1`
 
