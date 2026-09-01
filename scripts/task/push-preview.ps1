@@ -82,6 +82,17 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 
 . (Join-Path $PSScriptRoot '..\lib\preview-theme.ps1')
 
+# THE SHOPIFY CLI WRAPPER (inbound #1183, September 1, 2026). All three Shopify calls below were bare,
+# under this script's 'Stop' -- and the CONFIRMED instance of the class is one of them: a captured
+# 'theme list --json' in a consumer, killed by a hint line the CLI writes to stderr while succeeding.
+# On Windows the CLI is a PowerShell shim that inherits this script's preference, which is why lowering
+# it around the call is the repair and a try/catch at the call site is not. Its header has the detail.
+#
+# UNGUARDED, unlike the source-repo guard above: a copy of this script without the lib must fail at
+# load rather than push a theme whose failure path cannot be reached. Registered for team-shopify in
+# scripts/lib/shared-scripts-lib.ps1, so it travels beside this script in the mirror.
+. (Join-Path $PSScriptRoot '..\lib\shopify-cli-lib.ps1')
+
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # source root copy falls back to the git root. Same resolution as every other mirrored script, which is
 # what lets both copies stay byte-identical.
@@ -199,10 +210,14 @@ if (-not $id) { $id = ([string](git config --get "branch.$branch.previewTheme"))
 # 3. Otherwise: a name lookup through the theme list. The theme carries the flattened branch name.
 if (-not $id) {
     Write-Host "No remembered theme id; looking up '$themeName' in the theme list..." -ForegroundColor Yellow
-    $raw = & shopify theme list --store $store --json
-    if ($LASTEXITCODE -ne 0) { Write-Error "shopify theme list failed."; exit 1 }
+    # -Quiet AND -DiscardStderr, and both are required rather than tidy. THIS IS THE CONFIRMED CALL --
+    # the consumer's break was here (BWJ-ecommerce/smartwatchbanden#433). -DiscardStderr keeps the CLI's
+    # hint line out of Output, which ConvertFrom-Json would otherwise refuse as a JSON primitive; -Quiet
+    # keeps a theme list off the console, where it is noise rather than progress.
+    $list = Invoke-ShopifyCli -Arguments @('theme', 'list', '--store', $store, '--json') -Quiet -DiscardStderr
+    if ($list.ExitCode -ne 0) { Write-Error "shopify theme list failed."; exit 1 }
     $parsed = $null
-    try { $parsed = ($raw | Out-String) | ConvertFrom-Json } catch {
+    try { $parsed = ($list.Output | Out-String) | ConvertFrom-Json } catch {
         Write-Error "Could not read 'shopify theme list --json' output as JSON."
         exit 1
     }
@@ -218,13 +233,15 @@ if (-not $id) {
     # --unpublished CREATES the theme and pushes the current working tree in the SAME call, so no second
     # push follows on purpose.
     $createArgs = Get-ThemeCreateArgs -Store $store -ThemeName $themeName
-    $out = & shopify @createArgs
-    if ($LASTEXITCODE -ne 0) {
+    # -Quiet AND -DiscardStderr for the same two reasons as the list call: Get-ThemeIdFromPushOutput
+    # parses this output, and --json means there is no progress on stdout to show anyway.
+    $create = Invoke-ShopifyCli -Arguments $createArgs -Quiet -DiscardStderr
+    if ($create.ExitCode -ne 0) {
         Write-Error ("Creating the preview theme failed. If the CLI says 'A shop may only have 20 " +
             "themes', the estate is full: archive and remove a spent preview theme first.")
         exit 1
     }
-    $id = Get-ThemeIdFromPushOutput -Output ($out | Out-String)
+    $id = Get-ThemeIdFromPushOutput -Output ($create.Output | Out-String)
     if ($id) {
         # '$null = ' and NOT '| Out-Null': piping a native exe into a cmdlet wraps every stderr line in a
         # terminating ErrorRecord under $ErrorActionPreference = 'Stop'.
@@ -243,7 +260,9 @@ if ($liveId -and "$id" -eq "$liveId") {
 }
 
 $pushArgs = Get-ThemeUpdateArgs -Store $store -ThemeId "$id"
-& shopify @pushArgs
-if ($LASTEXITCODE -ne 0) { Write-Error "Push failed."; exit 1 }
+# STREAMED: Get-ThemeUpdateArgs deliberately passes no --json precisely so the CLI's progress is
+# visible, so this is the one call whose output is the point. Nothing parses it.
+$push = Invoke-ShopifyCli -Arguments $pushArgs
+if ($push.ExitCode -ne 0) { Write-Error "Push failed."; exit 1 }
 Write-Host "Pushed to the preview theme of '$branch' (id $id)." -ForegroundColor Green
 Write-PreviewUrls -Id $id

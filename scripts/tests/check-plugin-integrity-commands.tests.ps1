@@ -500,6 +500,48 @@ try {
     Assert-True (-not ($rB50.Out -match $BarredFindingPattern)) 'scenario 50: the changelog records the old wording and is never rewritten'
     if ($null -ne $s50Prev) { [System.IO.File]::WriteAllText($s50Path, $s50Prev, $Utf8NoBom) } else { Remove-Item -LiteralPath $s50Path -Force -ErrorAction SilentlyContinue }
 
+
+    # --- check 31: the Shopify CLI is never invoked bare ---------------------------------------------
+    #     Inbound #1183. Under $ErrorActionPreference = 'Stop' -- which every script here sets -- one
+    #     stderr line from the CLI is a TERMINATING ErrorRecord, so a bare call dies on the line AFTER it
+    #     and the $LASTEXITCODE check below it never runs. The wrapper is scripts/lib/shopify-cli-lib.ps1;
+    #     what this check exists for is that THE DANGEROUS FORM IS THE ABSENCE OF ONE -- there is no
+    #     redirect to grep for, so a convention alone produced four bare sites before anybody noticed.
+    #
+    #     Matched on the error phrase rather than the bare '[shopify-cli]' tag: that tag also prefixes the
+    #     coverage line, which is present on every run. Same trap the two patterns above document.
+    $ShopifyFindingPattern = '\[shopify-cli\].*invokes the Shopify CLI bare'
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\task') -Force | Out-Null
+
+    # --- Scenario 51: a bare call is a finding, and it names the line --------------------------------
+    Write-Host "check 31 -- a bare '& shopify' call is reported with its line" -ForegroundColor Cyan
+    $s51Path  = Join-Path $Fixture 'scripts\task\sync-something.ps1'
+    $s51Lines = @(
+        '$ErrorActionPreference = ''Stop'''
+        '# A comment naming shopify theme list must NOT be a subject -- only a CommandAst is.'
+        'Write-Host "run: shopify theme list --store x"'
+        '& shopify theme pull --store x --theme 1 --path y'
+        'if ($LASTEXITCODE -ne 0) { exit 1 }'
+    )
+    [System.IO.File]::WriteAllText($s51Path, (($s51Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC51 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rC51.Out -match $ShopifyFindingPattern) 'scenario 51: the bare call is a finding'
+    Assert-True ($rC51.Out -match 'sync-something\.ps1:4:') 'scenario 51: and it names the line the call is on, not the file alone'
+    Assert-Equal 1 ([regex]::Matches($rC51.Out, $ShopifyFindingPattern).Count) 'scenario 51: the comment and the printed hint are NOT subjects -- exactly one finding'
+
+    # --- Scenario 52: the wrapper itself is exempt, by name ------------------------------------------
+    #     The one permitted bare call lives inside the wrapper, so the check would otherwise report the
+    #     repair as the defect. Matched on the file NAME rather than a full path, which is what makes the
+    #     plugin mirror exempt too -- the same file, one directory tree over, and check 8 already holds
+    #     the two byte-identical.
+    Write-Host "check 31 -- the wrapper holds the one permitted call and is exempt" -ForegroundColor Cyan
+    Remove-Item -LiteralPath $s51Path -Force
+    $s52Path = Join-Path $Fixture 'scripts\lib\shopify-cli-lib.ps1'
+    [System.IO.File]::WriteAllText($s52Path, "function Invoke-ShopifyCli {`n    & shopify @args`n}`n", $Utf8NoBom)
+    $rC52 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rC52.Out -match $ShopifyFindingPattern)) 'scenario 52: the wrapper is not reported for holding the call it exists to hold'
+    Remove-Item -LiteralPath $s52Path -Force
+
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

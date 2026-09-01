@@ -262,6 +262,17 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # on purpose (its header), and it is the only file here the test suite loads without a sync.
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
+# THE SHOPIFY CLI WRAPPER (inbound #1183, September 1, 2026). The one pull below is the only Shopify
+# call in this script, and it was bare -- so a single stderr line from the CLI killed the run on the
+# line AFTER it, skipping the exit-code check that deletes the mirror and reports the failure. On
+# Windows the CLI is a PowerShell shim that inherits this script's 'Stop', so the wrapper's lowered
+# preference is what reaches the frame that raises the ErrorRecord. Its header has the measurement.
+#
+# UNGUARDED, for the reason the dot-source above it gives: a payload without the lib must fail at load
+# rather than run a pull whose failure path cannot be reached. It travels in team-shopify's own payload,
+# registered in scripts/lib/shared-scripts-lib.ps1.
+. (Join-Path $PSScriptRoot '..\lib\shopify-cli-lib.ps1')
+
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # source root copy falls back to the git root. Same resolution as every other mirrored script, which is
 # what lets both copies stay byte-identical.
@@ -677,8 +688,11 @@ if (-not $mirror) {
     $mirror = Join-Path ([System.IO.Path]::GetTempPath()) ('live-mirror-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
     New-Item -ItemType Directory -Path $mirror -Force | Out-Null
     $pulledMirror = $true
-    & shopify theme pull --store $store --theme $liveId --path $mirror
-    if ($LASTEXITCODE -ne 0) {
+    # STREAMED, NOT CAPTURED, and that is the one thing this wrapper is asked for beyond the exit code.
+    # A theme pull runs for minutes on a real theme and the CLI can stop to ask for authentication; a
+    # captured call would show the operator nothing until it was over, which turns a prompt into a hang.
+    $pull = Invoke-ShopifyCli -Arguments @('theme', 'pull', '--store', $store, '--theme', $liveId, '--path', $mirror)
+    if ($pull.ExitCode -ne 0) {
         Write-Host 'The Shopify pull failed. Nothing was touched.' -ForegroundColor Red
         if (-not $KeepMirror) { Remove-Item -LiteralPath $mirror -Recurse -Force -ErrorAction SilentlyContinue }
         exit 1

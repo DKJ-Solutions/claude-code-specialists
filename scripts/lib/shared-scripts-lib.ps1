@@ -681,6 +681,22 @@ function Get-SharedScriptPairs {
             Source  = 'scripts\lib\preview-theme.ps1'
             Plugin  = 'team-shopify'
             LibOnly = $true
+        },
+        @{
+            # The one place the Shopify CLI is invoked (inbound #1183, September 1, 2026). Both scripts in
+            # this plugin that reach the CLI dot-source it, so it is registered per plugin like
+            # source-repo-guard-lib rather than per script: the pair names a destination, and one
+            # destination cannot serve two.
+            #
+            # ITS OWN FILE RATHER THAN native-capture-lib.ps1, which is already mirrored here since
+            # inbound #1181 and was the first thing tried. It captures, and a theme pull or push has to
+            # STREAM -- minutes of silence over a call that can stop to ask for authentication is the same
+            # silent hang #1179 closed. And its bounded arm starts the child with Start-Process, which
+            # cannot run the npm .ps1 shim 'shopify' actually resolves to. Reasons in the lib's header.
+            Name    = 'shopify-cli-lib'
+            Source  = 'scripts\lib\shopify-cli-lib.ps1'
+            Plugin  = 'team-shopify'
+            LibOnly = $true
         }
     )
 
