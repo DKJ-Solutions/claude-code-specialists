@@ -134,7 +134,9 @@
 
       Get-ShopifyLiveThemeId          which theme is live. REQUIRED; the script refuses to guess.
       Get-ShopifyStoreDomain          the store the pull reads from. REQUIRED for the same reason.
-      Get-ShopifySyncReferencePattern the --grep pattern that recognises a sync commit.
+      Get-ShopifySyncReferencePattern the pattern that recognises a sync commit, matched against the
+                                      commit SUBJECT rather than through '--grep' (inbound #819), so
+                                      it is a .NET regex and not git's basic one.
                                       Default: the union of the two spellings in use ('^[Ss]ync').
       Get-ShopifySyncBranchPrefix     the drift branch's prefix. Default: 'sync/live-'.
       Get-ShopifySyncMerges           $true to open the PR and merge it once CI is green.
