@@ -32,6 +32,61 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/shopify-cli-calls-not-bare-v1` · 20260901-131625
+
+Every Shopify CLI call in `team-shopify` — the live-theme pull in `sync-main.ps1` and the three in
+`push-preview.ps1` — was invoked bare under `$ErrorActionPreference = 'Stop'`. In Windows PowerShell 5.1
+a single stderr line from the CLI is a **terminating** `ErrorRecord`, at exit code 0 as much as any
+other, so the run died on the line *after* the call and the `$LASTEXITCODE` block below it never ran.
+For the pull that block is the one that deletes the temp mirror and says `The Shopify pull failed.
+Nothing was touched.` — so the failure mode was not a slower failure but a different one: a mirror left
+behind and a message nobody saw. All four now go through `Invoke-ShopifyCli`
+(`scripts/lib/shopify-cli-lib.ps1`), which lowers the preference for the duration of the call, restores
+it in a `finally`, and hands back the exit code.
+
+The half that makes it stick is lint check 31: every `.ps1` in the tree is parsed for a command named
+`shopify`, and the two files allowed to hold one are named. **The dangerous form is the ABSENCE of a
+wrapper** — there is no redirect to grep for and no suspicious flag, the wrong spelling is simply the
+shorter one, which is how four bare sites accumulated without anyone noticing.
+
+The part worth reading twice is where the `ErrorRecord` actually comes from. On Windows `shopify` is
+npm's generated PowerShell shim, and `& shopify` runs it **in-process**, so it inherits the caller's
+preference — measured, and pinned by the suite. That is why a `try/catch` at the call site would not
+have fixed this, and why the report's distinction between its confirmed captured call and the
+"not separately reproduced" uncaptured one does not hold: the frame that wraps stderr is one level in,
+below both.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A Shopify consumer running `team-shopify` gets this on their next update with nothing to configure, and
+they are the only ones who can meet the failure — both scripts refuse to run in a repo that publishes
+plugins. What changes for them is that a Shopify call that goes wrong now **reports itself**. The pull
+that fails cleans up its mirror and says so; the preview push that fails says `Push failed.` instead of
+ending on a `NativeCommandError` naming a file inside `AppData\Roaming\npm`.
+
+It matters now rather than in the abstract because **the environment changed, not the code**: the CLI
+writes a `claude-code-hint` line to stderr *while succeeding* when it runs under Claude Code. Nothing in
+these scripts was wrong yesterday and nothing in them was edited to break — a bare native call is only
+safe while the exe never writes to stderr, and that is not a property any calling script controls.
+
+**Nothing to adopt and no flag to set**, and no behaviour changes on a successful run: the pull and the
+preview push still stream their progress as they always did. The one visible difference is on failure,
+which is the point.
+
+**Score:** 3
+
+#### Pull Request
+
+the Shopify CLI is never invoked bare
+
+Plugins: team-shopify
+
+[PR #1188](https://github.com/DaveKJohn/claude-code-specialists/pull/1188)
+
+---
+
 ### DEPLOY: `fix/sync-main-gh-calls-bounded-v1` · 20260901-124921
 
 `sync-main.ps1`'s four `gh` network calls -- `pr list`, `pr create`, `pr view`, `pr merge` -- now run
