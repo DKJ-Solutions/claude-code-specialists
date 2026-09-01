@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/asana-mirror-update-not-resolve-v1` · 20260901-223003
+
+The Asana mirror posts an update instead of ticking the ticket off, and it no longer holds a code
+path that could tick one off. Closing a GitHub issue says the work is **built**; it does not say the
+colleague who asked for it has seen it work. Those are two claims by two people, and a tracker that
+lets one stand in for the other can no longer tell you which of its closed tickets anybody actually
+looked at. So `closed` now writes "built and ready to test, this ticket stays open on purpose", and
+`reopened` writes its counterpart; `New-AsanaCompleteRequest` and `Set-AsanaTaskCompleted` are gone.
+
+Measured, and the reason this lands the day the mirror learned to read imported tickets: that sweep
+completed **six** Asana tasks it should only have commented on -- five belonging to colleagues who
+were never asked whether the work was any good. Four of the ten new asserts test an absence for
+exactly that reason.
+
+**The update also names where the change was made** (Dave, same day): the pull request that closed
+the issue, by number, title and URL -- the way GitHub itself puts it, *"closed this as completed in
+#434"*. It is the first thing somebody about to test wants, and the ticket is the only place they
+are looking. An issue closed by hand says so instead; an invented reference would be worse than a
+missing one. A close **as not planned** gets the opposite update, because asking somebody to test
+something that was never built is worse than saying nothing.
+
+De-duplication is the close update's own first sentence, which names the issue. The sweeps look for
+it and stay quiet; an event never does, because a close after a reopen is news again.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's subscribers are the consumers of the plugins, and nothing about installing or
+running them changes. The repair is inside a CI template a BWJ store repo copies.
+
+**Score:** N/A
+
+#### Pull Request
+
+the Asana mirror posts an update on the ticket instead of resolving it
+
+Plugins: bwj-codex
+
+[PR #1209](https://github.com/DaveKJohn/claude-code-specialists/pull/1209)
+
+---
+
 ### DEPLOY: `docs/sync-seam-grep-dialect-scripts-v1` · 20260901-220727
 
 Three script sites called `Get-ShopifySyncReferencePattern` *"the `--grep` pattern"*. The lookup it
