@@ -33,7 +33,8 @@ type (Bug / Feature / Task), plus the `tier-1` label where management and the co
 it, both set at creation so nobody has to classify a tracker by hand a second time. It is then
 **mirrored to Asana** as a colleague-friendly variant: plain language, outcome-framed, no code or
 repo jargon, so any BWJ colleague can read it. The two are **cross-linked both ways**. When the
-**GitHub issue is closed, the Asana task gets an update** saying the work is built and ready to test
+**GitHub issue is closed, the Asana task gets an update** saying the work is built and ready to test,
+naming the pull request that closed it
 -- by a small GitHub Actions workflow this plugin ships as a template for each repo to copy into its
 own `.github/`. Reopening the issue posts the counterpart; a daily reconciliation sweep carries over
 anything a missed event left behind, without ever saying the same thing twice.

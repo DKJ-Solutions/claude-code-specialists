@@ -14,9 +14,10 @@
 
       -Mode event      One issue changed. -Event is 'closed' or 'reopened'; -IssueBody is the issue
                        body (the Asana task is resolved from it, see below); -IssueRef is
-                       'owner/repo#n'. Both events post a comment: 'closed' says the work is ready to
-                       test, 'reopened' says to hold off. An event ALWAYS comments -- it is a real
-                       state change, and a second close after a reopen is news again.
+                       'owner/repo#n'. Both events post a comment: 'closed' names the pull request(s)
+                       that closed the issue and says the work is ready to test, 'reopened' says to
+                       hold off. An event ALWAYS comments -- it is a real state change, and a second
+                       close after a reopen is news again.
 
       -Mode reconcile  Two sweeps, for events that never arrived, and the only place de-duplication
                        applies:
@@ -42,8 +43,10 @@
     guesses which ticket an issue belongs to. Add a marker to settle it.
 
     Auth: -AsanaPat (from the ASANA_PAT secret). Project/workspace: -ProjectGid / -WorkspaceGid
-    (from the ASANA_PROJECT_GID / ASANA_WORKSPACE_GID variables). Sweep (b) additionally needs
-    -Repo (GITHUB_REPOSITORY) and `gh` on PATH.
+    (from the ASANA_PROJECT_GID / ASANA_WORKSPACE_GID variables). BOTH modes need `gh` on PATH with
+    GH_TOKEN set -- a close update asks GitHub which pull request closed the issue -- and sweep (b)
+    additionally needs -Repo (GITHUB_REPOSITORY). Where `gh` cannot answer, the update still goes out
+    and simply names no pull request.
 
     The comment text is English, like everything else this repo ships. It is the workflow speaking,
     not the subject -- the same boundary a BWJ store repo already draws when it keeps its ticket
@@ -186,33 +189,64 @@ function New-MirrorComment {
     <#
         The comment text for one event. Pure -- no network.
 
-        'closed'   the work is built and ready for the person who asked for it to test.
+        'closed'   the work is built and ready for the person who asked for it to test. -ClosedBy
+                   carries the pull request(s) that closed the issue, so the update names WHERE the
+                   change was made and links straight to it: that is the first thing a colleague
+                   wants when they are about to test, and GitHub itself says it that way
+                   ("closed this as completed in #434"). Empty means the issue was closed by hand,
+                   and the update then says so rather than implying a PR that does not exist.
         'reopened' it is being worked on again; do not test yet.
 
-        Neither text claims the ticket is done, and neither asks anybody to hurry: this script has no
+        -StateReason 'not_planned' turns the close update into its opposite: nothing was built, so
+        asking somebody to test it would be worse than saying nothing.
+
+        No text here claims the ticket is done, and none asks anybody to hurry: this script has no
         say over when a ticket is resolved.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$IssueRef,
-        [Parameter(Mandatory = $true)][ValidateSet('closed', 'reopened')][string]$Event
+        [Parameter(Mandatory = $true)][ValidateSet('closed', 'reopened')][string]$Event,
+        [pscustomobject[]]$ClosedBy = @(),
+        [string]$StateReason = ''
     )
 
     $parts = $IssueRef -split '#'
     $url = "https://github.com/$($parts[0])/issues/$($parts[1])"
 
-    if ($Event -eq 'closed') {
+    if ($Event -eq 'reopened') {
         return @(
-            (Get-MirrorCommentMarker -IssueRef $IssueRef) + ': the work behind this ticket is built and ready to test.',
-            $url,
-            '',
-            'This ticket stays open on purpose. Tick it off yourself once you have checked that it does what you meant.'
+            "GitHub issue $IssueRef has been reopened: it is being worked on again, so hold off on testing.",
+            $url
         ) -join "`n"
     }
 
-    return @(
-        "GitHub issue $IssueRef has been reopened: it is being worked on again, so hold off on testing.",
-        $url
-    ) -join "`n"
+    $marker = Get-MirrorCommentMarker -IssueRef $IssueRef
+
+    if ($StateReason -eq 'not_planned') {
+        return @(
+            "$marker, as not planned: this is not going to be built.",
+            $url,
+            '',
+            'There is nothing to test. The reason is on the issue; reply there or here if you disagree with it.'
+        ) -join "`n"
+    }
+
+    $lines = @("$marker`: the work behind this ticket is built and ready to test.", $url, '')
+
+    if ($ClosedBy.Count -gt 0) {
+        $lines += if ($ClosedBy.Count -eq 1) { 'Closed by pull request:' } else { 'Closed by pull requests:' }
+        foreach ($pr in $ClosedBy) {
+            $lines += "  #$($pr.number) $($pr.title)"
+            $lines += "  $($pr.url)"
+        }
+        $lines += ''
+    } else {
+        $lines += 'Closed by hand -- no pull request is linked to it.'
+        $lines += ''
+    }
+
+    $lines += 'This ticket stays open on purpose. Tick it off yourself once you have checked that it does what you meant.'
+    return ($lines -join "`n")
 }
 
 function New-AsanaCommentRequest {
@@ -331,6 +365,47 @@ function Test-GitHubIssueClosed {
     return ($LASTEXITCODE -eq 0 -and $state -eq 'CLOSED')
 }
 
+function Get-IssueClosure {
+    <#
+        How an issue was closed: its state reason, and the pull request(s) that closed it -- the same
+        thing GitHub itself shows as "closed this as completed in #434".
+
+        Asked through the GraphQL field built for exactly this question
+        (closedByPullRequestsReferences) rather than reconstructed from the timeline, where a merge
+        commit, a manual close and a cross-reference all look similar enough to get wrong.
+
+        Never throws. An unreachable API, a missing `gh`, or an issue nobody linked a PR to all give
+        an empty PullRequests list, and the update then says the issue was closed by hand instead of
+        inventing a reference.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Repo,
+        [Parameter(Mandatory = $true)][int]$Number
+    )
+
+    $empty = [pscustomobject]@{ StateReason = ''; PullRequests = @() }
+    $parts = $Repo -split '/'
+    if ($parts.Count -ne 2) { return $empty }
+
+    $query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){stateReason closedByPullRequestsReferences(first:10,includeClosedPrs:true){nodes{number url title}}}}}'
+    $ErrorActionPreference = 'Continue'
+    $raw = (& gh api graphql -f query=$query -F "owner=$($parts[0])" -F "name=$($parts[1])" -F "number=$Number") 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $raw) {
+        Write-Host "  Could not ask GitHub which pull request closed $Repo#$Number -- the update will not name one."
+        return $empty
+    }
+    try {
+        $issue = (($raw | Out-String) | ConvertFrom-Json).data.repository.issue
+        if (-not $issue) { return $empty }
+        return [pscustomobject]@{
+            StateReason  = ([string]$issue.stateReason).ToLowerInvariant()
+            PullRequests = @($issue.closedByPullRequestsReferences.nodes)
+        }
+    } catch {
+        return $empty
+    }
+}
+
 function Get-ClosedIssues {
     <#
         This repo's closed issues, newest first, optionally narrowed to the last -SinceDays days.
@@ -367,7 +442,13 @@ function Invoke-EventMode {
     }
     # No de-duplication here on purpose: an event is a real state change, so a close after a reopen
     # is news again and gets said again.
-    Add-AsanaComment -Gid $ref.Gid -Text (New-MirrorComment -IssueRef $IssueRef -Event $Event) -Pat $AsanaPat
+    $text = if ($Event -eq 'closed') {
+        $closure = Get-IssueClosure -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1])
+        New-MirrorComment -IssueRef $IssueRef -Event 'closed' -ClosedBy $closure.PullRequests -StateReason $closure.StateReason
+    } else {
+        New-MirrorComment -IssueRef $IssueRef -Event 'reopened'
+    }
+    Add-AsanaComment -Gid $ref.Gid -Text $text -Pat $AsanaPat
     Write-Host "Asana task $($ref.Gid) updated: $IssueRef $Event (matched by $($ref.Source)). The task was NOT completed -- that is the requester's call."
 }
 
@@ -386,7 +467,9 @@ function Update-MirroredTask {
     if ($task.completed) { return 0 }
     if (Test-MirrorUpdatePosted -Gid $Gid -IssueRef $IssueRef -Pat $AsanaPat) { return 0 }
 
-    Add-AsanaComment -Gid $Gid -Text (New-MirrorComment -IssueRef $IssueRef -Event 'closed') -Pat $AsanaPat
+    $closure = Get-IssueClosure -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1])
+    $text = New-MirrorComment -IssueRef $IssueRef -Event 'closed' -ClosedBy $closure.PullRequests -StateReason $closure.StateReason
+    Add-AsanaComment -Gid $Gid -Text $text -Pat $AsanaPat
     $how = if ($MatchedBy) { " (matched by $MatchedBy)" } else { '' }
     Write-Host "  Updated: Asana task $Gid told that $IssueRef is closed$how."
     return 1

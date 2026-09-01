@@ -156,12 +156,38 @@ Assert-Equal 'POST' $c.Method 'comment request is a POST'
 Assert-True  ($c.Uri.EndsWith('/tasks/123/stories')) 'comment request posts to the stories endpoint'
 
 # the update text -- what a colleague actually reads
-$closed = New-MirrorComment -IssueRef 'BWJ-ecommerce/smartwatchbanden#388' -Event 'closed'
+$pr = [pscustomobject]@{ number = 434; url = 'https://github.com/BWJ-ecommerce/smartwatchbanden/pull/434'; title = 'fix: close the delivery-date element' }
+$closed = New-MirrorComment -IssueRef 'BWJ-ecommerce/smartwatchbanden#388' -Event 'closed' -ClosedBy @($pr) -StateReason 'completed'
 Assert-True ($closed -match 'ready to test')                'the close update says the work is ready to test'
 Assert-True ($closed -match 'stays open on purpose')        'and says the ticket deliberately stays open'
 Assert-True ($closed -match 'Tick it off yourself')         'and puts the resolving in the requester hands'
 Assert-True ($closed -match 'https://github\.com/BWJ-ecommerce/smartwatchbanden/issues/388') 'and carries the issue URL'
 Assert-True ($closed -notmatch '(?i)resolved|completed|done\b') 'and never claims the ticket itself is resolved'
+
+# the closing pull request -- the first thing somebody about to test wants
+Assert-True ($closed -match 'Closed by pull request:')   'the close update names the pull request that closed the issue'
+Assert-True ($closed -match '#434')                      'by number'
+Assert-True ($closed -match 'close the delivery-date element') 'with its title'
+Assert-True ($closed -match 'https://github\.com/BWJ-ecommerce/smartwatchbanden/pull/434') 'and its URL, so it is one click away'
+
+$two = New-MirrorComment -IssueRef 'o/r#1' -Event 'closed' -StateReason 'completed' -ClosedBy @(
+    [pscustomobject]@{ number = 1; url = 'https://github.com/o/r/pull/1'; title = 'a' },
+    [pscustomobject]@{ number = 2; url = 'https://github.com/o/r/pull/2'; title = 'b' })
+Assert-True ($two -match 'Closed by pull requests:') 'two closing PRs are announced in the plural'
+Assert-True ($two -match '#1' -and $two -match '#2')  'and both are listed'
+
+# closed by hand -- say so rather than imply a PR that is not there
+$byHand = New-MirrorComment -IssueRef 'o/r#1' -Event 'closed' -StateReason 'completed'
+Assert-True ($byHand -match 'Closed by hand')            'an issue with no linked PR says it was closed by hand'
+Assert-True ($byHand -notmatch '/pull/' -and $byHand -notmatch 'Closed by pull request') 'and links none, rather than inventing a reference'
+Assert-True ($byHand -match 'ready to test')             'while still saying the ticket is ready to test'
+
+# closed as not planned -- the opposite update, because nothing was built
+$notPlanned = New-MirrorComment -IssueRef 'o/r#1' -Event 'closed' -StateReason 'not_planned'
+Assert-True ($notPlanned -match 'as not planned')        'a not-planned close says so'
+Assert-True ($notPlanned -match 'nothing to test')       'and tells the requester there is nothing to test'
+Assert-True ($notPlanned -notmatch 'ready to test')      'rather than asking them to test something that was never built'
+Assert-True ($notPlanned.StartsWith((Get-MirrorCommentMarker -IssueRef 'o/r#1'))) 'and it still carries the de-duplication marker'
 
 $reopened = New-MirrorComment -IssueRef 'BWJ-ecommerce/smartwatchbanden#388' -Event 'reopened'
 Assert-True ($reopened -match 'reopened')            'the reopen update says so'

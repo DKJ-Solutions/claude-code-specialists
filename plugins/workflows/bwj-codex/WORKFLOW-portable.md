@@ -148,7 +148,8 @@ GitHub Actions workflow in the repo (`.github/workflows/asana-mirror.yml`, copie
 
 | GitHub event | what happens in Asana |
 |---|---|
-| issue **closed** | a comment on the linked task: the work is built and ready to test, with the issue URL. The task stays open |
+| issue **closed** | a comment on the linked task: the work is built and ready to test, with the issue URL **and the pull request that closed it** -- number, title and link. The task stays open |
+| issue **closed as not planned** | the opposite comment: nothing was built, so there is nothing to test, and the reason is on the issue |
 | issue **reopened** | a comment saying it is being worked on again, so hold off on testing |
 | daily schedule | a reconciliation sweep in **both** directions, for events that never arrived: open tasks in the mirror project whose GitHub issue is closed, and issues closed in the last 30 days whose task has not been told yet |
 
@@ -163,6 +164,15 @@ This is the shape after a measured mistake, and the mistake is worth the sentenc
 September 1, 2026 the sweep that had just learned to read imported tickets completed **six** Asana
 tasks it should only have commented on -- five of them belonging to colleagues who had never been
 asked whether the work was any good.
+
+**The update names WHERE the change was made** (Dave, September 1, 2026), because that is the first
+thing somebody about to test wants and the ticket is the only place they are looking. GitHub says it
+as *"closed this as completed in #434"*; the update says the same, with the pull request's number,
+title and URL. It comes from the GraphQL field built for that question
+(`closedByPullRequestsReferences`) rather than from the timeline, where a merge commit, a manual
+close and a passing cross-reference are easy to confuse. **An issue closed by hand says so**, and one
+GitHub cannot be asked about still gets its update with no pull request named -- an invented
+reference would be worse than a missing one.
 
 **The de-duplication is the update's own opening sentence**, `GitHub issue <repo>#<n> is closed`, which
 names the issue. Sweeps look for it and stay silent when it is already there; **an event never

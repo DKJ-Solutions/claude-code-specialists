@@ -14,6 +14,8 @@ on:
 permissions:
   contents: read
   issues: read
+  # The close update names the pull request that closed the issue, which is a pull-requests read.
+  pull-requests: read
 
 concurrency:
   group: asana-mirror-${{ github.event.issue.number || 'reconcile' }}
@@ -35,6 +37,7 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_REF: ${{ github.repository }}#${{ github.event.issue.number }}
           EVENT_ACTION: ${{ github.event.action }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           ./.github/scripts/asana-mirror.ps1 `
             -Mode event `

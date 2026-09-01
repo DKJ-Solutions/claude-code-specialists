@@ -52,14 +52,26 @@ Dave, 2026-09-01: automation must never complete a mirrored Asana task -- the co
 - [x] The two docs and the skill: `WORKFLOW-portable.md` step 4 rewritten, the plugin README's
   paragraph, and `report-issue`'s frontmatter and step 4, which both promised the CI would complete
   the task.
+- [x] **The close update names the pull request that closed the issue** -- number, title and URL --
+  read from GitHub's `closedByPullRequestsReferences`, the GraphQL field built for that question,
+  rather than reconstructed from the timeline. An issue closed by hand says so; an issue GitHub
+  cannot be asked about still gets its update with no pull request named.
+- [x] A close **as not planned** gets the opposite update: nothing was built, so there is nothing to
+  test. Saying "ready to test" there would be worse than saying nothing.
+- [x] `templates/asana-mirror.yml`: `GH_TOKEN` added to the close/reopen step and `pull-requests: read`
+  to the permissions, which is what the new query needs.
 
 ### TEST
 
-- [x] `scripts/tests/bwj-codex.tests.ps1`: 54 asserts green. Ten are new, and four of those assert an
-  ABSENCE -- no completion helper is defined, no `completed=` payload is built, no `PUT` is issued --
-  because the guarantee here is a missing code path and no call can demonstrate one.
-- [x] The update texts are asserted on what a colleague reads, including that the close update never
-  says "resolved", "completed" or "done".
+- [x] `scripts/tests/bwj-codex.tests.ps1`: 67 asserts green. Four of the new ones assert an ABSENCE --
+  no completion helper is defined, no `completed=` payload is built, no `PUT` is issued -- because the
+  guarantee here is a missing code path and no call can demonstrate one.
+- [x] The update texts are asserted on what a colleague reads: that the close update never says
+  "resolved", "completed" or "done"; that it names the closing pull request by number, title and URL;
+  that two closing PRs read in the plural; that an issue with none says "closed by hand" and links
+  none; and that a not-planned close never asks anybody to test something that was never built.
+- [x] `Get-IssueClosure` run against the live tracker (`BWJ-ecommerce/smartwatchbanden#446`): it
+  returns `stateReason=completed` and PR #447, and the rendered comment carries all three fields.
 
 ### DEPLOY: `fix/asana-mirror-update-not-resolve-v1`
 
@@ -74,6 +86,13 @@ Measured, and the reason this lands the day the mirror learned to read imported 
 completed **six** Asana tasks it should only have commented on -- five belonging to colleagues who
 were never asked whether the work was any good. Four of the ten new asserts test an absence for
 exactly that reason.
+
+**The update also names where the change was made** (Dave, same day): the pull request that closed
+the issue, by number, title and URL -- the way GitHub itself puts it, *"closed this as completed in
+#434"*. It is the first thing somebody about to test wants, and the ticket is the only place they
+are looking. An issue closed by hand says so instead; an invented reference would be worse than a
+missing one. A close **as not planned** gets the opposite update, because asking somebody to test
+something that was never built is worse than saying nothing.
 
 De-duplication is the close update's own first sentence, which names the issue. The sweeps look for
 it and stay quiet; an event never does, because a close after a reopen is news again.
