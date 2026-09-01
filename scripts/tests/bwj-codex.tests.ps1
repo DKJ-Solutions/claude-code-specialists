@@ -92,7 +92,7 @@ Assert-True  ($null -eq (Get-AsanaTaskGid -IssueBody '<!-- asana-task: not-a-num
 Assert-True  ($null -eq (Get-AsanaTaskGid -IssueBody '')) 'Get-AsanaTaskGid handles an empty body'
 
 
-# tier 2 -- the header row of a ticket imported FROM Asana (the intake shape). This is the case the
+# matcher 2 -- the header row of a ticket imported FROM Asana (the intake shape). This is the case the
 # marker alone could not reach: issue #388 in smartwatchbanden closed with its Asana task untouched,
 # and the CI log said so in as many words -- "No <!-- asana-task: ... --> marker ... nothing to mirror".
 $intake = @'
@@ -118,7 +118,7 @@ $both = "| **Asana** | [a](https://app.asana.com/1/9/project/8/task/111) |`n<!--
 Assert-Equal 'marker' (Resolve-AsanaTaskRef -IssueBody $both).Source 'the marker outranks the header row'
 Assert-Equal '999'    (Get-AsanaTaskGid    -IssueBody $both)        'and it is the marker GID that is used'
 
-# tier 3 -- a single Asana task URL anywhere, in either URL shape Asana hands out
+# matcher 3 -- a single Asana task URL anywhere, in either URL shape Asana hands out
 Assert-Equal '1216905543348385' (Get-AsanaTaskGid -IssueBody 'see https://app.asana.com/1/9/project/8/task/1216905543348385') 'a sole modern task URL resolves'
 Assert-Equal '1216905543348385' (Get-AsanaTaskGid -IssueBody 'see https://app.asana.com/0/1214594032889511/1216905543348385/f') 'a sole classic task URL resolves'
 Assert-Equal 'sole-url'         (Resolve-AsanaTaskRef -IssueBody 'https://app.asana.com/1/9/project/8/task/77').Source 'and reports sole-url as the source'

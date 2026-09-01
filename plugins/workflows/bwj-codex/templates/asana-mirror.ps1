@@ -22,7 +22,7 @@
                            Covers a ticket that came the other way -- imported FROM Asana, whose
                            task carries no back-link for (a) to find.
 
-    How the Asana task is found -- Resolve-AsanaTaskRef, in this order:
+    How the Asana task is found -- Resolve-AsanaTaskRef, three matchers tried in this order:
 
       1. marker      the machine marker '<!-- asana-task: <digits> -->' the report-issue skill
                      writes. Authoritative: an issue that carries one is never matched any other way.
@@ -31,7 +31,7 @@
                      ticket copied out of Asana links its task for a reader, not for a machine.
       3. sole-url    exactly one Asana task URL anywhere else in the body.
 
-    More than one DIFFERENT task in tier 3 is reported as 'ambiguous' and skipped: the script never
+    More than one DIFFERENT task in matcher 3 is reported as 'ambiguous' and skipped: the script never
     guesses which ticket an issue belongs to. Add a marker to settle it.
 
     Auth: -AsanaPat (from the ASANA_PAT secret). Project/workspace: -ProjectGid / -WorkspaceGid
