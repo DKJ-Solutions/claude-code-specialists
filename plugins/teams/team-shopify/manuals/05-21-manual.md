@@ -63,14 +63,31 @@ live before a branch is cut from it. A **wholesale** pull — `shopify theme pul
 commit — is the obvious implementation, and it knows nothing about what the trunk has done since. It
 overwrites it.
 
-**The rule that fixes it is one sentence**, and it is one sentence because all three destruction modes are
-the same case:
+**The rule that fixes it is one sentence**, and the sentence reads **content** rather than the clock:
 
-> Has the trunk touched this file since the last sync? Then the **trunk** wins. Otherwise **live** wins.
+> Has this path ever held live's content in the trunk's history? Then the **trunk** wins. Otherwise
+> **live** wins — and if the trunk also changed it, **nobody** wins and a human looks.
 
-- the trunk **changed** a file live has an older copy of — live must not overwrite it;
-- the trunk **deleted** a file live still has — live must not resurrect it;
-- the trunk **added** a file live does not have — the pull must not delete it.
+Three destruction modes, and the sentence answers the first two by asking whose bytes live is holding:
+
+- the trunk **changed** a file live has an older copy of — live must not overwrite it. Those bytes are
+  ours, so the trunk wins however long ago it moved on;
+- the trunk **deleted** a file live still has — live must not resurrect it. Same question, same answer;
+- the trunk **added** a file live does not have — the pull must not delete it. This one the sentence never
+  asks about: a path live does not have is either trunk work that was never pushed or a third-party
+  deletion, the two are indistinguishable, and deleting is the irreversible option. So the sync **never**
+  deletes — it reports.
+
+**And do not carry the old sentence around**, because this page taught it until inbound
+[#807](https://github.com/DaveKJohn/claude-code-specialists/issues/807) replaced it: *"has the trunk
+touched this file since the last sync? then the trunk wins."* That was the **wrong measurement** rather
+than a buggy one. Nothing pushes the trunk *to* live except the per-file release step, and a deletion
+cannot be pushed that way at all — so the trunk's own changes are permanently invisible to live and sink
+below the floor as soon as one more sync commit lands, after which every future sync tries to overwrite
+them again, forever. The two rules **disagree exactly where it costs most**: on a path live holds an older
+copy of, the clock reverts merged work and content keeps it. Measured both ways on a real store, with the
+numbers, in the [`sync-main`](../skills/sync-main/SKILL.md) skill under *Why content replaced the time
+window*.
 
 **Do not write this script.** It ships, as the [`sync-main`](../skills/sync-main/SKILL.md) skill, with the
 exclusion rule as a tested lib beside it — because two Shopify consumers wrote it independently before it
@@ -112,8 +129,12 @@ git: it never pushes to live, publishes, or deletes a theme.
   [#1021](https://github.com/DaveKJohn/claude-code-specialists/issues/1021)).
 
 **And it refuses rather than guessing when it has no reference point** — no previous sync commit and no
-tag. That refusal is the rule protecting itself: without a floor, *every* file looks untouched by the
-trunk, so the exclusion rule would pass everything through and the failure would arrive as a green run.
+tag. **The floor no longer decides who wins a file** — content does that — and it survives **demoted**: its
+one remaining job is to notice that live's content is foreign *and* the trunk changed the same path
+recently, which is both sides having moved, and escalate that to a human. The refusal is protecting that
+one job: without a floor the script cannot ask the question at all, so such a conflict would be **taken
+silently**. A floor that is merely *wrong* now costs an extra conflict report rather than silent data loss
+— a far better failure mode for the piece of this that is hardest to get right.
 
 **The exposure grows the day a repo adopts a changelog**, which is worth saying because nothing else does:
 "merged into the trunk but not live yet" then becomes a *designed* state rather than an accident — it is
