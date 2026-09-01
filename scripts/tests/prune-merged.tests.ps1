@@ -10,11 +10,18 @@
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/prune-merged.tests.ps1
 
-    THE ASSERTS DELIBERATELY DO NOT DEPEND ON gh. A fixture's remote is a local bare repo, so
+    THE ASSERTS DEPEND ON NO REAL gh, AND ON NO NETWORK. A fixture's remote is a local bare repo, so
     `gh pr list` cannot resolve a GitHub repo there and the merged-PR proof is simply unavailable --
     which is a path the script has to answer gracefully anyway, and one of the cases below is exactly
-    that. What is asserted is the ANCESTRY proof and the keep-with-a-reason behaviour, both of which
-    are pure git and identical on a developer machine and in CI.
+    that. Most of what is asserted here is therefore the ANCESTRY proof and the keep-with-a-reason
+    behaviour, both pure git and identical on a developer machine and in CI.
+
+    THE THREE CASES THAT DO NEED THE MERGED-PR PROOF BRING THEIR OWN gh (inbound #1191), a batch file
+    on PATH that prints a canned answer -- see New-GhStub. It reaches nothing: no network, no GitHub,
+    no credential, and it is as reproducible in CI as everything above it. It exists because "the
+    asserts do not depend on gh" had a cost nobody had priced: proof (b) was never established in any
+    fixture, so the arm that force-deletes a branch on a merged PR was the one arm this suite could not
+    see -- and the name-versus-tip defect of #1191 lived there for the whole life of the script.
 
     prune-merged.ps1 itself calls 'exit', so it is run here as a CHILD PROCESS (powershell -File).
     Its git commands already run under ErrorActionPreference=Continue themselves (the #107 pitfall,
@@ -158,22 +165,30 @@ function Invoke-PruneMerged {
         fallback `git rev-parse --show-toplevel` lands there) and without CLAUDE_PROJECT_DIR left over
         from an earlier test run. EAP=Continue around the call, the same caution as the suites next to
         this one.
+
+        -GhStubDir PUTS A FAKE gh IN FRONT OF THE REAL ONE, for the three cases that need proof (b).
+        PATH is read by the child at process start, so prepending here is what decides which `gh` the
+        script's own `Get-Command 'gh'` resolves. Restored in the finally, like every other piece of
+        environment this function borrows -- a leaked PATH would silently stub every case below it.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Dir,
         [switch]$DryRun,
-        [switch]$IncludeRemote
+        [switch]$IncludeRemote,
+        [string]$GhStubDir
     )
     $scriptPath = Join-Path $Dir 'scripts\task\prune-merged.ps1'
     $callArgs = @()
     if ($DryRun) { $callArgs += '-DryRun' }
     if ($IncludeRemote) { $callArgs += '-IncludeRemote' }
 
-    $prevPd  = $env:CLAUDE_PROJECT_DIR
-    $prevEap = $ErrorActionPreference
-    $prevLoc = (Get-Location).Path
+    $prevPd   = $env:CLAUDE_PROJECT_DIR
+    $prevPath = $env:PATH
+    $prevEap  = $ErrorActionPreference
+    $prevLoc  = (Get-Location).Path
     try {
         Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue
+        if ($GhStubDir) { $env:PATH = "$GhStubDir;$prevPath" }
         Set-Location -LiteralPath $Dir
         $ErrorActionPreference = 'Continue'
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath @callArgs 2>&1
@@ -182,9 +197,81 @@ function Invoke-PruneMerged {
     } finally {
         $ErrorActionPreference = $prevEap
         Set-Location -LiteralPath $prevLoc
+        $env:PATH = $prevPath
         if ($null -eq $prevPd) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
         else { $env:CLAUDE_PROJECT_DIR = $prevPd }
     }
+}
+
+function New-GhStub {
+    <#
+        A `gh` that answers exactly one question -- `pr list --json headRefName,headRefOid` -- with a
+        canned array, and returns the folder to put in front of PATH.
+
+        WHY A STUB AT ALL, when this suite's whole stance is that the asserts do not depend on gh. That
+        stance is still right for everything it covers: a fixture's remote is a local bare repo, so a
+        REAL gh has no GitHub repo to resolve and proof (b) is simply unavailable -- which left the
+        merged-PR arm, and the name-versus-tip bug living in it, outside every assert here. The stub
+        does not reach a network or a real repo; it is a batch file that prints a string, and what it
+        exercises is this script's own matching, which is the part inbound #1191 was about.
+
+        A .cmd RATHER THAN A .ps1, because `Get-Command 'gh'` and `& 'gh'` both have to find it the way
+        they would find the real executable -- PATHEXT resolves .cmd, and a bare .ps1 on PATH is not a
+        command at all. `type` rather than an echo per row: the JSON carries quotes and braces, and
+        batch escaping of those is a trap this suite has no reason to walk into.
+
+        AND IT SITS BESIDE THE FIXTURE, NOT INSIDE IT. Two untracked files in the repo are a dirty
+        working tree, which is step 1 of the script under test -- so an in-tree stub buys a refusal
+        instead of a classification, on every case that uses it. Registered for cleanup like the
+        fixture and its bare remote.
+
+        IT HONOURS `--jq`, AND THAT IS WHAT MAKES THESE CASES REGRESSION TESTS. An arg-blind stub that
+        always printed JSON was tried first and looked fine: green on the fixed script, and green on
+        the BROKEN one too, because the pre-#1191 script asked for `--json headRefName --jq
+        .[].headRefName` and read a JSON array as one unusable line -- so it matched nothing and kept
+        the branch for entirely the wrong reason. A test that passes on the defect it was written for is
+        worse than no test. So the stub answers the shape it was ASKED for: names only where `--jq` is
+        present, the JSON array otherwise. Verified in both directions -- case (o) fails against the
+        pre-#1191 source and passes against this one.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Dir,
+        [Parameter(Mandatory = $true)][array]$Rows
+    )
+    $stubDir = "$Dir.ghstub"
+    if (Test-Path -LiteralPath $stubDir) { Remove-Item -Recurse -Force -LiteralPath $stubDir }
+    New-Item -ItemType Directory -Path $stubDir -Force | Out-Null
+    $script:fixtures += $stubDir
+
+    # Built by hand rather than with ConvertTo-Json: a one-element array serialises as an OBJECT in
+    # Windows PowerShell 5.1 unless it is wrapped, which is exactly the shape two of the three cases
+    # below use, and a silently-object body would make them pass as "gh answered nothing".
+    $items = @($Rows | ForEach-Object { '{"headRefName":"' + $_.Name + '","headRefOid":"' + $_.Oid + '"}' })
+    $json  = '[' + ($items -join ',') + ']'
+    $names = (@($Rows | ForEach-Object { $_.Name }) -join "`r`n") + "`r`n"
+    $utf8  = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText((Join-Path $stubDir 'gh-merged.json'),  $json,  $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $stubDir 'gh-merged-names.txt'), $names, $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $stubDir 'gh.cmd'), (@(
+        '@echo off',
+        'echo %*|findstr /C:"--jq" >nul',
+        'if errorlevel 1 goto json',
+        'type "%~dp0gh-merged-names.txt"',
+        'goto :eof',
+        ':json',
+        'type "%~dp0gh-merged.json"'
+    ) -join "`r`n") + "`r`n", $utf8)
+    return $stubDir
+}
+
+function Get-BranchTip {
+    <# The full sha a local branch points at -- what a merged PR's headRefOid is compared against. #>
+    param([Parameter(Mandatory = $true)][string]$Dir, [Parameter(Mandatory = $true)][string]$Name)
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        return ((& git -C $Dir rev-parse $Name | Select-Object -First 1) | Out-String).Trim()
+    } finally { $ErrorActionPreference = $prevEap }
 }
 
 function Get-LocalBranches {
@@ -523,6 +610,67 @@ try {
     Assert-True ($step2 -gt 0 -and $step2 -lt $step3) 'structural: the step-2 marker is still in the source, above step 3'
     $step2Checkouts = @(for ($i = $step2; $i -lt $step3; $i++) { if ($srcLines[$i] -match "'checkout'") { "line $($i + 1): $($srcLines[$i].Trim())" } })
     Assert-Equal 0 $step2Checkouts.Count "structural: step 2 makes no 'checkout' call -- the trunk is advanced by refspec fetch, never borrowed$(if ($step2Checkouts.Count) { " (found: $($step2Checkouts -join '; '))" })"
+
+    # --- (o) A RECYCLED BRANCH NAME DOES NOT INHERIT THE PREVIOUS BRANCH'S MERGE (inbound #1191) ----
+    #     The defect this suite could not see. Everything above runs without gh, so proof (b) was never
+    #     established in a fixture at all -- and proof (b) matching on the NAME is the whole bug: a name
+    #     freed by deleteBranchOnMerge and used again carried the first branch's merge, and `-D` took
+    #     the second branch's unmerged work with the word `merged PR` printed beside it.
+    #
+    #     THE STUB IS WHAT MAKES THIS TESTABLE, and (p) below is what keeps it honest: a stub that
+    #     silently failed would make THIS case pass for the wrong reason -- no gh, no proof, branch
+    #     kept. (p) is the same stub proving a REAL merge, so the pair can only both pass if gh is
+    #     genuinely answering and the name-and-tip test is genuinely being applied.
+    Write-Host "prune-merged.ps1 -- a recycled name does not inherit the old branch's merge" -ForegroundColor Cyan
+    $dirO = New-Fixture -Label 'o'
+    New-UnmergedBranch -Dir $dirO -Name 'sync/live-2026-09-01'
+    #     The sha of the PR that merged under this name BEFORE it was recycled. Any commit that is not
+    #     this branch's tip states the case; a literal one states it unmistakably.
+    $rO = Invoke-PruneMerged -Dir $dirO -GhStubDir (New-GhStub -Dir $dirO -Rows @(
+        @{ Name = 'sync/live-2026-09-01'; Oid = '0123456789abcdef0123456789abcdef01234567' }))
+    Assert-Equal 0 $rO.Code 'recycled: exit 0'
+    Assert-True ((Get-LocalBranches -Dir $dirO) -contains 'sync/live-2026-09-01') 'recycled: THE BRANCH SURVIVES -- its name was merged once, its commits never were'
+    Assert-True ($rO.Out -notmatch 'Deleted sync/live-2026-09-01') 'recycled: and nothing claims to have deleted it'
+    Assert-True ($rO.Out -match 'Kept sync/live-2026-09-01') 'recycled: it is reported kept, like any other unproven branch'
+    Assert-True ($rO.Out -match 'the name was recycled') 'recycled: with the reason that names what actually happened -- the lookup came up FULL, not empty'
+
+    # --- (p) A GENUINE squash merge is still proven -- by the head commit (inbound #1191) -----------
+    #     The other direction, and the reason (b) exists at all: a branch whose tip is deliberately not
+    #     in the trunk's history, which ancestry can therefore never prove. The name-and-tip test must
+    #     still delete it, or the repair for (o) would have cost the script its whole squash case.
+    Write-Host "prune-merged.ps1 -- a real squash merge is still proven by its head commit" -ForegroundColor Cyan
+    $dirP = New-Fixture -Label 'p'
+    New-UnmergedBranch -Dir $dirP -Name 'feat/squashed'
+    $tipP = Get-BranchTip -Dir $dirP -Name 'feat/squashed'
+    $rP = Invoke-PruneMerged -Dir $dirP -GhStubDir (New-GhStub -Dir $dirP -Rows @(
+        @{ Name = 'feat/squashed'; Oid = $tipP }))
+    Assert-Equal 0 $rP.Code 'squash: exit 0'
+    Assert-True (-not ((Get-LocalBranches -Dir $dirP) -contains 'feat/squashed')) 'squash: the branch IS deleted -- the merged PR is the proof that replaces ancestry'
+    Assert-True ($rP.Out -match 'Deleted feat/squashed') 'squash: and the run names what it deleted'
+    Assert-True ($rP.Out -match 'merged PR') 'squash: with the proof it deleted on'
+
+    # --- (q) The remote pass applies the same proof -- where it matters most (inbound #1191) --------
+    #     This pass hands over `git push origin --delete`, and origin is the copy of last resort: the
+    #     local pass at worst discards commits the remote still holds, while a wrong line here reaches
+    #     the only copy there is. Both heads exist ONLY on the remote, which is the shape of a parked
+    #     branch, and they differ in one thing -- whether the merged PR's head commit is theirs.
+    Write-Host "prune-merged.ps1 -- -IncludeRemote applies the name+tip proof too" -ForegroundColor Cyan
+    $dirQ = New-Fixture -Label 'q'
+    New-UnmergedBranch -Dir $dirQ -Name 'sync/live-recycled'
+    New-UnmergedBranch -Dir $dirQ -Name 'sync/live-finished'
+    $tipQ = Get-BranchTip -Dir $dirQ -Name 'sync/live-finished'
+    Invoke-FixtureGit -Arguments @('-C', $dirQ, 'push', '-q', 'origin', 'sync/live-recycled')
+    Invoke-FixtureGit -Arguments @('-C', $dirQ, 'push', '-q', 'origin', 'sync/live-finished')
+    Invoke-FixtureGit -Arguments @('-C', $dirQ, 'branch', '-q', '-D', 'sync/live-recycled')
+    Invoke-FixtureGit -Arguments @('-C', $dirQ, 'branch', '-q', '-D', 'sync/live-finished')
+    $rQ = Invoke-PruneMerged -Dir $dirQ -IncludeRemote -GhStubDir (New-GhStub -Dir $dirQ -Rows @(
+        @{ Name = 'sync/live-recycled'; Oid = '0123456789abcdef0123456789abcdef01234567' },
+        @{ Name = 'sync/live-finished'; Oid = $tipQ }))
+    Assert-Equal 0 $rQ.Code '-IncludeRemote recycled: exit 0'
+    Assert-True ($rQ.Out -notmatch 'git push origin --delete sync/live-recycled') '-IncludeRemote recycled: NO delete command for a head whose name was merged but whose commit was not'
+    Assert-True ($rQ.Out -match 'Kept origin/sync/live-recycled') '-IncludeRemote recycled: it is labelled kept instead'
+    Assert-True ($rQ.Out -match 'the name was recycled') '-IncludeRemote recycled: with the reason, so the reader is not left to re-derive it'
+    Assert-True ($rQ.Out -match 'git push origin --delete sync/live-finished') '-IncludeRemote recycled: and the head that IS proven still gets its paste-ready command -- the pass is not simply refusing everything'
 } finally {
     foreach ($f in $script:fixtures) {
         if ($f -and (Test-Path -LiteralPath $f)) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

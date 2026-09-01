@@ -115,7 +115,9 @@ practice, each worth getting right the first time:
   delete with `git branch -D <branch>`. **A squash merge is the same situation from the other side** and
   the confirmation is different: the branch's own tip is deliberately not in the trunk's history, so
   ancestry can never prove it and a merged PR is the proof that replaces it. `-D` is safe on that proof
-  and on no other — never reach for it because `-d` said no.
+  and on no other — never reach for it because `-d` said no. **And that proof is the PR's head commit,
+  not its branch name:** auto-delete-on-merge frees a name at the merge, so a name generated from a
+  template comes back around, and the second branch under it is not the one that was merged.
 
 ## The repo's own way of working comes first
 
