@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/sync-seam-grep-dialect-scripts-v1` · 20260901-220727
+
+Three script sites called `Get-ShopifySyncReferencePattern` *"the `--grep` pattern"*. The lookup it
+feeds has not used `--grep` since inbound #819 -- the pattern is matched against the commit
+**subject** read as its own field, which makes it a .NET regex rather than git's own POSIX basic one.
+All three now say that, and each is applied twice because every one of the files is mirrored into
+`plugins/teams/team-shopify/`.
+
+Two of the three were contradicting a statement in their own file: `sync-rules.ps1` said `--grep` in
+the `.SYNOPSIS` of `Get-SyncDefaultReferencePattern` and the opposite twenty-three lines below it,
+and `sync-main.ps1` said it in the seam list of its header and the opposite a hundred lines above.
+A reader who got as far as the long note was corrected; one who read only the summary line was not.
+
+The third has the longest reach and is not documentation about the seam at all -- it is the comment
+`adopt-shopify-floor.ps1` stamps into a consumer's own `scripts/repo-config.ps1`, at the moment they
+sit down to answer the seam, and it is the only one of the three visible without opening this repo.
+
+The label decides which dialect a consumer writes their pattern in, and a pattern valid in one and
+not the other fails as a floor that is silently too recent -- the failure the surrounding docstrings
+spend the most words on. Issue #1206; the prose layer of the same mislabel is #1205 / PR #1207.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer answering `Get-ShopifySyncReferencePattern` reads the right regex dialect in the comment
+their own config file carries. Nothing they have already answered changes meaning, and no behaviour
+moves -- what changes is that the instruction beside the question is no longer wrong about the
+engine it is judged in.
+
+**Score:** 2
+
+#### Pull Request
+
+the three script sites name the subject match and its regex dialect instead of `--grep`
+
+Plugins: team-shopify
+
+[PR #1208](https://github.com/DaveKJohn/claude-code-specialists/pull/1208)
+
+---
+
 ### DEPLOY: `docs/sync-seam-grep-dialect-v1` · 20260901-215412
 
 The two seam tables that document `Get-ShopifySyncReferencePattern` -- in the `sync-main` skill page
