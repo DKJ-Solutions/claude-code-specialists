@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/bwj-issue-type-tier-label-v1` · 20260901-212620
+
+`report-issue` filed every BWJ issue with a title and a body and nothing else, so each one arrived with
+no issue type and no reach label. Both BWJ trackers had just been classified by hand -- 135 issues, 100%
+type coverage on both -- and the tool that files the next one would not have maintained it. The skill now
+sets all three fields at creation (`--type`, `--label tier-1`, `--label documentation`), states how to
+decide each, and carries the retrofit commands for an issue already filed;
+[`WORKFLOW-portable.md`](../plugins/workflows/bwj-codex/WORKFLOW-portable.md) carries the reasoning so a
+reader can apply the conventions without the skill, and
+[`adopt-bwj-asana`](../plugins/workflows/bwj-codex/skills/adopt-bwj-asana/SKILL.md) gained a step that
+checks the labels exist -- `gh issue create` fails outright on a label the repo does not have, which
+would have made the new line in `report-issue` a hard failure in a freshly adopted repo.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Two things a reader of the plugin gets that the issue did not ask for. **The issue body is superseded by
+its own third comment** -- `tier-0`-marks-the-exception was tried and rejected in favour of `tier-1`
+marking it, and encoding the body would have inverted the whole convention; what landed is the comment.
+And the one question the issue left open (*ask the reporter for the tier, or infer it?*) is answered
+rather than parked: **infer, and name the call in the report**, because step 4 already puts the answer in
+front of the person who knows the store, at zero extra turn, beside the one line that corrects it.
+
+**Score:** 3
+
+#### Pull Request
+
+report-issue files BWJ issues with the issue type and the tier-1 label
+
+Plugins: bwj-codex
+
+[PR #1202](https://github.com/DaveKJohn/claude-code-specialists/pull/1202)
+
+---
+
 ### DEPLOY: `docs/sandra-manual-content-rule-v1` · 20260901-184151
 
 Sandra's manual now teaches the sync rule the script actually runs. It is the page that exists to explain
