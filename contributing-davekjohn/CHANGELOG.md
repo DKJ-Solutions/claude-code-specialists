@@ -32,212 +32,190 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
-### DEPLOY: `fix/review-quota-headline-not-just-timescale-v1` · 20260831-145901
+### DEPLOY: `feat/bwj-codex-rename-v1` · 20260901-104018
 
-The `claude-review` 429 headline no longer promises the failure reason names a timescale. A third
-kind of 429 -- an individual spend limit an account admin has to raise, measured on three PRs on
-August 31, 2026 (#1164) -- resets on no clock, so "wait hours" / "wait days" is the wrong read. The
-headline now points at the upstream reason string for WHICH of the three limits it is (session
-window, weekly cap, or spend limit) and asserts none itself; the diagnostic comment block, the
-`pr-issues` test that pins the caps, and the operator-facing note in `CONTRIBUTING.md` are updated to
-match. No behaviour change: the check still goes red on a 429, because the PR still got no review.
+The `workflow-bwj` plugin is renamed to `bwj-codex` throughout the tree: its folder
+(`plugins/workflows/bwj-codex/`), its `marketplace.json` name and source, its `plugin.json` name, its
+test file (`scripts/tests/bwj-codex.tests.ps1`), and every current-tense reference in the root and
+plugin READMEs, the `contributing-davekjohn` portable pages, and the plugin's own skill and template
+text. The marketplace and plugin descriptions are reframed from "a narrow ticket-work workflow" to
+"BWJ's codex -- the binding rules its two Shopify store repos operate under"; no capability is added,
+the plugin still ships exactly the Asana ticket seam. Lint check 23 (`[plugin-kind]`) learns `*-codex`
+as a third way-of-working name shape, the same accommodation it already makes for `contributing-*`.
+The v4.28.0 release record is left intact except for one dead relative link, whose href is repointed
+at the moved README. The one pending `## [Unreleased]` entry that names the plugin (PR #1176,
+`fix/checkout-v5-node20-deprecation-v1`) is repointed `workflow-bwj` -> `bwj-codex` in its prose and
+its machine-read `Plugins:` trailer, so the next cut attributes that work to a plugin name still in
+`marketplace.json`.
 
-**Score:** 2 -- a red `claude-review` is read by whoever is shipping a PR; the headline they land on
-now covers the spend-limit case instead of sending them to wait out a reset that will not come.
+**Score:** 1
+
+A published plugin changes identity. Any repo that enabled `workflow-bwj@claude-code-specialists` in
+`.claude/settings.json` must rename that entry to `bwj-codex@claude-code-specialists` or the plugin
+silently stops loading. The plugin is one release old and opt-in, so the set of affected repos is
+small-to-empty, but the change is breaking for an adopter rather than invisible plumbing -- above
+tier 0.
 
 #### What makes this deploy extra special
 
-Nothing. Comment/prose accuracy in a CI diagnostic plus its pinned test, no runtime change.
+A consumer who had enabled `workflow-bwj` (BWJ's two store repos are the only intended adopters) needs
+a one-line settings change to `bwj-codex` after taking the release carrying this. Nothing migrates
+automatically and nothing warns; a session in a repo whose settings still name `workflow-bwj` just
+loses the two skills and the CI template reference. Small, mechanical, but real for that reader.
+
+**Score:** 1
+
+#### Pull Request
+
+Rename the workflow-bwj plugin to bwj-codex
+
+Plugins: bwj-codex, contributing-davekjohn
+
+[PR #1180](https://github.com/DaveKJohn/claude-code-specialists/pull/1180)
+
+---
+
+### DEPLOY: `docs/testrun-series-tail-1168-v1` · 20260901-084902
+
+Close out the end-to-end testrun series ([#1135] → [#1157] → [#1168]). Run 5 met the series exit
+criterion for the first time — **0 HARD, 0 FRICTION against `v4.27.0`, no inbound issue needed** — so
+the series ends here. The residue the closed issues would otherwise have carried only as comments is
+recorded below instead, in the changelog, where a future runbook author will find it.
+
+**The one open measurement — the permission-classifier residue probe.** The same-shape A/B on the
+permission classifier is one probe short. Both halves of the classifier already read PASS; this probe
+only excludes *command shape* as an alternative explanation for one contrast. It is a tightening, not a
+gate.
+
+- **What:** `adopt-config.ps1` under the deny-everything protocol — deny the next two commands; a denial
+  arrives back in the session, an `allow`-covered command simply runs.
+- **Where:** a Claude Code session opened **inside `DaveKJohn/ccs-testrun-4`**, out of auto mode. A
+  session in the source repo is structurally the wrong instrument — a model observes results, not
+  prompts, so "asked and approved" and "never asked" are one event from its side unless the run is
+  inside the consumer with the runner denying.
+- **Status:** stays open on [#1168]. `ccs-testrun-4` is kept standing as the only place it can be
+  measured.
+
+**The amendment for the next step-4 runbook.** Run 5 did not walk step 4. Whenever step 4 is next
+walked, it inherits this rather than re-deriving it:
+
+1. **Name both permission layers and say they are different.** `permissions.defaultMode` in
+   `settings.json` decides what a session **starts** in; the shift+tab toggle (*manual mode /
+   auto-accept edits / plan mode*, where `default` is only the internal name for the first) is a
+   separate layer. A runner who reads "manual" off the status line has recorded a true fact about the
+   second and nothing about the first.
+2. **Measure by denying, not by asking.** Asking the runner whether a prompt appeared does not work —
+   where there are many prompts they get approved on autopilot. Deny everything for the next two
+   commands and the outcomes become distinguishable with nothing resting on recollection: a denial
+   arrives back in the session; a command covered by `allow` simply runs.
+
+**Teardown of the test repos** (decision by Dave, August 31, 2026): `ccs-testrun-1`, `ccs-testrun-3`
+(which takes [`ccs-testrun-3#5`](https://github.com/DaveKJohn/ccs-testrun-3/issues/5) with it) and
+`ccs-testrun-5` are deleted; `ccs-testrun-2` (cited by `runlog-3.md`) and `ccs-testrun-4` (the residue
+probe) are kept. The deletions are run outside this branch — they need the `delete_repo` gh scope.
+
+[#1135]: https://github.com/DaveKJohn/claude-code-specialists/issues/1135
+[#1157]: https://github.com/DaveKJohn/claude-code-specialists/issues/1157
+[#1168]: https://github.com/DaveKJohn/claude-code-specialists/issues/1168
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — internal QA bookkeeping; no subscriber of any consuming repo notices this.
 
 **Score:** N/A
 
 #### Pull Request
 
-The out-of-quota review headline stops promising the reason names a timescale
+Testrun series tail: closeout plan for the #1168 residue
 
-[PR #1167](https://github.com/DaveKJohn/claude-code-specialists/pull/1167)
-
----
-
-### DEPLOY: `docs/deploy-links-folder-relative-v1` · 20260831-142156
-
-Section 2.5 of `contributing-davekjohn/CONTRIBUTING.md` still told a DEPLOY author to write links
-root-relative (`scripts/x.ps1`) "because the DEPLOY section lands at the repo root". That has been the
-wrong instruction since issue
-[#1041](https://github.com/DaveKJohn/claude-code-specialists/issues/1041): when `CHANGELOG.md` moved into
-`contributing-davekjohn/`, `check-plugin-integrity.ps1` was repaired to judge a branch document's
-DEPLOY-section links against the changelog's own directory, so `../scripts/x.ps1` is the form that
-survives the fold and `scripts/x.ps1` is the one the link gate now refuses. The section's example and its
-"root-relative" framing are rewritten to folder-relative, matching `development.md`'s own header
-boilerplate. Docs only; the lint gate enforces the rule the prose now describes.
-
-**Score:** 2 — noticed by the next author who writes a DEPLOY section and cross-checks the guide against
-the gate; harmless until then because the gate already enforces the correct form.
-
-#### What makes this deploy extra special
-
-**Score:** N/A — internal contributor-guide wording; does not reach a subscriber of any consuming repo.
-
-#### Pull Request
-
-CONTRIBUTING.md 2.5: DEPLOY links resolve folder-relative to contributing-davekjohn/, not root-relative
-
-[PR #1166](https://github.com/DaveKJohn/claude-code-specialists/pull/1166)
+[PR #1173](https://github.com/DaveKJohn/claude-code-specialists/pull/1173)
 
 ---
 
-### DEPLOY: `fix/gate-seconds-invariant-v1` · 20260831-134801
+### DEPLOY: `fix/shopify-floor-checkout-v5-consistency-v1` · 20260831-225420
 
-`Invoke-TestSuiteGate` (the test gate `open-pr.ps1`, `cut-release.ps1` and CI all run) now formats
-its elapsed-seconds figure invariantly. `-f "{...:N0}s"` formats in the operator's culture, so on a
-`nl-NL` machine a run over 1000s printed `test gate: all 55 suites passed in 2.182s.` for a run that
-took 2182 seconds -- a factor of a thousand off and still plausible, and latent below 1000s, which is
-exactly where every figure this gate had ever printed sat. The new `Format-GateSeconds` helper routes
-the figure through `InvariantCulture` (the position `measure-skill-lib.ps1` already took and stated at
-length for its own Format-* helpers), so the two summary lines now read `2,182s` on any machine.
-Inbound #1159.
+`adopt-shopify-floor.ps1` scaffolded `theme-check.yml` with `actions/checkout@v7`, the one pin in the
+repo not on `@v5` after the #1175 sweep. Both mirrored copies now pin `@v5`, and the test suite
+asserts the scaffolded version so it cannot drift again.
 
 **Score:** 2
 
 #### What makes this deploy extra special
 
-A consumer runs this gate through the `contributing-davekjohn` plugin skill (`open-pr` / `ship-pr`),
-from the mirrored copy of this lib. A consumer on a European locale -- where `.` is the thousands
-separator -- with a test suite slow enough to cross 1000s would have been handed a runtime that looked
-a thousand times better than it was, at the one moment (a slow run) the number is worth reading. They
-receive the invariant formatting through the plugin update.
+A consumer adopting the Shopify floor gets a `theme-check.yml` whose checkout pin now matches every
+other workflow in the tree; no functional change while `@v7` still resolves, but the inconsistency is
+gone. N/A — no service subscriber notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+Shopify floor scaffolds actions/checkout@v5, matching the rest of the repo
+
+Plugins: team-shopify
+
+[PR #1178](https://github.com/DaveKJohn/claude-code-specialists/pull/1178)
+
+---
+
+### DEPLOY: `fix/checkout-v5-node20-deprecation-v1` · 20260831-223457
+
+`actions/checkout@v4` targets Node 20, which GitHub now force-runs on Node 24 while emitting a
+deprecation notice on every run. This bumps every `@v4` pin in the repo's shared workflow surface to
+`@v5` (Node 24 native): the `bwj-codex` `asana-mirror.yml` template a consumer copies, the repo's
+own `ci.yml` and `branch-entry.yml`, and the `branch-entry.yml` body `adopt-workflow-folder.ps1`
+scaffolds into a consumer (both the script and its plugin mirror). Behaviour is unchanged; the
+Actions log loses the deprecation line.
+
+**Score:** 1
+
+Cosmetic today -- the runs still succeed. It forecloses one failure: when GitHub retires the Node 24
+fallback for actions still targeting Node 20, every `@v4` `checkout` step stops running, and every
+`asana-mirror` run plus this repo's CI would break until someone traced it to the pin.
+
+#### What makes this deploy extra special
+
+A `bwj-codex` consumer who has copied `asana-mirror.yml` sees the deprecation line drop out of
+their own Actions log (the reporter, BWJ-ecommerce/smartwatchbanden, filed it for exactly that), and
+inherits the same foreclosed future break. Still cosmetic for them until that fallback is retired.
+
+**Score:** 1
+
+#### Pull Request
+
+Bump actions/checkout@v4 to @v5 across shared workflow templates and CI
+
+Plugins: contributing-davekjohn, bwj-codex
+
+[PR #1176](https://github.com/DaveKJohn/claude-code-specialists/pull/1176)
+
+---
+
+### DEPLOY: `fix/score-line-trailing-reason-v1` · 20260831-211004
+
+`**Score:** N/A -- <reason>` written on one line used to parse as *unanswered* (score 0, not N/A)
+because the value has to be the last token on the line; a reason trailing on the score line now reads
+the value and is named as a misplaced reason, the way one written below the line already was. Names
+the failure it forecloses: an audience-tier entry written as `**Score:** 3 -- <reason>` would have
+had its score ignored, resolved to tier 0, and silently under-bumped a release from minor to patch.
 
 **Score:** 2
 
-#### Pull Request
-
-Format the test gate's elapsed seconds invariantly
-
-Plugins: contributing-davekjohn
-
-[PR #1165](https://github.com/DaveKJohn/claude-code-specialists/pull/1165)
-
----
-
-### DEPLOY: `fix/measure-line-ending-unit-v1` · 20260831-131056
-
-`measure-always-on.ps1` now names the unit of its byte column. The column is still `Get-Item .Length`
-— the working copy on disk, the copy a session actually loads — but on a CRLF checkout (Windows,
-`core.autocrlf`, no `.gitattributes` pinning `eol=lf`) that is one byte per line above the LF form the
-repository stores. The always-present provenance line says so, and where any document on the path is
-CRLF a new block prints the LF size beside the on-disk one, per document and as a total, with the note
-that the LF column is the number the next reader will compare against. Reading the working copy is
-unchanged; only the unit is now labelled. Inbound #1162.
-
-This repo's own always-on path is LF (its `.gitattributes` pins `* text=auto eol=lf`), so the new
-block never fires here — it is a latent clarification for the source tree and a real one for a
-consumer on a CRLF checkout.
-
-**Score:** 2
-
 #### What makes this deploy extra special
 
-A consumer runs this tool via the `contributing-davekjohn` plugin skill against their own `CLAUDE.md`,
-and a Windows consumer with no `eol=lf` in `.gitattributes` is exactly who hit this: a byte series
-that mixed a fresh-checkout (CRLF) baseline with an editor-rewritten (LF) reading overstated one step
-by one byte per line — ~1.4% on a 1,346-line file, plausible enough to reach a folded changelog entry
-and need a correcting PR. They receive the label and the LF column through the plugin update.
+Internal changelog-tooling fix; no subscriber of the service observes it.
 
-**Score:** 3
+**Score:** N/A
 
 #### Pull Request
 
-measure-always-on: name the line-ending unit of the byte column
+The score-line parser reads the value when a reason trails on the same line
 
 Plugins: contributing-davekjohn
 
-[PR #1163](https://github.com/DaveKJohn/claude-code-specialists/pull/1163)
-
----
-
-### DEPLOY: `docs/ticket-rules-that-stayed-in-the-consumer-v1` · 20260831-104153
-
-`CONTRIBUTING-portable.md`'s ticket-work section gains **rules 11, 12 and 13** — the judgment living at the
-gate rather than with the evidence, every message living at its own gate with no question in the closing
-one, and the three rules for a message to a person. All three were already in daily use, in
-`BWJ-ecommerce/smartwatchbanden`'s local *answers* page, and none of them names a tracker: they were craft
-sitting on the answers side of the seam, which is the one defect an inbound issue never reports, because a
-rule in the wrong file is not wrong.
-
-Each arrives with the measurement that produced it, in the style the ten around them already use. The one
-worth reading twice is rule 12's: over six tickets, **five asked a question in their delivery message**, two
-of them without a question mark anywhere, while two of the question marks that were present were `?page=`
-and `?sort_by=` in a URL — so the check people reach for first does not work, and the rule says why.
-
-**They are three rules rather than five lessons on purpose.** A message at the wrong gate and a question in
-a delivery message share one subject, and splitting them would have restated rule 6 from the other end.
-Rules 12 and 13 name rules 6 and 8 instead of repeating them.
-
-`Where this comes from` records the second harvest beside the first, so the provenance of this section stays
-stated rather than discovered later, and the same paragraph drops `ticket folder`: that repo has run its
-ticket layer in GitHub issues since 2026-08-28.
-
-**Score:** 3
-
-#### What makes this deploy extra special
-
-A consumer running a ticket layer gets three rules they did not have, one of which changes what a delivery
-message may contain. It reaches no other consumer at all — the seam is unchanged, nothing is renamed, and a
-repo whose work does not arrive from somebody else's tracker reads none of this section.
-
-**Score:** 3
-
-#### Pull Request
-
-The ticket-work rules that never left the consumer
-
-Plugins: contributing-davekjohn
-
-[PR #1161](https://github.com/DaveKJohn/claude-code-specialists/pull/1161)
-
----
-
-### DEPLOY: `fix/named-gate-entry-point-v1` · 20260830-193334
-
-`open-pr.ps1` gains **`-GatesOnly`**: run this repo's lint gate and every test suite against the working
-tree, and stop there — no branch check, no push, no PR. It exists for the commits that are made on the
-trunk. Three changes land directly on `main` under named exceptions, and the release-notes commit is the one
-typed by hand: `cut-release`'s step 4 told its reader to run the gates *"exactly as `open-pr` would have run
-them for you"*, and `open-pr` refuses on `main` six hundred lines before it reaches a gate. The rule was
-right and the route was closed.
-
-**What that cost is not the missing flag but the invocation that replaces it.** With no named entry point the
-reader assembles one, it goes green, and it is quietly missing two things: `Get-TestCommands` is out of
-scope, so a repo whose suites are not all PowerShell has the rest of them skipped **without a word**, and the
-lint half gets a hardcoded script rather than the repo's own `Get-LintScript`. Both bite a consumer harder
-than they bite here.
-
-Mechanically, the gate block moved out of `open-pr.ps1` into `Invoke-WorkflowGates` in
-[`scripts/lib/gate-lib.ps1`](../scripts/lib/gate-lib.ps1), and both routes now call it — the flag's whole
-value is that the two **cannot** reach a different verdict about the same tree. It is not an escape valve: it
-adds a place the gates can run and removes none, `-SkipLint`/`-SkipTests` still mean what they always
-meant, and a green run records gate evidence like any other. `cut-release`'s step 4, the `open-pr` skill
-page and [`CONTRIBUTING.md`](CONTRIBUTING.md) §4.6 — which carried the same gap in different words — all
-name the command now.
-
-**Score:** 3
-
-#### What makes this deploy extra special
-
-A consumer meets this harder than the source repo does: their `scripts/tests` may hold a different set,
-`Get-TestCommands` may add commands an ad-hoc call never runs, and they have no #1033 in their history to
-warn them off the in-process shape. They receive both the flag and the pages that name it through the plugin
-update, so the documented route arrives with the capability rather than after it.
-
-**Score:** 3
-
-#### Pull Request
-
-A named entry point for the gates, so a direct-on-main commit can run them
-
-Plugins: contributing-davekjohn
-
-[PR #1160](https://github.com/DaveKJohn/claude-code-specialists/pull/1160)
+[PR #1174](https://github.com/DaveKJohn/claude-code-specialists/pull/1174)
 
 ---
 

@@ -1,0 +1,53 @@
+# Copied from bwj-codex/templates/asana-mirror.yml into .github/workflows/asana-mirror.yml.
+# Resolves the mirrored Asana task when its GitHub issue is closed (and re-opens it on reopen),
+# with a daily reconciliation sweep for missed events. See bwj-codex/WORKFLOW-portable.md.
+name: asana-mirror
+
+on:
+  issues:
+    types: [closed, reopened]
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: asana-mirror-${{ github.event.issue.number || 'reconcile' }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve on issue close / reopen
+        if: github.event_name == 'issues'
+        shell: pwsh
+        env:
+          ASANA_PAT: ${{ secrets.ASANA_PAT }}
+          ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
+          ASANA_WORKSPACE_GID: ${{ vars.ASANA_WORKSPACE_GID }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_REF: ${{ github.repository }}#${{ github.event.issue.number }}
+          EVENT_ACTION: ${{ github.event.action }}
+        run: |
+          ./.github/scripts/asana-mirror.ps1 `
+            -Mode event `
+            -Event $env:EVENT_ACTION `
+            -IssueBody $env:ISSUE_BODY `
+            -IssueRef $env:ISSUE_REF
+
+      - name: Reconciliation sweep
+        if: github.event_name != 'issues'
+        shell: pwsh
+        env:
+          ASANA_PAT: ${{ secrets.ASANA_PAT }}
+          ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
+          ASANA_WORKSPACE_GID: ${{ vars.ASANA_WORKSPACE_GID }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./.github/scripts/asana-mirror.ps1 -Mode reconcile

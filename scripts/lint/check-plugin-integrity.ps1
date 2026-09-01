@@ -140,10 +140,11 @@
          the '-File' argument rather than paths in general, because a tree-wide rule would be born
          accusing three correct comments that quote a user path to explain a path-mangling bug.
      23. a plugin's name says which kind it is, and it must sit where that says: 'team-*' under
-         plugins/teams/, 'workflow-*' under plugins/workflows/, and every plugin one or the other. The
-         directory rule is DERIVED from the prefix, so a plugin matching neither has its location held
-         against nothing -- an unprefixed name switches the check off for itself rather than merely
-         reading untidily. (Until #886 the reason was the core's workflow-sessioncheck counting by that
+         plugins/teams/, and a way of working ('workflow-*', 'contributing-*' or '*-codex') under
+         plugins/workflows/, and every plugin one or the other. The directory rule is DERIVED from the
+         name, so a plugin matching none of those has its location held against nothing -- an
+         unclassifiable name switches the check off for itself rather than merely reading untidily.
+         (Until #886 the reason was the core's workflow-sessioncheck counting by the 'workflow-'
          prefix; that hook was retired with workflow-default and the argument above is the one that
          survives it.)
      24. the PR template keeps the two promises open-pr makes about it: the shipped reference under
@@ -2437,10 +2438,10 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # comment, because the next reader trusts it.
 #
 # THE TEETH THAT SURVIVE, and they are this check's own. The two halves are not independent: the
-# DIRECTORY rule is DERIVED FROM THE NAME. A plugin called neither 'team-*' nor 'workflow-*' falls
-# through both branches below, so its location is never held against anything -- an unprefixed name
-# does not merely read untidily, it switches this check off for that plugin, silently and for as long
-# as nobody counts the Checked total against the published set. That is why the else-branch is an
+# DIRECTORY rule is DERIVED FROM THE NAME. A plugin whose name matches no team or way-of-working shape
+# falls through every branch below, so its location is never held against anything -- an unclassifiable
+# name does not merely read untidily, it switches this check off for that plugin, silently and for as
+# long as nobody counts the Checked total against the published set. That is why the else-branch is an
 # error and not a style note, and the reason is now internal to the check rather than borrowed from a
 # hook in another plugin.
 #
@@ -2451,14 +2452,15 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # 'every directory under plugins/teams/ is named team-*' is a DIFFERENT check from this one, and it
 # would be false the moment it was written.
 
-# TWO PREFIXES NAME THE SAME KIND SINCE AUGUST 26, 2026 (#886), AND THAT IS DELIBERATE. The directory
-# plugins/workflows/ holds the KIND -- a way of working -- and the prefix names WHOSE it is. The plugin
-# in it was renamed 'contributing-davekjohn' -> 'contributing-davekjohn' because that is what it does: it
-# serves one owner's contributing rules, not a workflow among several. Dave kept the directory name
-# (decision A on that issue), so a 'contributing-*' plugin living under plugins/workflows/ is the
-# intended shape rather than a mismatch nobody noticed. 'workflow-*' is still accepted: it is what a
-# plugin from anybody else would be called, and refusing it would make this family's rename somebody
-# else's problem.
+# SEVERAL NAME SHAPES MAP TO THE SAME KIND SINCE AUGUST 26, 2026 (#886), AND THAT IS DELIBERATE. The
+# directory plugins/workflows/ holds the KIND -- a way of working -- and the rest of the name says
+# WHOSE it is. 'contributing-davekjohn' was renamed from 'workflow-davekjohn' because that is what it
+# does: it serves one owner's contributing rules, not a workflow among several. Dave kept the directory
+# name (decision A on that issue), so a 'contributing-*' plugin living under plugins/workflows/ is the
+# intended shape rather than a mismatch nobody noticed. '*-codex' joined the same way on September 1,
+# 2026, when 'workflow-bwj' was renamed 'bwj-codex' -- a codex is a body of law, i.e. a way of working,
+# and the leading word names whose. 'workflow-*' is still accepted: it is what a plugin from anybody
+# else would be called, and refusing it would make this family's renames somebody else's problem.
 $kindChecked = 0
 foreach ($p in $publishedPlugins) {
     $kindChecked++
@@ -2467,16 +2469,16 @@ foreach ($p in $publishedPlugins) {
         if ($rel -notmatch '^plugins\\teams\\') {
             Add-Error "[plugin-kind] '$($p.Name)' is a team by its name but its source is '$rel' -- a team belongs under plugins/teams/."
         }
-    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*') {
+    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*' -or $p.Name -like '*-codex') {
         if ($rel -notmatch '^plugins\\workflows\\') {
-            Add-Error "[plugin-kind] '$($p.Name)' is a way of working by its name but its source is '$rel' -- 'workflow-*' and 'contributing-*' both belong under plugins/workflows/."
+            Add-Error "[plugin-kind] '$($p.Name)' is a way of working by its name but its source is '$rel' -- 'workflow-*', 'contributing-*' and '*-codex' all belong under plugins/workflows/."
         }
     } else {
-        Add-Error "[plugin-kind] '$($p.Name)' is none of 'team-*', 'workflow-*' or 'contributing-*'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the prefix, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
+        Add-Error "[plugin-kind] '$($p.Name)' is none of 'team-*', 'workflow-*', 'contributing-*' or '*-codex'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the name, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
     }
 }
 Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
-    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name, and sits in the directory its name claims -- 'workflow-*' and 'contributing-*' both map to plugins/workflows/, the directory naming the KIND while the prefix names whose it is. The naming half is the one that cannot be seen by reading the tree: the directory rule is derived from the prefix, so an unprefixed plugin is silently held to nothing" })
+    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name, and sits in the directory its name claims -- 'workflow-*', 'contributing-*' and '*-codex' all map to plugins/workflows/, the directory naming the KIND while the rest of the name says whose it is. The naming half is the one that cannot be seen by reading the tree: the directory rule is derived from the name, so an unclassifiable plugin is silently held to nothing" })
 
 # --- 24. the PR template keeps the two promises open-pr makes about it ------------------------------------
 # WHAT THIS IS FOR, measured at a consumer rather than imagined (#573). open-pr fills the PR body's

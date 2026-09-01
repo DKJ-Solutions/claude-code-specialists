@@ -305,7 +305,7 @@ jobs:
     name: Shopify theme check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v5
       - name: Run theme check
         uses: Shopify/theme-check-action@v2
         with:
