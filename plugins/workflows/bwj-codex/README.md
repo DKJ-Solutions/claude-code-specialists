@@ -28,12 +28,15 @@ step begins.
 ## The rule, in one paragraph
 
 A discovered issue is **created on GitHub first** -- GitHub is the source of truth, full technical
-detail, the normal `team-alpha` filing bar unchanged. It is then **mirrored to Asana** as a
-colleague-friendly variant: plain language, outcome-framed, no code or repo jargon, so any BWJ
-colleague can read it. The two are **cross-linked both ways**. When the **GitHub issue is closed,
-the Asana task is resolved automatically** -- by a small GitHub Actions workflow this plugin ships as
-a template for each repo to copy into its own `.github/`. Reopening the issue un-resolves the task; a
-daily reconciliation sweep repairs anything a missed event left behind.
+detail, the normal `team-alpha` filing bar unchanged. It is **classified in the same breath**: an issue
+type (Bug / Feature / Task), plus the `tier-1` label where management and the commissioner would notice
+it, both set at creation so nobody has to classify a tracker by hand a second time. It is then
+**mirrored to Asana** as a colleague-friendly variant: plain language, outcome-framed, no code or
+repo jargon, so any BWJ colleague can read it. The two are **cross-linked both ways**. When the
+**GitHub issue is closed, the Asana task is resolved automatically** -- by a small GitHub Actions
+workflow this plugin ships as a template for each repo to copy into its own `.github/`. Reopening
+the issue un-resolves the task; a daily reconciliation sweep repairs anything a missed event left
+behind.
 
 The whole rule, with the field-by-field shape of the Asana variant and the cross-link markers, is in
 [`WORKFLOW-portable.md`](WORKFLOW-portable.md) -- that is the page to read, and the page to point BWJ
@@ -56,7 +59,7 @@ The hooks and blueprint a workflow carries "only where it needs them" -- this on
 
 | skill | when |
 |---|---|
-| [`report-issue`](skills/report-issue/SKILL.md) | a real issue has been found in a BWJ store repo -- files it on GitHub, mirrors it to Asana as the colleague-facing variant, and writes the cross-links |
+| [`report-issue`](skills/report-issue/SKILL.md) | a real issue has been found in a BWJ store repo -- files it on GitHub with its type and reach label, mirrors it to Asana as the colleague-facing variant, and writes the cross-links |
 | [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) | one-time setup in a store repo -- copies the CI mechanism into `.github/`, proposes the Asana config seam, and prints the secret/variable setup |
 
 <!-- /skills:plugin -->

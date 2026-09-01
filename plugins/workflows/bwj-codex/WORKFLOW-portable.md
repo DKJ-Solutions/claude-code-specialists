@@ -40,6 +40,62 @@ is mirrored*, it does not loosen *when or whether it is filed*:
 - Say what you **measured** and what you only **inferred**.
 - Filing needs no permission, and asking for it is the same failure as not filing.
 
+#### Classify it as you file it -- three fields, all set at creation
+
+An issue that arrives typeless and unlabelled has to be classified by hand afterwards, and afterwards
+never comes. Both BWJ trackers were brought to 100% type coverage by hand on September 1, 2026 -- 135
+issues across the two -- and that state holds only if every filing from here on maintains it.
+
+| field | what it carries | how |
+|---|---|---|
+| **issue type** | Bug / Feature / Task | `--type Bug` -- a defect in behaviour that already exists is **Bug**, a capability the store does not have yet is **Feature**, and **Task** is everything else, which is most of it |
+| **`tier-1` label** | how far the issue reaches | `--label tier-1`, and only where it reaches the audience tier. Absence is the answer for tier 0 and is not a missing field |
+| **`documentation` label** | the one content distinction the type system cannot express here | `--label documentation` on a doc finding, on top of whatever type it has |
+
+**The type is set directly, not derived from a label.** `bug` and `enhancement` were deleted from both
+repos on September 1, 2026, because the type already carried them: all 28 `bug` issues held type `Bug`
+and all 16 `enhancement` issues held `Feature`. Nothing was lost with them, and they are not re-added.
+
+**`documentation` was deliberately kept** (Dave). The `BWJ-ecommerce` org has exactly three issue types
+and none of them is Documentation, so its 42 doc issues sit on `Task` and `Feature`. Deleting the label
+would have buried them in a 91-issue `Task` pile -- that is not *covered by the type*, that is lost. A
+`Documentation` type was considered and not taken: issue types are **org-wide**, so adding one would put
+it in every BWJ repo, which is a wider decision than these two.
+
+#### The `tier-1` label -- the reach axis, carried onto issues
+
+The label is the
+[tier model](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/contributing-davekjohn/RELEASES-portable.md#the-tier-model)
+applied to an issue instead of a changelog entry. Both BWJ repos answer `Get-ReleaseAudienceTier = 1`, so:
+
+- **`tier-1` present** -- management and the commissioner notice it.
+- **`tier-1` absent** -- tier 0: only this repo's developers notice.
+
+Tier 2 does not exist in these repos, so one label carries the whole axis and
+`is:open label:tier-1` is the business-facing worklist.
+
+**The model transfers; the mechanism does not.** A changelog entry is a form with a field per reader, and
+every tier is scored on it -- tier 0 included, because an unanswered field reads as an omission rather
+than a decision. A label is not a field, it is a filter, and *a filter that matches everything filters
+nothing*. So: **score every tier on an entry, label only the exception on an issue** (Dave, September 1,
+2026, after two other shapes were tried -- `tier-0` marking the exception, which labelled 106 of 135 and
+left the actionable set unmarked, and a `tier-0` floor with `tier-1` stacked on it, which is the changelog
+model exactly and is where the two genuinely part company).
+
+**The test is whether the reader notices the DEFECT, not whether the file renders to them.** This is the
+mistake the file path invites, and it was made: `smartwatchbanden#455` is a Liquid block on the product
+page -- inline CSS, invented hex instead of the token, five unsynchronised copies across the market
+templates. It renders correctly to every shopper. The named failure is that a copy change has to be made
+in four places with nothing reporting the one left behind, which only a developer can see. Tier 0, first
+classified tier 1 on the wrong question (*the PDP is customer-facing, so a PDP file is tier 1*).
+Re-testing all 31 tier-1 issues on the sharper question moved a second. **The inverse holds too**: a build
+script no customer will ever load, whose breakage stops a release the business is waiting on, is not tier
+0.
+
+**Doubt resolves to tier 0** -- no label (Dave, September 1, 2026, on three borderline cases in the
+backfill). The point of the label is a short list somebody can work, and a tier-1 issue is cheap to add
+later with `gh issue edit <n> --repo <owner>/<repo> --add-label tier-1`.
+
 ### 2. Then Asana -- a translation, not a copy
 
 Once the GitHub issue exists, mirror it to Asana in the project
