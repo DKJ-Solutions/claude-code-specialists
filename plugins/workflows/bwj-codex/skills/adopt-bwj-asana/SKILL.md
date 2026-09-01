@@ -3,7 +3,7 @@ name: adopt-bwj-asana
 description: >-
   One-time setup of bwj-codex in a BWJ store repo (smartwatchbanden or xoxowildhearts): copy the
   asana-mirror CI mechanism into .github/, propose the Asana config seam for scripts/repo-config.ps1,
-  and print the repo secret and variables the CI needs. Strictly additive and dry-run by default; it
+  print the repo secret and variables the CI needs, and check that the classification labels exist. Strictly additive and dry-run by default; it
   never overwrites an existing file. Run this right after enabling the plugin, or when report-issue
   reports the Asana config seam missing.
 ---
@@ -49,7 +49,24 @@ The CI workflow needs, on the repo (Settings -> Secrets and variables -> Actions
 
 Print these as a checklist. This skill does not set secrets.
 
-## 4 -- point the repo's governance at the rule
+## 4 -- make sure the classification labels exist
+
+[`report-issue`](../report-issue/SKILL.md) files every issue with an issue type and, where it reaches
+that far, the `tier-1` label. **`gh issue create` fails outright on a label the repo does not have**, so
+check for it and create it if it is missing:
+
+```bash
+gh label list --repo <owner>/<repo> | grep -E '^(tier-1|documentation)\b'
+gh label create tier-1 --repo <owner>/<repo> --color fbca04 \
+  --description "Reaches the business: management and the commissioner notice it"
+```
+
+The three issue **types** (Task / Bug / Feature) are org-wide, not per repo, so there is nothing to
+create for them -- confirm in the org settings that they are enabled and stop there. Do **not** create
+`bug` or `enhancement` labels: the type carries both, and they were deliberately deleted from the
+existing BWJ repos.
+
+## 5 -- point the repo's governance at the rule
 
 Add a line to the repo's `CLAUDE.md` (or a repo lens) pointing at
 `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/workflows/bwj-codex/WORKFLOW-portable.md`
