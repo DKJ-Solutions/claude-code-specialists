@@ -32,6 +32,60 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/sync-main-network-calls-bounded-v1` · 20260901-121405
+
+`sync-main.ps1` — the pre-task sync `team-shopify` ships to the Shopify consumers — reached the network
+five times with neither the non-interactive guard nor the bound that #1179 added, because that repair
+landed at a choke point this script was not a caller of. All five now go through
+`Invoke-NativeCapture`: they run with `GIT_TERMINAL_PROMPT=0` and `GCM_INTERACTIVE=never`, and a stall
+kills the process tree after two minutes and reports itself instead of reading as a run still in
+progress. Two calls also stop failing **silently**: an `ls-remote` or `fetch` that cannot reach origin
+used to leave the standing-predecessor guard reporting `none on origin`, and the post-merge pull had no
+exit-code check at all. The lib now travels in `team-shopify`'s own payload, so a consumer without the
+workflow plugin gets it too.
+
+For this repo the reach is narrow, and worth saying plainly: `sync-main.ps1` **refuses to run here** —
+a repo that publishes plugins is its source, not a Shopify store. So nobody maintaining this repo will
+meet the hang. What they meet is the maintenance shape: a second mirror entry for a lib that now travels
+in two payloads, and a `the network guard` section in the suite that pins the five calls at five, so a
+sixth added without a bound fails a test rather than shipping.
+
+The part worth reading twice is not the bound. It is that two of these calls ran through a wrapper that
+swallows stderr *by design*, and the guard reading them errs toward refusing — so a network failure
+arrived as the one answer that guard treats as safe. Bounding them and stopping there would have made the
+*hang* diagnosable and left the *silence* exactly where it was.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A Shopify consumer running `team-shopify` gets this the moment they update, without configuring
+anything — and they are the only ones who can meet the failure, because they are the only ones for whom
+this script runs at all. The hang is not hypothetical for them: #1179 measured it on `DAVE-KOK-BWJ`,
+fifteen minutes on a `git push` whose credential helper was drawing a window nothing was listening to.
+This is that same push, in the script whose commit holds a third party's in-flight edits to the live
+theme — taken out of a mirror the `finally` block then deletes, so until the push lands the only copy of
+that work is a local branch nobody is looking at, presented as a push still running.
+
+**One thing to know if you run this script on a flaky connection**, because the behaviour genuinely
+changed rather than only got safer: a `git ls-remote` or `git fetch` that cannot reach origin now
+**refuses the run**, where it used to continue. That includes `-DryRun`. Nothing is written either way, so
+the cost is re-running it; what you get back is that the standing-predecessor guard can no longer report
+`none on origin` when what it actually means is that it could not ask. There is nothing to adopt and no
+flag to set.
+
+**Score:** 3
+
+#### Pull Request
+
+sync-main.ps1's network calls run non-interactively and bounded
+
+Plugins: team-shopify
+
+[PR #1185](https://github.com/DaveKJohn/claude-code-specialists/pull/1185)
+
+---
+
 ### DEPLOY: `fix/git-calls-noninteractive-and-bounded-v1` · 20260901-114244
 
 Closes inbound #1179. A git call made by the workflow scripts can no longer hang on a credential
