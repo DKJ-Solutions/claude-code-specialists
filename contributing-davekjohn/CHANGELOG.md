@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/bwj-codex-rename-v1` · 20260901-104018
+
+The `workflow-bwj` plugin is renamed to `bwj-codex` throughout the tree: its folder
+(`plugins/workflows/bwj-codex/`), its `marketplace.json` name and source, its `plugin.json` name, its
+test file (`scripts/tests/bwj-codex.tests.ps1`), and every current-tense reference in the root and
+plugin READMEs, the `contributing-davekjohn` portable pages, and the plugin's own skill and template
+text. The marketplace and plugin descriptions are reframed from "a narrow ticket-work workflow" to
+"BWJ's codex -- the binding rules its two Shopify store repos operate under"; no capability is added,
+the plugin still ships exactly the Asana ticket seam. Lint check 23 (`[plugin-kind]`) learns `*-codex`
+as a third way-of-working name shape, the same accommodation it already makes for `contributing-*`.
+The v4.28.0 release record is left intact except for one dead relative link, whose href is repointed
+at the moved README. The one pending `## [Unreleased]` entry that names the plugin (PR #1176,
+`fix/checkout-v5-node20-deprecation-v1`) is repointed `workflow-bwj` -> `bwj-codex` in its prose and
+its machine-read `Plugins:` trailer, so the next cut attributes that work to a plugin name still in
+`marketplace.json`.
+
+**Score:** 1
+
+A published plugin changes identity. Any repo that enabled `workflow-bwj@claude-code-specialists` in
+`.claude/settings.json` must rename that entry to `bwj-codex@claude-code-specialists` or the plugin
+silently stops loading. The plugin is one release old and opt-in, so the set of affected repos is
+small-to-empty, but the change is breaking for an adopter rather than invisible plumbing -- above
+tier 0.
+
+#### What makes this deploy extra special
+
+A consumer who had enabled `workflow-bwj` (BWJ's two store repos are the only intended adopters) needs
+a one-line settings change to `bwj-codex` after taking the release carrying this. Nothing migrates
+automatically and nothing warns; a session in a repo whose settings still name `workflow-bwj` just
+loses the two skills and the CI template reference. Small, mechanical, but real for that reader.
+
+**Score:** 1
+
+#### Pull Request
+
+Rename the workflow-bwj plugin to bwj-codex
+
+Plugins: bwj-codex, contributing-davekjohn
+
+[PR #1180](https://github.com/DaveKJohn/claude-code-specialists/pull/1180)
+
+---
+
 ### DEPLOY: `docs/testrun-series-tail-1168-v1` · 20260901-084902
 
 Close out the end-to-end testrun series ([#1135] → [#1157] → [#1168]). Run 5 met the series exit
