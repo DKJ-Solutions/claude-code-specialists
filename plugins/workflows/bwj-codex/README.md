@@ -36,7 +36,9 @@ repo jargon, so any BWJ colleague can read it. The two are **cross-linked both w
 **GitHub issue is closed, the Asana task is resolved automatically** -- by a small GitHub Actions
 workflow this plugin ships as a template for each repo to copy into its own `.github/`. Reopening
 the issue un-resolves the task; a daily reconciliation sweep repairs anything a missed event left
-behind.
+behind. **A ticket that came the other way -- filed in Asana and copied into an issue for analysis --
+is covered too:** the workflow reads the Asana link in such an issue's header row when it carries no
+machine marker of its own.
 
 The whole rule, with the field-by-field shape of the Asana variant and the cross-link markers, is in
 [`WORKFLOW-portable.md`](WORKFLOW-portable.md) -- that is the page to read, and the page to point BWJ
