@@ -155,10 +155,20 @@ second candidate for the same content.
 So step 4 asks `git ls-remote` -- not the local `origin/*` refs, which are only as fresh as your last
 fetch and hold nothing at all for a branch pushed from another machine. Anything under **your**
 `Get-ShopifySyncBranchPrefix` counts, so a consumer who set that seam to `theme-drift/` is scanned for
-`theme-drift/` branches. A branch is *standing* unless it is an ancestor of the trunk or has a merged PR
--- the same two-part test `prune-merged` uses, both halves, so a repo without
-`delete_branch_on_merge` is answered too. Where `gh` cannot answer, a branch reads as standing: a
-refusal costs nothing, so that is the cheap side to be wrong on.
+`theme-drift/` branches. A branch is *standing* unless it is an ancestor of the trunk, **or** its current
+tip is the tip a merged PR carried -- both halves, so a repo without `delete_branch_on_merge`, where a
+squash-merged ref lingers forever, is answered too. Where `gh` cannot answer, a branch reads as standing:
+a refusal costs nothing, so that is the cheap side to be wrong on.
+
+**The second half asks about the ref, not the branch NAME**, and that distinction is the whole of inbound
+[#1190](https://github.com/DaveKJohn/claude-code-specialists/issues/1190). These names carry a date, so
+the same one comes round again: a `sync/live-<date>` branch merges, gets deleted, and a later run the
+same day picks that name for a **new** branch. Matching the name alone let the merged one vouch for the
+new one -- so the guard reported *"all merged"*, found nothing standing, and pushed a `-2` branch onto
+exactly the pile it exists to prevent. Measured in a consumer on September 1, 2026:
+`sync/live-2026-09-01` merged as PR #141 and deleted, re-created the same day with open PR #159, and
+`4.27.0` reported `1 found on origin, all merged`. The tip is compared now, which also declines a branch
+somebody pushed one more commit to after its PR merged.
 
 Two rows come out of it, and the verdict runs wherever the take set is complete -- the dry-run report,
 the pre-push report, and the "nothing to sync" exit, which is the most misleading place to stop quietly:
