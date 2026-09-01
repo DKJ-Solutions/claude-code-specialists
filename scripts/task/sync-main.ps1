@@ -227,12 +227,13 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 
 . (Join-Path $PSScriptRoot '..\lib\sync-rules.ps1')
 
-# THE NETWORK GUARD (inbound #1181 and #1184, September 1, 2026). Every git AND gh call in this script
-# that reaches the network goes through Invoke-NativeCapture, which runs its child with
+# THE NETWORK GUARD (inbound #1181, #1184 and #1187, September 1, 2026). Every git AND gh call in this
+# script that reaches the network goes through Invoke-NativeCapture, which runs its child with
 # GIT_TERMINAL_PROMPT=0 and GCM_INTERACTIVE=never and -- where the call is given -TimeoutSeconds --
 # kills the process tree and reports exit 124 rather than sitting there. Inbound #1179 closed that class
-# at the choke point the release scripts share; this script was not a caller, so nine network calls sat
-# outside it: five git (#1181) and four gh (#1184), the gh half scoped out of that branch and filed.
+# at the choke point the release scripts share; this script was not a caller, so ten network calls sat
+# outside it: five git (#1181), four gh (#1184) and the 'gh pr checks' poll (#1187). Three branches, in
+# that order, each one scoping the next out and filing it rather than riding it along.
 #
 # gh IS IN SCOPE EVEN THOUGH THE MEASURED HANG DID NOT REACH IT, and that is the whole of #1184's
 # question. #1179 measured gh as unaffected throughout -- it carries its own token instead of going
@@ -243,11 +244,18 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # worse than the gap it describes. And 'gh pr create' sits directly after the push, where a stall leaves
 # the branch on origin with NO PR -- a state nothing here reports.
 #
-# THE 'gh pr checks' POLLING LOOP IS DELIBERATELY NOT AMONG THEM, and its bracket stays hand-rolled. It
-# is bounded already, by -ChecksTimeoutMinutes across the loop rather than per call, and its stderr
-# handling is load-bearing in a way the lib's -DiscardStderr is not: it must SWALLOW the pending-run
-# noise while still reading states. Routing it is a separate judgement with its own trade-offs, filed
-# rather than ridden along here -- the same way #1181 filed this half.
+# THE 'gh pr checks' POLL WAS THE LAST ONE OUTSIDE, and #1184 left it there for a reason that did not
+# survive being checked (inbound #1187). Two claims were made for the exclusion and both were wrong.
+# "It is bounded already" was true of the LOOP and not of the call: -ChecksTimeoutMinutes is re-read
+# only at the top of the while, so a poll that never returns never reaches it -- the deadline bounds
+# iterations, not any one call, which is the same shape #1179 and #1181 were filed about. And "a bound
+# per call is the mistake the lib warns about by name" pointed at the wrong call: that warning is about
+# 'gh pr checks --watch' (ship-pr.ps1), which blocks for as long as CI takes by design. A poll that
+# answers in seconds is not that.
+#
+# What WAS true is that its hand-rolled bracket was load-bearing -- it had to swallow the stderr a
+# pending run writes while still reading states off stdout -- and -DiscardStderr does exactly that half.
+# The call site says how a timeout is judged, which is the part that needed the care.
 #
 # UNGUARDED DOT-SOURCE, unlike the source-repo guard above, and that is deliberate: that guard is
 # optional behaviour a tree may not have, while this lib is load-bearing here. A copy of this script
@@ -1050,15 +1058,40 @@ try {
 
     $deadline = (Get-Date).AddMinutes($ChecksTimeoutMinutes)
     while ((Get-Date) -lt $deadline) {
-        # The same stderr wrapper the lib carries for git, for the same reason: '2>$null' on a native
-        # executable under EAP=Stop turns every stderr line into a terminating NativeCommandError, and
-        # 'gh pr checks' writes to stderr while a run is still pending -- which is exactly the state this
-        # loop exists to sit through.
-        $prevEap = $ErrorActionPreference
-        try {
-            $ErrorActionPreference = 'Continue'
-            $states = @(gh pr checks $pr --json state --jq '.[].state' 2>$null | Where-Object { $_ })
-        } finally { $ErrorActionPreference = $prevEap }
+        # BOUNDED PER CALL, WHICH IS NOT THE BOUND THE LOOP ALREADY HAD (inbound #1187).
+        # -ChecksTimeoutMinutes is re-read only at the top of this while, so it bounds the number of
+        # ITERATIONS over wall clock and not any single call: one 'gh pr checks' that never returns
+        # never reaches the condition again, and the deadline below is never evaluated. That is the
+        # class #1179 and #1181 named, arriving through the one call that looked already bounded.
+        #
+        # -DiscardStderr IS THE HAND-ROLLED EAP BRACKET THIS REPLACES, and it does both halves of what
+        # that bracket did. 'gh pr checks' writes to stderr while a run is still pending -- exactly the
+        # state this loop exists to sit through -- so the noise must be SWALLOWED while states are still
+        # read off stdout. The flag drops stderr at the capture rather than merging it, and the child
+        # runs under EAP=Continue inside the lib's own scope, which is the other half.
+        #
+        # NOT THE 'gh pr checks --watch' CASE the lib's docstring warns about, which is why a bound is
+        # right here. That call blocks for as long as CI takes BY DESIGN (ship-pr.ps1); this one is a
+        # poll that answers in seconds and sleeps 15 between tries. The loop's deadline and the call's
+        # bound answer different questions, and both are wanted.
+        $poll = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr `
+                                     -Arguments @('pr', 'checks', $pr, '--json', 'state', '--jq', '.[].state') `
+                                     -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+        # A TIMEOUT IS 'THIS POLL DID NOT ANSWER', NOT A RED CHECK, so the run keeps polling until the
+        # deadline: a slow answer is not a verdict. Its Output is discarded rather than parsed, and that
+        # is load-bearing -- the bounded arm APPENDS two '[timeout]' lines to Output, which would arrive
+        # here as two states matching nothing and be reported as CI failure on the next line.
+        #
+        # A NON-ZERO EXIT IS NOT A VERDICT EITHER, which is why only TimedOut is judged. 'gh pr checks'
+        # exits 8 while checks are pending and 1 when one has failed, and this loop has always read the
+        # STATES rather than the code. Gating on ExitCode -eq 0 would throw away a real failure's states
+        # and sit out the whole of -ChecksTimeoutMinutes before reporting 'not green' for a PR that is red.
+        if ($poll.TimedOut) {
+            Write-Host "  'gh pr checks' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- polling again until the $ChecksTimeoutMinutes min deadline." -ForegroundColor Yellow
+            $states = @()
+        } else {
+            $states = @($poll.Output | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+        }
         if ($states.Count -eq 0) { Start-Sleep -Seconds 15; continue }
         $bad = @($states | Where-Object { $_ -notin @('SUCCESS', 'NEUTRAL', 'SKIPPED', 'PENDING', 'QUEUED', 'IN_PROGRESS') })
         if ($bad.Count -gt 0) {
