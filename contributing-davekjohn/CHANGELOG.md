@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/prune-merged-proof-by-oid-v1` · 20260901-155946
+
+`prune-merged.ps1` proved a merge by branch **name**, so a name that had been merged once and then
+recreated inherited the old branch's proof forever -- and its new, unmerged commits were force-deleted
+with `merged PR` printed beside them. That is not hypothetical recycling: `deleteBranchOnMerge`, which
+this script's own header leans on for the remote half, is exactly what frees a name for reuse. Measured
+in a consumer whose pre-task sync names its branches `sync/live-<date>`, where a second sync the same day
+reuses the name: `sync/live-2026-09-01` was deleted on PR #141's merge while the commit it stood on
+belonged to #159, still open. Both passes now require the branch's tip to BE the merged PR's head commit,
+and a recycled name is kept with a reason saying so. It matters most in `-IncludeRemote`, which hands over
+a `git push --delete` line for the copy of last resort.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's own maintenance tooling. No subscriber of a service notices a local branch-reaping
+script, and nothing about the consumer-facing product changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+prune-merged proves a merge by the PR's head commit, not by its branch name
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1193](https://github.com/DaveKJohn/claude-code-specialists/pull/1193)
+
+---
+
 ### DEPLOY: `fix/sync-guard-merged-by-oid-v1` · 20260901-152556
 
 The pre-task sync's standing-predecessor guard now proves that the *ref* was merged, not merely that
