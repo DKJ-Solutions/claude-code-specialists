@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/asana-mirror-intake-link-v1` · 20260901-215159
+
+The Asana mirror now recognises a ticket that came FROM Asana. It only ever matched the
+`<!-- asana-task: ... -->` marker it writes itself, so an issue imported from Asana -- which carries
+its task as a link in the header row, written for a reader -- closed without touching Asana. Measured
+in `BWJ-ecommerce/smartwatchbanden` on 2026-09-01: of 55 issues, 4 carried a marker and 11 carried a
+header-row link only, 6 of those already closed with their Asana task still open. The workflow had
+run on each of them and logged exactly why. The daily sweep gained the matching direction -- GitHub's
+recently closed issues, forward into Asana -- because the Asana-side pass reads a GitHub back-link
+that an imported ticket's task does not have.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's subscribers are the consumers of the plugins, and nothing about installing or
+running them changes. The repair is inside a CI template a BWJ store repo copies.
+
+**Score:** N/A
+
+#### Pull Request
+
+asana-mirror resolves an imported ticket's Asana task from its header link, not only from the marker
+
+Plugins: bwj-codex
+
+[PR #1203](https://github.com/DaveKJohn/claude-code-specialists/pull/1203)
+
+---
+
 ### DEPLOY: `docs/sync-rules-floor-consequence-v1` · 20260901-213401
 
 `Get-SyncReferencePoint`'s docstring is what a reader consults to decide how much a wrong or missing floor
