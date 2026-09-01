@@ -32,6 +32,58 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/sync-main-checks-poll-bounded-v1` · 20260901-134631
+
+`sync-main.ps1`'s `gh pr checks` polling loop -- the last network call in that script outside
+`Invoke-NativeCapture` -- now runs through it with the shared 120-second bound, so a poll that hangs is
+killed and reported instead of stopping the run dead. **The loop was bounded and the call was not, and
+those are different bounds:** `-ChecksTimeoutMinutes` is re-read only at the top of the `while`, so it
+limits how many times the script asks, not how long any one ask may take. A single `gh pr checks` that
+never returned never reached that condition again, and a run that had already opened the sync PR sat
+there for as long as the process lived. That is the same class inbound
+[#1179](https://github.com/DaveKJohn/claude-code-specialists/issues/1179) and
+[#1181](https://github.com/DaveKJohn/claude-code-specialists/issues/1181) closed, arriving through the
+one call that looked as though it had been handled.
+
+**A timeout is not a verdict**, and preserving that is most of the change. The run warns, treats the
+poll as unanswered and keeps polling until the deadline, because a slow answer is not a red check. Two
+things would each have turned a stall into a wrong answer and neither is visible in a call count: the
+bounded arm *appends* two `[timeout]` lines to its output, which parsed as check states match nothing
+and read as CI failure; and `gh pr checks` exits 8 while checks are pending and 1 when one has failed,
+so gating the parse on a zero exit would have thrown away a real red and sat out the whole timeout
+before reporting "not green" for a PR that was already broken. The exit code is therefore deliberately
+not judged here, exactly as before -- this loop has always read the states.
+
+**This reverses the last sentence of the entry above it**, which recorded the poll as deliberately
+untouched. Both reasons #1184 gave for that turned out not to hold: "it is bounded already" was true of
+the loop and not of the call, and "a bound per call is the mistake the lib warns about by name" pointed
+at `gh pr checks --watch` in `ship-pr.ps1`, which blocks for as long as CI takes by design. What was
+true is that the hand-rolled `$ErrorActionPreference` bracket was load-bearing -- it had to swallow the
+stderr a pending run writes while still reading states off stdout -- and `-DiscardStderr` does that
+half, measured rather than assumed. With the poll routed, the lib's own docstring claim that *every*
+git and gh call in the workflow scripts comes through this one function is true in this tree, and the
+script now carries no hand-rolled EAP bracket at all.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a consumer running `sync-main.ps1` is the reader, and this repo's subscriber never sees it. The
+change is invisible until the day a `gh` poll stalls, and on that day it is the difference between a
+15-minute silence and a named failure.
+
+**Score:** N/A
+
+#### Pull Request
+
+sync-main.ps1's CI poll is bounded per call, not only across the loop
+
+Plugins: team-shopify
+
+[PR #1189](https://github.com/DaveKJohn/claude-code-specialists/pull/1189)
+
+---
+
 ### DEPLOY: `fix/shopify-cli-calls-not-bare-v1` · 20260901-131625
 
 Every Shopify CLI call in `team-shopify` — the live-theme pull in `sync-main.ps1` and the three in
