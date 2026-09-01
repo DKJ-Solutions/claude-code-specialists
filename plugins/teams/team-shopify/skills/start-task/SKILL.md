@@ -43,8 +43,11 @@ states it once for every script that asks. Classify by *what actually changes*.
 ## Steps
 
 1. **No argument supplied?** → first ask which branch name is wanted. Do not guess.
-2. **Gatekeepers:** verify you are on the trunk with a clean working tree, and that this session has done
-   its sync. Take the branch convention from the repo, not from memory.
+2. **Gatekeepers:** verify you are on the trunk with a clean working tree. Take the branch convention from
+   the repo, not from memory. **A sync is a gatekeeper here only if this branch will edit theme files** —
+   [`sync-main`](../sync-main/SKILL.md#when-to-run-it) states when it applies, and a documentation, tooling
+   or config branch has no stale base to avoid. Do not run one *"to be safe"*: it can refuse on a standing
+   predecessor branch and block a branch it could never have conflicted with.
 3. **Run the repo's script**, if it has one — plain, without a stderr redirect (the Shopify CLI writes its
    progress to stderr):
    ```powershell

@@ -1,6 +1,6 @@
 ---
 name: sync-main
-description: Mirror the live Shopify theme into this repo's trunk without letting live overwrite the trunk's own work -- the pre-task sync, with the content rule that makes it safe. Use it at the START of any theme task, before creating a branch, since a live theme has no locking and third parties edit it through the theme editor while you work. Reads from live into a mirror outside the repo and writes to git only: it never pushes to live, publishes a theme, or deletes one. Run it with -DryRun first to see every verdict without writing anything. Stops before the merge by default, so somebody sees what changed on live before it becomes the base of new branches.
+description: Mirror the live Shopify theme into this repo's trunk without letting live overwrite the trunk's own work -- the sync that captures third-party drift, with the content rule that makes it safe. Run it before a live push, and before work that will edit theme files, since a live theme has no locking and third parties edit it through the theme editor while you work; NOT before a branch that cannot touch a theme file, where it buys nothing and can refuse on a standing predecessor. Reads from live into a mirror outside the repo and writes to git only: it never pushes to live, publishes a theme, or deletes one. Run it with -DryRun first to see every verdict without writing anything. Stops before the merge by default, so somebody sees what changed on live before it becomes the base of new branches.
 ---
 
 # sync-main -- mirror live into the trunk, without losing what the trunk did
@@ -14,6 +14,59 @@ This command is that step with the rule that fixes it:
 
 > Has this path ever held live's content in the trunk's history? Then the **trunk** wins. Otherwise
 > **live** wins -- and if the trunk also changed it, **nobody** wins and a human looks.
+
+## When to run it
+
+**Before a live push, and before work that will edit theme files. Not otherwise.**
+
+The step has two jobs, and they do not fire at the same moment:
+
+- **Capturing third-party drift into the trunk.** This is the half that becomes *safety-critical*, and it
+  does so at the **live push**: the per-file `--only` push carries the trunk's copy of exactly those paths
+  to live, so drift the trunk never captured is drift the push silently reverts.
+- **Not cutting a branch from a stale base.** This one can only bite a branch that **edits a theme file**,
+  and it costs rework rather than data.
+
+So a branch that cannot touch `assets/ blocks/ config/ layout/ locales/ sections/ snippets/ templates/` --
+documentation, tooling, CI, permissions, the workflow folder -- has neither failure to avoid. Running the
+sync there pulls a whole theme over the network, compares every file, and can **refuse outright**, in
+exchange for nothing.
+
+**And that refusal is why *"run it anyway, it only takes a minute"* is not the safe default it sounds
+like.** [A standing sync branch stops the run](#why-a-standing-sync-branch-stops-the-run), and that refusal
+is right *while the sync is a step in theme work*: the drift is already sitting on the predecessor, so
+refusing costs nothing. Mandate the sync before **every** task and the same refusal becomes a gate on the
+start of all work in the repo -- one unmerged sync PR blocking a documentation branch that could not
+conflict with it under any circumstances. The cheap-to-be-wrong-on side of that argument stops being
+cheap.
+
+Measured in a consumer on September 1, 2026 (inbound
+[#1196](https://github.com/DaveKJohn/claude-code-specialists/issues/1196)): a session picked up an issue
+whose entire content was a paste of `.claude/settings.json` -- a permission list. Its `CLAUDE.md` said to
+sync before *any* task, so it did: it pulled the live theme, classified **25 paths held back** and **4 to
+take from live**, and reported that a real run **would have refused**, because a sync branch from a
+previous run was still standing. None of it had any relationship to a JSON permission file. The owner's
+answer: *"the live sync is actually only relevant at the moment I push main to live."*
+
+**This is the same narrowing [`start-task`](../start-task/SKILL.md) already took**, for the same reason
+(inbound [#805](https://github.com/DaveKJohn/claude-code-specialists/issues/805)): a preview theme is now
+created by the first push rather than by starting work, because 6 of 12 real branch previews belonged to
+branches that never needed one. A preview theme is a consequence of *"I want to show this"* rather than of
+*"I am starting work"* -- and this sync is a consequence of *"I am about to touch the theme"* rather than
+of the same thing.
+
+**The name is older than the rule, and it is not the trigger.** It is called the *pre-task sync*
+throughout this plugin, which reads as *before every task* and is exactly the paraphrase this section
+exists to end. Read the name as what it is -- a label for the step -- and this section as when it fires.
+
+**Where the trigger is stated, and where it is not.** Here, and nowhere else. Everything else in this
+plugin that has to mention when the sync fires -- [Sandra's
+manual](../../manuals/05-21-manual.md#the-pre-task-sync--and-why-the-obvious-version-of-it-destroys-work),
+[`start-task`](../start-task/SKILL.md) -- links to this section instead of restating it, and a consumer's
+own `CLAUDE.md` should do the same. Three paraphrases inside this plugin had drifted into three different
+triggers before anybody compared them, and two consumers of one owner then read the step as
+mandatory-always, mandatory-for-theme-work and optional. **A trigger that is restated is a trigger that
+forks** -- and none of the three forks looked wrong from where it sat.
 
 ## Run it
 

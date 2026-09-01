@@ -56,12 +56,20 @@ persona's; the persona runs the checklist, and the push, on Dave's word.
 
 ## The pre-task sync — and why the obvious version of it destroys work
 
-**Work starts by mirroring live into the trunk, and that step is the most dangerous script in a Shopify
-repo.** A live theme has no locking, no merge and no conflict detection: third parties edit it through the
-theme editor while you work, and the last write wins silently. So the trunk has to be brought level with
-live before a branch is cut from it. A **wholesale** pull — `shopify theme pull --live`, `git add -A`,
-commit — is the obvious implementation, and it knows nothing about what the trunk has done since. It
-overwrites it.
+**Theme work starts by mirroring live into the trunk, and that step is the most dangerous script in a
+Shopify repo.** A live theme has no locking, no merge and no conflict detection: third parties edit it
+through the theme editor while you work, and the last write wins silently. So the trunk has to be brought
+level with live before a theme branch is cut from it, and again before anything the trunk holds is pushed
+to live. A **wholesale** pull — `shopify theme pull --live`, `git add -A`, commit — is the obvious
+implementation, and it knows nothing about what the trunk has done since. It overwrites it.
+
+**When it fires is stated in one place, and this is not it.** The name says *pre-task*, and the trigger is
+narrower than the name: before a live push, and before work that will edit theme files — never before a
+branch that cannot touch one, where it buys nothing and can refuse on a standing predecessor. That
+sentence lives in the skill, under [When to run it](../skills/sync-main/SKILL.md#when-to-run-it). This
+paragraph restating it is exactly how the plugin came to carry three different triggers, and two consumers
+of one owner to read the step three different ways (inbound
+[#1196](https://github.com/DaveKJohn/claude-code-specialists/issues/1196)).
 
 **The rule that fixes it is one sentence**, and it is one sentence because all three destruction modes are
 the same case:
@@ -125,7 +133,7 @@ If a management action repeats itself (standing up a fallback preview theme, pus
 
 Every new admin script gets a **hard allowlist** (with only the live theme as a forbidden target) and runs **dry-run first**. The per-market preview-URL table belongs in one single-source-of-truth helper that the create/push scripts dot-source — domain changed or market added, then update it there and nowhere else.
 
-**And that pre-task sync is the clearest illustration of which form to pick.** It has to happen before every task whether or not anybody remembers it, which is the definition of a **hook** rather than of a discipline: a sync that depends on being invoked is skipped on exactly the busy day it was protecting against. Everything Sandra invokes deliberately stays a **script on a skill page**, guardrails and dry-run included — that is what lets a repo which never wrote those guardrails still get them.
+**And that pre-task sync is the clearest illustration of which form to pick — by being the case *against* a hook.** It reads like one: a step that has to happen before work whether or not anybody remembers it. But a hook fires **unconditionally**, and this step is conditional — before a live push and before theme work, and pointedly not before a branch that cannot touch a theme file ([When to run it](../skills/sync-main/SKILL.md#when-to-run-it)). A hook cannot ask that question, so it would answer it wrong in the expensive direction: pulling a whole live theme, and refusing on a standing predecessor branch, at the start of every documentation task in the repo. So it stays a **script on a skill page**, like everything else Sandra invokes deliberately, guardrails and dry-run included — that is what lets a repo which never wrote those guardrails still get them.
 
 The **live push itself is deliberately NOT scripted** — it requires judgment about in-flight third-party drift; follow the step-by-step `--only` procedure with verification pulls for that.
 
