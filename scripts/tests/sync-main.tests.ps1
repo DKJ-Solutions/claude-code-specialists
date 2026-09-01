@@ -647,6 +647,82 @@ try {
     Assert-True ($cleanRun.Code -eq 0) 'guard/none: no standing branch is not a refusal'
     Assert-True ($cleanRun.Out -match 'none on origin') 'guard/none: the step reports that it looked'
     Assert-True ($cleanRun.Out -notmatch 'Standing sync branches, measured') 'guard/none: and prints no verdict table for branches that do not exist'
+
+    # --- the network guard (inbound #1181) ----------------------------------------------------------
+    # WHAT THESE CASES PROTECT is a failure with no error message: a git call that reaches the network,
+    # blocks on a credential prompt nothing can answer, and reads as a run still in progress. Inbound
+    # #1179 closed that class inside Invoke-NativeCapture -- the non-interactive environment plus an
+    # opt-in bound -- and this script was not a caller, so its five network calls sat outside it.
+    #
+    # FOUR OF THE FIVE ARE ALREADY DRIVEN FOR REAL by the cases above, against the fixture's local bare
+    # origin: the trunk pull at [1/6], the ls-remote and the fetch at [3b/6], and the push on the drift
+    # case (the suite header says that push is not asserted, and it still is not -- what it now proves is
+    # that the call SURVIVES the routing, which is a claim about this script). So a regression that broke
+    # the wiring would already be red. What no existing case can reach is the SHAPE of the guard, and
+    # that is what the static asserts below are for.
+    Write-Host ''
+    Write-Host 'the network guard'
+
+    $src = Get-Content -LiteralPath $Script -Raw
+
+    Assert-True ($src -match [regex]::Escape('. (Join-Path $PSScriptRoot ''..\lib\native-capture-lib.ps1'')')) `
+        'net: the lib is dot-sourced'
+    # UNGUARDED, unlike the source-repo guard three lines above it in the script. A Test-Path wrapper
+    # would turn a payload missing the lib into a run that pushes unbounded, which is the defect.
+    Assert-True ($src -notmatch 'Test-Path[^\n]*native-capture-lib') `
+        'net: and unguarded, so a payload without it fails at load rather than pushing unbounded'
+
+    # NO BARE '& git' NETWORK VERB LEFT. The local ones -- status, rev-parse, checkout, commit, ls-tree --
+    # are deliberately untouched: they cannot reach a credential helper, and a bound on them would buy
+    # nothing. So the assert names the four verbs that do reach the network rather than banning '& git'.
+    Assert-True ($src -notmatch '&\s*git\s+(pull|push|fetch|ls-remote)\b') `
+        'net: no bare ''& git'' call reaches the network any more'
+
+    # NOR THROUGH Invoke-SyncGitQuiet, which is the half of this that is easy to reintroduce. That
+    # wrapper swallows stderr by design (inbound #801), so a network call routed back through it fails
+    # silently as well as unboundedly -- and its remaining callers are all local queries.
+    Assert-True ($src -notmatch 'Invoke-SyncGitQuiet\s+@\(\s*''(pull|push|fetch|ls-remote)''') `
+        'net: and none goes back through the stderr-swallowing wrapper'
+
+    # EVERY Invoke-NativeCapture HERE CARRIES THE SHARED BOUND, and the count is pinned at five so a
+    # sixth network call added without one fails this assert rather than passing unnoticed. The number
+    # rather than a ratio: 5 == 5 would also hold if somebody deleted a call and its bound together.
+    # '-FilePath' IS PART OF THE PATTERN rather than the bare function name, because the banner at the
+    # top of the script names the function in prose -- and a bare-name count read 6 against 5 real calls.
+    $calls  = @([regex]::Matches($src, 'Invoke-NativeCapture\s+-FilePath\b')).Count
+    $bounds = @([regex]::Matches($src, [regex]::Escape('-TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds'))).Count
+    Assert-True ($calls -eq 5) "net: five network calls go through the lib (found $calls)"
+    Assert-True ($bounds -eq 5) "net: and all five pass the shared bound (found $bounds)"
+
+    # THE LIB TRAVELS IN team-shopify's OWN PAYLOAD. Without this entry the mirrored script dot-sources a
+    # file that is not in the mirror, and it fails at load in a consumer that installed team-shopify
+    # without contributing-davekjohn -- which is most of them. build-shared-scripts -Check cannot catch
+    # that: it compares the pairs the registry declares, so a missing entry is a pair it never looks at.
+    . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
+    $shopLib = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
+        Where-Object { $_.Plugin -eq 'team-shopify' -and $_.SourceRel -eq 'scripts\lib\native-capture-lib.ps1' })
+    Assert-True ($shopLib.Count -eq 1) 'net: the registry mirrors the lib into team-shopify'
+    Assert-True ($shopLib.Count -eq 1 -and (Test-Path -LiteralPath $shopLib[0].MirrorPath -PathType Leaf)) `
+        'net: and that mirror is present beside the mirrored sync-main.ps1'
+
+    # THE ls-remote REFUSAL, and this is the behavioural half. Before this branch the call ran through
+    # Invoke-SyncGitQuiet, so an unreachable origin produced no lines -- and no lines is exactly what "no
+    # sync branch on origin" looks like. The guard then reported 'none on origin' and let the run
+    # proceed, which is the silent miss the guard was filed to end, arriving through the guard's own
+    # query. A DRY RUN is what the case uses because it skips the trunk pull at [1/6]: that would fail
+    # first on a broken origin and never reach the step under test.
+    $netRepo = New-Consumer -Label 'net-lsremote' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $netRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Invoke-Git -C $netRepo remote set-url origin (Join-Path $netRepo 'no-such-origin.git')
+    $netRun = Invoke-Sync -Dir $netRepo -Mirror (New-Mirror -Label 'net-lsremote' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }) -Extra @('-DryRun')
+    Assert-True ($netRun.Code -eq 1) 'net/ls-remote: an origin it cannot read refuses the run'
+    Assert-True ($netRun.Out -match 'Could not list the heads on origin') 'net/ls-remote: and says which query could not answer'
+    Assert-True ($netRun.Out -match 'UNKNOWN') 'net/ls-remote: naming the answer it does not have, rather than assuming one'
+    Assert-True ($netRun.Out -notmatch 'none on origin') 'net/ls-remote: it no longer reads an unreachable origin as ''no predecessor'''
 }
 finally {
     foreach ($d in $script:trees) {

@@ -302,6 +302,24 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE SECOND MIRROR OF THE SAME SOURCE, on check-report-lib-workflow's precedent five entries
+            # up -- read its two banners for why a second entry rather than a list of mirrors, and why the
+            # name carries the plugin. Nothing here needs restating.
+            #
+            # WHY team-shopify NEEDS ITS OWN COPY (inbound #1181, September 1, 2026): sync-main.ps1 became
+            # a caller. Its five git network calls ran unguarded and unbounded -- the same hang #1179
+            # measured, in the script that pushes a commit holding a third party's in-flight edits -- and
+            # the guard lives in this lib. team-shopify and contributing-davekjohn are separately
+            # versioned and separately installed, and a Shopify consumer may run the first without the
+            # second, so reaching into the workflow plugin's cache would be a dependency a version
+            # mismatch breaks silently. sync-main.ps1's dot-source is UNGUARDED for the matching reason:
+            # a payload missing this file must fail at load, not push unbounded.
+            Name    = 'native-capture-lib-shopify'
+            Source  = 'scripts\lib\native-capture-lib.ps1'
+            Plugin  = 'team-shopify'
+            LibOnly = $true
+        },
+        @{
             # Get-SeamValue + Get-DefaultChangelogPath (issue #885, group A): the one definition
             # cut-release.ps1, new-internal-note.ps1 and fold-changelog-entry.ps1 all read an optional
             # repo-config seam through now, where two of them used to carry their own private copy of the

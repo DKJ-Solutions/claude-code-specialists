@@ -221,6 +221,30 @@ try {
     $plain8 = Invoke-NativeCapture -Utf8 -FilePath 'cmd' -Arguments @('/c', 'exit', '0')
     Assert-True (-not $plain8.TimedOut) 'and so does an unbounded call on the Start-Process arm'
 
+    # A BOUND MUST NOT MOVE THE CHILD'S WORKING DIRECTORY (inbound #1181). This is the assumption every
+    # bounded caller silently rests on, and it was worth measuring rather than reasoning about: passing
+    # -TimeoutSeconds routes the call onto the Start-Process arm, and Set-Location changes PowerShell's
+    # PROVIDER location without touching [Environment]::CurrentDirectory -- the classic 5.1 divergence.
+    # Had Start-Process followed the .NET value, a bound would have run git in whatever directory the
+    # session happened to start in. sync-main.ps1 is the caller that makes this load-bearing: it does
+    # Set-Location to the repo root it resolved and then relies on every git call landing there.
+    #
+    # THE ASSERT IS AGAINST A DIVERGENCE IT CREATES ITSELF, so it cannot pass by accident on a session
+    # where the two already agree -- which is how the first hand-check of this nearly proved nothing.
+    $cwdProbe = Join-Path $sandbox 'cwd-probe'
+    New-Item -ItemType Directory -Path $cwdProbe -Force | Out-Null
+    $prevNetCurrent = [Environment]::CurrentDirectory
+    Push-Location -LiteralPath $cwdProbe
+    try {
+        [Environment]::CurrentDirectory = $sandbox
+        Assert-True ((Get-Location).Path -ne [Environment]::CurrentDirectory) 'the probe really did diverge the two notions of "here"'
+        $whereBounded = Invoke-NativeCapture -FilePath 'cmd' -Arguments @('/c', 'cd') -TimeoutSeconds 30
+        Assert-Equal $cwdProbe (@($whereBounded.Output) -join '').Trim() 'a bounded call runs in the PROVIDER location, not in [Environment]::CurrentDirectory'
+    } finally {
+        Pop-Location
+        [Environment]::CurrentDirectory = $prevNetCurrent
+    }
+
     # ---------------------------------------------------------------------------------------------
     Write-Host 'Stop-NativeProcessTree -- the GRANDCHILD dies too (inbound #1179)' -ForegroundColor Cyan
 

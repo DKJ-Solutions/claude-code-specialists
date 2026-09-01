@@ -227,6 +227,25 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 
 . (Join-Path $PSScriptRoot '..\lib\sync-rules.ps1')
 
+# THE NETWORK GUARD (inbound #1181, September 1, 2026). Every git call in this script that reaches the
+# network goes through Invoke-NativeCapture, which runs its child with GIT_TERMINAL_PROMPT=0 and
+# GCM_INTERACTIVE=never and -- where the call is given -TimeoutSeconds -- kills the process tree and
+# reports exit 124 rather than sitting there. Inbound #1179 closed that class at the choke point the
+# release scripts share; this script was not a caller, so five network calls sat outside it.
+#
+# UNGUARDED DOT-SOURCE, unlike the source-repo guard above, and that is deliberate: that guard is
+# optional behaviour a tree may not have, while this lib is load-bearing here. A copy of this script
+# without it must fail at load rather than silently push unbounded. It travels in team-shopify's own
+# payload for exactly that reason -- see its second entry in scripts/lib/shared-scripts-lib.ps1.
+#
+# NOT INTO sync-rules.ps1, WHICH IS THE OTHER PLACE IT COULD HAVE GONE. Two of the five calls ran
+# through Invoke-SyncGitQuiet, so routing that wrapper looked like the smaller change. It is the wrong
+# one twice over: the wrapper's other eight callers are LOCAL queries that must not carry a network
+# bound, and two of them read $LASTEXITCODE as the answer rather than the output -- which the
+# Start-Process arm a bound implies does not set. sync-rules.ps1 also declares itself dependency-free
+# on purpose (its header), and it is the only file here the test suite loads without a sync.
+. (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # source root copy falls back to the git root. Same resolution as every other mirrored script, which is
 # what lets both copies stay byte-identical.
@@ -427,8 +446,19 @@ if ($DryRun) {
     Write-Host "[1/6] $trunk, fast-forward from origin ..." -ForegroundColor Yellow
     & git checkout $trunk | Out-Null
     if ($LASTEXITCODE -ne 0) { Write-Host "Could not switch to $trunk." -ForegroundColor Red; exit 1 }
-    & git pull --ff-only
-    if ($LASTEXITCODE -ne 0) { Write-Host "Could not fast-forward $trunk from origin." -ForegroundColor Red; exit 1 }
+    # BOUNDED (inbound #1181). The cheapest of the five to stall in -- nothing has been written yet --
+    # and it is still bounded rather than left alone: a run that hangs here hangs before it has said
+    # anything, which reads as the script being slow to start rather than as a credential to fix.
+    $pull = Invoke-NativeCapture -FilePath 'git' -Arguments @('pull', '--ff-only') `
+                                 -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    $pull.Output | ForEach-Object { Write-Host $_ }
+    if ($pull.ExitCode -ne 0) {
+        Write-Host "Could not fast-forward $trunk from origin." -ForegroundColor Red
+        if ($pull.TimedOut) {
+            Write-Host "  'git pull' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+        }
+        exit 1
+    }
 }
 
 # --- 3. the reference point, read before the pull --------------------------------------------------
@@ -484,8 +514,25 @@ Write-Host "      $branch"
 Write-Host ''
 Write-Host '[3b/6] previous sync branches ...' -ForegroundColor Yellow
 $standing   = @()
-$candidates = @(Get-SyncBranchNamesFromRefs -Prefix $branchPrefix -Lines @(
-    Invoke-SyncGitQuiet @('ls-remote', '--heads', 'origin')))
+#
+# BOUNDED, AND ITS FAILURE IS NOW A REFUSAL (inbound #1181). It used to run through
+# Invoke-SyncGitQuiet, which swallows stderr by design -- so a credential prompt, a dead remote or a
+# stall produced NO lines, and no lines is indistinguishable from "no sync branch on origin". That is
+# the silent miss this guard exists to end, arriving through the guard's own query. The refusal is the
+# direction the banner above already chose: a run that cannot be proven safe is refused, loudly.
+$lsRemote = Invoke-NativeCapture -FilePath 'git' -Arguments @('ls-remote', '--heads', 'origin') `
+                                 -DiscardStderr -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+if ($lsRemote.ExitCode -ne 0) {
+    Write-Host 'Could not list the heads on origin, so whether a previous run''s branch is still standing is UNKNOWN.' -ForegroundColor Red
+    if ($lsRemote.TimedOut) {
+        Write-Host "  'git ls-remote' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+    } else {
+        Write-Host "  'git ls-remote --heads origin' exited $($lsRemote.ExitCode)." -ForegroundColor Red
+    }
+    Write-Host '  Nothing was changed. Fix the remote or the credential and run again.' -ForegroundColor Red
+    exit 1
+}
+$candidates = @(Get-SyncBranchNamesFromRefs -Prefix $branchPrefix -Lines @($lsRemote.Output))
 
 if ($candidates.Count -eq 0) {
     Write-Host '      none on origin.'
@@ -495,9 +542,25 @@ if ($candidates.Count -eq 0) {
     # old as the last fetch -- and a predecessor pushed from another machine has no local ref at all,
     # which is precisely the branch that stacks. The trunk is in the same refspec because a dry run does
     # not pull, and a stale base would be read as the diff base below.
-    Invoke-SyncGitQuiet @('fetch', '--quiet', 'origin',
+    #
+    # BOUNDED, AND ITS FAILURE IS A REFUSAL TOO (inbound #1181), for the reason the paragraph above
+    # gives: the whole point of this fetch is that answering from refs as old as the last one is the
+    # failure. A fetch that quietly did nothing leaves every test below reading exactly those stale
+    # refs, and the trunk is in the same refspec, so the diff base goes stale with them.
+    $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', '--quiet', 'origin',
         "+refs/heads/${trunk}:refs/remotes/origin/$trunk",
-        "+refs/heads/$branchPrefix*:refs/remotes/origin/$branchPrefix*") | Out-Null
+        "+refs/heads/$branchPrefix*:refs/remotes/origin/$branchPrefix*") `
+        -DiscardStderr -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    if ($fetch.ExitCode -ne 0) {
+        Write-Host 'Could not fetch origin, so the refs the standing-predecessor test reads are as old as the last fetch.' -ForegroundColor Red
+        if ($fetch.TimedOut) {
+            Write-Host "  'git fetch' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+        } else {
+            Write-Host "  'git fetch --quiet origin' exited $($fetch.ExitCode)." -ForegroundColor Red
+        }
+        Write-Host '  Nothing was changed. Fix the remote or the credential and run again.' -ForegroundColor Red
+        exit 1
+    }
 
     # THE MERGED TEST IS THE TWO-PART ONE prune-merged.ps1 ALREADY USES, and both parts are needed here
     # rather than one. On a repo with delete_branch_on_merge a merged branch's ref is gone from origin, so
@@ -799,8 +862,22 @@ try {
     & git commit --quiet -m $msg -- @paths
     if ($LASTEXITCODE -ne 0) { Write-Host 'Commit failed.' -ForegroundColor Red; exit 1 }
 
-    & git push -u origin $branch
-    if ($LASTEXITCODE -ne 0) { Write-Host "Push failed. The commit is local on $branch." -ForegroundColor Red; exit 1 }
+    # BOUNDED, AND THIS IS THE WORST OF THE FIVE TO STALL IN (inbound #1181). The commit above holds a
+    # third party's in-flight edits to the live theme, taken out of a mirror the finally block then
+    # deletes -- so until this push lands, the only copy of that work is a local branch nobody is looking
+    # at, and a hang presents it as a push still in progress. The bound is what turns that into the
+    # message below, which already says the right thing.
+    $push = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin', $branch) `
+                                 -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    $push.Output | ForEach-Object { Write-Host $_ }
+    if ($push.ExitCode -ne 0) {
+        Write-Host "Push failed. The commit is local on $branch." -ForegroundColor Red
+        if ($push.TimedOut) {
+            Write-Host "  'git push' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+            Write-Host "  The branch is NOT on origin. Fix the credential and push it by hand: git push -u origin $branch" -ForegroundColor Red
+        }
+        exit 1
+    }
 
     # --- the PR body, composed ONCE for both paths --------------------------------------------------
     # BOTH PATHS, AND THAT IS THE HALF INBOUND #1000 MADE THE CASE FOR. The merging path used to compose
@@ -919,8 +996,23 @@ try {
     & gh pr merge $pr --$mergeMethod --subject "merge: $branch (#$pr)"
     if ($LASTEXITCODE -ne 0) { Write-Host "The merge failed. PR #$pr is open and green; merge it by hand." -ForegroundColor Red; exit 1 }
 
+    # BOUNDED, AND JUDGED, WHICH IT WAS NOT BEFORE (inbound #1181). The PR is already merged by the time
+    # this line runs, so this pull is all that stands between the operator and a trunk that does not
+    # contain the sync they were just told landed. It had no exit-code check at all: the 'Done' line
+    # below printed whether or not the pull worked, which is the one shape of this failure nobody would
+    # go looking for.
     & git checkout $trunk | Out-Null
-    & git pull --ff-only
+    $post = Invoke-NativeCapture -FilePath 'git' -Arguments @('pull', '--ff-only') `
+                                 -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    $post.Output | ForEach-Object { Write-Host $_ }
+    if ($post.ExitCode -ne 0) {
+        Write-Host "Sync PR #$pr IS MERGED, but $trunk could not be fast-forwarded, so this checkout does not have it yet." -ForegroundColor Red
+        if ($post.TimedOut) {
+            Write-Host "  'git pull' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+        }
+        Write-Host '  Nothing is lost; pull by hand: git pull --ff-only' -ForegroundColor Red
+        exit 1
+    }
     Write-Host "Done -- sync PR #$pr merged into $trunk." -ForegroundColor Green
     exit 0
 }
