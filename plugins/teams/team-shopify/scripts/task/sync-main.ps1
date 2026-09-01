@@ -227,18 +227,34 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 
 . (Join-Path $PSScriptRoot '..\lib\sync-rules.ps1')
 
-# THE NETWORK GUARD (inbound #1181, September 1, 2026). Every git call in this script that reaches the
-# network goes through Invoke-NativeCapture, which runs its child with GIT_TERMINAL_PROMPT=0 and
-# GCM_INTERACTIVE=never and -- where the call is given -TimeoutSeconds -- kills the process tree and
-# reports exit 124 rather than sitting there. Inbound #1179 closed that class at the choke point the
-# release scripts share; this script was not a caller, so five network calls sat outside it.
+# THE NETWORK GUARD (inbound #1181 and #1184, September 1, 2026). Every git AND gh call in this script
+# that reaches the network goes through Invoke-NativeCapture, which runs its child with
+# GIT_TERMINAL_PROMPT=0 and GCM_INTERACTIVE=never and -- where the call is given -TimeoutSeconds --
+# kills the process tree and reports exit 124 rather than sitting there. Inbound #1179 closed that class
+# at the choke point the release scripts share; this script was not a caller, so nine network calls sat
+# outside it: five git (#1181) and four gh (#1184), the gh half scoped out of that branch and filed.
+#
+# gh IS IN SCOPE EVEN THOUGH THE MEASURED HANG DID NOT REACH IT, and that is the whole of #1184's
+# question. #1179 measured gh as unaffected throughout -- it carries its own token instead of going
+# through a credential helper, and every gh call in that session worked while git push was blocked. Two
+# things settle it the other way anyway. The lib's own docstring states the non-interactive guard is
+# applied to every child rather than only to git, because gh shells out to git in places; leaving four
+# gh calls outside made that sentence false in this tree, and a load-bearing claim nobody can trust is
+# worse than the gap it describes. And 'gh pr create' sits directly after the push, where a stall leaves
+# the branch on origin with NO PR -- a state nothing here reports.
+#
+# THE 'gh pr checks' POLLING LOOP IS DELIBERATELY NOT AMONG THEM, and its bracket stays hand-rolled. It
+# is bounded already, by -ChecksTimeoutMinutes across the loop rather than per call, and its stderr
+# handling is load-bearing in a way the lib's -DiscardStderr is not: it must SWALLOW the pending-run
+# noise while still reading states. Routing it is a separate judgement with its own trade-offs, filed
+# rather than ridden along here -- the same way #1181 filed this half.
 #
 # UNGUARDED DOT-SOURCE, unlike the source-repo guard above, and that is deliberate: that guard is
 # optional behaviour a tree may not have, while this lib is load-bearing here. A copy of this script
 # without it must fail at load rather than silently push unbounded. It travels in team-shopify's own
 # payload for exactly that reason -- see its second entry in scripts/lib/shared-scripts-lib.ps1.
 #
-# NOT INTO sync-rules.ps1, WHICH IS THE OTHER PLACE IT COULD HAVE GONE. Two of the five calls ran
+# NOT INTO sync-rules.ps1, WHICH IS THE OTHER PLACE IT COULD HAVE GONE. Two of the five git calls ran
 # through Invoke-SyncGitQuiet, so routing that wrapper looked like the smaller change. It is the wrong
 # one twice over: the wrapper's other eight callers are LOCAL queries that must not carry a network
 # bound, and two of them read $LASTEXITCODE as the answer rather than the output -- which the
@@ -573,21 +589,31 @@ if ($candidates.Count -eq 0) {
     # fallback and the same principle: each errs toward doing nothing. There, a branch that cannot be
     # proven merged is KEPT; here, a run that cannot be proven safe is REFUSED -- loudly, naming
     # -AllowStacking. A refusal costs nothing, so it is the cheap side to be wrong on.
+    # BOUNDED, AND THROUGH THE LIB (inbound #1184). This was the ONE gh call of the four that already
+    # carried the save-EAP -> Continue -> restore dance by hand -- which is the half Invoke-NativeCapture
+    # exists to own, so the bracket is gone rather than left standing beside it. The report expected to
+    # find that dance at all four sites; measured, the other three had no bracket at all.
+    #
+    # -DiscardStderr BECAUSE THE OUTPUT IS DATA the loop below compares branch names against, not
+    # progress: a gh status line merged into it becomes a $mergedHeads entry that matches nothing, and
+    # -- worse -- an entry that matches a real branch would read as merged.
+    #
+    # A STALL HERE READS AS 'NO MERGED PRS', which is the expensive direction, and the existing shape
+    # already handles it. $ghKnown stays $false on a timeout exactly as on any other non-zero exit, so
+    # the guard falls through to its own refusal -- loudly, naming -AllowStacking -- rather than letting
+    # a branch it could not judge pass as merged. The Yellow line says which of the two happened.
     $mergedHeads = @()
     $ghKnown     = $false
     if (Get-Command 'gh' -ErrorAction SilentlyContinue) {
-        $prevEap = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        try {
-            $ghOut   = @(& gh pr list --state merged --limit 200 --json headRefName --jq '.[].headRefName' 2>$null)
-            $ghKnown = ($LASTEXITCODE -eq 0)
-            if ($ghKnown) {
-                $mergedHeads = @($ghOut | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
-            }
-        } catch {
-            $ghKnown = $false
-        } finally {
-            $ErrorActionPreference = $prevEap
+        $prList  = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr `
+                                        -Arguments @('pr', 'list', '--state', 'merged', '--limit', '200',
+                                                     '--json', 'headRefName', '--jq', '.[].headRefName') `
+                                        -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+        $ghKnown = ($prList.ExitCode -eq 0)
+        if ($ghKnown) {
+            $mergedHeads = @($prList.Output | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+        } elseif ($prList.TimedOut) {
+            Write-Host "  'gh pr list' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- the merged set reads as unknown." -ForegroundColor Yellow
         }
     }
 
@@ -945,13 +971,38 @@ try {
     # validates before opening -- and that is the better end to fail at: the branch is pushed, nothing is
     # lost, and the message below says what to do.
     #
-    # '@labelArgs' AND NOT '$labelArgs', measured against Windows PowerShell 5.1: the splat form
-    # contributes nothing when the list is empty, while the bare variable passes an EMPTY STRING argument
-    # -- which gh reads as a positional argument and rejects. No label is the default, so that is the path
-    # nearly every consumer takes.
-    & gh pr create --base $trunk --head $branch --title $msg --body $body @labelArgs
-    if ($LASTEXITCODE -ne 0) {
+    # '+ $labelArgs' AND NOT '@labelArgs', since the call became an -Arguments list (inbound #1184).
+    # The trap the splat form was chosen to avoid is the same one and it is still live: measured against
+    # Windows PowerShell 5.1, a bare '$labelArgs' on the '&' path passed an EMPTY STRING argument that gh
+    # reads as a positional and rejects, and no label is the default -- the path nearly every consumer
+    # takes. Array concatenation is the form that cannot reach it: '@(...) + @()' is the base array,
+    # contributing no element at all, which is what the splat did. Same shape as open-pr.ps1's create.
+    #
+    # AND THE MULTI-LINE BODY SURVIVES THE BOUNDED ARM, which is worth stating because a bound implies
+    # Start-Process and therefore this lib's own argument quoter rather than PowerShell's. Measured
+    # through a round-trip echo: the body arrives as ONE argument with its blank lines, its embedded
+    # double quotes and a trailing backslash intact. So '--body' stays inline here and does not need the
+    # '--body-file' the printed path uses -- that file exists because a console PASTE cannot carry
+    # newlines, which is a different problem from CreateProcess's.
+    # BOUNDED, AND THIS IS THE ONE THE REPORT ARGUED FROM (inbound #1184). It runs directly after the
+    # push, so a stall here leaves the branch on origin with NO PR -- a state nothing in this family
+    # reports and no later step goes looking for. The bound turns it into the message below, which
+    # already says the right thing: the branch is pushed, open it by hand.
+    #
+    # STDERR MERGED, unlike the two --json reads, because this output is PROGRESS: gh writes the PR URL
+    # there and that URL is the one thing the operator wants off this line. It is echoed rather than
+    # printed by gh directly, which is what routing through the lib costs and all it costs.
+    $create = Invoke-NativeCapture -FilePath 'gh' `
+                                   -Arguments (@('pr', 'create', '--base', $trunk, '--head', $branch,
+                                                 '--title', $msg, '--body', $body) + $labelArgs) `
+                                   -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    $create.Output | ForEach-Object { Write-Host $_ }
+    if ($create.ExitCode -ne 0) {
         Write-Host 'Could not open the PR. The branch is pushed; open it by hand.' -ForegroundColor Red
+        if ($create.TimedOut) {
+            Write-Host "  'gh pr create' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+            Write-Host '  The branch IS on origin. Check whether the PR exists before opening a second one.' -ForegroundColor Red
+        }
         if ($prLabels.Count -gt 0) {
             Write-Host "  If it named a label: gh refuses a label this repo does not have. Answered: $($prLabels -join ', ')" -ForegroundColor Red
             Write-Host '  Create the label, or correct Get-ShopifySyncPrLabels in scripts/repo-config.ps1.' -ForegroundColor Red
@@ -959,7 +1010,28 @@ try {
         exit 1
     }
 
-    $pr = ([string](& gh pr view $branch --json number --jq '.number')).Trim()
+    # BOUNDED, AND IT HAD NO EXIT-CODE CHECK AT ALL, which the report did not name (inbound #1184). The
+    # output went straight into .Trim(), so a failed read produced an EMPTY $pr rather than a message --
+    # and then 'gh pr checks' below was called with no PR number, found no states, and slept its way
+    # through the whole of -ChecksTimeoutMinutes before printing 'gh pr merge  --squash' for the operator
+    # to run. The PR was open and green the entire time. That is the same shape #1181 named on the trunk
+    # pull: the one failure nobody would go looking for.
+    #
+    # -DiscardStderr BECAUSE THE OUTPUT IS DATA -- a PR number that a stderr line would corrupt into
+    # something .Trim() still returns happily. First non-empty line rather than the whole capture, since
+    # the bounded arm returns an ARRAY of lines (the [timeout] note is appended to it on a stall).
+    $prView = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr `
+                                   -Arguments @('pr', 'view', $branch, '--json', 'number', '--jq', '.number') `
+                                   -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    $pr = ([string](@($prView.Output | Where-Object { ([string]$_).Trim() }) | Select-Object -First 1)).Trim()
+    if ($prView.ExitCode -ne 0 -or -not $pr) {
+        Write-Host 'The PR was opened, but its number could not be read -- so CI is NOT being waited on.' -ForegroundColor Red
+        if ($prView.TimedOut) {
+            Write-Host "  'gh pr view' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+        }
+        Write-Host "  Nothing is lost; the PR is open on $branch. Merge it yourself once CI is green." -ForegroundColor Red
+        exit 1
+    }
     Write-Host "Sync PR #$pr opened; waiting up to $ChecksTimeoutMinutes min for CI." -ForegroundColor Cyan
 
     $deadline = (Get-Date).AddMinutes($ChecksTimeoutMinutes)
@@ -993,8 +1065,25 @@ try {
 
     # --subject gives the merge commit the same shape as every other line in the graph. On a squash or
     # rebase method gh has no merge commit to name and ignores the flag.
-    & gh pr merge $pr --$mergeMethod --subject "merge: $branch (#$pr)"
-    if ($LASTEXITCODE -ne 0) { Write-Host "The merge failed. PR #$pr is open and green; merge it by hand." -ForegroundColor Red; exit 1 }
+    #
+    # BOUNDED, AND THROUGH THE LIB (inbound #1184). Stderr stays merged because this output is progress,
+    # and it is echoed for the same reason the push above is. A stall here is the one place in this
+    # script where the operator cannot tell from the message alone whether the work landed -- gh may have
+    # merged and then failed to report -- so the timeout line says to LOOK rather than to retry, which
+    # is the opposite of what the unbounded shape's silence invited.
+    $merge = Invoke-NativeCapture -FilePath 'gh' `
+                                  -Arguments @('pr', 'merge', "$pr", "--$mergeMethod",
+                                               '--subject', "merge: $branch (#$pr)") `
+                                  -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    $merge.Output | ForEach-Object { Write-Host $_ }
+    if ($merge.ExitCode -ne 0) {
+        Write-Host "The merge failed. PR #$pr is open and green; merge it by hand." -ForegroundColor Red
+        if ($merge.TimedOut) {
+            Write-Host "  'gh pr merge' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+            Write-Host "  Check whether it landed before retrying: gh pr view $pr --json state" -ForegroundColor Red
+        }
+        exit 1
+    }
 
     # BOUNDED, AND JUDGED, WHICH IT WAS NOT BEFORE (inbound #1181). The PR is already merged by the time
     # this line runs, so this pull is all that stands between the operator and a trunk that does not
