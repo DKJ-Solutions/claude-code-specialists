@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/sandra-manual-content-rule-v1` · 20260901-184151
+
+Sandra's manual now teaches the sync rule the script actually runs. It is the page that exists to explain
+*why the obvious implementation destroys work*, and it handed the reader a one-sentence rule to reason
+with — the **time-window** sentence that inbound #807 retired on August 21, 2026, when content
+provenance replaced it in the skill and the lib and this manual was never repointed. Both halves of that
+staleness are repaired: the rule itself, and the floor's job one paragraph down, where a missing floor
+was said to pass everything through and in fact now costs a silently-taken conflict. The three
+destruction modes are re-stated honestly under the new rule rather than reprinted, because only two of
+them are content questions and the third is unconditional. The retired sentence is kept on the page,
+named as retired and with the disagreement stated — the two rules part company exactly where it costs
+most, on a path live holds an older copy of, and that is the case #807 was filed about.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer running `team-shopify` reads this manual to decide whether a sync verdict looks right, and
+until now it would have taught them to predict the wrong ones — most sharply on the path where the two
+rules disagree and the retired one reverts merged work. The script's behaviour never changed and needed
+no change; what changed is that the page a human reasons from now matches it.
+
+**Score:** 3
+
+#### Pull Request
+
+Sandra's manual teaches the content rule, not the time window it replaced
+
+Plugins: team-shopify
+
+[PR #1200](https://github.com/DaveKJohn/claude-code-specialists/pull/1200)
+
+---
+
 ### DEPLOY: `docs/sync-main-trigger-v1` · 20260901-182430
 
 `sync-main` now states **when it fires**, in one place, and the two pages that used to restate it link
