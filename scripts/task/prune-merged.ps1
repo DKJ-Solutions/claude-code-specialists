@@ -37,11 +37,19 @@
 
            a. an ancestor of the trunk -- `git branch -d`, which refuses an unmerged branch on its
               own, so the proof is checked twice;
-           b. otherwise, a branch whose PR on GitHub is MERGED -- `git branch -D`. This is the squash
-              case: the branch's own tip is deliberately not in the trunk's history, so (a) can never
-              see it and `-d` would refuse a branch that is genuinely finished. The merged PR is the
-              proof that replaces ancestry, which is why the forced delete is safe HERE and nowhere
-              else.
+           b. otherwise, a branch whose tip IS THE HEAD COMMIT of a merged PR -- `git branch -D`. This
+              is the squash case: the branch's own tip is deliberately not in the trunk's history, so
+              (a) can never see it and `-d` would refuse a branch that is genuinely finished. The
+              merged PR is the proof that replaces ancestry, which is why the forced delete is safe
+              HERE and nowhere else.
+
+              AND IT IS THE PR'S HEAD COMMIT, NOT ITS BRANCH NAME (inbound #1191). A name is not a
+              proof of anything: `deleteBranchOnMerge` frees it at the merge, so a name generated from
+              a template comes back around, and the second branch under it used to inherit the first
+              one's merge and be force-deleted. The name-and-tip pair is what makes proof (b) belong
+              to the branch in front of you. A name whose merged PR ended on a DIFFERENT commit is
+              kept and says so in those words, because "no merged PR" would describe a lookup that
+              came up empty when this one came up full.
 
            c. and where that branch is the one YOU ARE STANDING ON, step off it onto the trunk first
               -- `git branch -d` can never delete the branch HEAD is on. This is the only thing in
@@ -366,17 +374,52 @@ if ($branches.Count -eq 0) {
 # ONE CALL SERVES BOTH PASSES, and it is skipped entirely when neither has anything to ask it: an
 # empty local list with no -IncludeRemote is a run with nothing left to classify, and a gh call there
 # would only be able to produce a warning.
-$mergedHeads = @()
+#
+# IT ASKS FOR THE HEAD COMMIT AS WELL AS THE NAME (inbound #1191, September 1, 2026), and the pair is
+# what the proof is made of. A branch NAME says nothing about which commits were merged under it, and
+# `deleteBranchOnMerge` -- the very setting this script's header leans on for the remote half -- is
+# what frees a name for reuse the moment the PR lands. So a workflow that generates branch names from
+# a template recycles them by design rather than by accident. Measured in a consumer whose pre-task
+# sync names its branches `sync/live-<date>`: a second sync on the same day recreated
+# `sync/live-2026-09-01`, and this script force-deleted it on PR #141's merge while the commit it was
+# standing on belonged to #159, still OPEN. The name matched; the proof belonged to a different
+# branch -- and the run printed `merged PR` while it did it, so the output actively reassured.
+#
+# SO THE MAP IS name -> the head commits merged under it, and a name may hold SEVERAL: a recycled name
+# merged twice has two, and each is a real proof for the branch that ended on it. The test below is
+# name AND tip, which is what makes the local pass resolve its own tip to compare.
+#
+# NO --jq, AND THAT IS THE CHEAP HALF. Two fields want a jq expression carrying an interpolation and a
+# separator, quoted through PowerShell into gh on Windows; ConvertFrom-Json is already in this shell
+# and needs no quoting at all. A body that will not parse is treated exactly as a non-zero exit --
+# unknown, warn, keep -- because the one thing this lookup must never do is half-answer.
+$mergedTips = @{}
 $ghKnown = $false
 if ($branches.Count -gt 0 -or $IncludeRemote) {
     $ghCmd = Get-Command 'gh' -ErrorAction SilentlyContinue
     if ($ghCmd) {
         $prRes = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-            'pr', 'list', '--state', 'merged', '--limit', '200', '--json', 'headRefName', '--jq', '.[].headRefName')
+            'pr', 'list', '--state', 'merged', '--limit', '200', '--json', 'headRefName,headRefOid')
         if ($prRes.ExitCode -eq 0) {
-            $ghKnown = $true
-            $mergedHeads = @(($prRes.Output | Out-String) -split '\r?\n' |
-                ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            $body = ($prRes.Output | Out-String).Trim()
+            try {
+                # AN EMPTY ANSWER IS STILL AN ANSWER. gh prints '[]' for a repo with no merged PRs, and a
+                # gh that printed nothing at all told us the same thing: there is no merged PR to match
+                # against. Both land on an empty map with $ghKnown TRUE, so the kept reason says "no
+                # merged PR" rather than "could not be checked" -- which is the difference between a
+                # fact and a gap.
+                $rows = if ($body) { @($body | ConvertFrom-Json) } else { @() }
+                foreach ($row in $rows) {
+                    $name = ([string]$row.headRefName).Trim()
+                    $oid  = ([string]$row.headRefOid).Trim()
+                    if (-not $name -or -not $oid) { continue }
+                    if (-not $mergedTips.ContainsKey($name)) { $mergedTips[$name] = @() }
+                    $mergedTips[$name] += $oid
+                }
+                $ghKnown = $true
+            } catch {
+                Write-Warning "gh's merged-PR list could not be read as JSON -- a squash-merged branch cannot be proven merged and will be kept. ($($_.Exception.Message))"
+            }
         } else {
             Write-Warning "gh could not list merged PRs -- a squash-merged branch cannot be proven merged and will be kept. ($(($prRes.Output | Out-String).Trim()))"
         }
@@ -385,18 +428,65 @@ if ($branches.Count -gt 0 -or $IncludeRemote) {
     }
 }
 
+function Get-MergedProof {
+    <#
+        BOTH PASSES ASK THE SAME QUESTION OF DIFFERENT TIPS, so they ask it through one function -- the
+        local pass resolves its tip with rev-parse, the remote pass already holds the sha ls-remote
+        reported. Three answers, and the middle one is the whole of inbound #1191:
+
+          'merged PR'  -- this exact commit is the head of a merged PR under this name: proof (b);
+          'recycled'   -- the name HAS a merged PR, but not for this commit: no proof, and a different
+                          sentence, because "no merged PR" would read as a lookup coming up empty when
+                          what happened is that it came up FULL and belonged to somebody else's work;
+          $null        -- no merged PR under this name at all.
+
+        An empty $Tip resolves to 'recycled' where the name is known, which is the safe direction: a
+        tip this run could not read is a tip it cannot match.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Branch,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Tip
+    )
+    if (-not $mergedTips.ContainsKey($Branch)) { return $null }
+    if ($Tip -and (@($mergedTips[$Branch]) -contains $Tip)) { return 'merged PR' }
+    return 'recycled'
+}
+
 $deleted = @()
 $kept    = @()
 
 foreach ($branch in $branches) {
     $ancestor = (Invoke-Git -Arguments @('merge-base', '--is-ancestor', $branch, $trunk)).ExitCode -eq 0
-    $mergedPr = ($mergedHeads -contains $branch)
+
+    # THE TIP THE MERGED-PR PROOF IS MEASURED AGAINST, resolved once per branch. `^{commit}` so a tag
+    # sharing the branch's name cannot answer instead of the branch, and --quiet so a ref that has gone
+    # missing between the for-each-ref above and here is a non-zero exit rather than noise on stderr.
+    # An unreadable tip leaves this empty, which Get-MergedProof reads as "not this commit" -- the safe
+    # direction, and the only one: a tip this run could not read must never look like a match.
+    $tipRes = Invoke-Git -Arguments @('rev-parse', '--verify', '--quiet', "refs/heads/$branch^{commit}")
+    $tip    = if ($tipRes.ExitCode -eq 0) {
+        (($tipRes.Output | Out-String) -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -First 1)
+    } else { '' }
+
+    $prProof  = Get-MergedProof -Branch $branch -Tip $tip
+    $mergedPr = ($prProof -eq 'merged PR')
 
     if (-not ($ancestor -or $mergedPr)) {
         # THE ONE BRANCH THIS SCRIPT PROTECTS. No ancestry and no merged PR means unfinished work, a
         # parked branch, or a branch pushed from another machine -- and its reason is printed rather
         # than left to be inferred from the absence of a delete line.
-        $why = if ($ghKnown) { 'not an ancestor of the trunk and no merged PR' } else { 'not an ancestor of the trunk, and no merged PR could be checked' }
+        #
+        # A RECYCLED NAME GETS ITS OWN SENTENCE (inbound #1191). "No merged PR" would be a true
+        # statement that reads as a lookup coming up empty, when the lookup came up FULL and belonged
+        # to a previous branch of the same name -- and that is exactly the branch whose loss this
+        # script used to cause, so it is the one case worth naming in the output.
+        $why = if ($prProof -eq 'recycled') {
+            'a merged PR used this name, but not this commit -- the name was recycled, so this branch is unproven'
+        } elseif ($ghKnown) {
+            'not an ancestor of the trunk and no merged PR'
+        } else {
+            'not an ancestor of the trunk, and no merged PR could be checked'
+        }
         $kept += [pscustomobject]@{ Branch = $branch; Why = $why }
         continue
     }
@@ -512,7 +602,12 @@ foreach ($h in $heads) {
     # KEPT. That is the safe direction, and the only one: this pass hands over a delete command, so an
     # unprovable head must never look provable.
     $ancestor = (Invoke-Git -Arguments @('merge-base', '--is-ancestor', $h.Sha, $trunk)).ExitCode -eq 0
-    $mergedPr = ($mergedHeads -contains $h.Branch)
+    # THE SAME name+tip PROOF, and this pass is the one place it costs nothing: ls-remote has already
+    # reported the sha, so there is no rev-parse to do. It also matters MOST here -- the local pass
+    # deletes a branch whose commits `origin` usually still holds, while this pass hands over a
+    # `git push --delete` line for the copy of last resort (inbound #1191).
+    $prProof  = Get-MergedProof -Branch $h.Branch -Tip $h.Sha
+    $mergedPr = ($prProof -eq 'merged PR')
 
     if ($ancestor -or $mergedPr) {
         $remoteReapable += [pscustomobject]@{
@@ -525,7 +620,9 @@ foreach ($h in $heads) {
     # THE HEAD THIS PASS EXISTS TO LABEL. Neither proof means live work -- unfinished, parked, or
     # somebody else's open PR -- and naming it here is what replaces the hand-written
     # don't-sweep-this-one warning that two of the three measured triages had to add by hand.
-    $why = if ($ghKnown) {
+    $why = if ($prProof -eq 'recycled') {
+        'a merged PR used this name, but not this commit -- the name was recycled, so this head is live work'
+    } elseif ($ghKnown) {
         'not an ancestor of the trunk and no merged PR -- live work (unfinished, parked, or another open PR)'
     } else {
         'not an ancestor of the trunk, and no merged PR could be checked -- treat as live'

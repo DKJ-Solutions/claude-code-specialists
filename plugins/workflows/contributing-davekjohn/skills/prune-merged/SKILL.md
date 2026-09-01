@@ -116,16 +116,48 @@ nothing moves `HEAD` unless the branch it was on has been deleted.
 
 - **An ancestor of the trunk** → `git branch -d`. That flag refuses an unmerged branch by itself, so
   the proof is checked twice.
-- **Otherwise, a merged PR on GitHub** → `git branch -D`. This is the squash case: the branch's own tip
-  is deliberately *not* in the trunk's history, so ancestry can never see it and `-d` would refuse a
-  branch that is genuinely finished. The merged PR is what replaces ancestry — which is why the forced
-  delete is safe here and nowhere else.
+- **Otherwise, a branch whose tip *is the head commit* of a merged PR** → `git branch -D`. This is the
+  squash case: the branch's own tip is deliberately *not* in the trunk's history, so ancestry can never
+  see it and `-d` would refuse a branch that is genuinely finished. The merged PR is what replaces
+  ancestry — which is why the forced delete is safe here and nowhere else.
 - **Neither** → the branch is **kept**, and the line says why. A parked branch (the `park` skill),
   unfinished work, or a branch pushed from another machine has neither proof, so none of them can be
   lost by this script.
 
-The merged-PR set is read **once** per run (`gh pr list --state merged`) and matched locally, rather than
-one lookup per branch. If `gh` is absent or unauthenticated that is not an error: proof (b) simply cannot
+### The proof is the PR's head commit, never its branch name (inbound [#1191](https://github.com/DaveKJohn/claude-code-specialists/issues/1191))
+
+A branch **name** proves nothing about which commits were merged under it, and this workflow recycles
+names on purpose. `deleteBranchOnMerge` — the setting the remote half of this script leans on — frees the
+name the moment a PR lands, so any repo that generates branch names from a template gets the same name
+back. Until September 1, 2026 proof (b) was a name match, and the second branch under a reused name
+inherited the first one's merge.
+
+**Measured in a consumer whose pre-task sync names its branches `sync/live-<date>`.** A second sync the
+same day recreated `sync/live-2026-09-01`, and the run printed:
+
+```text
+Deleted sync/live-2026-09-01 (git branch -D -- merged PR)
+```
+
+That name had two PRs: **#141**, merged, which is what put it in the merged set — and **#159**, still
+**open**, whose commit the local branch was actually standing on. Nothing was lost that day, because this
+script never touches a remote and `origin` still held the commit. What was broken regardless is the
+property the script claims: the proof belonged to a different branch, and the output said `merged PR`
+while it did it, so it actively reassured.
+
+So the test is now the **name and the tip together**, and a name whose merged PR ended on a *different*
+commit is kept with a reason that says exactly that — *"a merged PR used this name, but not this
+commit — the name was recycled"*. "No merged PR" would describe a lookup that came up empty, when this
+one came up full and belonged to somebody else's work.
+
+**It matters most in the `-IncludeRemote` pass**, which hands over a `git push origin --delete` line. The
+local pass at worst discards commits `origin` still holds; a wrong line there reaches the copy of last
+resort.
+
+The merged-PR set is read **once** per run (`gh pr list --state merged --json headRefName,headRefOid`) and
+matched locally, rather than one lookup per branch. A name may carry **several** head commits — a recycled
+name merged twice has two, and each is a real proof for the branch that ended on it. If `gh` is absent,
+unauthenticated, or answers something that will not parse, that is not an error: proof (b) simply cannot
 be established, the run says so, and every squash-merged branch is kept.
 
 ## `git fetch --prune` proves nothing about the remote
