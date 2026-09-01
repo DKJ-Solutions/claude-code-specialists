@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Regression tests for the workflow-bwj plugin: its structure, its marketplace registration, and
+    Regression tests for the bwj-codex plugin: its structure, its marketplace registration, and
     the pure helpers of the asana-mirror CI script it ships as a template.
 
 .DESCRIPTION
     Dependency-free: no Pester, only PowerShell. Exit 0 if everything passes, 1 on a failure.
 
-        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/workflow-bwj.tests.ps1
+        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/bwj-codex.tests.ps1
 
     The asana-mirror helpers are exercised by dot-sourcing the template: it runs its main flow only
     when invoked directly, so a dot-source loads the functions and does nothing else.
@@ -15,7 +15,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PluginRoot = Join-Path $RepoRoot 'plugins\workflows\workflow-bwj'
+$PluginRoot = Join-Path $RepoRoot 'plugins\workflows\bwj-codex'
 
 $script:pass = 0
 $script:fail = 0
@@ -50,7 +50,7 @@ Write-Host "`n-- structure --" -ForegroundColor Cyan
 $manifestPath = Join-Path $PluginRoot '.claude-plugin\plugin.json'
 Assert-True (Test-Path -LiteralPath $manifestPath) 'plugin.json is present'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-Assert-Equal 'workflow-bwj' $manifest.name 'plugin.json name is workflow-bwj'
+Assert-Equal 'bwj-codex' $manifest.name 'plugin.json name is bwj-codex'
 
 foreach ($rel in @('README.md', 'WORKFLOW-portable.md',
                    'skills\report-issue\SKILL.md', 'skills\adopt-bwj-asana\SKILL.md',
@@ -72,9 +72,9 @@ foreach ($skill in @('report-issue', 'adopt-bwj-asana')) {
 Write-Host "`n-- marketplace --" -ForegroundColor Cyan
 
 $marketplace = Get-Content -LiteralPath (Join-Path $RepoRoot '.claude-plugin\marketplace.json') -Raw | ConvertFrom-Json
-$entry = $marketplace.plugins | Where-Object { $_.name -eq 'workflow-bwj' }
-Assert-True ($null -ne $entry) 'workflow-bwj is listed in marketplace.json'
-Assert-Equal './plugins/workflows/workflow-bwj' $entry.source 'marketplace source points at the plugin folder'
+$entry = $marketplace.plugins | Where-Object { $_.name -eq 'bwj-codex' }
+Assert-True ($null -ne $entry) 'bwj-codex is listed in marketplace.json'
+Assert-Equal './plugins/workflows/bwj-codex' $entry.source 'marketplace source points at the plugin folder'
 
 $alphaManifest = Get-Content -LiteralPath (Join-Path $RepoRoot 'plugins\teams\team-alpha\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
 Assert-Equal $alphaManifest.version $manifest.version 'version is in lockstep with team-alpha'

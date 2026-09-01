@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Resolve (or un-resolve) the Asana task mirrored from a GitHub issue -- the CI half of the
-    workflow-bwj rule. Copied into a BWJ store repo as .github/scripts/asana-mirror.ps1 and driven
+    bwj-codex rule. Copied into a BWJ store repo as .github/scripts/asana-mirror.ps1 and driven
     by .github/workflows/asana-mirror.yml.
 
 .DESCRIPTION
@@ -21,7 +21,7 @@
 
     The pure helpers (Get-AsanaTaskGid, New-AsanaCompleteRequest, Get-IssueRefFromNotes) take no
     network and are what .github/scripts/asana-mirror.tests.ps1 (and the source repo's
-    scripts/tests/workflow-bwj.tests.ps1) exercise. The script runs its main flow only when invoked
+    scripts/tests/bwj-codex.tests.ps1) exercise. The script runs its main flow only when invoked
     directly; dot-sourcing it loads the helpers and does nothing else.
 
     Pure ASCII (repo convention for .ps1).

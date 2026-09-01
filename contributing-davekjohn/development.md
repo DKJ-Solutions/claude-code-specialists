@@ -92,7 +92,10 @@ text. The marketplace and plugin descriptions are reframed from "a narrow ticket
 the plugin still ships exactly the Asana ticket seam. Lint check 23 (`[plugin-kind]`) learns `*-codex`
 as a third way-of-working name shape, the same accommodation it already makes for `contributing-*`.
 The v4.28.0 release record is left intact except for one dead relative link, whose href is repointed
-at the moved README.
+at the moved README. The one pending `## [Unreleased]` entry that names the plugin (PR #1176,
+`fix/checkout-v5-node20-deprecation-v1`) is repointed `workflow-bwj` -> `bwj-codex` in its prose and
+its machine-read `Plugins:` trailer, so the next cut attributes that work to a plugin name still in
+`marketplace.json`.
 
 **Score:** 1
 

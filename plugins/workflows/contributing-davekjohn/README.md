@@ -157,7 +157,7 @@ hook that counted enabled ids beginning with `workflow-` is gone, along with the
 made two of them reachable. Nothing counts them now, so adding a second workflow to this family means
 answering the question above again rather than trusting a check that is no longer there.
 
-**`workflow-bwj` is a second workflow, added August 31, 2026 with that question answered.** It shares
+**`bwj-codex` is a second workflow, added August 31, 2026 with that question answered.** It shares
 none of the contradictions above: it extends only the *ticket-work* step — how a discovered issue is
 filed and mirrored to Asana in BWJ's two Shopify store repos — and says nothing about branch naming,
 the pre-PR bar, or releases. It **requires** this plugin rather than competing with it. A repo that

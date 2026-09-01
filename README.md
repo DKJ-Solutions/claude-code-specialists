@@ -169,7 +169,7 @@ workflow is ever added here, nothing will notice both being enabled, so that day
 question again rather than finding the check gone.
 
 **That day came on August 31, 2026, and the question was answered rather than skipped:
-`workflow-bwj` is a deliberate second workflow.** It is safe alongside `contributing-davekjohn`
+`bwj-codex` is a deliberate second workflow.** It is safe alongside `contributing-davekjohn`
 because it is **additive and non-overlapping** — it extends only the *ticket-work* step that sits
 before a branch (how a discovered issue is filed and mirrored to Asana in BWJ's two Shopify store
 repos) and decides nothing about branch naming, what a change owes before a PR, or what a release is.
@@ -179,10 +179,11 @@ these — nothing counts them, so adding one means making this call again on the
 
 **The naming rule outlived the count that justified it, on a reason of its own.** Lint check 23
 (`[plugin-kind]`) in [`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds every
-published plugin to being `team-*` under `plugins/teams/` or `workflow-*` under `plugins/workflows/`. It
-used to say the hook counted a workflow by that prefix and nothing else; now the teeth are internal —
-**the directory half is derived from the name**, so a plugin matching neither prefix has its location
-held against nothing at all, and an unprefixed name switches the check off for itself.
+published plugin to being `team-*` under `plugins/teams/` or a way of working (`workflow-*`,
+`contributing-*` or `*-codex`) under `plugins/workflows/`. It used to say the hook counted a workflow by
+the `workflow-` prefix and nothing else; now the teeth are internal — **the directory half is derived
+from the name**, so a plugin matching none of those shapes has its location held against nothing at all,
+and an unclassifiable name switches the check off for itself.
 
 | Plugin | What it is | Who it's for |
 |---|---|---|
@@ -191,7 +192,7 @@ held against nothing at all, and an unprefixed name switches the check off for i
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
 | [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
-| [`workflow-bwj/`](plugins/workflows/workflow-bwj/) | **A narrow, additive workflow.** BWJ's shared rule for handling Asana tickets across its two Shopify store repos: a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and the Asana task resolves itself when the GitHub issue closes (a CI workflow the plugin ships as a template). Two skills (`report-issue`, `adopt-bwj-asana`), no specialists, no hooks. Extends only the ticket-work step of `contributing-davekjohn` and contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `contributing-davekjohn`. |
+| [`bwj-codex/`](plugins/workflows/bwj-codex/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under; today one rule, for handling Asana tickets: a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and the Asana task resolves itself when the GitHub issue closes (a CI workflow the plugin ships as a template). Two skills (`report-issue`, `adopt-bwj-asana`), no specialists, no hooks. Extends only the ticket-work step of `contributing-davekjohn` and contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `contributing-davekjohn`. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -711,7 +712,7 @@ what a skill costs the sessions that carry it, and giving a branch its own workt
 ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-bwj-asana`<!-- /skills:all --> are the
 deliberate exceptions: a checklist with no script of its own (see below); a skill that must not have
 one — `orchestrator` reads a persona file into the conversation, and the environment it exists for is
-precisely the one where `powershell` is absent; and the two `workflow-bwj` procedures, which run over
+precisely the one where `powershell` is absent; and the two `bwj-codex` procedures, which run over
 `gh` and the Asana MCP with a judgement call in the middle (the colleague-facing translation) rather
 than a transform a script could carry. Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it

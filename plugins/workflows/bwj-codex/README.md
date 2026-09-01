@@ -1,4 +1,4 @@
-# workflow-bwj -- BWJ's shared ticket workflow, packaged so two repos cannot drift on it
+# bwj-codex -- BWJ's shared ticket workflow, packaged so two repos cannot drift on it
 
 **This is the one way BWJ's two Shopify stores -- `BWJ-ecommerce/smartwatchbanden` and
 `BWJ-ecommerce/xoxowildhearts` -- handle a discovered issue.** The two repos are identical in
@@ -8,7 +8,7 @@ happens between spotting a problem and it being tracked where every BWJ colleagu
 
 ## It is an add-on, not a replacement
 
-`workflow-bwj` **layers on top of `contributing-davekjohn`** -- it does not stand in for it. It
+`bwj-codex` **layers on top of `contributing-davekjohn`** -- it does not stand in for it. It
 extends exactly one seam of that workflow: *ticket-work, the layer before the branch*. It says
 **nothing** about how a branch is named, what a change owes before it can open a PR, or what a
 release is -- those are still `contributing-davekjohn`'s answers, unchanged. So the two do not hand
@@ -76,7 +76,7 @@ project may differ per brand. The CI half reads the same two values from repo va
 
 ## Enabling it
 
-An ordinary plugin change: enable `workflow-bwj` in `.claude/settings.json` alongside `team-alpha`
+An ordinary plugin change: enable `bwj-codex` in `.claude/settings.json` alongside `team-alpha`
 and `contributing-davekjohn`, then run [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) once.
 Disabling it removes nothing it already wrote to your repo -- the CI workflow and the config stay;
 the skill that reads them stops.

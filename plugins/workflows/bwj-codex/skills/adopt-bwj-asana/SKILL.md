@@ -1,7 +1,7 @@
 ---
 name: adopt-bwj-asana
 description: >-
-  One-time setup of workflow-bwj in a BWJ store repo (smartwatchbanden or xoxowildhearts): copy the
+  One-time setup of bwj-codex in a BWJ store repo (smartwatchbanden or xoxowildhearts): copy the
   asana-mirror CI mechanism into .github/, propose the Asana config seam for scripts/repo-config.ps1,
   and print the repo secret and variables the CI needs. Strictly additive and dry-run by default; it
   never overwrites an existing file. Run this right after enabling the plugin, or when report-issue
@@ -10,7 +10,7 @@ description: >-
 
 # adopt-bwj-asana -- place the CI mechanism and the config seam
 
-An install writes nothing into your repo. This command places the two things `workflow-bwj` needs on
+An install writes nothing into your repo. This command places the two things `bwj-codex` needs on
 your side: the CI workflow that resolves Asana tasks, and the config functions the skill and the CI
 both read.
 
@@ -52,7 +52,7 @@ Print these as a checklist. This skill does not set secrets.
 ## 4 -- point the repo's governance at the rule
 
 Add a line to the repo's `CLAUDE.md` (or a repo lens) pointing at
-`~/.claude/plugins/marketplaces/claude-code-specialists/plugins/workflows/workflow-bwj/WORKFLOW-portable.md`
+`~/.claude/plugins/marketplaces/claude-code-specialists/plugins/workflows/bwj-codex/WORKFLOW-portable.md`
 so a session reads the BWJ ticket rule the same way it reads the other portable pages.
 
 ## What this skill does not do
