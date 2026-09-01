@@ -120,7 +120,7 @@ id — the other five have defaults that are right for both existing Shopify con
 | function | default | what it decides |
 |---|---|---|
 | `Get-ShopifyStoreDomain` | **required** | the store the sync pulls from. It refuses rather than guessing; the skill's `-Store` gets you through one run. |
-| `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the `--grep` pattern that recognises a previous sync commit. **Narrow it if your history says so, never widen it:** the floor is the *most recent* match, so a looser pattern can only move it forward and protect fewer files. |
+| `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the pattern that recognises a previous sync commit, matched against the commit **subject** read as its own field — a .NET regex, not git's `--grep`, which the lookup no longer uses. **Narrow it if your history says so, never widen it:** the floor is the *most recent* match, so a looser pattern can only move it forward and protect fewer files. |
 | `Get-ShopifySyncBranchPrefix` | `sync/live-` | the drift branch's prefix. Yours to set because it has to line up with whatever your PR guardrails and CI exempt. |
 | `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges once CI is green. The default pushes and stops, so somebody *looks* at what third parties changed before it becomes the base of new branches. |
 | `Get-ShopifySyncPrBody` | *(none)* | the PR body, given the classified rows and the body the script already composed. Answer it only where the PR body **is** your review policy — a template, a checkbox, a fixed wording. Unanswered, the default already names both halves and every path with its kind. |
