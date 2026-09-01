@@ -980,9 +980,24 @@ $foldRoot = if ($foldTree) { $foldTree } else { $repoRoot }
 # than one ref to merge; naming origin/main explicitly hands it exactly one, so this step cannot reach
 # that failure mode, whereas a bare pull depends on whatever FETCH_HEAD happens to hold. Why the pull
 # got more than one ref was deliberately not guessed at -- see Derek's lens for that reasoning.
-$fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $foldRoot, 'fetch', '--prune', 'origin')
+#
+# BOUNDED (inbound #1179), and this is the worse of the two places to hang: the PR is already MERGED by
+# the time this line runs, so a stall here parks the tree in the one gap nothing reports -- merged
+# upstream, entry file still in the root -- and reports it as a ship still in progress. The lib's
+# non-interactive environment closes the measured cause; the bound is what turns any remaining stall
+# into a message naming this step.
+$fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $foldRoot, 'fetch', '--prune', 'origin') `
+                              -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
 $fetch.Output | ForEach-Object { Write-Host $_ }
-if ($fetch.ExitCode -ne 0) { Remove-ShipFoldWorktree -Path $foldTree; Write-Error "git fetch of origin failed."; exit 1 }
+if ($fetch.ExitCode -ne 0) {
+    Remove-ShipFoldWorktree -Path $foldTree
+    if ($fetch.TimedOut) {
+        Write-Error "git fetch of origin did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above. PR #$pr IS MERGED; only the fold is outstanding. Fix the credential and fold by hand: scripts\release\fold-changelog-entry.ps1 -Push"
+    } else {
+        Write-Error "git fetch of origin failed."
+    }
+    exit 1
+}
 
 $ff = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $foldRoot, 'merge', '--ff-only', 'origin/main')
 $ff.Output | ForEach-Object { Write-Host $_ }

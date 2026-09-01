@@ -27,6 +27,37 @@
     EAP is usually 'Stop') as its resolution scope, so an EAP override here would not reach it --
     passing FilePath/Arguments and invoking here is what makes the guard actually take effect.
 
+    THE SECOND GUARD, AND WHY IT BELONGS HERE TOO: THE CHILD RUNS NON-INTERACTIVELY (inbound #1179,
+    September 1, 2026). Every git and gh call the workflow scripts make comes through this one
+    function, and not one of them runs anywhere a human can answer a prompt. Measured on
+    DAVE-KOK-BWJ: a `git push -u origin <branch>` spawned `git credential-manager get`, that child
+    opened a prompt nothing was listening to, and fifteen minutes later both were still running. The
+    ship reported the hang as still shipping, and a lint + 13-suite gate that had already passed was
+    thrown away with the kill.
+
+    So Push-NativeNonInteractiveEnv brackets every child with GIT_TERMINAL_PROMPT=0 and
+    GCM_INTERACTIVE=never. BOTH ARE NEEDED, AND THEY STOP DIFFERENT THINGS: GIT_TERMINAL_PROMPT is
+    git's OWN terminal prompt and says nothing about a credential helper git hands off to -- the Git
+    Credential Manager window is GCM's, and GCM_INTERACTIVE=never is what makes GCM fail instead of
+    drawing it. Setting only the first leaves exactly the measured hang in place. Environment is the
+    only scope a child inherits, so the set is process-wide, saved and restored in the same finally
+    the EAP dance uses, and a variable that was ABSENT is restored to absent rather than to ''.
+
+    It is applied to every child rather than only to git: gh shells out to git in places, and there
+    is no call in this family for which an interactive credential prompt is ever the right answer.
+
+    -TimeoutSeconds: BOUND THE WAIT, for a hang whose cause is NOT a credential prompt. The guard
+    above closes the measured cause and cannot close the class -- the same report carries a second
+    stall that no environment variable would have named. A bounded call kills the process TREE (see
+    Stop-NativeProcessTree; the blocker was the child, not the parent), reports exit 124 and
+    TimedOut = $true, and appends a line saying so to Output -- so a caller that already prints
+    Output and judges ExitCode diagnoses the hang without changing a line.
+
+    IT IS OPT-IN, AND THAT IS NOT TIMIDITY. `gh pr checks --watch` (ship-pr.ps1) blocks for as long
+    as CI takes, by design; a default bound would turn the longest CORRECT call in the workflow into
+    a failure. The bound belongs on the calls that reach the network and should answer in seconds --
+    push, fetch -- and $NativeCaptureNetworkTimeoutSeconds is the shared number they pass.
+
     Usage:
         $r = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin', $branch)
         $r.Output | ForEach-Object { Write-Host $_ }
@@ -35,11 +66,38 @@
         # -DiscardStderr keeps stderr out of the captured output (e.g. so it cannot pollute JSON):
         $r = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--json', 'number') -DiscardStderr
 
+        # -TimeoutSeconds bounds a call that reaches the network, so a stall fails loudly (#1179):
+        $r = Invoke-NativeCapture -FilePath 'git' -Arguments @('push') -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+        if ($r.TimedOut) { Write-Error 'git push never answered -- see the [timeout] line above.' }
+
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
     Pure ASCII (repo convention for .ps1).
 #>
 
 $script:NativeCaptureInvariant = [System.Globalization.CultureInfo]::InvariantCulture
+
+# THE NON-INTERACTIVE ENVIRONMENT every child is bracketed with (inbound #1179). See
+# Invoke-NativeCapture's docstring for why both names are here and why neither is sufficient alone.
+# A hashtable rather than two literals at the call site: the pair is one policy, and the next name
+# that has to join it (an askpass, another helper's switch) belongs beside these two.
+$script:NativeCaptureNonInteractiveEnv = @{
+    GIT_TERMINAL_PROMPT = '0'
+    GCM_INTERACTIVE     = 'never'
+}
+
+# THE BOUND A GIT NETWORK CALL PASSES, in one place so the three sites that reach the network -- the
+# push in open-pr.ps1, the fetch in ship-pr.ps1, the fold's push in fold-changelog-entry.ps1 -- cannot
+# drift apart. Read it as $NativeCaptureNetworkTimeoutSeconds from a script that dot-sources this lib:
+# dot-sourcing runs the file in the CALLER's script scope, which is what makes $script: here readable
+# there. Two minutes is roughly twenty times the slowest honest push measured in this repo, and a
+# fraction of the fifteen minutes the reported hang sat for -- generous enough that a slow network is
+# not mistaken for a stall, short enough that a stall is reported inside one attention span.
+$script:NativeCaptureNetworkTimeoutSeconds = 120
+
+# 124 is `timeout(1)`'s conventional "the command timed out" code, borrowed rather than invented so a
+# reader who greps it lands on an answer. Neither git nor gh uses it, so it cannot be confused with a
+# real verdict -- but a caller who needs certainty reads TimedOut instead of the number.
+$script:NativeCaptureTimeoutExitCode = 124
 
 function Format-GateSeconds {
     <#
@@ -82,6 +140,79 @@ function ConvertTo-NativeArgumentToken {
     return '"' + $escaped + '"'
 }
 
+function Push-NativeNonInteractiveEnv {
+    <#
+        Set the non-interactive environment for the child about to be started and hand back what was
+        there before, for the finally to put back. Internal to this lib (no export, no contract row).
+
+        [Environment]::SetEnvironmentVariable rather than $env:NAME = ... for ONE reason that matters:
+        it can write $null, which REMOVES the variable. `$env:NAME = $null` in Windows PowerShell 5.1
+        leaves an empty-string variable behind, and empty is not absent -- git reads a defined
+        GIT_TERMINAL_PROMPT='' differently from an undefined one, so restoring with the assignment
+        form would leave every script that ran a single git call in a state it did not start in.
+
+        The previous value is captured BEFORE the set, per name, so a caller that deliberately set one
+        of these itself (a test, a consumer's wrapper) gets its own value back rather than ours.
+    #>
+    $previous = @{}
+    foreach ($name in @($script:NativeCaptureNonInteractiveEnv.Keys)) {
+        $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+        [Environment]::SetEnvironmentVariable($name, $script:NativeCaptureNonInteractiveEnv[$name], 'Process')
+    }
+    return $previous
+}
+
+function Pop-NativeNonInteractiveEnv {
+    <#
+        Put back what Push-NativeNonInteractiveEnv handed over. Internal to this lib.
+
+        Runs from a finally, so it must not throw whatever it is given: a $null (the push never ran
+        because Start-Process threw first) is a no-op rather than an error, because an exception raised
+        HERE would replace the one the caller is actually trying to report.
+    #>
+    param([AllowNull()][hashtable]$Previous)
+
+    if (-not $Previous) { return }
+    foreach ($name in @($Previous.Keys)) {
+        [Environment]::SetEnvironmentVariable($name, $Previous[$name], 'Process')
+    }
+}
+
+function Stop-NativeProcessTree {
+    <#
+        Kill a timed-out child AND ITS CHILDREN. Internal to this lib.
+
+        /T IS THE ENTIRE POINT, and it is what the measurement in #1179 argues for: the process that
+        blocked was not the `git.exe push` (PID 11372) but the `git credential-manager get` it spawned
+        (PID 27176), and killing only the parent leaves that one holding the prompt. taskkill is the
+        one tool on Windows that walks the tree; Stop-Process signals a single process.
+
+        BOTH ATTEMPTS ARE ALLOWED TO FAIL, and that is deliberate rather than sloppy. taskkill reports
+        "not found" for a child that exited in the gap between the wait giving up and this call, and it
+        can be refused for a process this session may not signal. By the time we are here the wait has
+        already stopped waiting, so a failed kill costs a stray process rather than a wrong answer --
+        whereas a throw would replace a diagnosable timeout with an unrelated error.
+
+        taskkill writes to stderr, so its call is bracketed with EAP=Continue for the #96/#107 reason
+        this whole lib exists for. The -Utf8 arm that calls this does NOT set EAP itself (it has no &
+        call to protect), so the caller's 'Stop' would otherwise be live right here.
+    #>
+    param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & taskkill.exe '/PID' "$ProcessId" '/T' '/F' 2>&1 | Out-Null
+    } catch {
+        # Deliberately swallowed -- see the docstring.
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+
+    Get-Process -Id $ProcessId -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
 function Invoke-NativeCapture {
     <#
         Run $FilePath with $Arguments under $ErrorActionPreference = 'Continue' and return a
@@ -90,7 +221,10 @@ function Invoke-NativeCapture {
                        echo full progress; with -DiscardStderr stderr is dropped (2>$null) so it
                        cannot pollute a machine-readable stdout (e.g. gh --json).
           - ExitCode : $LASTEXITCODE recorded immediately after the command ran.
-        EAP is always restored (finally), whether the command succeeds, fails, or throws.
+          - TimedOut : $true only when -TimeoutSeconds was given AND expired. Present on every return
+                       from both arms, so a caller never has to know which arm answered it.
+        EAP and the environment are always restored (finally), whether the command succeeds, fails, or
+        throws.
 
         -Utf8: DECODE THE OUTPUT AS UTF-8 INSTEAD OF WITH THE CONSOLE CODE PAGE (issue #907,
         August 26, 2026). Windows PowerShell 5.1 decodes a native child's stdout with
@@ -119,14 +253,28 @@ function Invoke-NativeCapture {
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$Arguments = @(),
         [switch]$DiscardStderr,
-        [switch]$Utf8
+        [switch]$Utf8,
+        [int]$TimeoutSeconds = 0
     )
 
-    if ($Utf8) { return Invoke-NativeCaptureUtf8 -FilePath $FilePath -Arguments $Arguments -DiscardStderr:$DiscardStderr }
+    # A BOUND IMPLIES THE Start-Process ARM, because the & operator cannot be interrupted: it hands
+    # control to PowerShell's own pipeline reader until the child exits, and there is no handle to wait
+    # on with a deadline. The -Utf8 arm already starts the child with -PassThru, which is exactly the
+    # handle a bounded wait needs -- so -TimeoutSeconds routes there whether or not -Utf8 was asked for.
+    # THE CONSEQUENCE IS REAL AND WORTH KNOWING: a bounded call therefore also gets that arm's UTF-8
+    # decode and its line-array Output. For the push and fetch progress the bound is applied to, that is
+    # cosmetic-to-better; for a caller that PARSES the output it is a change of shape, which is why
+    # -TimeoutSeconds is opt-in per call site rather than a default.
+    if ($Utf8 -or $TimeoutSeconds -gt 0) {
+        return Invoke-NativeCaptureUtf8 -FilePath $FilePath -Arguments $Arguments `
+                                        -DiscardStderr:$DiscardStderr -TimeoutSeconds $TimeoutSeconds
+    }
 
     $prevEap = $ErrorActionPreference
+    $prevEnv = $null
     try {
         $ErrorActionPreference = 'Continue'
+        $prevEnv = Push-NativeNonInteractiveEnv
         if ($DiscardStderr) {
             $output = & $FilePath @Arguments 2>$null
         } else {
@@ -134,17 +282,21 @@ function Invoke-NativeCapture {
         }
         $code = $LASTEXITCODE
     } finally {
+        Pop-NativeNonInteractiveEnv -Previous $prevEnv
         $ErrorActionPreference = $prevEap
     }
 
-    return [pscustomobject]@{ Output = $output; ExitCode = $code }
+    return [pscustomobject]@{ Output = $output; ExitCode = $code; TimedOut = $false }
 }
 
 function Invoke-NativeCaptureUtf8 {
     <#
         The -Utf8 arm of Invoke-NativeCapture; see that function's docstring for WHY. Split out rather
         than nested in an if/else because the two share no lines: different launcher, different
-        capture, different decode. Callers pass -Utf8 instead of naming this.
+        capture, different decode. Callers pass -Utf8 instead of naming this -- and since #1179 they
+        also arrive here by passing -TimeoutSeconds, because the bounded wait needs the -PassThru
+        handle only this arm has. So the arm is no longer "the UTF-8 one": it is the Start-Process one,
+        and UTF-8 decoding is one of the two things that follows from that.
 
         Start-Process -PassThru THEN $proc.Handle THEN WaitForExit is the proven pattern from
         Invoke-TestSuiteGate below, and reading .Handle is NOT a no-op: without it .NET does not retain
@@ -158,15 +310,21 @@ function Invoke-NativeCaptureUtf8 {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$Arguments = @(),
-        [switch]$DiscardStderr
+        [switch]$DiscardStderr,
+        [int]$TimeoutSeconds = 0
     )
 
     $capDir  = Join-Path ([System.IO.Path]::GetTempPath()) ("native-capture-$PID-" + [guid]::NewGuid().ToString('n'))
     $outFile = Join-Path $capDir 'out.txt'
     $errFile = Join-Path $capDir 'err.txt'
 
+    $prevEnv = $null
     try {
         New-Item -ItemType Directory -Path $capDir -Force | Out-Null
+
+        # Before Start-Process, because a child inherits its environment at CREATION -- setting these
+        # after the process exists would guard nothing. Restored in the finally below.
+        $prevEnv = Push-NativeNonInteractiveEnv
 
         $startArgs = @{
             FilePath               = $FilePath
@@ -183,8 +341,27 @@ function Invoke-NativeCaptureUtf8 {
 
         $proc = Start-Process @startArgs
         $null = $proc.Handle
-        $proc.WaitForExit()
-        $code = $proc.ExitCode
+
+        # THE BOUNDED WAIT (#1179). WaitForExit(ms) returns $false when the deadline passed rather than
+        # throwing, so the timeout is a verdict to report and not an exception to catch. The second,
+        # short wait after the kill is not belt-and-braces: the capture files are still open handles
+        # until the child is actually reaped, and reading them before that returns a truncated document
+        # -- which would drop the very git output a reader needs to see WHY it stalled.
+        $timedOut = $false
+        if ($TimeoutSeconds -gt 0) {
+            if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+                $timedOut = $true
+                Stop-NativeProcessTree -ProcessId $proc.Id
+                $null = $proc.WaitForExit(5000)
+            }
+        } else {
+            $proc.WaitForExit()
+        }
+
+        # A KILLED CHILD HAS AN EXIT CODE OF ITS OWN and it is a misleading one -- taskkill /F leaves 1
+        # or 0x40010004 behind, which reads as an ordinary git failure. The timeout code is substituted
+        # so the number and TimedOut tell the same story.
+        $code = if ($timedOut) { $script:NativeCaptureTimeoutExitCode } else { $proc.ExitCode }
 
         # No BOM on the decoder: a BOM-emitting child is not something gh or git does, and
         # UTF8Encoding($false) still strips one if it is there.
@@ -204,8 +381,22 @@ function Invoke-NativeCaptureUtf8 {
             $lines = @($text -split "`n")
         }
 
-        return [pscustomobject]@{ Output = $lines; ExitCode = $code }
+        # THE DIAGNOSIS GOES IN Output, not only in the exit code, because that is where every existing
+        # caller already looks: they pipe Output to Write-Host and then judge ExitCode. Appending the
+        # line means the three bounded sites report a stall in full without one of them changing a line
+        # -- and it names the command, so a reader who only has the console scrollback still knows which
+        # call it was. It goes AFTER git's own output rather than before: what git managed to say before
+        # it stalled is the evidence, and this is the verdict on it.
+        if ($timedOut) {
+            $lines = @($lines) + @(
+                "[timeout] '$FilePath' did not finish within $TimeoutSeconds seconds; its process tree was killed (reported as exit $($script:NativeCaptureTimeoutExitCode)).",
+                "[timeout] A git network call that stalls this way is usually a credential helper waiting on a prompt nothing can answer (inbound #1179). Check 'git config --get-all credential.helper' and that the credential for this remote is still valid."
+            )
+        }
+
+        return [pscustomobject]@{ Output = $lines; ExitCode = $code; TimedOut = $timedOut }
     } finally {
+        Pop-NativeNonInteractiveEnv -Previous $prevEnv
         if (Test-Path -LiteralPath $capDir) {
             Remove-Item -Recurse -Force -LiteralPath $capDir -ErrorAction SilentlyContinue
         }
