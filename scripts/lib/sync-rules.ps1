@@ -64,7 +64,8 @@ function Invoke-SyncGitQuiet {
 function Get-SyncDefaultReferencePattern {
     <#
     .SYNOPSIS
-        The default --grep pattern that recognises a previous sync commit.
+        The default subject pattern that recognises a previous sync commit -- a .NET regex, not
+        git's '--grep', which the lookup no longer uses.
 
     .DESCRIPTION
         '^[Ss]ync' rather than '^sync', and the capital is measured rather than defensive. The two

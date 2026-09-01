@@ -33,19 +33,65 @@
 
 ### PLAN
 
+#### The found set is fixed
+
+Issue #1206 names three sites and says so in as many words: treat them as the found set. Its own
+sweep confirmed which `--grep` mentions are correct -- the historical account of #801 and #819 in
+`sync-rules.ps1`, `sync-main.ps1`, `sync-rules.tests.ps1` and the archived release notes -- and this
+branch leaves every one of them alone. Verified again here before editing.
+
+The wording follows PR #1207 (issue #1205, the prose layer of the same mislabel), which is open on
+`docs/sync-seam-grep-dialect-v1`. Different files, no overlap.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/sync-rules.ps1` -- the `.SYNOPSIS` of `Get-SyncDefaultReferencePattern` names the
+      subject match and the .NET dialect, so it no longer contradicts line 90 of its own docstring
+- [x] `scripts/task/sync-main.ps1` -- the seam list in the header does the same, so it no longer
+      contradicts line 30 of the same header
+- [x] `scripts/task/adopt-shopify-floor.ps1` -- the comment block the script WRITES into a consumer's
+      `scripts/repo-config.ps1`, reflowed at its existing column
+- [x] All three copied to their `plugins/teams/team-shopify/` mirrors, which were byte-identical
+      before and are byte-identical after
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` green, drift lint included
+- [x] All suites green
+- [x] The rendered comment block re-read as a consumer sees it, and the whole tree swept for a
+      remaining `--grep` mislabel: only the correct historical mentions are left
+
 ### DEPLOY: `docs/sync-seam-grep-dialect-scripts-v1`
 
-**Score:**
+Three script sites called `Get-ShopifySyncReferencePattern` *"the `--grep` pattern"*. The lookup it
+feeds has not used `--grep` since inbound #819 -- the pattern is matched against the commit
+**subject** read as its own field, which makes it a .NET regex rather than git's own POSIX basic one.
+All three now say that, and each is applied twice because every one of the files is mirrored into
+`plugins/teams/team-shopify/`.
+
+Two of the three were contradicting a statement in their own file: `sync-rules.ps1` said `--grep` in
+the `.SYNOPSIS` of `Get-SyncDefaultReferencePattern` and the opposite twenty-three lines below it,
+and `sync-main.ps1` said it in the seam list of its header and the opposite a hundred lines above.
+A reader who got as far as the long note was corrected; one who read only the summary line was not.
+
+The third has the longest reach and is not documentation about the seam at all -- it is the comment
+`adopt-shopify-floor.ps1` stamps into a consumer's own `scripts/repo-config.ps1`, at the moment they
+sit down to answer the seam, and it is the only one of the three visible without opening this repo.
+
+The label decides which dialect a consumer writes their pattern in, and a pattern valid in one and
+not the other fails as a floor that is silently too recent -- the failure the surrounding docstrings
+spend the most words on. Issue #1206; the prose layer of the same mislabel is #1205 / PR #1207.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer answering `Get-ShopifySyncReferencePattern` reads the right regex dialect in the comment
+their own config file carries. Nothing they have already answered changes meaning, and no behaviour
+moves -- what changes is that the instruction beside the question is no longer wrong about the
+engine it is judged in.
+
+**Score:** 2
 
 #### Pull Request
 
