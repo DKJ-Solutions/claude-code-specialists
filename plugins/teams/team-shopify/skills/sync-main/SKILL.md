@@ -263,7 +263,7 @@ default beside it. `adopt-shopify-floor` writes the block; the two required ones
 |---|---|---|
 | `Get-ShopifyLiveThemeId` | **required** | which theme is live. A non-numeric answer counts as no answer, exactly as the guard reads it -- a `VUL-IN` left in place would otherwise read as answered. |
 | `Get-ShopifyStoreDomain` | **required** | the store the pull reads from. `-Store` gets you through one run; answering the seam is the durable fix. |
-| `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the `--grep` pattern that recognises a previous sync commit. |
+| `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the pattern that recognises a previous sync commit. It is matched against the commit **subject** read as its own field, so it is a .NET regex -- not git's `--grep`, which the lookup no longer uses. |
 | `Get-ShopifySyncBranchPrefix` | `sync/live-` | the drift branch's prefix. It has to line up with whatever your PR guardrails and CI exempt, which is why it is yours to set. |
 | `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges it once CI is green. |
 | `Get-ShopifySyncPrBody` | *(none)* | the PR body. Called with `-Take`, `-Keep` (the classified rows, each carrying `Status`/`Path`/`Reason`) and `-Default` (the body the script composed), and it returns the body to use. |
