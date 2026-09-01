@@ -8,20 +8,39 @@
     Two modes:
 
       -Mode event      One issue changed. -Event is 'closed' or 'reopened'; -IssueBody is the issue
-                       body (the <!-- asana-task: GID --> marker is read from it); -IssueRef is
+                       body (the Asana task is resolved from it, see below); -IssueRef is
                        'owner/repo#n' for the Asana comment. 'closed' completes the task, 'reopened'
-                       re-opens it. A body with no valid marker is logged and skipped, never guessed.
+                       re-opens it. A body linking no task, or several different ones, is logged and
+                       skipped, never guessed.
 
-      -Mode reconcile  Sweep. Lists the project's incomplete tasks, reads a GitHub issue URL from
-                       each task's notes, checks that issue's state with `gh`, and completes any task
-                       whose issue is closed. Covers a missed 'closed' event.
+      -Mode reconcile  Two sweeps, for events that never arrived:
+                       (a) Asana -> GitHub: the project's incomplete tasks, reading a GitHub issue
+                           URL from each task's notes and completing the task when that issue is
+                           closed. Covers a task this workflow created.
+                       (b) GitHub -> Asana: this repo's issues closed in the last -SinceDays days,
+                           resolving each body's Asana task and completing it when it is still open.
+                           Covers a ticket that came the other way -- imported FROM Asana, whose
+                           task carries no back-link for (a) to find.
+
+    How the Asana task is found -- Resolve-AsanaTaskRef, in this order:
+
+      1. marker      the machine marker '<!-- asana-task: <digits> -->' the report-issue skill
+                     writes. Authoritative: an issue that carries one is never matched any other way.
+      2. header-row  the header row of an imported ticket -- a markdown table row whose first cell
+                     is '**Asana**' -- carrying an Asana task URL. This is the intake shape: a
+                     ticket copied out of Asana links its task for a reader, not for a machine.
+      3. sole-url    exactly one Asana task URL anywhere else in the body.
+
+    More than one DIFFERENT task in tier 3 is reported as 'ambiguous' and skipped: the script never
+    guesses which ticket an issue belongs to. Add a marker to settle it.
 
     Auth: -AsanaPat (from the ASANA_PAT secret). Project/workspace: -ProjectGid / -WorkspaceGid
-    (from the ASANA_PROJECT_GID / ASANA_WORKSPACE_GID variables).
+    (from the ASANA_PROJECT_GID / ASANA_WORKSPACE_GID variables). Sweep (b) additionally needs
+    -Repo (GITHUB_REPOSITORY) and `gh` on PATH.
 
-    The pure helpers (Get-AsanaTaskGid, New-AsanaCompleteRequest, Get-IssueRefFromNotes) take no
-    network and are what .github/scripts/asana-mirror.tests.ps1 (and the source repo's
-    scripts/tests/bwj-codex.tests.ps1) exercise. The script runs its main flow only when invoked
+    The pure helpers (Resolve-AsanaTaskRef, Get-AsanaTaskGid, Get-AsanaGidsFromText,
+    New-AsanaCompleteRequest, Get-IssueRefFromNotes) take no network and are what the source repo's
+    scripts/tests/bwj-codex.tests.ps1 exercises. The script runs its main flow only when invoked
     directly; dot-sourcing it loads the helpers and does nothing else.
 
     Pure ASCII (repo convention for .ps1).
@@ -36,7 +55,10 @@ param(
 
     [string]$IssueBody = '',
     [string]$IssueRef = '',
-    [string]$Repo = '',
+    [string]$Repo = $env:GITHUB_REPOSITORY,
+
+    # Sweep (b) lookback, in days. 0 = every closed issue the listing returns.
+    [int]$SinceDays = 30,
 
     [string]$AsanaPat = $env:ASANA_PAT,
     [string]$ProjectGid = $env:ASANA_PROJECT_GID,
@@ -47,17 +69,80 @@ $ErrorActionPreference = 'Stop'
 
 $script:AsanaApiBase = 'https://app.asana.com/api/1.0'
 
-function Get-AsanaTaskGid {
+function Get-AsanaGidsFromText {
     <#
-        Read the machine marker '<!-- asana-task: <digits> -->' from an issue body and return the
-        bare numeric GID as a string, or $null if there is no valid marker. Non-numeric content
-        never matches, so it can never reach a request URL.
+        Return the distinct task GIDs of every Asana task URL in a piece of text, in the order they
+        first appear. Both URL shapes Asana hands out are read:
+
+            https://app.asana.com/1/<workspace>/project/<project>/task/<task>
+            https://app.asana.com/0/<project>/<task>
+
+        A URL that names no task (a project or portfolio link) contributes nothing.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text)
+
+    $gids = @()
+    foreach ($m in [regex]::Matches($Text, 'https://app\.asana\.com/[^\s)>\]]*')) {
+        $url = $m.Value
+        $t = [regex]::Match($url, '/task/([0-9]+)')
+        if (-not $t.Success) { $t = [regex]::Match($url, '^https://app\.asana\.com/0/[0-9]+/([0-9]+)') }
+        if ($t.Success) { $gids += $t.Groups[1].Value }
+    }
+    return @($gids | Select-Object -Unique)
+}
+
+function Get-AsanaHeaderRowText {
+    <#
+        Return the contents of an imported ticket's '| **Asana** | ... |' header row, or '' when the
+        body has no such row. Anchored on the row label, so a link to a sibling ticket elsewhere in
+        the body cannot be mistaken for this ticket's own task.
     #>
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$IssueBody)
 
-    $m = [regex]::Match($IssueBody, '<!--\s*asana-task:\s*([0-9]+)\s*-->')
-    if (-not $m.Success) { return $null }
+    $m = [regex]::Match($IssueBody, '(?m)^\|\s*\*{0,2}Asana\*{0,2}\s*\|(.*)$')
+    if (-not $m.Success) { return '' }
     return $m.Groups[1].Value
+}
+
+function Resolve-AsanaTaskRef {
+    <#
+        Resolve which Asana task an issue body belongs to. Returns an object with:
+
+            Gid         the numeric task GID as a string, or $null
+            Source      'marker' | 'header-row' | 'sole-url' | 'ambiguous' | 'none'
+            Candidates  the distinct GIDs seen, for the 'ambiguous' report
+
+        Pure -- no network. Non-numeric content never matches, so it can never reach a request URL.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$IssueBody)
+
+    $marker = [regex]::Match($IssueBody, '<!--\s*asana-task:\s*([0-9]+)\s*-->')
+    if ($marker.Success) {
+        return [pscustomobject]@{ Gid = $marker.Groups[1].Value; Source = 'marker'; Candidates = @($marker.Groups[1].Value) }
+    }
+
+    $row = Get-AsanaHeaderRowText -IssueBody $IssueBody
+    if ($row) {
+        $rowGids = @(Get-AsanaGidsFromText -Text $row)
+        if ($rowGids.Count -ge 1) {
+            return [pscustomobject]@{ Gid = $rowGids[0]; Source = 'header-row'; Candidates = $rowGids }
+        }
+    }
+
+    $all = @(Get-AsanaGidsFromText -Text $IssueBody)
+    if ($all.Count -eq 1) { return [pscustomobject]@{ Gid = $all[0]; Source = 'sole-url'; Candidates = $all } }
+    if ($all.Count -gt 1) { return [pscustomobject]@{ Gid = $null; Source = 'ambiguous'; Candidates = $all } }
+    return [pscustomobject]@{ Gid = $null; Source = 'none'; Candidates = @() }
+}
+
+function Get-AsanaTaskGid {
+    <#
+        The GID Resolve-AsanaTaskRef settled on, or $null. Kept as its own name because it is the
+        one thing most callers want.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$IssueBody)
+
+    return (Resolve-AsanaTaskRef -IssueBody $IssueBody).Gid
 }
 
 function Get-IssueRefFromNotes {
@@ -110,6 +195,27 @@ function Invoke-AsanaRequest {
     return Invoke-RestMethod -Method $Request.Method -Uri $Request.Uri -Headers $headers -Body $Request.Body
 }
 
+function Get-AsanaTaskState {
+    <#
+        Read a task's 'completed' flag. Returns $null when the task cannot be read -- it was deleted,
+        or it lives in a workspace this PAT has no access to. That is reported and skipped rather
+        than thrown, so one unreachable ticket cannot end a sweep over all of them.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Gid,
+        [Parameter(Mandatory = $true)][string]$Pat
+    )
+    if ($Gid -notmatch '^[0-9]+$') { throw "Refusing to read a non-numeric task GID: '$Gid'." }
+    $uri = "$script:AsanaApiBase/tasks/$Gid" + '?opt_fields=completed,name'
+    try {
+        $resp = Invoke-RestMethod -Method GET -Uri $uri -Headers @{ Authorization = "Bearer $Pat" }
+        return $resp.data
+    } catch {
+        Write-Host "  Asana task $Gid is not readable with this token ($($_.Exception.Message)) -- skipped."
+        return $null
+    }
+}
+
 function Set-AsanaTaskCompleted {
     param(
         [Parameter(Mandatory = $true)][string]$Gid,
@@ -150,22 +256,52 @@ function Test-GitHubIssueClosed {
     return ($LASTEXITCODE -eq 0 -and $state -eq 'CLOSED')
 }
 
+function Get-ClosedIssues {
+    <#
+        This repo's closed issues, newest first, optionally narrowed to the last -SinceDays days.
+        Returns an empty list (not a throw) when `gh` is unavailable or fails, so sweep (a) still runs.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Repo,
+        [int]$SinceDays = 30
+    )
+    $ErrorActionPreference = 'Continue'
+    $raw = (& gh issue list --repo $Repo --state closed --limit 200 --json number,body,closedAt) 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $raw) {
+        Write-Host "  Could not list the closed issues of $Repo with gh -- the GitHub-side sweep is skipped."
+        return @()
+    }
+    $items = @(($raw | Out-String) | ConvertFrom-Json)
+    if ($SinceDays -gt 0) {
+        $cutoff = (Get-Date).ToUniversalTime().AddDays(-$SinceDays)
+        $items = @($items | Where-Object { $_.closedAt -and ([datetime]$_.closedAt).ToUniversalTime() -ge $cutoff })
+    }
+    return $items
+}
+
 function Invoke-EventMode {
     if (-not $AsanaPat) { throw 'ASANA_PAT is not set.' }
-    $gid = Get-AsanaTaskGid -IssueBody $IssueBody
-    if (-not $gid) {
-        Write-Host "No <!-- asana-task: ... --> marker on $IssueRef -- nothing to mirror."
+    $ref = Resolve-AsanaTaskRef -IssueBody $IssueBody
+    if (-not $ref.Gid) {
+        if ($ref.Source -eq 'ambiguous') {
+            Write-Host "$IssueRef links several different Asana tasks ($($ref.Candidates -join ', ')) -- refusing to guess. Add an explicit <!-- asana-task: GID --> marker to settle it."
+        } else {
+            Write-Host "No Asana task is linked from $IssueRef -- nothing to mirror."
+        }
         return
     }
     $completed = ($Event -eq 'closed')
     $comment = if ($completed) { "Resolved via GitHub $IssueRef" } else { "Reopened via GitHub $IssueRef" }
-    Set-AsanaTaskCompleted -Gid $gid -Completed $completed -Pat $AsanaPat -Comment $comment
-    Write-Host "Asana task $gid set completed=$completed (from $IssueRef)."
+    Set-AsanaTaskCompleted -Gid $ref.Gid -Completed $completed -Pat $AsanaPat -Comment $comment
+    Write-Host "Asana task $($ref.Gid) set completed=$completed (from $IssueRef, matched by $($ref.Source))."
 }
 
-function Invoke-ReconcileMode {
-    if (-not $AsanaPat) { throw 'ASANA_PAT is not set.' }
-    if (-not $ProjectGid) { throw 'ASANA_PROJECT_GID is not set.' }
+function Invoke-ReconcileFromAsana {
+    <# Sweep (a): the project's incomplete tasks, matched back to GitHub through their notes. #>
+    if (-not $ProjectGid) {
+        Write-Host 'ASANA_PROJECT_GID is not set -- the Asana-side sweep is skipped.'
+        return 0
+    }
     $tasks = Get-ProjectIncompleteTasks -ProjectGid $ProjectGid -Pat $AsanaPat
     $fixed = 0
     foreach ($t in $tasks) {
@@ -173,10 +309,44 @@ function Invoke-ReconcileMode {
         if (-not $ref) { continue }
         if (Test-GitHubIssueClosed -IssueRef $ref) {
             Set-AsanaTaskCompleted -Gid $t.gid -Completed $true -Pat $AsanaPat -Comment "Resolved via GitHub $ref (reconciliation sweep)"
-            Write-Host "Reconciled: Asana task $($t.gid) completed for closed issue $ref."
+            Write-Host "  Reconciled: Asana task $($t.gid) completed for closed issue $ref."
             $fixed++
         }
     }
+    Write-Host "Asana-side sweep: $($tasks.Count) incomplete task(s) examined, $fixed completed."
+    return $fixed
+}
+
+function Invoke-ReconcileFromGitHub {
+    <#
+        Sweep (b): this repo's recently closed issues, matched forward to Asana through their bodies.
+        This is the half that reaches a ticket imported FROM Asana -- its task was written by a
+        colleague and carries no GitHub back-link, so sweep (a) is blind to it.
+    #>
+    if (-not $Repo) {
+        Write-Host 'GITHUB_REPOSITORY is not set -- the GitHub-side sweep is skipped.'
+        return 0
+    }
+    $issues = Get-ClosedIssues -Repo $Repo -SinceDays $SinceDays
+    $fixed = 0
+    foreach ($i in $issues) {
+        $ref = Resolve-AsanaTaskRef -IssueBody ([string]$i.body)
+        if (-not $ref.Gid) { continue }
+        $task = Get-AsanaTaskState -Gid $ref.Gid -Pat $AsanaPat
+        if ($null -eq $task -or $task.completed) { continue }
+        Set-AsanaTaskCompleted -Gid $ref.Gid -Completed $true -Pat $AsanaPat -Comment "Resolved via GitHub $Repo#$($i.number) (reconciliation sweep)"
+        Write-Host "  Reconciled: Asana task $($ref.Gid) completed for closed issue $Repo#$($i.number) (matched by $($ref.Source))."
+        $fixed++
+    }
+    Write-Host "GitHub-side sweep: $($issues.Count) closed issue(s) examined, $fixed completed."
+    return $fixed
+}
+
+function Invoke-ReconcileMode {
+    if (-not $AsanaPat) { throw 'ASANA_PAT is not set.' }
+    $fixed = 0
+    $fixed += Invoke-ReconcileFromAsana
+    $fixed += Invoke-ReconcileFromGitHub
     Write-Host "Reconciliation done -- $fixed task(s) completed."
 }
 

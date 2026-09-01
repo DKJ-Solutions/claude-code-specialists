@@ -1,6 +1,6 @@
 # Copied from bwj-codex/templates/asana-mirror.yml into .github/workflows/asana-mirror.yml.
 # Resolves the mirrored Asana task when its GitHub issue is closed (and re-opens it on reopen),
-# with a daily reconciliation sweep for missed events. See bwj-codex/WORKFLOW-portable.md.
+# with a daily reconciliation sweep (both directions) for missed events. See bwj-codex/WORKFLOW-portable.md.
 name: asana-mirror
 
 on:
@@ -50,4 +50,4 @@ jobs:
           ASANA_WORKSPACE_GID: ${{ vars.ASANA_WORKSPACE_GID }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          ./.github/scripts/asana-mirror.ps1 -Mode reconcile
+          ./.github/scripts/asana-mirror.ps1 -Mode reconcile -Repo $env:GITHUB_REPOSITORY

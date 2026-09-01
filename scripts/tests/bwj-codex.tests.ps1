@@ -91,6 +91,53 @@ Assert-True  ($null -eq (Get-AsanaTaskGid -IssueBody 'no marker here')) 'Get-Asa
 Assert-True  ($null -eq (Get-AsanaTaskGid -IssueBody '<!-- asana-task: not-a-number -->')) 'Get-AsanaTaskGid rejects a non-numeric marker'
 Assert-True  ($null -eq (Get-AsanaTaskGid -IssueBody '')) 'Get-AsanaTaskGid handles an empty body'
 
+
+# tier 2 -- the header row of a ticket imported FROM Asana (the intake shape). This is the case the
+# marker alone could not reach: issue #388 in smartwatchbanden closed with its Asana task untouched,
+# and the CI log said so in as many words -- "No <!-- asana-task: ... --> marker ... nothing to mirror".
+$intake = @'
+# 0150 CRO WIN | Lieferdatum unter ATC-button
+
+| | |
+|---|---|
+| **Asana** | [1216905543348385](https://app.asana.com/1/1199613597897177/project/1214594032889511/task/1216905543348385) - project Development BWJ |
+| **State** | buildable |
+
+A sibling ticket is https://github.com/BWJ-ecommerce/smartwatchbanden/issues/390.
+'@
+$ref = Resolve-AsanaTaskRef -IssueBody $intake
+Assert-Equal '1216905543348385' $ref.Gid    'header row of an imported ticket resolves its task'
+Assert-Equal 'header-row'       $ref.Source 'and reports header-row as the source'
+
+# the header row wins over any other Asana link in the body -- it is the ticket's own task
+$sibling = "| **Asana** | [a](https://app.asana.com/1/9/project/8/task/111) |`nalso https://app.asana.com/1/9/project/8/task/222"
+Assert-Equal '111' (Get-AsanaTaskGid -IssueBody $sibling) 'the header row wins over a sibling link further down'
+
+# the marker wins over everything, so an issue that carries one is never re-matched
+$both = "| **Asana** | [a](https://app.asana.com/1/9/project/8/task/111) |`n<!-- asana-task: 999 -->"
+Assert-Equal 'marker' (Resolve-AsanaTaskRef -IssueBody $both).Source 'the marker outranks the header row'
+Assert-Equal '999'    (Get-AsanaTaskGid    -IssueBody $both)        'and it is the marker GID that is used'
+
+# tier 3 -- a single Asana task URL anywhere, in either URL shape Asana hands out
+Assert-Equal '1216905543348385' (Get-AsanaTaskGid -IssueBody 'see https://app.asana.com/1/9/project/8/task/1216905543348385') 'a sole modern task URL resolves'
+Assert-Equal '1216905543348385' (Get-AsanaTaskGid -IssueBody 'see https://app.asana.com/0/1214594032889511/1216905543348385/f') 'a sole classic task URL resolves'
+Assert-Equal 'sole-url'         (Resolve-AsanaTaskRef -IssueBody 'https://app.asana.com/1/9/project/8/task/77').Source 'and reports sole-url as the source'
+
+# several DIFFERENT tasks and no marker -- reported, never guessed
+$ambiguous = Resolve-AsanaTaskRef -IssueBody 'a https://app.asana.com/1/9/project/8/task/111 b https://app.asana.com/1/9/project/8/task/222'
+Assert-True  ($null -eq $ambiguous.Gid)   'two different linked tasks resolve to nothing'
+Assert-Equal 'ambiguous' $ambiguous.Source 'and are reported as ambiguous'
+Assert-Equal 2 $ambiguous.Candidates.Count 'with both candidates named for the log'
+
+# the same task linked twice is not ambiguous
+Assert-Equal '111' (Get-AsanaTaskGid -IssueBody 'a https://app.asana.com/1/9/project/8/task/111 b https://app.asana.com/1/9/project/8/task/111') 'the same task linked twice still resolves'
+
+# a project link names no task
+Assert-True ($null -eq (Get-AsanaTaskGid -IssueBody 'board: https://app.asana.com/1/9/project/8')) 'a project link contributes no task GID'
+
+# a non-numeric task GID can never reach a request URL
+Assert-Throws { Get-AsanaTaskState -Gid 'abc' -Pat 'x' } 'Get-AsanaTaskState throws on a non-numeric GID'
+
 # request building -- closed vs reopened
 $put = New-AsanaCompleteRequest -Gid '123' -Completed $true
 Assert-Equal 'PUT' $put.Method 'complete request is a PUT'

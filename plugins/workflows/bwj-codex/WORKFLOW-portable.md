@@ -77,8 +77,9 @@ matches on it:
   <!-- asana-task: <numeric task GID> -->
   ```
 
-  The HTML-comment marker holds the bare numeric GID and nothing else. It is what the CI workflow
-  reads; a task URL alone is not enough.
+  The HTML-comment marker holds the bare numeric GID and nothing else, and it is what the CI workflow
+  matches on **first and unconditionally**. Write it whenever you create the task yourself: it is the
+  only form that cannot be misread, and an issue carrying one is never matched any other way.
 
 - **On the Asana task** -- the `Tracked on GitHub:` line of the skeleton already carries the issue
   URL. Nothing else is required there.
@@ -92,16 +93,40 @@ matches on it:
 |---|---|
 | issue **closed** | the linked task is marked complete, with a comment `Resolved via GitHub <repo>#<n>` |
 | issue **reopened** | the linked task is set back to incomplete |
-| daily schedule | a reconciliation sweep completes any task whose linked issue is closed but which a missed event left open |
+| daily schedule | a reconciliation sweep in **both** directions, for events that never arrived: incomplete tasks in the mirror project whose GitHub issue is closed, and issues closed in the last 30 days whose Asana task is still open |
 
-No one resolves the Asana task by hand. If a task has no `<!-- asana-task: ... -->` marker on its
-issue, the workflow logs it and moves on -- it never guesses.
+No one resolves the Asana task by hand.
+
+**Which task an issue belongs to is answered in three tiers**, because a repo has two kinds of issue
+and only one of them was ever written by this workflow:
+
+1. **the marker** -- `<!-- asana-task: <gid> -->`, written in step 3 above. Authoritative.
+2. **the header row** -- a `| **Asana** | ... |` row carrying a task URL. This is the shape of a
+   ticket **imported from Asana**: a colleague filed it there, somebody copied it into an issue for
+   analysis, and the link in its header was written for a reader rather than for a machine.
+3. **a sole task URL** anywhere else in the body.
+
+**Tier 2 exists because of what tier 1 alone could not reach.** In `BWJ-ecommerce/smartwatchbanden`,
+[#388](https://github.com/BWJ-ecommerce/smartwatchbanden/issues/388) was closed on 2026-09-01 and its
+Asana task stayed open; the workflow had run, and its log said why -- *"No `<!-- asana-task: ... -->`
+marker ... nothing to mirror"*. Measured across that repo the same day: of 55 issues, **4** carried a
+marker and **11** carried an Asana link in a header row only, **6** of those already closed. The
+mirror was working exactly as written, and reached 4 of the 15 issues that carry an Asana link at all.
+
+**More than one different task, and no marker, resolves to nothing** -- the workflow names the
+candidates in its log and moves on. It never guesses which ticket an issue belongs to, and the way to
+settle it is to add a marker.
 
 ### 5. What still needs a person
 
 - **Setup, once per repo:** the repo secret `ASANA_PAT` and the variables `ASANA_WORKSPACE_GID` /
   `ASANA_PROJECT_GID`, plus copying the two `templates/` files into `.github/`. The
   [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
+- **A token that can reach the tickets.** `ASANA_PAT` is a *user* token: it can only see the
+  workspaces that user is a member of. An imported ticket often lives in the requester's own Asana
+  organisation rather than in the one the mirror project sits in, and a task the token cannot read is
+  logged and skipped rather than failing the run -- so a sweep that reports `0 completed` with a line
+  per unreadable task is telling you about the token, not about the tickets.
 - **The Asana project answer:** whether both stores mirror into one shared project or one project
   each is a BWJ decision. `Get-AsanaProjectGid` returns whatever each repo sets, so either works --
   but the two repos must make the *same* kind of choice, or this page's promise of "identical" is
