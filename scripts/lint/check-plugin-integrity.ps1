@@ -3316,6 +3316,58 @@ Write-Coverage -Category 'barred-skill' -Checked $barredChecked `
         "script file(s) and markdown file(s) held against the $($barredSkills.Count) skill(s) whose frontmatter bars model invocation -- $barredFindings printed instruction(s) naming one with a bare imperative. Frontmatter-driven rather than a phrasing rule: the same wording about an UNFLAGGED skill (check-script-contract's 'adopt-workflow-folder') is correct and passes"
     })
 
+
+# --- Check 31: the Shopify CLI is never invoked bare ------------------------------------------------
+# WHY A STATIC GUARD RATHER THAN A CONVENTION (inbound #1183, September 1, 2026). Under
+# $ErrorActionPreference = 'Stop' -- which every script in this repo sets -- a bare
+#
+#     & shopify theme pull --store $store --theme $liveId --path $mirror
+#     if ($LASTEXITCODE -ne 0) { <clean up; report; exit 1> }
+#
+# dies on the line AFTER the call the moment the CLI writes anything to stderr, so the exit-code check
+# below it never runs. The repair is scripts/lib/shopify-cli-lib.ps1, which lowers the preference for
+# the duration of the call; the reason it needs a gate is that THE DANGEROUS FORM IS THE ABSENCE OF A
+# WRAPPER. There is no redirect to grep for and no suspicious flag -- the wrong spelling is the shorter,
+# more obvious one, which is exactly how the four sites this check was written for came to exist.
+#
+# ONE EXEMPTION, AND IT IS THE WRAPPER ITSELF, matched on its path so its plugin mirror is exempt too.
+# Anything else naming 'shopify' as a command is a finding, including a new script in a plugin that does
+# not exist yet: a consumer receives whatever ships, and a second wrapper is the same defect twice.
+#
+# THROUGH THE PARSER, NOT BY LINE MATCHING, for the reason check 30 gives: a comment explaining the rule
+# (this one included) mentions the command, and so does every printed hint that tells a reader to run
+# 'shopify theme list'. Only a CommandAst is a call. NOT SKIPPABLE, like every check added since the
+# -SkipCheck list was fixed at the three the gate's own suites need.
+# TWO EXEMPTIONS, BOTH BY FILE NAME AND BOTH ABOUT THE SAME ONE CALL. The wrapper holds the permitted
+# call, and shopify-cli.tests.ps1 holds the assert that gives the wrapper its meaning: it invokes the
+# stub BARE, on purpose, to read back that the shim inherits the caller's 'Stop' -- which is what makes
+# the neighbouring 'Continue' assert prove anything. Matched on the name rather than a full path, so a
+# plugin mirror of either is exempt too; check 8 already holds a mirror byte-identical to its source.
+# The gate found the test's own probe the first time it ran, which is how the second name got here.
+$shopifyExempt = @('shopify-cli-lib.ps1', 'shopify-cli.tests.ps1')
+$shopifyChecked  = 0
+$shopifyFindings = 0
+foreach ($psFile in (Get-PsScriptFiles)) {
+    $shopifyChecked++
+    if ($shopifyExempt -contains $psFile.Name) { continue }
+    $shRel = $psFile.FullName.Replace($RepoRoot, '.')
+    $shAst = [System.Management.Automation.Language.Parser]::ParseFile($psFile.FullName, [ref]$null, [ref]$null)
+    if ($null -eq $shAst) { continue }
+    foreach ($cmd in $shAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        if ($cmd.GetCommandName() -ne 'shopify') { continue }
+        $shSample = ($cmd.Extent.Text -replace '\s+', ' ').Trim()
+        if ($shSample.Length -gt 120) { $shSample = $shSample.Substring(0, 120) + '...' }
+        Add-Error ("[shopify-cli] ${shRel}:$($cmd.Extent.StartLineNumber): invokes the Shopify CLI bare." +
+            " Under `$ErrorActionPreference = 'Stop' one stderr line from the CLI is a TERMINATING" +
+            " ErrorRecord, so the run dies before the `$LASTEXITCODE check below it -- at exit code 0 as" +
+            " much as any other. Route it through Invoke-ShopifyCli (scripts/lib/shopify-cli-lib.ps1) and" +
+            " judge the run on its .ExitCode. Found: `"$shSample`"")
+        $shopifyFindings++
+    }
+}
+Write-Coverage -Category 'shopify-cli' -Checked $shopifyChecked `
+    -Note "script file(s) parsed for a command named 'shopify' -- $shopifyFindings bare call(s). Two files are exempt by NAME, so a plugin mirror of either is exempt too: shopify-cli-lib.ps1, which holds the one permitted call, and shopify-cli.tests.ps1, whose probe invokes the CLI bare on purpose to prove the shim inherits the caller's preference. A comment or a printed hint naming the CLI is not a subject: only a CommandAst is"
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
