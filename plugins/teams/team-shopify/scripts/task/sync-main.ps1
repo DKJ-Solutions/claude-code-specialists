@@ -605,9 +605,11 @@ if ($candidates.Count -eq 0) {
     # it keeps the ref of every squash-merged branch forever. Reading the setting would be one more thing
     # to get wrong; doing both halves is what prune-merged settled on for the same question.
     #
-    # ITS SECOND PART PROVES THE REF, NOT ITS NAME, and until inbound #1190 it proved the name (which is
-    # still what prune-merged.ps1 does -- filed separately, because there the same miss hands over a
-    # DELETE command). These names are date-stamped, so a day whose branch has already merged AND been
+    # ITS SECOND PART PROVES THE REF, NOT ITS NAME, and until inbound #1190 it proved the name -- which is
+    # still what prune-merged.ps1 does, tracked as #1191 rather than swept along here, because there the
+    # same miss hands over a DELETE command and the repair belongs in that plugin's own lib. It is worth
+    # knowing that the two are one defect in two places: fixing this one does not fix that one.
+    # These names are date-stamped, so a day whose branch has already merged AND been
     # deleted hands the next run the same name -- and a name-match then vouches for a brand-new, unmerged
     # predecessor. The guard reported 'all merged', found nothing standing, and pushed a '-2' branch onto
     # the pile it exists to prevent: the failure arriving through the guard's own answer. Measured in a
