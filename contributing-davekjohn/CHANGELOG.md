@@ -32,6 +32,58 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/sync-main-trigger-v1` · 20260901-182430
+
+`sync-main` now states **when it fires**, in one place, and the two pages that used to restate it link
+there instead. The trigger: before a live push, and before work that will edit theme files -- not before a
+branch that cannot touch one.
+
+The gap was never that the trigger was unwritten. It was written **three times**, differently, and each
+copy looked authoritative from where it sat: the skill's frontmatter said *"any theme task"*, `start-task`
+step 2 made a sync an unconditional gatekeeper, and Sandra's manual said *"before every task ... which is
+the definition of a hook"*. Two Shopify consumers of one owner then read the same step as
+mandatory-always, mandatory-for-theme-work and optional -- and neither of them had drifted; each had
+picked up a different one of the plugin's own wordings faithfully.
+
+What that cost, measured on September 1, 2026 in the strict consumer: a session picked up an issue whose
+entire content was a paste of `.claude/settings.json`, ran the sync first because its `CLAUDE.md` said to
+before *any* task, pulled the live theme, classified 25 paths held back and 4 to take, and reported that a
+real run would have refused on a standing predecessor branch. **That refusal is the structural half.**
+Inbound #1021 made a standing sync branch stop the run, on the reasoning that refusing costs nothing
+because the drift already sits on the predecessor -- and that holds only while the sync is a step in theme
+work. Mandate it before every task and one unmerged sync PR becomes a gate on the start of *all* work in
+the repo, documentation and permission changes included.
+
+The narrowing is the owner's, twice over: his instruction is quoted in the issue, and the plugin already
+carried the precedent -- inbound #805 moved the preview theme out of `start-task` on the same argument, at
+6 of 12 previews belonging to branches that never needed one. A preview theme is a consequence of *"I want
+to show this"*; this sync is a consequence of *"I am about to touch the theme"*.
+
+The skill's section also says out loud that the trigger lives there and nowhere else, and that the name
+*pre-task sync* is a label rather than the trigger -- because the name is what every paraphrase reached
+for.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A Shopify consumer stops running a live theme pull, a full-theme comparison and a possible hard refusal at
+the start of documentation, tooling, CI and config work that cannot touch a theme file -- and stops having
+one unmerged sync PR block the start of that work. It also gives their `CLAUDE.md` a section to point at
+instead of a fourth paraphrase to write.
+
+**Score:** 3
+
+#### Pull Request
+
+state when the pre-task sync fires, once, in the skill both other pages point at
+
+Plugins: team-shopify
+
+[PR #1198](https://github.com/DaveKJohn/claude-code-specialists/pull/1198)
+
+---
+
 ### DEPLOY: `fix/merged-pr-proof-shared-v1` · 20260901-164752
 
 The proof that a merged PR is about **this ref** and not merely about a branch that once wore its
