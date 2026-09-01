@@ -32,6 +32,35 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/git-calls-noninteractive-and-bounded-v1` · 20260901-114244
+
+Closes inbound #1179. A git call made by the workflow scripts can no longer hang on a credential
+prompt nothing will answer: every child now runs non-interactively, and the three calls that reach
+the network are bounded so any other stall reports itself instead of reading as work in progress.
+
+**Score:** 4
+
+A hang here is not a slow run -- it is a run that never ends and says nothing, and it costs whatever
+the gates had already paid for. The reporting machine lost a lint + 13-suite gate that way. Every
+consumer of the workflow plugin gets this the moment they update, without configuring anything.
+
+#### What makes this deploy extra special
+
+The repair is at the choke point rather than at the two call sites the report named, so all 111
+git and gh calls in the workflow are guarded rather than the two that happened to be measured.
+
+**Score:** 3
+
+#### Pull Request
+
+git calls in the shared workflow scripts fail fast instead of hanging on a credential prompt
+
+Plugins: contributing-davekjohn
+
+[PR #1182](https://github.com/DaveKJohn/claude-code-specialists/pull/1182)
+
+---
+
 ### DEPLOY: `feat/bwj-codex-rename-v1` · 20260901-104018
 
 The `workflow-bwj` plugin is renamed to `bwj-codex` throughout the tree: its folder
