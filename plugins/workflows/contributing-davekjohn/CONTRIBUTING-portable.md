@@ -583,8 +583,8 @@ the issue disproves — and the colleague chasing it chases it in the one place 
 
 **"Automatically" is how this step gets described once it is habitual, and a reader who believes it is
 handled will not do it.** Measured in the originating repo on 2026-09-02: a request was filed as an
-issue and the source board left on its intake column; over an hour later the task's own `modified_at`
-still predated the issue. Nothing was going to move it.
+issue and the source board left on its intake column; over an hour later the task's own last-modified
+time still predated the issue. Nothing was going to move it.
 
 Two things are yours to answer. **Which column** the row advances to on pickup — one target, picked
 once. **And which board**, when the request sits on more than one: advance only the board that tracks
@@ -592,9 +592,9 @@ once. **And which board**, when the request sits on more than one: advance only 
 picked it up, so moving its card says something false. Advancing every board the request touched was
 the first mistake made with this rule.
 
-This is the pickup end of a symmetry some repos already run at the other end — a tracker-specific layer
-that resolves the source task from the issue's close (see the introduction). Both ends are one idea:
-the source's state is not yours to copy, and it is yours to advance.
+This is the pickup end of a symmetry some repos already run at the other end — the introduction names
+one, a tracker-specific layer that resolves the source task from the issue's close. Both ends are one
+idea: the source's state is not yours to copy, and it is yours to advance.
 
 An explicit decision.
 
