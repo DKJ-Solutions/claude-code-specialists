@@ -73,16 +73,17 @@ The hooks and blueprint a workflow carries "only where it needs them" -- this on
 
 ## What it expects from your repo -- the seam
 
-The `report-issue` skill and the CI mechanism need to know which Asana workspace and project a
-mirrored task lands in. That is answered by two functions in your repo-owned
+The `report-issue` skill needs to know which Asana workspace and project a mirrored task lands in,
+and the CI mechanism needs the project. That is answered by two functions in your repo-owned
 `scripts/repo-config.ps1` -- the same file `contributing-davekjohn` already dot-sources:
 
 - `Get-AsanaWorkspaceGid` -- the Asana workspace GID.
 - `Get-AsanaProjectGid` -- the project a mirrored task is created in.
 
 `adopt-bwj-asana` **proposes** these, it never places them: they state what your repo *is*, and the
-project may differ per brand. The CI half reads the same two values from repo variables
-(`ASANA_WORKSPACE_GID`, `ASANA_PROJECT_GID`) plus the secret `ASANA_PAT`.
+project may differ per brand. The CI half reads the project from the repo variable
+`ASANA_PROJECT_GID` and its token from the secret `ASANA_PAT` -- it addresses every task by GID, so
+it needs no workspace of its own.
 
 ## Enabling it
 

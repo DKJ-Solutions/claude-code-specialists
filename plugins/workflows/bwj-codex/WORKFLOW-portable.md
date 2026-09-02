@@ -203,8 +203,8 @@ settle it is to add a marker.
 
 ### 5. What still needs a person
 
-- **Setup, once per repo:** the repo secret `ASANA_PAT` and the variables `ASANA_WORKSPACE_GID` /
-  `ASANA_PROJECT_GID`, plus copying the two `templates/` files into `.github/`. The
+- **Setup, once per repo:** the repo secret `ASANA_PAT` and the variable `ASANA_PROJECT_GID`, plus
+  copying the two `templates/` files into `.github/`. The
   [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
 - **A token that can reach the tickets.** `ASANA_PAT` is a *user* token: it can only see the
   workspaces that user is a member of. An imported ticket often lives in the requester's own Asana

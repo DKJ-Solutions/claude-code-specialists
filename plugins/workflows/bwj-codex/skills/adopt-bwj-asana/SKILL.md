@@ -44,10 +44,14 @@ function returns whatever this repo sets. The two repos must make the same *kind
 The CI workflow needs, on the repo (Settings -> Secrets and variables -> Actions):
 
 - **Secret** `ASANA_PAT` -- an Asana personal access token with write access to the project.
-- **Variable** `ASANA_WORKSPACE_GID` -- same value as `Get-AsanaWorkspaceGid`.
 - **Variable** `ASANA_PROJECT_GID` -- same value as `Get-AsanaProjectGid`.
 
 Print these as a checklist. This skill does not set secrets.
+
+**There is deliberately no workspace variable here**, and do not add one back: the CI half addresses
+every task and project by GID, so it never needs the workspace. `Get-AsanaWorkspaceGid` from step 2
+stays -- `report-issue` reads it session-side, where it CREATES a task and the API does want a
+workspace.
 
 ## 4 -- make sure the classification labels exist
 
