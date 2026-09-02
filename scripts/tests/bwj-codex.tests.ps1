@@ -257,6 +257,69 @@ Assert-True ($null -eq (Get-PrioScoreFromTask -Task $emptyScore -FieldName 'Prio
 # path returns before any gh call, so it is safe to assert here with no network and no repo.
 Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'high' -Current @('high', 'tier-1'))) 'an issue already carrying the right prio label is left alone'
 
+# --- the stage sections --------------------------------------------------------------------------
+# The board's six sections are the cycle's stages, and a section is recognised by the NUMBER its name
+# starts with -- the words after it belong to the board and may change any day.
+Assert-Equal 3 (Get-StageFromSectionName -Name '3. In ontwikkeling - branch open') 'a numbered section yields its stage'
+Assert-Equal 3 (Get-StageFromSectionName -Name '3. Aan het bouwen')                'and still does after the words are rewritten -- the number is the only machine-read half'
+Assert-Equal 6 (Get-StageFromSectionName -Name '  6. Completed')                   'leading whitespace does not hide the number'
+Assert-Equal 2 (Get-StageFromSectionName -Name '2.')                               'a bare number and dot is enough'
+Assert-True ($null -eq (Get-StageFromSectionName -Name 'Waiting for more info'))   'an unnumbered section is on no pipeline'
+Assert-True ($null -eq (Get-StageFromSectionName -Name 'Stap 3: bouwen'))          'and a number that is not the prefix does not count -- the anchor is the start of the name'
+Assert-True ($null -eq (Get-StageFromSectionName -Name ''))                        'an empty name yields nothing rather than throwing'
+
+# The ceiling, asserted rather than assumed -- the same treatment the 'completes nothing' guarantee
+# gets. Stage 1 is the requester's untriaged inbox and 6 is their verdict that the work is good.
+Assert-True (-not (Test-StageIsWritable -Stage 1))     'stage 1 is the requester inbox and is never written'
+Assert-True (Test-StageIsWritable -Stage 2)            'stage 2 is ours'
+Assert-True (Test-StageIsWritable -Stage 5)            'and so is stage 5, the last one that is'
+Assert-True (-not (Test-StageIsWritable -Stage 6))     'stage 6 is Completed and is NEVER written -- the section-move twin of never completing a task'
+Assert-True (-not (Test-StageIsWritable -Stage $null)) 'no stage at all is not writable either'
+Assert-Equal 4 $script:WritableStages.Count            'and WritableStages holds exactly four -- 2, 3, 4, 5'
+
+# The derivation. A FLOOR and not a position: CI cannot see a branch with no pull request behind it,
+# so a card a session moved to 3 must not be dragged back to 2 by a sweep that knows less.
+$prOpen   = [pscustomobject]@{ number = 1; state = 'OPEN';   merged = $false }
+$prMerged = [pscustomobject]@{ number = 2; state = 'MERGED'; merged = $true }
+Assert-Equal 2 (Get-StageFloorForIssue -State 'OPEN')                               'an open issue with nothing linked is stage 2 -- filed, not started'
+Assert-Equal 3 (Get-StageFloorForIssue -State 'OPEN' -PullRequests @($prOpen))      'an open linked pull request is stage 3 -- development under way'
+Assert-Equal 4 (Get-StageFloorForIssue -State 'OPEN' -PullRequests @($prMerged))    'a merged one on a still-open issue is stage 4 -- the gate Dave named'
+Assert-Equal 4 (Get-StageFloorForIssue -State 'OPEN' -PullRequests @($prOpen, $prMerged)) 'and merged wins over open when both are linked'
+Assert-Equal 5 (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed')    'closed as completed is stage 5 -- ready for the requester to test'
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'not_planned')) 'closed as not planned stages nothing -- nothing was built, so there is nothing to test'
+Assert-Equal 5 (Get-StageFloorForIssue -State 'closed' -StateReason 'COMPLETED')    'and the state is read case-insensitively, since two GitHub surfaces disagree on it'
+foreach ($case in @(@('OPEN', ''), @('OPEN', 'reopened'), @('CLOSED', 'completed'))) {
+    Assert-True (Test-StageIsWritable -Stage (Get-StageFloorForIssue -State $case[0] -StateReason $case[1])) "the derivation never leaves the writable range ($($case[0])/$($case[1]))"
+}
+
+# Which board -- read off the task's own memberships, so no repo keeps six section GIDs in its config.
+# A task on an unnumbered board only is on no pipeline, which is how any other board is left alone.
+$onBoard = @(
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '1201907543904785' }; section = [pscustomobject]@{ gid = '11'; name = 'Backlog' } },
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '1216936502427971' }; section = [pscustomobject]@{ gid = '22'; name = '4. Ontwikkeling klaar' } })
+$sel = Select-StageMembership -Memberships $onBoard
+Assert-Equal 'stage-section'    $sel.Source                'a numbered section past an unnumbered one still resolves'
+Assert-Equal 4                  $sel.Membership.Stage      'and reports the stage the card is in now'
+Assert-Equal '1216936502427971' $sel.Membership.ProjectGid 'and the board it read that from'
+Assert-Equal '22'               $sel.Membership.SectionGid 'and that section GID, which is what a move needs'
+
+Assert-Equal 'none' (Select-StageMembership -Memberships $onBoard[0]).Source 'a task on an unnumbered board only is on no pipeline'
+Assert-Equal 'none' (Select-StageMembership -Memberships @()).Source         'and a task on no board at all is the same answer'
+$twoBoards = @(
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '111' }; section = [pscustomobject]@{ gid = '1'; name = '2. Filed' } },
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '222' }; section = [pscustomobject]@{ gid = '2'; name = '5. Testing' } })
+Assert-Equal 'ambiguous' (Select-StageMembership -Memberships $twoBoards).Source 'two numbered boards is two answers, and neither is taken'
+Assert-Equal 2           (Select-StageMembership -Memberships $twoBoards).Candidates.Count 'and both are named for the log'
+
+# The move request. Pure, and it refuses non-numeric input on BOTH sides -- a section name is read out
+# of Asana and a GID out of an issue body, and neither may reach a request URL unchecked.
+$move = New-AsanaSectionMoveRequest -Gid '1216905543348385' -SectionGid '1217315819287423'
+Assert-Equal 'POST' $move.Method 'a section move is a POST'
+Assert-Equal 'https://app.asana.com/api/1.0/sections/1217315819287423/addTask' $move.Uri 'to the section addTask endpoint -- the task is the payload, not the path'
+Assert-Equal '{"data":{"task":"1216905543348385"}}' $move.Body 'and the body carries the task GID'
+Assert-Throws { New-AsanaSectionMoveRequest -Gid 'abc' -SectionGid '123' } 'a non-numeric task GID is refused'
+Assert-Throws { New-AsanaSectionMoveRequest -Gid '123' -SectionGid 'x/y' } 'and so is a non-numeric section GID'
+
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""
 if ($script:fail -gt 0) {

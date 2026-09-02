@@ -1,15 +1,25 @@
 <#
 .SYNOPSIS
     Keep a BWJ store repo and its Asana board in step -- the CI half of the bwj-codex rule. It posts
-    an update on the Asana task mirrored from a GitHub issue, and carries that task's prio score back
-    the other way as a label on the issue. Copied into a BWJ store repo as
-    .github/scripts/asana-mirror.ps1 and driven by .github/workflows/asana-mirror.yml.
+    an update on the Asana task mirrored from a GitHub issue, moves that task to the board section
+    its GitHub state has reached, and carries the task's prio score back the other way as a label on
+    the issue. Copied into a BWJ store repo as .github/scripts/asana-mirror.ps1 and driven by
+    .github/workflows/asana-mirror.yml.
 
 .DESCRIPTION
     IT NEVER COMPLETES A TASK, AND THERE IS NO CODE PATH THAT CAN (Dave, September 1, 2026). Closing
     a GitHub issue says the work is built; it does not say the colleague who asked for it has seen it
-    work. Only that person resolves their own ticket, after testing. So this script writes exactly one
-    kind of thing into Asana -- a comment -- and the 'completed' field is not written anywhere in it.
+    work. Only that person resolves their own ticket, after testing. So this script writes two kinds
+    of thing into Asana -- a comment, and which section a task sits in -- and the 'completed' field is
+    not written anywhere in it.
+
+    THE SECTION MOVE IS THAT SAME GUARANTEE IN THE BOARD'S OWN CURRENCY, so it carries its own
+    ceiling: only stages 2 to 5 are ever written. Stage 6 is 'Completed' and stage 1 is the
+    requester's untriaged inbox -- Test-StageIsWritable is the pure guard that says so, and a card
+    already sitting in 6 is not moved at all. Every move is FORWARD, so a card a session advanced by
+    hand is never dragged back by a sweep that can see less than the session could; the one exception
+    is the reopen event, which is a real state change and lands the card wherever the issue's own
+    state now puts it.
 
     The one thing it writes OUTSIDE Asana is a prio label on a GitHub issue -- sweep (c) below. That
     is a different system and a different claim, and it leaves the guarantee above exactly where it
@@ -22,9 +32,11 @@
                        'owner/repo#n'. Both events post a comment: 'closed' names the pull request(s)
                        that closed the issue and says the work is ready to test, 'reopened' says to
                        hold off. An event ALWAYS comments -- it is a real state change, and a second
-                       close after a reopen is news again.
+                       close after a reopen is news again. Both then move the card to the stage the
+                       issue's state has reached: 5 on a close as completed, and on a reopen whatever
+                       the issue is now (the only backward move in this script).
 
-      -Mode reconcile  Three sweeps, for events that never arrived, and the only place de-duplication
+      -Mode reconcile  Four sweeps, for events that never arrived, and the only place de-duplication
                        applies:
                        (a) Asana -> GitHub: the project's incomplete tasks, reading a GitHub issue
                            URL from each task's notes and commenting when that issue is closed.
@@ -38,6 +50,12 @@
                            label that matches its task's Prio-Score. Walks GitHub rather than the
                            project, so it reaches an imported ticket too and needs no
                            ASANA_PROJECT_GID at all.
+                       (d) GitHub -> Asana, SECTIONS: this repo's issues, open and recently closed,
+                           each card moved to the stage its issue's state has reached. This one is
+                           not a backstop like (a) and (b): stages 2, 3 and 4 have no GitHub event
+                           this workflow subscribes to, so for three of the four writable stages the
+                           daily sweep IS the mechanism. It needs no ASANA_PROJECT_GID either -- the
+                           board is read off the task's own memberships, see below.
 
     How the Asana task is found -- Resolve-AsanaTaskRef, three matchers tried in this order:
 
@@ -51,23 +69,33 @@
     More than one DIFFERENT task in matcher 3 is reported as 'ambiguous' and skipped: the script never
     guesses which ticket an issue belongs to. Add a marker to settle it.
 
+    How the BOARD is found -- Select-StageMembership, and it is deliberately not a configured GID.
+    A task carries one section per project it is in, so the script reads the task's memberships and
+    takes the one whose section name begins with a stage number ('3. ...'). The number is the
+    machine-readable half and the words after it are the board's own, so renaming a section changes
+    nothing here. A task on no numbered section is on no pipeline, and nothing is written to it --
+    which is how a board that has not adopted the convention is left alone rather than guessed at.
+    Two different numbered boards is 'ambiguous' and skipped, the same refusal to guess as above.
+
     Auth: -AsanaPat (from the ASANA_PAT secret). Project: -ProjectGid (from the ASANA_PROJECT_GID
     variable), read by sweep (a) alone. Sweep (c) reads the score field by name (-PrioFieldName,
     default 'Prio-Score'). There is deliberately NO workspace parameter: every call this
-    script makes addresses a task or a project by GID. BOTH modes need `gh` on PATH with
-    GH_TOKEN set -- a close update asks GitHub which pull request closed the issue -- and sweep (b)
-    additionally needs -Repo (GITHUB_REPOSITORY). Where `gh` cannot answer, the update still goes out
-    and simply names no pull request.
+    script makes addresses a task, a project or a section by GID. BOTH modes need `gh` on PATH with
+    GH_TOKEN set -- a close update asks GitHub which pull request closed the issue -- and sweeps (b),
+    (c) and (d) additionally need -Repo (GITHUB_REPOSITORY). Where `gh` cannot answer, the update
+    still goes out and simply names no pull request, and sweep (d) derives no stage rather than
+    guessing one.
 
     The comment text is English, like everything else this repo ships. It is the workflow speaking,
     not the subject -- the same boundary a BWJ store repo already draws when it keeps its ticket
     headings English while the analysis under them follows whoever filed the ticket.
 
     The pure helpers (Resolve-AsanaTaskRef, Get-AsanaTaskGid, Get-AsanaGidsFromText,
-    New-MirrorComment, Get-MirrorCommentMarker, New-AsanaCommentRequest, Get-IssueRefFromNotes) take
-    no network and are what the source repo's scripts/tests/bwj-codex.tests.ps1 exercises. The script
-    runs its main flow only when invoked directly; dot-sourcing it loads the helpers and does nothing
-    else.
+    New-MirrorComment, Get-MirrorCommentMarker, New-AsanaCommentRequest, Get-IssueRefFromNotes,
+    Get-StageFromSectionName, Select-StageMembership, Get-StageFloorForIssue, Test-StageIsWritable,
+    New-AsanaSectionMoveRequest) take no network and are what the source repo's
+    scripts/tests/bwj-codex.tests.ps1 exercises. The script runs its main flow only when invoked
+    directly; dot-sourcing it loads the helpers and does nothing else.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -103,6 +131,15 @@ $script:AsanaApiBase = 'https://app.asana.com/api/1.0'
 # what Set-IssuePrioLabel enforces by removing the other three. Named here rather than inline so the
 # mapping helper and the enforcer cannot drift apart.
 $script:PrioLabels = @('very low', 'low', 'high', 'very high')
+
+# The stages this script is allowed to write, low to high. The board has six sections; 1 is the
+# requester's untriaged inbox and 6 is 'Completed', and both are theirs to fill. Named here rather
+# than inline so Test-StageIsWritable and the derivation cannot drift apart.
+$script:WritableStages = @(2, 3, 4, 5)
+
+# Stage -> section-GID map per project, filled on first use. A sweep over fifty issues on one board
+# asks Asana for that board's sections once.
+$script:StageSectionCache = @{}
 
 function Get-AsanaGidsFromText {
     <#
@@ -269,10 +306,137 @@ function New-MirrorComment {
     return ($lines -join "`n")
 }
 
+function Get-StageFromSectionName {
+    <#
+        The stage number a section's name declares, or $null when it declares none. Pure.
+
+        A pipeline section is named '<N>. <whatever the board likes>'. The NUMBER is the
+        machine-readable half and the words after it belong to the board, which is the same split the
+        cross-link already uses: a marker for the machine, prose for the reader. So renaming
+        '3. In ontwikkeling' to '3. Aan het bouwen' changes nothing here, and no repo has to keep six
+        section GIDs correct in its config.
+
+        It is also the whole containment. A section with no leading number yields $null, and a task
+        whose sections all yield $null is on no pipeline and is never written to -- so pointing this
+        script at a workspace full of other boards costs nothing.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Name)
+
+    $m = [regex]::Match($Name, '^\s*([0-9]+)\s*\.')
+    if (-not $m.Success) { return $null }
+    return [int]$m.Groups[1].Value
+}
+
+function Test-StageIsWritable {
+    <#
+        Is this a stage this script may put a card in? Pure, and the code-level twin of the rule that
+        the board's two ends belong to the requester: stage 1 is their untriaged inbox and stage 6 is
+        their verdict that the work is good. Only 2 to 5 are ours.
+
+        It is belt and braces on purpose. Get-StageFloorForIssue cannot return 1 or 6 either, so this
+        guard should never fire -- which is exactly the property the 'no code path can complete a
+        task' guarantee has, and the reason both are asserted rather than assumed.
+    #>
+    param([AllowNull()]$Stage)
+
+    if ($null -eq $Stage) { return $false }
+    return ($script:WritableStages -contains [int]$Stage)
+}
+
+function Select-StageMembership {
+    <#
+        Which pipeline board this task is on, read off the task's own memberships. Returns an object
+        shaped like Resolve-AsanaTaskRef's, for the same reason -- the caller logs the Source:
+
+            Source      'stage-section' | 'none' | 'ambiguous'
+            Membership  ProjectGid / SectionGid / Stage, or $null
+            Candidates  the distinct project GIDs seen, for the 'ambiguous' report
+
+        Pure -- no network. Asana gives a task one section per project, so a single numbered project
+        resolves to a single section. Two DIFFERENT numbered projects is two answers and this script
+        takes neither: a card on two pipelines is a board question, not a script question.
+    #>
+    param($Memberships)
+
+    $found = @()
+    foreach ($m in @($Memberships)) {
+        if (-not $m -or -not $m.section) { continue }
+        $stage = Get-StageFromSectionName -Name ([string]$m.section.name)
+        if ($null -eq $stage) { continue }
+        $found += [pscustomobject]@{
+            ProjectGid = [string]$m.project.gid
+            SectionGid = [string]$m.section.gid
+            Stage      = $stage
+        }
+    }
+
+    $projects = @($found | ForEach-Object { $_.ProjectGid } | Sort-Object -Unique)
+    if ($projects.Count -eq 0) { return [pscustomobject]@{ Source = 'none';      Membership = $null;     Candidates = @() } }
+    if ($projects.Count -gt 1) { return [pscustomobject]@{ Source = 'ambiguous'; Membership = $null;     Candidates = $projects } }
+    return                             [pscustomobject]@{ Source = 'stage-section'; Membership = $found[0]; Candidates = $projects }
+}
+
+function Get-StageFloorForIssue {
+    <#
+        The stage an issue's own GitHub state puts a floor under, or $null when it puts none. Pure.
+
+            open,   no pull request linked        2   the issue exists; nothing is being built yet
+            open,   a linked pull request open    3   development is under way
+            open,   a linked pull request merged  4   built and merged, and the issue is still open
+            closed as completed                   5   built -- ready for the requester to test
+            closed as not planned              $null  nothing was built, so there is nothing to stage
+
+        A FLOOR, not a position, and that is what makes the daily sweep safe to run. CI cannot see a
+        branch that has no pull request yet, so a card a session moved to 3 at `new-branch` must not
+        be dragged back to 2 by a sweep that knows less than the session did. Sync-AsanaTaskStage
+        therefore moves forward only, and the single backward move in this script is the reopen event,
+        which is a real state change and asks for it by name.
+
+        Never 1 and never 6, whatever it is handed. Those two are the requester's own ends of the
+        board -- see Test-StageIsWritable.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$State,
+        [AllowEmptyString()][string]$StateReason = '',
+        $PullRequests = @()
+    )
+
+    if ($State -and $State.ToUpperInvariant() -eq 'CLOSED') {
+        if ($StateReason -and $StateReason.ToLowerInvariant() -eq 'not_planned') { return $null }
+        return 5
+    }
+
+    $prs = @($PullRequests)
+    if ($prs | Where-Object { $_.merged -eq $true -or ([string]$_.state).ToUpperInvariant() -eq 'MERGED' }) { return 4 }
+    if ($prs | Where-Object { ([string]$_.state).ToUpperInvariant() -eq 'OPEN' })                           { return 3 }
+    return 2
+}
+
+function New-AsanaSectionMoveRequest {
+    <#
+        Pure: describe the POST that puts a task in a section. No network.
+
+        Separated from the call for the same reason New-AsanaCommentRequest is -- the URL and the body
+        are assertable without a network -- and it refuses a non-numeric GID on either side, so no
+        text read out of an issue body or a section name can reach a request URL.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Gid,
+        [Parameter(Mandatory = $true)][string]$SectionGid
+    )
+    if ($Gid -notmatch '^[0-9]+$')        { throw "Refusing to move a non-numeric task GID: '$Gid'." }
+    if ($SectionGid -notmatch '^[0-9]+$') { throw "Refusing to move a task into a non-numeric section GID: '$SectionGid'." }
+    [pscustomobject]@{
+        Method = 'POST'
+        Uri    = "$script:AsanaApiBase/sections/$SectionGid/addTask"
+        Body   = (ConvertTo-Json @{ data = @{ task = $Gid } } -Compress -Depth 5)
+    }
+}
+
 function New-AsanaCommentRequest {
     <#
-        Pure: describe the POST that adds a comment to a task. No network. This is the only write
-        this script knows how to build.
+        Pure: describe the POST that adds a comment to a task. No network. One of the two writes this
+        script knows how to build -- the other is New-AsanaSectionMoveRequest.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Gid,
@@ -378,6 +542,114 @@ function Get-ProjectIncompleteTasks {
     return $out
 }
 
+function Get-ProjectStageSections {
+    <#
+        One project's stage -> section-GID map, built from its section NAMES. Cached for the run.
+
+        A project with no numbered section gives an empty map, and that is the answer for a board
+        which has not adopted the convention -- nothing is created and nothing is guessed. Where two
+        sections claim the same number the first one the board lists wins, which is a board defect
+        this script reports rather than resolves.
+
+        An unreadable project gives an empty map too, reported and not thrown: one board this PAT
+        cannot see must not end a sweep over all the others.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectGid,
+        [Parameter(Mandatory = $true)][string]$Pat
+    )
+    if ($ProjectGid -notmatch '^[0-9]+$') { throw "Refusing to read a non-numeric project GID: '$ProjectGid'." }
+    if ($script:StageSectionCache.ContainsKey($ProjectGid)) { return $script:StageSectionCache[$ProjectGid] }
+
+    $map = @{}
+    $uri = "$script:AsanaApiBase/projects/$ProjectGid/sections?opt_fields=name&limit=100"
+    try {
+        while ($uri) {
+            $resp = Invoke-RestMethod -Method GET -Uri $uri -Headers @{ Authorization = "Bearer $Pat" }
+            foreach ($s in @($resp.data)) {
+                $stage = Get-StageFromSectionName -Name ([string]$s.name)
+                if ($null -eq $stage) { continue }
+                if ($map.ContainsKey($stage)) {
+                    Write-Host "  Asana project $ProjectGid has more than one section numbered $stage -- using the first one it lists."
+                    continue
+                }
+                $map[$stage] = [string]$s.gid
+            }
+            $uri = if ($resp.next_page -and $resp.next_page.uri) { $resp.next_page.uri } else { $null }
+        }
+    } catch {
+        Write-Host "  Sections of Asana project $ProjectGid are not readable ($($_.Exception.Message)) -- no card is moved on that board."
+    }
+    $script:StageSectionCache[$ProjectGid] = $map
+    return $map
+}
+
+function Sync-AsanaTaskStage {
+    <#
+        Put one card in the section its issue's state has reached. Returns $true when it moved.
+
+        The guards, in the order they are checked. Every one of them is a case where the board is
+        right and this script is not, which is why each returns quietly instead of failing:
+
+            no target stage        nothing derived an opinion -- an issue closed as not planned
+            not a writable stage   1 and 6 belong to the requester (Test-StageIsWritable)
+            task unreadable        deleted, or in a workspace this PAT is not a member of
+            task completed         a person resolved it; leave it exactly where they left it
+            on no numbered board   it is on no pipeline at all
+            on two numbered boards two answers, so neither is taken
+            already in stage 6     a person put it there, and nothing here takes it back out
+            already at or past     forward-only -- and what keeps the daily re-run silent
+            board has no such      a board that stops at five sections is not given a sixth
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Gid,
+        [AllowNull()]$TargetStage,
+        [Parameter(Mandatory = $true)][string]$Pat,
+
+        # A label for the log line, normally 'owner/repo#n'.
+        [string]$For = '',
+
+        # The reopen event, and nothing else, moves a card backward.
+        [switch]$AllowBackward
+    )
+
+    if ($null -eq $TargetStage) { return $false }
+    $stage = [int]$TargetStage
+    if (-not (Test-StageIsWritable -Stage $stage)) {
+        Write-Host "  Refusing to move Asana task $Gid to stage $stage -- only $($script:WritableStages -join ', ') are this workflow's to write."
+        return $false
+    }
+
+    $task = Get-AsanaTaskState -Gid $Gid -Pat $Pat `
+                -OptFields 'completed,name,memberships.project.gid,memberships.section.gid,memberships.section.name'
+    if ($null -eq $task) { return $false }
+    if ($task.completed) { return $false }
+
+    $ref = Select-StageMembership -Memberships $task.memberships
+    if ($ref.Source -eq 'none') { return $false }
+    if ($ref.Source -eq 'ambiguous') {
+        Write-Host "  Asana task $Gid sits on two numbered boards ($($ref.Candidates -join ', ')) -- refusing to guess which pipeline it belongs to."
+        return $false
+    }
+
+    $current = $ref.Membership.Stage
+    if ($current -ge 6) { return $false }
+    if ($current -eq $stage) { return $false }
+    if ($current -gt $stage -and -not $AllowBackward) { return $false }
+
+    $sections = Get-ProjectStageSections -ProjectGid $ref.Membership.ProjectGid -Pat $Pat
+    if (-not $sections.ContainsKey($stage)) {
+        Write-Host "  Asana project $($ref.Membership.ProjectGid) has no section numbered $stage -- $($task.name) stays in $current."
+        return $false
+    }
+
+    Invoke-AsanaRequest -Request (New-AsanaSectionMoveRequest -Gid $Gid -SectionGid $sections[$stage]) -Pat $Pat | Out-Null
+    $what = if ($For) { "$For -> " } else { '' }
+    $how  = if ($current -gt $stage) { ' (back, on a reopen)' } else { '' }
+    Write-Host "  $what$($task.name): stage $current -> $stage$how"
+    return $true
+}
+
 function Test-GitHubIssueClosed {
     param([Parameter(Mandatory = $true)][string]$IssueRef)
     $parts = $IssueRef -split '#'
@@ -389,39 +661,48 @@ function Test-GitHubIssueClosed {
     return ($LASTEXITCODE -eq 0 -and $state -eq 'CLOSED')
 }
 
-function Get-IssueClosure {
+function Get-IssueLinkState {
     <#
-        How an issue was closed: its state reason, and the pull request(s) that closed it -- the same
-        thing GitHub itself shows as "closed this as completed in #434".
+        Where an issue stands and which pull requests are linked to it: its state, its state reason,
+        and the pull request(s) that close or would close it -- the same thing GitHub itself shows as
+        "closed this as completed in #434".
 
         Asked through the GraphQL field built for exactly this question
         (closedByPullRequestsReferences) rather than reconstructed from the timeline, where a merge
-        commit, a manual close and a cross-reference all look similar enough to get wrong.
+        commit, a manual close and a passing cross-reference all look similar enough to get wrong.
+        That field answers for an OPEN issue too, which is what lets one query serve both callers:
+        the close update, which wants the pull request's number and title, and the stage sweep, which
+        wants to know whether that pull request is open or merged.
 
-        Never throws. An unreachable API, a missing `gh`, or an issue nobody linked a PR to all give
-        an empty PullRequests list, and the update then says the issue was closed by hand instead of
-        inventing a reference.
+        A cross-reference is deliberately NOT read. A pull request that merely mentions an issue says
+        nothing about whether anybody is building it, and stage 3 is a claim about work in progress.
+
+        Never throws. An unreachable API, a missing `gh`, or an issue nobody linked a pull request to
+        all give an empty PullRequests list -- the update then says the issue was closed by hand
+        instead of inventing a reference, and the stage sweep reads the issue as unstarted rather than
+        moving a card on a guess.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Repo,
         [Parameter(Mandatory = $true)][int]$Number
     )
 
-    $empty = [pscustomobject]@{ StateReason = ''; PullRequests = @() }
+    $empty = [pscustomobject]@{ State = ''; StateReason = ''; PullRequests = @() }
     $parts = $Repo -split '/'
     if ($parts.Count -ne 2) { return $empty }
 
-    $query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){stateReason closedByPullRequestsReferences(first:10,includeClosedPrs:true){nodes{number url title}}}}}'
+    $query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){state stateReason closedByPullRequestsReferences(first:10,includeClosedPrs:true){nodes{number url title state merged}}}}}'
     $ErrorActionPreference = 'Continue'
     $raw = (& gh api graphql -f query=$query -F "owner=$($parts[0])" -F "name=$($parts[1])" -F "number=$Number") 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $raw) {
-        Write-Host "  Could not ask GitHub which pull request closed $Repo#$Number -- the update will not name one."
+        Write-Host "  Could not ask GitHub about $Repo#$Number -- no pull request is named and no card is moved."
         return $empty
     }
     try {
         $issue = (($raw | Out-String) | ConvertFrom-Json).data.repository.issue
         if (-not $issue) { return $empty }
         return [pscustomobject]@{
+            State        = ([string]$issue.state).ToUpperInvariant()
             StateReason  = ([string]$issue.stateReason).ToLowerInvariant()
             PullRequests = @($issue.closedByPullRequestsReferences.nodes)
         }
@@ -466,14 +747,22 @@ function Invoke-EventMode {
     }
     # No de-duplication here on purpose: an event is a real state change, so a close after a reopen
     # is news again and gets said again.
+    $link = Get-IssueLinkState -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1])
     $text = if ($Event -eq 'closed') {
-        $closure = Get-IssueClosure -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1])
-        New-MirrorComment -IssueRef $IssueRef -Event 'closed' -ClosedBy $closure.PullRequests -StateReason $closure.StateReason
+        New-MirrorComment -IssueRef $IssueRef -Event 'closed' -ClosedBy $link.PullRequests -StateReason $link.StateReason
     } else {
         New-MirrorComment -IssueRef $IssueRef -Event 'reopened'
     }
     Add-AsanaComment -Gid $ref.Gid -Text $text -Pat $AsanaPat
     Write-Host "Asana task $($ref.Gid) updated: $IssueRef $Event (matched by $($ref.Source)). The task was NOT completed -- that is the requester's call."
+
+    # And the card follows the news. A reopen is the one moment a card may go backward: it lands
+    # wherever the issue's own state now puts it, which is out of the test column and back into the
+    # one the work is actually in. The state comes from the query above rather than from -Event, so a
+    # close the API has already superseded cannot move a card on a stale reading.
+    $stage = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason -PullRequests $link.PullRequests
+    Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $stage -Pat $AsanaPat -For $IssueRef `
+        -AllowBackward:($Event -eq 'reopened') | Out-Null
 }
 
 function Update-MirroredTask {
@@ -683,6 +972,46 @@ function Invoke-LabelSweep {
     return $done
 }
 
+function Invoke-StageSweep {
+    <#
+        Sweep (d): this repo's issues -- open, and closed within the -SinceDays window -- each card
+        moved to the stage its issue's state has reached.
+
+        THIS ONE IS NOT A BACKSTOP, and that is what separates it from (a) and (b). Stages 2, 3 and 4
+        have no GitHub event this workflow subscribes to: an issue is filed, a branch opens and a pull
+        request merges without `issues: closed` ever firing. So for three of the four writable stages
+        the daily run is the mechanism rather than the safety net, and only stage 5 has an event of
+        its own.
+
+        It walks GitHub rather than the Asana project, for the same two reasons sweep (c) does: it
+        reaches a ticket imported FROM the board, whose task carries no GitHub back-link, and it needs
+        no ASANA_PROJECT_GID -- the board comes off the task's own memberships.
+
+        Two reads per issue that carries a task: one GraphQL for the issue's state and linked pull
+        requests, one Asana GET for the card's current section. An issue with no task costs neither,
+        because Resolve-AsanaTaskRef is pure and runs first.
+    #>
+    if (-not $Repo) {
+        Write-Host 'GITHUB_REPOSITORY is not set -- the stage sweep is skipped.'
+        return 0
+    }
+
+    $issues = @(Get-OpenIssues -Repo $Repo) + @(Get-ClosedIssues -Repo $Repo -SinceDays $SinceDays)
+    $moved  = 0
+    $carded = 0
+    foreach ($i in $issues) {
+        $ref = Resolve-AsanaTaskRef -IssueBody ([string]$i.body)
+        if (-not $ref.Gid) { continue }
+        $carded++
+        $link  = Get-IssueLinkState -Repo $Repo -Number ([int]$i.number)
+        if (-not $link.State) { continue }
+        $stage = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason -PullRequests $link.PullRequests
+        if (Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $stage -Pat $AsanaPat -For "$Repo#$($i.number)") { $moved++ }
+    }
+    Write-Host "Stage sweep: $($issues.Count) issue(s) examined, $carded carrying an Asana task, $moved card(s) moved."
+    return $moved
+}
+
 function Invoke-ReconcileMode {
     if (-not $AsanaPat) { throw 'ASANA_PAT is not set.' }
     $done = 0
@@ -694,6 +1023,11 @@ function Invoke-ReconcileMode {
     # count covering both would say neither.
     $labelled = Invoke-LabelSweep
     Write-Host "Prio labels done -- $labelled issue(s) relabelled."
+
+    # And (d) again separately: it moves CARDS. Three counts, three claims -- a single total would
+    # let a quiet day and a broken sweep read the same.
+    $staged = Invoke-StageSweep
+    Write-Host "Stage sections done -- $staged card(s) moved, still 0 completed."
 }
 
 function Invoke-Main {

@@ -1,7 +1,10 @@
 # Copied from bwj-codex/templates/asana-mirror.yml into .github/workflows/asana-mirror.yml.
 # Posts an update on the mirrored Asana task when its GitHub issue is closed (and the counterpart on
-# reopen), with a daily reconciliation sweep (both directions) for missed events. It never completes a
-# task -- the colleague who filed the ticket does that, after testing. See bwj-codex/WORKFLOW-portable.md.
+# reopen), and moves that task to the board section its issue's state has reached. Plus a daily
+# reconciliation sweep (both directions) for missed events -- and for the three stages that have no
+# GitHub event at all, that sweep IS the mechanism rather than a backstop. It never completes a task
+# and never puts a card in the 'Completed' section -- the colleague who filed the ticket does both,
+# after testing. See bwj-codex/WORKFLOW-portable.md.
 name: asana-mirror
 
 on:

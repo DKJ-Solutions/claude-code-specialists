@@ -5,10 +5,12 @@ description: >-
   its issue type and the `tier-1` reach label), then a colleague-facing Asana task, cross-linked both
   ways. Use this in BWJ-ecommerce/smartwatchbanden or BWJ-ecommerce/xoxowildhearts whenever a real
   finding needs tracking: a bug, a broken customer-facing behaviour, a stale doc, a decision that is
-  not yours to make. The GitHub issue always gets created
+  not yours to make. The Asana card lands in the board's stage-2 section -- tracked on GitHub now --
+  because the board's sections are the cycle's stages. The GitHub issue always gets created
   even if Asana is unreachable, so the source-of-truth guarantee holds. Nothing here resolves a ticket
   and nothing downstream does either: closing the GitHub issue only makes the asana-mirror CI workflow
-  post an update saying the work is ready to test, and the colleague who filed it ticks it off.
+  post an update saying the work is ready to test and move the card to stage 5, and the colleague who
+  filed it ticks it off.
 ---
 
 # report-issue -- the BWJ GitHub-first, Asana-mirrored filing procedure
@@ -75,6 +77,22 @@ Tracked on GitHub: <issue URL>
 Create it in the project `Get-AsanaProjectGid` names, in the workspace `Get-AsanaWorkspaceGid`
 names, via the Asana MCP `create task` tool. Note the task GID and URL.
 
+**Put it straight into the section whose name starts with `2.`** -- the board's sections are the
+cycle's stages, and stage 2 means *tracked on GitHub now*. Read the project's sections, take the one
+numbered 2, and pass it as the task's section on creation; the words after the number are the team's
+and tell you nothing, so match on the **number** only.
+[Step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-six-stages)
+has the whole stage model. **If the project has no numbered sections, place nothing and say so** --
+that board is not a pipeline, and the daily sweep will not move this card either.
+
+**On a ticket that came the other way** -- filed in Asana by a colleague and copied into an issue for
+analysis -- the task already exists and is sitting in stage 1, their untriaged inbox. Filing the
+GitHub issue is exactly what stage 2 records, so **move that card to the `2.` section** rather than
+creating a second task. Leaving it in 1 is the failure inbound
+[#1217](https://github.com/DaveKJohn/claude-code-specialists/issues/1217) measured: the issue existed
+and the board still read `New`, so to the colleague waiting on it the request looked untouched, and
+they chased it in the one place that had no answer.
+
 If Asana is unreachable: report the GitHub issue URL, say the mirror did not happen and why, and
 stop. The issue can be mirrored later by re-running this skill's steps 2-3.
 
@@ -97,8 +115,17 @@ stop. The issue can be mirrored later by re-running this skill's steps 2-3.
 
 Give both URLs and stop. **Do not resolve anything, and do not promise that anything else will.**
 When the GitHub issue is closed, the `asana-mirror` CI workflow posts an update on the Asana task
-saying the work is ready to test; the task stays open until the colleague who filed it ticks it off.
-Nothing in this chain -- not you, not the CI -- completes a task.
+saying the work is ready to test and moves the card to stage 5; the task stays open until the
+colleague who filed it ticks it off. Nothing in this chain -- not you, not the CI -- completes a task,
+and nothing puts a card in stage 6 either.
+
+**Say which section the card is in**, alongside the two URLs. It is the half a colleague can see
+without a GitHub account, and it is the one part of this run somebody may need to correct.
+
+**And when a branch is opened for this issue, the card moves to the `3.` section in the same
+breath.** That hop is a session's to make: GitHub has no signal for a branch that has no pull request
+behind it yet, so the daily sweep cannot see the work start. Nothing undoes the move -- the sweep
+derives a floor, never a position.
 
 **Name the type and the tier you chose, and why.** You infer both rather than asking for them -- the
 reach question is answerable from the finding itself, and the whole backfill of 135 issues was
