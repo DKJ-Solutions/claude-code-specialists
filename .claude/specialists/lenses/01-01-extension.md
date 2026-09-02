@@ -40,7 +40,7 @@ product: agent defs, manuals, docs, and tooling.
   or it is complete, current, and **transcribes a cause that does not exist**. So before treating a
   briefing as the work list, read the repo's own answer — `git status`/`git log`, the **pending entries**
   in [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md) (one `###` per change under
-  `## [Unreleased]`, furthest reach first), **`contributing-davekjohn/development.md` on the trunk** (it
+  `## [Unreleased]`, furthest reach first), **`contributing-davekjohn/development/<branch>.md` on the trunk** (it
   exists only while a branch is open, so a copy sitting on `main` is a silent half-state),
   **`git ls-remote --heads origin` for parked branches** — a parked branch has no PR by design, so every
   other item in this list is blind to it; the mechanism and what to do when you find one are in

@@ -520,7 +520,12 @@ function Format-EntryLinkGuidance {
         # Repo-root-relative directory the entry itself sits in. Defaults to this format's own.
         [string]$EntryDirRel = ''
     )
-    if (-not $EntryDirRel) { $EntryDirRel = (Get-BranchFilePaths).Directory }
+    # THE DOCUMENT'S OWN DIRECTORY, WHICH IS development/ SINCE #1255 -- not the workflow folder above it.
+    # This is the whole reason the third branch below exists, and it has been sitting unused: while the file
+    # shared CHANGELOG.md's directory the middle branch answered, and the author was told to write links
+    # exactly as they read. One level deeper that advice is wrong, and the existing else-branch already says
+    # the right thing, so the repair is this default rather than any new wording.
+    if (-not $EntryDirRel) { $EntryDirRel = (Get-BranchFilePaths).DevelopmentDir }
     $destNorm  = ($DestDirRel  -replace '\\', '/').Trim('/')
     $entryNorm = ($EntryDirRel -replace '\\', '/').Trim('/')
     $fragments = if (-not $destNorm) {
@@ -4604,7 +4609,9 @@ function Get-EntryLinkFindings {
         # that repoints Get-ChangelogPath back there.
         [string]$DestDirRel = ''
     )
-    if (-not $EntryDirRel) { $EntryDirRel = (Get-BranchFilePaths).Directory }
+    # development/ SINCE #1255, matching the writer above -- this is where the author's link is written, and
+    # this suggester's whole job is to say "you wrote it correct for HERE and it lands one level up".
+    if (-not $EntryDirRel) { $EntryDirRel = (Get-BranchFilePaths).DevelopmentDir }
     $destDir = if ($DestDirRel) { Join-Path $RepoRoot ($DestDirRel -replace '/', '\') } else { $RepoRoot }
     $findings = @()
     foreach ($target in (Get-EntryLinkTargets -EntryText $EntryText)) {
@@ -5111,6 +5118,16 @@ function Get-BranchFilePaths {
     #>
     return [pscustomobject]@{
         Directory        = 'contributing-davekjohn'
+        # THE DIRECTORY THE WRITER USES SINCE SEPTEMBER 3, 2026 (#1255). One file per branch, named after
+        # the branch -- Get-BranchFileWriterPath composes it, and nothing else may. The five names below
+        # are what a READER still recognises; this is the only thing anything writes.
+        DevelopmentDir   = 'contributing-davekjohn/development'
+        # THE SHARED NAME, NOW READ AND NEVER WRITTEN -- the sixth rename, and the first one made for a
+        # reason other than wording. Every branch wrote this ONE path, so every merge to main put its copy
+        # on the trunk and left every other open PR conflicting on it: measured September 2, 2026 at 7 of 7
+        # open branches, against 4 of 7 for all genuine code overlap combined. File/Cycle/Deployment keep
+        # naming it because ~8 call sites use them to ask "is this path a branch document?" and the answer
+        # for this path is still yes; ask Test-IsBranchFilePath instead, which knows the directory too.
         File             = 'contributing-davekjohn/development.md'
         # Cycle and Deployment both answer the same path now, deliberately, so every caller that asks for
         # one of the two halves keeps working and gets the one document. They are kept as names rather than
@@ -5133,6 +5150,77 @@ function Get-BranchFilePaths {
         PriorFolderOlderCycle       = 'workflow-davekjohn/branch/branch-progress.md'
         PriorFolderOlderDeployment  = 'workflow-davekjohn/branch/branch-changelog.md'
     }
+}
+
+function Get-BranchFileWriterPath {
+    <#
+        The path a WRITER creates for $Branch: one file per branch, inside the development directory.
+
+        THE ONE PLACE THE PER-BRANCH NAME IS COMPOSED (#1255, September 3, 2026). Every other name in
+        Get-BranchFilePaths is a fixed string a reader recognises; this one is computed, so it gets a
+        function rather than a table row -- and having exactly one composer is what keeps the writer and
+        the reader agreeing on a name neither can look up.
+
+        WHY THE BRANCH IS IN THE FILENAME AGAIN, having been taken out on August 23, 2026. That decision
+        reasoned: "it cannot collide -- git already tracks this file per branch, so each branch carries its
+        own version of the same path and a checkout swaps them. The per-branch filename was solving a
+        problem version control had already solved." The first half is true of CHECKOUT and false of MERGE,
+        and it is the merge that matters: git tracking one path per branch is exactly what makes two
+        branches' versions of it conflict when either lands on the trunk. Measured September 2, 2026 --
+        every one of the 7 open branches conflicted on that path, while all genuine code overlap together
+        accounted for 4, and 11 hand-made reconciliation merges appeared on main in two days where the
+        preceding weeks had none.
+
+        THE HALF OF THAT REASONING THAT STILL STANDS is the rest of the sentence -- "it cost a repo root
+        that filled up with other people's work" -- and it is answered by WHERE these go rather than by
+        arguing with it. The old per-branch entries sat in the REPO ROOT; these sit in one directory that
+        the fold empties as each branch lands, so it holds exactly the branches that are live. That is a
+        useful thing to be able to list, which the root full of stale entries never was.
+
+        SafeName IS branch-info's, not a second substitution here: a consumer's prefix table is theirs, and
+        a name computed two ways is a name that eventually disagrees. Where that repo-owned lib is absent
+        the one substitution is done inline -- the same degradation check-branch-entry.ps1 already makes,
+        for the same reason.
+    #>
+    param([Parameter(Mandatory)][string]$Branch)
+
+    $safe = if (Get-Command Get-BranchInfo -ErrorAction SilentlyContinue) {
+        [string](Get-BranchInfo -Branch $Branch).SafeName
+    } else { $Branch -replace '/', '-' }
+    if (-not $safe) { $safe = $Branch -replace '/', '-' }
+    return "$((Get-BranchFilePaths).DevelopmentDir)/$safe.md"
+}
+
+function Test-IsBranchFilePath {
+    <#
+        Is this repo-relative path one of the branch's working documents -- today's per-branch file, the
+        shared name it replaced, or any of the legacy names?
+
+        ONE MEMBERSHIP TEST INSTEAD OF THREE ad-hoc lists. check-plugin-integrity asked this question in
+        three places (the link base, the lifecycle scan, the script-contract scan) by building its own
+        array of Get-BranchFilePaths rows, and each list had drifted to a different subset -- one carried
+        File plus four legacy names, another File plus two. A directory cannot be expressed as a row in
+        any of them, so the three would have had to learn the same new rule three times.
+
+        SLASH-AGNOSTIC, because the callers build $rel from Windows paths while the table hands out forward
+        slashes -- the exact mismatch that once made one of those three exclusions silently do nothing.
+    #>
+    param([string]$Rel)
+
+    if (-not $Rel) { return $false }
+    $norm = ($Rel -replace '\\', '/').TrimStart('./')
+    $paths = Get-BranchFilePaths
+    $dir = [string]$paths.DevelopmentDir
+    # Inside the per-branch directory: any .md there is one of these documents, whatever the branch is
+    # called. Asking by prefix rather than by composing a name means this answers for a branch this
+    # checkout has never heard of -- which is the fold's case, on the trunk, after somebody else's merge.
+    if ($norm -like "$dir/*.md") { return $true }
+    foreach ($key in @('File', 'PriorNameFile', 'LegacyCycle', 'LegacyDeployment', 'OlderCycle',
+            'OlderDeployment', 'PriorFolderFile', 'PriorFolderLegacyCycle', 'PriorFolderLegacyDeployment',
+            'PriorFolderOlderCycle', 'PriorFolderOlderDeployment')) {
+        if ($norm -eq [string]$paths.$key) { return $true }
+    }
+    return $false
 }
 
 function Resolve-BranchFilePath {
@@ -5191,7 +5279,12 @@ function Resolve-BranchFilePath {
     param(
         [Parameter(Mandatory)][ValidateSet('File', 'Cycle', 'Deployment')][string]$Kind,
         [Parameter(Mandatory, ParameterSetName = 'Tree')][string]$RepoRoot,
-        [Parameter(Mandatory, ParameterSetName = 'Reader')][scriptblock]$Reader
+        [Parameter(Mandatory, ParameterSetName = 'Reader')][scriptblock]$Reader,
+        # THE BRANCH THIS IS BEING ASKED FOR (#1255). Optional, and its absence is not a failure: the
+        # per-branch name simply drops out of the candidates and the shared name leads, which is exactly
+        # the behaviour every caller had before. A caller that WRITES must pass it, or it writes the
+        # shared name and puts the collision back.
+        [string]$Branch = ''
     )
     # The default reader, so the loops below have exactly one shape. A PLAIN scriptblock, deliberately not
     # .GetNewClosure(): a closure is a new dynamic module whose scope chain reaches the global scope rather
@@ -5210,10 +5303,49 @@ function Resolve-BranchFilePath {
     $trunk = Get-BranchTrunkName
     # 'File' is the name a caller uses when it means the document rather than one of its two jobs; Cycle and
     # Deployment resolve to the same path and are kept so a gate can still say WHICH half it was reading.
-    $current = if ($Kind -eq 'File') { [string]$paths.File } else { [string]$paths.$Kind }
+    $shared = if ($Kind -eq 'File') { [string]$paths.File } else { [string]$paths.$Kind }
+
+    # THE BRANCH, WHERE IT WAS NOT PASSED (#1255). Best-effort and Tree-arm only: the Reader arm answers
+    # for a COMMIT, and the branch this checkout happens to stand on is not a fact about that commit --
+    # guessing there would name a path the tree being read does not carry, which is the failure -Reader
+    # exists to remove. A detached HEAD answers 'HEAD' and is discarded, as is the trunk: the trunk is
+    # where the fold REMOVES these documents, so composing one for it would invent a file that must not
+    # exist.
+    $trunk = Get-BranchTrunkName
+    if (-not $Branch -and $PSCmdlet.ParameterSetName -eq 'Tree') {
+        try {
+            $head = (& git -C $RepoRoot rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
+            if ($head -and $head -ne 'HEAD') { $Branch = $head }
+        } catch { $Branch = '' }
+    }
+    $perBranch = if ($Branch -and $Branch -ne $trunk) { Get-BranchFileWriterPath -Branch $Branch } else { '' }
+
+    # EVERY FILE IN THE DIRECTORY IS A CANDIDATE, not just this branch's. The fold runs on the TRUNK after
+    # somebody else's merge, so the document it must find is named after a branch this checkout was never
+    # on -- and the whole resolution rule is "which file DECLARES this branch", which can only be applied
+    # to a file it has been handed. Tree arm only, for the same reason the branch guess is: the Reader
+    # contract takes one path and returns its text, so it cannot list anything.
+    $dirFiles = @()
+    if ($PSCmdlet.ParameterSetName -eq 'Tree') {
+        $dirFull = Join-Path $RepoRoot ([string]$paths.DevelopmentDir -replace '/', '\')
+        if (Test-Path -LiteralPath $dirFull -PathType Container) {
+            $dirFiles = @(Get-ChildItem -LiteralPath $dirFull -Filter '*.md' -File -ErrorAction SilentlyContinue |
+                Sort-Object Name |
+                ForEach-Object { "$([string]$paths.DevelopmentDir)/$($_.Name)" } |
+                Where-Object { $_ -ne $perBranch })
+        }
+    }
+
+    # The fallback a WRITER gets when nothing claims the branch: the per-branch name where one can be
+    # composed, and only otherwise the shared name every branch used to share.
+    $current = if ($perBranch) { $perBranch } else { $shared }
     $legacyKind = if ($Kind -eq 'File') { 'Cycle' } else { $Kind }
     $candidates = @(
-        $current,
+        # THIS BRANCH'S OWN FILE FIRST, then the others in the directory, then the shared name it replaced,
+        # then every legacy name in the order they were retired.
+        $perBranch
+    ) + $dirFiles + @(
+        $shared,
         # THE PRE-#963 FILENAME, immediately after today's and before the branch/ pair, because it is the
         # nearest predecessor: every branch open on August 27, 2026 carries it. It answers every Kind for
         # the same reason PriorFolderFile does -- it was one document too, not a half.

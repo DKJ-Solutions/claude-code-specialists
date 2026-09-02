@@ -4,7 +4,7 @@ description: >-
   Fold a branch's changelog entry into CHANGELOG.md via the shared, centralized fold script from the
   plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate this script
   locally. Use this on main, immediately after merging a branch, to fold the entry
-  (the DEPLOY section of contributing-davekjohn/development.md, or an older branch/ pair, or a pre-split
+  (the DEPLOY section of contributing-davekjohn/development/<branch>.md, or an older branch/ pair, or a pre-split
   <branch-name>.md in the repo root) into CHANGELOG.md --
   a flat ranked list with no section headings, where each entry lands at the position its own
   Significance sections rank it at (furthest reach first, highest significance first within a tier) -- and then
@@ -26,10 +26,13 @@ where a conflict is pure noise, because the two entries never actually disagree.
 writes its **own** entry file, and this skill folds it in after the merge, when the conflict window is
 already closed.
 
-**The entry is the DEPLOY section of `contributing-davekjohn/development.md`** — a fixed path, the same on
-every branch. Git tracks it per branch, so branches in flight cannot collide on it. The phases above that
-section are the step list; they are never folded, and the document's own heading is what the fold reads the
-branch name back off in order to find the PR.
+**The entry is the DEPLOY section of `contributing-davekjohn/development/<branch>.md`** — one file per
+branch, named after it, so two branches in flight never write one path. This replaced a single shared
+`development.md` on September 3, 2026, and the reasoning it replaced is worth stating because it sounds
+right: git tracks a path per branch, so branches "cannot collide" on it. That holds for a **checkout** and
+is precisely what makes their two versions **conflict** at a **merge** — every open PR was left conflicting
+each time any other one landed. The phases above that section are the step list; they are never folded, and
+the document's own heading is what the fold reads the branch name back off in order to find the PR.
 
 **Which means the fold splits before it folds** (August 23, 2026). It takes the section from the DEPLOY
 heading down and leaves the plan where it is — publishing somebody's ticked checkboxes as a change
@@ -155,7 +158,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
 lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
 for them the line above is the correct one.
 
-Without `-Branch` it folds everything it finds: `contributing-davekjohn/development.md` if it holds an entry, plus
+Without `-Branch` it folds everything it finds: `contributing-davekjohn/development/<branch>.md` if it holds an entry, plus
 any pre-split entry file in the root. An optional `-RepoRoot <path>`
 overrides which repo root the script writes to — for a consumer that runs the fold from a
 temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere) and wants the fold
@@ -165,7 +168,7 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 1. Folds each entry into `CHANGELOG.md`, with the PR number + link included (retrieved via
    `gh pr list` — keyed on `-Branch`, or on the name in the document's heading, or for a pre-split entry
    on its file name).
-2. Clears it afterwards: **`contributing-davekjohn/development.md` is removed** — one deletion, which
+2. Clears it afterwards: **`contributing-davekjohn/development/<branch>.md` is removed** — one deletion, which
    clears the plan along with the entry since they are sections of one file. A pre-split root entry file is
    removed as it always was, and an older `branch/` step list is removed beside it.
 

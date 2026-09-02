@@ -191,8 +191,12 @@ try {
     Assert-Equal 'main' (Get-HeadBranch -Dir $fa) "open: the PRIMARY still sits on main (the load-bearing guarantee)"
     # The -RepoRoot delegation: the dossier belongs to the lane, and the primary must not have gained
     # a copy. Asserting only the first half would pass for a script that wrote into both.
-    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development.md')) "open: the development document is written in the lane"
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development.md'))) "open: the primary did NOT gain one"
+    # PER-BRANCH SINCE #1255, so the path is composed from the branch the lane was opened for rather than
+    # written out -- which is also what makes the second half meaningful: the primary must not gain THAT
+    # file, and a literal would stop naming it the next time this document is renamed.
+    $laneDocRel = (Get-BranchFileWriterPath -Branch 'feat/lane-a-v1') -replace '/', '\'
+    Assert-True (Test-Path -LiteralPath (Join-Path $laneA $laneDocRel)) "open: the development document is written in the lane"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa $laneDocRel))) "open: the primary did NOT gain one"
     # AND THE LANE IS ON ORIGIN THE MOMENT IT OPENS (#900). Asserted here rather than left to
     # new-branch's own suite, because a lane is the case that needs it most: opening one is by definition
     # work running beside something else, which is exactly when the other side cannot see a local branch.

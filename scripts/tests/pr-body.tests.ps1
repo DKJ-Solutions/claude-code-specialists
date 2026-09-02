@@ -762,8 +762,8 @@ foreach ($f in $oldFolderForms) {
 # placeholder a fresh template is scaffolded with, and nothing else would notice.
 Assert-Equal $known[$known.Count - 1] (Get-PrTemplateCanonicalPlaceholder) `
     'the canonical placeholder is the last entry, so an appended form did not land mid-list'
-Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'development\.md') `
-    'and it names the document by its current filename'
+Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'development/<branch>\.md') `
+    'and it names the document by its current path, which is per-branch since #1255'
 
 $canonical = Get-PrTemplateCanonicalPlaceholder
 Assert-True ($known -contains $canonical) `

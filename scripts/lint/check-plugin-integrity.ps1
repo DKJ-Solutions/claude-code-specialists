@@ -840,11 +840,21 @@ foreach ($lf in $linkFiles) {
     # the head is guidance comments and phase headings, which carry no links at all in the scaffold, and an
     # author who does write one in a step means the same path the section below asks for. Two bases inside
     # one document would be a rule nobody could apply while writing.
+    #
+    # AND SINCE #1255 THE DOCUMENT SITS ONE LEVEL DEEPER THAN ITS DESTINATION, which is the one thing the
+    # per-branch path costs. While it shared CHANGELOG.md's directory, a link written for the entry was
+    # correct in both places at once and this rule was a formality; now the file lives in development/ and
+    # its text still lands one level up. So the rule that was already here -- resolve an entry's links from
+    # where the ENTRY lands, not from where the file sits -- is what makes the move safe, and the scaffold's
+    # own guidance line says the same thing to whoever is writing.
+    $entryDirForLinks = '\' + ((Get-BranchFilePaths).DevelopmentDir -replace '/', '\') + '\'
     $entryRelsForLinks = @((Get-BranchFilePaths).File, (Get-BranchFilePaths).LegacyDeployment,
         (Get-BranchFilePaths).OlderDeployment) |
         ForEach-Object { '\' + ($_ -replace '/', '\') }
     if ($lf -match '\\personas\\.*-persona\.md$') {
         $dir = Join-Path $RepoRoot '.claude\extensions'
+    } elseif ($lf.Contains($entryDirForLinks) -and $lf.EndsWith('.md')) {
+        $dir = $changelogDirForLinks
     } elseif (@($entryRelsForLinks | Where-Object { $lf.EndsWith($_) }).Count -gt 0) {
         $dir = $changelogDirForLinks
     } else {
@@ -1385,10 +1395,11 @@ $lifecycleFiles = @($linkFiles | Where-Object {
     # under the branch directory, which WAS only branch files; the seam's Directory is the workflow folder
     # itself now, so the same expression would wave through the folder's README, CLAUDE.md and
     # CONTRIBUTING.md -- three documents that print lifecycle commands and are exactly what this check is for.
-    $lcBranchDoc = @((Get-BranchFilePaths).File, (Get-BranchFilePaths).LegacyCycle,
-        (Get-BranchFilePaths).LegacyDeployment, (Get-BranchFilePaths).OlderCycle,
-        (Get-BranchFilePaths).OlderDeployment) | ForEach-Object { $_ -replace '/', '\' }
-    if ($lcBranchDoc -contains $rel) { return $false }
+    # ONE MEMBERSHIP TEST SINCE #1255, where this built its own list of table rows. A directory cannot BE a
+    # row, and this was one of three copies that would each have had to learn that separately -- copies which
+    # had already drifted to different subsets of the same table. Test-IsBranchFilePath normalises the
+    # separators itself, which is the thing the sibling copy records getting wrong on its first run.
+    if (Test-IsBranchFilePath -Rel $rel) { return $false }
     return $true
 })
 
@@ -1810,7 +1821,11 @@ if (Test-CheckEnabled 'branch-template') {
         $btCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
         if (Test-Path -LiteralPath $btCfg) { . $btCfg }
         . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
-        $btRel  = (Get-BranchFilePaths).File
+        # THROUGH THE RESOLVER SINCE #1255, not off the table. The document is per-branch now, so the
+        # shared name this used to read exists on no new branch at all -- and this check reports what it
+        # FINDS, so a path that is simply absent reads as "no branch in progress" rather than as an error.
+        # A silent pass is the one failure mode a gate must not have; the resolver knows every name.
+        $btRel  = Resolve-BranchFilePath -Kind Deployment -RepoRoot $RepoRoot
         $btFull = Join-Path $RepoRoot ($btRel -replace '/', '\')
         $btOnDisk = if (Test-Path -LiteralPath $btFull) {
             [System.IO.File]::ReadAllText($btFull, [System.Text.Encoding]::UTF8)
@@ -2311,11 +2326,11 @@ $scFiles = @($linkFiles | Where-Object {
     # Get-BranchFilePaths returns forward slashes while $rel is built from a
     # Windows path, so the two never compared equal and the exclusion did nothing. The step list of the very
     # branch that added this check was then reported for QUOTING a stale count while explaining it.
-    $scPaths = Get-BranchFilePaths
-    $scBranchFiles = @($scPaths.File, $scPaths.LegacyCycle, $scPaths.LegacyDeployment,
-        $scPaths.OlderCycle, $scPaths.OlderDeployment) |
-        ForEach-Object { $_ -replace '/', '\' }
-    if ($scBranchFiles -contains $rel) { return $false }
+    # THE NORMALISATION MOVED INTO Test-IsBranchFilePath (#1255) and the lesson above is why it is that
+    # function's job rather than each caller's: three copies asked this question and only the ones that had
+    # already been bitten normalised. The helper also knows the per-branch directory, which no list of table
+    # rows can express.
+    if (Test-IsBranchFilePath -Rel $rel) { return $false }
     return $true
 })
 

@@ -1,6 +1,6 @@
 # `development.md` — the portable half
 
-Everything a branch needs to carry lives in **one file**: `contributing-davekjohn/development.md`,
+Everything a branch needs to carry lives in **one file**: `contributing-davekjohn/development/<branch>.md`,
 inside the workflow's own root folder, where everything portable gathers. It has two halves with two
 different readers, and they are sections of one document rather than two files:
 
@@ -258,7 +258,7 @@ something Claude's own output demonstrates, and for a branch that is the gate ou
 depend on:
 
 ```text
-/goal every step above the DEPLOY heading in contributing-davekjohn/development.md is resolved
+/goal every step above the DEPLOY heading in contributing-davekjohn/development/<branch>.md is resolved
 and open-pr reports the lint and test gates green, or stop after 20 turns
 ```
 
@@ -322,7 +322,7 @@ See [the lib](../scripts/lib/release-lib.ps1).    <- correct where it sits BESID
 ```
 
 **You do not have to work out which one you are.** The guidance block at the top of your own
-`contributing-davekjohn/development.md` states your repo's answer in one sentence, composed by
+`contributing-davekjohn/development/<branch>.md` states your repo's answer in one sentence, composed by
 `new-branch` from the same seam `open-pr`'s link gate resolves against — so the file you are typing in and
 the gate that refuses cannot disagree about the base.
 

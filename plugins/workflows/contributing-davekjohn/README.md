@@ -114,7 +114,7 @@ below changes for you, and nothing here asks you to run anything.
 |---|---|
 | [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `contributing-davekjohn/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
 | [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
-| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `contributing-davekjohn/development.md` in one move |
+| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `contributing-davekjohn/development/<branch>.md` in one move |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`worktree-lane`](skills/worktree-lane/SKILL.md) | one branch has to be built while another one ships — opens a branch in its own worktree, and hands it back when it is ready to ship |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |

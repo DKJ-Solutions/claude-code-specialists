@@ -182,7 +182,7 @@ opened the page and a development task was the first thing that happened here; s
 since earlier that day, so `NEW` had started claiming what the step above it does. The step numbers did not
 move with the name — every `2.x` on this page and in [`README.md`](README.md) still points where it did.
 
-### 2.1. Create the branch and the empty `development.md`
+### 2.1. Create the branch and the branch's own `development/<branch>.md`
 
 **Two steps, one command, and that is the point rather than a shortcut.** `new-branch` does both: a branch is
 never entry-less, so there is no moment at which the branch exists and its document does not. They are
@@ -585,7 +585,7 @@ ship — `open-pr`'s lint and test gates — is the one step that reads the **wo
 more, and a second command in the same checkout during that minute moves it under them: `new-branch.ps1`
 cutting a branch, `worktree-lane.ps1` moving the tree. Measured on
 [PR #1144](https://github.com/DaveKJohn/claude-code-specialists/pull/1144): one suite of 55 red inside the
-gate, green standalone on the same commit seconds later, because `contributing-davekjohn/development.md`
+gate, green standalone on the same commit seconds later, because `contributing-davekjohn/development/<branch>.md`
 exists on the branch and not on the trunk and the suite walks every `*.md` under that folder. **No gate
 refuses this** — `open-pr` reports it instead: a red whose tree moved says it is not trustworthy, and a green
 whose tree moved is not recorded as gate evidence. Re-run the gate; do not go hunting the failure.

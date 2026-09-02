@@ -464,8 +464,9 @@ $branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 # THE BRANCH'S WORKING DOCUMENT LIVES AT contributing-davekjohn/development.md, NOT IN THE REPO ROOT
 # UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder August 14,
 # 2026; merged from two files into one on August 23, 2026).
-# One fixed path, and git's own per-branch tracking is what keeps two branches from colliding on it --
-# see the block in entry-scaffold-lib.ps1 for why that beats a filename per branch.
+# One file per branch again since September 3, 2026 (#1255), inside the workflow's development/ directory.
+# The fixed path it replaces relied on git's per-branch tracking to keep two branches apart, which holds for
+# a checkout and fails for a merge -- see the block in entry-scaffold-lib.ps1 for the measurement.
 $branchFiles    = Get-BranchFilePaths
 $branchDirPath  = Join-Path $repoRoot $branchFiles.Directory
 
@@ -498,12 +499,23 @@ function Get-BranchFileTargetRel {
     return $Current
 }
 
-$cycleRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.File `
-    -Legacy @($branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
+# THE SHARED NAME JOINED THE LEGACY LIST ON SEPTEMBER 3, 2026 (#1255), and that placement is the whole
+# migration. A branch already working in contributing-davekjohn/development.md keeps writing it -- the rule
+# above is unchanged: an old name survives exactly as long as it declares THIS branch, because moving
+# somebody's half-finished work to a new file is the split this function exists to prevent. Every new
+# branch gets its own file, so two of them can never write one path again.
+$cycleRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current (Get-BranchFileWriterPath -Branch $branch) `
+    -Legacy @($branchFiles.File, $branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
 $cyclePath = Join-Path $repoRoot ($cycleRel -replace '/', '\')
 
 if (-not (Test-Path -LiteralPath $branchDirPath)) {
     $null = New-Item -ItemType Directory -Path $branchDirPath -Force
+}
+# The per-branch directory, created only where the document is actually going there -- a branch resuming in
+# a legacy name must not leave an empty directory behind to explain.
+$cycleDirPath = Split-Path -Parent $cyclePath
+if ($cycleDirPath -and -not (Test-Path -LiteralPath $cycleDirPath)) {
+    $null = New-Item -ItemType Directory -Path $cycleDirPath -Force
 }
 
 # NOTHING WRITES A TEMPLATE ANY MORE (August 23, 2026), and the reason it can stop is that the working
@@ -622,6 +634,33 @@ if ($cycleTaken) {
             Write-Host "Replaced: $cycleRel (it held the development document of '$cycleOwner', committed on that branch)" -ForegroundColor Yellow
         } else {
             Write-Host "Created: $cycleRel" -ForegroundColor Green
+        }
+    }
+
+    # THE STACKED CASE, WHICH THE PER-BRANCH NAME MOVED RATHER THAN REMOVED (#1255). While every branch wrote
+    # one path, a document inherited from the parent branch arrived AT THE PATH THIS RUN WAS ABOUT TO WRITE,
+    # so the foreign-owner rule above met it head-on. Now the parent's document sits under the parent's own
+    # name and this run's write does not touch it -- leaving two documents in the tree, both declaring a
+    # branch, which is the duplicate the one-file rule exists to prevent and which the fold would then find
+    # by enumeration.
+    #
+    # SAME RULE, APPLIED ONE FILE OVER, and deliberately not a different one: committed on the other branch
+    # means git still holds it and removing it here costs nothing; uncommitted means `git checkout -b` carried
+    # edits that exist in exactly one place, so it is kept and said out loud. The distinction is the measured
+    # one from the block above, and the wording matches so a reader meets one vocabulary.
+    $devDirFull = Join-Path $repoRoot ((Get-BranchFilePaths).DevelopmentDir -replace '/', '\')
+    if (Test-Path -LiteralPath $devDirFull -PathType Container) {
+        foreach ($inherited in @(Get-ChildItem -LiteralPath $devDirFull -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+            $inheritedRel = "$((Get-BranchFilePaths).DevelopmentDir)/$($inherited.Name)"
+            if ($inheritedRel -eq $cycleRel) { continue }
+            $inheritedOwner = Get-BranchFileDeclaredBranch -Text ([System.IO.File]::ReadAllText($inherited.FullName, [System.Text.Encoding]::UTF8))
+            if (-not $inheritedOwner -or $inheritedOwner -eq $trunk -or $inheritedOwner -eq $branch) { continue }
+            if (Test-BranchFileIsDirty -RepoRoot $repoRoot -RelativePath $inheritedRel) {
+                Write-Warning "Kept: $inheritedRel -- it holds UNCOMMITTED work belonging to '$inheritedOwner', which exists nowhere else. Commit or discard that work; until then this branch carries two development documents."
+            } else {
+                Remove-Item -LiteralPath $inherited.FullName -Force
+                Write-Host "Removed: $inheritedRel (it held the development document of '$inheritedOwner', committed on that branch)" -ForegroundColor Yellow
+            }
         }
     }
 

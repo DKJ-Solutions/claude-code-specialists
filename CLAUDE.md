@@ -273,7 +273,7 @@ The constitution above, concretely implemented here:
 - **Five more gates arrive with the workflow plugin**, and all of them read the branch's own document.
   Four run locally: the **scaffold gate** refuses to push an entry still carrying the wording
   `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
-  `contributing-davekjohn/development.md` has an unresolved step above its DEPLOY heading, the
+  `contributing-davekjohn/development/<branch>.md` has an unresolved step above its DEPLOY heading, the
   **backing gate** refuses to push when that plan reads as finished while nothing is committed on the
   branch behind it and the work sits uncommitted in the working copy, and the
   **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
@@ -295,11 +295,16 @@ The constitution above, concretely implemented here:
      document, which the same run **removes** — and the commit names them, so nothing else in the tree
      can ride along. Committing stays opt-in, because it is this exception being used.
      **The second path is named by its resolver, `Resolve-BranchFilePath`, rather than spelled out here.**
-     That document has been renamed four times, and on the day of each rename every branch already open
+     That document has now been renamed six times, and on the day of each rename every branch already open
      carried a name the bound did not list — which put its own fold outside the exception it runs under.
      So the bound is still exactly two paths and still checkable after the fact, because the commit prints
      the path it actually touched; it is simply no longer a spelling that goes stale under the tooling it
-     governs. Today's writer is `contributing-davekjohn/development.md`.
+     governs. **Today's writer is `contributing-davekjohn/development/<branch>.md` — one file per branch
+     since September 3, 2026 (#1255), where every branch used to write one shared `development.md`.** That
+     sixth move is the first made for a reason other than wording: the shared path meant every merge to
+     `main` left every other open PR conflicting on it, measured at 7 of 7 open branches against 4 of 7 for
+     all genuine code overlap combined. The bound is unchanged and still two paths — the fold removes the
+     one file that declares the branch it just folded, and names it in the commit.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `contributing-davekjohn/releases/`,
      **empties the changelog down to its intro**, commits that on `main`, and tags `vX.Y.Z`.

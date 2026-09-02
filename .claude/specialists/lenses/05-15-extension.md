@@ -107,7 +107,7 @@ infrastructure.
 
   **It does not stop at the three exceptions — it blocks MERGES too, by a chain reaction**, and that is
   the part worth reading before anybody concludes the damage is bounded. A PR still merges; its fold
-  cannot push; so `contributing-davekjohn/development.md` **stays on `origin/main`**. That path is fixed
+  cannot push; so `contributing-davekjohn/development/<branch>.md` **stays on `origin/main`**. That path is fixed
   by design — the design's safety argument being that the fold removes it at the merge — so the trunk
   now carries a live branch document, every open branch has its own file at that same path, and every
   subsequent PR conflicts on it. The conflict is not cosmetic: resolving it in favour of the incoming
@@ -830,7 +830,7 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
-the DEPLOY section of `contributing-davekjohn/development.md`, so everything else it asked was already answered four lines lower. Measured
+the DEPLOY section of `contributing-davekjohn/development/<branch>.md`, so everything else it asked was already answered four lines lower. Measured
 over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
 single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
 `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and

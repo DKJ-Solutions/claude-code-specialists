@@ -743,7 +743,12 @@ function Get-PrDescriptionPlaceholderDefaults {
         "<!-- Filled from contributing-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
-        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+        # THE PER-BRANCH PATH (#1255, September 3, 2026). '<branch>' is literal here, not a placeholder this
+        # list expands: the template is one file for every branch, so it cannot name any one of them, and a
+        # reader substitutes it exactly as they do in the docs. The predecessor above it stays recognised,
+        # like all ten before it -- a consumer's checked-in template is not rewritten by an update.
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development/<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
     )
 }
 

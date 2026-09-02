@@ -810,7 +810,11 @@ $shipCycleRead = {
     param([string]$Rel)
     Get-GitFileTextAtRef -Ref $shipCycleRef -Path $Rel -RepoRoot $shipCycleRoot
 }
-$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead
+# -Branch IS MANDATORY IN PRACTICE ON THIS ARM (#1255). The resolver guesses the branch from the checkout
+# only on its Tree arm, deliberately: this one answers for a COMMIT, and the branch this tree stands on is
+# not a fact about it. Without the name the per-branch file cannot be composed and the resolver would fall
+# back to the shared name -- reading, silently, a document this branch no longer writes.
+$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead -Branch $branch
 $shipCycleText    = & $shipCycleRead $shipProgressRel
 if ($null -ne $shipCycleText) {
     $shipSteps = @(Get-BranchProgressFindings -Text $shipCycleText)

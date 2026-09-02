@@ -285,8 +285,12 @@ function Test-IsChangelogEntryFile {
 # carrying the trunk's reset copy of the new file beside the pair holding its real work. So a mixed tree
 # folds and clears exactly the files it has, which is the same
 # "recognise both, write one" rule the paragraph above states for the root form.
-$branchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
-$branchCycleRel      = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
+# -Branch IS PASSED WHERE THE CALLER NAMED ONE (#1255), and its absence is a real state rather than an
+# oversight: fold-all mode has no branch by definition. Neither case needs a guess -- this runs on the
+# TRUNK after the merge, where the resolver composes no per-branch name and enumerates the development
+# directory instead, so what it finds is the file DECLARING a branch, whatever this checkout was last on.
+$branchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot -Branch $Branch
+$branchCycleRel      = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot -Branch $Branch
 $branchDeploymentPath = Join-Path $repoRoot $branchDeploymentRel
 $branchDeploymentFilled = (Test-Path -LiteralPath $branchDeploymentPath) -and
     (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($branchDeploymentPath)))
@@ -330,6 +334,18 @@ else {
     $reserved = @("CHANGELOG.md", "CLAUDE.md", "README.md")
     $entryFiles = @()
     if ($branchDeploymentFilled) { $entryFiles += $branchDeploymentRel }
+    # EVERY PENDING DOCUMENT IN THE DEVELOPMENT DIRECTORY, not just the one the resolver settled on (#1255).
+    # The resolver answers with ONE path because that is what its readers need; fold-all's whole job is the
+    # plural, and more than one can genuinely be waiting -- a fold that failed to push leaves its own behind,
+    # which is exactly the state #1244 has main in right now. Held to the same Test-IsChangelogEntryFile bar
+    # as the root sweep below, so a directory that ever gains a README is not folded into the changelog.
+    $devDirFull = Join-Path $repoRoot ((Get-BranchFilePaths).DevelopmentDir -replace '/', '\')
+    if (Test-Path -LiteralPath $devDirFull -PathType Container) {
+        $entryFiles += @(Get-ChildItem -LiteralPath $devDirFull -Filter "*.md" -File |
+            Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |
+            ForEach-Object { "$((Get-BranchFilePaths).DevelopmentDir)/$($_.Name)" } |
+            Where-Object { $_ -ne $branchDeploymentRel })
+    }
     $entryFiles += @(Get-ChildItem -Path $repoRoot -Filter "*.md" -File |
         Where-Object { $reserved -notcontains $_.Name } |
         Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |

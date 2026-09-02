@@ -180,7 +180,10 @@ $safeName = if (Get-Command Get-BranchInfo -ErrorAction SilentlyContinue) {
     (Get-BranchInfo -Branch $Branch).SafeName
 } else { $Branch -replace '/', '-' }
 
-$entryRel  = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
+# -Branch IS PASSED AND NOT GUESSED (#1255), for the reason this whole script takes it as a parameter: a
+# pull_request checkout is a detached merge commit, so the resolver's own fallback -- rev-parse HEAD -- reads
+# 'HEAD' here and would find no per-branch file at all.
+$entryRel  = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot -Branch $Branch
 $entryPath = Join-Path $repoRoot $entryRel
 if (-not (Test-Path -LiteralPath $entryPath)) {
     $entryPath = Join-Path $repoRoot ($safeName + '.md')

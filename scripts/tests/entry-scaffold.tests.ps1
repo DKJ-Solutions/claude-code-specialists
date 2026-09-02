@@ -221,9 +221,12 @@ try {
 # thing that can say the run finished at all. So it is asserted, once, here.
 Assert-Equal 0 $script:roundTripCode 'the round-trip run finished -- a fixture missing one of the shared libs cannot pass silently any more'
 
-# ONE DOCUMENT, at a fixed path: contributing-davekjohn/development.md, not feat-round-trip-v1.md in the
-# root and not a pair under branch/. The path comes from the same lib the readers use.
-$writtenDoc = Join-Path $fixture ((Get-BranchFilePaths).File)
+# ONE DOCUMENT, at its own per-branch path since #1255: contributing-davekjohn/development/<branch>.md,
+# not the shared development.md every branch wrote before it, not feat-round-trip-v1.md in the root, and
+# not a pair under branch/. Composed by the same lib function the WRITER uses, so this fails when the two
+# stop agreeing rather than merely when a literal here goes stale.
+$roundTripBranch = (& git -C $fixture rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
+$writtenDoc = Join-Path $fixture ((Get-BranchFileWriterPath -Branch $roundTripBranch) -replace '/', '\')
 Assert-True (Test-Path -LiteralPath $writtenDoc) 'the writer produced the development document in the fixture'
 # BOTH HALVES ANSWER SEPARATELY, which is the claim the merge has to keep. Split-Development is what
 # every reader in the system uses to find the boundary, so asserting through it is asserting the contract
@@ -2178,14 +2181,17 @@ Write-Host "Get-EntryLinkTargets / Get-EntryLinkFindings -- the entry's links re
 # reads -- so this fixture is the depth the suggester will actually try.
 $linkEntry = @(
     '## DEPLOY: `fix/x-v1`', '',
-    'See [the lib](scripts/lib/release-lib.ps1) and [the gate](../scripts/lint/check-plugin-integrity.ps1).',
+    # '../../' AND NOT '../' SINCE #1255: the document sits in contributing-davekjohn/development/ now, so
+    # the link an author writes "as it reads in front of me" climbs two levels rather than one. The subject
+    # is unchanged -- a branch-relative link that the fold breaks -- only its depth moved with the file.
+    'See [the lib](scripts/lib/release-lib.ps1) and [the gate](../../scripts/lint/check-plugin-integrity.ps1).',
     'Also [upstream](https://example.com/x), [an anchor](#somewhere) and [absolute](/etc/x).', '',
     '**Score:** 3', ''
 ) -join "`n"
 $targets = @(Get-EntryLinkTargets -EntryText $linkEntry)
 Assert-Equal 2 $targets.Count 'only the two RELATIVE targets are read -- http, a pure anchor and an absolute path cannot be broken by the move'
 Assert-True ($targets -contains 'scripts/lib/release-lib.ps1') 'the root-relative one is read'
-Assert-True ($targets -contains '../scripts/lint/check-plugin-integrity.ps1') 'and the branch-relative one, as written'
+Assert-True ($targets -contains '../../scripts/lint/check-plugin-integrity.ps1') 'and the branch-relative one, as written'
 
 # THE ANCHOR AND THE TITLE ARE DROPPED: whether a heading exists is a different question with a different
 # answer, and the repo's own link lint already asks it. This function answers only "is there a file there".
@@ -2209,7 +2215,7 @@ Assert-Equal 0 (@(Get-EntryLinkTargets -EntryText $quoting)).Count 'a link quote
 $repoRootForLinks = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $findings = @(Get-EntryLinkFindings -EntryText $linkEntry -RepoRoot $repoRootForLinks)
 Assert-Equal 1 $findings.Count 'the root-relative link resolves and is not reported; the branch-relative one is'
-Assert-Equal '../scripts/lint/check-plugin-integrity.ps1' $findings[0].Target 'the finding names the link AS WRITTEN, which is what the author has to find in their file'
+Assert-Equal '../../scripts/lint/check-plugin-integrity.ps1' $findings[0].Target 'the finding names the link AS WRITTEN, which is what the author has to find in their file'
 # THE SUGGESTION IS THE POINT, not decoration. A finding that only says "does not exist" sends the author to
 # add another '../' -- the repo's own link lint had to learn the same lesson on August 19, 2026.
 Assert-Equal 'scripts/lint/check-plugin-integrity.ps1' $findings[0].Suggested 'and it names the root-relative form, because the naive repair is to add another ../'
@@ -2251,7 +2257,9 @@ Write-Host "Get-EntryLinkFindings -DestDirRel -- the base follows the CHANGELOG,
 # tree states exactly which file is where, and it does not move when the repo's layout does.
 $linkFixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-link-dest-$PID"
 if (Test-Path -LiteralPath $linkFixture) { Remove-Item -Recurse -Force -LiteralPath $linkFixture }
-$folderRel = (Get-BranchFilePaths).Directory
+# THE DOCUMENT'S OWN DIRECTORY, which is development/ since #1255. This fixture is about where the ENTRY
+# FILE sits, not where the workflow folder is, and those stopped being the same thing.
+$folderRel = (Get-BranchFilePaths).DevelopmentDir
 New-Item -ItemType Directory -Path (Join-Path $linkFixture $folderRel) -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $linkFixture 'scripts') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $linkFixture 'releases') -Force | Out-Null
@@ -2279,7 +2287,7 @@ try {
     $rootStyleLink = '[the script](scripts/x.ps1)'
     $fromFolder = @(Get-EntryLinkFindings -EntryText $rootStyleLink -RepoRoot $linkFixture -DestDirRel $folderRel)
     Assert-Equal 1 $fromFolder.Count 'a root-relative link is dead at a destination inside the folder, and is reported there'
-    Assert-Equal '../scripts/x.ps1' $fromFolder[0].Suggested 'and the suggestion names the form that destination needs, computed from the repo root as the second candidate base'
+    Assert-Equal '../../scripts/x.ps1' $fromFolder[0].Suggested 'and the suggestion names the form that destination needs, computed from the repo root as the second candidate base'
     Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText $rootStyleLink -RepoRoot $linkFixture -DestDirRel '')).Count 'while the same link passes for a repo whose changelog is at the root'
 
     # A TYPO IS STILL A TYPO AT EITHER DESTINATION, and gets no guess at either.
@@ -2295,7 +2303,7 @@ try {
     Assert-Equal 'scripts/x.ps1' `
         (Get-PathRelativeToDirectory -FullPath (Join-Path $linkFixture 'scripts\x.ps1') -Directory $linkFixture) `
         'a target UNDER the directory is its tail -- the only case the substring this replaced could answer'
-    Assert-Equal '../scripts/x.ps1' `
+    Assert-Equal '../../scripts/x.ps1' `
         (Get-PathRelativeToDirectory -FullPath (Join-Path $linkFixture 'scripts\x.ps1') -Directory (Join-Path $linkFixture $folderRel)) `
         'a target BESIDE it needs a ../, which is the case that silently produced nothing before'
     Assert-Equal 'beside.md' `
@@ -2456,8 +2464,53 @@ Assert-True ($null -eq (Get-FoldedEntryForBranch -ChangelogText $dupLog -Branch 
 # AND THE FOLD ASKS FOR IT. The asserts above prove the read; this one proves the caller uses it, which is
 # the half a reverted call site would leave green.
 $foldText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'), [System.Text.Encoding]::UTF8)
+
 Assert-True ($foldText -match 'Get-FoldedEntryForBranch -ChangelogText') 'the fold consults this read before it writes'
 Assert-True ($foldText -match '\$alreadyFolded -and -not \$Force') 'and -Force is the only way past it'
+
+# --- ONE FILE PER BRANCH: the writer, the membership test, and the enumeration (issue #1255) --------
+# Measured September 2, 2026: every branch wrote one shared contributing-davekjohn/development.md, so
+# every merge to main left every OTHER open PR conflicting on it -- 7 of 7 open branches, against 4 of 7
+# for all genuine code overlap combined. These pin the three pieces that removed the collision.
+Write-Host "Get-BranchFileWriterPath / Test-IsBranchFilePath -- one file per branch (#1255)" -ForegroundColor Cyan
+
+Assert-Equal "$((Get-BranchFilePaths).DevelopmentDir)/fix-a-b-v1.md" (Get-BranchFileWriterPath -Branch 'fix/a-b-v1') 'the writer composes <dir>/<SafeName>.md, with the slash hyphenated as branch-info does it'
+Assert-Equal (Get-BranchFileWriterPath -Branch 'fix/a-b-v1') (Get-BranchFileWriterPath -Branch 'fix/a-b-v1') 'and it is a pure function of the branch -- two asks, one answer'
+Assert-True ((Get-BranchFileWriterPath -Branch 'docs/x') -ne (Get-BranchFileWriterPath -Branch 'feat/x')) 'two branches never compose one path, which is the whole repair'
+
+# THE MEMBERSHIP TEST, which replaced three ad-hoc lists that had drifted to different subsets.
+Assert-True (Test-IsBranchFilePath -Rel "$((Get-BranchFilePaths).DevelopmentDir)/anything-at-all.md") 'any .md in the directory is a branch document -- the fold meets branches this checkout was never on'
+$sepWin = (Get-BranchFileWriterPath -Branch 'feat/sep-v1').Replace('/', [char]92)
+Assert-True (Test-IsBranchFilePath -Rel $sepWin) 'separators are normalised here, which is what the three ad-hoc copies kept getting wrong'
+Assert-True (Test-IsBranchFilePath -Rel (Get-BranchFilePaths).File) 'the shared name it replaced is still recognised -- a branch in flight is not stranded'
+Assert-True (Test-IsBranchFilePath -Rel (Get-BranchFilePaths).LegacyDeployment) 'and so is the branch/ pair'
+Assert-True (Test-IsBranchFilePath -Rel (Get-BranchFilePaths).PriorFolderFile) 'and the pre-rename folder'
+Assert-True (-not (Test-IsBranchFilePath -Rel 'contributing-davekjohn/CHANGELOG.md')) 'the changelog it folds INTO is not one of them'
+Assert-True (-not (Test-IsBranchFilePath -Rel 'contributing-davekjohn/CONTRIBUTING.md')) 'nor the folder pages, which is the distinction the lifecycle check needs'
+Assert-True (-not (Test-IsBranchFilePath -Rel "$((Get-BranchFilePaths).DevelopmentDir)/notes.txt")) 'and a non-markdown file in the directory is not a branch document'
+Assert-True (-not (Test-IsBranchFilePath -Rel '')) 'empty in, false out -- a path nobody passed is not a branch document'
+
+# THE ENUMERATION, which is the half that only matters on the TRUNK: after a merge the document to fold is
+# named after somebody else's branch, so composing a name cannot find it and the directory has to be read.
+$perBranchFixture = Join-Path ([System.IO.Path]::GetTempPath()) "branch-doc-resolve-$PID"
+if (Test-Path -LiteralPath $perBranchFixture) { Remove-Item -Recurse -Force -LiteralPath $perBranchFixture }
+New-Item -ItemType Directory -Path (Join-Path $perBranchFixture ((Get-BranchFilePaths).DevelopmentDir -replace '/', '\')) -Force | Out-Null
+try {
+    $mineRel  = Get-BranchFileWriterPath -Branch 'feat/mine-v1'
+    $theirRel = Get-BranchFileWriterPath -Branch 'docs/theirs-v1'
+    [System.IO.File]::WriteAllText((Join-Path $perBranchFixture ($mineRel  -replace '/', '\')), "# ``feat/mine-v1`` development cycle`n")
+    [System.IO.File]::WriteAllText((Join-Path $perBranchFixture ($theirRel -replace '/', '\')), "# ``docs/theirs-v1`` development cycle`n")
+
+    Assert-Equal $mineRel (Resolve-BranchFilePath -Kind Deployment -RepoRoot $perBranchFixture -Branch 'feat/mine-v1') 'asked for a branch, the resolver answers that branch''s own file'
+    Assert-Equal $theirRel (Resolve-BranchFilePath -Kind Deployment -RepoRoot $perBranchFixture -Branch 'docs/theirs-v1') 'and the other one''s, from the same directory -- two documents coexist without either being wrong'
+    # THE TRUNK CASE. No per-branch name can be composed for a branch that is not there, so the answer has to
+    # come from reading the directory -- which is exactly what the fold does after a merge.
+    $found = Resolve-BranchFilePath -Kind Deployment -RepoRoot $perBranchFixture -Branch 'main'
+    Assert-True (@($mineRel, $theirRel) -contains $found) 'on the trunk it enumerates and returns a document that DECLARES a branch, not a composed name'
+} finally {
+    if (Test-Path -LiteralPath $perBranchFixture) { Remove-Item -Recurse -Force -LiteralPath $perBranchFixture -ErrorAction SilentlyContinue }
+}
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
