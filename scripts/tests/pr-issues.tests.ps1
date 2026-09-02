@@ -1100,6 +1100,65 @@ foreach ($h in $headlines) {
     Assert-True ($room -ge $longestMeasuredReason) "the $($h.Length)-character headline leaves the console $room characters of reason -- more than the $longestMeasuredReason ever measured"
 }
 
+# --- THE PRE-SDK FAILURE CLASS: a titled annotation where there was none (#1245) -----------------
+#
+# The asserts above all describe a failure the SDK lived long enough to REPORT. When the action dies
+# before the SDK is reached, `execution_file` is empty, the *Why the review failed* step is skipped,
+# and the workflow used to write no titled annotation at all -- so `Get-AuthoredFailureNote` selected
+# nothing and ship-pr printed nothing beside the red mark. That is the #966 silence in a class the 429
+# work never reached, and it is not hypothetical: run 33663986438 (September 2, 2026) failed the
+# app-token exchange with a 401, and its only failure annotations were the runner's two UNTITLED ones.
+#
+# WHAT THESE PIN IS THE COVERAGE, not the wording. `failure()` has exactly two cases here and each
+# needs a step, so the guard is that BOTH gates exist and that the second one authors a title. A
+# rewrite of either sentence passes; deleting the second step, or renaming the output either gate
+# reads, does not.
+$wfGates = @([regex]::Matches($wfText, "steps\.claude-review\.outputs\.execution_file (!=|==) ''") |
+    ForEach-Object { $_.Groups[1].Value })
+Assert-NameSet @('!=', '==') $wfGates 'both halves of failure() are diagnosed -- a result message to read, and none'
+Assert-Equal 2 $wfGates.Count 'and exactly once each: two gates on the same output, so neither class falls between them'
+
+# The literals are read out of the workflow rather than re-typed, so this cannot drift from the file
+# it describes -- the same reason the headline loop above reads its own.
+$wfPreSdk = [regex]::Match($wfText, "(?s)- name: Why the review never started.*?\z")
+Assert-True $wfPreSdk.Success 'the pre-SDK step is still named as these asserts address it'
+$preShort = [regex]::Match($wfPreSdk.Value, "(?m)^\s*short='([^']*)'").Groups[1].Value
+$preHead  = [regex]::Match($wfPreSdk.Value, "(?m)^\s*headline='([^']*)'").Groups[1].Value
+Assert-True ($preShort -and $preHead) 'and still builds its annotation from a short title and a headline'
+Assert-True ($wfPreSdk.Value.Contains('::error title=claude-review -- ${short}::')) 'which it writes as a TITLED failure annotation -- the one field the relay reads'
+foreach ($punct in @(',', '::')) {
+    Assert-True (-not $preShort.Contains($punct)) "the title carries no '$punct' -- both are annotation-command syntax, as the step above notes"
+}
+
+# END TO END, through the function ship-pr actually calls: the annotation this step writes must come
+# back out as a sentence, where the runner's untitled 401 came back as ''.
+$annPreSdk = '[' +
+  '{"annotation_level":"warning","title":"","message":"Node.js 20 is deprecated."},' +
+  '{"annotation_level":"failure","title":"claude-review -- ' + $preShort + '","message":"' + $preHead + '"},' +
+  '{"annotation_level":"failure","title":"","message":"Process completed with exit code 1."},' +
+  '{"annotation_level":"failure","title":"","message":"Action failed with error: Claude Code is not installed on this repository. Please install the Claude Code GitHub App at https://github.com/apps/claude"}]'
+$notePreSdk = Get-AuthoredFailureNote -AnnotationsJson $annPreSdk -CheckName 'claude-review'
+Assert-True ($notePreSdk -like 'claude-review*') 'the pre-SDK note names its check'
+Assert-True ($notePreSdk -notlike '*claude-review: claude-review*') 'once, like the quota note -- the title already carries the job name'
+Assert-True ($notePreSdk.Contains($preShort)) 'and carries the title the workflow authored'
+Assert-True ($notePreSdk -notlike '*exit code 1*') 'not the runner exit noise'
+Assert-True ($notePreSdk -notlike '*not installed on this repository*') 'and not the runner UNTITLED error either -- relaying that is the lib change #1112 ruled out, so the workflow states its own case'
+
+# THE CAP, AND WHY THIS ONE IS AN ABSOLUTE RATHER THAN #1116's ARITHMETIC. The quota headlines leave
+# room for a reason the relay may cut; this one has NO reason appended -- there is no result message
+# to take one from -- so its whole note is literals from this repo and must arrive intact. If it ever
+# does not, the fix is a shorter sentence here, not a wider cap there.
+Assert-True ($notePreSdk.Length -lt $relayCap) "the pre-SDK note is $($notePreSdk.Length) characters against the relay's $relayCap -- it carries no reason, so it must arrive whole"
+Assert-True ($notePreSdk -notlike '*...') 'and therefore unmarked by the truncation ellipsis'
+
+# The claims it makes are bounded to what an EMPTY output proves, which is the standing rule of that
+# workflow after #974, #1055, #1112 and #1164. A quota status cannot be among them: a 429 or 529
+# arrives WITH a result message, so it is the other step's business and naming it here would be the
+# over-claim those four issues each repaired.
+foreach ($overclaim in @('429', '529', 'quota', 'resets')) {
+    Assert-True (-not $preHead.Contains($overclaim)) "the pre-SDK headline does not mention '$overclaim' -- that class arrives with a result message and is diagnosed by the other step"
+}
+
 # Unreadable in, empty out -- a diagnostic must never be the reason the warning beside it cannot print.
 foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"annotation_level":"failure"}]')) {
     Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson $bad -CheckName 'x') "an unreadable annotations payload ('$bad') costs the note and nothing else"
@@ -1144,9 +1203,16 @@ Assert-True (-not ($shortLines | Where-Object { $_ -like '*$status*' })) 'and no
 
 # 3. The percent axis. The runner percent-DECODES a command's data, so an unescaped %0A renders as a
 #    newline. `reason` was escaped from the start; `headline` needs it too now that it carries status.
+#
+#    AND THE COUNT IS PART OF THE PROPERTY, not bookkeeping around it -- which #1245 is why. That
+#    issue added a THIRD emission site, for the pre-SDK class whose headline is pure literal and so
+#    needs no escaping on today's text. Exempting it is the #1118 shape exactly: the branch nobody
+#    escaped was the branch nobody had interpolated into YET, and it was the one that broke. So the
+#    invariant is every site, and a new site raises this number deliberately rather than passing
+#    under a `-ge`.
 $errLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -like '*::error title=claude-review*' })
-Assert-True ($errLines.Count -eq 2) 'the annotation is emitted from exactly two places -- one with a reason, one without'
-Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and BOTH escape the headline, which is the variable the case block interpolates the status into'
+Assert-True ($errLines.Count -eq 3) 'the annotation is emitted from exactly three places -- with a reason, without one, and the pre-SDK step that has none to take (#1245)'
+Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and EVERY ONE escapes the headline -- the variable the case block interpolates the status into, and the one a literal-only site is tempted to leave bare (#1245)'
 Assert-True (($errLines | Where-Object { $_ -like '*${reason//%/%25}*' }).Count -eq 1) 'while the reason keeps its own escape on the one line that carries it'
 
 
