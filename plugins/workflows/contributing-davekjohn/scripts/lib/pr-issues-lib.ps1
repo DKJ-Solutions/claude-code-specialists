@@ -1450,3 +1450,140 @@ function Get-MissingCheckSuiteNote {
     }
     return $note
 }
+
+function Get-LabelNames {
+    <#
+    .SYNOPSIS
+        The label names in a `gh label list --json name` payload, as a string array. An EMPTY array
+        for empty input, unparseable JSON, or a payload with no readable name -- every one of which
+        the caller must treat as "could not be asked", never as "the label is missing".
+
+    .DESCRIPTION
+        Inbound #1221. open-pr.ps1 handed the branch prefix's label straight to `gh pr create --label`
+        and let gh be the one to discover it does not exist. gh refuses, so no PR is created -- and by
+        then every gate has run and the branch is on origin. Parsing the answer lives HERE, as a pure
+        function of the JSON text, because the caller drives a live remote and cannot be covered by a
+        suite while this can. Same move and same reasoning as Get-ExistingPrRecord above.
+
+        EMPTY IS "UNKNOWABLE" AND NOT "ABSENT", which is the one thing this function's contract has to
+        make unambiguous: a caller that read an empty array as "no such label" would refuse every PR in
+        a repo whose gh is too old for --json, or whose query returned something unexpected. The caller
+        therefore checks gh's exit code first and treats an empty list as a warning it carries on from
+        -- the same "a failed query is not an answer" the existing-PR lookup already applies.
+
+        THE 5.1 PARSE TRAPS ARE THE PART WORTH TESTING: a parsed JSON array reaches the pipeline as a
+        SINGLE object, so the assign-first/wrap-second shape is required; and a field gh was never asked
+        for is absent rather than empty, so every record is probed for 'name' before it is read.
+    #>
+    param([string]$Json)
+
+    if (-not $Json -or -not $Json.Trim()) { return @() }
+    try { $parsed = $Json | ConvertFrom-Json } catch { return @() }
+    if ($null -eq $parsed) { return @() }
+
+    $names = New-Object System.Collections.Generic.List[string]
+    foreach ($record in @(@($parsed) | Where-Object { $_ })) {
+        if (-not $record.PSObject.Properties['name']) { continue }
+        $name = ([string]$record.name).Trim()
+        if ($name -and -not $names.Contains($name)) { $names.Add($name) | Out-Null }
+    }
+    return @($names)
+}
+
+function Get-MissingLabelNote {
+    <#
+    .SYNOPSIS
+        The refusal for a PR label that does not exist in the repository -- or '' when it does exist,
+        and '' when there is no label list to judge against.
+
+    .DESCRIPTION
+        Inbound #1221, measured in BWJ-ecommerce/smartwatchbanden on September 1, 2026: the labels 'bug'
+        and 'enhancement' were deleted org-wide because the issue TYPE now carries that classification,
+        and the next PR died on
+
+            could not add label: 'bug' not found
+
+        AFTER the entry gate, the step gate and the resolves gate had all passed and the branch had been
+        pushed. What makes that worth a round trip to GitHub is WHEN the failure lands rather than that
+        it lands: everything expensive has already happened, the remedy is outside the script (create a
+        label, or edit the seam table), and the state left behind is a pushed branch with no PR -- which
+        reads exactly like a parked branch.
+
+        IT IS NOT AN AUTHOR'S MISTAKE, which is why it is a gate and not a better error message. The
+        seam table was correct the day before and nothing in the consumer changed; any repo that renames
+        or retires a label breaks the same way, and the first sign of it is a failed create after a push.
+
+        IT REFUSES AND DOES NOT FALL BACK, deliberately. Substituting 'question' would classify the PR
+        wrongly and a repo that GATES on the label -- as that consumer does in pr-guardrails.yml -- would
+        go green on a label that says nothing; dropping the label is worse still, because the gate would
+        then go red after a successful create. So the two remedies are named and neither is taken.
+
+        AND IT COVERS THE FALLBACK ITSELF, one layer down. open-pr substitutes 'question' for an unknown
+        branch prefix, which is a GitHub DEFAULT label a repo may equally have deleted -- so the note
+        says so when that is where the label came from. The check is on the label that would be sent,
+        whatever produced it, rather than on the prefix table.
+
+    .PARAMETER Labels
+        The repository's label names, from Get-LabelNames. EMPTY means the query could not be read, and
+        the answer is '' -- a diagnostic must never be the reason a PR cannot be opened.
+
+    .PARAMETER Label
+        The label `gh pr create --label` would be given.
+
+    .PARAMETER Prefix
+        The branch prefix the label came from, when the seam table backed one. Empty means the label is
+        open-pr's unknown-prefix fallback, and the note says that instead.
+
+    .PARAMETER SeamPath
+        The repo-owned file that maps prefixes to labels, so the reader is sent to the edit rather than
+        to a search.
+
+    .PARAMETER Repo
+        'owner/name', so the note can name the repository the label is missing from and print a
+        paste-ready `gh label create`. Optional.
+    #>
+    param(
+        [AllowNull()][AllowEmptyCollection()][string[]]$Labels,
+        [string]$Label,
+        [string]$Prefix = '',
+        [string]$SeamPath = 'scripts\lib\branch-info.ps1',
+        [string]$Repo = ''
+    )
+
+    $known = @(@($Labels) | Where-Object { $_ -and ([string]$_).Trim() } | ForEach-Object { ([string]$_).Trim() })
+    if ($known.Count -eq 0) { return '' }
+    if (-not $Label -or -not $Label.Trim()) { return '' }
+    $wanted = $Label.Trim()
+    # Case-INSENSITIVE, because that is how GitHub treats a label name: it refuses to create 'Bug'
+    # beside 'bug', and `--label bug` attaches the existing 'Bug'. A case-sensitive compare here would
+    # refuse a PR gh would have opened, which is the one direction this gate must never fail in.
+    if (@($known | Where-Object { $_ -eq $wanted }).Count -gt 0) { return '' }
+
+    $where = if ($Repo) { " in $Repo" } else { '' }
+    $note = "'$wanted' is not a label$where, so 'gh pr create' would refuse this PR -- refused HERE instead, before the push."
+
+    $note += if ($Prefix) {
+        " The label comes from the branch prefix '$Prefix/' via $SeamPath, which is repo-owned: this script cannot validate it against a list of its own, so it asked GitHub."
+    } else {
+        " Nothing produced it but the unknown-prefix fallback: '$wanted' is a GitHub DEFAULT label, which a repo may equally have deleted."
+    }
+
+    # THE LABELS THAT DO EXIST, BOUNDED, and the bound is the point rather than tidiness. Naming them is
+    # what turns a refusal into a repair when the answer is a rename ('bug' -> 'type: bug'), and it is
+    # the same service Get-MissingCheckSuiteNote does by naming the suites that DID register. But a
+    # label set is unbounded in a way a commit's check suites are not, so above ten the count plus the
+    # command that lists them is the honest line for something read once in a terminal.
+    $note += if ($known.Count -le 10) {
+        " Labels that do exist: $(Format-CheckNameList -Names $known)."
+    } else {
+        $listCmd = if ($Repo) { "gh label list --repo $Repo" } else { 'gh label list' }
+        " $($known.Count) labels do exist -- '$listCmd' names them."
+    }
+
+    $create = if ($Repo) { "gh label create '$wanted' --repo $Repo" } else { "gh label create '$wanted'" }
+    $note += " Two remedies, and this script takes neither: create the label ($create), or point the prefix at a label that exists ($SeamPath)."
+    # WHY NEITHER IS TAKEN, said in the refusal rather than left to the reader's judgement: both silent
+    # options look like kindnesses and both break a repo that gates on the label.
+    $note += " Not substituted and not dropped: a fallback label would classify this PR wrongly, and a repo whose own workflow gates on the label would then go green on a label that says nothing."
+    return $note
+}

@@ -125,6 +125,19 @@
     and the link gate is not: this refuses text somebody wrote, and a consumer whose seam names an unusual
     prefix should get a warning rather than a wedge.
 
+    Label gate (inbound #1221, September 2, 2026): the label this PR would be given has to exist in the
+    repository. It used to be handed to `gh pr create --label` unchecked, so gh was the one to discover
+    it does not exist -- and gh refuses the whole create, after every gate above has run and the branch
+    has been pushed. Measured in a consumer whose 'bug' and 'enhancement' labels had been deleted
+    org-wide because the issue TYPE now carries that classification: the seam table was correct the day
+    before and nothing in the consumer changed. One `gh label list` answers it, and it runs BEFORE the
+    lint and test gates so the author who has to go and create a label hears it in seconds. Create path
+    only (an existing PR keeps its own labels and is never sent one), not -Force-able as the link and
+    impact gates are not, and a query that fails or returns nothing readable leaves the old behaviour
+    rather than blocking. The refusal names the label, the prefix that produced it, the seam file that
+    maps them and the labels that do exist -- see Get-MissingLabelNote for why neither substituting nor
+    dropping the label is the kindness it looks like.
+
     Lint gate (guardrail for main): before the push, scripts/lint/check-plugin-integrity.ps1 runs.
     If that finds errors (invalid marketplace/plugin manifests, missing agent-def frontmatter,
     dead links), the branch is NOT pushed and NO PR is opened. Use -SkipLint to deliberately skip
@@ -995,6 +1008,79 @@ If the title really does begin with that word, ship it with -Force.
     }
 }
 
+# --- LABEL GATE: THE LABEL THIS PR WOULD BE GIVEN HAS TO EXIST (inbound #1221) --------------------
+#
+# THE DEFECT. The branch prefix's label went straight to `gh pr create --label` and gh was the one to
+# discover it does not exist. gh refuses the whole create, so no PR is opened -- and by then every gate
+# above has run and the branch is on origin:
+#
+#     could not add label: 'bug' not found
+#
+# Measured in BWJ-ecommerce/smartwatchbanden on September 1, 2026, where 'bug' and 'enhancement' had
+# been deleted org-wide because the issue TYPE now carries that classification. The seam table was
+# correct the day before and nothing in the consumer changed, which is why this is a gate and not a
+# better error message: any repo that renames or retires a label breaks the same way.
+#
+# WHY IT IS WORTH A ROUND TRIP: WHEN THE FAILURE LANDS, not that it lands. Everything expensive has
+# already happened, the remedy is outside this script (create a label, or edit the seam table), and the
+# state left behind is a pushed branch with no PR -- which reads exactly like a parked branch.
+#
+# BEFORE THE LINT AND TEST GATES, not merely before the push. One `gh label list` is the cheapest
+# network call in this script and the suites are the most expensive thing in it, so the author who has
+# to go and create a label hears it in seconds rather than after the suites.
+#
+# THE CREATE PATH ONLY. An existing PR keeps its own labels and `--label` is never sent on that path,
+# so a repo that retired a label after the PR was opened must not be blocked from updating it.
+#
+# NOT -Force-ABLE, like the link and impact gates: -Force exists for text somebody legitimately wrote,
+# and a label that does not exist is a fact about the repository rather than a judgement about prose.
+# Waving it through could only relocate the failure to after the push, which is the state this gate
+# exists to prevent.
+#
+# AND IT DOES NOT FALL BACK -- see Get-MissingLabelNote's own header for why neither substituting nor
+# dropping the label is the kindness it looks like.
+$label = ''
+if (-not $existingPr) {
+    # RESOLVED HERE rather than at the create call, where it sat until this gate existed. The warning
+    # for an unknown prefix moved with it, which is where it belongs anyway: it is about the label that
+    # is about to be checked.
+    if ($info.IsKnown) {
+        $label = $info.Label
+    } else {
+        $label = 'question'
+        Write-Warning "Unknown branch prefix '$($info.Prefix)' - label 'question' set; classify the PR manually."
+    }
+
+    # -Utf8 because a label name is DATA and routinely carries an emoji or an accent (#907), and
+    # -DiscardStderr because gh's own progress is not the answer -- the exit code and the payload are.
+    # --limit is load-bearing: `gh label list` defaults to 30, and a truncated list would refuse a PR
+    # over a label that exists but did not fit.
+    $labelLookup = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('label', 'list', '--json', 'name', '--limit', '500', '--repo', $repo) -DiscardStderr
+    # A FAILED OR UNREADABLE QUERY IS NOT AN ANSWER, and it deliberately does not block -- the same
+    # reasoning the existing-PR lookup gives. An old gh with no --json, a network hiccup or a repo with
+    # no labels at all leaves the behaviour this script always had: gh judges the label at the create.
+    $repoLabels = @()
+    if ($labelLookup.ExitCode -ne 0) {
+        Write-Warning "label gate: could not ask gh which labels $repo has (exit $($labelLookup.ExitCode)) - continuing, so 'gh pr create' is again the one that judges '$label', after the push."
+    } else {
+        $repoLabels = @(Get-LabelNames -Json ($labelLookup.Output -join "`n"))
+        if ($repoLabels.Count -eq 0) {
+            Write-Warning "label gate: gh returned no readable label for $repo - continuing, so 'gh pr create' is again the one that judges '$label', after the push."
+        }
+    }
+
+    if ($repoLabels.Count -gt 0) {
+        $labelNote = Get-MissingLabelNote -Labels $repoLabels -Label $label `
+                                          -Prefix $(if ($info.IsKnown) { $info.Prefix } else { '' }) `
+                                          -SeamPath 'scripts\lib\branch-info.ps1' -Repo $repo
+        if ($labelNote) {
+            Write-Error "label gate: $labelNote`n`nNothing pushed, no PR opened."
+            exit 1
+        }
+        Write-Host "label gate: label '$label' exists in $repo." -ForegroundColor DarkGray
+    }
+}
+
 # THE GATES BELOW CONSULT WHAT THEY ALREADY PROVED (August 16, 2026). ship-pr.ps1 calls this script,
 # so a branch opened in one step and shipped in a later one used to run both gates twice on a commit
 # nothing had touched -- measured at 249s of excess on 28.3% of 293 merged PRs, and routed around by
@@ -1276,12 +1362,9 @@ if ($existingPr) {
     exit 0
 }
 
-if ($info.IsKnown) {
-    $label = $info.Label
-} else {
-    $label = 'question'
-    Write-Warning "Unknown branch prefix '$($info.Prefix)' - label 'question' set; classify the PR manually."
-}
+# $label WAS RESOLVED BY THE LABEL GATE, above the push (inbound #1221) -- it used to be resolved here,
+# one line before the create, which is exactly why an unknown label could only be discovered by gh after
+# the branch had been pushed. The unknown-prefix warning moved up with it.
 
 # A PR CANNOT BE CREATED NAMELESS, and this is the one place that has to hold. The emptiness gate above
 # already refuses an entry whose title section is empty -- but -Force waves that gate through for the entry
