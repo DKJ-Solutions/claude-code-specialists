@@ -1,4 +1,4 @@
-## Development: `docs/dropped-ship-cost-overstated-v1` · 20260902-200002
+## Development: `docs/ship-pr-titled-annotation-page-v1` · 20260902-204137
 
 > **How this file is read.** A step is `- [ ]` until it is resolved -- `- [x]` done, or
 > `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.
@@ -33,46 +33,49 @@
 
 ### PLAN
 
-#### Context
-
-Issue #1235. The folded DEPLOY entry for `fix/ship-pr-lost-watch-retry-v1` (PR #1233) overstates
-what a dropped ship costs: it claims *"a re-checkout of the branch plus a full local gate run --
-lint and every suite"*. `scripts/lib/gate-lib.ps1` keeps gate evidence keyed on the tree
-(`Test-GateEvidence`/`Save-GateEvidence`, `GateEvidenceMaxAgeMinutes = 240`), so a same-tree resume
-within four hours skips both gates -- the true, smaller cost is only the re-checkout step 2b (#1073)
-had just handed back to the trunk. The DEPLOY lock (#884) meant #1233 could not fix it in place;
-this is the ordinary `docs/` follow-up the issue prescribes.
+- [x] Confirm the gap from #1251: `Get-AuthoredFailureNote` (pr-issues-lib.ps1) relays only a
+      *titled* failure annotation, and that contract on a consumer's workflows is stated only in that
+      docstring -- `grep annotation plugins/` hits three `.ps1`, zero `.md`. Confirmed against the tree.
+- [x] Decide the home (technical writer's call): the substance goes in the `ship-pr` skill, beside its
+      existing "no required check" / "required check never appears" subsections, since that is where a
+      consumer meets the relay in `ship-pr`'s own output; a short pointer with the one-line form goes in
+      `CONTRIBUTING-portable.md` step 5, which is the first thing a consumer reads.
 
 ### CREATE
 
-- [x] Replace the overstated clause in `contributing-davekjohn/CHANGELOG.md` (the
-  `fix/ship-pr-lost-watch-retry-v1` DEPLOY entry) with *"a re-checkout of the branch step 2b had
-  just left"* -- the wording the issue proposes. Nothing else in the entry changes.
+- [x] New subsection in `plugins/workflows/contributing-davekjohn/skills/ship-pr/SKILL.md`: what the
+      relay reads (`::error title=X::Y`), why "titled" is the selection rule (the runner's own
+      annotations are untitled), and that an untitled failure is silent on purpose.
+- [x] Pointer paragraph in `plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md` step 5,
+      linking the new subsection.
 
 ### TEST
 
-- [x] Verified against `scripts/lib/gate-lib.ps1` that the lint and test gates both skip on a
-  same-tree resume within `GateEvidenceMaxAgeMinutes` (240). No automated test -- prose-only
-  changelog correction.
+- [x] Lint gate green (`check-plugin-integrity.ps1`, 0 errors) -- link-scan and plugin-link resolve the
+      new within-plugin anchor link. No script changed, so no suite is in scope; the doc gates cover it.
 
-### DEPLOY: `docs/dropped-ship-cost-overstated-v1`
+### DEPLOY: `docs/ship-pr-titled-annotation-page-v1`
 
-The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
-costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
-a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
-ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
-trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+`ship-pr` merges past a failing *not-required* check and relays the sentence that check wrote about
+itself -- but only a *titled* annotation (`echo "::error title=X::Y"`), because GitHub's Actions runner
+writes its own with an empty title and "titled" is what tells an author's diagnosis from exit noise.
+That is a real contract on a consumer's own workflows, and until now it lived only in
+`Get-AuthoredFailureNote`'s docstring -- so a consumer whose advisory check goes red past `ship-pr`
+saw a blank reason line and concluded the relay was broken. The `ship-pr` skill now has a subsection
+stating what the relay reads, the one-line form that satisfies it, and that an untitled failure is
+silent on purpose; `CONTRIBUTING-portable.md` step 5 carries a short pointer to it.
 
-**Score:** 1
+**Score:** 2
 
 #### What makes this deploy extra special
 
-N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
-who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+This is the half of #1245's workflow repair that a consumer inherits: their advisory CI (a linter, a
+coverage job) can now be made to explain its own red mark in `ship-pr`'s console by emitting one
+`::error title=…::…` line, where before the reason was reachable only by opening the run.
 
-**Score:** N/A
+**Score:** 2
 
 #### Pull Request
 
-the lost-watch retry changelog entry no longer overstates a dropped ship's cost
+the shipped PR docs say what ship-pr's failure-note relay reads, and that an untitled failure is silent on purpose
 
