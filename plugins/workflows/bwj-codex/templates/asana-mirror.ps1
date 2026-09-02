@@ -16,7 +16,27 @@
     THE SECTION MOVE IS THAT SAME GUARANTEE IN THE BOARD'S OWN CURRENCY, so it carries its own
     ceiling: the two ends of the board are never written. 'Requests' is the submitter's untriaged
     inbox and 'Completed' is their verdict that the work is good -- Test-StageIsWritable is the pure
-    guard that says so, and a card already sitting in Completed is not moved at all.
+    guard that says so.
+
+    AND TWO SECTIONS ARE TERMINAL, not just one (Dave, September 2, 2026): a card sitting in
+    'ReadyToTest' or 'Completed' is never moved out of it by this script, because both mean the
+    submitter is holding the card. That outranks even the reopen, which everywhere else earns a
+    backward move -- if the work turns out not to be done, the person holding it moves it, and having
+    it pulled back out from under them by the next sweep is the failure this guard names. See
+    Test-StageIsTerminal.
+
+    THE THREE MIDDLE STAGES ARE THE GITHUB PROJECT'S THREE STATUSES, and always in sync with them
+    (Dave, September 2, 2026). Filed / InDevelopment / InReview are Todo / In Progress / Done, read
+    off the project board rather than re-derived from the issue and its pull requests -- GitHub's own
+    built-in project workflows already write that field, and deriving it twice made two writers of
+    one fact. Get-GithubStatusMap is the seam; Get-DefaultGithubStatusMap is the fallback.
+
+    READYTOTEST IS THE ONE STAGE NO STATUS CAN REACH, and it is entered on FEEDBACK instead: the
+    issue is closed AND the submitter named in the task's notes has actually been told, which is this
+    script's own close update. Where a ticket has no submitter -- nobody else asked for it -- stage 6
+    is skipped entirely and the owner accepts it into Completed by hand. A repo that names no
+    SubmitterPattern can never tell, so there the promotion never fires at all, which is the
+    fail-safe direction.
 
     WHICH NUMBERED SECTION EACH STAGE IS comes from the repo, not from this file: Get-AsanaStageMap in
     scripts/repo-config.ps1, with Get-DefaultAsanaStageMap as the fallback. That seam exists because
@@ -100,6 +120,13 @@
     still goes out and simply names no pull request, and sweep (d) derives no stage rather than
     guessing one.
 
+    AND THE STAGE SWEEP NEEDS A SECOND TOKEN, in GH_PROJECT_TOKEN. `GITHUB_TOKEN` cannot read an
+    organization's Projects v2 -- there is no `permissions:` key that grants it -- so with the
+    workflow's own token the status field comes back as an error rather than a value. That failure is
+    contained rather than fatal: the query retries once without projectItems, so the close update goes
+    out exactly as before and only the staging goes quiet, naming the missing token. Set
+    GH_PROJECT_TOKEN to a PAT that can read the org's projects to turn staging back on.
+
     The comment text is English, like everything else this repo ships. It is the workflow speaking,
     not the subject -- the same boundary a BWJ store repo already draws when it keeps its ticket
     headings English while the analysis under them follows whoever filed the ticket.
@@ -107,7 +134,9 @@
     The pure helpers (Resolve-AsanaTaskRef, Get-AsanaTaskGid, Get-AsanaGidsFromText,
     New-MirrorComment, Get-MirrorCommentMarker, New-AsanaCommentRequest, Get-IssueRefFromNotes,
     Get-StageFromSectionName, Select-StageMembership, Get-DefaultAsanaStageMap, Get-StageMapNumbers,
-    Get-WritableStages, Test-StageIsWritable, Test-AsanaStageMap, Get-StageFloorForIssue,
+    Get-WritableStages, Test-StageIsWritable, Test-StageIsTerminal, Test-AsanaStageMap,
+    Get-DefaultGithubStatusMap, Test-GithubStatusMap, Select-ProjectStatus, Get-StageForProjectStatus,
+    Get-SubmitterFromNotes, Get-StageFloorForIssue,
     Resolve-TargetStage, New-AsanaSectionMoveRequest) take no network and are what the source repo's
     scripts/tests/bwj-codex.tests.ps1 exercises -- including against a board numbered some other way,
     so the map cannot quietly become decoration over literals. The script runs its main flow only when
@@ -155,6 +184,10 @@ $script:PrioLabels = @('very low', 'low', 'high', 'very high')
 
 # The stage map, resolved once per run from the repo's own seam -- see Resolve-AsanaStageMap.
 $script:StageMap = $null
+
+# And which project status means which of those stages -- see Resolve-GithubStatusMap. Two maps and
+# not one, because they answer to two different boards: this one is keyed on GitHub's column names.
+$script:StatusMap = $null
 
 # Stage -> section-GID map per project, filled on first use. A sweep over fifty issues on one board
 # asks Asana for that board's sections once.
@@ -372,6 +405,60 @@ function Get-DefaultAsanaStageMap {
     }
 }
 
+function Get-DefaultGithubStatusMap {
+    <#
+        Which stage of the cycle each GitHub Project Status MEANS, when a repo states nothing. Pure.
+
+        Stages Filed, InDevelopment and InReview are linked to the three statuses of the project
+        board and are always in sync with them (Dave, September 2, 2026). GitHub is the source: its
+        own built-in project workflows write that field -- 'Item added to project' sets Todo,
+        'Pull request linked to issue' sets In Progress, 'Item closed' sets Done -- so reading it
+        instead of re-deriving the same thing from the issue and its pull requests is what makes the
+        two boards agree rather than race.
+
+        THE STATUS NAMES ARE THE KEYS because they are what the API returns, and a board may rename
+        them. The VALUES are stage keys of Get-AsanaStageMap, never section numbers: a repo that
+        renumbers its board states that once, in the stage map, and this map keeps working.
+
+        The stages outside those three are deliberately unreachable from a status, and Test-GithubStatusMap
+        refuses a map that tries. Requests and NeedsInfo answer to a person and a label; Completed is the
+        submitter's verdict; and ReadyToTest is reached by the RULE BELOW rather than by any column of the
+        project board, because no GitHub status means 'the submitter has been told'.
+
+        READYTOTEST IS ENTERED ON FEEDBACK, NOT ON A STATUS (Dave, September 2, 2026). A card advances
+        from InReview to ReadyToTest once two things are true: the issue is closed, and the submitter of
+        the Asana ticket has actually been told -- which is this script's own close update, the comment
+        carrying Get-MirrorCommentMarker. So InReview means 'closed on GitHub, nobody has been told yet'
+        and ReadyToTest means 'it is the submitter's turn', which is the distinction the column is named
+        for.
+
+        AND WHERE THERE IS NO SUBMITTER, STAGE 6 IS SKIPPED ENTIRELY (Dave, same day). A ticket nobody
+        else asked for has nobody to hand it to: it stays in InReview until the person who owns it accepts
+        it into Completed by hand. SubmitterPattern is how a repo says where the submitter's name is
+        written, and '' -- the default -- means this script can never tell, so ReadyToTest is never
+        entered automatically at all. That is the fail-safe direction: a card held one column short is
+        visible and a person can move it, where a card pushed into the submitter's column claims a
+        handover that never happened.
+
+        Measured on the BWJ board the day this shipped: `created_by` is NOT the submitter -- the intake
+        form creates every card as its own owner, so it reads the same on a colleague's request and on
+        one filed by a session. The submitter is the name the form writes into the notes, and is added
+        as a follower when it can find them in Asana.
+    #>
+    return @{
+        FieldName        = 'Status'
+        Statuses         = @{
+            'Todo'        = 'Filed'          # on the board, nothing linked yet
+            'In Progress' = 'InDevelopment'  # a pull request is linked to the issue
+            'Done'        = 'InReview'       # the issue is closed
+        }
+
+        # A regex over the task's notes whose first capture group is the submitter's name. Empty means
+        # the repo has not said, and then ReadyToTest is never entered automatically -- see above.
+        SubmitterPattern = ''
+    }
+}
+
 function Get-StageMapNumbers {
     <# The seven stage numbers a map names, in cycle order. Pure. #>
     param([Parameter(Mandatory = $true)]$Map)
@@ -487,6 +574,186 @@ function Resolve-AsanaStageMap {
     return $own
 }
 
+function Test-GithubStatusMap {
+    <#
+        Is this a usable status map? Returns the list of complaints, empty when it is. Pure.
+
+        It checks the shape and the stage KEYS, not the status names: a board is free to call its
+        columns anything, but a value that is not a stage of the cycle can never be looked up in the
+        stage map, and would read as stage 0 at runtime -- silently, which is the failure this
+        validation exists to make loud.
+    #>
+    param([AllowNull()]$Map)
+
+    if (-not $Map) { return @('the status map is empty') }
+
+    $bad = @()
+    if (-not ([string]$Map.FieldName)) { $bad += 'FieldName names no project field' }
+
+    $statuses = $Map.Statuses
+    if (-not $statuses)            { return @($bad + 'Statuses names no status at all') }
+    if (-not ($statuses -is [System.Collections.IDictionary])) {
+        return @($bad + 'Statuses is not a name-to-stage table')
+    }
+    if (@($statuses.Keys).Count -eq 0) { $bad += 'Statuses names no status at all' }
+
+    # What a STATUS may name is narrower than what this script may write. ReadyToTest is writable, but
+    # only the feedback rule may reach it -- a status that named it would hand a card to the submitter
+    # on a column change instead of on an actual handover.
+    $stageKeys = @('Requests', 'NeedsInfo', 'Filed', 'InDevelopment', 'InReview', 'ReadyToTest', 'Completed')
+    $mappable  = @('NeedsInfo', 'Filed', 'InDevelopment', 'InReview')
+    foreach ($k in @($statuses.Keys)) {
+        $v = [string]$statuses[$k]
+        if (-not $v)                    { $bad += "status '$k' names no stage"; continue }
+        if ($stageKeys -notcontains $v) { $bad += "status '$k' names '$v', which is not a stage of the cycle"; continue }
+        if ($mappable -notcontains $v)  { $bad += "status '$k' names '$v', which no project status may name -- it is reached by the feedback rule or by a person" }
+    }
+    return $bad
+}
+
+function Resolve-GithubStatusMap {
+    <#
+        The repo's own status map, or the built-in one. Same seam, same file and same never-throws
+        contract as Resolve-AsanaStageMap -- scripts/repo-config.ps1, read once per run, and a line
+        saying which map the run is using so a wrong one is never silent.
+    #>
+    param([string]$RepoRoot = '.')
+
+    $default = Get-DefaultGithubStatusMap
+    $cfg = Join-Path $RepoRoot 'scripts/repo-config.ps1'
+    if (-not (Test-Path -LiteralPath $cfg)) {
+        Write-Host "  No scripts/repo-config.ps1 -- using the built-in status map."
+        return $default
+    }
+
+    try { . $cfg } catch {
+        Write-Host "  scripts/repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- using the built-in status map."
+        return $default
+    }
+    if (-not (Get-Command -Name 'Get-GithubStatusMap' -ErrorAction SilentlyContinue)) {
+        Write-Host "  scripts/repo-config.ps1 defines no Get-GithubStatusMap -- using the built-in status map."
+        return $default
+    }
+
+    $own = $null
+    try { $own = Get-GithubStatusMap } catch {
+        Write-Host "  Get-GithubStatusMap threw ($($_.Exception.Message)) -- using the built-in status map."
+        return $default
+    }
+
+    $complaints = Test-GithubStatusMap -Map $own
+    if ($complaints.Count -gt 0) {
+        Write-Host "  Get-GithubStatusMap is not usable -- using the built-in status map instead. $($complaints -join '; ')."
+        return $default
+    }
+
+    $pairs = @(@($own.Statuses.Keys) | Sort-Object | ForEach-Object { "$_ -> $($own.Statuses[$_])" })
+    Write-Host "  Status map from scripts/repo-config.ps1: field '$($own.FieldName)', $($pairs -join ', ')."
+    return $own
+}
+
+function Select-ProjectStatus {
+    <#
+        The one project Status this issue carries, and where the answer came from. Pure -- no network.
+
+            Source  'status' | 'none' | 'ambiguous'
+            Status  the status name, or $null
+
+        An issue may sit on several project boards, and two boards that both name a status are two
+        answers -- so it gets neither, exactly as a card on two numbered Asana boards does. The
+        candidates are named by the caller for the log and nothing moves. An issue on no board, or on
+        one whose status field is empty, is 'none': a real answer meaning this issue is on no
+        pipeline, and the safe one, because a missing status must never read as stage 0.
+    #>
+    param($ProjectItems = @())
+
+    $named = @()
+    foreach ($it in @($ProjectItems)) {
+        $name = [string]$it.fieldValueByName.name
+        if ($name) { $named += $name }
+    }
+
+    if ($named.Count -eq 0) { return [pscustomobject]@{ Source = 'none';      Status = $null } }
+    if (@($named | Sort-Object -Unique).Count -gt 1) {
+        return [pscustomobject]@{ Source = 'ambiguous'; Status = $null; Candidates = @($named | Sort-Object -Unique) }
+    }
+    return [pscustomobject]@{ Source = 'status'; Status = $named[0] }
+}
+
+function Get-StageForProjectStatus {
+    <#
+        The stage a project Status names, or $null when it names none. Pure.
+
+        $null covers both ways this can fail to answer, and they are deliberately not distinguished
+        here: no status at all, and a status the map has no entry for -- a board that has added a
+        fourth column nobody has mapped yet. Both mean 'this run does not know where the card goes',
+        and the answer to not knowing is to leave the card alone.
+    #>
+    param(
+        [AllowNull()][AllowEmptyString()]$Status,
+        [Parameter(Mandatory = $true)]$StatusMap,
+        [Parameter(Mandatory = $true)]$Map
+    )
+
+    if (-not [string]$Status) { return $null }
+    $stageKey = [string]$StatusMap.Statuses[[string]$Status]
+    if (-not $stageKey) { return $null }
+    $number = $Map[$stageKey]
+    if ($null -eq $number) { return $null }
+    return [int]$number
+}
+
+function Get-SubmitterFromNotes {
+    <#
+        The name of the person who asked for this ticket, or $null when the notes name nobody. Pure.
+
+        The pattern comes from the repo, because where a submitter's name sits is a property of the
+        intake form rather than of this workflow -- see Get-DefaultGithubStatusMap's SubmitterPattern.
+        An empty pattern answers $null for everything, which is the fail-safe: no submitter means
+        stage 6 is skipped, not that everyone is a submitter.
+
+        A pattern that names a capture group takes group 1; one that names none takes the whole match,
+        so a repo can point at a line without having to write a group it does not need.
+    #>
+    param(
+        [AllowNull()][AllowEmptyString()][string]$Notes,
+        [AllowNull()][AllowEmptyString()][string]$Pattern
+    )
+
+    if (-not $Pattern -or -not $Notes) { return $null }
+    $m = $null
+    try { $m = [regex]::Match($Notes, $Pattern) } catch { return $null }
+    if (-not $m.Success) { return $null }
+
+    $name = if ($m.Groups.Count -gt 1 -and $m.Groups[1].Success) { $m.Groups[1].Value } else { $m.Value }
+    $name = ([string]$name).Trim()
+    if (-not $name) { return $null }
+    return $name
+}
+
+function Test-StageIsTerminal {
+    <#
+        Is this a stage a card is never moved OUT of by this script? Pure.
+
+        Two stages, and both belong to the submitter: ReadyToTest, which they are testing, and
+        Completed, which is their verdict. Once a card is in either, this workflow is a spectator.
+
+        THIS OUTRANKS -AllowBackward, which is the whole point of it (Dave, September 2, 2026): the
+        reopen is a real state change and normally earns a backward move, but a card somebody has
+        already been handed must not be pulled back out from under them by a later sweep. If the work
+        turns out not to be done, the person holding the card moves it -- that is what holding it
+        means. Before this, Completed alone was terminal and a card dragged to ReadyToTest by hand
+        could be walked back to InReview on the next run.
+    #>
+    param(
+        [AllowNull()]$Stage,
+        [Parameter(Mandatory = $true)]$Map
+    )
+
+    if ($null -eq $Stage) { return $false }
+    return (@([int]$Map.ReadyToTest, [int]$Map.Completed) -contains [int]$Stage)
+}
+
 function Select-StageMembership {
     <#
         Which pipeline board this task is on, read off the task's own memberships. Returns an object
@@ -522,46 +789,51 @@ function Select-StageMembership {
 
 function Get-StageFloorForIssue {
     <#
-        The stage an issue's own GitHub state puts a floor under, or $null when it puts none. Pure.
+        The stage the GitHub side puts a floor under, or $null when it puts none. Pure.
 
-            open,   no pull request linked      Filed        the issue exists; nothing is being built
-            open,   a pull request open         InReview     it is under review
-            open,   a pull request merged       InReview     merged, and the issue is not closed yet
-            closed as completed                 ReadyToTest  the submitter's turn
-            closed as not planned               $null        nothing was built, so nothing to stage
+            project status Todo                 Filed         on the board, nothing linked yet
+            project status In Progress           InDevelopment a pull request is linked to the issue
+            project status Done                  InReview      the issue is closed
+            no status, or one the map misses     $null         this issue is on no pipeline
+            closed as not planned                $null         nothing was built, so nothing to stage
 
-        A FLOOR, not a position, and that is what makes the daily sweep safe to run. CI cannot see a
-        branch that has no pull request behind it, so a card a session moved to InDevelopment at
-        `new-branch` must not be dragged back to Filed by a sweep that knows less than the session
-        did. Sync-AsanaTaskStage therefore moves forward only.
+        THE PROJECT STATUS IS THE SOURCE, and the issue's own state is no longer read for this (Dave,
+        September 2, 2026). Stages Filed, InDevelopment and InReview are linked to the three statuses
+        of the project board and must always be in sync with them -- so this reads that field instead
+        of re-deriving the same answer from the issue and its pull requests. GitHub's own built-in
+        project workflows already do that derivation ('Pull request linked to issue' sets In Progress,
+        'Item closed' sets Done); doing it a second time here made two writers of one fact, which is a
+        race rather than a sync.
 
-        WHICH MEANS THIS NEVER DERIVES InDevelopment, and that is deliberate rather than a gap: that
-        stage is the one hop only a session can see, and forward-only is what protects it. A card
-        there with no pull request yet floors at Filed, which is backward, so nothing moves.
+        THE not_planned GUARD SURVIVES THE CHANGE, and it has to. 'Item closed' sets Done whatever the
+        reason, so a ticket closed as 'will not be built' arrives here looking exactly like a finished
+        one. Nothing was built, so nothing is staged.
 
-        A MERGED pull request floors at InReview and not beyond (Dave, September 2, 2026). His board
-        has no column for 'merged but the issue is still open', and the gate he set holds either way:
-        a card only reaches the submitter once the issue is actually closed.
+        A FLOOR, not a position, and that is what makes the daily sweep safe to run. Sync-AsanaTaskStage
+        moves forward only, which is what protects the one hop CI cannot see: a session that opened a
+        branch and moved the card to InDevelopment keeps it there while the status still reads Todo,
+        because Filed is backward from where the card already is. That asymmetry is the deliberate
+        exception to 'always in sync' -- syncing it would mean undoing a person's own move on the
+        strength of a column GitHub has no event to update.
 
-        Never Requests and never Completed, whatever it is handed -- see Test-StageIsWritable.
+        Never Requests, never ReadyToTest and never Completed, whatever it is handed. The first is a
+        person's, the last is their verdict, and the middle one is reached only by the feedback rule
+        in Resolve-TargetStage -- Test-GithubStatusMap refuses a map that tries to name any of them.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$State,
         [AllowEmptyString()][string]$StateReason = '',
-        $PullRequests = @(),
+        [AllowNull()][AllowEmptyString()]$ProjectStatus = $null,
+        [Parameter(Mandatory = $true)]$StatusMap,
         [Parameter(Mandatory = $true)]$Map
     )
 
-    if ($State -and $State.ToUpperInvariant() -eq 'CLOSED') {
-        if ($StateReason -and $StateReason.ToLowerInvariant() -eq 'not_planned') { return $null }
-        return [int]$Map.ReadyToTest
+    if ($State -and $State.ToUpperInvariant() -eq 'CLOSED' -and
+        $StateReason -and $StateReason.ToLowerInvariant() -eq 'not_planned') {
+        return $null
     }
 
-    $prs = @($PullRequests)
-    if ($prs | Where-Object { $_.merged -eq $true -or ([string]$_.state).ToUpperInvariant() -in @('OPEN', 'MERGED') }) {
-        return [int]$Map.InReview
-    }
-    return [int]$Map.Filed
+    return Get-StageForProjectStatus -Status $ProjectStatus -StatusMap $StatusMap -Map $Map
 }
 
 function Resolve-TargetStage {
@@ -584,14 +856,32 @@ function Resolve-TargetStage {
 
         A map whose NeedsInfoLabel is empty switches the column off: the label is then never looked
         for, and that is a real answer for a board without one.
+
+        AND ONE ANSWER GOES ONE STAGE FURTHER THAN THE STATUS DOES: the feedback promotion (Dave,
+        September 2, 2026). A card whose status floors it at InReview advances to ReadyToTest once BOTH
+        of these hold -- the notes name a submitter, and that submitter has already been told, which is
+        this script's own close update. Either one missing leaves the card at InReview, and where the
+        repo names no SubmitterPattern at all the promotion can never fire, so stage 6 is skipped
+        entirely and the person who owns the ticket accepts it into Completed by hand.
+
+        The promotion never allows a backward move. It only ever fires one stage above where the status
+        already puts the card, so it cannot pull anything down, and a card that has ALREADY reached
+        ReadyToTest is held there by Test-StageIsTerminal rather than by anything here.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$State,
         [AllowEmptyString()][string]$StateReason = '',
-        $PullRequests = @(),
+        [AllowNull()][AllowEmptyString()]$ProjectStatus = $null,
         [string[]]$Labels = @(),
+        [Parameter(Mandatory = $true)]$StatusMap,
         [Parameter(Mandatory = $true)]$Map,
-        [switch]$Reopened
+        [switch]$Reopened,
+
+        # The submitter's name, or empty when the notes name nobody -- Get-SubmitterFromNotes.
+        [AllowNull()][AllowEmptyString()][string]$Submitter = '',
+
+        # Has that submitter already been told the issue is closed? Test-MirrorUpdatePosted.
+        [switch]$SubmitterTold
     )
 
     $label = [string]$Map.NeedsInfoLabel
@@ -603,8 +893,18 @@ function Resolve-TargetStage {
         }
     }
 
-    $floor = Get-StageFloorForIssue -State $State -StateReason $StateReason -PullRequests $PullRequests -Map $Map
-    $why   = if ($Reopened) { 'the reopen' } else { 'the issue state' }
+    $floor = Get-StageFloorForIssue -State $State -StateReason $StateReason `
+                 -ProjectStatus $ProjectStatus -StatusMap $StatusMap -Map $Map
+
+    if ($null -ne $floor -and [int]$floor -eq [int]$Map.InReview -and $Submitter -and $SubmitterTold) {
+        return [pscustomobject]@{
+            Stage         = [int]$Map.ReadyToTest
+            AllowBackward = $false
+            Why           = "$Submitter has been told"
+        }
+    }
+
+    $why = if ($Reopened) { 'the reopen' } elseif ($ProjectStatus) { "the project status '$ProjectStatus'" } else { 'the project status' }
     return [pscustomobject]@{
         Stage         = $floor
         AllowBackward = [bool]$Reopened
@@ -798,7 +1098,7 @@ function Sync-AsanaTaskStage {
             on no numbered board   it is on no pipeline at all
             on two numbered boards two answers, so neither is taken
             in an UNMAPPED column  the board grew a section this repo's map does not name
-            already in Completed   a person put it there, and nothing here takes it back out
+            already in 6 or 7      the submitter is holding it; nothing here takes it back out
             already at or past     forward-only, unless the answer earned -AllowBackward
             board has no such      a board missing that section is not given one
 
@@ -850,7 +1150,9 @@ function Sync-AsanaTaskStage {
         Write-Host "  Asana task $Gid sits in section $current, which this repo's stage map does not name -- left alone."
         return $false
     }
-    if ($current -eq [int]$Map.Completed) { return $false }
+    # Terminal FIRST, and ahead of -AllowBackward on purpose: a card the submitter is already holding
+    # is never taken back off them, not even by a reopen. See Test-StageIsTerminal.
+    if (Test-StageIsTerminal -Stage $current -Map $Map) { return $false }
     if ($current -eq $stage) { return $false }
     if ($current -gt $stage -and -not $AllowBackward) { return $false }
 
@@ -895,35 +1197,82 @@ function Get-IssueLinkState {
         A cross-reference is deliberately NOT read. A pull request that merely mentions an issue says
         nothing about whether anybody is building it, and stage 3 is a claim about work in progress.
 
+        AND THE PROJECT STATUS, which is what the stage sweep actually steers on since September 2,
+        2026 -- read through projectItems in the same round trip, so the common case stays one call.
+
+        THAT FIELD NEEDS A TOKEN THE DEFAULT ONE IS NOT. `GITHUB_TOKEN` has no access to organization
+        Projects v2 at all -- there is no `permissions:` key that grants it -- so the query carrying
+        projectItems fails wholesale on a CI run that only has the workflow's own token. Rather than
+        lose the close update along with the status, a failure RETRIES ONCE WITHOUT projectItems: the
+        comment half then works exactly as before and only the staging goes quiet, with a line saying
+        why. Set GH_PROJECT_TOKEN to a token that can read the org's projects to get it back.
+
         Never throws. An unreachable API, a missing `gh`, or an issue nobody linked a pull request to
         all give an empty PullRequests list -- the update then says the issue was closed by hand
-        instead of inventing a reference, and the stage sweep reads the issue as unstarted rather than
-        moving a card on a guess.
+        instead of inventing a reference, and the stage sweep reads no status rather than moving a
+        card on a guess.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Repo,
-        [Parameter(Mandatory = $true)][int]$Number
+        [Parameter(Mandatory = $true)][int]$Number,
+
+        # The project field to read the stage from -- Get-GithubStatusMap's FieldName. Empty skips it.
+        [string]$StatusField = 'Status'
     )
 
-    $empty = [pscustomobject]@{ State = ''; StateReason = ''; PullRequests = @(); Labels = @() }
+    $empty = [pscustomobject]@{ State = ''; StateReason = ''; PullRequests = @(); Labels = @(); ProjectStatus = $null; ProjectStatusSource = 'none' }
     $parts = $Repo -split '/'
     if ($parts.Count -ne 2) { return $empty }
 
-    $query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){state stateReason labels(first:50){nodes{name}} closedByPullRequestsReferences(first:10,includeClosedPrs:true){nodes{number url title state merged}}}}}'
+    $core = 'state stateReason labels(first:50){nodes{name}} closedByPullRequestsReferences(first:10,includeClosedPrs:true){nodes{number url title state merged}}'
+    $withStatus = "query(`$owner:String!,`$name:String!,`$number:Int!,`$field:String!){repository(owner:`$owner,name:`$name){issue(number:`$number){$core projectItems(first:10){nodes{fieldValueByName(name:`$field){... on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}"
+    $plain      = "query(`$owner:String!,`$name:String!,`$number:Int!){repository(owner:`$owner,name:`$name){issue(number:`$number){$core}}}"
+
     $ErrorActionPreference = 'Continue'
-    $raw = (& gh api graphql -f query=$query -F "owner=$($parts[0])" -F "name=$($parts[1])" -F "number=$Number") 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $raw) {
-        Write-Host "  Could not ask GitHub about $Repo#$Number -- no pull request is named and no card is moved."
-        return $empty
+    $raw = $null
+    $askedForStatus = [bool]$StatusField
+
+    if ($askedForStatus) {
+        $prev = $env:GH_TOKEN
+        if ($env:GH_PROJECT_TOKEN) { $env:GH_TOKEN = $env:GH_PROJECT_TOKEN }
+        try {
+            $raw = (& gh api graphql -f query=$withStatus -F "owner=$($parts[0])" -F "name=$($parts[1])" -F "number=$Number" -F "field=$StatusField") 2>$null
+        } finally {
+            $env:GH_TOKEN = $prev
+        }
+        if ($LASTEXITCODE -ne 0 -or -not $raw) {
+            Write-Host "  Could not read the '$StatusField' project field of $Repo#$Number -- no card is staged from it. Set GH_PROJECT_TOKEN to a token that can read the organization's projects."
+            $raw = $null
+            $askedForStatus = $false
+        }
     }
+
+    if (-not $raw) {
+        $raw = (& gh api graphql -f query=$plain -F "owner=$($parts[0])" -F "name=$($parts[1])" -F "number=$Number") 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $raw) {
+            Write-Host "  Could not ask GitHub about $Repo#$Number -- no pull request is named and no card is moved."
+            return $empty
+        }
+    }
+
     try {
         $issue = (($raw | Out-String) | ConvertFrom-Json).data.repository.issue
         if (-not $issue) { return $empty }
+        $status = if ($askedForStatus) {
+            Select-ProjectStatus -ProjectItems @($issue.projectItems.nodes)
+        } else {
+            [pscustomobject]@{ Source = 'none'; Status = $null }
+        }
+        if ($status.Source -eq 'ambiguous') {
+            Write-Host "  $Repo#$Number sits on project boards naming two different statuses ($(@($status.Candidates) -join ', ')) -- refusing to guess which pipeline it belongs to."
+        }
         return [pscustomobject]@{
-            State        = ([string]$issue.state).ToUpperInvariant()
-            StateReason  = ([string]$issue.stateReason).ToLowerInvariant()
-            PullRequests = @($issue.closedByPullRequestsReferences.nodes)
-            Labels       = @($issue.labels.nodes | ForEach-Object { [string]$_.name })
+            State               = ([string]$issue.state).ToUpperInvariant()
+            StateReason         = ([string]$issue.stateReason).ToLowerInvariant()
+            PullRequests        = @($issue.closedByPullRequestsReferences.nodes)
+            Labels              = @($issue.labels.nodes | ForEach-Object { [string]$_.name })
+            ProjectStatus       = $status.Status
+            ProjectStatusSource = $status.Source
         }
     } catch {
         return $empty
@@ -953,6 +1302,53 @@ function Get-ClosedIssues {
     return $items
 }
 
+function Get-SubmitterHandoff {
+    <#
+        The two facts the feedback promotion needs: WHO the submitter is, and whether they have been
+        TOLD. Returns both empty when stage 6 is not in play.
+
+            Submitter  the name from the task's notes, or '' when the notes name nobody
+            Told       $true when the close update is already on the task
+
+        Not pure -- up to two Asana reads -- so every cheap reason to skip is checked first, in the
+        order that costs least: a repo that named no SubmitterPattern, a card the status has not
+        floored at InReview, and a card the needs-info label has claimed (which outranks the status,
+        so the promotion could not fire anyway). Only what survives all three costs a round trip.
+
+        TOLD IS MEASURED, NOT ASSUMED, in both modes. In event mode the close comment has just been
+        posted, so reading the comments back is one redundant call on the happy path -- and it is the
+        call that keeps a label event on an already-closed issue, or a run whose comment failed, from
+        claiming a handover that never happened.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Gid,
+        [Parameter(Mandatory = $true)][string]$IssueRef,
+        [Parameter(Mandatory = $true)][string]$Pat,
+        [AllowNull()]$Floor,
+        [Parameter(Mandatory = $true)]$StatusMap,
+        [Parameter(Mandatory = $true)]$Map,
+        [string[]]$Labels = @()
+    )
+
+    $none = [pscustomobject]@{ Submitter = ''; Told = $false }
+
+    if (-not [string]$StatusMap.SubmitterPattern) { return $none }
+    if ($null -eq $Floor -or [int]$Floor -ne [int]$Map.InReview) { return $none }
+    $label = [string]$Map.NeedsInfoLabel
+    if ($label -and (@($Labels) -contains $label)) { return $none }
+
+    $task = Get-AsanaTaskState -Gid $Gid -Pat $Pat -OptFields 'completed,name,notes'
+    if ($null -eq $task -or $task.completed) { return $none }
+
+    $who = [string](Get-SubmitterFromNotes -Notes ([string]$task.notes) -Pattern ([string]$StatusMap.SubmitterPattern))
+    if (-not $who) { return $none }
+
+    return [pscustomobject]@{
+        Submitter = $who
+        Told      = [bool](Test-MirrorUpdatePosted -Gid $Gid -IssueRef $IssueRef -Pat $Pat)
+    }
+}
+
 function Invoke-EventMode {
     if (-not $AsanaPat) { throw 'ASANA_PAT is not set.' }
     $ref = Resolve-AsanaTaskRef -IssueBody $IssueBody
@@ -964,7 +1360,8 @@ function Invoke-EventMode {
         }
         return
     }
-    $link = Get-IssueLinkState -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1])
+    $link = Get-IssueLinkState -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1]) `
+                -StatusField ([string]$script:StatusMap.FieldName)
 
     # A LABEL EVENT MOVES THE CARD AND SAYS NOTHING. 'closed' and 'reopened' are news for the person
     # waiting on the ticket; a label going on or off is a change in OUR state, and narrating it would
@@ -981,10 +1378,17 @@ function Invoke-EventMode {
         Write-Host "Asana task $($ref.Gid) updated: $IssueRef $Event (matched by $($ref.Source)). The task was NOT completed -- that is the requester's call."
     }
 
-    # And the card follows. The state comes from the query above rather than from -Event, so a close
+    # And the card follows. The status comes from the query above rather than from -Event, so a close
     # the API has already superseded cannot move a card on a stale reading.
+    $floor = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason `
+                 -ProjectStatus $link.ProjectStatus -StatusMap $script:StatusMap -Map $script:StageMap
+    $hand = Get-SubmitterHandoff -Gid $ref.Gid -IssueRef $IssueRef -Pat $AsanaPat -Floor $floor `
+                -StatusMap $script:StatusMap -Map $script:StageMap -Labels $link.Labels
+
     $target = Resolve-TargetStage -State $link.State -StateReason $link.StateReason `
-                  -PullRequests $link.PullRequests -Labels $link.Labels -Map $script:StageMap `
+                  -ProjectStatus $link.ProjectStatus -Labels $link.Labels `
+                  -StatusMap $script:StatusMap -Map $script:StageMap `
+                  -Submitter $hand.Submitter -SubmitterTold:$hand.Told `
                   -Reopened:($Event -eq 'reopened')
     Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $target.Stage -Pat $AsanaPat -Map $script:StageMap `
         -For $IssueRef -Why $target.Why -AllowBackward:$target.AllowBackward | Out-Null
@@ -1202,19 +1606,28 @@ function Invoke-StageSweep {
         Sweep (d): this repo's issues -- open, and closed within the -SinceDays window -- each card
         moved to the stage its issue's state has reached.
 
-        THIS ONE IS NOT A BACKSTOP, and that is what separates it from (a) and (b). Stages 2, 3 and 4
-        have no GitHub event this workflow subscribes to: an issue is filed, a branch opens and a pull
-        request merges without `issues: closed` ever firing. So for three of the four writable stages
-        the daily run is the mechanism rather than the safety net, and only stage 5 has an event of
-        its own.
+        THIS ONE IS NOT A BACKSTOP, and that is what separates it from (a) and (b). A project status
+        changes without any `issues:` event firing -- somebody drags a card to In Progress, or a
+        built-in project workflow sets Done -- and this workflow subscribes to none of that. So for
+        the statuses the daily run IS the mechanism rather than the safety net, and only the close and
+        the reopen have an event of their own.
+
+        THE FEEDBACK PROMOTION IS THIS SWEEP'S SAFETY NET RATHER THAN ITS MECHANISM, though. The close
+        event posts the comment BEFORE it measures the handoff, so a card normally reaches ReadyToTest
+        on the event itself; this sweep catches the ones where that did not happen -- a comment that
+        failed, an event that never arrived, or a ticket closed while the board could not be read.
+        Either way 'the submitter has been told' is measured from the task's own comments rather than
+        assumed from having tried, so a failed comment never hands the card over.
 
         It walks GitHub rather than the Asana project, for the same two reasons sweep (c) does: it
         reaches a ticket imported FROM the board, whose task carries no GitHub back-link, and it needs
         no ASANA_PROJECT_GID -- the board comes off the task's own memberships.
 
-        Two reads per issue that carries a task: one GraphQL for the issue's state and linked pull
-        requests, one Asana GET for the card's current section. An issue with no task costs neither,
-        because Resolve-AsanaTaskRef is pure and runs first.
+        Two reads per issue that carries a task: one GraphQL for the issue's state, its linked pull
+        requests AND its project status, one Asana GET for the card's current section. An issue with
+        no task costs neither, because Resolve-AsanaTaskRef is pure and runs first. A card the status
+        has floored at InReview costs two more -- the notes and the comments, for the handoff -- and
+        Get-SubmitterHandoff checks every cheap reason to skip before spending either.
     #>
     if (-not $Repo) {
         Write-Host 'GITHUB_REPOSITORY is not set -- the stage sweep is skipped.'
@@ -1228,10 +1641,17 @@ function Invoke-StageSweep {
         $ref = Resolve-AsanaTaskRef -IssueBody ([string]$i.body)
         if (-not $ref.Gid) { continue }
         $carded++
-        $link = Get-IssueLinkState -Repo $Repo -Number ([int]$i.number)
+        $link = Get-IssueLinkState -Repo $Repo -Number ([int]$i.number) `
+                    -StatusField ([string]$script:StatusMap.FieldName)
         if (-not $link.State) { continue }
+        $floor = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason `
+                     -ProjectStatus $link.ProjectStatus -StatusMap $script:StatusMap -Map $script:StageMap
+        $hand = Get-SubmitterHandoff -Gid $ref.Gid -IssueRef "$Repo#$($i.number)" -Pat $AsanaPat -Floor $floor `
+                    -StatusMap $script:StatusMap -Map $script:StageMap -Labels $link.Labels
         $target = Resolve-TargetStage -State $link.State -StateReason $link.StateReason `
-                      -PullRequests $link.PullRequests -Labels $link.Labels -Map $script:StageMap
+                      -ProjectStatus $link.ProjectStatus -Labels $link.Labels `
+                      -StatusMap $script:StatusMap -Map $script:StageMap `
+                      -Submitter $hand.Submitter -SubmitterTold:$hand.Told
         if (Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $target.Stage -Pat $AsanaPat `
                 -Map $script:StageMap -For "$Repo#$($i.number)" -Why $target.Why `
                 -AllowBackward:$target.AllowBackward) { $moved++ }
@@ -1261,7 +1681,8 @@ function Invoke-ReconcileMode {
 function Invoke-Main {
     # Resolved once, before either mode, so the run says which map it used exactly once and every
     # move afterwards is against the same answer.
-    $script:StageMap = Resolve-AsanaStageMap -RepoRoot $RepoRoot
+    $script:StageMap  = Resolve-AsanaStageMap -RepoRoot $RepoRoot
+    $script:StatusMap = Resolve-GithubStatusMap -RepoRoot $RepoRoot
     switch ($Mode) {
         'event'     { Invoke-EventMode }
         'reconcile' { Invoke-ReconcileMode }
