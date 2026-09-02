@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/prio-label-workspace-limit-v1` · 20260902-100854
+
+Step 5 of the BWJ workflow page now states the limit that decides whether the prio labels reach
+anything: **`Prio-Score` is a field of one Asana workspace and does not cross into another.** The page
+already said the sweep needs no `ASANA_PROJECT_GID` -- true, and the reason the labels work at all
+today. What it did not say is the surprising half: a ticket the workflow **files itself** lands in
+whatever `Get-AsanaProjectGid` points at, and where that project sits in another workspace, its task has
+no `Prio-Score` to read -- not an empty one, none. So a provisional project GID costs an imported ticket
+nothing and costs a self-filed one every label it could have had.
+
+Measured across both BWJ stores on September 2, 2026, the day after the labels shipped: of the 12 open
+issues that resolved to a task, every one that came away with a label was imported from the board, and
+no self-filed ticket was labelled in either repo. The workspace boundary is the *reading* of why, and
+the page says so -- the same self-filed tasks were unreadable to that session's token, and from outside
+the two causes cannot be told apart.
+
+The statement lands at the four sites a reader actually meets it: step 5, step 6's "Asana project
+answer" bullet, the `adopt-bwj-asana` step that proposes the seam, and the seam list in the plugin
+README. `Get-PrioScoreFromTask`'s comment in the template picks up the other end -- it already noted
+that the field's GID differs per workspace, and now says whose problem that is.
+
+**Nothing about the mechanism changed**, and the repointing #1213 also asks for is not here: that is a
+consumer change plus two Actions variables, and it stays on the issue.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A subscriber who has set `ASANA_PROJECT_GID` to something provisional can now find out what it costs
+them, from the page, instead of discovering it by watching a daily run label only the imported half of
+their board. That reverses the shape of the surprise: the limit was live in both stores before anyone
+had written it down, which is the state a portable page exists to prevent.
+
+**Score:** 3
+
+#### Pull Request
+
+step 5 names the workspace the prio field cannot cross
+
+Plugins: bwj-codex
+
+[PR #1214](https://github.com/DaveKJohn/claude-code-specialists/pull/1214)
+
+---
+
 ### DEPLOY: `feat/asana-mirror-prio-labels-v1` · 20260902-093758
 
 The Asana board's prio score now reaches the issue list. The BWJ team scores a task on the
