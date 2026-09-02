@@ -32,6 +32,70 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/dropped-ship-cost-overstated-v1` · 20260902-201709
+
+The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
+costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
+a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
+ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
+trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
+who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+
+**Score:** N/A
+
+#### Pull Request
+
+the lost-watch retry changelog entry no longer overstates a dropped ship's cost
+
+[PR #1250](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1250)
+
+---
+
+### DEPLOY: `feat/repoint-org-transfer-v1` · 20260902-181358
+
+The repo moved from the personal account `DaveKJohn` into the `DKJ-Solutions` organisation on
+September 2, 2026, and every functional reference now names the new owner: `Get-RepoName` (so every
+`gh --repo` in the tree), the marketplace source this repo consumes itself through, the connector
+register, the config blueprint shipped to consumers, and the install documentation.
+
+**The work was deciding what NOT to touch.** Of 2,133 mentions of `DaveKJohn`, 30 were functional; the
+rest are other repos that did not move, local filesystem paths, author attribution, and dated
+measurements. Each is named in CREATE with the reason it stays, so the next reader does not re-open
+the question — and so nobody runs the sweep this branch deliberately did not.
+
+**Nothing breaks in the meantime, and one thing must never happen.** GitHub's transfer redirect keeps
+the old path resolving, which is what every existing consumer's `settings.json` still rides on. That
+redirect survives only while nothing is created at `DaveKJohn/claude-code-specialists`, so that path
+must never be recreated — now stated in `README.md` beside the two rename redirects it sits next to.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer needs to do nothing: their `extraKnownMarketplaces` still names the old owner, and the
+transfer redirect resolves it. What changes for them is what a *fresh* adoption writes — `INSTALL.md`,
+the `specialists-init` bootstrap block and the shipped config blueprint now name `DKJ-Solutions` — and
+one standing condition they inherit without asking for it: the old path must never be recreated, or
+every registration still pointing at it stops resolving at once.
+
+**Score:** 2
+
+#### Pull Request
+
+Repoint every functional reference to the DKJ-Solutions org
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1241](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1241)
+
+---
+
 ### DEPLOY: `fix/ship-pr-missing-check-suite-v1` · 20260902-164150
 
 When `ship-pr` waits out its full 180 seconds and no check has registered, the refusal now reads the
