@@ -316,6 +316,17 @@ Its own number because the three gates below fire *here*, at the push, and becau
 at this moment: 3.2 is what it puts in the body, and 3.2.4 locks that body against later edits to the
 document.
 
+**One more gate fires here and reads nothing on the branch at all: the PR's label has to exist.** The label
+comes from the branch prefix via the repo-owned seam table, and it used to go straight to
+`gh pr create --label` — so a label that had been renamed or retired killed the create *after* every gate had
+run and the branch was on `origin`, leaving a pushed branch with no PR. One `gh label list` now answers it
+ahead of the lint and test gates. It refuses rather than falling back to a default label, because a repo whose
+own workflow gates on the label would otherwise go green on a label that says nothing; the refusal names the
+label, the prefix, the seam file and the labels that do exist. Measured in a consumer on September 1, 2026
+(inbound [#1221](https://github.com/DaveKJohn/claude-code-specialists/issues/1221)), where two labels were
+deleted org-wide because the issue **type** now carries that classification — the seam table was correct the
+day before. Full mechanics on the [`open-pr` skill page](../plugins/workflows/contributing-davekjohn/skills/open-pr/SKILL.md#the-label-gate-does-the-label-your-seam-names-still-exist).
+
 ### 3.2. Copy the last DEPLOY into the PR
 
 `open-pr.ps1` composes the PR body from the document, and **five gates read it on the way**. Four run
