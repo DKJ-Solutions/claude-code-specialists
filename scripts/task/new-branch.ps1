@@ -540,6 +540,20 @@ $cycleExisting = if (Test-Path -LiteralPath $cyclePath) { [System.IO.File]::Read
 $cycleOwner    = Get-BranchFileDeclaredBranch -Text $cycleExisting
 $cycleTaken    = ($cycleOwner -eq $branch)
 
+# READ THIS BEFORE DELETING THE BLOCK BELOW AS DEAD CODE (#1255, September 3, 2026). Naming the document
+# per branch removed almost every way of reaching it. The target is now this branch's own name, and a
+# legacy name is chosen for one reason only -- it already declares THIS branch -- so the ordinary route in,
+# a branch stacked on an unfolded one, cannot produce a foreign owner any more: the two branches write
+# different files. What is left is the odd tree: a branch renamed after its document was written, or a
+# document created by hand under a name that does not match it.
+#
+# IT STAYS, for the reason the block itself gives. What it protects is work that exists in exactly one
+# place -- edits carried into a new branch by `git checkout -b` and never committed -- and the cost of
+# keeping an unreachable guard is a few lines, while the cost of being wrong about "unreachable" is
+# somebody's uncommitted entry. new-branch.tests.ps1 scenario (n2) measures the new guarantee (a foreign
+# document is never TARGETED) rather than pretending to reach this; that is deliberate and is written up
+# there.
+#
 # A FOREIGN OWNER IS OVERWRITTEN, EXCEPT WHERE THE OVERWRITE WOULD BE UNRECOVERABLE -- and that
 # distinction is measured rather than assumed, because this repair is what creates the destructive
 # path. Before it, a foreign file was kept; after it, it is written over. In the ordinary stacked case
