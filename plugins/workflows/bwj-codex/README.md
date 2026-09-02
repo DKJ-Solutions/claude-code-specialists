@@ -51,17 +51,27 @@ covered too:** the workflow reads the Asana link in such an issue's header row w
 machine marker of its own.
 
 **And the card moves with it.** The board's sections **are** the cycle, in order, from *a colleague put
-this on your name* to *tested and good* -- and a card sits in the one its GitHub issue's own state has
-reached. Two questions, deliberately kept apart: a section is recognised by the **number its name
-starts with**, so the words after it belong to the team and can be rewritten any day; what each number
-**means** is stated once by the repo, in `Get-AsanaStageMap`. A board whose sections are not numbered
-is never written to, and a column the map does not name is left alone rather than guessed at.
+this on your name* to *tested and good*. Two questions, deliberately kept apart: a section is
+recognised by the **number its name starts with**, so the words after it belong to the team and can be
+rewritten any day; what each number **means** is stated once by the repo, in `Get-AsanaStageMap`. A
+board whose sections are not numbered is never written to, and a column the map does not name is left
+alone rather than guessed at.
+
+**The three middle stages are the GitHub Project's three statuses, and always in sync with them** --
+`Todo` / `In Progress` / `Done` are *filed* / *being built* / *closed*, read off the project board
+rather than re-derived from the issue, because GitHub's own project workflows already write that field
+and deriving it twice made two writers of one fact. `Get-GithubStatusMap` is where a repo states it.
+
+**The stage past those is reached by FEEDBACK, not by a column:** a card moves to *ready to test* once
+the submitter has actually been told, which is the workflow's own close update -- and where a ticket
+has no submitter that stage is skipped entirely, because there is nobody to hand it to.
 
 The two ends stay the submitter's -- their untriaged inbox at one end and `Completed` at the other --
 and the code permits the middle and nothing else, which is the same guarantee as *"it never ticks the
-task off"* in the board's own currency. Moves are forward, with exactly two exceptions that are both a
-person saying something: the `needs-info` label, which blocks a card whatever the branch is doing, and
-an issue being reopened. Dave, September 2, 2026, closing
+task off"* in the board's own currency. **And the last two sections are terminal**: once a card is in
+*ready to test* or `Completed`, nothing here takes it back out, not even a reopen. Moves are otherwise
+forward, with exactly two exceptions that are both a person saying something: the `needs-info` label,
+which blocks a card whatever the board is doing, and an issue being reopened. Dave, September 2, 2026, closing
 [#1222](https://github.com/DaveKJohn/claude-code-specialists/issues/1222); **there is exactly one such
 board**, which is what makes the *"which board?"* question inbound
 [#1217](https://github.com/DaveKJohn/claude-code-specialists/issues/1217) ran into moot.
@@ -103,6 +113,12 @@ and the CI mechanism needs the project. That is answered by two functions in you
   label that drives the blocked column. **Optional**: leave it out and the built-in map is used, which
   is right only if your board happens to be numbered the same way, and the run says which map it read.
   Semantic keys rather than GIDs, so a rebuilt column costs nothing.
+- `Get-GithubStatusMap` -- which **GitHub Project status** each of the three middle stages is, keyed on
+  the project board's own column names, plus `SubmitterPattern`: the regex over an Asana task's notes
+  that names who asked for it. **Also optional**, with one consequence worth knowing: leave the pattern
+  out and *ready to test* is never entered automatically, so every closed ticket waits a column short
+  for a person. That is the fail-safe default rather than a fault -- a card pushed into the submitter's
+  column claims a handover that never happened -- but it is silent, so it is worth stating deliberately.
 - `Get-AsanaProjectGid` -- the project a mirrored task is created in, and it has exactly one correct
   value: **the board the team reads**. Two independent constraints land on the same answer. An Asana
   custom field does not cross workspaces, so a project outside the board's workspace makes the prio

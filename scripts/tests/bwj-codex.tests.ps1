@@ -308,51 +308,131 @@ Assert-True (Test-StageIsWritable -Stage 30 -Map $shifted)        'and its Filed
 Assert-True (-not (Test-StageIsWritable -Stage 3 -Map $shifted))  'while the DEFAULT Filed number is not, under that map'
 Assert-True (-not (Test-StageIsWritable -Stage 70 -Map $shifted))  'and its Completed stage is still the untouchable end'
 
-# The derivation. A FLOOR and not a position: CI cannot see a branch with no pull request behind it,
-# so a card a session moved to InDevelopment must not be dragged back by a sweep that knows less.
-$prOpen   = [pscustomobject]@{ number = 1; state = 'OPEN';   merged = $false }
-$prMerged = [pscustomobject]@{ number = 2; state = 'MERGED'; merged = $true }
-Assert-Equal $map.Filed       (Get-StageFloorForIssue -State 'OPEN' -Map $map)                            'an open issue with nothing linked floors at Filed'
-Assert-Equal $map.InReview    (Get-StageFloorForIssue -State 'OPEN' -PullRequests @($prOpen)   -Map $map) 'an open pull request floors at In review'
-Assert-Equal $map.InReview    (Get-StageFloorForIssue -State 'OPEN' -PullRequests @($prMerged) -Map $map) 'and a MERGED one on a still-open issue floors there too -- Dave, September 2, 2026: his board has no column between the two'
-Assert-Equal $map.ReadyToTest (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed' -Map $map) 'closed as completed floors at Ready to test -- the submitter turn'
-Assert-True ($null -eq (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'not_planned' -Map $map)) 'closed as not planned floors nowhere -- nothing was built, so there is nothing to test'
-Assert-Equal $map.ReadyToTest (Get-StageFloorForIssue -State 'closed' -StateReason 'COMPLETED' -Map $map) 'and the state is read case-insensitively, since two GitHub surfaces disagree on it'
+# The derivation. THE PROJECT STATUS IS THE SOURCE since September 2, 2026 -- the issue's own state
+# and its pull requests are no longer read for it. GitHub's own built-in project workflows already
+# write that field ('Pull request linked to issue' sets In Progress, 'Item closed' sets Done), so
+# deriving the same answer here a second time made two writers of one fact, which is a race.
+$statusMap = Get-DefaultGithubStatusMap
+Assert-Equal 0 (Test-GithubStatusMap -Map $statusMap).Count 'the default status map validates'
+Assert-Equal 'Status' $statusMap.FieldName 'and it names the project field the stage is read from'
+Assert-Equal $map.Filed         (Get-StageFloorForIssue -State 'OPEN'   -ProjectStatus 'Todo'        -StatusMap $statusMap -Map $map) 'status Todo floors at Filed'
+Assert-Equal $map.InDevelopment (Get-StageFloorForIssue -State 'OPEN'   -ProjectStatus 'In Progress' -StatusMap $statusMap -Map $map) 'status In Progress floors at In development'
+Assert-Equal $map.InReview      (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed' -ProjectStatus 'Done' -StatusMap $statusMap -Map $map) 'and status Done floors at In review -- Dave, September 2, 2026: stages 3/4/5 ARE Todo/In Progress/Done'
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'OPEN' -ProjectStatus '' -StatusMap $statusMap -Map $map)) 'an issue on no board floors nowhere, rather than reading as stage 0'
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'OPEN' -ProjectStatus 'Blocked' -StatusMap $statusMap -Map $map)) 'and a column nobody has mapped floors nowhere either -- leaving the card alone is the answer to not knowing'
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'not_planned' -ProjectStatus 'Done' -StatusMap $statusMap -Map $map)) "closed as not planned floors nowhere, though 'Item closed' set Done on it anyway -- nothing was built, so there is nothing to test"
+Assert-Equal $map.InReview (Get-StageFloorForIssue -State 'closed' -StateReason 'COMPLETED' -ProjectStatus 'Done' -StatusMap $statusMap -Map $map) 'and the state is still read case-insensitively, since two GitHub surfaces disagree on it'
 
-# InDevelopment is NEVER derived, and that is the design rather than a gap: it is the one hop only a
-# session can see, and forward-only is what protects it.
-$derived = @()
-foreach ($case in @(@('OPEN', '', @()), @('OPEN', '', @($prOpen)), @('OPEN', '', @($prMerged)), @('CLOSED', 'completed', @($prMerged)))) {
-    $f = Get-StageFloorForIssue -State $case[0] -StateReason $case[1] -PullRequests $case[2] -Map $map
-    $derived += $f
-    Assert-True (Test-StageIsWritable -Stage $f -Map $map) "the derivation never leaves the writable range ($($case[0])/$($case[1]))"
+# The three stages a status may NOT name: two are a person's, and the third is the feedback rule's.
+foreach ($stage in @('Requests', 'ReadyToTest', 'Completed')) {
+    $badTarget = Get-DefaultGithubStatusMap
+    $badTarget.Statuses = @{ 'Done' = $stage }
+    Assert-True ((Test-GithubStatusMap -Map $badTarget).Count -gt 0) "a status naming $stage is refused -- that stage is reached by a person or by the feedback rule, never by a column"
 }
-Assert-True ($derived -notcontains $map.InDevelopment) 'and it never derives InDevelopment -- that hop belongs to the session at new-branch'
+$badStage = Get-DefaultGithubStatusMap
+$badStage.Statuses = @{ 'Done' = 'Nonsense' }
+Assert-True (((Test-GithubStatusMap -Map $badStage) -join ' ') -match 'not a stage') 'one naming something that is no stage at all is refused, naming it'
+Assert-True ((Test-GithubStatusMap -Map $null).Count -gt 0) 'and an empty status map is refused rather than treated as a default'
+
+# Keyed on the BOARD's own column names, so a board that renames its columns states that once here.
+$renamed = @{ FieldName = 'Fase'; SubmitterPattern = ''
+              Statuses = @{ 'Te doen' = 'Filed'; 'Bezig' = 'InDevelopment'; 'Klaar' = 'InReview' } }
+Assert-Equal 0 (Test-GithubStatusMap -Map $renamed).Count 'a board with its own column names validates too'
+Assert-Equal $map.InReview (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed' -ProjectStatus 'Klaar' -StatusMap $renamed -Map $map) 'and its own words drive the same stage'
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'OPEN' -ProjectStatus 'Todo' -StatusMap $renamed -Map $map)) "while the DEFAULT column names mean nothing under it -- or the map is decoration over literals"
+
+# WHICH PAIR CHANGED: InDevelopment IS derived now, and ReadyToTest no longer is.
+$derived = @()
+foreach ($s in @('Todo', 'In Progress', 'Done')) {
+    $f = Get-StageFloorForIssue -State 'OPEN' -ProjectStatus $s -StatusMap $statusMap -Map $map
+    $derived += $f
+    Assert-True (Test-StageIsWritable -Stage $f -Map $map) "the derivation never leaves the writable range ($s)"
+}
+Assert-True ($derived -contains $map.InDevelopment) 'In development IS derived now -- GitHub sets In Progress itself when a pull request is linked'
+Assert-True ($derived -notcontains $map.ReadyToTest) 'and Ready to test is never derived from a status -- only the feedback rule reaches it'
 
 # --- the target, and the two answers that may go BACKWARD -----------------------------------------
 # Everything else is a floor, and floors only rise. These two are a person saying something.
-$t = Resolve-TargetStage -State 'OPEN' -PullRequests @($prOpen) -Labels @('tier-1', 'needs-info') -Map $map
-Assert-Equal $map.NeedsInfo $t.Stage         'the needs-info label OUTRANKS the issue state -- an open pull request does not unblock a card somebody blocked'
+$t = Resolve-TargetStage -State 'OPEN' -ProjectStatus 'In Progress' -Labels @('tier-1', 'needs-info') -StatusMap $statusMap -Map $map
+Assert-Equal $map.NeedsInfo $t.Stage         'the needs-info label OUTRANKS the project status -- In Progress does not unblock a card somebody blocked'
 Assert-True  $t.AllowBackward                'and it may move the card backward, because a person set it'
 Assert-True  ($t.Why -match 'needs-info')    'and the log says which label decided it'
 
-$t = Resolve-TargetStage -State 'OPEN' -PullRequests @($prOpen) -Labels @('tier-1') -Map $map
-Assert-Equal $map.InReview $t.Stage          'removing the label hands the card back to its state-derived floor'
+$t = Resolve-TargetStage -State 'OPEN' -ProjectStatus 'In Progress' -Labels @('tier-1') -StatusMap $statusMap -Map $map
+Assert-Equal $map.InDevelopment $t.Stage     'removing the label hands the card back to its status-derived floor'
 Assert-True  (-not $t.AllowBackward)         'which is forward, so it needs no permission'
+Assert-True  ($t.Why -match 'In Progress')   'and the log names the status that decided it, not just that a status did'
 
-$t = Resolve-TargetStage -State 'OPEN' -Labels @() -Map $map -Reopened
-Assert-Equal $map.Filed $t.Stage             'a reopen lands the card wherever the issue now is'
+$t = Resolve-TargetStage -State 'OPEN' -ProjectStatus 'Todo' -Labels @() -StatusMap $statusMap -Map $map -Reopened
+Assert-Equal $map.Filed $t.Stage             'a reopen lands the card wherever the board now says it is'
 Assert-True  $t.AllowBackward                'and is the other answer allowed to go backward -- it is a real state change'
 Assert-True  ($t.Why -match 'reopen')        'and says so'
 
-$t = Resolve-TargetStage -State 'CLOSED' -StateReason 'not_planned' -Labels @('needs-info') -Map $map
-Assert-Equal $map.NeedsInfo $t.Stage 'the label still answers for an issue whose state answers nothing'
+$t = Resolve-TargetStage -State 'CLOSED' -StateReason 'not_planned' -ProjectStatus 'Done' -Labels @('needs-info') -StatusMap $statusMap -Map $map
+Assert-Equal $map.NeedsInfo $t.Stage 'the label still answers for an issue whose status answers nothing'
 
-$t = Resolve-TargetStage -State 'OPEN' -Labels @('blocked') -Map $shifted
+$t = Resolve-TargetStage -State 'OPEN' -ProjectStatus 'Todo' -Labels @('blocked') -StatusMap $statusMap -Map $shifted
 Assert-Equal 20 $t.Stage 'the label name comes from the map too, so a repo may call it anything'
+$t = Resolve-TargetStage -State 'OPEN' -ProjectStatus 'Todo' -Labels @() -StatusMap $statusMap -Map $shifted
+Assert-Equal 30 $t.Stage 'and the stage NUMBERS still come off the stage map, so the status drives a board numbered any other way just the same'
 $noLabel = $map.Clone(); $noLabel['NeedsInfoLabel'] = ''
-$t = Resolve-TargetStage -State 'OPEN' -Labels @('needs-info') -Map $noLabel
+$t = Resolve-TargetStage -State 'OPEN' -ProjectStatus 'Todo' -Labels @('needs-info') -StatusMap $statusMap -Map $noLabel
 Assert-Equal $map.Filed $t.Stage 'and a map naming no label switches the column off -- a real answer for a board without one'
+
+# --- the feedback promotion, and the two stages nothing here takes a card back out of -------------
+# Dave, September 2, 2026, in two rules. A card reaches Ready to test only once the submitter has
+# actually been TOLD -- and once a card is in 6 or 7 it does not come back.
+$withPattern = Get-DefaultGithubStatusMap
+$withPattern.SubmitterPattern = '(?m)^\s*Aangevraagd door:\s*(.+?)\s*$'
+$closed = @{ State = 'CLOSED'; StateReason = 'completed'; ProjectStatus = 'Done' }
+
+$t = Resolve-TargetStage @closed -StatusMap $withPattern -Map $map -Submitter 'Jordy Navarro' -SubmitterTold
+Assert-Equal $map.ReadyToTest $t.Stage  'a closed issue whose submitter has been told advances one stage past its status, to Ready to test'
+Assert-True  ($t.Why -match 'Jordy')    'and the log names who was told, so the hop is attributable'
+Assert-True  (-not $t.AllowBackward)    'the promotion never earns a backward move -- it only ever goes one stage up'
+
+$t = Resolve-TargetStage @closed -StatusMap $withPattern -Map $map -Submitter 'Jordy Navarro'
+Assert-Equal $map.InReview $t.Stage 'while one whose submitter has NOT been told waits in In review -- no status means anybody has been told'
+
+$t = Resolve-TargetStage @closed -StatusMap $withPattern -Map $map -Submitter '' -SubmitterTold
+Assert-Equal $map.InReview $t.Stage 'and a ticket nobody else asked for SKIPS stage 6 entirely -- there is nobody to hand it to, so its owner accepts it into Completed himself'
+
+$t = Resolve-TargetStage -State 'OPEN' -ProjectStatus 'Todo' -StatusMap $withPattern -Map $map -Submitter 'Jordy Navarro' -SubmitterTold
+Assert-Equal $map.Filed $t.Stage 'the promotion fires only off In review -- a Todo card is not handed to anybody however much they have been told'
+
+# The pattern is the repo's, because where a submitter's name sits is a property of the intake form.
+$notes = "Type: Automation`nAangevraagd door: Jordy Navarro`nDeadline: 2026-10-30"
+Assert-Equal 'Jordy Navarro' (Get-SubmitterFromNotes -Notes $notes -Pattern $withPattern.SubmitterPattern) 'the submitter comes off the intake form line in the notes'
+Assert-True ($null -eq (Get-SubmitterFromNotes -Notes 'n8n query splitter' -Pattern $withPattern.SubmitterPattern)) "notes naming nobody name nobody -- created_by is NOT the submitter, measured September 2, 2026: the intake form creates every card as its own owner, so it reads the same either way"
+Assert-True ($null -eq (Get-SubmitterFromNotes -Notes $notes -Pattern '')) 'and a repo naming no pattern can never tell, so the promotion never fires at all -- the fail-safe direction'
+Assert-Equal '' ([string]$statusMap.SubmitterPattern) 'which is what the DEFAULT map does, so stage 6 is opt-in per repo'
+Assert-True ($null -eq (Get-SubmitterFromNotes -Notes $notes -Pattern '(unclosed')) 'a pattern that will not compile names nobody rather than throwing mid-sweep'
+
+# Terminal, and it OUTRANKS -AllowBackward: a card the submitter is holding is never taken back.
+Assert-True (Test-StageIsTerminal -Stage $map.ReadyToTest -Map $map) 'a card in Ready to test is never moved out of it'
+Assert-True (Test-StageIsTerminal -Stage $map.Completed   -Map $map) 'nor one in Completed'
+Assert-True (-not (Test-StageIsTerminal -Stage $map.InReview -Map $map)) 'while In review is an ordinary stage a sweep may still move'
+Assert-True (-not (Test-StageIsTerminal -Stage $map.Requests -Map $map)) 'and Requests is not terminal -- cards do leave it, they are just never sent there'
+Assert-True (Test-StageIsTerminal -Stage 60 -Map $shifted) 'the terminal pair comes off the map too, so a board numbered any other way is protected the same'
+Assert-True (-not (Test-StageIsTerminal -Stage $null -Map $map)) 'and no stage at all is not terminal'
+
+# Select-ProjectStatus: one answer, none, or a refusal to guess -- the same three the Asana side gives.
+$one = @([pscustomobject]@{ fieldValueByName = [pscustomobject]@{ name = 'Todo' } })
+Assert-Equal 'Todo'   (Select-ProjectStatus -ProjectItems $one).Status 'one board, one status'
+Assert-Equal 'status' (Select-ProjectStatus -ProjectItems $one).Source 'and it says where the answer came from'
+Assert-Equal 'none'   (Select-ProjectStatus -ProjectItems @()).Source 'an issue on no board is on no pipeline'
+$empty = @([pscustomobject]@{ fieldValueByName = $null })
+Assert-Equal 'none'   (Select-ProjectStatus -ProjectItems $empty).Source 'and one on a board whose status is unset is the same answer'
+$twoDifferent = @(
+    [pscustomobject]@{ fieldValueByName = [pscustomobject]@{ name = 'Todo' } },
+    [pscustomobject]@{ fieldValueByName = [pscustomobject]@{ name = 'Done' } }
+)
+Assert-Equal 'ambiguous' (Select-ProjectStatus -ProjectItems $twoDifferent).Source 'two boards naming two different statuses is two answers, so it gets neither'
+$twoSame = @(
+    [pscustomobject]@{ fieldValueByName = [pscustomobject]@{ name = 'Done' } },
+    [pscustomobject]@{ fieldValueByName = [pscustomobject]@{ name = 'Done' } }
+)
+Assert-Equal 'Done' (Select-ProjectStatus -ProjectItems $twoSame).Status 'while two boards that agree are one answer, not a conflict'
 
 # Which board -- read off the task's own memberships, so no repo keeps six section GIDs in its config.
 # A task on an unnumbered board only is on no pipeline, which is how any other board is left alone.

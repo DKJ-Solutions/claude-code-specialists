@@ -29,7 +29,7 @@ overwriting -- report the difference and let the maintainer decide.
 
 ## 2 -- propose the config seam for `scripts/repo-config.ps1`
 
-Add two functions to the repo-owned `scripts/repo-config.ps1` (the same file `contributing-davekjohn`
+Add these functions to the repo-owned `scripts/repo-config.ps1` (the same file `contributing-davekjohn`
 dot-sources). **Propose** them -- do not place them -- because the values state what this repo *is*:
 
 ```powershell
@@ -42,15 +42,39 @@ function Get-AsanaStageMap {
     return @{
         Requests       = 1   # the submitter's inbox -- never a target, though cards do leave it
         NeedsInfo      = 2   # blocked on the submitter -- driven by the label below
-        Filed          = 3   # the GitHub issue exists; nothing is being built yet
-        InDevelopment  = 4   # a branch is open -- the session's own hop, never derived by CI
-        InReview       = 5   # a pull request is open OR merged, and the issue is not closed yet
-        ReadyToTest    = 6   # the issue is closed as completed -- the submitter's turn
+        Filed          = 3   # project status Todo -- tracked on GitHub, nothing linked yet
+        InDevelopment  = 4   # project status In Progress -- a pull request is linked
+        InReview       = 5   # project status Done -- the issue is closed
+        ReadyToTest    = 6   # the submitter has been TOLD -- their turn; never moved OUT of
         Completed      = 7   # the submitter says it is good -- never a target, never moved OUT of
         NeedsInfoLabel = 'needs-info'
     }
 }
+
+# Which GitHub Project status each of the three MIDDLE stages is. Also optional, and the two maps
+# answer to two different boards -- this one is keyed on GitHub's own column names.
+function Get-GithubStatusMap {
+    return @{
+        FieldName        = 'Status'
+        Statuses         = @{
+            'Todo'        = 'Filed'
+            'In Progress' = 'InDevelopment'
+            'Done'        = 'InReview'
+        }
+        # A regex over the Asana task's notes whose group 1 is the submitter's name -- the intake
+        # form's own line. '' means stage 6 is never entered automatically; see below.
+        SubmitterPattern = ''
+    }
+}
 ```
+
+**`SubmitterPattern` is the one value here that decides whether a whole column is used.** Stage 6 is
+entered only once the submitter has been told, so a repo that names no pattern never enters it: every
+closed ticket waits in `InReview` for a person. That is a working configuration and the safe default,
+but it is *silent* -- so if the team expects an acceptance column to fill itself, this is the value
+that makes it. Propose it against the wording the repo's intake form actually writes, and do not guess
+it from `created_by`: measured on the BWJ board, the form creates every card as its own owner, so
+`created_by` reads identically whether a colleague asked for it or a session filed it.
 
 **Propose the stage map against the board you actually read in step 5, not against the example.** The
 keys are the cycle and are fixed; the numbers are that board's and nothing else can supply them. Say
@@ -80,9 +104,21 @@ record that both are incomplete until it is.
 The CI workflow needs, on the repo (Settings -> Secrets and variables -> Actions):
 
 - **Secret** `ASANA_PAT` -- an Asana personal access token with write access to the project.
+- **Secret** `GH_PROJECT_TOKEN` -- a GitHub PAT that can **read the organization's Projects v2**.
 - **Variable** `ASANA_PROJECT_GID` -- same value as `Get-AsanaProjectGid`.
 
 Print these as a checklist. This skill does not set secrets.
+
+**`GH_PROJECT_TOKEN` is not optional if you want the stage sweep**, and it is worth saying why rather
+than listing it. The three middle stages are read off the project board's `Status` field, and
+`GITHUB_TOKEN` -- the token the workflow gets for free -- **cannot see an organization's Projects v2 at
+all**. There is no `permissions:` key that grants it; it is not a scope this workflow can ask for.
+
+Without the secret the workflow still runs and the close update still goes out: the query retries once
+without the project field, and the log says the status could not be read. **So the symptom is cards that
+never move, with the reason in the run log** -- which is the right failure, but only if somebody reads
+it. Say that plainly when you report, because "the mirror works" and "the board moves" are two claims
+here and the first can be true while the second is not.
 
 **There is deliberately no workspace variable here**, and do not add one back: the CI half addresses
 every task and project by GID, so it never needs the workspace. `Get-AsanaWorkspaceGid` from step 2
@@ -167,6 +203,31 @@ proposal. Four cases are worth naming explicitly when you report:
   `Get-AsanaStageMap` is not optional. The board this model was first written against gained a column
   the same afternoon it shipped, which moved every stage above it by one -- so treat "the default
   happens to fit" as a claim to verify here, not to assume.
+
+### And read the GitHub side of the same question
+
+The three middle stages come from the **project board's `Status` field**, so that field is the other
+half of this step. Read its options and report them beside the Asana columns:
+
+```bash
+gh api graphql -f query='
+query { organization(login: "<org>") { projectV2(number: <n>) {
+  fields(first: 30) { nodes { ... on ProjectV2SingleSelectField { name options { name } } } } } } }'
+```
+
+Three cases to name when you report:
+
+- **The three defaults** (`Todo` / `In Progress` / `Done`). The built-in status map fits, and
+  `Get-GithubStatusMap` is optional.
+- **Renamed or translated columns.** Then the map is **not** optional -- the status names are its keys,
+  and an unmapped column derives no stage, so cards simply stop moving.
+- **A fourth column** (a `Blocked`, a `Icebox`). Leave it out of the map: an unmapped status is a
+  **hold**, which is the intended way to park a card outside the pipeline.
+
+**Also report which of the project's built-in workflows are enabled**, because they are what writes
+that field: `Item added to project`, `Pull request linked to issue` and `Item closed` are the three
+that matter. A board where those are off has a `Status` nobody maintains, and then this whole half of
+the model reads a stale column -- which looks exactly like a board that works.
 
 ## 6 -- point the repo's governance at the rule
 
