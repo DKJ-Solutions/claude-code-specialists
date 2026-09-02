@@ -358,6 +358,33 @@ merge state can drop back to `BLOCKED`, with the merge refused for a base-branch
 to go green, then merge normally. **Never reach for `--admin` here.** That bypasses the gate the check
 exists for, and a forge suggesting it in its own error text does not make it the fix.
 
+### When a not-required check fails, the merge proceeds and ship-pr relays the reason
+
+A required check that goes red is a refusal, and its reason is one you meet first-hand at the local
+gate before the push. A **not-required** (advisory) check is the other case: the ruleset does not block
+on it, so `ship-pr` merges past it and prints `a check FAILED but the merge is not blocked`. That line
+names the check but not *why* it failed, and the red mark is now behind you where nobody re-reads it —
+so step 3 also fetches the failing check's annotations and prints the sentence the workflow **wrote
+about itself**, right beside the warning.
+
+**It relays a *titled* failure annotation only, and that is the whole contract on your workflow.** A
+line your job emits as
+
+```
+echo "::error title=<name>::<one sentence on why it failed>"
+```
+
+is picked up and printed. GitHub's own Actions runner also writes failure annotations — `Process
+completed with exit code 1`, `Action failed with error: ...` — but always with an **empty title**, so
+"has a title" is what separates a sentence an author left for this reader from the runner's exit noise.
+Nothing keys on a check *name*, so this works in your repo whose workflows the plugin has never seen.
+
+**An advisory check that fails with no titled annotation is silent here on purpose.** A blank reason
+line beside the red mark means the job left no sentence behind — not that the relay is broken. If your
+advisory workflow has something useful to say about a failure, give it a titled `::error::` line and
+`ship-pr` carries it to the operator's console; the first titled failure in the job wins, and warnings
+are not read.
+
 ## The merge method is repo policy
 
 `gh pr merge` runs with `--merge` by default. A consumer that squashes or rebases declares that in
