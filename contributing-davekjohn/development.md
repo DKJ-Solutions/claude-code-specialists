@@ -1,4 +1,4 @@
-## Development: `docs/ruleset-bypass-dropped-by-transfer-v1` · 20260902-204414
+## Development: `fix/native-capture-grandchild-handle-race-v1` · 20260902-201606
 
 > **How this file is read.** A step is `- [ ]` until it is resolved -- `- [x]` done, or
 > `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.
@@ -33,52 +33,55 @@
 
 ### PLAN
 
-#### Four present-tense claims went untrue on September 2, 2026, and none of them announced it
-
-The transfer into `DKJ-Solutions` carried `main-ci-gate` across intact and dropped its bypass list
-(#1244). Four documents describe that list, or a route that runs on it, in the present tense.
-
-#### The reach was measured rather than assumed
-
-`grep -rn "bypass" --include=*.md` over the tree, minus the archived release notes: eleven hits, four
-of them claims about this ruleset. The other seven are about gates in general and are untouched.
+- [x] Confirm the mechanism from #1252 against the tree: `Invoke-NativeCaptureUtf8`'s timeout path
+      kills the process tree, then waits on the direct child only, then reads `out.txt` with
+      `[System.IO.File]::ReadAllText` -- which opens `FileShare.Read` and throws when a killed
+      grandchild still holds the inherited stdout handle. Verified at
+      `scripts/lib/native-capture-lib.ps1:370,372`.
+- [x] Pick the repair. Took the issue author's lean -- repair 1 (shared read): smallest change,
+      never throws, and a possibly-truncated tail is the honest answer for a killed tree.
 
 ### CREATE
 
-- [x] `05-15-extension.md` -- the bypass-list claim, plus the measured chain reaction and the generalisable half
-- [x] `05-15-extension.md` -- the three pre-transfer readings behind "the App is NOT in the bypass list", dated rather than deleted; the method is the keeper
-- [x] `.claude/rules/language-layers.md` -- "bypass actors are all unchanged", bounded to the rename it was measured against
-- [x] `05-06-extension.md` -- the release route's "its push to `main` bypasses the required check", which is currently impossible
-- [~] Promote the lesson to Sylvester's portable manual -- dropped: repo settings are not in that manual's stated scope, and the neighbouring generalisable half ("when an API hides a field, check whether a sibling representation leaks its shape") already lives in this lens. Following the section's own convention rather than inventing scope.
+- [x] Add `Read-NativeCaptureFileText` to `scripts/lib/native-capture-lib.ps1` -- opens the capture
+      file via `FileStream` with `FileShare.ReadWrite`, decodes with the caller's encoding.
+- [x] Route both capture reads in `Invoke-NativeCaptureUtf8` through it, and note at the bounded-wait
+      comment why the read tolerates a lingering handle rather than waiting longer.
+- [x] Mirror to the plugin copies: `scripts/sync/build-shared-scripts.ps1` (team-alpha workflow +
+      team-shopify).
 
 ### TEST
 
-- [x] `check-plugin-integrity.ps1` + all suites via `open-pr`
-- [x] The four claims re-read against the live API: `bypass_actors: null`, `current_user_can_bypass: never`, `updated_at 2026-09-02T17:41:27`
-- [~] An automated check that a doc claim about repo settings still matches the API -- dropped, and it is a real gap: the tree cannot see repo settings, which `language-layers.md` already names ("it is exhaustive over the tree, and the tree is not the whole product"). Naming the gap is the fix available here.
+- [x] New assert block in `scripts/tests/native-capture.tests.ps1`: hold a real writer handle open
+      with `FileShare.Read`, assert the plain `ReadAllText` throws (the bug) and
+      `Read-NativeCaptureFileText` returns the flushed bytes. `native-capture.tests.ps1`: 60 pass, 0 fail.
+- [x] Lint gate green (`check-plugin-integrity.ps1`, 0 errors -- incl. check 27 script-ascii),
+      shared-scripts drift check green, `shared-scripts.tests.ps1` green.
 
-### DEPLOY: `docs/ruleset-bypass-dropped-by-transfer-v1`
+### DEPLOY: `fix/native-capture-grandchild-handle-race-v1`
 
-Four documents stop claiming a bypass list that no longer exists. The org transfer carried the
-`main-ci-gate` ruleset across intact and dropped only its bypass actors, so a ruleset that reports
-`active` reads as a clean bill of health while the one array all three direct-on-`main` exceptions run
-on is empty. The system-administration lens said the list "keeps the direct fold/release commits
-possible", the release lens said the cut's push "bypasses the required check", the language rule said a
-field-by-field re-check found the bypass actors unchanged, and the three readings behind "the App is
-NOT in the bypass list" no longer reproduce. Each is now corrected or dated, with the measured
-consequence written down beside it: a blocked fold leaves a live branch document on the trunk, and
-because that path is fixed by design every subsequent PR then conflicts on it -- where the intuitive
-resolution destroys another branch's unfolded changelog entry.
+`Invoke-NativeCaptureUtf8` read its capture files with `[System.IO.File]::ReadAllText`, which opens
+`FileShare.Read`. On the timeout path the whole process tree is force-killed but the wait afterwards
+is on the direct child only, so a grandchild that inherited the redirected stdout handle can still
+hold `out.txt` when the read runs -- and `ReadAllText` then throws "being used by another process"
+instead of returning the partial output. The window is wall-clock, so it was invisible locally and
+lost the race on the slower CI runner, turning an unrelated branch's `lint-en-tests` red with a suite
+name that had no relationship to its diff. The reads now go through a new `Read-NativeCaptureFileText`
+that opens `FileShare.ReadWrite`: it coexists with the lingering handle and returns whatever was
+flushed, which for a killed tree is the honest answer. A regression assert in
+`native-capture.tests.ps1` holds a writer handle open for real and checks both halves.
 
 **Score:** 3
 
 #### What makes this deploy extra special
 
-N/A -- all four documents are repo-owned. The lenses and `.claude/rules/` do not travel to a consumer,
-and the portable manuals are deliberately untouched: repo settings are not in their scope.
+The fix ships to consumers through the shared `native-capture-lib.ps1` mirror. A consumer whose
+`ship-pr` makes a bounded `git push`/`git fetch` that stalls and is force-killed on a slow machine
+would otherwise get an unrelated `IOException` in place of the timeout diagnosis the bound exists to
+give them.
 
-**Score:** N/A
+**Score:** 2
 
 #### Pull Request
 
-Correct the ruleset bypass claims the org transfer made untrue
+native-capture's bounded read tolerates a killed grandchild still holding out.txt
