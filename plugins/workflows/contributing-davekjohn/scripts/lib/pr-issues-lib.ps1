@@ -1388,6 +1388,30 @@ function Get-MissingCheckSuiteNote {
         never as a diagnosis. The reader who reopens and gets nothing has learned something the old
         sentence could not tell them either way.
 
+        AND ONE CAUSE IS NOT A GUESS AT ALL, which is what issue #1247 turned out to be (measured
+        September 2, 2026, on PR #1243). A `pull_request` workflow runs against `refs/pull/<n>/merge`,
+        the commit GitHub builds by merging the head into the base -- so while the PR CONFLICTS there is
+        no such commit, no check suite is created, and a required check can never be satisfied. Nothing
+        went missing here: the event was never eligible to fire.
+
+        THE MEASUREMENT, because #1247 read this state as an Actions outage and inferred runner
+        entitlement at the newly transferred org:
+
+          * #1243 (CONFLICTING): no `refs/pull/1243/merge`, 0 check suites -- and it stayed 0 through
+            BOTH escalations, `gh pr close && gh pr reopen` and then a fresh head pushed to the branch.
+          * #1249 and #1240, opened either side of it: `refs/pull/<n>/merge` present, three suites each,
+            same repo, same hour, same workflows.
+
+        That is why the conflict is named FIRST and the reopen is WITHHELD rather than reworded. Against
+        a dropped event the reopen is the cheapest thing to try; against a conflict it is measured to do
+        nothing, and printing it there sends the reader round a loop that cannot terminate. The repair is
+        to make the merge commit computable -- merge the base in, or rebase -- after which the ordinary
+        `synchronize` creates the suite.
+
+        STILL A DIAGNOSIS AND NOT A CAUSE, and the refusal is untouched for the fifth time. A conflicting
+        PR could also be missing its suite for one of the reasons above; what the conflict buys the reader
+        is a repair they can carry out without guessing, never proof that it is the only one.
+
     .PARAMETER SuitesJson
         `gh api repos/<owner>/<repo>/commits/<sha>/check-suites` output. Unreadable in, '' out: a
         diagnostic must never be the reason a refusal cannot be printed.
@@ -1395,10 +1419,19 @@ function Get-MissingCheckSuiteNote {
     .PARAMETER PrNumber
         The PR number, so the note can name the reopen. Optional; left out, the note ends after the
         state it read.
+
+    .PARAMETER Mergeable
+        `gh pr view --json mergeable` -- GitHub's own word, one of CONFLICTING, MERGEABLE or UNKNOWN.
+        Only CONFLICTING changes what the reader is told. UNKNOWN means GitHub has not finished computing
+        the merge and is deliberately read as NO INFORMATION rather than as a conflict, because a note
+        that guesses at a cause is the failure this whole function exists to end. Optional, and optional
+        on purpose: the caller reads it best-effort like every other fact in this refusal, so a read that
+        fails costs this clause and nothing else.
     #>
     param(
         [string]$SuitesJson,
-        [string]$PrNumber = ''
+        [string]$PrNumber = '',
+        [string]$Mergeable = ''
     )
 
     if (-not $SuitesJson -or -not $SuitesJson.Trim()) { return '' }
@@ -1444,7 +1477,19 @@ function Get-MissingCheckSuiteNote {
     $note = "GitHub created no Actions check suite for this commit -- $found, so no workflow of this repository was ever asked to run."
     # The enumeration IS the "do not go and read the YAML" instruction; saying that separately as well
     # states one conclusion twice in the longest sentence the operator has to read.
-    $note += ' This is NOT a paths: filter, a wrong trigger or a syntax error: Actions is typically healthy elsewhere in the repo at the same moment, and it is the event for THIS commit that went missing.'
+    $note += ' This is NOT a paths: filter, a wrong trigger or a syntax error: Actions is typically healthy elsewhere in the repo at the same moment.'
+
+    # THE CONFLICT BRANCH, AND IT REPLACES THE REOPEN RATHER THAN JOINING IT (#1247). A pull_request
+    # workflow runs against refs/pull/<n>/merge, which does not exist while the PR conflicts -- so the
+    # suite is not late, it is ineligible, and the reopen measured on #1243 changed nothing twice over.
+    # Printing both would leave the reader to pick, and the cheap one is the one that cannot work here.
+    # Only CONFLICTING branches: UNKNOWN is GitHub still computing and must not be read as a conflict.
+    if ($Mergeable -and $Mergeable.Trim().ToUpperInvariant() -eq 'CONFLICTING') {
+        $note += ' AND THIS ONE IS NOT A MYSTERY: GitHub reports this PR as CONFLICTING, and a pull_request workflow runs against the merge commit (refs/pull/<n>/merge) that a conflicting PR has none of -- so no suite can be created for it at all. Resolve the conflict (merge the base branch in, or rebase) and the ordinary push creates it. A close/reopen does NOT repair this and was measured doing nothing.'
+        return $note
+    }
+
+    $note += ' It is the event for THIS commit that went missing.'
     if ($PrNumber) {
         $note += " Cheapest thing to try, and it is not a diagnosis: gh pr close $PrNumber && gh pr reopen $PrNumber -- 'reopened' is one of the default pull_request types, so it re-asks every workflow that has not narrowed them, and it moves neither the head commit nor the PR body."
     }
