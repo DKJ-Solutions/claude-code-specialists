@@ -353,6 +353,40 @@ answered. How you name them is your business.
 
 ---
 
+### Where the ticket lives, and the fields you therefore do not write
+
+**This section says *file* throughout, because that is the shape it was measured in. Read it as *the
+ticket*, wherever yours lives.** A folder of markdown is one answer; a row in a tracker you host
+yourself — an issue, a board card — is another, and every rule survives the swap. One thing changes,
+and it is stated in none of them: **a tracker you host already owns some of these fields, and what it
+owns natively is not written a second time in the body.**
+
+**Two trackers are in play, and only one of them is meant here.** The section opens on somebody
+else's — the **source**, where the request came from, which you do not control and which the
+provenance boundary above exists to date your copy of. The one meant in this passage is the
+**host**: where your own ticket sits, when it is not a file. Read the rule against the source
+instead and you delete the snapshot that boundary exists to protect, which is the opposite of what
+it says.
+
+| a host tracker typically owns | so |
+|---|---|
+| **the title**, in a field of its own | the body does not open by repeating it. No rule below prescribes a heading — but nothing below prompts the question either, and a ticket transcribed out of a file brings its `# H1` along with it. |
+| **the list**, with its filters and columns | that list *is* the index of rule 10, so you have one whether or not you asked for one, and the rule becomes one about which columns it shows. |
+| **open/closed, and labels** | **not** a substitute for rule 7's field. Two values are not a vocabulary, and rule 7 asks for one that is closed *and* covers every stage — so the field stays, whether you carry it in labels or in the body. This is the one that reads as a duplicate and is not. |
+| **an author and a creation date** | which record who transcribed the ticket and when — not who filed the request and when they filed it. Those two are copied state: they belong in the snapshot half above the provenance line, and they stay written down. |
+
+**The test is which field you would be maintaining in two places**, and where the answer is none, the
+rule costs you nothing. It is written down because the shape the section was measured in prompts
+nobody to ask.
+
+**Measured in the originating repo on 2026-09-02**, after its eleven ticket files were moved verbatim
+into its tracker and a twelfth was written from these rules rather than copied: **12 of 12 carried
+their title twice**, once in the tracker's own field and once as the first line of the body. The
+twelfth is the one worth noticing — nothing about it was migration residue. It was written from this
+page, and this page did not prompt the question.
+
+---
+
 ### The rules
 
 #### 1. The decision is a section, not a mood
@@ -542,13 +576,14 @@ of this plugin uses:
 
 | yours to decide | notes |
 |---|---|
-| **which tracker, and where the boundary is** | the whole page assumes the request originates somewhere you do not control |
-| **the folder, and the file naming** | including where research material sits relative to the tickets |
+| **which tracker the request comes from, and where the boundary is** | the whole page assumes the request originates somewhere you do not control |
+| **where a ticket lives, and what it is named** | a folder and a file naming, or a row in a tracker you host yourself — including where research material sits relative to the tickets |
+| **which fields your host tracker already owns** | only if it hosts your tickets rather than a folder doing it; see [Where the ticket lives](#where-the-ticket-lives-and-the-fields-you-therefore-do-not-write) |
 | **the language of the form** | section names, field names, the state vocabulary — one answer per repo |
 | **the language of the outgoing message** | not one answer per repo; see below |
 | **every section and field name** | the roles above are the rule; the names are not |
 | **the state vocabulary** | rule 7 requires it to be *closed*, not to be these eight values |
-| **whether there is an index at all** | rule 10 applies if you have one |
+| **whether there is an index at all** | rule 10 applies if you have one, and a host tracker gives you one whether or not you wanted it |
 
 **The language is two questions, and only the first has one answer per repo.** The **form** — the section
 names, the field names, the state vocabulary — is workflow rather than subject matter, so a repo picks a
