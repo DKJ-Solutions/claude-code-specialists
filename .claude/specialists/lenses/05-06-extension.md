@@ -508,6 +508,15 @@ commit is therefore the least-gated commit in the workflow, and it is the one th
 changelog and bumps every plugin. The repair is coverage, not route: the cut runs the
 suites too, and CI runs on `main` pushes so the artefacts the cut itself generates are checked after
 they land.
+
+**That bypass is gone at the moment of writing, so the cut cannot run at all** (September 2, 2026,
+[#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244)): the transfer into the
+`DKJ-Solutions` org carried `main-ci-gate` across intact and dropped its bypass list, and a required
+status check cannot be satisfied by a direct push. The paragraph above still describes the route
+correctly — it is the argument for why the cut is not a PR — but a release is blocked until Dave
+restores the list, and so is every fold. Do not read the blockage as a reason to reopen the route
+question: the three objections at the top of this section are unchanged, and a release branch would
+still meet two gates it cannot satisfy by construction.
 Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
 workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
 that legitimately differs per repo — which root docs are permanent, how the notes are foldered,

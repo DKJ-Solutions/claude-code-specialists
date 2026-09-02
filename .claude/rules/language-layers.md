@@ -143,4 +143,13 @@ object's security binding, and the doc follows — never the reverse. This secti
 ruleset enforcing the CI gate under that reasoning, as `main-ci-poort` (verified via the GitHub API
 rather than assumed). Dave has since renamed it to `main-ci-gate` (July 26, 2026); a field-by-field API
 re-check confirmed only the name changed — required check, enforcement, target branch, rules, and bypass
-actors are all unchanged.
+actors were all unchanged **by that rename**.
+
+**They are no longer all unchanged, and the sentence above is dated on purpose rather than swept.** The
+September 2, 2026 transfer into the `DKJ-Solutions` org left the required check, the enforcement, the
+target and the rules exactly as that re-check found them, and dropped the **bypass actors** to empty
+([#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244)). The language point this
+paragraph exists to make is untouched — the job id `lint-en-tests` is still the live name of an external
+object this repo may cite but not unilaterally rename. What the correction adds is the reason a
+field-by-field re-check is worth repeating rather than citing: it is a **snapshot**, and it went stale
+under a move nobody read as touching it.
