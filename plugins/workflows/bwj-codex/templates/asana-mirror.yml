@@ -13,7 +13,9 @@ on:
 
 permissions:
   contents: read
-  issues: read
+  # WRITE, not read, since the prio-label sweep edits labels on this repo's own issues. It is the
+  # only write this workflow makes outside Asana, and it touches labels and nothing else.
+  issues: write
   # The close update names the pull request that closed the issue, which is a pull-requests read.
   pull-requests: read
 

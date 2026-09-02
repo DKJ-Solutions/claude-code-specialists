@@ -65,6 +65,27 @@ gh label create tier-1 --repo <owner>/<repo> --color fbca04 \
   --description "Reaches the business: management and the commissioner notice it"
 ```
 
+**And the four prio labels**, which the reconcile sweep needs: it sets one of them on every open
+issue from its Asana task's `Prio-Score`, and `gh issue edit` fails on a label the repo does not have
+exactly as `gh issue create` does.
+
+```bash
+gh label create "very high" --repo <owner>/<repo> --color b60205 \
+  --description "Asana Prio-Score 4.00-5.00"
+gh label create "high"      --repo <owner>/<repo> --color d93f0b \
+  --description "Asana Prio-Score 3.00-3.99"
+gh label create "low"       --repo <owner>/<repo> --color 0e8a16 \
+  --description "Asana Prio-Score 2.00-2.99"
+gh label create "very low"  --repo <owner>/<repo> --color c2e0c6 \
+  --description "Asana Prio-Score 1.00-1.99"
+```
+
+Four buckets and deliberately no `medium` (Dave, September 2, 2026). **Exactly one of them sits on an
+issue at a time** -- the sweep removes the other three as it sets one, so a ticket rescored from 2.5
+to 4.2 loses `low` as it gains `very high`. A task with **no** score, or a score outside 1.00-5.00,
+gets no prio label at all rather than a guessed one; on the BWJ board the day this shipped that was
+28 of 96 open tasks, so it is the common case and not an edge one.
+
 The three issue **types** (Task / Bug / Feature) are org-wide, not per repo, so there is nothing to
 create for them -- confirm in the org settings that they are enabled and stop there. Do **not** create
 `bug` or `enhancement` labels: the type carries both, and they were deliberately deleted from the
