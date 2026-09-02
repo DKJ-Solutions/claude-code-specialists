@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/asana-mirror-unused-workspace-gid-v1` · 20260902-090439
+
+The mirror's CI half stops advertising a value it never reads. `asana-mirror.ps1` declared
+`-WorkspaceGid`, defaulting to `$env:ASANA_WORKSPACE_GID`, and named it in its own help as one of the
+two values the script runs on -- while nothing in the script body ever read it. `asana-mirror.yml`
+handed that variable to both steps, and `adopt-bwj-asana` printed it as a variable the CI needs. All
+four statements are gone.
+
+The parameter never had work to do: every call this script makes addresses a task or a project by
+GID, and the Asana API wants no workspace for either. What stays is `Get-AsanaWorkspaceGid` in the
+repo seam -- `report-issue` reads it session-side, where it CREATES a task and the API does want one.
+So the seam is untouched and only the CI half stops claiming a reader it has not got.
+
+Why this was worth a branch rather than a shrug: a wrong or absent value there produced no signal in
+either direction, so it read as a plausible cause the next time a sweep reported `0 updated`. That is
+not hypothetical -- the session that filed it had just spent real time ruling it out. Three asserts
+now hold the absence, beside the four guarding the rule that automation never ticks a ticket off.
+
+Consumers that already copied the templates keep a `.github/` copy carrying the dead parameter, and a
+repo variable nothing consumes. Both are harmless and neither is touched from here: the copy is
+per-repo by design, and re-copying is that repo's own move.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A repo adopting `bwj-codex` now sets one Actions variable instead of two, and its setup checklist
+stops naming a value the CI never reads. An existing adopter may delete `ASANA_WORKSPACE_GID` from
+its Actions variables, and nothing breaks if they leave it standing.
+
+**Score:** 2
+
+#### Pull Request
+
+the mirror's CI half stops advertising a workspace GID it never reads
+
+Plugins: bwj-codex
+
+[PR #1211](https://github.com/DaveKJohn/claude-code-specialists/pull/1211)
+
+---
+
 ### DEPLOY: `fix/asana-mirror-update-not-resolve-v1` · 20260901-223003
 
 The Asana mirror posts an update instead of ticking the ticket off, and it no longer holds a code
