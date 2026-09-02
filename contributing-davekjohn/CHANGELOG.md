@@ -32,6 +32,38 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/bwj-codex-english-stage-examples-v1` · 20260902-132523
+
+The stage examples that shipped with the board-section model were written in Dutch -- one docstring in
+`asana-mirror.ps1`, one in step 6 of `WORKFLOW-portable.md`, and three fixture names in the test
+suite. All five are English now, and the board's own sections were renamed to match, so the examples
+cite what a reader actually sees.
+
+Nothing behavioural moved. The suite is green at the same 128 asserts with three of its fixtures
+rewritten, which is the model's own claim demonstrated rather than asserted: a section is recognised by
+the number its name starts with, so translating every word after that number changes nothing.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer reading step 6 of the portable page now sees examples in the same language as the rest of
+it. Previously the one paragraph explaining *"the words after the number are yours"* was the only
+paragraph on the page that was not in the page's language -- which made the example look like a
+prescription for what to name a section rather than an illustration of what does not matter.
+
+**Score:** 2
+
+#### Pull Request
+
+the stage examples and fixtures follow the repo's English rule
+
+Plugins: bwj-codex
+
+[PR #1226](https://github.com/DaveKJohn/claude-code-specialists/pull/1226)
+
+---
+
 ### DEPLOY: `feat/asana-board-stage-sections-v1` · 20260902-124821
 
 The `bwj-codex` mirror learns the half of the board a colleague actually reads: **which column a card
