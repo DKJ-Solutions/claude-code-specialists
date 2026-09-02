@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/asana-github-status-sync-v1` · 20260902-151628
+
+The Asana board's three middle columns now follow the GitHub Project's `Status` field instead of
+being re-derived from the issue and its pull requests -- `Todo`/`In Progress`/`Done` are *filed*,
+*being built*, *closed*. GitHub already wrote that field through its own project workflows, so
+deriving it a second time made two writers of one fact; reading it makes the two boards agree
+rather than race. The stage past those is no longer a column at all: a card reaches *ready to
+test* once the submitter has actually been told, and where a ticket has no submitter that stage is
+skipped. Both of the last two sections are now terminal -- a card there is never taken back, not
+even by a reopen.
+
+Needs one thing per store repo: a `GH_PROJECT_TOKEN` secret. `GITHUB_TOKEN` cannot read an
+organization's Projects v2 at all, so without it the close update still goes out and only the
+staging goes quiet, naming the missing token in the log.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own developers and the BWJ colleagues who read the Asana board,
+and the board's behaviour is not a subscriber-facing service.
+
+**Score:** N/A
+
+#### Pull Request
+
+the GitHub Project Status drives the Asana stages Filed, InDevelopment and InReview
+
+Plugins: bwj-codex
+
+[PR #1231](https://github.com/DaveKJohn/claude-code-specialists/pull/1231)
+
+---
+
 ### DEPLOY: `docs/ticket-work-tracker-pickup-state-v1` · 20260902-150729
 
 The **Ticket work** section of `CONTRIBUTING-portable.md` modelled the tracker as something you only
