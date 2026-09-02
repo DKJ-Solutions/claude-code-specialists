@@ -169,7 +169,7 @@ single release train, and that dissolved with the reorganisation rather than nee
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
 its own `team-alpha` plugin (the core team), with the `github` marketplace source
-`DaveKJohn/claude-code-specialists` — so the repo points at itself. That way work here runs against
+`DKJ-Solutions/claude-code-specialists` — so the repo points at itself. That way work here runs against
 exactly the product it maintains. One consequence to be aware of: a session reads the plugins from the
 **local marketplace clone**, and that clone advances on a `claude plugin marketplace update` — **not on
 a push**. So an agent def you modify on a branch takes effect after merge, push *and* that refresh, and

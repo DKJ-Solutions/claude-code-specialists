@@ -2,7 +2,7 @@
 
 > **First: did you go and get these plugins, or did they arrive?** Everything on this page registers a
 > marketplace and installs from it, and every command here names the **public** source
-> `DaveKJohn/claude-code-specialists`. If your organisation publishes this family through a marketplace
+> `DKJ-Solutions/claude-code-specialists`. If your organisation publishes this family through a marketplace
 > of its own — a private mirror, an Enterprise channel — then the registration and the install were done
 > once, centrally, and **the commands below are not yours to run**. Running them anyway does not fail
 > loudly; it quietly adds a second channel pointing somewhere else, which is the one thing an
@@ -52,7 +52,7 @@ line per add-on team you want, and add `contributing-davekjohn` only if you deli
 {
   "extraKnownMarketplaces": {
     "claude-code-specialists": {
-      "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" }
+      "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" }
     }
   },
   "enabledPlugins": {
@@ -744,7 +744,7 @@ that domain). What follows is a **complete, pasteable file** — if you already 
 {
   "extraKnownMarketplaces": {
     "claude-code-specialists": {
-      "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" }
+      "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" }
     }
   },
   "enabledPlugins": {
@@ -783,7 +783,7 @@ the running session — measured, the refresh below then succeeded immediately, 
 get right, because this command does not follow the pattern of the others on this page:
 
 ```powershell
-claude plugin marketplace add DaveKJohn/claude-code-specialists --scope project
+claude plugin marketplace add DKJ-Solutions/claude-code-specialists --scope project
 ```
 
 It takes a **source** (a URL, path, or GitHub repo) where everything else here uses the marketplace

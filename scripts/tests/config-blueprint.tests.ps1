@@ -173,7 +173,7 @@ Assert-True (Test-Path -LiteralPath $Artefact -PathType Leaf) 'the blueprint art
 
 $bp = Get-Content -LiteralPath $Artefact -Raw | ConvertFrom-Json
 Assert-Equal $contract.Count $bp.records.Count 'the artefact carries exactly one record per contract entry'
-Assert-Equal 'DaveKJohn/claude-code-specialists' $bp.sourceRepo 'the artefact names the repo it came from'
+Assert-Equal 'DKJ-Solutions/claude-code-specialists' $bp.sourceRepo 'the artefact names the repo it came from'
 
 # In sync with the libs as they stand right now. This is the same thing the lint gate runs; asserting
 # it here too means a stale artefact fails the suite rather than only the gate.
@@ -324,11 +324,11 @@ Assert-Equal 0 $r.Code 'apply: exit 0'
 
 $after = [System.IO.File]::ReadAllText($repoConfig)
 Assert-Match 'Get-RosterPath' $after 'apply: a copy record landed in the consumer lib'
-Assert-Match 'Adopted from the DaveKJohn/claude-code-specialists config blueprint' $after 'apply: the placed block says where it came from'
+Assert-Match 'Adopted from the DKJ-Solutions/claude-code-specialists config blueprint' $after 'apply: the placed block says where it came from'
 
 # NEVER OVERWRITES: the consumer's own answer survives, and the source's is not appended beside it.
 Assert-Match "someone/their-repo" $after "apply: the consumer's own Get-RepoName value is untouched"
-Assert-NotMatch 'DaveKJohn/claude-code-specialists.{0,40}Single place this is stated' $after "apply: the source's repo name was not written into the consumer"
+Assert-NotMatch 'DKJ-Solutions/claude-code-specialists.{0,40}Single place this is stated' $after "apply: the source's repo name was not written into the consumer"
 
 # A decide record is proposed and NEVER placed -- the assert that protects the whole doctrine.
 # Get-ReleaseNotesGrouping joined the list on August 10, 2026 (#560), and it is the case that shows what the

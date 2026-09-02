@@ -16,7 +16,7 @@ at the moment the branch is created. You do not create it by hand, and you do no
 **How to read this page.** It travels with the plugin, so two conventions keep it true in every tree it
 lands in — the same two `RELEASES-portable.md` states for itself. *This repo* always names the **source
 repo** the page was written in
-([claude-code-specialists](https://github.com/DaveKJohn/claude-code-specialists)) — its measurements travel
+([claude-code-specialists](https://github.com/DKJ-Solutions/claude-code-specialists)) — its measurements travel
 as the evidence behind the rules, never as your repo's own record. And links into the source's script tree
 are **absolute** on purpose; the file every adopting repo has of its own is named in code rather than
 linked, because the copy that matters is yours.

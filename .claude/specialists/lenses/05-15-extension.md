@@ -313,7 +313,7 @@ infrastructure.
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
   it in isolation — mirroring the `release-lib` setup. **Never edit between the sentinels by hand.**
 - **`.claude/settings.json`** — this repo's harness config: the `extraKnownMarketplaces` (the
-  `github` source `DaveKJohn/claude-code-specialists`) and `enabledPlugins` with which the repo enables
+  `github` source `DKJ-Solutions/claude-code-specialists`) and `enabledPlugins` with which the repo enables
   its own `team-alpha` plugin (the core team).
 - **The manifests** `.claude-plugin/marketplace.json` and every `<plugin>/.claude-plugin/plugin.json`
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with

@@ -346,7 +346,7 @@ $entryGateWorkflow = @(
     '      - name: Fetch the shared workflow scripts',
     '        uses: actions/checkout@v5',
     '        with:',
-    '          repository: DaveKJohn/claude-code-specialists',
+    '          repository: DKJ-Solutions/claude-code-specialists',
     '          ref: main',
     '          path: .workflow-scripts',
     '',
