@@ -120,10 +120,9 @@ it changes only the sentence and never the verdict.
 
 A consumer running the workflow's `ship-pr.ps1` gets both halves. The retry is the part they feel:
 step 1 is the only step that reads the working tree and step 2b has already sent the checkout back to
-the trunk, so before this a dropped socket cost them a re-checkout of the branch plus a full local
-gate run -- lint and every suite -- against a commit CI was already testing. Now it costs one more gh
-call. And on the run that does have to stop, the sentence no longer sends them into their own code
-for a state no branch can repair.
+the trunk, so before this a dropped socket cost them a re-checkout of the branch it had just left --
+against a commit CI was already testing. Now it costs one more gh call. And on the run that does have
+to stop, the sentence no longer sends them into their own code for a state no branch can repair.
 
 **Score:** 3
 
