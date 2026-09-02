@@ -32,6 +32,131 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/asana-stage-map-seam-v1` · 20260902-140055
+
+The stage model shipped with its meanings written as literals, and the board it was written against
+changed shape the same afternoon -- a column added in the middle, moving every stage above it by one.
+Nothing failed: the sweep would simply have filed every card a column early, on a board whose entire
+purpose is telling somebody where their request is.
+
+So the model now separates two questions that looked like one. **Which column is this?** is still
+answered by the number a section's name starts with -- unchanged, and still what lets the team rename
+a column freely. **What does that column mean?** is answered by the repo, in `Get-AsanaStageMap`, with
+semantic keys rather than GIDs so a rebuilt column costs nothing. A repo that states no map gets the
+built-in one and the run says which it read. **And a column the map does not name is now a hold** --
+not a target and not a source -- so the next board that grows a section has cards that stop moving
+rather than cards in the wrong place.
+
+The blocked column is label-driven: while `needs-info` is on an issue the card stays there whatever
+the branch and the pull request are doing, because the person who set it knows something the tracker
+does not. That makes it the second of exactly two answers allowed to move a card backward, beside an
+issue being reopened -- and it is why `labeled`/`unlabeled` now fire the workflow, moving the card
+without commenting, since a label is a change in our state rather than news for the submitter.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo can now describe its own board instead of being described by the plugin. The seam is
+optional and the default still works, so nothing breaks by ignoring it -- but a repo whose board is
+numbered any other way needs it, and this release is the first that lets it say so.
+
+**The failure it removes is the silent kind.** Before this, adapting the plugin to a board meant
+editing the shipped script, which the drift lint would then flag forever; and a board that changed
+shape produced no error at all, just cards a column out. After it, an unrecognised column stops the
+card instead of moving it somewhere plausible.
+
+**Score:** 3
+
+#### Pull Request
+
+the stage map becomes a repo seam, and Need more info is label-driven
+
+Plugins: bwj-codex
+
+[PR #1227](https://github.com/DaveKJohn/claude-code-specialists/pull/1227)
+
+---
+
+### DEPLOY: `fix/bwj-codex-english-stage-examples-v1` · 20260902-132523
+
+The stage examples that shipped with the board-section model were written in Dutch -- one docstring in
+`asana-mirror.ps1`, one in step 6 of `WORKFLOW-portable.md`, and three fixture names in the test
+suite. All five are English now, and the board's own sections were renamed to match, so the examples
+cite what a reader actually sees.
+
+Nothing behavioural moved. The suite is green at the same 128 asserts with three of its fixtures
+rewritten, which is the model's own claim demonstrated rather than asserted: a section is recognised by
+the number its name starts with, so translating every word after that number changes nothing.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer reading step 6 of the portable page now sees examples in the same language as the rest of
+it. Previously the one paragraph explaining *"the words after the number are yours"* was the only
+paragraph on the page that was not in the page's language -- which made the example look like a
+prescription for what to name a section rather than an illustration of what does not matter.
+
+**Score:** 2
+
+#### Pull Request
+
+the stage examples and fixtures follow the repo's English rule
+
+Plugins: bwj-codex
+
+[PR #1226](https://github.com/DaveKJohn/claude-code-specialists/pull/1226)
+
+---
+
+### DEPLOY: `feat/asana-board-stage-sections-v1` · 20260902-124821
+
+The `bwj-codex` mirror learns the half of the board a colleague actually reads: **which column a card
+is in**. The board's six sections are now the ticket cycle -- from *a colleague put this on your name*
+through *tracked on GitHub*, *in development*, *merged*, *ready to test*, to *tested and good* -- and
+the card follows its GitHub issue's own state without anybody dragging it.
+
+A section is recognised by the **number its name starts with**, so the words after it belong to the
+team and can be rewritten any day; a board whose sections are not numbered is never written to at all,
+which is what keeps this off every other board in the workspace. The two ends stay the requester's:
+`Test-StageIsWritable` permits stages 2 to 5 and nothing else, and a card already in `Completed` is not
+moved -- the section-move twin of the standing guarantee that nothing here ever ticks a task off. Every
+move is forward, derived as a **floor** rather than a position, so the nightly sweep can never undo the
+one hop only a session can see; an `issue reopened` event is the single backward move in the script.
+
+For three of the four writable stages that sweep is not a backstop but the mechanism, because an issue
+is filed, a branch opens and a pull request merges without `issues: closed` ever firing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+For the two BWJ store repos this plugin serves, the board stops being a static list. The gap inbound
+#1217 measured -- an issue filed here while the board still said `New`, so the colleague waiting on it
+read their request as untouched and chased it in the one place with no answer -- is closed at the
+mechanism rather than with a written reminder.
+
+**Two setup steps are required before any of it happens, and both fail silently if skipped.** The
+board's sections have to carry a leading number, and `Get-AsanaProjectGid` has to name that board --
+which turns a question this page used to leave open (*one shared project or one per store?*) into a
+single right answer, because the stages live on the board's sections and `Prio-Score` does not cross
+workspaces. **Both** store repos currently point at the same provisional "Test" project in a different
+workspace from the board -- `smartwatchbanden#470` already reports it and now carries the second
+consequence; `xoxowildhearts#194` is its own.
+
+**Score:** 4
+
+#### Pull Request
+
+the Asana board's six sections become the cycle's stages
+
+Plugins: bwj-codex
+
+[PR #1223](https://github.com/DaveKJohn/claude-code-specialists/pull/1223)
+
+---
+
 ### DEPLOY: `docs/tracker-native-ticket-fields-v1` · 20260902-103815
 
 The ticket-work layer gains the one rule it was missing for a consumer whose tickets live in a tracker

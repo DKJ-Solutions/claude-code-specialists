@@ -1,12 +1,18 @@
 # Copied from bwj-codex/templates/asana-mirror.yml into .github/workflows/asana-mirror.yml.
 # Posts an update on the mirrored Asana task when its GitHub issue is closed (and the counterpart on
-# reopen), with a daily reconciliation sweep (both directions) for missed events. It never completes a
-# task -- the colleague who filed the ticket does that, after testing. See bwj-codex/WORKFLOW-portable.md.
+# reopen), and moves that task to the board section its issue's state has reached. Plus a daily
+# reconciliation sweep (both directions) for missed events -- and for the three stages that have no
+# GitHub event at all, that sweep IS the mechanism rather than a backstop. It never completes a task
+# and never puts a card in the 'Completed' section -- the colleague who filed the ticket does both,
+# after testing. See bwj-codex/WORKFLOW-portable.md.
 name: asana-mirror
 
 on:
   issues:
-    types: [closed, reopened]
+    # closed/reopened comment AND move the card. labeled/unlabeled only move it: a label going on or
+    # off is a change in OUR state, and narrating it would comment on the submitter's ticket every
+    # time somebody triaged the issue. The script decides which of the two a given action is.
+    types: [closed, reopened, labeled, unlabeled]
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
@@ -29,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Update the task on issue close / reopen
+      - name: Update the task and stage the card on an issue event
         if: github.event_name == 'issues'
         shell: pwsh
         env:

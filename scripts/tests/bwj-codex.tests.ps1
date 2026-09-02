@@ -257,6 +257,131 @@ Assert-True ($null -eq (Get-PrioScoreFromTask -Task $emptyScore -FieldName 'Prio
 # path returns before any gh call, so it is safe to assert here with no network and no repo.
 Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'high' -Current @('high', 'tier-1'))) 'an issue already carrying the right prio label is left alone'
 
+# --- the stage sections --------------------------------------------------------------------------
+# The board's six sections are the cycle's stages, and a section is recognised by the NUMBER its name
+# starts with -- the words after it belong to the board and may change any day.
+Assert-Equal 3 (Get-StageFromSectionName -Name '3. In development - branch open') 'a numbered section yields its stage'
+Assert-Equal 3 (Get-StageFromSectionName -Name '3. Building it')                  'and still does after the words are rewritten -- the number is the only machine-read half'
+Assert-Equal 6 (Get-StageFromSectionName -Name '  6. Completed')                   'leading whitespace does not hide the number'
+Assert-Equal 2 (Get-StageFromSectionName -Name '2.')                               'a bare number and dot is enough'
+Assert-True ($null -eq (Get-StageFromSectionName -Name 'Waiting for more info'))   'an unnumbered section is on no pipeline'
+Assert-True ($null -eq (Get-StageFromSectionName -Name 'Stap 3: bouwen'))          'and a number that is not the prefix does not count -- the anchor is the start of the name'
+Assert-True ($null -eq (Get-StageFromSectionName -Name ''))                        'an empty name yields nothing rather than throwing'
+
+# --- the stage MAP ------------------------------------------------------------------------------
+# The number convention says how a section is RECOGNISED; the map says what each one MEANS. They were
+# one question until the board this was written against grew a section the same afternoon, shifting
+# every stage above it by one -- silently, since nothing failed and every card would simply have been
+# filed a column early. The map is now a repo seam, and the default is what a repo stating none gets.
+$map = Get-DefaultAsanaStageMap
+Assert-Equal '1/2/3/4/5/6/7' ((Get-StageMapNumbers -Map $map) -join '/') 'the default map is the seven-section board, in cycle order'
+Assert-Equal 'needs-info' $map.NeedsInfoLabel 'and it names the label that drives the Need more info column'
+Assert-Equal 0 (Test-AsanaStageMap -Map $map).Count 'the default map validates'
+
+# Three ways a hand-written map goes wrong, and all three are SILENT at runtime rather than loud:
+# a missing key reads as stage 0, a non-numeric one as 0 too, and a duplicate makes two stages one
+# column so a card can never leave one of them.
+$noKey = $map.Clone(); $noKey.Remove('InReview')
+Assert-True (((Test-AsanaStageMap -Map $noKey) -join ' ') -match 'InReview') 'a map missing a stage is refused, naming which'
+$notNum = $map.Clone(); $notNum['Filed'] = 'three'
+Assert-True ((Test-AsanaStageMap -Map $notNum).Count -gt 0) 'a stage that is not a section number is refused'
+$dupe = $map.Clone(); $dupe['InReview'] = $dupe['Filed']
+Assert-True (((Test-AsanaStageMap -Map $dupe) -join ' ') -match 'more than one stage') 'two stages naming one section is refused -- a card could never leave one of them'
+Assert-True ((Test-AsanaStageMap -Map $null).Count -gt 0) 'and an empty map is refused rather than treated as a default'
+
+# The two ends of the board, asserted rather than assumed -- the same treatment the 'completes
+# nothing' guarantee gets. Requests is the submitter's inbox; Completed is their verdict.
+Assert-True (-not (Test-StageIsWritable -Stage $map.Requests  -Map $map)) 'Requests is the submitter inbox and is never a target'
+Assert-True (-not (Test-StageIsWritable -Stage $map.Completed -Map $map)) 'Completed is NEVER a target -- the section-move twin of never completing a task'
+Assert-True (Test-StageIsWritable -Stage $map.NeedsInfo   -Map $map) 'Need more info is ours to set, because a label drives it'
+Assert-True (Test-StageIsWritable -Stage $map.Filed       -Map $map) 'Filed is ours'
+Assert-True (Test-StageIsWritable -Stage $map.ReadyToTest -Map $map) 'and so is Ready to test, the last one that is'
+Assert-True (-not (Test-StageIsWritable -Stage $null -Map $map)) 'no stage at all is not writable either'
+Assert-Equal 5 (Get-WritableStages -Map $map).Count 'five writable stages -- the whole board minus its two ends'
+
+# A REMAPPED board is the real test of the seam: the same assertions must hold against numbers this
+# suite never mentions, or the map is decoration over hard-coded literals.
+$shifted = @{ Requests = 10; NeedsInfo = 20; Filed = 30; InDevelopment = 40
+              InReview = 50; ReadyToTest = 60; Completed = 70; NeedsInfoLabel = 'blocked' }
+Assert-Equal 0 (Test-AsanaStageMap -Map $shifted).Count 'a board numbered any other way validates too'
+Assert-True (Test-StageIsWritable -Stage 30 -Map $shifted)        'and its Filed stage is writable'
+Assert-True (-not (Test-StageIsWritable -Stage 3 -Map $shifted))  'while the DEFAULT Filed number is not, under that map'
+Assert-True (-not (Test-StageIsWritable -Stage 70 -Map $shifted))  'and its Completed stage is still the untouchable end'
+
+# The derivation. A FLOOR and not a position: CI cannot see a branch with no pull request behind it,
+# so a card a session moved to InDevelopment must not be dragged back by a sweep that knows less.
+$prOpen   = [pscustomobject]@{ number = 1; state = 'OPEN';   merged = $false }
+$prMerged = [pscustomobject]@{ number = 2; state = 'MERGED'; merged = $true }
+Assert-Equal $map.Filed       (Get-StageFloorForIssue -State 'OPEN' -Map $map)                            'an open issue with nothing linked floors at Filed'
+Assert-Equal $map.InReview    (Get-StageFloorForIssue -State 'OPEN' -PullRequests @($prOpen)   -Map $map) 'an open pull request floors at In review'
+Assert-Equal $map.InReview    (Get-StageFloorForIssue -State 'OPEN' -PullRequests @($prMerged) -Map $map) 'and a MERGED one on a still-open issue floors there too -- Dave, September 2, 2026: his board has no column between the two'
+Assert-Equal $map.ReadyToTest (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed' -Map $map) 'closed as completed floors at Ready to test -- the submitter turn'
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'not_planned' -Map $map)) 'closed as not planned floors nowhere -- nothing was built, so there is nothing to test'
+Assert-Equal $map.ReadyToTest (Get-StageFloorForIssue -State 'closed' -StateReason 'COMPLETED' -Map $map) 'and the state is read case-insensitively, since two GitHub surfaces disagree on it'
+
+# InDevelopment is NEVER derived, and that is the design rather than a gap: it is the one hop only a
+# session can see, and forward-only is what protects it.
+$derived = @()
+foreach ($case in @(@('OPEN', '', @()), @('OPEN', '', @($prOpen)), @('OPEN', '', @($prMerged)), @('CLOSED', 'completed', @($prMerged)))) {
+    $f = Get-StageFloorForIssue -State $case[0] -StateReason $case[1] -PullRequests $case[2] -Map $map
+    $derived += $f
+    Assert-True (Test-StageIsWritable -Stage $f -Map $map) "the derivation never leaves the writable range ($($case[0])/$($case[1]))"
+}
+Assert-True ($derived -notcontains $map.InDevelopment) 'and it never derives InDevelopment -- that hop belongs to the session at new-branch'
+
+# --- the target, and the two answers that may go BACKWARD -----------------------------------------
+# Everything else is a floor, and floors only rise. These two are a person saying something.
+$t = Resolve-TargetStage -State 'OPEN' -PullRequests @($prOpen) -Labels @('tier-1', 'needs-info') -Map $map
+Assert-Equal $map.NeedsInfo $t.Stage         'the needs-info label OUTRANKS the issue state -- an open pull request does not unblock a card somebody blocked'
+Assert-True  $t.AllowBackward                'and it may move the card backward, because a person set it'
+Assert-True  ($t.Why -match 'needs-info')    'and the log says which label decided it'
+
+$t = Resolve-TargetStage -State 'OPEN' -PullRequests @($prOpen) -Labels @('tier-1') -Map $map
+Assert-Equal $map.InReview $t.Stage          'removing the label hands the card back to its state-derived floor'
+Assert-True  (-not $t.AllowBackward)         'which is forward, so it needs no permission'
+
+$t = Resolve-TargetStage -State 'OPEN' -Labels @() -Map $map -Reopened
+Assert-Equal $map.Filed $t.Stage             'a reopen lands the card wherever the issue now is'
+Assert-True  $t.AllowBackward                'and is the other answer allowed to go backward -- it is a real state change'
+Assert-True  ($t.Why -match 'reopen')        'and says so'
+
+$t = Resolve-TargetStage -State 'CLOSED' -StateReason 'not_planned' -Labels @('needs-info') -Map $map
+Assert-Equal $map.NeedsInfo $t.Stage 'the label still answers for an issue whose state answers nothing'
+
+$t = Resolve-TargetStage -State 'OPEN' -Labels @('blocked') -Map $shifted
+Assert-Equal 20 $t.Stage 'the label name comes from the map too, so a repo may call it anything'
+$noLabel = $map.Clone(); $noLabel['NeedsInfoLabel'] = ''
+$t = Resolve-TargetStage -State 'OPEN' -Labels @('needs-info') -Map $noLabel
+Assert-Equal $map.Filed $t.Stage 'and a map naming no label switches the column off -- a real answer for a board without one'
+
+# Which board -- read off the task's own memberships, so no repo keeps six section GIDs in its config.
+# A task on an unnumbered board only is on no pipeline, which is how any other board is left alone.
+$onBoard = @(
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '1201907543904785' }; section = [pscustomobject]@{ gid = '11'; name = 'Backlog' } },
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '1216936502427971' }; section = [pscustomobject]@{ gid = '22'; name = '4. Development done' } })
+$sel = Select-StageMembership -Memberships $onBoard
+Assert-Equal 'stage-section'    $sel.Source                'a numbered section past an unnumbered one still resolves'
+Assert-Equal 4                  $sel.Membership.Stage      'and reports the stage the card is in now'
+Assert-Equal '1216936502427971' $sel.Membership.ProjectGid 'and the board it read that from'
+Assert-Equal '22'               $sel.Membership.SectionGid 'and that section GID, which is what a move needs'
+
+Assert-Equal 'none' (Select-StageMembership -Memberships $onBoard[0]).Source 'a task on an unnumbered board only is on no pipeline'
+Assert-Equal 'none' (Select-StageMembership -Memberships @()).Source         'and a task on no board at all is the same answer'
+$twoBoards = @(
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '111' }; section = [pscustomobject]@{ gid = '1'; name = '2. Filed' } },
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '222' }; section = [pscustomobject]@{ gid = '2'; name = '5. Testing' } })
+Assert-Equal 'ambiguous' (Select-StageMembership -Memberships $twoBoards).Source 'two numbered boards is two answers, and neither is taken'
+Assert-Equal 2           (Select-StageMembership -Memberships $twoBoards).Candidates.Count 'and both are named for the log'
+
+# The move request. Pure, and it refuses non-numeric input on BOTH sides -- a section name is read out
+# of Asana and a GID out of an issue body, and neither may reach a request URL unchecked.
+$move = New-AsanaSectionMoveRequest -Gid '1216905543348385' -SectionGid '1217315819287423'
+Assert-Equal 'POST' $move.Method 'a section move is a POST'
+Assert-Equal 'https://app.asana.com/api/1.0/sections/1217315819287423/addTask' $move.Uri 'to the section addTask endpoint -- the task is the payload, not the path'
+Assert-Equal '{"data":{"task":"1216905543348385"}}' $move.Body 'and the body carries the task GID'
+Assert-Throws { New-AsanaSectionMoveRequest -Gid 'abc' -SectionGid '123' } 'a non-numeric task GID is refused'
+Assert-Throws { New-AsanaSectionMoveRequest -Gid '123' -SectionGid 'x/y' } 'and so is a non-numeric section GID'
+
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""
 if ($script:fail -gt 0) {

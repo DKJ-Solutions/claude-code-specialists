@@ -50,6 +50,22 @@ the issue says the work is *built*, and only the colleague who asked for it can 
 covered too:** the workflow reads the Asana link in such an issue's header row when it carries no
 machine marker of its own.
 
+**And the card moves with it.** The board's sections **are** the cycle, in order, from *a colleague put
+this on your name* to *tested and good* -- and a card sits in the one its GitHub issue's own state has
+reached. Two questions, deliberately kept apart: a section is recognised by the **number its name
+starts with**, so the words after it belong to the team and can be rewritten any day; what each number
+**means** is stated once by the repo, in `Get-AsanaStageMap`. A board whose sections are not numbered
+is never written to, and a column the map does not name is left alone rather than guessed at.
+
+The two ends stay the submitter's -- their untriaged inbox at one end and `Completed` at the other --
+and the code permits the middle and nothing else, which is the same guarantee as *"it never ticks the
+task off"* in the board's own currency. Moves are forward, with exactly two exceptions that are both a
+person saying something: the `needs-info` label, which blocks a card whatever the branch is doing, and
+an issue being reopened. Dave, September 2, 2026, closing
+[#1222](https://github.com/DaveKJohn/claude-code-specialists/issues/1222); **there is exactly one such
+board**, which is what makes the *"which board?"* question inbound
+[#1217](https://github.com/DaveKJohn/claude-code-specialists/issues/1217) ran into moot.
+
 The whole rule, with the field-by-field shape of the Asana variant and the cross-link markers, is in
 [`WORKFLOW-portable.md`](WORKFLOW-portable.md) -- that is the page to read, and the page to point BWJ
 colleagues at.
@@ -83,10 +99,20 @@ and the CI mechanism needs the project. That is answered by two functions in you
 `scripts/repo-config.ps1` -- the same file `contributing-davekjohn` already dot-sources:
 
 - `Get-AsanaWorkspaceGid` -- the Asana workspace GID.
-- `Get-AsanaProjectGid` -- the project a mirrored task is created in. It has to sit in the workspace
-  that defines the `Prio-Score` field, or the prio labels of
+- `Get-AsanaStageMap` -- which numbered section of the board each stage of the cycle is, plus the
+  label that drives the blocked column. **Optional**: leave it out and the built-in map is used, which
+  is right only if your board happens to be numbered the same way, and the run says which map it read.
+  Semantic keys rather than GIDs, so a rebuilt column costs nothing.
+- `Get-AsanaProjectGid` -- the project a mirrored task is created in, and it has exactly one correct
+  value: **the board the team reads**. Two independent constraints land on the same answer. An Asana
+  custom field does not cross workspaces, so a project outside the board's workspace makes the prio
+  labels of
   [step 5](WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label) reach only the
-  tickets imported from the board -- an Asana custom field does not cross workspaces.
+  tickets imported from the board; and the stages of
+  [step 6](WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
+  live on
+  that board's sections, so a task filed anywhere else is on no pipeline and never moves a column.
+  Neither failure says anything in a log.
 
 `adopt-bwj-asana` **proposes** these, it never places them: they state what your repo *is*, and the
 project may differ per brand. The CI half reads the project from the repo variable

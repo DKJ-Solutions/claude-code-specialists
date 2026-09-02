@@ -250,7 +250,7 @@ the 12 open issues that resolved to a task, every one that came away with a labe
 (4 of the 5 matched by header row; the fifth was unscored), and no self-filed ticket was labelled in
 either repo. The workspace boundary is the reading of *why* -- inferred from the field model above
 rather than measured, because in that run the same self-filed tasks were unreadable to the session's own
-token, which is the separate cause described two bullets into step 6, and from outside the two cannot be
+token, which is the separate cause described three bullets into step 7, and from outside the two cannot be
 told apart. Issue
 [#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213).
 
@@ -262,11 +262,152 @@ step writes to Asana.
 **What it costs on the GitHub side:** the workflow's `issues:` permission is `write` rather than
 `read`. That is the only write it makes outside Asana, and it touches labels and nothing else.
 
-### 6. What still needs a person
+### 6. The board's sections ARE the cycle -- one card, one column per stage
+
+Everything above says what is written *into* a ticket. This step says *where the ticket sits*, and it
+is the one view of this workflow a BWJ colleague actually reads: the board's sections, in order, are
+the steps of the contributing cycle. A card's column is the answer to *"where is my request?"*, which
+until now the board could not give.
+
+**There is exactly ONE board, and its name is the team's** (Dave, September 2, 2026, closing
+[#1222](https://github.com/DaveKJohn/claude-code-specialists/issues/1222)). At BWJ that is
+`Workload Overview`; `Development BWJ` was retired in the same decision, and every card of Dave's was
+taken off it that day. So the *"which board, and what happens to the others"* edge that inbound
+[#1217](https://github.com/DaveKJohn/claude-code-specialists/issues/1217) had to be corrected on by
+hand does not arise here any more -- there is no other board to advance by mistake. The containment
+that answered it is still in the mechanism, and it is what the next two headings are about.
+
+#### How a section is recognised, and what it MEANS -- two questions, not one
+
+**A section is recognised by the NUMBER its name starts with.** `3. In development` and
+`3. Building it` are the same stage; rename the words whenever the team likes. It is the same split
+the cross-link of step 3 already uses -- a marker for the machine, prose for the reader.
+
+**And it is the containment.** A section with no leading number is on no pipeline, so a task sitting
+only in such sections is never written to. That is why pointing this workflow at a workspace full of
+other boards costs nothing, and it is the mechanism that made #1217's correction structural rather
+than a written warning. A card on **two** numbered boards has two answers and gets neither: the
+candidates are named in the log and nothing moves.
+
+**What each number MEANS is a separate question, and it belongs to the repo.** `Get-AsanaStageMap` in
+your own `scripts/repo-config.ps1` -- the file `contributing-davekjohn` already dot-sources -- names
+one section per stage of the cycle:
+
+```powershell
+function Get-AsanaStageMap {
+    return @{
+        Requests       = 1   # the submitter's inbox -- never a target, though cards do leave it
+        NeedsInfo      = 2   # blocked on the submitter -- driven by the label below
+        Filed          = 3   # the GitHub issue exists; nothing is being built yet
+        InDevelopment  = 4   # a branch is open -- the session's own hop, never derived by CI
+        InReview       = 5   # a pull request is open OR merged, and the issue is not closed yet
+        ReadyToTest    = 6   # the issue is closed as completed -- the submitter's turn
+        Completed      = 7   # the submitter says it is good -- never a target, never moved OUT of
+        NeedsInfoLabel = 'needs-info'
+    }
+}
+```
+
+**That seam exists because the meanings were literals in the script for exactly one afternoon.** They
+shipped on September 2, 2026 against a six-section board; the board gained a section the same day, and
+every stage from `Filed` upward moved by one. **Nothing failed** -- the sweep would simply have put
+every card a column early, quietly, on a board whose whole purpose is telling somebody where their
+request is. Semantic keys and not GIDs, deliberately: a rebuilt column keeps its number and loses its
+GID, so a GID map is born with the failure mode it was meant to prevent.
+
+**A section the map does not name is a HOLD -- not a target, and not a source.** That is the repair
+for what just happened: a board that grows a column no longer has its cards yanked into whatever the
+old numbering meant. A repo that states no map at all gets the default above, and the run says which
+map it used.
+
+#### The stages, and who moves a card into each
+
+| stage | what a card there means | who puts it there | on what signal |
+|---|---|---|---|
+| `Requests` | new, and nobody has looked at it yet -- a colleague put it on your name | the submitter | **never this workflow** |
+| `NeedsInfo` | we cannot proceed until the submitter answers something | the `needs-info` label | that label is on the issue |
+| `Filed` | it is tracked on GitHub now, where the work happens | [`report-issue`](skills/report-issue/SKILL.md), as it files | the issue exists |
+| `InDevelopment` | somebody is building it | the session at `new-branch` | **never derived by CI** -- see below |
+| `InReview` | a pull request is open, or merged and the issue not yet closed | the daily sweep | that pull request exists |
+| `ReadyToTest` | ready to test -- the submitter has the update naming what was fixed | the close event, and the daily sweep | the issue is closed **as completed** |
+| `Completed` | the submitter has tested it and says it is good | the submitter | **never this workflow** |
+
+**The two ends of the board belong to the submitter, and the code says so and not only this page.**
+`Test-StageIsWritable` permits the five middle stages and nothing else, and a card already sitting in
+`Completed` is not moved at all. That is the *section-move twin* of the rule in step 4: closing an
+issue says the work is built, and only the person who asked for it can say it is good. A workflow that
+could slide a card into `Completed` would take that judgement and replace it with a guess -- in the
+board's own currency this time, but the same guess.
+
+**`InReview` covers merged as well as open** (Dave, September 2, 2026). The board has no column for
+*"merged, but the issue is still open"*, and the gate holds either way: nothing but a **closed** issue
+puts a card in `ReadyToTest`, so the submitter is never asked to test something that is not finished.
+An issue **closed as not planned** derives no stage at all -- nothing was built, so there is nothing
+to test and the card stays where the team left it.
+
+#### Forward only, and the two answers that may go back
+
+`Get-StageFloorForIssue` derives a **floor** from the issue's own state rather than a position,
+because CI can see a pull request and cannot see a branch: a card a session advanced to
+`InDevelopment` at `new-branch` must not be dragged back to `Filed` by a sweep that knows less than
+the session did. **So CI never derives `InDevelopment` at all** -- that stage is the one hop only a
+session can see, and forward-only is exactly what protects it.
+
+**Two answers may move a card backward, and both are a person saying something** rather than CI
+inferring it:
+
+- **The `needs-info` label**, which *outranks the issue's own state*. A card blocked on the submitter
+  stays blocked whatever the branch and the pull request are doing, because the person who set the
+  label knows something the tracker does not. Removing the label hands the card straight back to its
+  state-derived floor -- which is forward, so it needs no permission. The label fires its own CI run
+  (`labeled` / `unlabeled`), so the column changes as the triage happens rather than a day later.
+- **An `issue reopened` event**, which is a real state change: the card lands wherever the issue now
+  is, which is out of the test column and back into the one the work is actually in.
+
+**A label event moves the card and says nothing.** `closed` and `reopened` are news for the person
+waiting on the ticket; a label is a change in *our* state, and commenting on it would put a note on
+the submitter's ticket every time somebody triaged the issue.
+
+#### The daily sweep is the mechanism, not a backstop
+
+For most of the writable stages there is no GitHub event this workflow subscribes to -- an issue is
+filed, a branch opens and a pull request merges without `issues: closed` ever firing. So unlike the
+reconciliation of step 4, sweep (d) is not a safety net for a missed webhook. Only `ReadyToTest` and
+`NeedsInfo` have events of their own, and they are the two that matter most to the submitter, which is
+why they are also the two that do not wait a day.
+
+**What that costs at `InDevelopment`, said plainly:** GitHub has no reliable signal for *"a branch was
+opened"* in this workflow. `linkedBranches` answers only for a branch created through GitHub's own
+issue UI, and `contributing-davekjohn` branches are not. **So that hop is a session's to make**, and
+nothing catches it up -- a card left in `Filed` while a branch is open is the one inaccuracy this
+model tolerates, and it corrects itself the moment the pull request opens. A cross-reference is
+deliberately not read for this: a pull request that merely mentions an issue says nothing about
+whether anybody is building it.
+
+### 7. What still needs a person
 
 - **Setup, once per repo:** the repo secret `ASANA_PAT`, the variable `ASANA_PROJECT_GID`, the four
-  prio labels of step 5, plus copying the two `templates/` files into `.github/`. The
-  [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
+  prio labels of step 5 plus the `needs-info` label of step 6, and copying the two `templates/` files
+  into `.github/`. The [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
+- **Numbering the board's sections, once, and stating what each number means.** Step 6 reads a stage
+  off the number a section's name starts with, so a board whose sections are named in prose has no
+  stages and nothing is ever moved on it. That is the safe default rather than a failure -- but it is
+  also silent, so a board that is meant to be a pipeline and is not numbered looks exactly like one
+  that works. The meanings go in `Get-AsanaStageMap`; leave it out and the default map is used, which
+  is right only if your board happens to be numbered the same way.
+- **Re-reading that map whenever the board changes shape.** Adding or removing a column shifts every
+  stage above it, and the map is the one place that has to learn it. A section the map does not name is
+  left alone rather than guessed at, so the symptom of a forgotten update is cards that stop moving --
+  not cards in the wrong place. That is deliberate, and it is still yours to notice.
+- **The `InDevelopment` hop, at `new-branch`.** The one stage transition CI cannot see: GitHub has no
+  signal for a branch that has no pull request behind it yet. A session opening a branch for a mirrored
+  issue moves the card there in the same breath, and **nothing catches it up** -- the sweep never
+  derives that stage. Step 6 says why, and it is why the derivation is a floor: nothing undoes the move
+  you made by hand.
+- **Deciding a ticket is blocked on the submitter.** The `needs-info` label is the whole mechanism for
+  that column, and no automation sets or clears it. Putting it on is a judgement about whether the
+  request can proceed; taking it off says the answer arrived, and the card returns to wherever the work
+  actually is.
 - **Scoring the ticket.** The label follows the board and nothing here decides a priority. A task
   nobody has scored carries no prio label, and putting a number on it is the team's call to make in
   Asana -- the same shape as resolving a ticket, further down this list.
@@ -277,12 +418,15 @@ step writes to Asana.
   per unreadable task is telling you about the token, not about the tickets.
 - **Resolving the ticket. That is the whole point of step 4**: the colleague who filed
   it ticks it off once they have tested the change, and nothing in this workflow will do it for them.
-- **The Asana project answer:** whether both stores mirror into one shared project or one project
-  each is a BWJ decision. `Get-AsanaProjectGid` returns whatever each repo sets, so either works --
-  but the two repos must make the *same* kind of choice, or this page's promise of "identical" is
-  broken. **And either shape has to live in the workspace that defines `Prio-Score`**, or the tickets
-  this workflow files itself can never be scored -- step 5 says why, and a provisional GID left
-  standing is the case where that bites.
+- **The Asana project answer, and step 6 has now settled it.** This used to be an open BWJ decision --
+  one shared project for both stores or one each, as long as both repos made the *same* kind of
+  choice. It is not open any more: the board a card is staged on is the board the team reads, there is
+  exactly **one** of those (Dave, September 2, 2026), and a task this workflow files anywhere else
+  lands on no pipeline and is never staged. Put together with the `Prio-Score` constraint of step 5,
+  which independently requires that project to sit in the board's workspace, `Get-AsanaProjectGid`
+  has one correct value per repo: **the board itself**. A **provisional** GID is the case where both
+  costs land at once -- such a ticket carries no prio label and never moves a column, and neither
+  failure says anything in a log.
 
 ---
 
@@ -306,3 +450,30 @@ step writes to Asana.
   is finished when the person who built it says so; the request is finished when the person who made
   it says so. A tracker that lets one stand in for the other cannot afterwards tell you which of its
   closed tickets anybody actually looked at.
+- **The board's sections, and not a status field**, because a section is what a colleague already
+  reads. The stages could have been a custom field with six options and nothing about the mechanism
+  would change -- but then the answer to *"where is my request?"* would sit one click inside a card
+  instead of being the shape of the board, and a card would look identical whether it had been picked
+  up or not. That is the failure inbound #1217 measured: an issue existed here while the board still
+  said `New`, and the person waiting on it had no way to tell.
+- **A number in the section name, and not a GID per section in a config**, because the two halves
+  have different owners. The number identifies the column; the words are the team's and change
+  whenever one reads badly. Configured GIDs would put both halves in a file only a developer edits,
+  and would go stale the first time somebody rebuilt a column -- the way a provisional project GID
+  went stale and cost every prio label behind it.
+- **But the MEANING of each number in a config after all**, because that half turned out to belong to
+  the board rather than to the workflow. It was a literal in the script for one afternoon and the
+  board changed shape the same day. The two questions look like one and are not: *which column is
+  this?* is answered by the board, and *what does that column mean?* is answered by the team who
+  built it.
+- **An unnamed column is a hold rather than a stage**, because the alternative is the failure that
+  produced the seam. Treating an unknown number as an ordinary stage means a board that grows a column
+  has its cards dragged to whatever the old numbering meant, silently. Stopping is the only answer
+  that is wrong in a way somebody notices.
+- **A label for the blocked column, not an inference**, because "we are waiting on the submitter" is
+  not visible in any state GitHub tracks. An open pull request does not mean the question was
+  answered, so the card has to stay blocked until a person says otherwise -- which is why the label
+  outranks the issue's state instead of competing with it.
+- **A floor rather than a position**, because CI knows less than the person at the keyboard. A sweep
+  that set the stage outright would spend every night undoing the one hop only a session can see -- a
+  branch opening -- and the card would flap between two columns with nothing wrong.

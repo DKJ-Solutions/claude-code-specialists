@@ -3,9 +3,10 @@ name: adopt-bwj-asana
 description: >-
   One-time setup of bwj-codex in a BWJ store repo (smartwatchbanden or xoxowildhearts): copy the
   asana-mirror CI mechanism into .github/, propose the Asana config seam for scripts/repo-config.ps1,
-  print the repo secret and variables the CI needs, and check that the classification labels exist. Strictly additive and dry-run by default; it
-  never overwrites an existing file. Run this right after enabling the plugin, or when report-issue
-  reports the Asana config seam missing.
+  print the repo secret and variables the CI needs, check that the classification labels exist, and
+  report whether the board's sections are numbered so the stage model can read them. Strictly additive and dry-run by default; it
+  never overwrites an existing file, and it renames nothing on the board. Run this right after
+  enabling the plugin, or when report-issue reports the Asana config seam missing.
 ---
 
 # adopt-bwj-asana -- place the CI mechanism and the config seam
@@ -34,20 +35,45 @@ dot-sources). **Propose** them -- do not place them -- because the values state 
 ```powershell
 function Get-AsanaWorkspaceGid { '<your Asana workspace GID>' }
 function Get-AsanaProjectGid   { '<the Asana project a mirrored task lands in>' }
+
+# Which numbered section of that board each stage of the cycle IS. Optional -- omit it and the
+# built-in map is used, which is right only if your board is numbered the same way.
+function Get-AsanaStageMap {
+    return @{
+        Requests       = 1   # the submitter's inbox -- never a target, though cards do leave it
+        NeedsInfo      = 2   # blocked on the submitter -- driven by the label below
+        Filed          = 3   # the GitHub issue exists; nothing is being built yet
+        InDevelopment  = 4   # a branch is open -- the session's own hop, never derived by CI
+        InReview       = 5   # a pull request is open OR merged, and the issue is not closed yet
+        ReadyToTest    = 6   # the issue is closed as completed -- the submitter's turn
+        Completed      = 7   # the submitter says it is good -- never a target, never moved OUT of
+        NeedsInfoLabel = 'needs-info'
+    }
+}
 ```
 
-Whether both BWJ stores mirror into one shared project or one project each is a BWJ decision; the
-function returns whatever this repo sets. The two repos must make the same *kind* of choice.
+**Propose the stage map against the board you actually read in step 5, not against the example.** The
+keys are the cycle and are fixed; the numbers are that board's and nothing else can supply them. Say
+plainly that a wrong map is *silent*: every card lands a column early or late, on a board whose whole
+job is telling somebody where their request is. It is a `.ps1` in the repo, so it goes through that
+repo's ordinary branch and review route like any other change.
 
-**Say this when you propose the project, because it is the one constraint on the value and it is not
-guessable from the seam:** the project has to live in the workspace that defines the `Prio-Score`
-field, i.e. the board the team scores on. An Asana custom field does not cross workspaces, so a task
-this workflow creates in a project of some *other* workspace can never carry a score -- and the prio
-sweep of
-[step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
-then reaches only the tickets *imported from* the board. A **provisional** GID is exactly that case, so
-if the real project is not known yet, record that the prio labels are incomplete until it is
-([#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213)).
+**Propose one value and say why it is the only one: `Get-AsanaProjectGid` is the board the team
+reads.** That used to be an open BWJ decision -- one shared project or one per store -- and it is not
+any more (Dave, September 2, 2026): there is exactly one board, and two independent constraints both
+land on it.
+
+- **The prio labels.** An Asana custom field does not cross workspaces, so a task created in a project
+  of some *other* workspace can never carry a `Prio-Score`, and the sweep of
+  [step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
+  then reaches only the tickets *imported from* the board
+  ([#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213)).
+- **The stages.** They live on that board's own sections, so a task filed anywhere else sits on no
+  pipeline and never moves a column -- see step 5 below.
+
+**A provisional GID is where both costs land at once**, and neither says anything in a log: such a
+ticket carries no prio label and never advances a stage. So if the real project is not known yet,
+record that both are incomplete until it is.
 
 ## 3 -- print the CI secret and variables (the maintainer sets these)
 
@@ -90,6 +116,17 @@ gh label create "very low"  --repo <owner>/<repo> --color c2e0c6 \
   --description "Asana Prio-Score 1.00-1.99"
 ```
 
+**And the `needs-info` label**, which is the entire mechanism for the board's blocked column: while it
+is on an issue the card sits in `NeedsInfo` whatever the branch and the pull request are doing, and
+taking it off returns the card to wherever the work actually is. Name it in
+`Get-AsanaStageMap`'s `NeedsInfoLabel` if the repo prefers another word; set that to `''` and the
+column is switched off, which is a real answer for a board without one.
+
+```bash
+gh label create needs-info --repo <owner>/<repo> --color d4c5f9 \
+  --description "Blocked on the person who filed it -- parks the Asana card in the blocked column"
+```
+
 Four buckets and deliberately no `medium` (Dave, September 2, 2026). **Exactly one of them sits on an
 issue at a time** -- the sweep removes the other three as it sets one, so a ticket rescored from 2.5
 to 4.2 loses `low` as it gains `very high`. A task with **no** score, or a score outside 1.00-5.00,
@@ -101,7 +138,37 @@ create for them -- confirm in the org settings that they are enabled and stop th
 `bug` or `enhancement` labels: the type carries both, and they were deliberately deleted from the
 existing BWJ repos.
 
-## 5 -- point the repo's governance at the rule
+## 5 -- check the board's sections are numbered
+
+The stage model of
+[step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
+reads a card's stage off the **number its section's name starts with**, and takes the *meaning* of
+each number from `Get-AsanaStageMap`. **This step is where both halves are established, and it comes
+before step 2's proposal can be written** -- read the sections of the project and report them:
+
+```text
+<N>. <anything>   ->  which stage of the cycle this column is
+```
+
+The words after each number belong to the team; only the number is read. **Report what you find and
+change nothing** -- a board is a shared surface, and renaming somebody's column is not an adoption
+step. Then map the columns you found onto the seven cycle stages and put *that* in the step 2
+proposal. Four cases are worth naming explicitly when you report:
+
+- **No numbered sections at all.** Nothing is ever moved on that board. That is the safe default, and
+  it is *silent* -- so a board meant to be a pipeline and not numbered looks exactly like one that
+  works. Say so plainly.
+- **A gap in the middle** (say, no `4.`). Cards simply stop at the stage below it and the log says
+  which section was missing. Nothing is created.
+- **More columns than stages.** A board may have columns this cycle has no stage for. Leave them out
+  of the map: an unnamed column is a **hold** -- not a target and not a source -- so cards parked
+  there stay put. That is the intended way to keep a column out of the pipeline.
+- **A board numbered differently from the example.** Then the example map is wrong for this repo and
+  `Get-AsanaStageMap` is not optional. The board this model was first written against gained a column
+  the same afternoon it shipped, which moved every stage above it by one -- so treat "the default
+  happens to fit" as a claim to verify here, not to assume.
+
+## 6 -- point the repo's governance at the rule
 
 Add a line to the repo's `CLAUDE.md` (or a repo lens) pointing at
 `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/workflows/bwj-codex/WORKFLOW-portable.md`
