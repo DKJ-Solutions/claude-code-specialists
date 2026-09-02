@@ -572,6 +572,12 @@ function Get-PrioScoreFromTask {
 
         Asana returns every custom field the task has, each with its own name, so the lookup is a
         match on name rather than a position.
+
+        A field is defined in ONE workspace and does not cross into another, which is what makes the
+        name -- not a GID -- the only portable handle. The consequence is on the caller, not here: a
+        task living in a project of some other workspace carries no field by this name at all, so a
+        ticket this workflow filed itself scores only when ASANA_PROJECT_GID names a project in the
+        board's own workspace. Issue #1213.
     #>
     param(
         [AllowNull()]$Task,

@@ -83,7 +83,10 @@ and the CI mechanism needs the project. That is answered by two functions in you
 `scripts/repo-config.ps1` -- the same file `contributing-davekjohn` already dot-sources:
 
 - `Get-AsanaWorkspaceGid` -- the Asana workspace GID.
-- `Get-AsanaProjectGid` -- the project a mirrored task is created in.
+- `Get-AsanaProjectGid` -- the project a mirrored task is created in. It has to sit in the workspace
+  that defines the `Prio-Score` field, or the prio labels of
+  [step 5](WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label) reach only the
+  tickets imported from the board -- an Asana custom field does not cross workspaces.
 
 `adopt-bwj-asana` **proposes** these, it never places them: they state what your repo *is*, and the
 project may differ per brand. The CI half reads the project from the repo variable

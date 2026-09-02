@@ -233,6 +233,27 @@ GitHub back-link for a project walk to follow -- the same gap the header-row mat
 needs **no `ASANA_PROJECT_GID`**: a repo whose project GID is still wrong or provisional gets its
 labels right anyway.
 
+**But `Prio-Score` belongs to ONE workspace, and that is the limit to know before relying on this
+step.** An Asana custom field is defined in a workspace and does not cross into another -- which is why
+this sweep looks the field up by *name* and never by GID. Set that against the two populations the step
+reaches and they come apart. A ticket **imported from** the board *is* a task on that board, so it
+scores normally. A ticket the workflow **files itself** lands in whatever `Get-AsanaProjectGid` points
+at, and where that project sits in a different workspace from the board, its tasks have no `Prio-Score`
+for the sweep to find -- not an empty one, none. So the paragraph above reads too generously: a wrong or
+provisional project GID costs an imported ticket nothing, and costs a self-filed one every label it
+could have had.
+
+**Which gives `Get-AsanaProjectGid` an answer it did not have before.** Whichever project a repo mirrors
+into, it has to sit in the workspace that defines `Prio-Score`, or step 5 is a feature only imported
+tickets can use. Measured across both BWJ stores on September 2, 2026, the day after this shipped: of
+the 12 open issues that resolved to a task, every one that came away with a label was an imported one
+(4 of the 5 matched by header row; the fifth was unscored), and no self-filed ticket was labelled in
+either repo. The workspace boundary is the reading of *why* -- inferred from the field model above
+rather than measured, because in that run the same self-filed tasks were unreadable to the session's own
+token, which is the separate cause described two bullets into step 6, and from outside the two cannot be
+told apart. Issue
+[#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213).
+
 **Why this direction does not contradict "GitHub first".** That rule is about where a ticket is *born*
 and where its lifecycle is *tracked*. Priority is neither: it is the business's judgement, made in the
 window the rest of BWJ looks through, and the workbench is where it has to be visible. Nothing in this
@@ -259,7 +280,9 @@ step writes to Asana.
 - **The Asana project answer:** whether both stores mirror into one shared project or one project
   each is a BWJ decision. `Get-AsanaProjectGid` returns whatever each repo sets, so either works --
   but the two repos must make the *same* kind of choice, or this page's promise of "identical" is
-  broken.
+  broken. **And either shape has to live in the workspace that defines `Prio-Score`**, or the tickets
+  this workflow files itself can never be scored -- step 5 says why, and a provisional GID left
+  standing is the case where that bites.
 
 ---
 

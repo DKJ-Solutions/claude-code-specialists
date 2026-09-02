@@ -39,6 +39,16 @@ function Get-AsanaProjectGid   { '<the Asana project a mirrored task lands in>' 
 Whether both BWJ stores mirror into one shared project or one project each is a BWJ decision; the
 function returns whatever this repo sets. The two repos must make the same *kind* of choice.
 
+**Say this when you propose the project, because it is the one constraint on the value and it is not
+guessable from the seam:** the project has to live in the workspace that defines the `Prio-Score`
+field, i.e. the board the team scores on. An Asana custom field does not cross workspaces, so a task
+this workflow creates in a project of some *other* workspace can never carry a score -- and the prio
+sweep of
+[step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
+then reaches only the tickets *imported from* the board. A **provisional** GID is exactly that case, so
+if the real project is not known yet, record that the prio labels are incomplete until it is
+([#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213)).
+
 ## 3 -- print the CI secret and variables (the maintainer sets these)
 
 The CI workflow needs, on the repo (Settings -> Secrets and variables -> Actions):
