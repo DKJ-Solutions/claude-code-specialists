@@ -832,6 +832,76 @@ $idxFacts     = $shipText.IndexOf('startedAt,completedAt,link')
 Assert-True ($idxFacts -gt $idxWatchCall -and $idxFacts -lt $idxLost) 'and the check facts are re-read per attempt, which is what the decision is made from'
 
 
+# --- Get-MissingCheckSuiteNote: no Actions suite was ever created (issue #1234) --------------------
+# Measured on PR #1233, September 2, 2026, head b09c71b2: the step-3 probe ran its full 180s and
+# refused with "Check the workflow", while `gh run list` was empty and the commit's check-suite list
+# held netlify and claude and NO github-actions suite -- Actions demonstrably healthy elsewhere in the
+# repo the same minute. The fourth case of the distinction #943, #1044 and #1219 already drew three
+# times, and the refusal is untouched for the fourth time: these asserts pin the DIAGNOSIS, never the
+# merge decision.
+Write-Host "Get-MissingCheckSuiteNote -- no Actions suite for this commit" -ForegroundColor Cyan
+
+# The measured payload: two suites from other providers, none from Actions.
+$suitesNoActions = '{"total_count":2,"check_suites":[{"status":"queued","app":{"slug":"netlify"}},{"status":"queued","app":{"slug":"claude"}}]}'
+$missNote = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '1233'
+Assert-True ($missNote -ne '') 'two suites and none from Actions is recognised as "no workflow was ever asked to run"'
+Assert-True ($missNote -like '*no Actions check suite*') 'and the note names what is MISSING rather than sending the reader to the workflow files'
+Assert-True ($missNote -like "*only 'netlify' and 'claude' registered*") 'the suites that DO exist are named, so the reader sees what was asked and what was not'
+Assert-True ($missNote -like '*NOT a paths: filter*') 'it states the negative too, since "check the workflow" is the reading being corrected'
+Assert-True ($missNote -like '*gh pr close 1233 && gh pr reopen 1233*') 'and it names the remedy, which is not a thing an operator guesses'
+Assert-True ($missNote -like '*not a diagnosis*') 'while saying plainly that the reopen is the cheapest thing to TRY, not a cause it has established'
+
+# THE ASSERT THAT KEEPS THIS FROM CRYING WOLF, the same one its three siblings carry. An Actions suite
+# that exists and has not reported is exactly the case the OLD wording is correct for -- there the
+# workflow really may be why -- so this note must stay out of the way whatever that suite is doing.
+$suitesWithActions = '{"check_suites":[{"status":"queued","app":{"slug":"netlify"}},{"status":"in_progress","app":{"slug":"github-actions"}}]}'
+Assert-Equal '' (Get-MissingCheckSuiteNote -SuitesJson $suitesWithActions -PrNumber '1233') 'an Actions suite that exists is not this note''s case'
+Assert-Equal '' (Get-MissingCheckSuiteNote -SuitesJson '{"check_suites":[{"status":"completed","app":{"slug":"github-actions"}}]}') 'a completed Actions suite is not it either -- the question is existence, not outcome'
+
+# An empty suite list is the same finding said differently, and gets its own clause rather than a
+# sentence naming an empty list, which reads as a bug in the note.
+$missEmpty = Get-MissingCheckSuiteNote -SuitesJson '{"total_count":0,"check_suites":[]}' -PrNumber '7'
+Assert-True ($missEmpty -like '*nothing registered for it at all*') 'a commit carrying no suite whatsoever says so'
+Assert-True ($missEmpty -like '*gh pr close 7 && gh pr reopen 7*') 'and still gets the remedy -- the finding is the same one'
+
+# Singular where one other provider registered, plural where several did.
+$missOne = Get-MissingCheckSuiteNote -SuitesJson '{"check_suites":[{"app":{"slug":"netlify"}}]}'
+Assert-True ($missOne -like "*only 'netlify' registered*") 'one foreign suite reads the same way -- the clause takes no grammatical number'
+Assert-True ($missNote -notlike '*commit -- the commit*') 'and the sentence names the commit once, not twice'
+
+# A suite whose app gh did not return is skipped rather than throwing -- absent is not empty under
+# Set-StrictMode, the trap every reader in this lib guards against.
+$missAppless = Get-MissingCheckSuiteNote -SuitesJson '{"check_suites":[{"status":"queued"},{"app":null},{"app":{"slug":"netlify"}}]}'
+Assert-True ($missAppless -like "*'netlify'*") 'a suite with no readable app is skipped and the readable one still counted'
+Assert-True ($missAppless -notlike '*and*registered*') 'and the unreadable ones are not listed beside it'
+
+# The same slug twice is one provider, not two -- GitHub lists a suite per app INSTALLATION, and #1233
+# itself came back with three github-actions rows once the reopen had fired.
+$missDupe = Get-MissingCheckSuiteNote -SuitesJson '{"check_suites":[{"app":{"slug":"netlify"}},{"app":{"slug":"netlify"}}]}'
+Assert-True ($missDupe -like "*only 'netlify' registered*") 'a repeated slug is deduped rather than listed twice'
+
+# UNREADABLE IN, EMPTY OUT: a diagnostic must never be the reason a refusal cannot be printed. The
+# refusal prints with or without this note, which is what makes attempting the read safe at all.
+foreach ($bad in @('', '   ', 'not json', 'null', '{}', '[]', '{"total_count":0}')) {
+    Assert-Equal '' (Get-MissingCheckSuiteNote -SuitesJson $bad) "an unreadable check-suites payload ('$bad') costs the note and nothing else"
+}
+
+# Without a PR number the diagnosis still stands and simply stops before the command.
+$missNoId = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions
+Assert-True ($missNoId -like '*no Actions check suite*') 'no PR number: the diagnosis is unchanged'
+Assert-True ($missNoId -notlike '*gh pr close *') 'and no command is printed with a missing argument'
+
+# AND SHIP-PR'S PROBE ACTUALLY ASKS. Same reasoning and same failure mode as the #1044 and #1219
+# call-site asserts above: a reverted call site leaves every assert here green while the refusal goes
+# on sending the reader to YAML that is fine.
+Assert-True ($shipText -like '*Get-MissingCheckSuiteNote -SuitesJson*') 'ship-pr.ps1 asks whether an Actions suite exists before it words the step-3 refusal (#1234)'
+Assert-True ($shipText -like '*commits/$sha/check-suites*') 'and reads it for the commit the PR actually carries'
+Assert-True ($shipText -like '*Check the workflow, or merge manually once it is green.*') 'while the old wording survives for the one case it is correct for'
+$idxSuiteNote = $shipText.IndexOf('Get-MissingCheckSuiteNote')
+$idxWatchArg  = $shipText.IndexOf("'--watch'")
+Assert-True ($idxSuiteNote -ge 0 -and $idxSuiteNote -lt $idxWatchArg) 'the read sits in the PRE-watch probe it diagnoses, not beside the post-watch notes'
+
+
 # --- Get-PrCreateFailureReason: gh's own answer, not a guess (inbound #1077) -----------------------
 # open-pr replaced gh's message with "Creating the PR failed (is gh logged in?)" on a run where gh had
 # just listed PRs, pushed and read the issue list -- so the loudest line on screen named the one thing
