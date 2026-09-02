@@ -1149,6 +1149,87 @@ Assert-True ($errLines.Count -eq 2) 'the annotation is emitted from exactly two 
 Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and BOTH escape the headline, which is the variable the case block interpolates the status into'
 Assert-True (($errLines | Where-Object { $_ -like '*${reason//%/%25}*' }).Count -eq 1) 'while the reason keeps its own escape on the one line that carries it'
 
+
+Write-Host ""
+Write-Host "The label gate: does the label this PR would be given exist? (inbound #1221)" -ForegroundColor Cyan
+
+# THE PAYLOAD IS THE REAL SHAPE of `gh label list --json name`, which is a flat array of {name}.
+$labelJson = '[{"name":"documentation"},{"name":"question"},{"name":"inbound"}]'
+$labelNames = @(Get-LabelNames -Json $labelJson)
+Assert-Equal 3 $labelNames.Count 'every label name is read out of a gh label list payload'
+Assert-Equal 'documentation' $labelNames[0] 'and in the order gh gave them'
+
+# UNREADABLE IN, EMPTY OUT -- and the CALLER must read empty as "could not be asked", never as "the
+# label is missing". A single-record payload is in this list on purpose: 5.1 hands a one-element parsed
+# array to the pipeline as the record itself, which is the trap the assign-first/wrap-second shape
+# navigates.
+foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"colour":"red"}]')) {
+    Assert-Equal 0 (@(Get-LabelNames -Json $bad)).Count "an unreadable label payload ('$bad') yields no names rather than a wrong answer"
+}
+Assert-Equal 1 (@(Get-LabelNames -Json '[{"name":"bug"}]')).Count 'a ONE-record payload is read as one name, not flattened away'
+Assert-Equal 1 (@(Get-LabelNames -Json '[{"name":"bug"},{"name":"bug"}]')).Count 'a duplicated name is counted once'
+
+# THE MEASURED CASE. 'bug' and 'enhancement' were deleted org-wide in BWJ-ecommerce/smartwatchbanden on
+# September 1, 2026 because the issue TYPE now carries that classification, and the next PR died on
+# "could not add label: 'bug' not found" -- after every gate had run and the branch had been pushed.
+$missing = Get-MissingLabelNote -Labels $labelNames -Label 'bug' -Prefix 'fix' `
+                                -SeamPath 'scripts\lib\branch-info.ps1' -Repo 'BWJ-ecommerce/smartwatchbanden'
+Assert-True ($missing -ne '') "the measured case is caught: 'bug' is not among the repo's labels"
+Assert-True ($missing -like "*'bug' is not a label in BWJ-ecommerce/smartwatchbanden*") 'the note names the label and the repository'
+Assert-True ($missing -like "*'fix/'*") 'and the branch prefix that produced it'
+Assert-True ($missing -like '*branch-info.ps1*') 'and the repo-owned seam file that maps them, so the reader is sent to the edit'
+Assert-True ($missing -like '*before the push*') 'and says the refusal came before the push, which is the whole point of the gate'
+Assert-True ($missing -like '*gh label create*') 'the first remedy is paste-ready'
+Assert-True ($missing -like "*'documentation', 'question' and 'inbound'*") 'the labels that DO exist are named -- what turns the refusal into a repair when the answer is a rename'
+
+# A LABEL THAT EXISTS COSTS NOTHING AND SAYS NOTHING.
+Assert-Equal '' (Get-MissingLabelNote -Labels $labelNames -Label 'documentation' -Prefix 'docs' -Repo 'x/y') 'a label that exists produces no note'
+# CASE-INSENSITIVE, because GitHub is: it refuses to create 'Bug' beside 'bug', and `--label bug`
+# attaches the existing 'Bug'. Refusing a PR gh would have opened is the one direction this gate must
+# never fail in.
+Assert-Equal '' (Get-MissingLabelNote -Labels @('Bug') -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'a label that differs only in case is the same label to GitHub, so it is not refused'
+
+# NOTHING TO JUDGE AGAINST IS NOT A REFUSAL -- an old gh with no --json, a network hiccup, a repo with
+# no labels at all. A diagnostic must never be the reason a PR cannot be opened.
+Assert-Equal '' (Get-MissingLabelNote -Labels @() -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'an empty label list is "unknowable" and not "absent"'
+Assert-Equal '' (Get-MissingLabelNote -Labels $null -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'and so is no list at all'
+Assert-Equal '' (Get-MissingLabelNote -Labels $labelNames -Label '' -Prefix 'fix' -Repo 'x/y') 'and so is an empty label -- that is the nameless-PR guard subject, not this gate'
+
+# THE FALLBACK HAS THE SAME HOLE ONE LAYER DOWN, which the report named: open-pr substitutes 'question'
+# for an unknown prefix, and that is a GitHub DEFAULT label a repo may equally have deleted. The check
+# is on the label that would be SENT, whatever produced it.
+$fallbackNote = Get-MissingLabelNote -Labels @('documentation') -Label 'question' -Prefix '' -Repo 'x/y'
+Assert-True ($fallbackNote -ne '') "the unknown-prefix fallback is checked too, not trusted"
+Assert-True ($fallbackNote -like '*unknown-prefix fallback*') 'and the note says that is where the label came from, since there is no prefix to name'
+Assert-True ($fallbackNote -notlike "*''/*") 'and it never prints an empty prefix as if it were one'
+
+# ABOVE TEN LABELS THE COUNT REPLACES THE LIST. A label set is unbounded in a way a commit's check
+# suites are not, and this note is read once in a terminal.
+$many = @(1..12 | ForEach-Object { "label-$_" })
+$manyNote = Get-MissingLabelNote -Labels $many -Label 'bug' -Prefix 'fix' -Repo 'x/y'
+Assert-True ($manyNote -like '*12 labels do exist*') 'a large label set is counted rather than listed'
+Assert-True ($manyNote -like '*gh label list --repo x/y*') 'and the command that lists them is given instead'
+Assert-True ($manyNote -notlike '*label-7*') 'so the refusal cannot become a wall of names'
+
+# AND open-pr.ps1 ACTUALLY RUNS IT, BEFORE THE PUSH. Without this assert every check above stays green
+# while the label is resolved one line before `gh pr create` again -- which IS the defect, not a
+# regression in the helper. Same reasoning as the #919 ordering assert above and the #1044 call-site one
+# below: the script is the one caller no suite gets to run.
+$idxLabelGate = $openPrText.IndexOf('Get-MissingLabelNote -Labels')
+$idxPush      = $openPrText.IndexOf("Invoke-NativeCapture -FilePath 'git' -Arguments @('push'")
+# LastIndexOf BEFORE the push, not IndexOf: -GatesOnly calls Invoke-WorkflowGates near the top of the
+# script and exits, so the first occurrence is not the one on the push path.
+$idxGates     = if ($idxPush -ge 0) { $openPrText.LastIndexOf('Invoke-WorkflowGates -RepoRoot', $idxPush) } else { -1 }
+$idxCreate    = $openPrText.IndexOf("@('pr', 'create'")
+Assert-True ($idxLabelGate -ge 0) 'open-pr.ps1 asks whether the label exists (inbound #1221)'
+Assert-True ($idxPush -gt $idxLabelGate) 'and it asks BEFORE the push, which is the whole repair -- a failed create after the push leaves a pushed branch with no PR'
+Assert-True ($idxGates -gt $idxLabelGate) 'and before the lint and test gates, so the author hears it in seconds rather than after the suites'
+Assert-True ($idxCreate -gt $idxLabelGate) 'and the create still gets the label that was checked'
+Assert-True ($openPrText -like "*@('label', 'list', '--json', 'name', '--limit', '500'*") 'the query names --limit, because gh label list defaults to 30 and a truncated list would refuse a label that exists'
+$idxResolve = $openPrText.IndexOf('$label = $info.Label')
+Assert-True ($idxResolve -ge 0 -and $idxResolve -lt $idxPush) 'the label is RESOLVED before the push too -- a check on a label resolved later would be checking nothing'
+Assert-True (([regex]::Matches($openPrText, '\$label = \$info\.Label')).Count -eq 1) 'and resolved in exactly one place, so the checked label and the sent label cannot differ'
+Assert-True ($openPrText -like '*if (-not $existingPr) {*') 'the gate is on the create path only -- an existing PR keeps its own labels and is never sent one'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1
