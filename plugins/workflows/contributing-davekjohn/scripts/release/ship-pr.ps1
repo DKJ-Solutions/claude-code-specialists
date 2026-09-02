@@ -502,7 +502,42 @@ while ($true) {
     $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--repo', $repo)
     if (($probe.Output | Out-String) -notmatch 'no checks reported') { break }
     if ($waited -ge $maxWaitSec) {
-        Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
+        # WHICH REFUSAL THIS IS -- issue #1234, and the same move #1044 and #1219 made one step later in
+        # this file. The refusal is unchanged and cannot let a merge through; only the sentence beside it
+        # moves. "Check the workflow" claims the repo's YAML is wrong, and the state that most often
+        # produces this has healthy workflows -- GitHub simply created no Actions check suite for the
+        # commit. Reading the suite list separates the two, and only the second is about the workflow.
+        #
+        # THE SHA IS READ LOCALLY, for the reason step 4's DEPLOY lock gives for the same read: step 1's
+        # open-pr.ps1 pushed $branch before this point on every path through here, so refs/heads/<branch>
+        # IS the PR's head commit, and a gh headRefOid read would say the same thing over the network in
+        # a diagnostic that must not need a live token to word a refusal.
+        #
+        # Best-effort by construction, like all three notes below -- the lost watch, the stalled run and
+        # the authored failure: every read is guarded and any failure degrades to the wording that was
+        # already here.
+        $suiteNote = ''
+        try {
+            $shaRead = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('rev-parse', "refs/heads/$branch")
+            $sha = if ($shaRead.ExitCode -eq 0) { ($shaRead.Output -join '').Trim() } else { '' }
+            if ($sha) {
+                # -DiscardStderr because this output is PARSED: a gh warning merged into it would break
+                # the parse and cost the note. Nothing here reads anything but an app slug, all of which
+                # are ASCII, so the console code page cannot change the answer and -Utf8 would buy nothing.
+                $suiteFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                    'api', "repos/$repo/commits/$sha/check-suites")
+                if ($suiteFacts.ExitCode -eq 0) {
+                    $suiteNote = Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$pr"
+                }
+            }
+        } catch {
+            $suiteNote = ''
+        }
+        if ($suiteNote) {
+            Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. $suiteNote"
+        } else {
+            Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
+        }
         exit 1
     }
     Write-Host "  (no check registered yet -- waited ${waited}s/${maxWaitSec}s)" -ForegroundColor DarkYellow

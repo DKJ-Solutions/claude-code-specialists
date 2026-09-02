@@ -1333,3 +1333,120 @@ function Get-AuthoredFailureNote {
 
     return ''
 }
+
+function Get-MissingCheckSuiteNote {
+    <#
+    .SYNOPSIS
+        One sentence for the operator when the reason no check has registered is that GitHub created
+        NO GitHub Actions check suite for the commit at all -- so no workflow of this repository was
+        ever asked to run. '' when an Actions suite does exist, which is the ordinary case and the case
+        the caller's existing sentence already covers, because that sentence really is about the
+        workflow.
+
+    .DESCRIPTION
+        Issue #1234, measured on PR #1233 (September 2, 2026, head b09c71b2). ship-pr's step-3 probe
+        polls `gh pr checks` for 180s and then refuses with
+
+            No CI check registered for PR #N after 180s -- NOT merged. Check the workflow, or merge
+            manually once it is green.
+
+        The refusal is right and the second sentence is not. "Check the workflow" means *your
+        .github/workflows/*.yml is wrong* -- a paths: filter, a bad trigger, a syntax error -- and the
+        state that most often produces this has healthy workflows. On that PR `gh pr checks` reported
+        nothing and `gh run list` was empty, while the commit's check-suite list held netlify and
+        claude and NO github-actions suite. Actions itself was demonstrably fine: a sibling PR got its
+        three runs minutes earlier, and two pushes to main either side of this one -- 13:07:32 and
+        13:08:20 -- both created runs, while the push at 13:07:55 got none. No amount of reading YAML
+        finds that, and the reader who goes looking spends the time before they read the suite list.
+
+        THE FOURTH CASE OF A DISTINCTION THIS FILE ALREADY DRAWS THREE TIMES. #943 separated a red
+        REQUIRED check from a red advisory one; #1044 separated a check that went red from a run that
+        never started; #1219 separated a verdict from a dropped watch. Each time the sentence sent the
+        reader somewhere no repair exists. This one has them auditing YAML that is fine.
+
+        Get-StalledRunNote does NOT cover it, and the report checked: that note reads a RUN, and the
+        whole finding here is that no run -- and no suite to hold one -- was ever created. There is
+        nothing for it to be asked about.
+
+        THE REFUSAL IS UNCHANGED, deliberately and for the fourth time. Refusing to merge on a commit
+        no check has measured is the conservative half of that probe and stays exactly as it is: this
+        adds no state to any decision and cannot let a merge through. What moves is the DIAGNOSIS.
+
+        THE REMEDY IS NAMED BECAUSE IT IS NOT GUESSABLE. `gh pr close <n> && gh pr reopen <n>` re-fires
+        the `pull_request` event, whose DEFAULT types include `reopened`, so every workflow that has not
+        narrowed them with an explicit types: list is asked again -- and neither the head commit nor the
+        PR body moves, which matters because the DEPLOY lock reads that body at the merge. Measured on
+        #1233: the reopen produced three in_progress github-actions suites in about 20 seconds. It is
+        stated as GitHub's default rather than as a fact about the caller's workflows, which this script
+        does not read and must not claim to know -- the same restraint that keeps the probe from naming
+        a check.
+
+        WHAT THIS DOES NOT CLAIM IS A CAUSE. A missing suite has more than one (a dropped internal
+        event, Actions disabled for the repository, a `paths:` filter that genuinely excludes every
+        file in the push), and only the first is repaired by a reopen. So the note reports the FACT --
+        no Actions suite exists for this commit -- and offers the reopen as the cheapest thing to try,
+        never as a diagnosis. The reader who reopens and gets nothing has learned something the old
+        sentence could not tell them either way.
+
+    .PARAMETER SuitesJson
+        `gh api repos/<owner>/<repo>/commits/<sha>/check-suites` output. Unreadable in, '' out: a
+        diagnostic must never be the reason a refusal cannot be printed.
+
+    .PARAMETER PrNumber
+        The PR number, so the note can name the reopen. Optional; left out, the note ends after the
+        state it read.
+    #>
+    param(
+        [string]$SuitesJson,
+        [string]$PrNumber = ''
+    )
+
+    if (-not $SuitesJson -or -not $SuitesJson.Trim()) { return '' }
+    try { $parsed = $SuitesJson | ConvertFrom-Json } catch { return '' }
+    if ($null -eq $parsed) { return '' }
+    # A field gh was never asked for is absent, and absent is not empty under Set-StrictMode -- the
+    # same guard every reader in this file applies.
+    if (-not $parsed.PSObject.Properties['check_suites']) { return '' }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object; the
+    # same trap the two parses in Get-MergeBlockVerdict walked into.
+    $suites = @(@($parsed.check_suites) | Where-Object { $_ })
+
+    $slugs = New-Object System.Collections.Generic.List[string]
+    foreach ($s in $suites) {
+        if (-not $s.PSObject.Properties['app']) { continue }
+        if ($null -eq $s.app) { continue }
+        if (-not $s.app.PSObject.Properties['slug']) { continue }
+        $slug = ([string]$s.app.slug).Trim()
+        if ($slug -and -not $slugs.Contains($slug)) { $slugs.Add($slug) | Out-Null }
+    }
+    # NEITHER BOUNDED NOR ESCAPED, UNLIKE Get-AuthoredFailureNote ABOVE, and that difference is the
+    # point rather than an oversight. That function relays FREE TEXT a workflow author wrote, so it cuts
+    # to one line and 500 characters; a `slug` is a GitHub-assigned identifier -- lowercase, hyphenated,
+    # no newline -- validated by the side that issues it. Written down rather than defended against: no
+    # payload has yet produced a slug this could not print, and a bound built for one that has not
+    # arrived would be guessing at its shape.
+    # THE ONE SLUG THAT MATTERS, and it is GitHub's own rather than a name this repo chose. Every other
+    # app on the commit (netlify and claude on #1233, a consumer's own integration elsewhere) is a
+    # different provider whose presence or absence says nothing about this repo's workflows -- which is
+    # why they are NAMED in the note and never counted as an answer.
+    if ($slugs.Contains('github-actions')) { return '' }
+
+    # READ ONCE, IN A TERMINAL, AT THE MOMENT A MERGE IS REFUSED -- so every clause has to earn its
+    # place. "only <list> registered" carries the same fact as naming the commit a second time and
+    # takes no grammatical number with it, which is why there is no singular/plural branch here.
+    $found = if ($slugs.Count -eq 0) {
+        'nothing registered for it at all'
+    } else {
+        "only $(Format-CheckNameList -Names @($slugs)) registered"
+    }
+
+    $note = "GitHub created no Actions check suite for this commit -- $found, so no workflow of this repository was ever asked to run."
+    # The enumeration IS the "do not go and read the YAML" instruction; saying that separately as well
+    # states one conclusion twice in the longest sentence the operator has to read.
+    $note += ' This is NOT a paths: filter, a wrong trigger or a syntax error: Actions is typically healthy elsewhere in the repo at the same moment, and it is the event for THIS commit that went missing.'
+    if ($PrNumber) {
+        $note += " Cheapest thing to try, and it is not a diagnosis: gh pr close $PrNumber && gh pr reopen $PrNumber -- 'reopened' is one of the default pull_request types, so it re-asks every workflow that has not narrowed them, and it moves neither the head commit nor the PR body."
+    }
+    return $note
+}
