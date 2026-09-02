@@ -1639,17 +1639,35 @@ foreach ($ef in @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
 # form, which has nothing to say about heading structure; check 13b is what holds that state to its shape.
 # Every older name is read as well, because a branch created before the merge still has to be checked --
 # Resolve-BranchFilePath picks the one that declares this branch.
+#
+# EVERY BRANCH DOCUMENT PRESENT, NOT ONLY THIS BRANCH'S (#1255). The resolver answers ONE path -- the right
+# one for the branch you are on -- and that was the whole set while there was a single shared name. Now a
+# tree can hold several: this branch's, plus any left on the trunk by a fold that could not push. Judging
+# only one of them would let a malformed heading in another reach CHANGELOG.md at ITS fold, which is exactly
+# the phantom entry this check exists to prevent -- and it would do it silently, since the run would report
+# a clean pass over a document it never opened.
 $branchDocForHeadings = Resolve-BranchFilePath -Kind Deployment -RepoRoot $RepoRoot
-$branchDocPathForHeadings = Join-Path $RepoRoot ($branchDocForHeadings -replace '/', '\')
-if (Test-Path -LiteralPath $branchDocPathForHeadings) {
+# The other per-branch documents in the folder, found by pattern because no list can name them. Same sweep
+# check 13b runs, and for the same reason -- see the block above.
+$branchDocPathsForHeadings = Get-BranchFilePaths
+$branchDocDirForHeadings = Join-Path $RepoRoot ([string]$branchDocPathsForHeadings.Directory -replace '/', '\')
+$branchDocSweep = @()
+if (Test-Path -LiteralPath $branchDocDirForHeadings -PathType Container) {
+    $branchDocSweep = @(Get-ChildItem -LiteralPath $branchDocDirForHeadings -Filter ([string]$branchDocPathsForHeadings.Pattern) -File -ErrorAction SilentlyContinue |
+        ForEach-Object { "$([string]$branchDocPathsForHeadings.Directory)/$($_.Name)" } | Sort-Object)
+}
+$entryHeadingRels = @($branchDocForHeadings) + @($branchDocSweep) | Select-Object -Unique
+foreach ($bdRel in $entryHeadingRels) {
+    if (-not $bdRel) { continue }
+    $branchDocPathForHeadings = Join-Path $RepoRoot ($bdRel -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $branchDocPathForHeadings)) { continue }
     $bdText = [System.IO.File]::ReadAllText($branchDocPathForHeadings, [System.Text.Encoding]::UTF8)
-    if (Test-BranchChangelogIsFilled -Text $bdText) {
-        $bdSplit = Split-Development -Text $bdText
-        $entryTextsForHeadings += [pscustomobject]@{
-            Rel    = $branchDocForHeadings -replace '/', '\'
-            Text   = $(if ($bdSplit.Found) { $bdSplit.Entry } else { $bdText })
-            Offset = $(if ($bdSplit.Found) { $bdSplit.Index } else { 0 })
-        }
+    if (-not (Test-BranchChangelogIsFilled -Text $bdText)) { continue }
+    $bdSplit = Split-Development -Text $bdText
+    $entryTextsForHeadings += [pscustomobject]@{
+        Rel    = $bdRel -replace '/', '\'
+        Text   = $(if ($bdSplit.Found) { $bdSplit.Entry } else { $bdText })
+        Offset = $(if ($bdSplit.Found) { $bdSplit.Index } else { 0 })
     }
 }
 foreach ($ef in $entryTextsForHeadings) {

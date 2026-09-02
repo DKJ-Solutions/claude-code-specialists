@@ -62,7 +62,9 @@ docstring: that form coupled the fold to guessing the branch from the filename, 
 - [x] `new-branch.ps1` -- writes the per-branch name, with the shared name leading the legacy list so a branch already working in it is not split in half
 - [x] `fold-changelog-entry.ps1` -- `-Branch` handed to the resolver (this runs on the trunk), and fold-all sweeps every per-branch document rather than one
 - [x] `ship-pr.ps1` + `check-branch-entry.ps1` -- the two callers where HEAD is the wrong answer: the Reader arm resolves against another tree, and CI runs on a detached HEAD
-- [x] `check-plugin-integrity.ps1` -- the scaffold gate sweeps the set instead of one fixed path, and both link/lifecycle checks gained the predicate
+- [x] `check-plugin-integrity.ps1` -- the scaffold gate (13b) sweeps the set instead of one fixed path, and both link/lifecycle checks gained the predicate
+- [x] `check-plugin-integrity.ps1` -- the entry-heading gate (13) judges every branch document present, not only this branch's: a malformed heading in a leftover would otherwise reach `CHANGELOG.md` at ITS fold, and the run would report a clean pass over a document it never opened
+- [x] `entry-scaffold.tests.ps1` -- its round trip derived the written path without a branch, so it asserted against the shared name while the writer had moved
 - [x] The documents: `CLAUDE.md`, both CONTRIBUTING pages, both READMEs, `DEVELOPMENT-portable.md`, six skill pages, the PR template in all three places, four lenses, the adoption scaffold
 - [x] The two documents stranded on the trunk by this very defect, migrated to their per-branch names rather than lost
 - [~] Detection that a PR has silently lost CI -- dropped: it is the third option's half, and with the collision gone the cause it would report no longer occurs. Filed separately if it is still wanted for other causes.
@@ -70,9 +72,19 @@ docstring: that form coupled the fold to guessing the branch from the filename, 
 ### TEST
 
 - [x] `scripts/tests/branch-document-path.tests.ps1` -- 24 asserts over the naming, the predicate, the resolver against a real tree, and the regression itself
-- [x] `check-plugin-integrity.ps1` -- 0 errors; `[branch-template]` now reports the document instead of `absent`
-- [x] All 59 suites green, including the pre-existing 58
+- [x] `check-plugin-integrity.ps1` -- 0 errors; `[branch-template]` reports all three documents present instead of `absent`, and `[entry-heading]` reads 3 unfolded entries instead of 1
+- [x] All suites via `open-pr`'s own gate, which is the authoritative run
 - [x] `git merge-tree` against all four open PRs, before and after a simulated fold -- the measurement that chose the repair
+
+#### One measurement was wrong before it was right, and it is recorded rather than quietly corrected
+
+An ad-hoc `$LASTEXITCODE` loop used to check the suites mid-branch reported "0 failing" twice over a suite
+that was red: `entry-scaffold.tests.ps1` died on a terminating exception before reaching its own `exit 1`,
+and piping through `Out-String` left the exit code at 0. Six `[FAIL]` lines were in the output both times.
+The repo's own gate (`Invoke-TestSuiteGate`) reads exit codes per child via `Start-Process` and was never
+blind to it -- the defect was in the ad-hoc check, not in the gate, so nothing here needed repairing. Worth
+recording anyway: this is the shape the repo keeps rediscovering, and the lesson is the one already written
+down -- run the gate, do not reimplement it.
 
 ### DEPLOY: `fix/development-doc-per-branch-path-v1`
 
