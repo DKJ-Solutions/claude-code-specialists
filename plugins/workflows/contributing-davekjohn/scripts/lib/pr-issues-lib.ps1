@@ -1111,6 +1111,110 @@ function Get-StalledRunNote {
     return $note
 }
 
+function Get-LostWatchNote {
+    <#
+    .SYNOPSIS
+        One sentence for the operator when a non-zero `gh pr checks --watch` exit is the WATCH dying
+        rather than a check going red -- i.e. when nothing has reported a failure and at least one
+        check is still running. '' when something actually failed, which is the ordinary case and the
+        case the caller's existing wording already covers.
+
+    .DESCRIPTION
+        Issue #1219, measured on PR #1218 (September 2, 2026). `--watch` is one long-lived call against
+        the GraphQL API, and after nine clean poll cycles it printed
+
+            Post "https://api.github.com/graphql": read tcp ...: wsarecv: An existing connection was
+            forcibly closed by the remote host.
+
+        and exited non-zero. Get-MergeBlockVerdict blocked -- correctly, it could not see a green
+        required check -- and ship-pr said "CI did not pass for PR #1218 (exit 1) ... Fix CI and
+        re-run, or merge manually once green." Nothing about CI had failed. Read seconds later,
+        `branch-entry` was pass, `lint-en-tests` was in_progress with its own lint step already green,
+        and `claude-review` was pending; the run went green on its own minutes later.
+
+        THE THIRD CASE OF A DISTINCTION THIS FILE ALREADY DRAWS TWICE. #943 separated "a check the
+        ruleset REQUIRES went red" from "a check it does not"; #1044 separated "a check went red" from
+        "the job never started". This is the same failure with a third cause, and it costs the same
+        thing: "Fix CI and re-run" sends the reader into their own code for a state no branch can
+        repair. It is the cheapest of the three to get wrong, because here CI is not even unhealthy --
+        it is still going, and the only thing that broke was a socket the operator will never see again.
+
+        Get-StalledRunNote does NOT cover it, and the report checked: that note fires on a run that
+        never STARTED, and this run had started and was progressing. Which is precisely the fact read
+        here, from the other side.
+
+        THE MERGE DECISION IS UNCHANGED, deliberately and for the third time. This adds no state to
+        Get-MergeBlockVerdict and cannot let a merge through -- refusing on an unreadable required-check
+        list is the conservative half of #943 and stays as it is. What moves is the DIAGNOSIS, plus the
+        caller's licence to re-enter the wait: the deadline is the operator's, not the socket's.
+
+        THE FACT IS "NOTHING FAILED AND SOMETHING IS STILL RUNNING", NOT THE ERROR TEXT. gh's message
+        is a transport detail that varies with platform, proxy and gh version, and it goes to stderr,
+        where a caller may not have kept it. The payload carries the same conclusion more reliably: a
+        non-zero `--watch` exit CLAIMS something failed, so a payload in which nothing has failed while
+        a check is still pending contradicts that exit code -- and the exit code is the half that came
+        over the wire.
+
+        AN UNREADABLE PAYLOAD RETURNS '', which is the opposite of Get-MergeBlockVerdict's answer to
+        the same input, and right in both places. There, silence must REFUSE, because it guards a
+        merge. Here, silence must not NARRATE: claiming a dropped connection on a payload nobody could
+        read would put "CI is still running" in front of an operator whose check went red, and
+        mis-narrating a real failure is worse than the wording being repaired.
+
+        A PAYLOAD IN WHICH EVERYTHING PASSED IS ALSO '', and no caller reaches this with one: with no
+        failing required check the verdict is not Blocked, so the caller takes its merge-proceeds path
+        instead of its refusal path. Left out rather than guessed at, because "all green and the watch
+        exited non-zero" wants a different sentence from this one and no run has produced it yet.
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,bucket,state` output. Anything that will not parse yields '',
+        because this only ever costs the caller a diagnostic line and a retry it can do without.
+
+    .PARAMETER PrNumber
+        The PR number, so the note can name the command that re-enters the wait. Optional; left out,
+        the note ends after the state it read.
+    #>
+    param(
+        [string]$ChecksJson,
+        [string]$PrNumber = ''
+    )
+
+    if (-not $ChecksJson -or -not $ChecksJson.Trim()) { return '' }
+    try { $parsed = $ChecksJson | ConvertFrom-Json } catch { return '' }
+    if ($null -eq $parsed) { return '' }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object; the
+    # same trap the two parses in Get-MergeBlockVerdict walked into.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.name })
+    if ($records.Count -eq 0) { return '' }
+
+    $failed = @()
+    $pending = @()
+    foreach ($r in $records) {
+        switch (Get-CheckOutcome -Record $r) {
+            'fail'    { $failed += [string]$r.name }
+            'pending' { $pending += [string]$r.name }
+        }
+    }
+    # ONE failing check and this is a verdict, whatever else the payload holds. Read through
+    # Get-CheckOutcome, so 'cancel', 'timed out' and 'startup failure' end the question here for the
+    # same reason they do in the verdict above -- none of them is green, and none of them is a socket.
+    if ($failed.Count -gt 0) { return '' }
+    # 'unknown' counts as neither. It is not a failure, and it is not proof that anything is running:
+    # without a check provably still going the non-zero exit is not contradicted, and there is nothing
+    # to say.
+    $pending = @($pending | Sort-Object -Unique)
+    if ($pending.Count -eq 0) { return '' }
+
+    $is = if ($pending.Count -eq 1) { 'is' } else { 'are' }
+    $note = "The WATCH dropped, CI did not: nothing has reported a failure and $(Format-CheckNameList -Names $pending) $is still running, so the non-zero exit came from the connection and not from a verdict."
+    $note += ' There is nothing on the branch to fix and nothing to re-run -- the run is still going and may well go green on its own.'
+    if ($PrNumber) {
+        $note += " Re-enter the wait with: gh pr checks $PrNumber --watch"
+    }
+    return $note
+}
+
 function Get-AuthoredFailureNote {
     <#
     .SYNOPSIS
