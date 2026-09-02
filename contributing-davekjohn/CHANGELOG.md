@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/repoint-org-transfer-v1` · 20260902-181358
+
+The repo moved from the personal account `DaveKJohn` into the `DKJ-Solutions` organisation on
+September 2, 2026, and every functional reference now names the new owner: `Get-RepoName` (so every
+`gh --repo` in the tree), the marketplace source this repo consumes itself through, the connector
+register, the config blueprint shipped to consumers, and the install documentation.
+
+**The work was deciding what NOT to touch.** Of 2,133 mentions of `DaveKJohn`, 30 were functional; the
+rest are other repos that did not move, local filesystem paths, author attribution, and dated
+measurements. Each is named in CREATE with the reason it stays, so the next reader does not re-open
+the question — and so nobody runs the sweep this branch deliberately did not.
+
+**Nothing breaks in the meantime, and one thing must never happen.** GitHub's transfer redirect keeps
+the old path resolving, which is what every existing consumer's `settings.json` still rides on. That
+redirect survives only while nothing is created at `DaveKJohn/claude-code-specialists`, so that path
+must never be recreated — now stated in `README.md` beside the two rename redirects it sits next to.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer needs to do nothing: their `extraKnownMarketplaces` still names the old owner, and the
+transfer redirect resolves it. What changes for them is what a *fresh* adoption writes — `INSTALL.md`,
+the `specialists-init` bootstrap block and the shipped config blueprint now name `DKJ-Solutions` — and
+one standing condition they inherit without asking for it: the old path must never be recreated, or
+every registration still pointing at it stops resolving at once.
+
+**Score:** 2
+
+#### Pull Request
+
+Repoint every functional reference to the DKJ-Solutions org
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1241](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1241)
+
+---
+
 ### DEPLOY: `fix/ship-pr-missing-check-suite-v1` · 20260902-164150
 
 When `ship-pr` waits out its full 180 seconds and no check has registered, the refusal now reads the
