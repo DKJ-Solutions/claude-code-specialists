@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-pr-missing-check-suite-v1` · 20260902-164150
+
+When `ship-pr` waits out its full 180 seconds and no check has registered, the refusal now reads the
+commit's check-suite list before it words itself. Where GitHub created no Actions suite at all, it
+says so -- naming the suites that DO exist -- states that this is not a `paths:` filter, a wrong
+trigger or a syntax error, and offers `gh pr close <n> && gh pr reopen <n>` as the cheapest thing to
+try, explicitly not as a diagnosis. Where an Actions suite does exist, nothing changes: that is the
+one case *"Check the workflow"* was always right for, and it still prints.
+
+The merge decision is untouched, deliberately and for the fourth time. Refusing on a commit no check
+has measured is the conservative half of that probe; this adds no state to any decision and cannot let
+a merge through. What moves is the diagnosis -- the same repair #943, #1044 and #1219 each made one
+step further down the same script, and the fourth time a sentence has been found sending the reader
+somewhere no repair exists. Here it had them auditing YAML that was fine.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer running this workflow ships through the same probe, and a missing check suite is not a
+state an operator recognises: the first instinct is to audit the triggers, which is exactly the time
+the old sentence charged them for. They now get the fact and the twenty-second remedy in the line that
+refuses. The reopen is stated as GitHub's own default `pull_request` types rather than as a claim
+about their workflows, which this script does not read -- the same restraint that keeps the probe from
+naming a check.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr names the missing Actions check suite and the reopen that restores it
+
+Plugins: contributing-davekjohn
+
+[PR #1238](https://github.com/DaveKJohn/claude-code-specialists/pull/1238)
+
+---
+
 ### DEPLOY: `fix/native-capture-grandchild-launch-race-v1` · 20260902-161546
 
 The test gate no longer refuses a push because the machine was busy. `native-capture.tests.ps1`'s
