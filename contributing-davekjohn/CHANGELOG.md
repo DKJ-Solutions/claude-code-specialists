@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/missing-suite-note-escalation-v1` · 20260902-210200
+
+When `ship-pr` refuses because no check suite exists, it now names the one cause that is checkable
+rather than guessed. A `pull_request` workflow runs against `refs/pull/<n>/merge`; a conflicting PR has
+no such commit, so GitHub creates no suite for it and the required check can never go green. The
+refusal now says so, and prescribes resolving the conflict.
+
+What makes it worth more than an extra sentence is what it takes AWAY. The note used to offer
+`gh pr close && gh pr reopen` as the cheapest thing to try, and against a conflict that is measured to
+do nothing -- twice over on PR #1243: the reopen the reporter ran, and a fresh head pushed here, polled
+300s, no run either time. Offering it there sends the reader round a loop that cannot terminate, so the
+conflict clause replaces it rather than sitting beside it. The refusal itself is untouched for the
+fifth time; only the diagnosis moved.
+
+The fifth case of a distinction this file has now drawn four times before -- #943 (a red required check
+vs a red advisory one), #1044 (a check that went red vs a run that never started), #1219 (a verdict vs
+a dropped watch), #1234 (no run vs no suite at all). Each time the sentence sent the reader somewhere no
+repair exists. This one had them auditing an org's runner billing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`ship-pr.ps1` and `pr-issues-lib.ps1` are both mirrored into `contributing-davekjohn`, so this reaches
+every consumer running that workflow -- and a conflicting PR is a state any of them can reach, on any
+repo, with no org transfer involved. What made it visible here was a tree-wide merge landing 68 seconds
+before a branch cut from the older base; what makes it recur elsewhere is any PR left open across a
+large merge. The consumer gets the repair named at the exact moment their ship refuses, instead of a
+reopen that cannot work.
+
+**Score:** 3
+
+#### Pull Request
+
+The missing-suite note names the conflicting PR, and withholds the reopen that cannot fix it
+
+Plugins: contributing-davekjohn
+
+[PR #1254](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1254)
+
+---
+
 ### DEPLOY: `fix/gate-assert-errorrecord-wrap-v1` · 20260902-204235
 
 The local test gate no longer refuses a branch because of how long the operator's home directory is.

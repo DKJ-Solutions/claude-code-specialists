@@ -891,12 +891,51 @@ $missNoId = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions
 Assert-True ($missNoId -like '*no Actions check suite*') 'no PR number: the diagnosis is unchanged'
 Assert-True ($missNoId -notlike '*gh pr close *') 'and no command is printed with a missing argument'
 
+# --- The conflicting PR: the one cause that is checkable rather than guessed (issue #1247) ---------
+# Measured September 2, 2026. A pull_request workflow runs against refs/pull/<n>/merge, which a
+# conflicting PR does not have -- so no suite is created for it, and #1247 read that as an Actions
+# outage across the whole org. PR #1243 (CONFLICTING) had no merge ref and 0 suites, and stayed at 0
+# through a close/reopen AND a freshly pushed head; #1240 and #1249, opened either side of it, each had
+# a merge ref and three suites. These asserts pin the DIAGNOSIS; the refusal is untouched, again.
+Write-Host "Get-MissingCheckSuiteNote -- the conflicting PR (#1247)" -ForegroundColor Cyan
+
+$missConflict = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '1243' -Mergeable 'CONFLICTING'
+Assert-True ($missConflict -like '*CONFLICTING*') 'a conflicting PR is named as such, in GitHub''s own word'
+Assert-True ($missConflict -like '*refs/pull/*') 'and the note says WHICH commit does not exist, since that is the whole mechanism'
+Assert-True ($missConflict -like '*Resolve the conflict*') 'the repair named is the one that works -- resolve, then push'
+# THE POINT OF THE BRANCH, not a nicety: the reopen is measured to do nothing here, and printing it
+# beside the real repair leaves the reader to choose between them with the cheap one listed first.
+Assert-True ($missConflict -notlike '*gh pr close 1243 && gh pr reopen 1243*') 'and the reopen is WITHHELD rather than offered beside it'
+Assert-True ($missConflict -like '*measured*') 'while saying the reopen was measured doing nothing, so the reader does not try it anyway'
+Assert-True ($missConflict -like '*no Actions check suite*') 'the #1234 finding still leads -- the conflict explains it, it does not replace it'
+
+# EVERY OTHER ANSWER LEAVES THE #1234 WORDING EXACTLY AS IT WAS. UNKNOWN is GitHub still computing the
+# merge, and reading it as a conflict would be this function guessing at a cause -- the failure it
+# exists to end. An absent argument is the back-compat path every existing caller takes.
+foreach ($state in @('MERGEABLE', 'UNKNOWN', '', '   ')) {
+    $missOther = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '1233' -Mergeable $state
+    Assert-True ($missOther -like '*gh pr close 1233 && gh pr reopen 1233*') "mergeable '$state' still gets the reopen -- only CONFLICTING is decisive"
+    Assert-True ($missOther -notlike '*Resolve the conflict*') "mergeable '$state' is never told to resolve a conflict it may not have"
+}
+Assert-Equal $missNote (Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '1233') 'and the note is byte-identical to the pre-#1247 one when nothing is passed'
+
+# gh's answer arrives as JSON text through Invoke-NativeCapture, so tolerate what that hands back.
+Assert-True ((Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '9' -Mergeable ' conflicting ') -like '*Resolve the conflict*') 'the state is matched case-insensitively and trimmed, as gh output reaches it'
+
+# An Actions suite that EXISTS is still not this note's case, conflict or no conflict: there the
+# ordinary "the check has not reported yet" wording is the correct one and this must stay out of it.
+Assert-Equal '' (Get-MissingCheckSuiteNote -SuitesJson $suitesWithActions -PrNumber '1243' -Mergeable 'CONFLICTING') 'a conflicting PR that DOES have an Actions suite is not this note''s case either'
+
 # AND SHIP-PR'S PROBE ACTUALLY ASKS. Same reasoning and same failure mode as the #1044 and #1219
 # call-site asserts above: a reverted call site leaves every assert here green while the refusal goes
 # on sending the reader to YAML that is fine.
 Assert-True ($shipText -like '*Get-MissingCheckSuiteNote -SuitesJson*') 'ship-pr.ps1 asks whether an Actions suite exists before it words the step-3 refusal (#1234)'
 Assert-True ($shipText -like '*commits/$sha/check-suites*') 'and reads it for the commit the PR actually carries'
 Assert-True ($shipText -like '*Check the workflow, or merge manually once it is green.*') 'while the old wording survives for the one case it is correct for'
+# The #1247 half of the same guard: the conflict branch above is unreachable in production unless the
+# call site actually reads the state and passes it, and nothing else in this suite would notice.
+Assert-True ($shipText -like '*-Mergeable $mergeable*') 'ship-pr.ps1 passes the PR''s mergeable state, so the conflict branch is reachable at all (#1247)'
+Assert-True ($shipText -like "*'--json', 'mergeable'*") 'and reads it from gh rather than inferring it from the checkout'
 $idxSuiteNote = $shipText.IndexOf('Get-MissingCheckSuiteNote')
 $idxWatchArg  = $shipText.IndexOf("'--watch'")
 Assert-True ($idxSuiteNote -ge 0 -and $idxSuiteNote -lt $idxWatchArg) 'the read sits in the PRE-watch probe it diagnoses, not beside the post-watch notes'
