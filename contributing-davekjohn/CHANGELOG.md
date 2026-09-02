@@ -32,6 +32,31 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/dropped-ship-cost-overstated-v1` · 20260902-201709
+
+The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
+costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
+a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
+ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
+trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
+who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+
+**Score:** N/A
+
+#### Pull Request
+
+the lost-watch retry changelog entry no longer overstates a dropped ship's cost
+
+[PR #1250](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1250)
+
+---
+
 ### DEPLOY: `feat/repoint-org-transfer-v1` · 20260902-181358
 
 The repo moved from the personal account `DaveKJohn` into the `DKJ-Solutions` organisation on
@@ -159,9 +184,8 @@ it changes only the sentence and never the verdict.
 
 A consumer running the workflow's `ship-pr.ps1` gets both halves. The retry is the part they feel:
 step 1 is the only step that reads the working tree and step 2b has already sent the checkout back to
-the trunk, so before this a dropped socket cost them a re-checkout of the branch plus a full local
-gate run -- lint and every suite -- against a commit CI was already testing. Now it costs one more gh
-call. And on the run that does have to stop, the sentence no longer sends them into their own code
+the trunk, so before this a dropped socket cost them a re-checkout of the branch step 2b had just
+left. Now it costs one more gh call. And on the run that does have to stop, the sentence no longer sends them into their own code
 for a state no branch can repair.
 
 **Score:** 3
