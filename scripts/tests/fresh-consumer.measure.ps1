@@ -71,7 +71,7 @@ New-Item -ItemType Directory -Path (Join-Path $FixtureRoot '.claude') -Force | O
 {
   "extraKnownMarketplaces": {
     "claude-code-specialists": {
-      "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" }
+      "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" }
     }
   },
   "enabledPlugins": { "team-alpha@claude-code-specialists": true }

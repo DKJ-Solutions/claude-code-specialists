@@ -32,6 +32,145 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-pr-missing-check-suite-v1` · 20260902-164150
+
+When `ship-pr` waits out its full 180 seconds and no check has registered, the refusal now reads the
+commit's check-suite list before it words itself. Where GitHub created no Actions suite at all, it
+says so -- naming the suites that DO exist -- states that this is not a `paths:` filter, a wrong
+trigger or a syntax error, and offers `gh pr close <n> && gh pr reopen <n>` as the cheapest thing to
+try, explicitly not as a diagnosis. Where an Actions suite does exist, nothing changes: that is the
+one case *"Check the workflow"* was always right for, and it still prints.
+
+The merge decision is untouched, deliberately and for the fourth time. Refusing on a commit no check
+has measured is the conservative half of that probe; this adds no state to any decision and cannot let
+a merge through. What moves is the diagnosis -- the same repair #943, #1044 and #1219 each made one
+step further down the same script, and the fourth time a sentence has been found sending the reader
+somewhere no repair exists. Here it had them auditing YAML that was fine.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer running this workflow ships through the same probe, and a missing check suite is not a
+state an operator recognises: the first instinct is to audit the triggers, which is exactly the time
+the old sentence charged them for. They now get the fact and the twenty-second remedy in the line that
+refuses. The reopen is stated as GitHub's own default `pull_request` types rather than as a claim
+about their workflows, which this script does not read -- the same restraint that keeps the probe from
+naming a check.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr names the missing Actions check suite and the reopen that restores it
+
+Plugins: contributing-davekjohn
+
+[PR #1238](https://github.com/DaveKJohn/claude-code-specialists/pull/1238)
+
+---
+
+### DEPLOY: `fix/native-capture-grandchild-launch-race-v1` · 20260902-161546
+
+The test gate no longer refuses a push because the machine was busy. `native-capture.tests.ps1`'s
+grandchild fixture had a 3-second bound that has to cover two cold PowerShell 5.1 startups before the
+grandchild can write the marker proving it launched, and that bound is crossed by load alone --
+measured here at 2.67s with every core busy and 9.68s at twice that, against 3s. The assert that
+failed is about process startup timing, so the refusal named a branch that had nothing to do with it
+and cost a full gate run. The attempt is now repeated at a wider bound rather than reported as a
+failure, with the grandchild's sleep and the post-run wait derived from whichever bound is in play;
+an unloaded machine still pays what it always paid, and a run where even the wide bound cannot get
+the grandchild up still fails, because a gate whose verdict a re-run clears is a gate that has
+stopped working.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the suite is not plugin payload. `native-capture-lib.ps1` is mirrored to consumers, its test
+suite is not, so nothing here reaches a consuming repo.
+
+**Score:** N/A
+
+#### Pull Request
+
+the grandchild-launch assert no longer races two cold PowerShell startups
+
+[PR #1236](https://github.com/DaveKJohn/claude-code-specialists/pull/1236)
+
+---
+
+### DEPLOY: `fix/ship-pr-lost-watch-retry-v1` · 20260902-152938
+
+`ship-pr` no longer reports a dropped connection as a code failure, and re-enters the wait instead of
+handing the branch back. `gh pr checks --watch` is one long-lived GraphQL call; when it dies mid-wait
+on a transient socket error its exit code is indistinguishable from a failing check, so the operator
+read *"CI did not pass for PR #1218 (exit 1) ... Fix CI and re-run, or merge manually once green"*
+about a run that was still progressing and went green on its own minutes later. Step 3 now reads the
+check payload instead of trusting that exit code alone: where nothing has reported a failure and a
+check is still running, the watch is re-entered (up to three attempts, one poll interval apart), and
+if the attempts run out the refusal says **CI is still RUNNING** rather than that it failed. The
+merge decision does not move -- this is the third cause of a distinction the script already drew
+twice, after a red required check (#943) and a run that never started (#1044), and like both of those
+it changes only the sentence and never the verdict.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running the workflow's `ship-pr.ps1` gets both halves. The retry is the part they feel:
+step 1 is the only step that reads the working tree and step 2b has already sent the checkout back to
+the trunk, so before this a dropped socket cost them a re-checkout of the branch plus a full local
+gate run -- lint and every suite -- against a commit CI was already testing. Now it costs one more gh
+call. And on the run that does have to stop, the sentence no longer sends them into their own code
+for a state no branch can repair.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr tells a dropped CI watch from a red check, and re-enters the wait
+
+Plugins: contributing-davekjohn
+
+[PR #1233](https://github.com/DaveKJohn/claude-code-specialists/pull/1233)
+
+---
+
+### DEPLOY: `feat/asana-github-status-sync-v1` · 20260902-151628
+
+The Asana board's three middle columns now follow the GitHub Project's `Status` field instead of
+being re-derived from the issue and its pull requests -- `Todo`/`In Progress`/`Done` are *filed*,
+*being built*, *closed*. GitHub already wrote that field through its own project workflows, so
+deriving it a second time made two writers of one fact; reading it makes the two boards agree
+rather than race. The stage past those is no longer a column at all: a card reaches *ready to
+test* once the submitter has actually been told, and where a ticket has no submitter that stage is
+skipped. Both of the last two sections are now terminal -- a card there is never taken back, not
+even by a reopen.
+
+Needs one thing per store repo: a `GH_PROJECT_TOKEN` secret. `GITHUB_TOKEN` cannot read an
+organization's Projects v2 at all, so without it the close update still goes out and only the
+staging goes quiet, naming the missing token in the log.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own developers and the BWJ colleagues who read the Asana board,
+and the board's behaviour is not a subscriber-facing service.
+
+**Score:** N/A
+
+#### Pull Request
+
+the GitHub Project Status drives the Asana stages Filed, InDevelopment and InReview
+
+Plugins: bwj-codex
+
+[PR #1231](https://github.com/DaveKJohn/claude-code-specialists/pull/1231)
+
+---
+
 ### DEPLOY: `docs/ticket-work-tracker-pickup-state-v1` · 20260902-150729
 
 The **Ticket work** section of `CONTRIBUTING-portable.md` modelled the tracker as something you only

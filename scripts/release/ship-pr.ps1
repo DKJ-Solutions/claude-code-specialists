@@ -89,6 +89,15 @@
          nothing and one whose required checks have not reported look identical from here. The wait
          itself is unchanged; see the comment at the step.
 
+         AND RE-ENTER THE WATCH WHEN IT IS THE CONNECTION THAT DROPPED, NOT A CHECK (issue #1219).
+         `--watch` is one long-lived GraphQL call and it can die mid-wait on a transient socket error
+         while every check is still pending -- read from its exit code alone that is indistinguishable
+         from a failure, and the operator was told to "fix CI and re-run" about a run that goes green
+         on its own. Up to three attempts, decided from the check payload (nothing failed and something
+         is still running) rather than from gh's error text; a real red check breaks out on the first
+         pass, and so does a payload that cannot be read. If the attempts run out the merge is still
+         refused, in a sentence that says CI is still RUNNING -- the verdict does not move.
+
          AND SAY, BEFORE THE WATCH BEGINS, THAT NOBODY HAS TO SIT THROUGH IT (issue #985). Backgrounding
          this run is the default: the merge cannot move before the check is green either way, so the only
          thing the wait buys in the foreground is a second look at a result the local gate already gave.
@@ -493,7 +502,42 @@ while ($true) {
     $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--repo', $repo)
     if (($probe.Output | Out-String) -notmatch 'no checks reported') { break }
     if ($waited -ge $maxWaitSec) {
-        Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
+        # WHICH REFUSAL THIS IS -- issue #1234, and the same move #1044 and #1219 made one step later in
+        # this file. The refusal is unchanged and cannot let a merge through; only the sentence beside it
+        # moves. "Check the workflow" claims the repo's YAML is wrong, and the state that most often
+        # produces this has healthy workflows -- GitHub simply created no Actions check suite for the
+        # commit. Reading the suite list separates the two, and only the second is about the workflow.
+        #
+        # THE SHA IS READ LOCALLY, for the reason step 4's DEPLOY lock gives for the same read: step 1's
+        # open-pr.ps1 pushed $branch before this point on every path through here, so refs/heads/<branch>
+        # IS the PR's head commit, and a gh headRefOid read would say the same thing over the network in
+        # a diagnostic that must not need a live token to word a refusal.
+        #
+        # Best-effort by construction, like all three notes below -- the lost watch, the stalled run and
+        # the authored failure: every read is guarded and any failure degrades to the wording that was
+        # already here.
+        $suiteNote = ''
+        try {
+            $shaRead = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('rev-parse', "refs/heads/$branch")
+            $sha = if ($shaRead.ExitCode -eq 0) { ($shaRead.Output -join '').Trim() } else { '' }
+            if ($sha) {
+                # -DiscardStderr because this output is PARSED: a gh warning merged into it would break
+                # the parse and cost the note. Nothing here reads anything but an app slug, all of which
+                # are ASCII, so the console code page cannot change the answer and -Utf8 would buy nothing.
+                $suiteFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                    'api', "repos/$repo/commits/$sha/check-suites")
+                if ($suiteFacts.ExitCode -eq 0) {
+                    $suiteNote = Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$pr"
+                }
+            }
+        } catch {
+            $suiteNote = ''
+        }
+        if ($suiteNote) {
+            Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. $suiteNote"
+        } else {
+            Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
+        }
         exit 1
     }
     Write-Host "  (no check registered yet -- waited ${waited}s/${maxWaitSec}s)" -ForegroundColor DarkYellow
@@ -509,43 +553,90 @@ while ($true) {
 # `lint-en-tests` -- the only check the `main` ruleset requires -- green, GitHub itself reporting those
 # PRs as MERGEABLE / UNSTABLE, and this script reporting BLOCKED. The wait is untouched (#831 measured
 # it and Dave kept it); only the verdict below moved.
-$checks = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo)
-$checks.Output | ForEach-Object { Write-Host $_ }
-$waitedSec = [int][math]::Round(((Get-Date) - $waitBegan).TotalSeconds)
-
-# ONE pair of reads, serving both remaining questions: which check governed the wait (#831, the line
-# printed further down) and, on a failure, whether what failed is a check the ruleset requires (#943,
-# the merge decision). Measured while writing this: `gh pr checks --json` returns exit 0 while
-# reporting a failing check in its payload, so the STATE has to be read from the records -- which is
-# why both reads ask for `bucket,state` and neither trusts its own exit code for the outcome.
 #
-# Still best-effort, and the invariant that mattered survives: an unreadable payload cannot turn a
-# GREEN run red, because a green watch never consults the verdict at all. What it can do is leave a
-# failing run refusing exactly as it did before this change -- Get-MergeBlockVerdict blocks on an
-# unreadable required-check list rather than guessing, which is the conservative half of the fix.
-# They no longer sit after the decision, because they are now part of it: a failing run that spends
-# two gh calls is spending them on the verdict, not on a line nobody will read.
-$checkFactsJson = ''
-$requiredFactsJson = ''
-try {
-    # `link` rides along for inbound #1044: it is the only field in this payload that names the
-    # Actions RUN behind a check, and the fact separating "the job never started" from "a check went
-    # red" lives on the run rather than on the check. It costs nothing on a green run -- the block
-    # that reads it is inside the refusal below.
-    $checkFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-        'pr', 'checks', "$pr", '--json', 'name,bucket,state,startedAt,completedAt,link', '--repo', $repo)
-    if ($checkFacts.ExitCode -eq 0) { $checkFactsJson = $checkFacts.Output -join "`n" }
-    # `--required` exits non-zero on a repo whose ruleset requires nothing, which is a legitimate state
-    # and not an error. For the wait report the label is then simply omitted rather than guessed; for
-    # the verdict it is the case that keeps refusing, since "requires nothing" and "the required checks
-    # have not reported" are indistinguishable from here.
-    $requiredFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-        'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
-    if ($requiredFacts.ExitCode -eq 0) { $requiredFactsJson = $requiredFacts.Output -join "`n" }
-} catch {
+# AND THE WATCH IS RE-ENTERED WHEN THE CONNECTION DROPS RATHER THAN THE CHECK (#1219). `--watch` is
+# one long-lived GraphQL call, and on PR #1218 (September 2, 2026) it died mid-wait on `wsarecv: An
+# existing connection was forcibly closed by the remote host` after nine clean poll cycles, while
+# every check was still running. Its exit code says "something failed", the verdict below acted on
+# that, and the operator read "CI did not pass ... Fix CI and re-run" about a run that went green on
+# its own a few minutes later. Nothing about CI had failed; the socket had.
+#
+# WHY THIS IS A RETRY AND NOT ONLY A SENTENCE. Step 1 is the only step that reads the working tree
+# and step 2b has already sent this checkout home (#1073), so resuming a ship that died HERE means
+# checking the branch out again and re-running the whole local gate against a commit CI is already
+# testing. The recovery costs more than the failure did, and a multi-minute wait dropping a
+# connection is not exotic. The deadline is the operator's, not the socket's.
+#
+# BOUNDED, AND READ FROM THE PAYLOAD RATHER THAN THE ERROR TEXT. Get-LostWatchNote re-reads the
+# checks and calls it a dropped watch only where nothing has reported a failure and something is
+# still running -- so a red check breaks out on the first pass with the wording that is correct for
+# it, and an UNREADABLE payload is not that case either, which is what keeps a gh that cannot answer
+# at all from spinning here. Three attempts with one poll interval between them: a watch that dies
+# instantly three times costs seconds instead of hammering the API.
+$maxWatchAttempts = 3
+$watchAttempt = 0
+$lostWatchNote = ''
+while ($true) {
+    $watchAttempt++
+    $checks = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo)
+    $checks.Output | ForEach-Object { Write-Host $_ }
+
+    # ONE pair of reads, serving both remaining questions: which check governed the wait (#831, the
+    # line printed further down) and, on a failure, whether what failed is a check the ruleset
+    # requires (#943, the merge decision). Measured while writing this: `gh pr checks --json` returns
+    # exit 0 while reporting a failing check in its payload, so the STATE has to be read from the
+    # records -- which is why both reads ask for `bucket,state` and neither trusts its own exit code
+    # for the outcome.
+    #
+    # Still best-effort, and the invariant that mattered survives: an unreadable payload cannot turn a
+    # GREEN run red, because a green watch never consults the verdict at all. What it can do is leave a
+    # failing run refusing exactly as it did before this change -- Get-MergeBlockVerdict blocks on an
+    # unreadable required-check list rather than guessing, which is the conservative half of the fix.
+    # They no longer sit after the decision, because they are now part of it: a failing run that spends
+    # two gh calls is spending them on the verdict, not on a line nobody will read.
+    #
+    # INSIDE THE LOOP SINCE #1219, and that is where they were already going to be needed: the retry
+    # decision is made from this same payload, so reading it per attempt costs a dropped watch two gh
+    # calls and costs the ordinary run -- one attempt -- exactly what it cost before.
     $checkFactsJson = ''
     $requiredFactsJson = ''
+    try {
+        # `link` rides along for inbound #1044: it is the only field in this payload that names the
+        # Actions RUN behind a check, and the fact separating "the job never started" from "a check went
+        # red" lives on the run rather than on the check. It costs nothing on a green run -- the block
+        # that reads it is inside the refusal below.
+        $checkFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+            'pr', 'checks', "$pr", '--json', 'name,bucket,state,startedAt,completedAt,link', '--repo', $repo)
+        if ($checkFacts.ExitCode -eq 0) { $checkFactsJson = $checkFacts.Output -join "`n" }
+        # `--required` exits non-zero on a repo whose ruleset requires nothing, which is a legitimate state
+        # and not an error. For the wait report the label is then simply omitted rather than guessed; for
+        # the verdict it is the case that keeps refusing, since "requires nothing" and "the required checks
+        # have not reported" are indistinguishable from here.
+        $requiredFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+            'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
+        if ($requiredFacts.ExitCode -eq 0) { $requiredFactsJson = $requiredFacts.Output -join "`n" }
+    } catch {
+        $checkFactsJson = ''
+        $requiredFactsJson = ''
+    }
+
+    if ($checks.ExitCode -eq 0) { $lostWatchNote = ''; break }
+
+    # Best-effort, like every diagnostic on the refusal path below: a read that throws costs the retry
+    # and the sentence, never the refusal itself.
+    $lostWatchNote = ''
+    try { $lostWatchNote = Get-LostWatchNote -ChecksJson $checkFactsJson -PrNumber "$pr" } catch { $lostWatchNote = '' }
+    # Not a dropped watch: something really did fail, and the verdict below is about to say what.
+    if (-not $lostWatchNote) { break }
+    # It IS a dropped watch and there are no attempts left. The note survives the loop and the refusal
+    # prints it, so the operator still reads the right sentence instead of "Fix CI and re-run".
+    if ($watchAttempt -ge $maxWatchAttempts) { break }
+
+    Write-Host "ship-pr: the WATCH dropped, not the run -- re-entering the wait (attempt $($watchAttempt + 1) of $maxWatchAttempts)." -ForegroundColor DarkYellow
+    Write-Host "  $lostWatchNote" -ForegroundColor DarkGray
+    Start-Sleep -Seconds $PollSeconds
 }
+$waitedSec = [int][math]::Round(((Get-Date) - $waitBegan).TotalSeconds)
 
 if ($checks.ExitCode -ne 0) {
     $verdict = Get-MergeBlockVerdict -RequiredChecksJson $requiredFactsJson -ChecksJson $checkFactsJson
@@ -576,8 +667,15 @@ if ($checks.ExitCode -ne 0) {
             $stalled = @()
         }
 
+        # THREE WORDINGS, ONE VERDICT. The two below are #1044's; the middle one is #1219's, and the
+        # ordering is by construction rather than by preference -- a lost watch means nothing failed, so
+        # Get-FailedCheckRunIds found no run to ask about and $stalled is necessarily empty there. Any
+        # of the three can be reached with the merge still refused, which is the invariant all three
+        # were built under.
         if ($stalled.Count -gt 0) {
             Write-Error "CI never RAN for PR #$pr -- NOT merged: $($verdict.Reason). $($stalled -join ' ')"
+        } elseif ($lostWatchNote) {
+            Write-Error "CI is still RUNNING for PR #$pr -- NOT merged after $maxWatchAttempts watch attempts: $($verdict.Reason). $lostWatchNote"
         } else {
             Write-Error "CI did not pass for PR #$pr (exit $($checks.ExitCode)) -- NOT merged: $($verdict.Reason). Fix CI and re-run, or merge manually once green."
         }

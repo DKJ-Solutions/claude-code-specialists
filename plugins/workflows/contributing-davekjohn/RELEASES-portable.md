@@ -17,7 +17,7 @@ current version is read from the newest `vX.Y.Z` tag instead, exactly as the scr
 
 **How to read this page.** It travels with the plugin, so two conventions keep it true in every tree it
 lands in. *This repo* always names the **source repo** the page was written in
-([claude-code-specialists](https://github.com/DaveKJohn/claude-code-specialists)) — its measurements travel
+([claude-code-specialists](https://github.com/DKJ-Solutions/claude-code-specialists)) — its measurements travel
 as the evidence behind the rules, never as your repo's own record. And links into the source's script tree
 are **absolute** on purpose, so they resolve from wherever this page is read; files every adopting repo has
 of its own (`scripts/repo-config.ps1`, `CHANGELOG.md`, `releases/README.md`) are named in code rather than

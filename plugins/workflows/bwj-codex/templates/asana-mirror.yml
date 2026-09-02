@@ -1,10 +1,10 @@
 # Copied from bwj-codex/templates/asana-mirror.yml into .github/workflows/asana-mirror.yml.
 # Posts an update on the mirrored Asana task when its GitHub issue is closed (and the counterpart on
-# reopen), and moves that task to the board section its issue's state has reached. Plus a daily
-# reconciliation sweep (both directions) for missed events -- and for the three stages that have no
-# GitHub event at all, that sweep IS the mechanism rather than a backstop. It never completes a task
-# and never puts a card in the 'Completed' section -- the colleague who filed the ticket does both,
-# after testing. See bwj-codex/WORKFLOW-portable.md.
+# reopen), and moves that task to the board section its GitHub PROJECT STATUS names. Plus a daily
+# reconciliation sweep (both directions) for missed events -- and since a status changes with no
+# `issues:` event at all, that sweep IS the mechanism rather than a backstop. It never completes a
+# task and never puts a card in the 'Completed' section -- the colleague who filed the ticket does
+# both, after testing. See bwj-codex/WORKFLOW-portable.md.
 name: asana-mirror
 
 on:
@@ -45,6 +45,9 @@ jobs:
           ISSUE_REF: ${{ github.repository }}#${{ github.event.issue.number }}
           EVENT_ACTION: ${{ github.event.action }}
           GH_TOKEN: ${{ github.token }}
+          # The stage sweep reads the org project's Status field, which github.token cannot see at all.
+          # Absent, the staging goes quiet and says so; the close update is unaffected.
+          GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
         run: |
           ./.github/scripts/asana-mirror.ps1 `
             -Mode event `
@@ -59,5 +62,8 @@ jobs:
           ASANA_PAT: ${{ secrets.ASANA_PAT }}
           ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
           GH_TOKEN: ${{ github.token }}
+          # The stage sweep reads the org project's Status field, which github.token cannot see at all.
+          # Absent, the staging goes quiet and says so; the close update is unaffected.
+          GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
         run: |
           ./.github/scripts/asana-mirror.ps1 -Mode reconcile -Repo $env:GITHUB_REPOSITORY

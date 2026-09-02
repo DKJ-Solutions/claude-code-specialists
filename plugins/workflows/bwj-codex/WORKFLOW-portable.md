@@ -298,10 +298,10 @@ function Get-AsanaStageMap {
     return @{
         Requests       = 1   # the submitter's inbox -- never a target, though cards do leave it
         NeedsInfo      = 2   # blocked on the submitter -- driven by the label below
-        Filed          = 3   # the GitHub issue exists; nothing is being built yet
-        InDevelopment  = 4   # a branch is open -- the session's own hop, never derived by CI
-        InReview       = 5   # a pull request is open OR merged, and the issue is not closed yet
-        ReadyToTest    = 6   # the issue is closed as completed -- the submitter's turn
+        Filed          = 3   # project status Todo -- tracked on GitHub, nothing linked yet
+        InDevelopment  = 4   # project status In Progress -- a pull request is linked
+        InReview       = 5   # project status Done -- the issue is closed
+        ReadyToTest    = 6   # the submitter has been TOLD -- their turn; never moved OUT of
         Completed      = 7   # the submitter says it is good -- never a target, never moved OUT of
         NeedsInfoLabel = 'needs-info'
     }
@@ -320,49 +320,141 @@ for what just happened: a board that grows a column no longer has its cards yank
 old numbering meant. A repo that states no map at all gets the default above, and the run says which
 map it used.
 
+#### The three middle stages ARE the GitHub Project's three statuses
+
+**`Filed`, `InDevelopment` and `InReview` are linked to `Todo`, `In Progress` and `Done`, and are
+always in sync with them** (Dave, September 2, 2026). The project board's `Status` field is the
+**source**; the Asana board follows it. So the sweep reads that field instead of re-deriving the same
+answer from the issue and its pull requests:
+
+```powershell
+function Get-GithubStatusMap {
+    return @{
+        FieldName        = 'Status'
+        Statuses         = @{
+            'Todo'        = 'Filed'
+            'In Progress' = 'InDevelopment'
+            'Done'        = 'InReview'
+        }
+        # Where the submitter's name sits in the task notes. '' means stage 6 is never entered.
+        SubmitterPattern = ''
+    }
+}
+```
+
+**Why read it rather than derive it: GitHub already writes that field.** The project's own built-in
+workflows do it -- `Item added to project` sets `Todo`, `Pull request linked to issue` sets
+`In Progress`, `Item closed` sets `Done`. Deriving the same fact a second time in the sweep made
+**two writers of one thing**, which is a race and not a sync. Measured on the BWJ board the day this
+shipped: all 144 items carried a status, and every one of the 108 closed issues read `Done` -- so the
+field is maintained, and it is maintained by GitHub.
+
+**The status names are the keys because they are the board's, not ours.** A team that renames a column
+states that once here and nothing else changes. The *values* are stage keys of `Get-AsanaStageMap` and
+never section numbers, so renumbering the Asana board is still stated in one place too.
+
+**A status may only name those three stages, and `Test-GithubStatusMap` refuses a map that tries
+otherwise.** `Requests` and `Completed` are the submitter's ends, and `ReadyToTest` is reached by the
+feedback rule below -- a column change must never hand a card to somebody.
+
+**An issue with no status, or one in a column nobody has mapped, derives no stage at all** and its card
+is left where it is. That is the same containment as an unnamed Asana section: the answer to not
+knowing is to do nothing, because a missing status must never read as stage 0.
+
+**One thing does still come from the issue rather than the status: `closed as not planned`.**
+`Item closed` sets `Done` whatever the reason, so a ticket that will never be built arrives looking
+exactly like a finished one. It derives no stage, because nothing was built.
+
+#### `ReadyToTest` is entered on FEEDBACK, and no status can reach it
+
+**A card advances from `InReview` to `ReadyToTest` once the submitter has actually been told** (Dave,
+September 2, 2026) -- which is this workflow's own close update, the comment of step 4. Two things
+must hold: the issue is closed, and that comment is on the task. So the two columns say genuinely
+different things:
+
+- **`InReview`** -- closed on GitHub, and nobody has been told yet.
+- **`ReadyToTest`** -- the submitter has the update naming what was fixed, and it is their turn.
+
+**Where a ticket has no submitter, stage 6 is skipped entirely.** Nobody else asked for it, so there
+is nobody to hand it to: the card waits in `InReview` until the person who owns it accepts it into
+`Completed` themselves. `SubmitterPattern` is how a repo says where the submitter's name is written,
+and **`''` -- the default -- means this workflow can never tell, so the promotion never fires at all.**
+That is the fail-safe direction: a card held one column short is visible and a person can move it,
+where a card pushed into the submitter's column claims a handover that never happened.
+
+**`created_by` is NOT the submitter**, measured on the BWJ board the same day: the intake form creates
+every card as its own owner, so it reads identically on a colleague's request and on one filed by a
+session. The submitter is the name the form writes into the notes, and is added as a follower when the
+form can find them in Asana.
+
+**Being told is MEASURED, not assumed.** The close event posts the comment before it checks, so a card
+normally reaches `ReadyToTest` on the event itself; but the check reads the task's own comments, so a
+run whose comment failed does not hand the card over on the strength of having tried. The daily sweep
+catches those.
+
 #### The stages, and who moves a card into each
 
 | stage | what a card there means | who puts it there | on what signal |
 |---|---|---|---|
 | `Requests` | new, and nobody has looked at it yet -- a colleague put it on your name | the submitter | **never this workflow** |
 | `NeedsInfo` | we cannot proceed until the submitter answers something | the `needs-info` label | that label is on the issue |
-| `Filed` | it is tracked on GitHub now, where the work happens | [`report-issue`](skills/report-issue/SKILL.md), as it files | the issue exists |
-| `InDevelopment` | somebody is building it | the session at `new-branch` | **never derived by CI** -- see below |
-| `InReview` | a pull request is open, or merged and the issue not yet closed | the daily sweep | that pull request exists |
-| `ReadyToTest` | ready to test -- the submitter has the update naming what was fixed | the close event, and the daily sweep | the issue is closed **as completed** |
+| `Filed` | it is tracked on GitHub now, where the work happens | the daily sweep | project status **`Todo`** |
+| `InDevelopment` | somebody is building it | the daily sweep | project status **`In Progress`** |
+| `InReview` | closed on GitHub, and nobody has been told yet | the daily sweep | project status **`Done`** |
+| `ReadyToTest` | the submitter has the update naming what was fixed -- their turn | the close event, and the daily sweep | that update is **on the task**; skipped when there is no submitter |
 | `Completed` | the submitter has tested it and says it is good | the submitter | **never this workflow** |
 
 **The two ends of the board belong to the submitter, and the code says so and not only this page.**
-`Test-StageIsWritable` permits the five middle stages and nothing else, and a card already sitting in
-`Completed` is not moved at all. That is the *section-move twin* of the rule in step 4: closing an
-issue says the work is built, and only the person who asked for it can say it is good. A workflow that
-could slide a card into `Completed` would take that judgement and replace it with a guess -- in the
-board's own currency this time, but the same guess.
+`Test-StageIsWritable` permits the five middle stages and nothing else. That is the *section-move twin*
+of the rule in step 4: closing an issue says the work is built, and only the person who asked for it
+can say it is good. A workflow that could slide a card into `Completed` would take that judgement and
+replace it with a guess -- in the board's own currency this time, but the same guess.
 
-**`InReview` covers merged as well as open** (Dave, September 2, 2026). The board has no column for
-*"merged, but the issue is still open"*, and the gate holds either way: nothing but a **closed** issue
-puts a card in `ReadyToTest`, so the submitter is never asked to test something that is not finished.
-An issue **closed as not planned** derives no stage at all -- nothing was built, so there is nothing
-to test and the card stays where the team left it.
+#### And TWO stages are terminal, not just one
+
+**A card sitting in `ReadyToTest` or `Completed` is never moved out of it by this workflow** (Dave,
+September 2, 2026). Both mean the submitter is holding the card:
+
+> *"it is not the intention that if I drag a ticket to section 6, GitHub syncs it back to 5 later. Once
+> it is in six it does not just go back."*
+
+**This outranks even the reopen**, which everywhere else in this model earns a backward move. If the
+work turns out not to be done, the person holding the card moves it -- that is what holding it means,
+and having it pulled back out from under them by the next morning's sweep is the failure the rule
+names. `Test-StageIsTerminal` is the guard, and it is checked **before** the backward-move permission
+rather than after.
+
+**It is also the one place `always in sync` deliberately does not hold**, and it is worth saying which
+way: the Asana board may sit *ahead* of the GitHub status, never behind it. A closed issue reads `Done`
+forever, so a card in 6 or 7 keeps a status that would floor it at 5 -- and that is correct, because
+6 and 7 are answers GitHub has no column for at all.
 
 #### Forward only, and the two answers that may go back
 
-`Get-StageFloorForIssue` derives a **floor** from the issue's own state rather than a position,
-because CI can see a pull request and cannot see a branch: a card a session advanced to
-`InDevelopment` at `new-branch` must not be dragged back to `Filed` by a sweep that knows less than
-the session did. **So CI never derives `InDevelopment` at all** -- that stage is the one hop only a
-session can see, and forward-only is exactly what protects it.
+`Get-StageFloorForIssue` derives a **floor** from the project status rather than a position, and the
+difference is what keeps a person's own move safe: a card somebody advanced by hand is never dragged
+back by a sweep reading a column GitHub has no event to update. The concrete case is a branch open
+with no pull request yet -- GitHub sets nothing, so the status still reads `Todo`, which floors at
+`Filed`, which is **backward** from the `InDevelopment` the session moved the card to. Nothing moves.
+
+**That asymmetry is the deliberate exception to *always in sync***, and the alternative is worse:
+syncing it would mean undoing a person's own move on the strength of a column that has no way of
+knowing about it.
 
 **Two answers may move a card backward, and both are a person saying something** rather than CI
 inferring it:
 
-- **The `needs-info` label**, which *outranks the issue's own state*. A card blocked on the submitter
-  stays blocked whatever the branch and the pull request are doing, because the person who set the
-  label knows something the tracker does not. Removing the label hands the card straight back to its
-  state-derived floor -- which is forward, so it needs no permission. The label fires its own CI run
-  (`labeled` / `unlabeled`), so the column changes as the triage happens rather than a day later.
-- **An `issue reopened` event**, which is a real state change: the card lands wherever the issue now
-  is, which is out of the test column and back into the one the work is actually in.
+- **The `needs-info` label**, which *outranks the project status*. A card blocked on the submitter
+  stays blocked whatever the board says, because the person who set the label knows something the
+  tracker does not. Removing the label hands the card straight back to its status-derived floor --
+  which is forward, so it needs no permission. The label fires its own CI run (`labeled` /
+  `unlabeled`), so the column changes as the triage happens rather than a day later.
+- **An `issue reopened` event**, which is a real state change: the card lands wherever the board now
+  says it is, which is out of the review column and back into the one the work is actually in.
+
+**Both are outranked in turn by the terminal rule above.** A reopen moves a card back out of
+`InReview`; it does **not** reach into `ReadyToTest` or `Completed`, because those are not this
+workflow's to take back.
 
 **A label event moves the card and says nothing.** `closed` and `reopened` are news for the person
 waiting on the ticket; a label is a change in *our* state, and commenting on it would put a note on
@@ -370,25 +462,38 @@ the submitter's ticket every time somebody triaged the issue.
 
 #### The daily sweep is the mechanism, not a backstop
 
-For most of the writable stages there is no GitHub event this workflow subscribes to -- an issue is
-filed, a branch opens and a pull request merges without `issues: closed` ever firing. So unlike the
-reconciliation of step 4, sweep (d) is not a safety net for a missed webhook. Only `ReadyToTest` and
-`NeedsInfo` have events of their own, and they are the two that matter most to the submitter, which is
-why they are also the two that do not wait a day.
+**A project status changes with no `issues:` event at all** -- somebody drags a card to `In Progress`,
+or a built-in project workflow sets `Done` -- and this workflow subscribes to none of that. So unlike
+the reconciliation of step 4, sweep (d) is not a safety net for a missed webhook: for the three
+statuses it **is** the mechanism, and a column change shows up on the Asana board the next morning.
+Only the close, the reopen and the label have events of their own, and they are the ones that matter
+most to the submitter, which is why they are also the ones that do not wait a day.
 
-**What that costs at `InDevelopment`, said plainly:** GitHub has no reliable signal for *"a branch was
-opened"* in this workflow. `linkedBranches` answers only for a branch created through GitHub's own
-issue UI, and `contributing-davekjohn` branches are not. **So that hop is a session's to make**, and
-nothing catches it up -- a card left in `Filed` while a branch is open is the one inaccuracy this
-model tolerates, and it corrects itself the moment the pull request opens. A cross-reference is
-deliberately not read for this: a pull request that merely mentions an issue says nothing about
-whether anybody is building it.
+**What that costs at `InDevelopment`, said plainly:** GitHub sets `In Progress` when a pull request is
+*linked*, and nothing at all when a branch merely opens. `linkedBranches` answers only for a branch
+created through GitHub's own issue UI, and `contributing-davekjohn` branches are not. **So that hop is
+still a session's to make first**, and forward-only is what keeps it: a card left in `Filed` while a
+branch is open is the one inaccuracy this model tolerates, and it corrects itself the moment the pull
+request opens and the board says `In Progress`.
+
+**And the stage sweep needs its own token.** `GITHUB_TOKEN` cannot read an organization's Projects v2
+at all -- there is no `permissions:` key that grants it -- so with the workflow's own token the status
+comes back as an error rather than a value. That failure is **contained rather than fatal**: the query
+retries once without the project field, so the close update of step 4 goes out exactly as before and
+only the staging goes quiet, naming the missing token in the log. Set `GH_PROJECT_TOKEN` to a PAT that
+can read the org's projects to turn staging on.
 
 ### 7. What still needs a person
 
-- **Setup, once per repo:** the repo secret `ASANA_PAT`, the variable `ASANA_PROJECT_GID`, the four
-  prio labels of step 5 plus the `needs-info` label of step 6, and copying the two `templates/` files
-  into `.github/`. The [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
+- **Setup, once per repo:** the repo secrets `ASANA_PAT` and `GH_PROJECT_TOKEN`, the variable
+  `ASANA_PROJECT_GID`, the four prio labels of step 5 plus the `needs-info` label of step 6, and
+  copying the two `templates/` files into `.github/`. The
+  [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
+- **Naming the project board's three statuses, and where the submitter's name sits.** `Get-AsanaStageMap`
+  says which Asana section each stage is; `Get-GithubStatusMap` says which GitHub status each of the
+  three middle stages is, and carries `SubmitterPattern`. Leave that pattern out and stage 6 is never
+  entered automatically -- which is a working configuration, not a broken one, but it does mean every
+  card waits in `InReview` for a person.
 - **Numbering the board's sections, once, and stating what each number means.** Step 6 reads a stage
   off the number a section's name starts with, so a board whose sections are named in prose has no
   stages and nothing is ever moved on it. That is the safe default rather than a failure -- but it is
