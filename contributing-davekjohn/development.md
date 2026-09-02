@@ -1,4 +1,4 @@
-## Development: `docs/dropped-ship-cost-overstated-v1` · 20260902-200002
+## Development: `fix/gate-assert-errorrecord-wrap-v1` · 20260902-194808
 
 > **How this file is read.** A step is `- [ ]` until it is resolved -- `- [x]` done, or
 > `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.
@@ -33,46 +33,54 @@
 
 ### PLAN
 
-#### Context
+#### The report's reason was checked before the repair, and it holds
 
-Issue #1235. The folded DEPLOY entry for `fix/ship-pr-lost-watch-retry-v1` (PR #1233) overstates
-what a dropped ship costs: it claims *"a re-checkout of the branch plus a full local gate run --
-lint and every suite"*. `scripts/lib/gate-lib.ps1` keeps gate evidence keyed on the tree
-(`Test-GateEvidence`/`Save-GateEvidence`, `GateEvidenceMaxAgeMinutes = 240`), so a same-tree resume
-within four hours skips both gates -- the true, smaller cost is only the re-checkout step 2b (#1073)
-had just handed back to the trunk. The DEPLOY lock (#884) meant #1233 could not fix it in place;
-this is the ordinary `docs/` follow-up the issue prescribes.
+`$r6.Out` is a `Write-Error` from a child `powershell`, rendered by that child's host formatter and
+captured through `Invoke-NativeCapture` as separate lines. The wrap is therefore made in the child,
+before the pipe, at that console's width -- which is why the same message is green here and red on the
+reporting machine. Verified: the suite is 33 pass / 0 fail on this machine at the same commit where
+the report measured 32/1.
+
+#### One thing the report got too narrow, and it is filed rather than built
+
+#1242 argues against a shared helper because this is "the only assert in the tree that matches a bare
+token against an `ErrorRecord` rendering". True as written, but the class is any host-rendered stream:
+`prune-merged.tests.ps1:417` matches `HandBack` against a `Write-Warning` carrying two absolute paths.
+It has not bitten, so under "no pre-emptive fixes" it is named and left -- #1248.
 
 ### CREATE
 
-- [x] Replace the overstated clause in `contributing-davekjohn/CHANGELOG.md` (the
-  `fix/ship-pr-lost-watch-retry-v1` DEPLOY entry) with *"a re-checkout of the branch step 2b had
-  just left"* -- the wording the issue proposes. Nothing else in the entry changes.
+- [x] `round-tally.tests.ps1:209` -- rejoin the wrapped lines before matching, with the reason in a comment
+- [~] Promote the normalisation to `native-capture-lib.ps1` -- dropped: the second instance has not bitten, so it is filed as #1248 instead of built
+- [x] Trace the other bare-token asserts in the tree, so the "exactly two" claim in #1248 is measured rather than assumed
 
 ### TEST
 
-- [x] Verified against `scripts/lib/gate-lib.ps1` that the lint and test gates both skip on a
-  same-tree resume within `GateEvidenceMaxAgeMinutes` (240). No automated test -- prose-only
-  changelog correction.
+- [x] `round-tally.tests.ps1` -- 33 pass, 0 fail
+- [x] The normalisation proved against the exact wrapped string from the report: old assert `False`, new assert `True`
+- [x] And against an indented continuation, which the report's own newline-only proposal would miss: `True`
+- [~] A regression test that the assert survives a wrap -- dropped, and it is a real test gap: reproducing it means driving the child's console width, which tests the formatter rather than the counter. The comment at the assert is the durable record instead.
 
-### DEPLOY: `docs/dropped-ship-cost-overstated-v1`
+### DEPLOY: `fix/gate-assert-errorrecord-wrap-v1`
 
-The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
-costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
-a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
-ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
-trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+The local test gate no longer refuses a branch because of how long the operator's home directory is.
+`round-tally.tests.ps1` asserted that the "nothing to count" error names `-ColumnPattern` by matching
+the bare token against the child's rendered `ErrorRecord` -- and PowerShell 5.1 hard-wraps that
+rendering at the console width, mid-token, at a column that moves with the absolute paths the message
+carries. On a long enough home path the token split and the assert went red on a message that visibly
+contained it, blocking every PR while CI stayed green, because a runner's path is short. The wrapped
+lines are now rejoined before the match, since the property under test is that the message names the
+parameter and never that the formatter left the line whole.
 
-**Score:** 1
+**Score:** 3
 
 #### What makes this deploy extra special
 
-N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
-who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+N/A -- `scripts/tests/` is repo-owned and ships to no consumer; the suite this touches has no mirror in
+any plugin.
 
 **Score:** N/A
 
 #### Pull Request
 
-the lost-watch retry changelog entry no longer overstates a dropped ship's cost
-
+Rejoin the child formatter's hard wrap before the round-tally assert matches
