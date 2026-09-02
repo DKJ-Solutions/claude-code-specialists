@@ -9,7 +9,10 @@ name: asana-mirror
 
 on:
   issues:
-    types: [closed, reopened]
+    # closed/reopened comment AND move the card. labeled/unlabeled only move it: a label going on or
+    # off is a change in OUR state, and narrating it would comment on the submitter's ticket every
+    # time somebody triaged the issue. The script decides which of the two a given action is.
+    types: [closed, reopened, labeled, unlabeled]
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
@@ -32,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Update the task on issue close / reopen
+      - name: Update the task and stage the card on an issue event
         if: github.event_name == 'issues'
         shell: pwsh
         env:
