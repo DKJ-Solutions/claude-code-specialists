@@ -42,8 +42,9 @@
     More than one DIFFERENT task in matcher 3 is reported as 'ambiguous' and skipped: the script never
     guesses which ticket an issue belongs to. Add a marker to settle it.
 
-    Auth: -AsanaPat (from the ASANA_PAT secret). Project/workspace: -ProjectGid / -WorkspaceGid
-    (from the ASANA_PROJECT_GID / ASANA_WORKSPACE_GID variables). BOTH modes need `gh` on PATH with
+    Auth: -AsanaPat (from the ASANA_PAT secret). Project: -ProjectGid (from the ASANA_PROJECT_GID
+    variable), read by sweep (a) alone. There is deliberately NO workspace parameter: every call this
+    script makes addresses a task or a project by GID. BOTH modes need `gh` on PATH with
     GH_TOKEN set -- a close update asks GitHub which pull request closed the issue -- and sweep (b)
     additionally needs -Repo (GITHUB_REPOSITORY). Where `gh` cannot answer, the update still goes out
     and simply names no pull request.
@@ -76,8 +77,7 @@ param(
     [int]$SinceDays = 30,
 
     [string]$AsanaPat = $env:ASANA_PAT,
-    [string]$ProjectGid = $env:ASANA_PROJECT_GID,
-    [string]$WorkspaceGid = $env:ASANA_WORKSPACE_GID
+    [string]$ProjectGid = $env:ASANA_PROJECT_GID
 )
 
 $ErrorActionPreference = 'Stop'

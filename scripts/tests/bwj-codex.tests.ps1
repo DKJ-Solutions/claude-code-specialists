@@ -148,6 +148,15 @@ Assert-True (-not (Get-Command -Name 'Set-AsanaTaskCompleted'   -ErrorAction Sil
 Assert-True ($mirrorSrc -notmatch "completed\s*=\s*\`$(true|false)") 'the script never builds a completed=true/false payload'
 Assert-True ($mirrorSrc -notmatch "(?m)^\s*[^#]*-Method\s+PUT")      'the script issues no PUT at all -- the only write it knows is a comment'
 
+# THE CI HALF NEEDS NO WORKSPACE (#1210): every call it makes addresses a task or a project by GID,
+# so the parameter it used to declare had no reader, while the yml handed BOTH steps a variable
+# nothing consumed -- which reads as a possible cause the next time a sweep reports 0 updated.
+# Asserted over the source text and over the workflow, because this too is the absence of a thing.
+$mirrorYml = Get-Content -LiteralPath (Join-Path $PluginRoot 'templates\asana-mirror.yml') -Raw
+Assert-True ($mirrorSrc -notmatch 'WorkspaceGid')        'the script declares no workspace parameter'
+Assert-True ($mirrorYml -notmatch 'ASANA_WORKSPACE_GID') 'and the workflow hands neither step a workspace variable'
+Assert-True ($mirrorYml -match 'ASANA_PROJECT_GID')      'while the project variable it does read is still passed'
+
 # comment request -- the only write this script builds
 Assert-Throws { New-AsanaCommentRequest -Gid 'abc' -Text 'x' }             'New-AsanaCommentRequest throws on a non-numeric GID'
 Assert-Throws { New-AsanaCommentRequest -Gid '123; rm -rf /' -Text 'x' }   'and on a GID carrying a shell payload'

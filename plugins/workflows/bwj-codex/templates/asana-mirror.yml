@@ -33,7 +33,6 @@ jobs:
         env:
           ASANA_PAT: ${{ secrets.ASANA_PAT }}
           ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
-          ASANA_WORKSPACE_GID: ${{ vars.ASANA_WORKSPACE_GID }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_REF: ${{ github.repository }}#${{ github.event.issue.number }}
           EVENT_ACTION: ${{ github.event.action }}
@@ -51,7 +50,6 @@ jobs:
         env:
           ASANA_PAT: ${{ secrets.ASANA_PAT }}
           ASANA_PROJECT_GID: ${{ vars.ASANA_PROJECT_GID }}
-          ASANA_WORKSPACE_GID: ${{ vars.ASANA_WORKSPACE_GID }}
           GH_TOKEN: ${{ github.token }}
         run: |
           ./.github/scripts/asana-mirror.ps1 -Mode reconcile -Repo $env:GITHUB_REPOSITORY
