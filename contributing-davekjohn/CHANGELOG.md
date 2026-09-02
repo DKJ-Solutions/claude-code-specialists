@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/ticket-work-tracker-pickup-state-v1` · 20260902-150729
+
+The **Ticket work** section of `CONTRIBUTING-portable.md` modelled the tracker as something you only
+ever read from -- and the provenance-boundary rule stated that one-way flow as a premise. It said
+nothing about the one moment the flow reverses: when the ticket layer takes a request in, the source
+row moves on, and the person who filed it is watching that column, not the repo. An issue that exists
+while the source still says *new* reads, to the filer, as a request nobody picked up.
+
+New `#### 14. Taking a request in is a move the requester can see`: the source row advances **when the
+ticket document is created**, not at branch and not at ship; "automatically" is how the step gets
+described once it is habitual, with the 2026-09-02 measurement where a filed request left the board on
+its intake column and nothing moved it. Two answers are the consumer's -- which column pickup advances
+to, and which board when the request sits on several (advance only the board that tracks your delivery
+state; a requester's intake board still describes the request accurately after pickup). A clause in the
+structural rule keeps read-only from being misread as "never write to the source", and a row in
+**What your repo answers** carries the two questions.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A repo running the ticket layer against a host tracker now has the rule that pickup is a visible state
+change, and the two questions it has to answer -- which column, and which board when the request lives
+on more than one. The gap it closes is a silent one: the step is easy to skip because nothing prompted
+it, and the cost lands on the requester, who cannot see the repo and reads the un-advanced row as "not
+picked up". It is the pickup end of a symmetry whose close end some repos already run.
+
+**Score:** 3
+
+#### Pull Request
+
+ticket work: taking a request in is a move the requester can see
+
+Plugins: contributing-davekjohn
+
+[PR #1230](https://github.com/DaveKJohn/claude-code-specialists/pull/1230)
+
+---
+
 ### DEPLOY: `feat/asana-stage-map-seam-v1` · 20260902-140055
 
 The stage model shipped with its meanings written as literals, and the board it was written against
