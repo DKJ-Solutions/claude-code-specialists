@@ -32,6 +32,34 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/gate-assert-errorrecord-wrap-v1` · 20260902-204235
+
+The local test gate no longer refuses a branch because of how long the operator's home directory is.
+`round-tally.tests.ps1` asserted that the "nothing to count" error names `-ColumnPattern` by matching
+the bare token against the child's rendered `ErrorRecord` -- and PowerShell 5.1 hard-wraps that
+rendering at the console width, mid-token, at a column that moves with the absolute paths the message
+carries. On a long enough home path the token split and the assert went red on a message that visibly
+contained it, blocking every PR while CI stayed green, because a runner's path is short. The wrapped
+lines are now rejoined before the match, since the property under test is that the message names the
+parameter and never that the formatter left the line whole.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `scripts/tests/` is repo-owned and ships to no consumer; the suite this touches has no mirror in
+any plugin.
+
+**Score:** N/A
+
+#### Pull Request
+
+Rejoin the child formatter's hard wrap before the round-tally assert matches
+
+[PR #1249](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1249)
+
+---
+
 ### DEPLOY: `docs/dropped-ship-cost-overstated-v1` · 20260902-201709
 
 The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
