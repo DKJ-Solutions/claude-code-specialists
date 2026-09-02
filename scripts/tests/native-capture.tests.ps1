@@ -263,35 +263,70 @@ try {
     # never launch, and the survival assert would pass for the wrong reason. -File plus parameters means
     # the only quoting that has to be right is ConvertTo-NativeArgumentToken's, which is under test
     # sixty lines above.
-    $started  = Join-Path $sandbox 'grandchild-started.txt'
-    $survived = Join-Path $sandbox 'grandchild-survived.txt'
-
+    # ONE SANDBOX PATH PER ATTEMPT (see the retry note below): a kill is ALLOWED to fail, so a
+    # grandchild that outlived its attempt must not be able to write into the next attempt's markers
+    # and vouch for a launch that did not happen.
     $gcScript = Join-Path $sandbox 'grandchild.ps1'
     Set-Content -LiteralPath $gcScript -Encoding Ascii -Value @(
-        'param([string]$Started, [string]$Survived)'
+        'param([string]$Started, [string]$Survived, [int]$Sleep)'
         'Set-Content -LiteralPath $Started -Value started'
-        'Start-Sleep -Seconds 6'
+        'Start-Sleep -Seconds $Sleep'
         'Set-Content -LiteralPath $Survived -Value survived'
     )
 
     # The outer quotes the grandchild's arguments itself, for the same Start-Process reason.
     $outerScript = Join-Path $sandbox 'grandchild-parent.ps1'
     Set-Content -LiteralPath $outerScript -Encoding Ascii -Value @(
-        'param([string]$Child, [string]$Started, [string]$Survived)'
+        'param([string]$Child, [string]$Started, [string]$Survived, [int]$Sleep, [int]$Stall)'
         '$quoted = @($Child, $Started, $Survived) | ForEach-Object { ''"'' + $_ + ''"'' }'
-        'Start-Process -FilePath powershell -NoNewWindow -ArgumentList (@(''-NoProfile'', ''-ExecutionPolicy'', ''Bypass'', ''-File'') + $quoted)'
-        'Start-Sleep -Seconds 30'
+        'Start-Process -FilePath powershell -NoNewWindow -ArgumentList (@(''-NoProfile'', ''-ExecutionPolicy'', ''Bypass'', ''-File'') + $quoted + @("$Sleep"))'
+        'Start-Sleep -Seconds $Stall'
     )
 
-    $tree = Invoke-NativeCapture -FilePath 'powershell' -Arguments @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $outerScript, $gcScript, $started, $survived
-    ) -TimeoutSeconds 3
+    # THE BOUND HAS TO COVER TWO COLD POWERSHELL 5.1 STARTUPS BEFORE THE GRANDCHILD CAN WRITE ITS
+    # MARKER, and on a loaded machine 3s does not (issue #1232). Measured here on 18 cores, launch to
+    # marker: 0.52s idle, 0.58s at half the cores busy, 2.67s with every core busy, 9.68s at twice
+    # that -- so the failure arrives exactly when this suite is run the way it is meant to be run, in
+    # a 58-suite sweep. The two startups split it roughly in half, and the OUTER half alone (4.6s at
+    # twice the cores) already overruns 3s, so making only the grandchild cheaper would not settle it.
+    #
+    # POLLING FOR THE MARKER AFTER THE RUN RETURNS CANNOT WORK, which is worth stating because it is
+    # the obvious repair: Stop-NativeProcessTree kills with taskkill /T, the grandchild is inside that
+    # tree, and whether it wrote its marker is therefore settled AT kill time and never changes after.
+    #
+    # SO THE ATTEMPT IS REPEATED WITH A WIDER BOUND. An unloaded machine passes the first one and pays
+    # what this fixture always paid; a loaded one re-runs the fixture instead of reporting a failure
+    # of the code under test. A run where even the wide bound cannot get the grandchild up still
+    # FAILS -- the gate keeps a verdict that means something, and by then the machine is the finding.
+    #
+    # The two derived numbers, per attempt. The grandchild must outlive the kill, so it sleeps
+    # bound + 3. A SURVIVOR must have had time to write its second marker before that marker is
+    # checked, so the wait after the run is bound + 6. At the first bound those are 6 and 9 -- the
+    # numbers this fixture has used since it was written.
+    $tree     = $null
+    $started  = $null
+    $survived = $null
+    $afterRun = 0
+    foreach ($bound in 3, 12) {
+        $started  = Join-Path $sandbox "grandchild-started-$bound.txt"
+        $survived = Join-Path $sandbox "grandchild-survived-$bound.txt"
+        $afterRun = $bound + 6
+
+        $tree = Invoke-NativeCapture -FilePath 'powershell' -Arguments @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $outerScript,
+            $gcScript, $started, $survived, "$($bound + 3)", "$($bound + 30)"
+        ) -TimeoutSeconds $bound
+
+        if (Test-Path -LiteralPath $started) { break }
+        Write-Host "  the grandchild did not launch inside ${bound}s -- loaded machine, retrying wider" -ForegroundColor DarkYellow
+    }
+
     Assert-True $tree.TimedOut 'the fixture stalled as intended, so the kill under test actually ran'
     Assert-True (Test-Path -LiteralPath $started) 'the grandchild really launched -- without this the next assert could not fail'
 
-    # Long enough that a SURVIVING grandchild would have written its second marker (it sleeps 6s from a
-    # start that precedes the 3s bound), with margin for a loaded machine.
-    Start-Sleep -Seconds 9
+    # Long enough that a SURVIVING grandchild would have written its second marker (it sleeps from a
+    # start that precedes the bound), with margin for a loaded machine.
+    Start-Sleep -Seconds $afterRun
     Assert-True (-not (Test-Path -LiteralPath $survived)) 'the grandchild was killed with its parent -- taskkill /T, not Stop-Process'
 
     # ---------------------------------------------------------------------------------------------
