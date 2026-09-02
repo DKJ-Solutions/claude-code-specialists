@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/ruleset-bypass-dropped-by-transfer-v1` · 20260902-212249
+
+Four documents stop claiming a bypass list that no longer exists. The org transfer carried the
+`main-ci-gate` ruleset across intact and dropped only its bypass actors, so a ruleset that reports
+`active` reads as a clean bill of health while the one array all three direct-on-`main` exceptions run
+on is empty. The system-administration lens said the list "keeps the direct fold/release commits
+possible", the release lens said the cut's push "bypasses the required check", the language rule said a
+field-by-field re-check found the bypass actors unchanged, and the three readings behind "the App is
+NOT in the bypass list" no longer reproduce. Each is now corrected or dated, with the measured
+consequence written down beside it: a blocked fold leaves a live branch document on the trunk, and
+because that path is fixed by design every subsequent PR then conflicts on it -- where the intuitive
+resolution destroys another branch's unfolded changelog entry.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- all four documents are repo-owned. The lenses and `.claude/rules/` do not travel to a consumer,
+and the portable manuals are deliberately untouched: repo settings are not in their scope.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct the ruleset bypass claims the org transfer made untrue
+
+[PR #1257](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1257)
+
+---
+
 ### DEPLOY: `fix/missing-suite-note-escalation-v1` · 20260902-210200
 
 When `ship-pr` refuses because no check suite exists, it now names the one cause that is checkable
