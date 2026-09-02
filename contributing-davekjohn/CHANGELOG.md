@@ -32,6 +32,68 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/tracker-native-ticket-fields-v1` · 20260902-103815
+
+The ticket-work layer gains the one rule it was missing for a consumer whose tickets live in a tracker
+rather than in a folder: **what the tracker you host already owns natively is not written a second time
+in the body.** The section was written for a ticket that is a file and reads that way -- measured over
+its 290 lines, **16 uses of `file`/`files`, 3 of `index`, and 0 of `title`** -- so nothing in it ever
+prompted the reader to ask *which of these does my tracker already carry?*
+
+A new subsection sits between the structural rule and the rules, where it is read before any rule is
+applied. It does the whole job in one sentence -- *read `file` as `the ticket`, wherever yours lives* --
+rather than sweeping sixteen occurrences out of 290 lines that were each measured in their current
+wording. Then it names what a host tracker typically owns and what that does to the rules: the **title**
+(the body does not open by repeating it), the **list** (that *is* rule 10's index, so you have one
+whether or not you asked for one), and the **author and creation date** (which record who transcribed
+the ticket, never who filed the request -- so the snapshot half stays written down). **Rule 7's state
+field is named as the one that reads as a duplicate and is not**: open/closed is two values, and a
+vocabulary that is closed *and* covers every stage cannot be two values.
+
+**The distinction the passage is built on is which of two trackers is meant.** The section already
+assumes a **source** tracker -- somebody else's, the one the request came out of -- and the provenance
+boundary exists to date what is copied from it. The new rule is about the **host**, where your own ticket
+sits. Stated without that separation it reads as licence to delete the snapshot the structural rule
+exists to protect, which is the opposite of what that rule says.
+
+**What your repo answers** picks up the same seam: the folder row now covers a tracker row too, the index
+row says a host tracker hands you one whether or not you wanted it, and a new row asks which fields yours
+already owns.
+
+**Deliberately not here:** a template or a scaffolder, both of which [What deliberately is not
+here](../plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md#what-deliberately-is-not-here)
+declines and inbound [#1216](https://github.com/DaveKJohn/claude-code-specialists/issues/1216) explicitly
+did not reopen. The ask was one rule, not a shape.
+
+**Score:** 1
+
+The rule is inert here -- this repo consumes the workflow but runs no ticket layer, so nothing a
+maintainer does today changes. What it prevents is the repair that was available instead: answering the
+next report of this class by sweeping `file` out of 290 lines whose wording is the record of five rounds
+against six real tickets.
+
+#### What makes this deploy extra special
+
+A consumer adopting the ticket layer against a tracker rather than a folder is now told, before they
+reach the first rule, which fields they are about to write down twice -- and which one only looks like a
+duplicate. Measured in the originating repo on 2026-09-02, after its eleven ticket files were moved
+verbatim into its tracker: **12 of 12 carried their title twice.** The twelfth of those was not migration
+residue -- it was written from this page, from the rules, and the page did not prompt the question. That
+is the rediscovery the next repo no longer has to pay for, which is the whole argument for the section
+being portable at all.
+
+**Score:** 3
+
+#### Pull Request
+
+the ticket-work section names what a host tracker already owns
+
+Plugins: contributing-davekjohn
+
+[PR #1218](https://github.com/DaveKJohn/claude-code-specialists/pull/1218)
+
+---
+
 ### DEPLOY: `docs/prio-label-workspace-limit-v1` · 20260902-100854
 
 Step 5 of the BWJ workflow page now states the limit that decides whether the prio labels reach
