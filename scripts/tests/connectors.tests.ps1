@@ -593,7 +593,7 @@ try {
     #     wrong story -- its entry simply lists fewer lenses than the repo holds. The check emits the
     #     line only about the repo the session is in, so the hook can surface it unconditionally.
     $stub = New-StubWorkshop -Name 'stub-inventory' -ExitCode 0 -OutputLines @(
-        "  [INFO]  DaveKJohn/claude-code-specialists / team-alpha@claude-code-specialists: extension '04-11' exists in the consumer but is not in the register -- update the register or review the change.",
+        "  [INFO]  DKJ-Solutions/claude-code-specialists / team-alpha@claude-code-specialists: extension '04-11' exists in the consumer but is not in the register -- update the register or review the change.",
         "  [INVENTORY] this repo has 1 lens(es) that its own entry in the connector register does not list (04-11) -- add them to the 'extensions' array in claude-code-specialists.json, in the same change that landed the lens. Nothing is broken: the register's view of this repo is simply behind reality.",
         'Summary: 0 error(s), 1 info signal(s).'
     )

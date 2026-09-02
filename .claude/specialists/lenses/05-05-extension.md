@@ -413,7 +413,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 
 ### Tooling & account
 
-- **GitHub CLI (`gh`)** is used for PRs. This repo lives under **`DaveKJohn`** and is
+- **GitHub CLI (`gh`)** is used for PRs. This repo lives under the **`DKJ-Solutions`** org and is
   **public** — a deliberate choice, so the remote `github` marketplace source can be read without gh auth.
   If you get `Repository not found`, first run `gh auth setup-git`.
 - This repo is **public**: nothing confidential belongs in it (no personal information, credentials,
@@ -485,5 +485,5 @@ remains [Rendall #06](05-06-extension.md)'s tool, run on `main` after the merge.
 GitHub chore? Derek builds a script for it.
 
 In short: the **how** (branching, PRs, merging, cleanup, automation) is portable; the **what** (this
-prefix table, the `scripts/release/*` pipeline with the plugin lint gate, the public `DaveKJohn` repo,
+prefix table, the `scripts/release/*` pipeline with the plugin lint gate, the public `DKJ-Solutions` repo,
 and the fold exception) belongs to this repo.

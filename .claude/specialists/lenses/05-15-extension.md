@@ -90,10 +90,40 @@ infrastructure.
   cost half the box. Since July 15, 2026, the repo ruleset
   **`main-ci-gate`** (renamed from `main-ci-poort` by Dave on July 26, 2026; found at GitHub →
   Settings → Rules) enforces that gate as a **required status check**: a PR to `main` only merges
-  on a green `lint-en-tests` job. The bypass list (Repository admin + the Write role, "Always
-  allow") keeps the direct fold/release commits on `main` possible — the work account `davekokbwj`
-  has write rights, not admin. That Write bypass is safe as long as there are no external
-  collaborators and must be revisited as soon as there are.
+  on a green `lint-en-tests` job. The bypass list is what keeps the direct fold/release commits on
+  `main` possible, and it is not a convenience: a required status check **cannot** be satisfied by a
+  direct push, because the check has to be green before the push is accepted and a push is what would
+  trigger it. Until September 2, 2026 it held *Repository admin + the Write role, "Always allow"* —
+  the work account `davekokbwj` has write rights, not admin — and that Write bypass is safe as long
+  as there are no external collaborators, to be revisited as soon as there are.
+
+  **THAT LIST IS EMPTY RIGHT NOW, AND THE TRANSFER IS WHY** (September 2, 2026,
+  [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244)). Moving the repo into
+  the `DKJ-Solutions` org carried the ruleset across **intact** — active, `~DEFAULT_BRANCH`,
+  `deletion` + `non_fast_forward` + `required_status_checks` on `lint-en-tests` — and dropped only its
+  bypass list: `bypass_actors: null`, `current_user_can_bypass: never`, which means nobody can push to
+  `main` directly, `DaveKJohn` as repo admin included. All three direct-on-`main` exceptions are dead
+  until Dave restores it at Settings → Rules → `main-ci-gate` → Bypass list.
+
+  **It does not stop at the three exceptions — it blocks MERGES too, by a chain reaction**, and that is
+  the part worth reading before anybody concludes the damage is bounded. A PR still merges; its fold
+  cannot push; so `contributing-davekjohn/development.md` **stays on `origin/main`**. That path is fixed
+  by design — the design's safety argument being that the fold removes it at the merge — so the trunk
+  now carries a live branch document, every open branch has its own file at that same path, and every
+  subsequent PR conflicts on it. The conflict is not cosmetic: resolving it in favour of the incoming
+  branch **destroys an unfolded DEPLOY entry**, which is the only copy of that change's changelog text.
+  Measured the same evening on PR #1249, where the trunk's conflicting file turned out to belong to
+  PR #1250 and `deleted by us` meant *"our fold deleted a different document at the same path"*. It was
+  untangled by keeping theirs, running #1250's pending fold, and letting both held folds ride out
+  through the open PR — a workaround, since the trunk carries the next branch's document the moment
+  that PR merges.
+
+  **The generalisable half, beside the one below it: a setting that is present and active is not proof
+  that the thing you depend on inside it survived.** [#1239](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1239)
+  made *"does `main-ci-gate` still exist"* the post-transfer check, and it existed — enforcement, target,
+  rules and required check all unchanged. What does not survive a transfer is the **sub-field**, and a
+  ruleset reporting `active` reads as a clean bill of health while the one array the fold model runs on
+  is gone. So check the field you actually rely on, not the object that contains it.
 - **`.github/workflows/claude.yml` + `.github/workflows/claude-code-review.yml`** — the two Claude Code
   workflows, added August 14, 2026 via
   [PR #658](https://github.com/DaveKJohn/claude-code-specialists/pull/658). The first answers an
@@ -127,7 +157,13 @@ infrastructure.
   14, 2026). The question decides whether that App token can reach the trunk past the required check, and
   the REST endpoints all refuse: `bypass_actors` is returned to admins only, and the work account
   `davekokbwj` has `admin: false, maintain: false, push: true`. It was answered anyway, from three
-  measurements that survive a redacted field:
+  measurements that survive a redacted field.
+
+  **All three readings below are from before the transfer and none of them reproduces today** — the list
+  is empty, so `bypass_actors` is `null` rather than two redacted nodes, `current_user_can_bypass` reads
+  `never` rather than `always`, and `updated_at` is the transfer's own stamp. The conclusion still holds
+  trivially (an empty list names no App), and **the method is what this entry is for**: it is how a
+  question about a field you cannot read gets answered instead of guessed at.
   - **GraphQL redacts the entries but not the array.** `repository.rulesets.bypassActors` came back as
     `nodes: [null, null]` — the contents are hidden from a non-admin, the **count** is not. Exactly two
     actors.
@@ -313,7 +349,7 @@ infrastructure.
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
   it in isolation — mirroring the `release-lib` setup. **Never edit between the sentinels by hand.**
 - **`.claude/settings.json`** — this repo's harness config: the `extraKnownMarketplaces` (the
-  `github` source `DaveKJohn/claude-code-specialists`) and `enabledPlugins` with which the repo enables
+  `github` source `DKJ-Solutions/claude-code-specialists`) and `enabledPlugins` with which the repo enables
   its own `team-alpha` plugin (the core team).
 - **The manifests** `.claude-plugin/marketplace.json` and every `<plugin>/.claude-plugin/plugin.json`
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with

@@ -97,7 +97,7 @@ path as the only remaining move. The two SessionStart hooks, `adopt-config.ps1` 
 
 ```jsonc
 "extraKnownMarketplaces": {
-  "claude-code-specialists": { "source": { "source": "github", "repo": "DaveKJohn/claude-code-specialists" } }
+  "claude-code-specialists": { "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" } }
 },
 "enabledPlugins": {
   "team-alpha@claude-code-specialists": true
@@ -341,7 +341,7 @@ clone, not about your payload. It is honest about what is knowable here.
 **To identify the release, ask the source rather than the cache** — the tags live there:
 
 ```powershell
-gh api repos/DaveKJohn/claude-code-specialists/tags --jq '.[] | select(.name=="v3.0.9") | .commit.sha'
+gh api repos/DKJ-Solutions/claude-code-specialists/tags --jq '.[] | select(.name=="v3.0.9") | .commit.sha'
 ```
 
 That route has no peeling problem to worry about: the API's `.commit.sha` is the commit already, annotated

@@ -24,7 +24,7 @@
 #>
 
 # The GitHub repo where this workshop lives (owner/name). Single place this is stated.
-$script:RepoName = 'DaveKJohn/claude-code-specialists'
+$script:RepoName = 'DKJ-Solutions/claude-code-specialists'
 
 function Get-RepoName {
     <# owner/name of this repo, e.g. for `gh ... --repo`. #>
