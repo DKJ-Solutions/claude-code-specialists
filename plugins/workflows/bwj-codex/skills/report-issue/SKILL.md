@@ -5,11 +5,11 @@ description: >-
   its issue type and the `tier-1` reach label), then a colleague-facing Asana task, cross-linked both
   ways. Use this in BWJ-ecommerce/smartwatchbanden or BWJ-ecommerce/xoxowildhearts whenever a real
   finding needs tracking: a bug, a broken customer-facing behaviour, a stale doc, a decision that is
-  not yours to make. The Asana card lands in the board's stage-2 section -- tracked on GitHub now --
+  not yours to make. The Asana card lands in the board's `Filed` section -- tracked on GitHub now --
   because the board's sections are the cycle's stages. The GitHub issue always gets created
   even if Asana is unreachable, so the source-of-truth guarantee holds. Nothing here resolves a ticket
   and nothing downstream does either: closing the GitHub issue only makes the asana-mirror CI workflow
-  post an update saying the work is ready to test and move the card to stage 5, and the colleague who
+  post an update saying the work is ready to test and move the card to `ReadyToTest`, and the colleague who
   filed it ticks it off.
 ---
 
@@ -77,18 +77,19 @@ Tracked on GitHub: <issue URL>
 Create it in the project `Get-AsanaProjectGid` names, in the workspace `Get-AsanaWorkspaceGid`
 names, via the Asana MCP `create task` tool. Note the task GID and URL.
 
-**Put it straight into the section whose name starts with `2.`** -- the board's sections are the
-cycle's stages, and stage 2 means *tracked on GitHub now*. Read the project's sections, take the one
-numbered 2, and pass it as the task's section on creation; the words after the number are the team's
-and tell you nothing, so match on the **number** only.
-[Step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-six-stages)
+**Put it straight into the `Filed` section** -- the board's sections are the cycle's stages, and
+`Filed` means *tracked on GitHub now*. Read `Get-AsanaStageMap` from `scripts/repo-config.ps1` for the
+section **number** that stage is (leave it unset and the default is `3`), then read the project's
+sections and take the one whose name starts with that number. The words after the number are the
+team's and tell you nothing, so match on the **number** only.
+[Step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
 has the whole stage model. **If the project has no numbered sections, place nothing and say so** --
 that board is not a pipeline, and the daily sweep will not move this card either.
 
 **On a ticket that came the other way** -- filed in Asana by a colleague and copied into an issue for
-analysis -- the task already exists and is sitting in stage 1, their untriaged inbox. Filing the
-GitHub issue is exactly what stage 2 records, so **move that card to the `2.` section** rather than
-creating a second task. Leaving it in 1 is the failure inbound
+analysis -- the task already exists and is sitting in `Requests`, their untriaged inbox. Filing the
+GitHub issue is exactly what `Filed` records, so **move that card there** rather than
+creating a second task. Leaving it in `Requests` is the failure inbound
 [#1217](https://github.com/DaveKJohn/claude-code-specialists/issues/1217) measured: the issue existed
 and the board still read `New`, so to the colleague waiting on it the request looked untouched, and
 they chased it in the one place that had no answer.
@@ -115,17 +116,23 @@ stop. The issue can be mirrored later by re-running this skill's steps 2-3.
 
 Give both URLs and stop. **Do not resolve anything, and do not promise that anything else will.**
 When the GitHub issue is closed, the `asana-mirror` CI workflow posts an update on the Asana task
-saying the work is ready to test and moves the card to stage 5; the task stays open until the
+saying the work is ready to test and moves the card to `ReadyToTest`; the task stays open until the
 colleague who filed it ticks it off. Nothing in this chain -- not you, not the CI -- completes a task,
-and nothing puts a card in stage 6 either.
+and nothing puts a card in `Completed` either.
 
 **Say which section the card is in**, alongside the two URLs. It is the half a colleague can see
 without a GitHub account, and it is the one part of this run somebody may need to correct.
 
-**And when a branch is opened for this issue, the card moves to the `3.` section in the same
-breath.** That hop is a session's to make: GitHub has no signal for a branch that has no pull request
-behind it yet, so the daily sweep cannot see the work start. Nothing undoes the move -- the sweep
-derives a floor, never a position.
+**And when a branch is opened for this issue, the card moves to `InDevelopment` in the same breath.**
+That hop is a session's to make and **nothing catches it up**: GitHub has no signal for a branch with
+no pull request behind it, so the sweep never derives that stage at all. Nothing undoes the move
+either -- the sweep derives a floor, never a position.
+
+**A ticket blocked on the person who filed it gets the `needs-info` label**, and that is the whole
+mechanism for the board's blocked column -- the label fires its own CI run, so the card moves as you
+triage. Take the label off when the answer arrives and the card returns to wherever the work actually
+is. Do not move that card by hand: the label is what the column is derived from, so a hand-move is
+undone on the next sweep while the label stays.
 
 **Name the type and the tier you chose, and why.** You infer both rather than asking for them -- the
 reach question is answerable from the finding itself, and the whole backfill of 135 issues was

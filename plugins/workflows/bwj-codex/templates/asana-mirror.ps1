@@ -14,12 +14,22 @@
     not written anywhere in it.
 
     THE SECTION MOVE IS THAT SAME GUARANTEE IN THE BOARD'S OWN CURRENCY, so it carries its own
-    ceiling: only stages 2 to 5 are ever written. Stage 6 is 'Completed' and stage 1 is the
-    requester's untriaged inbox -- Test-StageIsWritable is the pure guard that says so, and a card
-    already sitting in 6 is not moved at all. Every move is FORWARD, so a card a session advanced by
-    hand is never dragged back by a sweep that can see less than the session could; the one exception
-    is the reopen event, which is a real state change and lands the card wherever the issue's own
-    state now puts it.
+    ceiling: the two ends of the board are never written. 'Requests' is the submitter's untriaged
+    inbox and 'Completed' is their verdict that the work is good -- Test-StageIsWritable is the pure
+    guard that says so, and a card already sitting in Completed is not moved at all.
+
+    WHICH NUMBERED SECTION EACH STAGE IS comes from the repo, not from this file: Get-AsanaStageMap in
+    scripts/repo-config.ps1, with Get-DefaultAsanaStageMap as the fallback. That seam exists because
+    the meanings were literals here for exactly one afternoon (September 2, 2026) and the board they
+    were written against grew a section the same day, shifting every stage above it by one. Nothing
+    failed loudly; every card would have been filed a column early. A section the map does not name is
+    now a hold -- not a target, and not a source.
+
+    MOVES ARE FORWARD, so a card a session advanced by hand is never dragged back by a sweep that can
+    see less than the session could. Exactly two answers may go backward, and both are a person
+    saying something rather than CI inferring it: the needs-info label, which declares the work
+    blocked on the submitter and outranks whatever the branch and the pull request are doing, and the
+    reopen event, which is a real state change.
 
     The one thing it writes OUTSIDE Asana is a prio label on a GitHub issue -- sweep (c) below. That
     is a different system and a different claim, and it leaves the guarantee above exactly where it
@@ -27,14 +37,18 @@
 
     Two modes:
 
-      -Mode event      One issue changed. -Event is 'closed' or 'reopened'; -IssueBody is the issue
-                       body (the Asana task is resolved from it, see below); -IssueRef is
-                       'owner/repo#n'. Both events post a comment: 'closed' names the pull request(s)
-                       that closed the issue and says the work is ready to test, 'reopened' says to
-                       hold off. An event ALWAYS comments -- it is a real state change, and a second
-                       close after a reopen is news again. Both then move the card to the stage the
-                       issue's state has reached: 5 on a close as completed, and on a reopen whatever
-                       the issue is now (the only backward move in this script).
+      -Mode event      One issue changed. -Event is 'closed', 'reopened', 'labeled' or 'unlabeled';
+                       -IssueBody is the issue body (the Asana task is resolved from it, see below);
+                       -IssueRef is 'owner/repo#n'.
+
+                       'closed' and 'reopened' COMMENT and move the card. The comment on 'closed'
+                       names the pull request(s) that closed the issue and says the work is ready to
+                       test; 'reopened' says to hold off. Neither de-duplicates -- an event is a real
+                       state change, and a second close after a reopen is news again.
+
+                       'labeled' and 'unlabeled' ONLY move the card, deliberately: a label going on
+                       or off is a change in our state, and narrating it would put a comment on the
+                       submitter's ticket every time somebody triaged the issue.
 
       -Mode reconcile  Four sweeps, for events that never arrived, and the only place de-duplication
                        applies:
@@ -92,10 +106,12 @@
 
     The pure helpers (Resolve-AsanaTaskRef, Get-AsanaTaskGid, Get-AsanaGidsFromText,
     New-MirrorComment, Get-MirrorCommentMarker, New-AsanaCommentRequest, Get-IssueRefFromNotes,
-    Get-StageFromSectionName, Select-StageMembership, Get-StageFloorForIssue, Test-StageIsWritable,
-    New-AsanaSectionMoveRequest) take no network and are what the source repo's
-    scripts/tests/bwj-codex.tests.ps1 exercises. The script runs its main flow only when invoked
-    directly; dot-sourcing it loads the helpers and does nothing else.
+    Get-StageFromSectionName, Select-StageMembership, Get-DefaultAsanaStageMap, Get-StageMapNumbers,
+    Get-WritableStages, Test-StageIsWritable, Test-AsanaStageMap, Get-StageFloorForIssue,
+    Resolve-TargetStage, New-AsanaSectionMoveRequest) take no network and are what the source repo's
+    scripts/tests/bwj-codex.tests.ps1 exercises -- including against a board numbered some other way,
+    so the map cannot quietly become decoration over literals. The script runs its main flow only when
+    invoked directly; dot-sourcing it loads the helpers and does nothing else.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -104,7 +120,8 @@ param(
     [ValidateSet('event', 'reconcile')]
     [string]$Mode = 'event',
 
-    [ValidateSet('closed', 'reopened')]
+    # 'closed' and 'reopened' comment AND move the card; 'labeled'/'unlabeled' only move it.
+    [ValidateSet('closed', 'reopened', 'labeled', 'unlabeled')]
     [string]$Event = 'closed',
 
     [string]$IssueBody = '',
@@ -120,7 +137,11 @@ param(
     # The Asana number field the prio label is read from, by NAME: its GID differs per workspace, so
     # a name needs no repo variable of its own. A rename does not fail silently -- the label sweep
     # prints how many issues carried a score, and a sudden 0 there is the signal.
-    [string]$PrioFieldName = 'Prio-Score'
+    [string]$PrioFieldName = 'Prio-Score',
+
+    # Where to look for scripts/repo-config.ps1, whose Get-AsanaStageMap states which numbered
+    # section each stage of the cycle is. Defaults to the checkout the workflow runs in.
+    [string]$RepoRoot = '.'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -132,10 +153,8 @@ $script:AsanaApiBase = 'https://app.asana.com/api/1.0'
 # mapping helper and the enforcer cannot drift apart.
 $script:PrioLabels = @('very low', 'low', 'high', 'very high')
 
-# The stages this script is allowed to write, low to high. The board has six sections; 1 is the
-# requester's untriaged inbox and 6 is 'Completed', and both are theirs to fill. Named here rather
-# than inline so Test-StageIsWritable and the derivation cannot drift apart.
-$script:WritableStages = @(2, 3, 4, 5)
+# The stage map, resolved once per run from the repo's own seam -- see Resolve-AsanaStageMap.
+$script:StageMap = $null
 
 # Stage -> section-GID map per project, filled on first use. A sweep over fifty issues on one board
 # asks Asana for that board's sections once.
@@ -327,20 +346,145 @@ function Get-StageFromSectionName {
     return [int]$m.Groups[1].Value
 }
 
+function Get-DefaultAsanaStageMap {
+    <#
+        Which numbered section each stage of the cycle IS, when a repo states nothing. Pure.
+
+        The number convention says how a section is recognised; this says what each one MEANS, and the
+        two are separate questions. They were one question until September 2, 2026, with the meanings
+        written as literals in the derivation -- and the board they were written against grew a
+        section the same afternoon, which shifted every stage from 'Filed' upward by one. Nothing
+        failed loudly: the sweep would simply have filed every card one column early.
+
+        So the meaning lives in the repo's own scripts/repo-config.ps1, as Get-AsanaStageMap, and this
+        is the fallback. Semantic keys and not GIDs, deliberately: a rebuilt column keeps its number
+        and loses its GID, which is the failure mode a GID map is born with.
+    #>
+    return @{
+        Requests       = 1   # the requester's inbox -- never a target, though cards do leave it
+        NeedsInfo      = 2   # blocked on the submitter -- set by a label, see Resolve-TargetStage
+        Filed          = 3   # the GitHub issue exists; nothing is being built yet
+        InDevelopment  = 4   # a branch is open -- the session's own hop, never derived by CI
+        InReview       = 5   # a pull request is open OR merged, and the issue is not closed yet
+        ReadyToTest    = 6   # the issue is closed as completed -- the submitter's turn
+        Completed      = 7   # the submitter says it is good -- never a target, never moved OUT of
+        NeedsInfoLabel = 'needs-info'
+    }
+}
+
+function Get-StageMapNumbers {
+    <# The seven stage numbers a map names, in cycle order. Pure. #>
+    param([Parameter(Mandatory = $true)]$Map)
+    return @($Map.Requests, $Map.NeedsInfo, $Map.Filed, $Map.InDevelopment,
+             $Map.InReview, $Map.ReadyToTest, $Map.Completed) | ForEach-Object { [int]$_ }
+}
+
+function Get-WritableStages {
+    <#
+        The stages this script may put a card in: the five pipeline stages. Pure.
+
+        Requests and Completed are excluded, and they are excluded for two different reasons worth
+        keeping apart. Requests is never a TARGET -- a card leaves it the moment the issue is filed,
+        which is the whole of inbound #1217 -- while Completed is never a target AND never moved out
+        of, because a card is only there because a person put it there.
+    #>
+    param([Parameter(Mandatory = $true)]$Map)
+    return @($Map.NeedsInfo, $Map.Filed, $Map.InDevelopment, $Map.InReview, $Map.ReadyToTest) |
+        ForEach-Object { [int]$_ }
+}
+
 function Test-StageIsWritable {
     <#
         Is this a stage this script may put a card in? Pure, and the code-level twin of the rule that
-        the board's two ends belong to the requester: stage 1 is their untriaged inbox and stage 6 is
-        their verdict that the work is good. Only 2 to 5 are ours.
+        the board's two ends belong to the requester.
 
-        It is belt and braces on purpose. Get-StageFloorForIssue cannot return 1 or 6 either, so this
-        guard should never fire -- which is exactly the property the 'no code path can complete a
-        task' guarantee has, and the reason both are asserted rather than assumed.
+        It is belt and braces on purpose. Resolve-TargetStage cannot return Requests or Completed
+        either, so this guard should never fire -- exactly the property the 'no code path can complete
+        a task' guarantee has, and the reason both are asserted rather than assumed.
     #>
-    param([AllowNull()]$Stage)
+    param(
+        [AllowNull()]$Stage,
+        [Parameter(Mandatory = $true)]$Map
+    )
 
     if ($null -eq $Stage) { return $false }
-    return ($script:WritableStages -contains [int]$Stage)
+    return ((Get-WritableStages -Map $Map) -contains [int]$Stage)
+}
+
+function Test-AsanaStageMap {
+    <#
+        Is this a usable stage map? Returns the list of complaints, empty when it is. Pure.
+
+        Three ways a hand-written map goes wrong, and all three are silent at runtime rather than
+        loud: a missing key reads as stage 0, a non-numeric one as stage 0 too, and a duplicate makes
+        two stages the same column so a card can never leave one of them.
+    #>
+    param([AllowNull()]$Map)
+
+    $keys = @('Requests', 'NeedsInfo', 'Filed', 'InDevelopment', 'InReview', 'ReadyToTest', 'Completed')
+    if (-not $Map) { return @('the map is empty') }
+
+    $bad = @()
+    foreach ($k in $keys) {
+        $v = $Map[$k]
+        if ($null -eq $v)                       { $bad += "$k names no section"; continue }
+        if ("$v" -notmatch '^[0-9]+$')          { $bad += "$k is '$v', which is not a section number" }
+        elseif ([int]$v -lt 1)                  { $bad += "$k is $v, and a section number starts at 1" }
+    }
+    if ($bad.Count -gt 0) { return $bad }
+
+    $nums = Get-StageMapNumbers -Map $Map
+    $dupes = @($nums | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+    foreach ($d in $dupes) { $bad += "section $d is named by more than one stage" }
+    return $bad
+}
+
+function Resolve-AsanaStageMap {
+    <#
+        The repo's own stage map, or the built-in one. Reads scripts/repo-config.ps1 -- the same file
+        contributing-davekjohn already dot-sources and report-issue already reads session-side -- and
+        calls Get-AsanaStageMap if it defines one.
+
+        It never throws and it always returns a usable map. A repo with no seam, a seam that fails to
+        load, or a map that does not validate all fall back to the default WITH A LINE SAYING SO,
+        because a silently wrong map is the exact failure this seam exists to end: every card one
+        column early, and nothing in the log to say why.
+    #>
+    param([string]$RepoRoot = '.')
+
+    $default = Get-DefaultAsanaStageMap
+    $cfg = Join-Path $RepoRoot 'scripts/repo-config.ps1'
+    if (-not (Test-Path -LiteralPath $cfg)) {
+        Write-Host "  No scripts/repo-config.ps1 -- using the built-in stage map."
+        return $default
+    }
+
+    try { . $cfg } catch {
+        Write-Host "  scripts/repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- using the built-in stage map."
+        return $default
+    }
+    if (-not (Get-Command -Name 'Get-AsanaStageMap' -ErrorAction SilentlyContinue)) {
+        Write-Host "  scripts/repo-config.ps1 defines no Get-AsanaStageMap -- using the built-in stage map."
+        return $default
+    }
+
+    $own = $null
+    try { $own = Get-AsanaStageMap } catch {
+        Write-Host "  Get-AsanaStageMap threw ($($_.Exception.Message)) -- using the built-in stage map."
+        return $default
+    }
+
+    $complaints = Test-AsanaStageMap -Map $own
+    if ($complaints.Count -gt 0) {
+        Write-Host "  Get-AsanaStageMap is not usable -- using the built-in stage map instead. $($complaints -join '; ')."
+        return $default
+    }
+
+    # The label is the one optional key: a map that names none keeps the default, and a map that sets
+    # it to '' switches the needs-info column off altogether, which is a real answer.
+    if (-not $own.ContainsKey('NeedsInfoLabel')) { $own['NeedsInfoLabel'] = $default.NeedsInfoLabel }
+    Write-Host "  Stage map from scripts/repo-config.ps1: $((Get-StageMapNumbers -Map $own) -join '/'), needs-info label '$($own.NeedsInfoLabel)'."
+    return $own
 }
 
 function Select-StageMembership {
@@ -380,36 +524,92 @@ function Get-StageFloorForIssue {
     <#
         The stage an issue's own GitHub state puts a floor under, or $null when it puts none. Pure.
 
-            open,   no pull request linked        2   the issue exists; nothing is being built yet
-            open,   a linked pull request open    3   development is under way
-            open,   a linked pull request merged  4   built and merged, and the issue is still open
-            closed as completed                   5   built -- ready for the requester to test
-            closed as not planned              $null  nothing was built, so there is nothing to stage
+            open,   no pull request linked      Filed        the issue exists; nothing is being built
+            open,   a pull request open         InReview     it is under review
+            open,   a pull request merged       InReview     merged, and the issue is not closed yet
+            closed as completed                 ReadyToTest  the submitter's turn
+            closed as not planned               $null        nothing was built, so nothing to stage
 
         A FLOOR, not a position, and that is what makes the daily sweep safe to run. CI cannot see a
-        branch that has no pull request yet, so a card a session moved to 3 at `new-branch` must not
-        be dragged back to 2 by a sweep that knows less than the session did. Sync-AsanaTaskStage
-        therefore moves forward only, and the single backward move in this script is the reopen event,
-        which is a real state change and asks for it by name.
+        branch that has no pull request behind it, so a card a session moved to InDevelopment at
+        `new-branch` must not be dragged back to Filed by a sweep that knows less than the session
+        did. Sync-AsanaTaskStage therefore moves forward only.
 
-        Never 1 and never 6, whatever it is handed. Those two are the requester's own ends of the
-        board -- see Test-StageIsWritable.
+        WHICH MEANS THIS NEVER DERIVES InDevelopment, and that is deliberate rather than a gap: that
+        stage is the one hop only a session can see, and forward-only is what protects it. A card
+        there with no pull request yet floors at Filed, which is backward, so nothing moves.
+
+        A MERGED pull request floors at InReview and not beyond (Dave, September 2, 2026). His board
+        has no column for 'merged but the issue is still open', and the gate he set holds either way:
+        a card only reaches the submitter once the issue is actually closed.
+
+        Never Requests and never Completed, whatever it is handed -- see Test-StageIsWritable.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$State,
         [AllowEmptyString()][string]$StateReason = '',
-        $PullRequests = @()
+        $PullRequests = @(),
+        [Parameter(Mandatory = $true)]$Map
     )
 
     if ($State -and $State.ToUpperInvariant() -eq 'CLOSED') {
         if ($StateReason -and $StateReason.ToLowerInvariant() -eq 'not_planned') { return $null }
-        return 5
+        return [int]$Map.ReadyToTest
     }
 
     $prs = @($PullRequests)
-    if ($prs | Where-Object { $_.merged -eq $true -or ([string]$_.state).ToUpperInvariant() -eq 'MERGED' }) { return 4 }
-    if ($prs | Where-Object { ([string]$_.state).ToUpperInvariant() -eq 'OPEN' })                           { return 3 }
-    return 2
+    if ($prs | Where-Object { $_.merged -eq $true -or ([string]$_.state).ToUpperInvariant() -in @('OPEN', 'MERGED') }) {
+        return [int]$Map.InReview
+    }
+    return [int]$Map.Filed
+}
+
+function Resolve-TargetStage {
+    <#
+        Where this card belongs, and whether the answer may move it BACKWARD. Pure.
+
+            Stage          the target, or $null when nothing derives one
+            AllowBackward  $true only for the two answers that are a person's statement
+            Why            one phrase for the log, so a move is always attributable
+
+        TWO ANSWERS MAY GO BACKWARD, and both are somebody saying something rather than CI inferring
+        it. The needs-info label is a person declaring the work cannot proceed; the reopen is a real
+        state change. Everything else is a floor, and floors only rise.
+
+        THE LABEL OUTRANKS THE ISSUE'S STATE, which is the point of it (Dave, September 2, 2026). A
+        card blocked on the submitter stays blocked whatever the branch and the pull request are
+        doing, because the person who set the label knows something the tracker does not. Removing
+        the label hands the card straight back to its state-derived floor -- which is forward, so it
+        needs no permission.
+
+        A map whose NeedsInfoLabel is empty switches the column off: the label is then never looked
+        for, and that is a real answer for a board without one.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$State,
+        [AllowEmptyString()][string]$StateReason = '',
+        $PullRequests = @(),
+        [string[]]$Labels = @(),
+        [Parameter(Mandatory = $true)]$Map,
+        [switch]$Reopened
+    )
+
+    $label = [string]$Map.NeedsInfoLabel
+    if ($label -and (@($Labels) -contains $label)) {
+        return [pscustomobject]@{
+            Stage         = [int]$Map.NeedsInfo
+            AllowBackward = $true
+            Why           = "the '$label' label"
+        }
+    }
+
+    $floor = Get-StageFloorForIssue -State $State -StateReason $StateReason -PullRequests $PullRequests -Map $Map
+    $why   = if ($Reopened) { 'the reopen' } else { 'the issue state' }
+    return [pscustomobject]@{
+        Stage         = $floor
+        AllowBackward = [bool]$Reopened
+        Why           = $why
+    }
 }
 
 function New-AsanaSectionMoveRequest {
@@ -592,31 +792,43 @@ function Sync-AsanaTaskStage {
         right and this script is not, which is why each returns quietly instead of failing:
 
             no target stage        nothing derived an opinion -- an issue closed as not planned
-            not a writable stage   1 and 6 belong to the requester (Test-StageIsWritable)
+            not a writable stage   Requests and Completed are the submitter's (Test-StageIsWritable)
             task unreadable        deleted, or in a workspace this PAT is not a member of
             task completed         a person resolved it; leave it exactly where they left it
             on no numbered board   it is on no pipeline at all
             on two numbered boards two answers, so neither is taken
-            already in stage 6     a person put it there, and nothing here takes it back out
-            already at or past     forward-only -- and what keeps the daily re-run silent
-            board has no such      a board that stops at five sections is not given a sixth
+            in an UNMAPPED column  the board grew a section this repo's map does not name
+            already in Completed   a person put it there, and nothing here takes it back out
+            already at or past     forward-only, unless the answer earned -AllowBackward
+            board has no such      a board missing that section is not given one
+
+        THE UNMAPPED-COLUMN GUARD IS THE ONE WITH SCAR TISSUE ON IT. Without it a card in a section
+        the map does not name is read as a stage number like any other, so a board that grew a column
+        gets its cards yanked into whatever the old numbering meant. That is not hypothetical: the
+        board this was first written against gained a section within the afternoon (September 2,
+        2026), and every stage above it shifted by one. An unnamed column is now a hold -- not a
+        target and not a source.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Gid,
         [AllowNull()]$TargetStage,
         [Parameter(Mandatory = $true)][string]$Pat,
+        [Parameter(Mandatory = $true)]$Map,
 
         # A label for the log line, normally 'owner/repo#n'.
         [string]$For = '',
 
-        # The reopen event, and nothing else, moves a card backward.
+        # Why the target was chosen, for the log -- Resolve-TargetStage's own phrase.
+        [string]$Why = '',
+
+        # Only the needs-info label and the reopen earn this; see Resolve-TargetStage.
         [switch]$AllowBackward
     )
 
     if ($null -eq $TargetStage) { return $false }
     $stage = [int]$TargetStage
-    if (-not (Test-StageIsWritable -Stage $stage)) {
-        Write-Host "  Refusing to move Asana task $Gid to stage $stage -- only $($script:WritableStages -join ', ') are this workflow's to write."
+    if (-not (Test-StageIsWritable -Stage $stage -Map $Map)) {
+        Write-Host "  Refusing to move Asana task $Gid to stage $stage -- only $((Get-WritableStages -Map $Map) -join ', ') are this workflow's to write."
         return $false
     }
 
@@ -633,7 +845,12 @@ function Sync-AsanaTaskStage {
     }
 
     $current = $ref.Membership.Stage
-    if ($current -ge 6) { return $false }
+    $known = Get-StageMapNumbers -Map $Map
+    if ($known -notcontains $current) {
+        Write-Host "  Asana task $Gid sits in section $current, which this repo's stage map does not name -- left alone."
+        return $false
+    }
+    if ($current -eq [int]$Map.Completed) { return $false }
     if ($current -eq $stage) { return $false }
     if ($current -gt $stage -and -not $AllowBackward) { return $false }
 
@@ -645,8 +862,9 @@ function Sync-AsanaTaskStage {
 
     Invoke-AsanaRequest -Request (New-AsanaSectionMoveRequest -Gid $Gid -SectionGid $sections[$stage]) -Pat $Pat | Out-Null
     $what = if ($For) { "$For -> " } else { '' }
-    $how  = if ($current -gt $stage) { ' (back, on a reopen)' } else { '' }
-    Write-Host "  $what$($task.name): stage $current -> $stage$how"
+    $back = if ($current -gt $stage) { ' (back)' } else { '' }
+    $why  = if ($Why) { " -- $Why" } else { '' }
+    Write-Host "  $what$($task.name): stage $current -> $stage$back$why"
     return $true
 }
 
@@ -687,11 +905,11 @@ function Get-IssueLinkState {
         [Parameter(Mandatory = $true)][int]$Number
     )
 
-    $empty = [pscustomobject]@{ State = ''; StateReason = ''; PullRequests = @() }
+    $empty = [pscustomobject]@{ State = ''; StateReason = ''; PullRequests = @(); Labels = @() }
     $parts = $Repo -split '/'
     if ($parts.Count -ne 2) { return $empty }
 
-    $query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){state stateReason closedByPullRequestsReferences(first:10,includeClosedPrs:true){nodes{number url title state merged}}}}}'
+    $query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){state stateReason labels(first:50){nodes{name}} closedByPullRequestsReferences(first:10,includeClosedPrs:true){nodes{number url title state merged}}}}}'
     $ErrorActionPreference = 'Continue'
     $raw = (& gh api graphql -f query=$query -F "owner=$($parts[0])" -F "name=$($parts[1])" -F "number=$Number") 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $raw) {
@@ -705,6 +923,7 @@ function Get-IssueLinkState {
             State        = ([string]$issue.state).ToUpperInvariant()
             StateReason  = ([string]$issue.stateReason).ToLowerInvariant()
             PullRequests = @($issue.closedByPullRequestsReferences.nodes)
+            Labels       = @($issue.labels.nodes | ForEach-Object { [string]$_.name })
         }
     } catch {
         return $empty
@@ -745,24 +964,30 @@ function Invoke-EventMode {
         }
         return
     }
-    # No de-duplication here on purpose: an event is a real state change, so a close after a reopen
-    # is news again and gets said again.
     $link = Get-IssueLinkState -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1])
-    $text = if ($Event -eq 'closed') {
-        New-MirrorComment -IssueRef $IssueRef -Event 'closed' -ClosedBy $link.PullRequests -StateReason $link.StateReason
-    } else {
-        New-MirrorComment -IssueRef $IssueRef -Event 'reopened'
-    }
-    Add-AsanaComment -Gid $ref.Gid -Text $text -Pat $AsanaPat
-    Write-Host "Asana task $($ref.Gid) updated: $IssueRef $Event (matched by $($ref.Source)). The task was NOT completed -- that is the requester's call."
 
-    # And the card follows the news. A reopen is the one moment a card may go backward: it lands
-    # wherever the issue's own state now puts it, which is out of the test column and back into the
-    # one the work is actually in. The state comes from the query above rather than from -Event, so a
-    # close the API has already superseded cannot move a card on a stale reading.
-    $stage = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason -PullRequests $link.PullRequests
-    Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $stage -Pat $AsanaPat -For $IssueRef `
-        -AllowBackward:($Event -eq 'reopened') | Out-Null
+    # A LABEL EVENT MOVES THE CARD AND SAYS NOTHING. 'closed' and 'reopened' are news for the person
+    # waiting on the ticket; a label going on or off is a change in OUR state, and narrating it would
+    # put a comment on the submitter's ticket every time somebody triaged it.
+    if ($Event -in @('closed', 'reopened')) {
+        # No de-duplication here on purpose: an event is a real state change, so a close after a
+        # reopen is news again and gets said again.
+        $text = if ($Event -eq 'closed') {
+            New-MirrorComment -IssueRef $IssueRef -Event 'closed' -ClosedBy $link.PullRequests -StateReason $link.StateReason
+        } else {
+            New-MirrorComment -IssueRef $IssueRef -Event 'reopened'
+        }
+        Add-AsanaComment -Gid $ref.Gid -Text $text -Pat $AsanaPat
+        Write-Host "Asana task $($ref.Gid) updated: $IssueRef $Event (matched by $($ref.Source)). The task was NOT completed -- that is the requester's call."
+    }
+
+    # And the card follows. The state comes from the query above rather than from -Event, so a close
+    # the API has already superseded cannot move a card on a stale reading.
+    $target = Resolve-TargetStage -State $link.State -StateReason $link.StateReason `
+                  -PullRequests $link.PullRequests -Labels $link.Labels -Map $script:StageMap `
+                  -Reopened:($Event -eq 'reopened')
+    Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $target.Stage -Pat $AsanaPat -Map $script:StageMap `
+        -For $IssueRef -Why $target.Why -AllowBackward:$target.AllowBackward | Out-Null
 }
 
 function Update-MirroredTask {
@@ -1003,10 +1228,13 @@ function Invoke-StageSweep {
         $ref = Resolve-AsanaTaskRef -IssueBody ([string]$i.body)
         if (-not $ref.Gid) { continue }
         $carded++
-        $link  = Get-IssueLinkState -Repo $Repo -Number ([int]$i.number)
+        $link = Get-IssueLinkState -Repo $Repo -Number ([int]$i.number)
         if (-not $link.State) { continue }
-        $stage = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason -PullRequests $link.PullRequests
-        if (Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $stage -Pat $AsanaPat -For "$Repo#$($i.number)") { $moved++ }
+        $target = Resolve-TargetStage -State $link.State -StateReason $link.StateReason `
+                      -PullRequests $link.PullRequests -Labels $link.Labels -Map $script:StageMap
+        if (Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $target.Stage -Pat $AsanaPat `
+                -Map $script:StageMap -For "$Repo#$($i.number)" -Why $target.Why `
+                -AllowBackward:$target.AllowBackward) { $moved++ }
     }
     Write-Host "Stage sweep: $($issues.Count) issue(s) examined, $carded carrying an Asana task, $moved card(s) moved."
     return $moved
@@ -1031,6 +1259,9 @@ function Invoke-ReconcileMode {
 }
 
 function Invoke-Main {
+    # Resolved once, before either mode, so the run says which map it used exactly once and every
+    # move afterwards is against the same answer.
+    $script:StageMap = Resolve-AsanaStageMap -RepoRoot $RepoRoot
     switch ($Mode) {
         'event'     { Invoke-EventMode }
         'reconcile' { Invoke-ReconcileMode }
