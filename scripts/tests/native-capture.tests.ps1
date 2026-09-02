@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/lib/native-capture-lib.ps1 -- the -Utf8 capture path (issue #907) and
-    the non-interactive environment + bounded wait (inbound #1179).
+    Regression tests for scripts/lib/native-capture-lib.ps1 -- the -Utf8 capture path (issue #907),
+    the non-interactive environment + bounded wait (inbound #1179), and the shared read of the capture
+    files while a killed grandchild still holds a handle (#1252).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Exit code 0 if everything passes, 1 on a
@@ -328,6 +329,32 @@ try {
     # start that precedes the bound), with margin for a loaded machine.
     Start-Sleep -Seconds $afterRun
     Assert-True (-not (Test-Path -LiteralPath $survived)) 'the grandchild was killed with its parent -- taskkill /T, not Stop-Process'
+
+    # ---------------------------------------------------------------------------------------------
+    Write-Host 'Read-NativeCaptureFileText -- a lingering write handle is not an IO error (#1252)' -ForegroundColor Cyan
+
+    # THE OTHER HALF OF THE KILL ABOVE. The grandchild dies, but not synchronously: the bounded wait
+    # after Stop-NativeProcessTree is on the DIRECT child only, so a grandchild that inherited the
+    # redirected stdout handle can still hold out.txt when the read runs. The gap is wall-clock --
+    # invisible locally (58 suites, 207s), a lost race on a CI runner four times slower (859s), where
+    # it turned an unrelated branch's green red. [System.IO.File]::ReadAllText opens with
+    # FileShare.Read, which cannot coexist with the writer handle still open, so it throws
+    # "being used by another process". The fixture holds that handle for real rather than simulating
+    # the window with a sleep.
+    $held = Join-Path $sandbox 'held-open.txt'
+    [System.IO.File]::WriteAllText($held, "flushed output`n", (New-Object System.Text.UTF8Encoding $false))
+    $writer = New-Object System.IO.FileStream(
+        $held, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
+    try {
+        $threw = $false
+        try { [void][System.IO.File]::ReadAllText($held) } catch { $threw = $true }
+        Assert-True $threw 'the plain ReadAllText throws while the handle is held -- this is the bug the CI red was'
+
+        $got = Read-NativeCaptureFileText -Path $held -Encoding (New-Object System.Text.UTF8Encoding $false)
+        Assert-Equal "flushed output`n" $got 'the shared read returns what was flushed instead of throwing'
+    } finally {
+        $writer.Dispose()
+    }
 
     # ---------------------------------------------------------------------------------------------
     Write-Host 'Invoke-NativeCapture -Utf8 -- the code page cannot reach the answer (issue #907)' -ForegroundColor Cyan

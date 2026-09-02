@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/native-capture-grandchild-handle-race-v1` · 20260903-003022
+
+`Invoke-NativeCaptureUtf8` read its capture files with `[System.IO.File]::ReadAllText`, which opens
+`FileShare.Read`. On the timeout path the whole process tree is force-killed but the wait afterwards
+is on the direct child only, so a grandchild that inherited the redirected stdout handle can still
+hold `out.txt` when the read runs -- and `ReadAllText` then throws "being used by another process"
+instead of returning the partial output. The window is wall-clock, so it was invisible locally and
+lost the race on the slower CI runner, turning an unrelated branch's `lint-en-tests` red with a suite
+name that had no relationship to its diff. The reads now go through a new `Read-NativeCaptureFileText`
+that opens `FileShare.ReadWrite`: it coexists with the lingering handle and returns whatever was
+flushed, which for a killed tree is the honest answer. A regression assert in
+`native-capture.tests.ps1` holds a writer handle open for real and checks both halves.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The fix ships to consumers through the shared `native-capture-lib.ps1` mirror. A consumer whose
+`ship-pr` makes a bounded `git push`/`git fetch` that stalls and is force-killed on a slow machine
+would otherwise get an unrelated `IOException` in place of the timeout diagnosis the bound exists to
+give them.
+
+**Score:** 2
+
+#### Pull Request
+
+native-capture's bounded read tolerates a killed grandchild still holding out.txt
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1256](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1256)
+
+---
+
 ### DEPLOY: `docs/ruleset-bypass-dropped-by-transfer-v1` · 20260902-212249
 
 Four documents stop claiming a bypass list that no longer exists. The org transfer carried the
