@@ -313,7 +313,7 @@ function Get-StageFromSectionName {
         A pipeline section is named '<N>. <whatever the board likes>'. The NUMBER is the
         machine-readable half and the words after it belong to the board, which is the same split the
         cross-link already uses: a marker for the machine, prose for the reader. So renaming
-        '3. In ontwikkeling' to '3. Aan het bouwen' changes nothing here, and no repo has to keep six
+        '3. In development' to '3. Building it' changes nothing here, and no repo has to keep six
         section GIDs correct in its config.
 
         It is also the whole containment. A section with no leading number yields $null, and a task
