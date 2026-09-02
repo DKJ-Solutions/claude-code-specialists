@@ -1,14 +1,19 @@
 <#
 .SYNOPSIS
-    Post an update on the Asana task mirrored from a GitHub issue -- the CI half of the bwj-codex
-    rule. Copied into a BWJ store repo as .github/scripts/asana-mirror.ps1 and driven by
-    .github/workflows/asana-mirror.yml.
+    Keep a BWJ store repo and its Asana board in step -- the CI half of the bwj-codex rule. It posts
+    an update on the Asana task mirrored from a GitHub issue, and carries that task's prio score back
+    the other way as a label on the issue. Copied into a BWJ store repo as
+    .github/scripts/asana-mirror.ps1 and driven by .github/workflows/asana-mirror.yml.
 
 .DESCRIPTION
     IT NEVER COMPLETES A TASK, AND THERE IS NO CODE PATH THAT CAN (Dave, September 1, 2026). Closing
     a GitHub issue says the work is built; it does not say the colleague who asked for it has seen it
     work. Only that person resolves their own ticket, after testing. So this script writes exactly one
     kind of thing into Asana -- a comment -- and the 'completed' field is not written anywhere in it.
+
+    The one thing it writes OUTSIDE Asana is a prio label on a GitHub issue -- sweep (c) below. That
+    is a different system and a different claim, and it leaves the guarantee above exactly where it
+    was: nothing about a label says anybody has tested anything.
 
     Two modes:
 
@@ -19,7 +24,7 @@
                        hold off. An event ALWAYS comments -- it is a real state change, and a second
                        close after a reopen is news again.
 
-      -Mode reconcile  Two sweeps, for events that never arrived, and the only place de-duplication
+      -Mode reconcile  Three sweeps, for events that never arrived, and the only place de-duplication
                        applies:
                        (a) Asana -> GitHub: the project's incomplete tasks, reading a GitHub issue
                            URL from each task's notes and commenting when that issue is closed.
@@ -29,6 +34,10 @@
                            back-link for (a) to find.
                        Both skip a task that is already complete (a person resolved it -- leave it
                        alone) and a task that already carries this issue's close update.
+                       (c) Asana -> GitHub, LABELS: this repo's OPEN issues, each given the one prio
+                           label that matches its task's Prio-Score. Walks GitHub rather than the
+                           project, so it reaches an imported ticket too and needs no
+                           ASANA_PROJECT_GID at all.
 
     How the Asana task is found -- Resolve-AsanaTaskRef, three matchers tried in this order:
 
@@ -43,7 +52,8 @@
     guesses which ticket an issue belongs to. Add a marker to settle it.
 
     Auth: -AsanaPat (from the ASANA_PAT secret). Project: -ProjectGid (from the ASANA_PROJECT_GID
-    variable), read by sweep (a) alone. There is deliberately NO workspace parameter: every call this
+    variable), read by sweep (a) alone. Sweep (c) reads the score field by name (-PrioFieldName,
+    default 'Prio-Score'). There is deliberately NO workspace parameter: every call this
     script makes addresses a task or a project by GID. BOTH modes need `gh` on PATH with
     GH_TOKEN set -- a close update asks GitHub which pull request closed the issue -- and sweep (b)
     additionally needs -Repo (GITHUB_REPOSITORY). Where `gh` cannot answer, the update still goes out
@@ -77,12 +87,22 @@ param(
     [int]$SinceDays = 30,
 
     [string]$AsanaPat = $env:ASANA_PAT,
-    [string]$ProjectGid = $env:ASANA_PROJECT_GID
+    [string]$ProjectGid = $env:ASANA_PROJECT_GID,
+
+    # The Asana number field the prio label is read from, by NAME: its GID differs per workspace, so
+    # a name needs no repo variable of its own. A rename does not fail silently -- the label sweep
+    # prints how many issues carried a score, and a sudden 0 there is the signal.
+    [string]$PrioFieldName = 'Prio-Score'
 )
 
 $ErrorActionPreference = 'Stop'
 
 $script:AsanaApiBase = 'https://app.asana.com/api/1.0'
+
+# The four prio labels, low to high. EXACTLY ONE of these belongs on an issue at a time, which is
+# what Set-IssuePrioLabel enforces by removing the other three. Named here rather than inline so the
+# mapping helper and the enforcer cannot drift apart.
+$script:PrioLabels = @('very low', 'low', 'high', 'very high')
 
 function Get-AsanaGidsFromText {
     <#
@@ -294,10 +314,14 @@ function Get-AsanaTaskState {
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Gid,
-        [Parameter(Mandatory = $true)][string]$Pat
+        [Parameter(Mandatory = $true)][string]$Pat,
+
+        # The fields to ask Asana for. The default keeps every existing caller unchanged; the label
+        # sweep asks for the custom fields on top of it.
+        [string]$OptFields = 'completed,name'
     )
     if ($Gid -notmatch '^[0-9]+$') { throw "Refusing to read a non-numeric task GID: '$Gid'." }
-    $uri = "$script:AsanaApiBase/tasks/$Gid" + '?opt_fields=completed,name'
+    $uri = "$script:AsanaApiBase/tasks/$Gid" + "?opt_fields=$OptFields"
     try {
         $resp = Invoke-RestMethod -Method GET -Uri $uri -Headers @{ Authorization = "Bearer $Pat" }
         return $resp.data
@@ -514,12 +538,156 @@ function Invoke-ReconcileFromGitHub {
     return $done
 }
 
+function Get-PrioLabelForScore {
+    <#
+        The GitHub label for one Asana Prio-Score, or $null when the score names none. Pure.
+
+            1.00-1.99  very low     3.00-3.99  high
+            2.00-2.99  low          4.00-5.00  very high
+
+        Dave's mapping, September 2, 2026. There is deliberately no 'medium': four buckets, and each
+        boundary is closed at the bottom and open at the top, so a precision-2 field can never land
+        between two of them.
+
+        $null for a task with no score AND for a score outside 1.00-5.00. Neither is guessed at and
+        neither is an error: an unscored ticket simply carries no prio label, which is the common case
+        rather than the exception -- measured on the BWJ board the day this was written, 28 of 96 open
+        tasks had no score at all.
+    #>
+    param([AllowNull()]$Score)
+
+    if ($null -eq $Score) { return $null }
+    $s = [double]$Score
+    if ($s -ge 1 -and $s -lt 2) { return 'very low'  }
+    if ($s -ge 2 -and $s -lt 3) { return 'low'       }
+    if ($s -ge 3 -and $s -lt 4) { return 'high'      }
+    if ($s -ge 4 -and $s -le 5) { return 'very high' }
+    return $null
+}
+
+function Get-PrioScoreFromTask {
+    <#
+        The named number field's value from a task object, or $null when the task carries no such
+        field or the field is empty. Pure -- no network.
+
+        Asana returns every custom field the task has, each with its own name, so the lookup is a
+        match on name rather than a position.
+    #>
+    param(
+        [AllowNull()]$Task,
+        [Parameter(Mandatory = $true)][string]$FieldName
+    )
+
+    if (-not $Task -or -not $Task.custom_fields) { return $null }
+    foreach ($f in $Task.custom_fields) {
+        if ($f.name -eq $FieldName) { return $f.number_value }
+    }
+    return $null
+}
+
+function Get-OpenIssues {
+    <#
+        This repo's open issues with their bodies and their current labels. Returns an empty list
+        (not a throw) when `gh` is unavailable or fails, so one broken listing cannot end the run.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Repo)
+
+    $ErrorActionPreference = 'Continue'
+    $raw = (& gh issue list --repo $Repo --state open --limit 200 --json number,body,labels) 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $raw) {
+        Write-Host "  Could not list the open issues of $Repo with gh -- the label sweep is skipped."
+        return @()
+    }
+    return @(($raw | Out-String) | ConvertFrom-Json)
+}
+
+function Set-IssuePrioLabel {
+    <#
+        Put EXACTLY ONE prio label on an issue: add -Label if it is missing, and remove whichever of
+        the other three the issue carries. That second half is the whole point -- a ticket rescored
+        from 2.5 to 4.2 must lose 'low' as it gains 'very high', or the issue ends up claiming two
+        priorities at once.
+
+        Returns $true when it changed something, $false when the issue already read correctly or the
+        edit failed. Nothing is done when there is nothing to do, so a re-run is quiet.
+
+        `gh issue edit` fails outright on a label the repo does not have; adopt-bwj-asana creates all
+        four, which is why that step and this function ship together.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Repo,
+        [Parameter(Mandatory = $true)][int]$Number,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [string[]]$Current = @()
+    )
+
+    $stale = @($script:PrioLabels | Where-Object { $_ -ne $Label -and $Current -contains $_ })
+    $needsAdd = ($Current -notcontains $Label)
+    if (-not $needsAdd -and $stale.Count -eq 0) { return $false }
+
+    $ghArgs = @('issue', 'edit', "$Number", '--repo', $Repo)
+    if ($needsAdd) { $ghArgs += @('--add-label', $Label) }
+    foreach ($s in $stale) { $ghArgs += @('--remove-label', $s) }
+
+    $ErrorActionPreference = 'Continue'
+    & gh @ghArgs 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  Could not set '$Label' on $Repo#$Number -- does the repo have all four prio labels?"
+        return $false
+    }
+    $removed = if ($stale.Count) { " (removed $($stale -join ', '))" } else { '' }
+    Write-Host "  $Repo#$Number -> $Label$removed"
+    return $true
+}
+
+function Invoke-LabelSweep {
+    <#
+        Sweep (c): this repo's OPEN issues, each carrying its Asana task's Prio-Score as one label.
+
+        It walks GITHUB and not the Asana project, deliberately, and that is what separates it from
+        sweep (a). Two reasons. It reaches a ticket imported FROM Asana, whose task carries no GitHub
+        back-link for a project walk to follow -- the same gap the header-row matcher was added for.
+        And it needs no ASANA_PROJECT_GID, so a repo whose project GID is wrong or provisional still
+        gets its labels right.
+
+        Priority flows Asana -> GitHub, which is the one direction this system's 'GitHub first' rule
+        does not cover and does not contradict: the business sets what matters in the window it looks
+        through, and the workbench is where that has to be visible. Nothing here writes to Asana.
+    #>
+    if (-not $Repo) {
+        Write-Host 'GITHUB_REPOSITORY is not set -- the label sweep is skipped.'
+        return 0
+    }
+    $issues = Get-OpenIssues -Repo $Repo
+    $scored = 0
+    $done   = 0
+    foreach ($i in $issues) {
+        $ref = Resolve-AsanaTaskRef -IssueBody ([string]$i.body)
+        if (-not $ref.Gid) { continue }
+        $task = Get-AsanaTaskState -Gid $ref.Gid -Pat $AsanaPat `
+                    -OptFields 'completed,name,custom_fields.name,custom_fields.number_value'
+        if (-not $task) { continue }
+        $label = Get-PrioLabelForScore -Score (Get-PrioScoreFromTask -Task $task -FieldName $PrioFieldName)
+        if (-not $label) { continue }
+        $scored++
+        $current = @($i.labels | ForEach-Object { $_.name })
+        if (Set-IssuePrioLabel -Repo $Repo -Number ([int]$i.number) -Label $label -Current $current) { $done++ }
+    }
+    Write-Host "Label sweep: $($issues.Count) open issue(s) examined, $scored carrying a '$PrioFieldName', $done relabelled."
+    return $done
+}
+
 function Invoke-ReconcileMode {
     if (-not $AsanaPat) { throw 'ASANA_PAT is not set.' }
     $done = 0
     $done += Invoke-ReconcileFromAsana
     $done += Invoke-ReconcileFromGitHub
     Write-Host "Reconciliation done -- $done task(s) updated, 0 completed (this script completes nothing)."
+
+    # Sweep (c) reports separately: it relabels ISSUES, where the two above update TASKS, and one
+    # count covering both would say neither.
+    $labelled = Invoke-LabelSweep
+    Write-Host "Prio labels done -- $labelled issue(s) relabelled."
 }
 
 function Invoke-Main {

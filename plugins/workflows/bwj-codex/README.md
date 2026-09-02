@@ -39,6 +39,11 @@ naming the pull request that closed it
 own `.github/`. Reopening the issue posts the counterpart; a daily reconciliation sweep carries over
 anything a missed event left behind, without ever saying the same thing twice.
 
+And that same daily run carries exactly one thing the other way: the Asana task's **`Prio-Score`**
+becomes one of four prio labels on the GitHub issue (`very high` / `high` / `low` / `very low`), so
+the priority the business sets on the board is readable where the work actually happens. It is the
+only step that moves Asana -> GitHub, and the only thing this plugin writes outside Asana.
+
 **It never ticks the task off, and it has no code path that could** (Dave, September 1, 2026): closing
 the issue says the work is *built*, and only the colleague who asked for it can say it is *good*.
 **A ticket that came the other way -- filed in Asana and copied into an issue for analysis -- is

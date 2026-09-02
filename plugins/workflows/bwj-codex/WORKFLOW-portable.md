@@ -201,17 +201,60 @@ mirror was working exactly as written, and reached 4 of the 15 issues that carry
 candidates in its log and moves on. It never guesses which ticket an issue belongs to, and the way to
 settle it is to add a marker.
 
-### 5. What still needs a person
+### 5. The Asana prio score comes back as a GitHub label
 
-- **Setup, once per repo:** the repo secret `ASANA_PAT` and the variable `ASANA_PROJECT_GID`, plus
-  copying the two `templates/` files into `.github/`. The
+Everything above moves GitHub -> Asana. This one step goes the other way, and it is the only one that
+does. The BWJ team scores a task on the board's **`Prio-Score`** number field, 1.00 to 5.00; the
+reconcile run reads that score and puts the matching label on the GitHub issue:
+
+| Prio-Score | GitHub label |
+|---|---|
+| 4.00 - 5.00 | `very high` |
+| 3.00 - 3.99 | `high` |
+| 2.00 - 2.99 | `low` |
+| 1.00 - 1.99 | `very low` |
+
+Dave's mapping, September 2, 2026. **Four buckets and deliberately no `medium`**, and each boundary is
+closed at the bottom and open at the top, so a field with two decimals can never land between two of
+them.
+
+**Exactly one prio label sits on an issue at a time.** The sweep removes the other three as it sets
+one, so a ticket rescored from 2.5 to 4.2 loses `low` as it gains `very high` rather than claiming two
+priorities at once. Where the issue already reads correctly nothing is written, so a daily re-run is
+quiet.
+
+**No score means no label, and that is the common case.** A task whose `Prio-Score` is empty, or whose
+score falls outside 1.00-5.00, is left without a prio label rather than given a guessed one -- measured
+on the board the day this shipped, 28 of its 96 open tasks carried no score at all.
+
+**It walks GitHub, not the Asana project**, and that is what separates it from the sweeps in step 4.
+Two consequences worth knowing. It reaches a ticket **imported from Asana**, whose task carries no
+GitHub back-link for a project walk to follow -- the same gap the header-row matcher exists for. And it
+needs **no `ASANA_PROJECT_GID`**: a repo whose project GID is still wrong or provisional gets its
+labels right anyway.
+
+**Why this direction does not contradict "GitHub first".** That rule is about where a ticket is *born*
+and where its lifecycle is *tracked*. Priority is neither: it is the business's judgement, made in the
+window the rest of BWJ looks through, and the workbench is where it has to be visible. Nothing in this
+step writes to Asana.
+
+**What it costs on the GitHub side:** the workflow's `issues:` permission is `write` rather than
+`read`. That is the only write it makes outside Asana, and it touches labels and nothing else.
+
+### 6. What still needs a person
+
+- **Setup, once per repo:** the repo secret `ASANA_PAT`, the variable `ASANA_PROJECT_GID`, the four
+  prio labels of step 5, plus copying the two `templates/` files into `.github/`. The
   [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
+- **Scoring the ticket.** The label follows the board and nothing here decides a priority. A task
+  nobody has scored carries no prio label, and putting a number on it is the team's call to make in
+  Asana -- the same shape as resolving a ticket, further down this list.
 - **A token that can reach the tickets.** `ASANA_PAT` is a *user* token: it can only see the
   workspaces that user is a member of. An imported ticket often lives in the requester's own Asana
   organisation rather than in the one the mirror project sits in, and a task the token cannot read is
   logged and skipped rather than failing the run -- so a sweep that reports `0 updated` with a line
   per unreadable task is telling you about the token, not about the tickets.
-- **Resolving the ticket. That is the whole point of the previous section**: the colleague who filed
+- **Resolving the ticket. That is the whole point of step 4**: the colleague who filed
   it ticks it off once they have tested the change, and nothing in this workflow will do it for them.
 - **The Asana project answer:** whether both stores mirror into one shared project or one project
   each is a BWJ decision. `Get-AsanaProjectGid` returns whatever each repo sets, so either works --
@@ -232,6 +275,10 @@ settle it is to add a marker.
   reviewable where an Asana-side automation rule is not.
 - **A reconciliation sweep**, because a single webhook can be missed and a colleague waiting on a
   ticket nobody told them about is exactly the drift this plugin exists to prevent.
+- **The prio label goes Asana -> GitHub**, against the grain of everything else here, because
+  priority is the one thing the business owns and the developers consume. The board is where it is
+  decided and the issue list is where it has to be read; carrying it across beats asking a developer
+  to keep a second window open.
 - **An update and not a tick**, because the two are different claims by different people. The build
   is finished when the person who built it says so; the request is finished when the person who made
   it says so. A tracker that lets one stand in for the other cannot afterwards tell you which of its

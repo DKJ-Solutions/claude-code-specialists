@@ -213,6 +213,50 @@ Assert-True ($marker -ne (Get-MirrorCommentMarker -IssueRef 'BWJ-ecommerce/smart
 Assert-Equal 'BWJ-ecommerce/smartwatchbanden#42' (Get-IssueRefFromNotes -Notes 'see https://github.com/BWJ-ecommerce/smartwatchbanden/issues/42 for detail') 'Get-IssueRefFromNotes pulls owner/repo#n from a GitHub URL'
 Assert-True  ($null -eq (Get-IssueRefFromNotes -Notes 'no link at all')) 'Get-IssueRefFromNotes returns null without a GitHub issue URL'
 
+# --- the prio label ------------------------------------------------------------------------------
+# Dave's mapping, September 2, 2026: 1.00-1.99 very low | 2.00-2.99 low | 3.00-3.99 high |
+# 4.00-5.00 very high. EVERY boundary is asserted from both sides, because an off-by-a-hundredth
+# here mislabels real work and nothing downstream would notice it had happened.
+Assert-Equal 'very low'  (Get-PrioLabelForScore -Score 1)    'score 1.00 is very low -- the bottom of the scale'
+Assert-Equal 'very low'  (Get-PrioLabelForScore -Score 1.99) 'and 1.99 is still very low'
+Assert-Equal 'low'       (Get-PrioLabelForScore -Score 2)    '2.00 flips to low'
+Assert-Equal 'low'       (Get-PrioLabelForScore -Score 2.99) 'and 2.99 is still low'
+Assert-Equal 'high'      (Get-PrioLabelForScore -Score 3)    '3.00 flips to high'
+Assert-Equal 'high'      (Get-PrioLabelForScore -Score 3.99) 'and 3.99 is still high'
+Assert-Equal 'very high' (Get-PrioLabelForScore -Score 4)    '4.00 flips to very high'
+Assert-Equal 'very high' (Get-PrioLabelForScore -Score 5)    'and 5.00, the top of the scale, is very high'
+
+# no score and an out-of-range score give the same answer -- no label, never the nearest bucket
+Assert-True ($null -eq (Get-PrioLabelForScore -Score $null)) 'a task with no score gets no label at all'
+Assert-True ($null -eq (Get-PrioLabelForScore -Score 0.99))  'and a score below the scale gets none rather than the nearest one'
+Assert-True ($null -eq (Get-PrioLabelForScore -Score 5.01))  'and one above the scale gets none either'
+
+# THE MAPPING IS CULTURE-INVARIANT, which is not obvious and was measured rather than assumed: the
+# machine this repo is maintained on runs nl-NL, where the decimal separator is a comma. A score
+# arriving as a string must still read as three-and-a-half and not as thirty-five.
+Assert-Equal 'high' (Get-PrioLabelForScore -Score '3.5') "a score arriving as the string '3.5' still reads as 3.5"
+
+# every label the mapper can return is one the enforcer knows how to remove: if these two drift, a
+# rescored ticket keeps a stale label forever and the issue claims two priorities at once
+foreach ($s in @(1.5, 2.5, 3.5, 4.5)) {
+    Assert-True ($script:PrioLabels -contains (Get-PrioLabelForScore -Score $s)) "the label for score $s is one PrioLabels knows"
+}
+Assert-Equal 4 $script:PrioLabels.Count 'and PrioLabels holds exactly the four buckets -- there is no medium'
+
+# reading the score off a task object, past the other custom fields Asana returns beside it
+$scoredTask = [pscustomobject]@{ custom_fields = @(
+    [pscustomobject]@{ name = 'Type';       number_value = $null },
+    [pscustomobject]@{ name = 'Prio-Score'; number_value = 3.8 }) }
+Assert-Equal 3.8 (Get-PrioScoreFromTask -Task $scoredTask -FieldName 'Prio-Score') 'Get-PrioScoreFromTask finds the field by name, past another field'
+Assert-True ($null -eq (Get-PrioScoreFromTask -Task $scoredTask -FieldName 'Nope'))      'and returns null for a field the task has not got'
+Assert-True ($null -eq (Get-PrioScoreFromTask -Task $null       -FieldName 'Prio-Score')) 'and null for a task that could not be read at all'
+$emptyScore = [pscustomobject]@{ custom_fields = @([pscustomobject]@{ name = 'Prio-Score'; number_value = $null }) }
+Assert-True ($null -eq (Get-PrioScoreFromTask -Task $emptyScore -FieldName 'Prio-Score')) 'and null for a field that is present but empty'
+
+# an issue that already reads correctly is not written to -- what keeps the daily re-run quiet. This
+# path returns before any gh call, so it is safe to assert here with no network and no repo.
+Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'high' -Current @('high', 'tier-1'))) 'an issue already carrying the right prio label is left alone'
+
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""
 if ($script:fail -gt 0) {
