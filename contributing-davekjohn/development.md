@@ -33,19 +33,44 @@
 
 ### PLAN
 
+#### Context
+
+Issue #1235. The folded DEPLOY entry for `fix/ship-pr-lost-watch-retry-v1` (PR #1233) overstates
+what a dropped ship costs: it claims *"a re-checkout of the branch plus a full local gate run --
+lint and every suite"*. `scripts/lib/gate-lib.ps1` keeps gate evidence keyed on the tree
+(`Test-GateEvidence`/`Save-GateEvidence`, `GateEvidenceMaxAgeMinutes = 240`), so a same-tree resume
+within four hours skips both gates -- the true, smaller cost is only the re-checkout step 2b (#1073)
+had just handed back to the trunk. The DEPLOY lock (#884) meant #1233 could not fix it in place;
+this is the ordinary `docs/` follow-up the issue prescribes.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Replace the overstated clause in `contributing-davekjohn/CHANGELOG.md` (the
+  `fix/ship-pr-lost-watch-retry-v1` DEPLOY entry) with *"a re-checkout of the branch step 2b had
+  just left"* -- the wording the issue proposes. Nothing else in the entry changes.
 
 ### TEST
 
+- [x] Verified against `scripts/lib/gate-lib.ps1` that the lint and test gates both skip on a
+  same-tree resume within `GateEvidenceMaxAgeMinutes` (240). No automated test -- prose-only
+  changelog correction.
+
 ### DEPLOY: `docs/dropped-ship-cost-overstated-v1`
 
-**Score:**
+The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
+costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
+a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
+ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
+trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+
+**Score:** 1
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
+who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+
+**Score:** N/A
 
 #### Pull Request
 
