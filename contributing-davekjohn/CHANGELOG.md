@@ -32,6 +32,101 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/missing-suite-note-escalation-v1` · 20260902-210200
+
+When `ship-pr` refuses because no check suite exists, it now names the one cause that is checkable
+rather than guessed. A `pull_request` workflow runs against `refs/pull/<n>/merge`; a conflicting PR has
+no such commit, so GitHub creates no suite for it and the required check can never go green. The
+refusal now says so, and prescribes resolving the conflict.
+
+What makes it worth more than an extra sentence is what it takes AWAY. The note used to offer
+`gh pr close && gh pr reopen` as the cheapest thing to try, and against a conflict that is measured to
+do nothing -- twice over on PR #1243: the reopen the reporter ran, and a fresh head pushed here, polled
+300s, no run either time. Offering it there sends the reader round a loop that cannot terminate, so the
+conflict clause replaces it rather than sitting beside it. The refusal itself is untouched for the
+fifth time; only the diagnosis moved.
+
+The fifth case of a distinction this file has now drawn four times before -- #943 (a red required check
+vs a red advisory one), #1044 (a check that went red vs a run that never started), #1219 (a verdict vs
+a dropped watch), #1234 (no run vs no suite at all). Each time the sentence sent the reader somewhere no
+repair exists. This one had them auditing an org's runner billing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`ship-pr.ps1` and `pr-issues-lib.ps1` are both mirrored into `contributing-davekjohn`, so this reaches
+every consumer running that workflow -- and a conflicting PR is a state any of them can reach, on any
+repo, with no org transfer involved. What made it visible here was a tree-wide merge landing 68 seconds
+before a branch cut from the older base; what makes it recur elsewhere is any PR left open across a
+large merge. The consumer gets the repair named at the exact moment their ship refuses, instead of a
+reopen that cannot work.
+
+**Score:** 3
+
+#### Pull Request
+
+The missing-suite note names the conflicting PR, and withholds the reopen that cannot fix it
+
+Plugins: contributing-davekjohn
+
+[PR #1254](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1254)
+
+---
+
+### DEPLOY: `fix/gate-assert-errorrecord-wrap-v1` · 20260902-204235
+
+The local test gate no longer refuses a branch because of how long the operator's home directory is.
+`round-tally.tests.ps1` asserted that the "nothing to count" error names `-ColumnPattern` by matching
+the bare token against the child's rendered `ErrorRecord` -- and PowerShell 5.1 hard-wraps that
+rendering at the console width, mid-token, at a column that moves with the absolute paths the message
+carries. On a long enough home path the token split and the assert went red on a message that visibly
+contained it, blocking every PR while CI stayed green, because a runner's path is short. The wrapped
+lines are now rejoined before the match, since the property under test is that the message names the
+parameter and never that the formatter left the line whole.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `scripts/tests/` is repo-owned and ships to no consumer; the suite this touches has no mirror in
+any plugin.
+
+**Score:** N/A
+
+#### Pull Request
+
+Rejoin the child formatter's hard wrap before the round-tally assert matches
+
+[PR #1249](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1249)
+
+---
+
+### DEPLOY: `docs/dropped-ship-cost-overstated-v1` · 20260902-201709
+
+The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
+costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
+a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
+ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
+trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
+who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+
+**Score:** N/A
+
+#### Pull Request
+
+the lost-watch retry changelog entry no longer overstates a dropped ship's cost
+
+[PR #1250](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1250)
+
+---
+
 ### DEPLOY: `feat/repoint-org-transfer-v1` · 20260902-181358
 
 The repo moved from the personal account `DaveKJohn` into the `DKJ-Solutions` organisation on
@@ -159,9 +254,8 @@ it changes only the sentence and never the verdict.
 
 A consumer running the workflow's `ship-pr.ps1` gets both halves. The retry is the part they feel:
 step 1 is the only step that reads the working tree and step 2b has already sent the checkout back to
-the trunk, so before this a dropped socket cost them a re-checkout of the branch plus a full local
-gate run -- lint and every suite -- against a commit CI was already testing. Now it costs one more gh
-call. And on the run that does have to stop, the sentence no longer sends them into their own code
+the trunk, so before this a dropped socket cost them a re-checkout of the branch step 2b had just
+left. Now it costs one more gh call. And on the run that does have to stop, the sentence no longer sends them into their own code
 for a state no branch can repair.
 
 **Score:** 3

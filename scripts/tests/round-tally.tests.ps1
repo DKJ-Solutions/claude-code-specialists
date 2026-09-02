@@ -206,7 +206,14 @@ try {
     )
     $r6 = Invoke-Measure -ScriptArgs @('-Path', $f6)
     Assert-Equal 1 $r6.Code 'none: exits 1 rather than printing a table of nothing'
-    Assert-True ($r6.Out -match 'ColumnPattern') 'none: and points at the parameter that would fix it'
+    # THE HARD WRAP IS NOT THE PROPERTY UNDER TEST (#1242). $r6.Out is a Write-Error rendered by the
+    # CHILD's formatter, which breaks the message at that console's width -- mid-token, with no
+    # continuation indent. The break point moves with the absolute paths the rendering carries (the
+    # measure script's and the fixture's), so the naive match is green on a short home directory and red
+    # on a long one while the message is byte-identical: a gate refusing work it has not measured, and
+    # invisible to CI, whose runner path happens to be short. Rejoin the wrapped lines first -- the
+    # assert is "the message names the parameter", never "the formatter left this line whole".
+    Assert-True ((($r6.Out -replace "`r?`n\s*", '') -match 'ColumnPattern')) 'none: and points at the parameter that would fix it'
 
     # --- 7. -ColumnPattern really is the knob ------------------------------------------------------
     $r7 = Invoke-Measure -ScriptArgs @('-Path', $f6, '-ColumnPattern', '^status$')
