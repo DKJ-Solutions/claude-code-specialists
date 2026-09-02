@@ -206,7 +206,28 @@ try {
     )
     $r6 = Invoke-Measure -ScriptArgs @('-Path', $f6)
     Assert-Equal 1 $r6.Code 'none: exits 1 rather than printing a table of nothing'
-    Assert-True ($r6.Out -match 'ColumnPattern') 'none: and points at the parameter that would fix it'
+    # THE WRAP IS NORMALISED BEFORE MATCHING, and the naive form is the one anybody would write again
+    # (issue #1242). $r6.Out is a Write-Error record, and PowerShell 5.1's error formatter hard-wraps an
+    # ErrorRecord at the output width SPLITTING MID-TOKEN -- so this assert read '-ColumnPat\ntern' and
+    # failed against text that visibly contains the word. The break column is a function of ABSOLUTE PATH
+    # LENGTHS (the rendered line is prefixed with the measure script's full path and carries the fixture's),
+    # so it moves with the operator's home directory name: green on a CI runner, red on a checkout under a
+    # longer one. That makes it a gate refusing work it never measured, and invisible to the mechanism that
+    # normally finds a red suite. The property under test is that the MESSAGE names the parameter, never
+    # that the formatter left the line alone, so the wrap is removed rather than matched around.
+    #
+    # FLATTENING IS ALREADY THE HOUSE PATTERN, and this suite was the one that matched raw:
+    # park-branch, park-cycle, worktree-lane and find-specialist-mentions all run captured output through
+    # the same `-replace "`r?`n"` before asserting on it. So this is round-tally joining the convention
+    # rather than inventing one, which is also why no shared helper is promoted -- four suites do it
+    # inline at the point of capture and a fifth would not make it a mechanism.
+    #
+    # BUT ONLY THIS ASSERT, not the whole of Invoke-Measure. Every other match here is on Write-Host
+    # output, which the formatter does not re-wrap, and the table asserts need the line structure kept --
+    # flattening $r6.Out for everybody would break the very cases this suite exists to pin.
+    $r6Flat = $r6.Out -replace "`r?`n", ''
+    Assert-True ($r6Flat -match 'ColumnPattern') 'none: and points at the parameter that would fix it'
+
 
     # --- 7. -ColumnPattern really is the knob ------------------------------------------------------
     $r7 = Invoke-Measure -ScriptArgs @('-Path', $f6, '-ColumnPattern', '^status$')
