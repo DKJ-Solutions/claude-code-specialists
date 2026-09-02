@@ -32,6 +32,31 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/dropped-ship-cost-overstated-v1` · 20260902-201709
+
+The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
+costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
+a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
+ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
+trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
+who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+
+**Score:** N/A
+
+#### Pull Request
+
+the lost-watch retry changelog entry no longer overstates a dropped ship's cost
+
+[PR #1250](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1250)
+
+---
+
 ### DEPLOY: `feat/repoint-org-transfer-v1` · 20260902-181358
 
 The repo moved from the personal account `DaveKJohn` into the `DKJ-Solutions` organisation on
