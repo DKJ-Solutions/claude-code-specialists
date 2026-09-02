@@ -2,7 +2,7 @@
 name: new-branch
 description: >-
   Create (or idempotently resume) a git branch AND its development document --
-  contributing-davekjohn/development.md, the branch's plan and the DEPLOY section that becomes its
+  contributing-davekjohn/development-<branch>.md, the branch's plan and the DEPLOY section that becomes its
   changelog entry -- in one move, via the shared, centralized new-branch script from the plugin
   (single source of truth, issue #81), so a consumer does not have to duplicate this script locally.
   Use this whenever a new piece of work starts: a branch is never entry-less -- creating it brings that
@@ -54,7 +54,7 @@ The script:
      the remote tip**, carrying the parked work, and the run says in so many words that this is a resume
      rather than a new branch (issue #1139 -- see below);
    - neither -> `git checkout -b <name>` from the current base.
-6. Immediately writes that branch's **`contributing-davekjohn/development.md`** -- so the branch and its
+6. Immediately writes that branch's **`contributing-davekjohn/development-<branch>.md`** -- so the branch and its
    document come into existence in a single step. Idempotent: a document that already belongs to this
    branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
    unless it holds uncommitted work, which is kept and reported instead.
@@ -107,7 +107,7 @@ idempotent, the one you are told to re-run to resume, was the one blind to exact
 
 **And neither half of the run looked wrong.** A clean run is what idempotence promises, and the scaffold
 written into the fork is byte-identical to the one already on the parked branch, because the same script
-wrote both -- so even reading `development.md` afterwards shows nothing. What is missing is the branch's
+wrote both -- so even reading `development-<branch>.md` afterwards shows nothing. What is missing is the branch's
 **work**, and nothing on screen is about work. `worktree-lane.ps1` inherited the whole failure through
 its delegation, with its worktree already detached at `origin/<trunk>`, and reported `Lane open` exactly
 as on a genuine new branch.
@@ -167,7 +167,7 @@ route moved to a page the model is allowed to read.
 ## The document, and its two halves
 
 ```text
-contributing-davekjohn/development.md
+contributing-davekjohn/development-feat-x-v1.md
   # Development: `feat/x-v1` * <creation stamp>
   ## PLAN / ## CREATE / ## TEST      what still MUST HAPPEN -- the step list, gated before the PR
   ## DEPLOY: `feat/x-v1`            what the change DOES   -- folded verbatim into CHANGELOG.md

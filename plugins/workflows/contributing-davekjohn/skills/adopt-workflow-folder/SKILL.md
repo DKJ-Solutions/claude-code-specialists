@@ -18,7 +18,7 @@ contributing-davekjohn/
   CONTRIBUTING.md        this repo's answers to CONTRIBUTING-portable.md
   releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is not here)
   (releases/audience/ is NOT placed -- your first cut creates it when it writes the note there)
-  (development.md is NOT placed -- it lives only while a branch is open)
+  (development-<branch>.md is NOT placed -- one per branch, living only while that branch is open)
 ```
 
 **And one file outside it**, since August 20, 2026 (inbound
@@ -64,7 +64,7 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
   only the new location, deliberately without a dual-read fallback.
 - **The folder itself is permanent** (issue #885). No command in this plugin removes
   `contributing-davekjohn/`, and no future teardown may -- uninstalling the plugin takes the plugin, not the
-  record that belongs to your repo. `development.md` is the one file inside it that does not share
+  record that belongs to your repo. `development-<branch>.md` is the one file inside it that does not share
   that lifetime: it exists only while a branch is open, which is a precision on the rule rather than an
   exception to it.
 

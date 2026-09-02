@@ -464,9 +464,10 @@ $branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 # THE BRANCH'S WORKING DOCUMENT LIVES AT contributing-davekjohn/development.md, NOT IN THE REPO ROOT
 # UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder August 14,
 # 2026; merged from two files into one on August 23, 2026).
-# One fixed path, and git's own per-branch tracking is what keeps two branches from colliding on it --
-# see the block in entry-scaffold-lib.ps1 for why that beats a filename per branch.
-$branchFiles    = Get-BranchFilePaths
+# ONE NAME PER BRANCH SINCE #1255 (September 3, 2026), where it was one fixed path. The fixed path did not
+# collide on CHECKOUT, which is what the old reasoning said; it collided on MERGE, which is what it did not.
+# See the block in entry-scaffold-lib.ps1 for the measurement.
+$branchFiles    = Get-BranchFilePaths -Branch $branch
 $branchDirPath  = Join-Path $repoRoot $branchFiles.Directory
 
 # WHICH NAME THIS RUN WRITES, on a repo that may still hold a pre-August-23-2026 pair. The rule is the
@@ -498,8 +499,12 @@ function Get-BranchFileTargetRel {
     return $Current
 }
 
+# THE SHARED NAME LEADS THE LEGACY LIST (#1255), and it is the entry that matters most on the day of the
+# change: every branch open right now is working in it. Without it a rerun of this script on such a branch
+# would create the per-branch document beside the one holding the work and split it in half -- the exact
+# failure this list exists to prevent, one rename further on.
 $cycleRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.File `
-    -Legacy @($branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
+    -Legacy @($branchFiles.SharedFile, $branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
 $cyclePath = Join-Path $repoRoot ($cycleRel -replace '/', '\')
 
 if (-not (Test-Path -LiteralPath $branchDirPath)) {

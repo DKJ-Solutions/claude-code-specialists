@@ -107,16 +107,29 @@ infrastructure.
 
   **It does not stop at the three exceptions — it blocks MERGES too, by a chain reaction**, and that is
   the part worth reading before anybody concludes the damage is bounded. A PR still merges; its fold
-  cannot push; so `contributing-davekjohn/development.md` **stays on `origin/main`**. That path is fixed
-  by design — the design's safety argument being that the fold removes it at the merge — so the trunk
-  now carries a live branch document, every open branch has its own file at that same path, and every
-  subsequent PR conflicts on it. The conflict is not cosmetic: resolving it in favour of the incoming
-  branch **destroys an unfolded DEPLOY entry**, which is the only copy of that change's changelog text.
-  Measured the same evening on PR #1249, where the trunk's conflicting file turned out to belong to
+  cannot push; so the merged branch's development document **stays on `origin/main`**. The trunk then
+  carries a live branch document that should have been deleted, and while the fold stays blocked they
+  accumulate.
+
+  **The second half of this chain reaction is fixed as of September 3, 2026, and the sentence that used
+  to be here is dated rather than swept.** It read: *"That path is fixed by design — the design's safety
+  argument being that the fold removes it at the merge — so ... every open branch has its own file at that
+  same path, and every subsequent PR conflicts on it."* That was true, and it was the shared-path design's
+  defect rather than this ruleset's: the conflict happened on **every** merge, blocked fold or not, and a
+  conflicting PR gets no check suite at all, so it could never go green and never merge
+  ([#1255](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1255)). The document is named
+  per branch now, so two branches never write the same path and a leftover on the trunk collides with
+  nobody. **What this ruleset still costs is the leftover itself** — an unfolded entry sitting on `main`
+  with nothing saying so — which is the half #1244 owns and this change does not repair.
+
+  **The hazard that made it urgent is worth keeping, because it is what a reader would otherwise
+  rediscover.** Resolving that conflict in favour of the incoming branch **destroys an unfolded DEPLOY
+  entry**, the only copy of that change's changelog text — and *keep mine* is exactly what a session hits
+  this reaches for. Measured on PR #1249, where the trunk's conflicting file turned out to belong to
   PR #1250 and `deleted by us` meant *"our fold deleted a different document at the same path"*. It was
-  untangled by keeping theirs, running #1250's pending fold, and letting both held folds ride out
-  through the open PR — a workaround, since the trunk carries the next branch's document the moment
-  that PR merges.
+  untangled by keeping theirs, running #1250's pending fold, and letting both held folds ride out through
+  the open PR. Per-branch names remove the situation rather than the hazard's teeth: there is no longer a
+  resolution in which one branch's document can stand in for another's.
 
   **The generalisable half, beside the one below it: a setting that is present and active is not proof
   that the thing you depend on inside it survived.** [#1239](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1239)
@@ -830,7 +843,7 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
-the DEPLOY section of `contributing-davekjohn/development.md`, so everything else it asked was already answered four lines lower. Measured
+the DEPLOY section of `contributing-davekjohn/development-<branch>.md`, so everything else it asked was already answered four lines lower. Measured
 over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
 single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
 `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and

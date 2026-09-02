@@ -845,7 +845,11 @@ foreach ($lf in $linkFiles) {
         ForEach-Object { '\' + ($_ -replace '/', '\') }
     if ($lf -match '\\personas\\.*-persona\.md$') {
         $dir = Join-Path $RepoRoot '.claude\extensions'
-    } elseif (@($entryRelsForLinks | Where-Object { $lf.EndsWith($_) }).Count -gt 0) {
+    # AND THE PER-BRANCH NAMES BY PATTERN (#1255), because a list cannot enumerate them. Same answer as the
+    # fixed names above -- these documents sit in the same folder as CHANGELOG.md, so their links resolve
+    # from the same base.
+    } elseif (@($entryRelsForLinks | Where-Object { $lf.EndsWith($_) }).Count -gt 0 -or
+        (Test-IsPerBranchDocumentPath -RelativePath ($lf.Substring($RepoRoot.Length)))) {
         $dir = $changelogDirForLinks
     } else {
         $dir = Split-Path -Parent $lf
@@ -1388,7 +1392,10 @@ $lifecycleFiles = @($linkFiles | Where-Object {
     $lcBranchDoc = @((Get-BranchFilePaths).File, (Get-BranchFilePaths).LegacyCycle,
         (Get-BranchFilePaths).LegacyDeployment, (Get-BranchFilePaths).OlderCycle,
         (Get-BranchFilePaths).OlderDeployment) | ForEach-Object { $_ -replace '/', '\' }
+    # THE PER-BRANCH NAMES JOIN IT BY PATTERN (#1255) -- see the predicate's own header for why a list
+    # cannot do this job any more.
     if ($lcBranchDoc -contains $rel) { return $false }
+    if (Test-IsPerBranchDocumentPath -RelativePath $rel) { return $false }
     return $true
 })
 
@@ -1810,30 +1817,47 @@ if (Test-CheckEnabled 'branch-template') {
         $btCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
         if (Test-Path -LiteralPath $btCfg) { . $btCfg }
         . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
-        $btRel  = (Get-BranchFilePaths).File
-        $btFull = Join-Path $RepoRoot ($btRel -replace '/', '\')
-        $btOnDisk = if (Test-Path -LiteralPath $btFull) {
-            [System.IO.File]::ReadAllText($btFull, [System.Text.Encoding]::UTF8)
-        } else { $null }
+        # EVERY BRANCH DOCUMENT, NOT ONE PATH (#1255). This read the single shared name until the documents
+        # were named per branch, at which point the one thing it exists to find -- a leftover -- became the
+        # one thing it could no longer see: a stale document now sits at a name this check was not looking
+        # at, and the run reported 'absent, which is the trunk between branches'. A gate that answers
+        # 'nothing here' when it did not look is worse than no gate, so the subject is the SET.
+        $btPaths = Get-BranchFilePaths
+        $btDir   = Join-Path $RepoRoot ([string]$btPaths.Directory -replace '/', '\')
+        $btRels  = @([string]$btPaths.SharedFile)
+        if (Test-Path -LiteralPath $btDir -PathType Container) {
+            $btRels += @(Get-ChildItem -LiteralPath $btDir -Filter ([string]$btPaths.Pattern) -File -ErrorAction SilentlyContinue |
+                ForEach-Object { "$([string]$btPaths.Directory)/$($_.Name)" } | Sort-Object)
+        }
+        $btDocs = @()
+        foreach ($btRel in ($btRels | Select-Object -Unique)) {
+            $btFull = Join-Path $RepoRoot ($btRel -replace '/', '\')
+            if (-not (Test-Path -LiteralPath $btFull)) { continue }
+            $btOnDisk = [System.IO.File]::ReadAllText($btFull, [System.Text.Encoding]::UTF8)
+            $btDocs += [pscustomobject]@{
+                Rel      = $btRel
+                Declared = (Get-BranchFileDeclaredBranch -Text $btOnDisk)
+            }
+        }
         [pscustomobject]@{
-            Rel      = $btRel
-            Present  = ($null -ne $btOnDisk)
-            Declared = $(if ($null -ne $btOnDisk) { Get-BranchFileDeclaredBranch -Text $btOnDisk } else { '' })
-            Trunk    = (Get-BranchTrunkName)
+            Docs  = $btDocs
+            Trunk = (Get-BranchTrunkName)
         }
     }
-    $btChecked = 1
-    if ($btState.Present) {
-        if (-not $btState.Declared) {
+    # ONE PER DOCUMENT, and 1 where there are none -- the absent case is still a thing this check ASSERTED,
+    # so reporting 0 checks would read as 'not run'.
+    $btChecked = [Math]::Max(1, @($btState.Docs).Count)
+    foreach ($btDoc in @($btState.Docs)) {
+        if (-not $btDoc.Declared) {
             $btStale = 1
-            Add-Error "[branch-template] $($btState.Rel) exists but declares no branch in its heading. Every reader of this document -- the fold, the two local gates and the CI gate -- identifies a branch's work by that name, so a document without one belongs to nobody. Let new-branch.ps1 write it rather than creating it by hand."
-        } elseif ($btState.Declared -eq $btState.Trunk) {
+            Add-Error "[branch-template] $($btDoc.Rel) exists but declares no branch in its heading. Every reader of this document -- the fold, the two local gates and the CI gate -- identifies a branch's work by that name, so a document without one belongs to nobody. Let new-branch.ps1 write it rather than creating it by hand."
+        } elseif ($btDoc.Declared -eq $btState.Trunk) {
             $btStale = 1
-            Add-Error "[branch-template] $($btState.Rel) names the trunk ('$($btState.Trunk)'), which is the empty state this repo no longer keeps. The document lives only while a branch is open -- new-branch.ps1 creates it and fold-changelog-entry.ps1 removes it -- so a trunk-declaring copy is a leftover from a fold that ran under the old behaviour. Delete it."
+            Add-Error "[branch-template] $($btDoc.Rel) names the trunk ('$($btState.Trunk)'), which is the empty state this repo no longer keeps. The document lives only while a branch is open -- new-branch.ps1 creates it and fold-changelog-entry.ps1 removes it -- so a trunk-declaring copy is a leftover from a fold that ran under the old behaviour. Delete it."
         }
     }
     Write-Coverage -Category 'branch-template' -Checked $btChecked `
-        -Note $(if ($btStale -gt 0) { 'a document declaring the trunk was found where none should exist' } elseif ($btState.Present) { "present and declaring '$($btState.Declared)', which is a branch in progress" } else { 'absent, which is the trunk between branches' })
+        -Note $(if ($btStale -gt 0) { 'a document declaring the trunk was found where none should exist' } elseif (@($btState.Docs).Count -gt 0) { "present and declaring $((@($btState.Docs) | ForEach-Object { "'$($_.Declared)'" }) -join ', '), which is a branch in progress" } else { 'absent, which is the trunk between branches' })
 } else {
     Write-Skip 'branch-template -- not run (-SkipCheck). Nothing is asserted about whether a branch document is left behind in this run.'
 }
