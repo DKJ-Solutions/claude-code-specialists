@@ -39,6 +39,14 @@ $ParkLibSrc        = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 # since inbound #967.
 $SeamLibSrc        = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 
+# LOADED HERE AS WELL AS COPIED INTO THE FIXTURES (#1255). Every lib above is copied into the fixture for
+# the scripts under test to use; these two are additionally dot-sourced into THIS process, because the
+# asserts now have to compose the same per-branch document path the script under test writes. Composing it
+# from the same function is the point -- a literal here would keep passing after the next rename while the
+# lane silently wrote somewhere else. branch-info first: SafeName comes from it.
+. $BranchInfoSrc
+. $EntryScaffoldSrc
+
 $script:pass = 0
 $script:fail = 0
 
