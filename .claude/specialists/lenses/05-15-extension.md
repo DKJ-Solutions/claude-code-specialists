@@ -234,6 +234,63 @@ infrastructure.
   that removes the overlap is not automatically the fix.** Here it would have moved the loss from a marked
   truncation in one reader's view to an unmarked one in another's, and delivered the same text to the
   reader it was meant to help.
+  **AND THE RELAY IS ONLY AS GOOD AS THE WORKFLOW HAVING SPOKEN AT ALL** — issue
+  [#1245](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1245), September 2, 2026, and it is
+  the first entry in this narrative about a failure the diagnostic step never *saw*. Every measurement
+  above describes a run the SDK lived long enough to report on. The **Why the review failed** step is
+  gated on `execution_file != ''`, so when the action dies before the SDK is reached that step is
+  **skipped**, the workflow writes no titled annotation, and `Get-AuthoredFailureNote` — correctly —
+  selects nothing. The operator meets a red tick with a blank reason line: the #966 silence again, in the
+  one class all of the 429 work could not reach.
+
+  **Measured rather than reasoned about.** Run `33663986438` (PR #1249): step *Run Claude Code Review*
+  `failure` after 16s, step *Why the review failed* `skipped`, and the job's annotations were a Node-20
+  warning plus two **untitled** failures — *"Process completed with exit code 1"* and *"Action failed with
+  error: Claude Code is not installed on this repository"*. The reason was in the API the whole time, in
+  the one field the relay does not read. The cause was #1245's own subject: the Claude Code GitHub App did
+  not follow the transfer into `DKJ-Solutions`, so the app-token exchange returned 401.
+
+  **The repair is the second diagnostic step, and its placement is the #1112 rule applied again.** The
+  tempting change is to let the relay fall back to an untitled annotation — and it is the wrong one, for
+  the reason its own asserts already state: it would relay *"Process completed with exit code 1"* in every
+  consuming repo, which is the reassuring-looking note that says nothing. A workflow that wants to be heard
+  writes a title. So the workflow now has the **complementary** gate, `execution_file == ''`, and
+  `pr-issues.tests.ps1` pins that both halves of `failure()` exist — a class cannot fall between them
+  again.
+
+  **What that second sentence may CLAIM is the interesting constraint**, and it is the standing rule of
+  that file rather than a new one. It states only what an **empty output** proves: the SDK produced no
+  result, so the failure is in the setup around it and not in the diff, and no `api_error_status` exists —
+  a 429 or 529 arrives *with* a result message and is therefore the other step's business. It does **not**
+  name the cause, because it cannot: the cause is in the runner's untitled annotation and in the step log,
+  and the step can read neither. Naming today's cause in the sentence would be #966's mistake with the sign
+  flipped — an assertion the run never proved — so the app installation is cited in the job summary as *the
+  measured instance*, not as the diagnosis. The asserts pin that too: the headline may not mention 429,
+  529, quota or a reset.
+
+  **And the escape went in even though every character of that headline is a literal**, which is the
+  #1118 lesson taken at face value rather than re-learned. On literals `${headline//%/%25}` is a no-op —
+  but #1118 was precisely the branch nobody escaped because nobody had interpolated into it *yet*, and it
+  was then the only branch without the guard. So the test pins the emission-site **count** rather than a
+  `-ge`: a new site raises the number deliberately, and cannot slip in unescaped.
+
+  **The transferable half, and it is #1245's own sentence: after a transfer, verify the CAPABILITY, not
+  the artefact that represents it.** The post-transfer checklist checked that the Actions secret survived,
+  and it had — so the check came back clean while both workflows depending on it were dead anyway, because
+  the dependency that broke was one layer further out than the check reached. Its sibling
+  [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244) is the same shape on the same
+  day: `main-ci-gate` present and active while the bypass list it depended on was gone. **Both failure
+  modes are silent by design** — one check is advisory, the other's absence only shows when somebody tries
+  to use it — which is why *"the artefact is still there"* is the one form of verification a transfer
+  defeats.
+
+  **What is NOT in this repo's gift**, stated because the temptation is to close the loop: the app install
+  is an **account-level** action on the `DKJ-Solutions` organisation, like the spend limit #1164 turned out
+  to need. A session can make the failure legible and cannot make it stop. The consumer-facing half — that
+  no shipped *page* states the titled-annotation contract, only the code enforcing it — is
+  [#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251), deliberately not folded in
+  here.
+
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
