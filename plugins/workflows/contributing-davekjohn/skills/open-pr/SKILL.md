@@ -66,6 +66,8 @@ The script:
    [The link gate](#the-link-gate-do-the-entrys-links-survive-the-fold) below.
    Then the **step-list gate**: the branch's own plan must be finished. See
    [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
+   And the **label gate**: the label this PR would be given has to exist in your repository. See
+   [The label gate](#the-label-gate-does-the-label-your-seam-names-still-exist) below.
 4. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
@@ -362,6 +364,57 @@ its reason on the page, which is the half worth reading later.
 `ship-pr` runs this check **again** before the merge. Not belt-and-braces: the requirement is about the
 merge, and a PR opened through `-Force`, by hand on github.com, or days ago and resumed would otherwise
 land with an unfinished plan.
+
+## The label gate: does the label your seam names still exist?
+
+The PR is labelled from the branch prefix -- `fix/` -> `bug`, `feat/` -> `enhancement`, whatever your own
+`scripts/lib/branch-info.ps1` says -- and that label used to go straight to `gh pr create --label`, with
+`gh` as the one to discover it does not exist. `gh` refuses the **whole** create, so no PR is opened:
+
+```text
+resolves gate: this PR closes no issue.
+could not add label: 'bug' not found
+Creating the PR failed: could not add label: 'bug' not found
+```
+
+**What made that expensive is *when* it landed, not that it landed.** Every gate above had already
+passed and the branch was already on `origin`, the remedy was outside the script (create a label, or
+edit the seam table), and the state left behind -- a pushed branch with no PR -- reads exactly like a
+parked branch. So one `gh label list` now runs **before the lint and test gates**, and a label that does
+not exist is refused there:
+
+```text
+label gate: 'bug' is not a label in <owner>/<repo>, so 'gh pr create' would refuse this PR -- refused
+HERE instead, before the push. The label comes from the branch prefix 'fix/' via
+scripts\lib\branch-info.ps1, which is repo-owned: this script cannot validate it against a list of its
+own, so it asked GitHub. Labels that do exist: 'documentation', 'inbound' and 'question'. Two remedies,
+and this script takes neither: create the label (gh label create 'bug' --repo <owner>/<repo>), or point
+the prefix at a label that exists (scripts\lib\branch-info.ps1). ...
+```
+
+**It is not your mistake, which is why it is a gate rather than a better error message.** Measured in a
+consumer on September 1, 2026 (inbound
+[#1221](https://github.com/DaveKJohn/claude-code-specialists/issues/1221)): `bug` and `enhancement` were
+deleted org-wide because the issue **type** now carries that classification. The seam table was correct
+the day before and nothing in the consumer changed. Any repo that renames or retires a label breaks the
+same way, and the first sign of it was a failed create after a push.
+
+- **It refuses and does not fall back.** Substituting a default label would classify the PR wrongly, and
+  a repo that **gates on the label** -- a `pr-guardrails.yml` reading it, say -- would go green on a
+  label that says nothing. Dropping the label is worse: that gate would then go red *after* a successful
+  create. Both silent options look like kindnesses; neither is taken, and the two real remedies are
+  named instead.
+- **The unknown-prefix fallback is checked too.** A branch whose prefix your table does not know is
+  labelled `question`, which is a GitHub *default* label a repo may equally have deleted. The check is
+  on the label that would be **sent**, whatever produced it.
+- **Create path only.** A PR that already exists keeps its own labels and is never sent one, so a label
+  retired after the PR was opened does not block an update.
+- **Not `-Force`-able**, like the link and impact gates. `-Force` exists for text somebody legitimately
+  wrote; a label that does not exist is a fact about the repository, and waving it through could only
+  move the failure back to after the push.
+- **A query it cannot read is not an answer.** An old `gh` without `--json`, a network hiccup, or a repo
+  with no labels at all leaves you with the behaviour this script always had: a warning, and `gh`
+  judging the label at the create. The gate never becomes the reason a PR cannot be opened.
 
 ## The impact gate: how far does this change reach, and how much does it weigh?
 

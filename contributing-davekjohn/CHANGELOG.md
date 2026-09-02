@@ -32,6 +32,237 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/ship-pr-titled-annotation-page-v1` · 20260903-012152
+
+`ship-pr` merges past a failing *not-required* check and relays the sentence that check wrote about
+itself -- but only a *titled* annotation (`echo "::error title=X::Y"`), because GitHub's Actions runner
+writes its own with an empty title and "titled" is what tells an author's diagnosis from exit noise.
+That is a real contract on a consumer's own workflows, and until now it lived only in
+`Get-AuthoredFailureNote`'s docstring -- so a consumer whose advisory check goes red past `ship-pr`
+saw a blank reason line and concluded the relay was broken. The `ship-pr` skill now has a subsection
+stating what the relay reads, the one-line form that satisfies it, and that an untitled failure is
+silent on purpose; `CONTRIBUTING-portable.md` step 5 carries a short pointer to it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+This is the half of #1245's workflow repair that a consumer inherits: their advisory CI (a linter, a
+coverage job) can now be made to explain its own red mark in `ship-pr`'s console by emitting one
+`::error title=…::…` line, where before the reason was reachable only by opening the run.
+
+**Score:** 2
+
+#### Pull Request
+
+the shipped PR docs say what ship-pr's failure-note relay reads, and that an untitled failure is silent on purpose
+
+Plugins: contributing-davekjohn
+
+[PR #1258](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1258)
+
+---
+
+### DEPLOY: `fix/open-pr-label-preflight-v1` · 20260903-005620
+
+`open-pr` now asks GitHub whether the label it is about to attach exists, and refuses there -- before
+the lint and test gates, and therefore before the push. The label came from the repo-owned branch
+prefix table and went to `gh pr create --label` unchecked, so a renamed or retired label killed the
+create after every gate had run and the branch was on `origin`: a pushed branch with no PR, which
+reads exactly like a parked one. The refusal names the label, the prefix that produced it, the seam
+file that maps them and the labels that do exist -- so a rename (`bug` -> `type: bug`) is a repair
+rather than a search.
+
+It refuses instead of falling back, deliberately. Substituting a default label would classify the PR
+wrongly and a repo that gates on the label would go green on a label that says nothing; dropping it
+would turn that same gate red after a successful create. Both silent options look like kindnesses. The
+unknown-prefix fallback is checked on the same footing, since `question` is a GitHub default a repo may
+equally have deleted, and a query that cannot be read is not an answer: an old `gh`, a network hiccup
+or a repo with no labels leaves the behaviour this script always had.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow labels its PRs from a seam table it owns, and a label is a repo
+setting somebody else can change: measured in a consumer on September 1, 2026, `bug` and `enhancement`
+were deleted org-wide because the issue **type** now carries that classification, and the seam table
+was correct the day before. The failure that produced arrived at the most expensive possible moment --
+after the entry, step and resolves gates, after the suites, after the push -- and left behind a state
+indistinguishable from a parked branch. Now it costs one API call and lands in seconds, with both
+remedies named in the line that refuses.
+
+**Score:** 3
+
+#### Pull Request
+
+open-pr checks the branch prefix's label exists before it pushes
+
+Plugins: contributing-davekjohn
+
+[PR #1240](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1240)
+
+---
+
+### DEPLOY: `fix/native-capture-grandchild-handle-race-v1` · 20260903-003022
+
+`Invoke-NativeCaptureUtf8` read its capture files with `[System.IO.File]::ReadAllText`, which opens
+`FileShare.Read`. On the timeout path the whole process tree is force-killed but the wait afterwards
+is on the direct child only, so a grandchild that inherited the redirected stdout handle can still
+hold `out.txt` when the read runs -- and `ReadAllText` then throws "being used by another process"
+instead of returning the partial output. The window is wall-clock, so it was invisible locally and
+lost the race on the slower CI runner, turning an unrelated branch's `lint-en-tests` red with a suite
+name that had no relationship to its diff. The reads now go through a new `Read-NativeCaptureFileText`
+that opens `FileShare.ReadWrite`: it coexists with the lingering handle and returns whatever was
+flushed, which for a killed tree is the honest answer. A regression assert in
+`native-capture.tests.ps1` holds a writer handle open for real and checks both halves.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The fix ships to consumers through the shared `native-capture-lib.ps1` mirror. A consumer whose
+`ship-pr` makes a bounded `git push`/`git fetch` that stalls and is force-killed on a slow machine
+would otherwise get an unrelated `IOException` in place of the timeout diagnosis the bound exists to
+give them.
+
+**Score:** 2
+
+#### Pull Request
+
+native-capture's bounded read tolerates a killed grandchild still holding out.txt
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1256](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1256)
+
+---
+
+### DEPLOY: `docs/ruleset-bypass-dropped-by-transfer-v1` · 20260902-212249
+
+Four documents stop claiming a bypass list that no longer exists. The org transfer carried the
+`main-ci-gate` ruleset across intact and dropped only its bypass actors, so a ruleset that reports
+`active` reads as a clean bill of health while the one array all three direct-on-`main` exceptions run
+on is empty. The system-administration lens said the list "keeps the direct fold/release commits
+possible", the release lens said the cut's push "bypasses the required check", the language rule said a
+field-by-field re-check found the bypass actors unchanged, and the three readings behind "the App is
+NOT in the bypass list" no longer reproduce. Each is now corrected or dated, with the measured
+consequence written down beside it: a blocked fold leaves a live branch document on the trunk, and
+because that path is fixed by design every subsequent PR then conflicts on it -- where the intuitive
+resolution destroys another branch's unfolded changelog entry.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- all four documents are repo-owned. The lenses and `.claude/rules/` do not travel to a consumer,
+and the portable manuals are deliberately untouched: repo settings are not in their scope.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct the ruleset bypass claims the org transfer made untrue
+
+[PR #1257](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1257)
+
+---
+
+### DEPLOY: `fix/missing-suite-note-escalation-v1` · 20260902-210200
+
+When `ship-pr` refuses because no check suite exists, it now names the one cause that is checkable
+rather than guessed. A `pull_request` workflow runs against `refs/pull/<n>/merge`; a conflicting PR has
+no such commit, so GitHub creates no suite for it and the required check can never go green. The
+refusal now says so, and prescribes resolving the conflict.
+
+What makes it worth more than an extra sentence is what it takes AWAY. The note used to offer
+`gh pr close && gh pr reopen` as the cheapest thing to try, and against a conflict that is measured to
+do nothing -- twice over on PR #1243: the reopen the reporter ran, and a fresh head pushed here, polled
+300s, no run either time. Offering it there sends the reader round a loop that cannot terminate, so the
+conflict clause replaces it rather than sitting beside it. The refusal itself is untouched for the
+fifth time; only the diagnosis moved.
+
+The fifth case of a distinction this file has now drawn four times before -- #943 (a red required check
+vs a red advisory one), #1044 (a check that went red vs a run that never started), #1219 (a verdict vs
+a dropped watch), #1234 (no run vs no suite at all). Each time the sentence sent the reader somewhere no
+repair exists. This one had them auditing an org's runner billing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`ship-pr.ps1` and `pr-issues-lib.ps1` are both mirrored into `contributing-davekjohn`, so this reaches
+every consumer running that workflow -- and a conflicting PR is a state any of them can reach, on any
+repo, with no org transfer involved. What made it visible here was a tree-wide merge landing 68 seconds
+before a branch cut from the older base; what makes it recur elsewhere is any PR left open across a
+large merge. The consumer gets the repair named at the exact moment their ship refuses, instead of a
+reopen that cannot work.
+
+**Score:** 3
+
+#### Pull Request
+
+The missing-suite note names the conflicting PR, and withholds the reopen that cannot fix it
+
+Plugins: contributing-davekjohn
+
+[PR #1254](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1254)
+
+---
+
+### DEPLOY: `fix/gate-assert-errorrecord-wrap-v1` · 20260902-204235
+
+The local test gate no longer refuses a branch because of how long the operator's home directory is.
+`round-tally.tests.ps1` asserted that the "nothing to count" error names `-ColumnPattern` by matching
+the bare token against the child's rendered `ErrorRecord` -- and PowerShell 5.1 hard-wraps that
+rendering at the console width, mid-token, at a column that moves with the absolute paths the message
+carries. On a long enough home path the token split and the assert went red on a message that visibly
+contained it, blocking every PR while CI stayed green, because a runner's path is short. The wrapped
+lines are now rejoined before the match, since the property under test is that the message names the
+parameter and never that the formatter left the line whole.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `scripts/tests/` is repo-owned and ships to no consumer; the suite this touches has no mirror in
+any plugin.
+
+**Score:** N/A
+
+#### Pull Request
+
+Rejoin the child formatter's hard wrap before the round-tally assert matches
+
+[PR #1249](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1249)
+
+---
+
+### DEPLOY: `docs/dropped-ship-cost-overstated-v1` · 20260902-201709
+
+The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
+costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
+a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
+ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
+trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
+who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
+
+**Score:** N/A
+
+#### Pull Request
+
+the lost-watch retry changelog entry no longer overstates a dropped ship's cost
+
+[PR #1250](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1250)
+
+---
+
 ### DEPLOY: `feat/repoint-org-transfer-v1` · 20260902-181358
 
 The repo moved from the personal account `DaveKJohn` into the `DKJ-Solutions` organisation on
@@ -159,9 +390,8 @@ it changes only the sentence and never the verdict.
 
 A consumer running the workflow's `ship-pr.ps1` gets both halves. The retry is the part they feel:
 step 1 is the only step that reads the working tree and step 2b has already sent the checkout back to
-the trunk, so before this a dropped socket cost them a re-checkout of the branch plus a full local
-gate run -- lint and every suite -- against a commit CI was already testing. Now it costs one more gh
-call. And on the run that does have to stop, the sentence no longer sends them into their own code
+the trunk, so before this a dropped socket cost them a re-checkout of the branch step 2b had just
+left. Now it costs one more gh call. And on the run that does have to stop, the sentence no longer sends them into their own code
 for a state no branch can repair.
 
 **Score:** 3

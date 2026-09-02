@@ -289,6 +289,42 @@ function Invoke-NativeCapture {
     return [pscustomobject]@{ Output = $output; ExitCode = $code; TimedOut = $false }
 }
 
+function Read-NativeCaptureFileText {
+    <#
+        Read a capture file as text with the given encoding, TOLERATING A WRITE HANDLE STILL OPEN ON
+        IT. Internal to this lib; the -Utf8/timeout arm below is the only caller.
+
+        WHY THIS EXISTS (issue #1252). On a timeout, Invoke-NativeCaptureUtf8 force-kills the child's
+        whole process tree with taskkill /T and then waits on the DIRECT child only. A grandchild that
+        inherited the redirected stdout handle keeps out.txt open until IT is reaped too, and the gap
+        between the kill and that moment is wall-clock -- invisible on a fast machine, a lost race on a
+        CI runner several times slower. [System.IO.File]::ReadAllText opens the file with
+        FileShare.Read, which cannot coexist with the writer handle still held, so it throws
+        "The process cannot access the file ... because it is being used by another process." -- and
+        the exception replaces a diagnosable timeout with an unrelated IO error, on a branch whose diff
+        never touched this code.
+
+        FileShare.ReadWrite coexists with that lingering handle and returns whatever was flushed. For a
+        process tree that was just killed, a possibly-truncated tail is the honest answer -- the same
+        judgement Stop-NativeProcessTree already makes when it lets its own kill attempts fail. Used
+        for BOTH reads, not only the timeout path: a grandchild can outlive a clean exit too, and a
+        shared read costs the normal case nothing.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][System.Text.Encoding]$Encoding
+    )
+
+    $stream = New-Object System.IO.FileStream(
+        $Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+    try {
+        $reader = New-Object System.IO.StreamReader($stream, $Encoding)
+        try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 function Invoke-NativeCaptureUtf8 {
     <#
         The -Utf8 arm of Invoke-NativeCapture; see that function's docstring for WHY. Split out rather
@@ -346,7 +382,10 @@ function Invoke-NativeCaptureUtf8 {
         # throwing, so the timeout is a verdict to report and not an exception to catch. The second,
         # short wait after the kill is not belt-and-braces: the capture files are still open handles
         # until the child is actually reaped, and reading them before that returns a truncated document
-        # -- which would drop the very git output a reader needs to see WHY it stalled.
+        # -- which would drop the very git output a reader needs to see WHY it stalled. That wait is on
+        # the DIRECT child only, though, so a killed grandchild can still hold out.txt when the read
+        # runs -- see Read-NativeCaptureFileText below (#1252) for why the read tolerates that rather
+        # than waiting longer.
         $timedOut = $false
         if ($TimeoutSeconds -gt 0) {
             if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
@@ -367,9 +406,9 @@ function Invoke-NativeCaptureUtf8 {
         # UTF8Encoding($false) still strips one if it is there.
         $utf8 = New-Object System.Text.UTF8Encoding $false
         $text = ''
-        if (Test-Path -LiteralPath $outFile) { $text = [System.IO.File]::ReadAllText($outFile, $utf8) }
+        if (Test-Path -LiteralPath $outFile) { $text = Read-NativeCaptureFileText -Path $outFile -Encoding $utf8 }
         if (-not $DiscardStderr -and (Test-Path -LiteralPath $errFile)) {
-            $text += [System.IO.File]::ReadAllText($errFile, $utf8)
+            $text += Read-NativeCaptureFileText -Path $errFile -Encoding $utf8
         }
 
         # Lines, to match what the & path hands back. A single trailing newline is the terminator of
