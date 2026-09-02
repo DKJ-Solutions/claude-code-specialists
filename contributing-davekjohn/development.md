@@ -1,4 +1,4 @@
-## Development: `feat/repoint-org-transfer-v1` · 20260902-174417
+## Development: `docs/dropped-ship-cost-overstated-v1` · 20260902-200002
 
 > **How this file is read.** A step is `- [ ]` until it is resolved -- `- [x]` done, or
 > `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.
@@ -33,67 +33,46 @@
 
 ### PLAN
 
-Transfer verified (301 redirect, 806 PRs, secret + main-ci-gate ruleset all survived). Next: repoint the functional slugs only -- other DaveKJohn repos (life-hub, thumbnail-generator, djcylow-react), local filesystem paths and author attribution stay.
+#### Context
 
-#### The classification, because a sweep is wrong here
-
-`git grep DaveKJohn` returns **2,133** hits. Filtering out the issue/PR/blob citations and the release
-archive leaves **102**, and only **30** of those are functional. The other 72 are four kinds that a
-find-and-replace would break:
-
-| kind | example | why it stays |
-|---|---|---|
-| other repos under `DaveKJohn` | `connectors/life-hub.json`, `thumbnail-generator`, `djcylow-react`, `ccs-testrun-*` | **not transferred** — repointing them names repos that do not exist |
-| local filesystem paths | `worktree-lib.tests.ps1` (4), `connector-sessioncheck.ps1`'s `..\..\DaveKJohn\claude-code-specialists` | the checkout folder is deliberately not renamed — the install record is keyed on it |
-| author attribution | `marketplace.json`, every `plugin.json` `author`, `SECURITY.md`, the `contributing-davekjohn` plugin name | Dave is still `DaveKJohn`; the org owns the repo, not the authorship |
-| dated measurements | `specialists-init/SKILL.md:246`, `06-16-extension.md:239` | they record what was true on a date — rewriting falsifies the record |
+Issue #1235. The folded DEPLOY entry for `fix/ship-pr-lost-watch-retry-v1` (PR #1233) overstates
+what a dropped ship costs: it claims *"a re-checkout of the branch plus a full local gate run --
+lint and every suite"*. `scripts/lib/gate-lib.ps1` keeps gate evidence keyed on the tree
+(`Test-GateEvidence`/`Save-GateEvidence`, `GateEvidenceMaxAgeMinutes = 240`), so a same-tree resume
+within four hours skips both gates -- the true, smaller cost is only the re-checkout step 2b (#1073)
+had just handed back to the trunk. The DEPLOY lock (#884) meant #1233 could not fix it in place;
+this is the ordinary `docs/` follow-up the issue prescribes.
 
 ### CREATE
 
-- [x] Classify all 102 non-citation hits by hand into change / reword / leave, per the table above
-- [x] Repoint the 28 functional slugs — `Get-RepoName`, `extraKnownMarketplaces`, the connector register, the shipped blueprint (both hits, one inside the JSON-escaped `Get-RepoName` body), both `adopt-workflow-folder.ps1` copies, the `specialists-init` bootstrap block and its `gh api` example, `check-consumer-drift`'s docstring, five test fixtures, the two `*-portable.md` pointers, `INSTALL.md` (4), `README.md` (2), `CLAUDE.md`, the specialists handbook and Sylvester's lens
-- [x] Repoint the two prose owner mentions in Derek's lens (`lives under DaveKJohn`, `the public DaveKJohn repo`) — not slugs, so no sweep would have caught them
-- [x] Record the transfer in `README.md`'s canonical-channel paragraph: a **transfer** redirect is not a rename redirect, and it holds only while nothing is created at the old path
-- [x] Reword the `#669` C4 argument in `agent-shared/README.md` + `agent-shared-lib.ps1` instead of repointing it — its premise was *"a **personal** repo"*, which the transfer retired
-- [~] Repoint the other three connector entries — dropped: `life-hub`, `thumbnail-generator` and `djcylow-react` were not part of this transfer and still live under `DaveKJohn`
+- [x] Replace the overstated clause in `contributing-davekjohn/CHANGELOG.md` (the
+  `fix/ship-pr-lost-watch-retry-v1` DEPLOY entry) with *"a re-checkout of the branch step 2b had
+  just left"* -- the wording the issue proposes. Nothing else in the entry changes.
 
 ### TEST
 
-- [x] `check-plugin-integrity.ps1`: **0 findings** across all 33 checks — including `[config-blueprint]`, which regenerates the shipped artefact from these libs and would have caught a half-repointed blueprint
-- [x] Full suite gate: **58 suites, 0 failures** (245s), covering the five fixtures that assert the repo name
-- [x] `check-connectors.ps1`: the register reads `DKJ-Solutions/claude-code-specialists` and **still resolves this repo's install record** — that record is keyed on the folder path, which did not change
-- [x] `git push` to the new `origin`, and `gh issue`/`gh api` against the org path, both exercised during the branch
+- [x] Verified against `scripts/lib/gate-lib.ps1` that the lint and test gates both skip on a
+  same-tree resume within `GateEvidenceMaxAgeMinutes` (240). No automated test -- prose-only
+  changelog correction.
 
-### DEPLOY: `feat/repoint-org-transfer-v1`
+### DEPLOY: `docs/dropped-ship-cost-overstated-v1`
 
-The repo moved from the personal account `DaveKJohn` into the `DKJ-Solutions` organisation on
-September 2, 2026, and every functional reference now names the new owner: `Get-RepoName` (so every
-`gh --repo` in the tree), the marketplace source this repo consumes itself through, the connector
-register, the config blueprint shipped to consumers, and the install documentation.
+The folded changelog entry for `fix/ship-pr-lost-watch-retry-v1` no longer claims a dropped ship
+costs a full local gate run. `scripts/lib/gate-lib.ps1` stores gate evidence keyed on the tree, so
+a resume within four hours on an unchanged tree skips both lint and the suites -- what a dropped
+ship still costs is the re-checkout of the branch `ship-pr` step 2b had just handed back to the
+trunk. The diagnosis in the entry was accurate; only its impact clause was inflated.
 
-**The work was deciding what NOT to touch.** Of 2,133 mentions of `DaveKJohn`, 30 were functional; the
-rest are other repos that did not move, local filesystem paths, author attribution, and dated
-measurements. Each is named in CREATE with the reason it stays, so the next reader does not re-open
-the question — and so nobody runs the sweep this branch deliberately did not.
-
-**Nothing breaks in the meantime, and one thing must never happen.** GitHub's transfer redirect keeps
-the old path resolving, which is what every existing consumer's `settings.json` still rides on. That
-redirect survives only while nothing is created at `DaveKJohn/claude-code-specialists`, so that path
-must never be recreated — now stated in `README.md` beside the two rename redirects it sits next to.
-
-**Score:** 3
+**Score:** 1
 
 #### What makes this deploy extra special
 
-A consumer needs to do nothing: their `extraKnownMarketplaces` still names the old owner, and the
-transfer redirect resolves it. What changes for them is what a *fresh* adoption writes — `INSTALL.md`,
-the `specialists-init` bootstrap block and the shipped config blueprint now name `DKJ-Solutions` — and
-one standing condition they inherit without asking for it: the old path must never be recreated, or
-every registration still pointing at it stops resolving at once.
+N/A -- a subscriber of the service does not read this repo's internal changelog entries; a consumer
+who does now reads a sentence that matches the shipped behaviour, with nothing to act on.
 
-**Score:** 2
+**Score:** N/A
 
 #### Pull Request
 
-Repoint every functional reference to the DKJ-Solutions org
+the lost-watch retry changelog entry no longer overstates a dropped ship's cost
 
