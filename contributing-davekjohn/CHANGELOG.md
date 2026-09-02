@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/native-capture-grandchild-launch-race-v1` · 20260902-161546
+
+The test gate no longer refuses a push because the machine was busy. `native-capture.tests.ps1`'s
+grandchild fixture had a 3-second bound that has to cover two cold PowerShell 5.1 startups before the
+grandchild can write the marker proving it launched, and that bound is crossed by load alone --
+measured here at 2.67s with every core busy and 9.68s at twice that, against 3s. The assert that
+failed is about process startup timing, so the refusal named a branch that had nothing to do with it
+and cost a full gate run. The attempt is now repeated at a wider bound rather than reported as a
+failure, with the grandchild's sleep and the post-run wait derived from whichever bound is in play;
+an unloaded machine still pays what it always paid, and a run where even the wide bound cannot get
+the grandchild up still fails, because a gate whose verdict a re-run clears is a gate that has
+stopped working.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the suite is not plugin payload. `native-capture-lib.ps1` is mirrored to consumers, its test
+suite is not, so nothing here reaches a consuming repo.
+
+**Score:** N/A
+
+#### Pull Request
+
+the grandchild-launch assert no longer races two cold PowerShell startups
+
+[PR #1236](https://github.com/DaveKJohn/claude-code-specialists/pull/1236)
+
+---
+
 ### DEPLOY: `fix/ship-pr-lost-watch-retry-v1` · 20260902-152938
 
 `ship-pr` no longer reports a dropped connection as a code failure, and re-enters the wait instead of
