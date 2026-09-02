@@ -323,7 +323,8 @@ something is *wrong*, and a rule in the wrong file is not wrong, so nothing was 
 Reading a consumer's answers page occasionally is the only thing that finds this class.
 
 **What follows from that, for you.** Two things. First, the rules carrying explicit decisions — 2, 4 and 6
-below — are the ones to keep even where they are inconvenient; they are what the five rounds were spent on.
+below, and 14 — are the ones to keep even where they are inconvenient; the first three are what the five
+rounds were spent on, and 14 came back later as an inbound report from the same repo.
 Second, **the vocabulary has not met a second tracker**, so treat every name in this section as an example of a
 role rather than a term to adopt. If a rule reads as obviously wrong for your tracker, the rule is the thing
 to re-measure — file it back as an inbound issue rather than working around it silently.
@@ -346,6 +347,10 @@ that line is a snapshot; everything below it does not rot.
 This is the rule that makes the rest safe, and it is the one most likely to be skipped as bookkeeping.
 Measured in the originating repo before it existed: **30 undated copies of tracker state across six files**,
 with no way to tell which were current and no gate on any of them.
+
+**Read-only is about the copied *content*, not about the source tracker as a whole.** Its one field you
+do change is its state, and rule 14 covers when — taking a request in is a move the person who filed it
+can see.
 
 Beyond that boundary, a ticket file needs to answer four things in some order — what we know, whether we
 know enough, what happens next, and what has happened so far. The rules below are about how each of those is
@@ -566,6 +571,33 @@ The outgoing text is read by a colleague rather than by us, and each of these wa
    picked, the sentence promised something that was not delivered. **A number is a reference to us and a
    guess to him** — name the question instead.
 
+#### 14. Taking a request in is a move the requester can see
+
+The provenance boundary treats the source tracker as read-only, and for what you *copy* from it that is
+right. It is not right for the one thing the source owns that you also **change**: its state. A request
+taken in has moved — from *nobody has looked at this* to *this is tracked where the work happens* — and
+the person who filed it is watching that column, not your repo. So the row advances **when the ticket
+document is created**, not when a branch opens and not when it ships. An issue that exists here while
+the source still says *new* reads, to the filer, as a request nobody picked up — which is exactly what
+the issue disproves — and the colleague chasing it chases it in the one place with no answer.
+
+**"Automatically" is how this step gets described once it is habitual, and a reader who believes it is
+handled will not do it.** Measured in the originating repo on 2026-09-02: a request was filed as an
+issue and the source board left on its intake column; over an hour later the task's own last-modified
+time still predated the issue. Nothing was going to move it.
+
+Two things are yours to answer. **Which column** the row advances to on pickup — one target, picked
+once. **And which board**, when the request sits on more than one: advance only the board that tracks
+*your* delivery state; a requester's intake board still describes the request accurately after you have
+picked it up, so moving its card says something false. Advancing every board the request touched was
+the first mistake made with this rule.
+
+This is the pickup end of a symmetry some repos already run at the other end — the introduction names
+one, a tracker-specific layer that resolves the source task from the issue's close. Both ends are one
+idea: the source's state is not yours to copy, and it is yours to advance.
+
+An explicit decision.
+
 ---
 
 ### What your repo answers
@@ -584,6 +616,7 @@ of this plugin uses:
 | **every section and field name** | the roles above are the rule; the names are not |
 | **the state vocabulary** | rule 7 requires it to be *closed*, not to be these eight values |
 | **whether there is an index at all** | rule 10 applies if you have one, and a host tracker gives you one whether or not you wanted it |
+| **which column pickup advances the source row to, and on which board** | rule 14 — one target column, and only the board that tracks your delivery state when the request sits on several |
 
 **The language is two questions, and only the first has one answer per repo.** The **form** — the section
 names, the field names, the state vocabulary — is workflow rather than subject matter, so a repo picks a
