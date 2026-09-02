@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/asana-board-stage-sections-v1` · 20260902-124821
+
+The `bwj-codex` mirror learns the half of the board a colleague actually reads: **which column a card
+is in**. The board's six sections are now the ticket cycle -- from *a colleague put this on your name*
+through *tracked on GitHub*, *in development*, *merged*, *ready to test*, to *tested and good* -- and
+the card follows its GitHub issue's own state without anybody dragging it.
+
+A section is recognised by the **number its name starts with**, so the words after it belong to the
+team and can be rewritten any day; a board whose sections are not numbered is never written to at all,
+which is what keeps this off every other board in the workspace. The two ends stay the requester's:
+`Test-StageIsWritable` permits stages 2 to 5 and nothing else, and a card already in `Completed` is not
+moved -- the section-move twin of the standing guarantee that nothing here ever ticks a task off. Every
+move is forward, derived as a **floor** rather than a position, so the nightly sweep can never undo the
+one hop only a session can see; an `issue reopened` event is the single backward move in the script.
+
+For three of the four writable stages that sweep is not a backstop but the mechanism, because an issue
+is filed, a branch opens and a pull request merges without `issues: closed` ever firing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+For the two BWJ store repos this plugin serves, the board stops being a static list. The gap inbound
+#1217 measured -- an issue filed here while the board still said `New`, so the colleague waiting on it
+read their request as untouched and chased it in the one place with no answer -- is closed at the
+mechanism rather than with a written reminder.
+
+**Two setup steps are required before any of it happens, and both fail silently if skipped.** The
+board's sections have to carry a leading number, and `Get-AsanaProjectGid` has to name that board --
+which turns a question this page used to leave open (*one shared project or one per store?*) into a
+single right answer, because the stages live on the board's sections and `Prio-Score` does not cross
+workspaces. **Both** store repos currently point at the same provisional "Test" project in a different
+workspace from the board -- `smartwatchbanden#470` already reports it and now carries the second
+consequence; `xoxowildhearts#194` is its own.
+
+**Score:** 4
+
+#### Pull Request
+
+the Asana board's six sections become the cycle's stages
+
+Plugins: bwj-codex
+
+[PR #1223](https://github.com/DaveKJohn/claude-code-specialists/pull/1223)
+
+---
+
 ### DEPLOY: `docs/tracker-native-ticket-fields-v1` · 20260902-103815
 
 The ticket-work layer gains the one rule it was missing for a consumer whose tickets live in a tracker
