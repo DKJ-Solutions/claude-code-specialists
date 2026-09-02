@@ -32,6 +32,47 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/open-pr-label-preflight-v1` · 20260903-005620
+
+`open-pr` now asks GitHub whether the label it is about to attach exists, and refuses there -- before
+the lint and test gates, and therefore before the push. The label came from the repo-owned branch
+prefix table and went to `gh pr create --label` unchecked, so a renamed or retired label killed the
+create after every gate had run and the branch was on `origin`: a pushed branch with no PR, which
+reads exactly like a parked one. The refusal names the label, the prefix that produced it, the seam
+file that maps them and the labels that do exist -- so a rename (`bug` -> `type: bug`) is a repair
+rather than a search.
+
+It refuses instead of falling back, deliberately. Substituting a default label would classify the PR
+wrongly and a repo that gates on the label would go green on a label that says nothing; dropping it
+would turn that same gate red after a successful create. Both silent options look like kindnesses. The
+unknown-prefix fallback is checked on the same footing, since `question` is a GitHub default a repo may
+equally have deleted, and a query that cannot be read is not an answer: an old `gh`, a network hiccup
+or a repo with no labels leaves the behaviour this script always had.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow labels its PRs from a seam table it owns, and a label is a repo
+setting somebody else can change: measured in a consumer on September 1, 2026, `bug` and `enhancement`
+were deleted org-wide because the issue **type** now carries that classification, and the seam table
+was correct the day before. The failure that produced arrived at the most expensive possible moment --
+after the entry, step and resolves gates, after the suites, after the push -- and left behind a state
+indistinguishable from a parked branch. Now it costs one API call and lands in seconds, with both
+remedies named in the line that refuses.
+
+**Score:** 3
+
+#### Pull Request
+
+open-pr checks the branch prefix's label exists before it pushes
+
+Plugins: contributing-davekjohn
+
+[PR #1240](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1240)
+
+---
+
 ### DEPLOY: `fix/native-capture-grandchild-handle-race-v1` · 20260903-003022
 
 `Invoke-NativeCaptureUtf8` read its capture files with `[System.IO.File]::ReadAllText`, which opens
