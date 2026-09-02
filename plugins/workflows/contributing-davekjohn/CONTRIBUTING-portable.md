@@ -1,6 +1,6 @@
 # The contribution cycle — the portable half
 
-This is the cycle the `contributing-davekjohn` scripts run: an issue, a branch, its `contributing-davekjohn/development.md`, a Pull
+This is the cycle the `contributing-davekjohn` scripts run: an issue, a branch, its `contributing-davekjohn/development-<branch>.md`, a Pull
 Request that has to get past its gates, a merge, and a fold. **It is written to be read in any repo that
 enables this plugin**, which is why it names the *seam* wherever a repo owns the answer, rather than stating
 one repo's answer as the rule.
@@ -94,7 +94,7 @@ this plugin reads either**, so that alignment is a convention you keep rather th
 Creating the branch writes its working document, so **a branch is never entry-less**. It has two halves
 with two different readers:
 
-| half of `contributing-davekjohn/development.md` | subject | lifetime |
+| half of `contributing-davekjohn/development-<branch>.md` | subject | lifetime |
 |---|---|---|
 | `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | removed at the merge; never folded |
 | `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |

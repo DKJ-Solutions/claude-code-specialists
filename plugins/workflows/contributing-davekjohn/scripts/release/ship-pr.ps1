@@ -810,7 +810,11 @@ $shipCycleRead = {
     param([string]$Rel)
     Get-GitFileTextAtRef -Ref $shipCycleRef -Path $Rel -RepoRoot $shipCycleRoot
 }
-$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead
+# -Branch IS MANDATORY ON THIS ARM IN PRACTICE (#1255). The Reader arm deliberately does NOT default to
+# HEAD -- it resolves against a tree this script is not standing in -- so without the branch the resolver
+# would look for the pre-#1255 shared name and miss this branch's own document entirely. The failure would
+# be the silent one the paragraph above describes: no path, no text, and a gate reading "no document".
+$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead -Branch $branch
 $shipCycleText    = & $shipCycleRead $shipProgressRel
 if ($null -ne $shipCycleText) {
     $shipSteps = @(Get-BranchProgressFindings -Text $shipCycleText)

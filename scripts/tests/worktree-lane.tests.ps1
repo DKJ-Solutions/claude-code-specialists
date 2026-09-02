@@ -191,8 +191,14 @@ try {
     Assert-Equal 'main' (Get-HeadBranch -Dir $fa) "open: the PRIMARY still sits on main (the load-bearing guarantee)"
     # The -RepoRoot delegation: the dossier belongs to the lane, and the primary must not have gained
     # a copy. Asserting only the first half would pass for a script that wrote into both.
-    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development.md')) "open: the development document is written in the lane"
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development.md'))) "open: the primary did NOT gain one"
+    # The name carries the branch since #1255, and the lane's branch is 'feat/lane-a-v1'. Written out
+    # rather than derived, deliberately: this suite is asserting that worktree-lane delegated -RepoRoot
+    # correctly, and a path computed from the same lib the script used would agree with it either way.
+    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development-feat-lane-a-v1.md')) "open: the development document is written in the lane"
+    # THE NAME THIS COULD ACTUALLY GAIN, which is the per-branch one (#1255). Checking the pre-#1255
+    # shared name here would pass whatever the script did, because nothing writes that name any more --
+    # a negative assert against a path no writer can produce is not a measurement.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development-feat-lane-a-v1.md'))) "open: the primary did NOT gain one"
     # AND THE LANE IS ON ORIGIN THE MOMENT IT OPENS (#900). Asserted here rather than left to
     # new-branch's own suite, because a lane is the case that needs it most: opening one is by definition
     # work running beside something else, which is exactly when the other side cannot see a local branch.

@@ -182,7 +182,7 @@ opened the page and a development task was the first thing that happened here; s
 since earlier that day, so `NEW` had started claiming what the step above it does. The step numbers did not
 move with the name — every `2.x` on this page and in [`README.md`](README.md) still points where it did.
 
-### 2.1. Create the branch and the empty `development.md`
+### 2.1. Create the branch and the empty `development-<branch>.md`
 
 **Two steps, one command, and that is the point rather than a shortcut.** `new-branch` does both: a branch is
 never entry-less, so there is no moment at which the branch exists and its document does not. They are
@@ -193,6 +193,18 @@ not because anybody performs them apart.
 belongs to the **current branch** and exists only while one is open — the fold removes it at the merge, so on
 the trunk it is simply not there. That absence is the trunk's normal state, not a file somebody deleted, and
 it is why the file is named here without a link.
+
+**The name carries the branch** — `fix/thing-v1` gets `contributing-davekjohn/development-fix-thing-v1.md`,
+slashes flattened. **One per branch since September 3, 2026**
+([#1255](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1255)), where it was a single shared
+`development.md`. That shared path did not collide on checkout, which is what the old reasoning said, but it
+collided on *merge*: every merge to `main` left every other open PR conflicting on it, and a conflicting PR
+gets **no check suite at all** — so `lint-en-tests` could never go green and the PR could never merge. The
+full measurement, including why the fold is not the fix and why a `.gitattributes` merge strategy would not
+have worked either, is in
+[`DEVELOPMENT-portable.md`](../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
+**Nothing identifies a document by its filename**, then or now: the fold and all four gates read the branch
+out of the document's own heading, which is what keeps a `-v2` suffix free.
 
 **Four `###` headings and never a fifth**, and nothing branch-specific above `### PLAN` (Dave, August 26, 2026).
 PLAN, CREATE, TEST and DEPLOY are the whole top level; a section needing its own heading goes in as a `####`
@@ -279,7 +291,7 @@ reads it as a step.
 DEPLOY section folds into `CHANGELOG.md`, which sits there — and so does this file, so a link that resolves
 here resolves there too. `../scripts/x.ps1`, never `scripts/x.ps1` — the second resolves to
 `contributing-davekjohn/scripts/x.ps1`, which does not exist, so it reads correctly on the branch and is dead
-once it lands, and `open-pr`'s link gate refuses it. This is what `development.md`'s own header boilerplate
+once it lands, and `open-pr`'s link gate refuses it. This is what `development-<branch>.md`'s own header boilerplate
 means by *"Relative links in that text resolve FROM THIS DIRECTORY."* (It was root-relative until issue
 [#1041](https://github.com/DaveKJohn/claude-code-specialists/issues/1041), which moved the gate's base to the
 changelog's own directory when `CHANGELOG.md` moved off the repo root.)
@@ -361,7 +373,7 @@ the same rule the tier line gets, and the same rule the folder rename got in ste
 #### 3.2.2. the step-list gate, on the branch's own plan
 
 **Dave, August 6, 2026.** A branch reaches a PR when its own plan is finished, so `open-pr.ps1` refuses to
-push and `ship-pr.ps1` refuses to merge while the step half of `development.md` has an unresolved step.
+push and `ship-pr.ps1` refuses to merge while the step half of `development-<branch>.md` has an unresolved step.
 **Both**, deliberately: the requirement Dave gave is about the *merge*, and `open-pr` has an escape valve — a
 PR opened through it, or by hand on github.com, would otherwise land with an unfinished plan.
 
@@ -403,7 +415,7 @@ reads the diff**. So `open-pr.ps1` asks the second question — a plan reading a
 committed on the branch besides this document** does not become a PR.
 
 **What it was measured on.** PR #1025 merged an entry describing two new rules in a manual whose edit was
-never committed. The branch's whole diff was `development.md`; the fold then *removes* that file, so the merge
+never committed. The branch's whole diff was `development-<branch>.md`; the fold then *removes* that file, so the merge
 delivered a changelog entry and no content at all. Every gate was green.
 
 **The measurement is not new — its delivery is.** `park-cycle`'s backing note
@@ -596,7 +608,7 @@ ship — `open-pr`'s lint and test gates — is the one step that reads the **wo
 more, and a second command in the same checkout during that minute moves it under them: `new-branch.ps1`
 cutting a branch, `worktree-lane.ps1` moving the tree. Measured on
 [PR #1144](https://github.com/DaveKJohn/claude-code-specialists/pull/1144): one suite of 55 red inside the
-gate, green standalone on the same commit seconds later, because `contributing-davekjohn/development.md`
+gate, green standalone on the same commit seconds later, because `contributing-davekjohn/development-<branch>.md`
 exists on the branch and not on the trunk and the suite walks every `*.md` under that folder. **No gate
 refuses this** — `open-pr` reports it instead: a red whose tree moved says it is not trustworthy, and a green
 whose tree moved is not recorded as gate evidence. Re-run the gate; do not go hunting the failure.
@@ -702,12 +714,12 @@ Merge method: **`merge`** — a merge commit, not a squash (`Get-PrMergeMethod`)
 
 ### 3.5. Copy the last DEPLOY into `CHANGELOG.md` under `## [Unreleased]`, newest to oldest
 
-### 3.6. Delete `development.md`
+### 3.6. Delete `development-<branch>.md`
 
 **3.5 and 3.6 are one command, and the first direct-on-`main` exception.**
 [`fold-changelog-entry.ps1`](../scripts/release/fold-changelog-entry.ps1) folds the entry into `CHANGELOG.md`
 and clears it, and on request makes that commit itself — **bounded to `CHANGELOG.md` plus
-`development.md`**, which the same run removes. Since August 2, 2026 that bound is enforced rather than
+`development-<branch>.md`**, which the same run removes. Since August 2, 2026 that bound is enforced rather than
 merely intended: the commit names its paths, so nothing else in the tree can ride along. Committing stays
 opt-in, because it is this exception being used.
 

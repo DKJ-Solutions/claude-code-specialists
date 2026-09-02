@@ -762,8 +762,12 @@ foreach ($f in $oldFolderForms) {
 # placeholder a fresh template is scaffolded with, and nothing else would notice.
 Assert-Equal $known[$known.Count - 1] (Get-PrTemplateCanonicalPlaceholder) `
     'the canonical placeholder is the last entry, so an appended form did not land mid-list'
-Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'development\.md') `
-    'and it names the document by its current filename'
+# THE CURRENT FILENAME CARRIES THE BRANCH SINCE #1255, so the placeholder names the SHAPE rather than a
+# literal path -- a template is scaffolded once and read on every branch, so it cannot name one branch's
+# document. The assert follows the shape for the same reason it followed the name before: to catch a
+# placeholder left describing a document that no longer exists.
+Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'development-<branch>\.md') `
+    'and it names the document by its current filename shape'
 
 $canonical = Get-PrTemplateCanonicalPlaceholder
 Assert-True ($known -contains $canonical) `

@@ -464,9 +464,10 @@ $branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
 # THE BRANCH'S WORKING DOCUMENT LIVES AT contributing-davekjohn/development.md, NOT IN THE REPO ROOT
 # UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder August 14,
 # 2026; merged from two files into one on August 23, 2026).
-# One fixed path, and git's own per-branch tracking is what keeps two branches from colliding on it --
-# see the block in entry-scaffold-lib.ps1 for why that beats a filename per branch.
-$branchFiles    = Get-BranchFilePaths
+# ONE NAME PER BRANCH SINCE #1255 (September 3, 2026), where it was one fixed path. The fixed path did not
+# collide on CHECKOUT, which is what the old reasoning said; it collided on MERGE, which is what it did not.
+# See the block in entry-scaffold-lib.ps1 for the measurement.
+$branchFiles    = Get-BranchFilePaths -Branch $branch
 $branchDirPath  = Join-Path $repoRoot $branchFiles.Directory
 
 # WHICH NAME THIS RUN WRITES, on a repo that may still hold a pre-August-23-2026 pair. The rule is the
@@ -498,8 +499,12 @@ function Get-BranchFileTargetRel {
     return $Current
 }
 
+# THE SHARED NAME LEADS THE LEGACY LIST (#1255), and it is the entry that matters most on the day of the
+# change: every branch open right now is working in it. Without it a rerun of this script on such a branch
+# would create the per-branch document beside the one holding the work and split it in half -- the exact
+# failure this list exists to prevent, one rename further on.
 $cycleRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.File `
-    -Legacy @($branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
+    -Legacy @($branchFiles.SharedFile, $branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
 $cyclePath = Join-Path $repoRoot ($cycleRel -replace '/', '\')
 
 if (-not (Test-Path -LiteralPath $branchDirPath)) {
@@ -535,6 +540,20 @@ $cycleExisting = if (Test-Path -LiteralPath $cyclePath) { [System.IO.File]::Read
 $cycleOwner    = Get-BranchFileDeclaredBranch -Text $cycleExisting
 $cycleTaken    = ($cycleOwner -eq $branch)
 
+# READ THIS BEFORE DELETING THE BLOCK BELOW AS DEAD CODE (#1255, September 3, 2026). Naming the document
+# per branch removed almost every way of reaching it. The target is now this branch's own name, and a
+# legacy name is chosen for one reason only -- it already declares THIS branch -- so the ordinary route in,
+# a branch stacked on an unfolded one, cannot produce a foreign owner any more: the two branches write
+# different files. What is left is the odd tree: a branch renamed after its document was written, or a
+# document created by hand under a name that does not match it.
+#
+# IT STAYS, for the reason the block itself gives. What it protects is work that exists in exactly one
+# place -- edits carried into a new branch by `git checkout -b` and never committed -- and the cost of
+# keeping an unreachable guard is a few lines, while the cost of being wrong about "unreachable" is
+# somebody's uncommitted entry. new-branch.tests.ps1 scenario (n2) measures the new guarantee (a foreign
+# document is never TARGETED) rather than pretending to reach this; that is deliberate and is written up
+# there.
+#
 # A FOREIGN OWNER IS OVERWRITTEN, EXCEPT WHERE THE OVERWRITE WOULD BE UNRECOVERABLE -- and that
 # distinction is measured rather than assumed, because this repair is what creates the destructive
 # path. Before it, a foreign file was kept; after it, it is written over. In the ordinary stacked case
