@@ -766,6 +766,72 @@ Assert-True ($shipText -like '*no readable check facts*') 'ship-pr''s wait-repor
 Assert-True ($shipText -notmatch 'which check governed could not be read') 'and no longer words that as a fault about the wait itself'
 
 
+# --- Get-LostWatchNote: the watch dropped, CI did not (issue #1219) -------------------------------
+# Measured on PR #1218, September 2, 2026: `gh pr checks --watch` died after nine clean poll cycles on
+# `wsarecv: An existing connection was forcibly closed by the remote host`, exited non-zero, and
+# ship-pr said "CI did not pass ... Fix CI and re-run" about a run that went green minutes later. The
+# third case of the distinction #943 and #1044 already drew twice -- and the verdict is untouched for
+# the third time: these asserts pin the DIAGNOSIS and the RETRY DECISION, never the merge.
+
+# The measured payload, read seconds after the drop: one check green, two still running, none failed.
+$dropped = '[{"bucket":"pass","name":"branch-entry","state":"SUCCESS"},{"bucket":"pending","name":"lint-en-tests","state":"IN_PROGRESS"},{"bucket":"pending","name":"claude-review","state":"PENDING"}]'
+$lostNote = Get-LostWatchNote -ChecksJson $dropped -PrNumber '1218'
+Assert-True ($lostNote -ne '') 'nothing failed while two checks are still running -- the exit code is contradicted by the payload'
+Assert-True ($lostNote -like '*WATCH dropped*') 'and the note names the watch as what broke, which is the whole reading being corrected'
+Assert-True ($lostNote -like '*nothing to re-run*') 'it states the negative too: there is no branch-side repair for a healthy run'
+Assert-True ($lostNote -like "*'claude-review' and 'lint-en-tests' are still running*") 'the pending checks are named and read as prose, not as System.Object[]'
+Assert-True ($lostNote -like '*gh pr checks 1218 --watch*') 'and it names the one command that re-enters the wait'
+
+$lostNoteOne = Get-LostWatchNote -ChecksJson '[{"bucket":"pending","name":"lint-en-tests","state":"QUEUED"}]' -PrNumber '7'
+Assert-True ($lostNoteOne -like "*'lint-en-tests' is still running*") 'one pending check is described in the singular'
+
+# THE ASSERT THAT KEEPS THIS FROM MIS-NARRATING A REAL FAILURE, and it is the mirror of the
+# cry-wolf assert Get-StalledRunNote carries. ONE failing check makes the non-zero exit a verdict,
+# whatever else is still pending, and there the old wording is the correct one.
+$redPlusPending = '[{"bucket":"fail","name":"lint-en-tests","state":"FAILURE"},{"bucket":"pending","name":"claude-review","state":"PENDING"}]'
+Assert-Equal '' (Get-LostWatchNote -ChecksJson $redPlusPending) 'a failing check beside a pending one is a verdict -- no note, so "Fix CI and re-run" still prints'
+Assert-Equal '' (Get-LostWatchNote -ChecksJson $pr937All) 'the #943 payload (claude-review red, lint-en-tests green) is a verdict too'
+foreach ($state in @('CANCELLED', 'TIMED_OUT', 'STARTUP_FAILURE')) {
+    $cj = "[{`"bucket`":`"fail`",`"name`":`"a`",`"state`":`"$state`"},{`"bucket`":`"pending`",`"name`":`"b`",`"state`":`"PENDING`"}]"
+    Assert-Equal '' (Get-LostWatchNote -ChecksJson $cj) "a $state check is read through Get-CheckOutcome and is not a socket either"
+}
+
+# NOTHING PENDING, NOTHING SAID. A payload in which everything passed does not reach this -- the
+# verdict is not Blocked there, so the caller takes its merge-proceeds path -- and "all green and the
+# watch exited non-zero" wants a different sentence from this one.
+Assert-Equal '' (Get-LostWatchNote -ChecksJson '[{"bucket":"pass","name":"a","state":"SUCCESS"}]') 'every check passed: not this note''s case'
+Assert-Equal '' (Get-LostWatchNote -ChecksJson '[{"bucket":"weird","name":"a","state":"HUH"}]') 'an unrecognised state is not proof anything is running, so nothing is claimed'
+
+# UNREADABLE IN, EMPTY OUT -- the OPPOSITE of Get-MergeBlockVerdict's answer to the same input, and
+# right in both places. There silence must refuse, because it guards a merge; here silence must not
+# narrate, because a "CI is still running" in front of a red check is worse than the old wording.
+foreach ($bad in @('', '   ', 'not json', 'null', '[]', '{}', '[{"bucket":"pending"}]')) {
+    Assert-Equal '' (Get-LostWatchNote -ChecksJson $bad) "an unreadable checks payload ('$bad') costs the note and the retry, and claims nothing"
+}
+
+# Without a PR number the note still stands and simply stops after the state it read.
+$lostNoId = Get-LostWatchNote -ChecksJson $dropped
+Assert-True ($lostNoId -like '*WATCH dropped*') 'no PR number: the diagnosis is unchanged'
+Assert-True ($lostNoId -notlike '*gh pr checks  --watch*') 'and no command is printed with a missing argument'
+
+# AND SHIP-PR ACTUALLY RETRIES ON IT. The asserts above prove the decision; these prove the caller
+# both asks for it and acts on it -- the same reasoning as the #1044 call-site asserts above, and the
+# same failure mode: a reverted call site would leave every assert here green while a dropped watch
+# still cost a re-checkout and a duplicate gate run.
+Assert-True ($shipText -like '*Get-LostWatchNote -ChecksJson*') 'ship-pr.ps1 asks whether a non-zero watch was the connection rather than a check (#1219)'
+Assert-True ($shipText -like '*maxWatchAttempts*') 'and the retry is BOUNDED rather than a loop with no ceiling'
+Assert-True ($shipText -like '*CI is still RUNNING for PR*') 'a dropped watch gets its own lead sentence, beside "CI never RAN" and "CI did not pass"'
+$idxWatchCall = $shipText.IndexOf("'--watch'")
+$idxLost      = $shipText.IndexOf('Get-LostWatchNote -ChecksJson')
+Assert-True ($idxLost -gt $idxWatchCall) 'the read happens AFTER the watch it is diagnosing'
+# The retry needs the check payload, so the fact-pair read moved inside the loop -- and the loop has to
+# close after it, or the second attempt would judge the first attempt's payload.
+$idxLoopHead  = $shipText.IndexOf('$watchAttempt++')
+Assert-True ($idxLoopHead -ge 0 -and $idxLoopHead -lt $idxWatchCall) 'the watch call sits inside the attempt loop rather than before it'
+$idxFacts     = $shipText.IndexOf('startedAt,completedAt,link')
+Assert-True ($idxFacts -gt $idxWatchCall -and $idxFacts -lt $idxLost) 'and the check facts are re-read per attempt, which is what the decision is made from'
+
+
 # --- Get-PrCreateFailureReason: gh's own answer, not a guess (inbound #1077) -----------------------
 # open-pr replaced gh's message with "Creating the PR failed (is gh logged in?)" on a run where gh had
 # just listed PRs, pushed and read the issue list -- so the loudest line on screen named the one thing
