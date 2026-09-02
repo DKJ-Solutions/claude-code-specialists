@@ -32,6 +32,52 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/asana-stage-map-seam-v1` · 20260902-140055
+
+The stage model shipped with its meanings written as literals, and the board it was written against
+changed shape the same afternoon -- a column added in the middle, moving every stage above it by one.
+Nothing failed: the sweep would simply have filed every card a column early, on a board whose entire
+purpose is telling somebody where their request is.
+
+So the model now separates two questions that looked like one. **Which column is this?** is still
+answered by the number a section's name starts with -- unchanged, and still what lets the team rename
+a column freely. **What does that column mean?** is answered by the repo, in `Get-AsanaStageMap`, with
+semantic keys rather than GIDs so a rebuilt column costs nothing. A repo that states no map gets the
+built-in one and the run says which it read. **And a column the map does not name is now a hold** --
+not a target and not a source -- so the next board that grows a section has cards that stop moving
+rather than cards in the wrong place.
+
+The blocked column is label-driven: while `needs-info` is on an issue the card stays there whatever
+the branch and the pull request are doing, because the person who set it knows something the tracker
+does not. That makes it the second of exactly two answers allowed to move a card backward, beside an
+issue being reopened -- and it is why `labeled`/`unlabeled` now fire the workflow, moving the card
+without commenting, since a label is a change in our state rather than news for the submitter.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo can now describe its own board instead of being described by the plugin. The seam is
+optional and the default still works, so nothing breaks by ignoring it -- but a repo whose board is
+numbered any other way needs it, and this release is the first that lets it say so.
+
+**The failure it removes is the silent kind.** Before this, adapting the plugin to a board meant
+editing the shipped script, which the drift lint would then flag forever; and a board that changed
+shape produced no error at all, just cards a column out. After it, an unrecognised column stops the
+card instead of moving it somewhere plausible.
+
+**Score:** 3
+
+#### Pull Request
+
+the stage map becomes a repo seam, and Need more info is label-driven
+
+Plugins: bwj-codex
+
+[PR #1227](https://github.com/DaveKJohn/claude-code-specialists/pull/1227)
+
+---
+
 ### DEPLOY: `fix/bwj-codex-english-stage-examples-v1` · 20260902-132523
 
 The stage examples that shipped with the board-section model were written in Dutch -- one docstring in
