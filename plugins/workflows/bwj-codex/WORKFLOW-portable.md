@@ -294,7 +294,7 @@ into `Completed` would take that judgement and replace it with a guess -- in the
 this time, but the same guess.
 
 **A section is recognised by the NUMBER its name starts with**, and that is the whole configuration.
-`3. In ontwikkeling` and `3. Aan het bouwen` are the same stage; rename the words whenever the team
+`3. In development` and `3. Building it` are the same stage; rename the words whenever the team
 likes. It is the same split the cross-link of step 3 already uses -- a marker for the machine, prose
 for the reader -- and it means no repo has to keep six section GIDs correct in a config file, which is
 six more values that could go stale the way a provisional project GID did.

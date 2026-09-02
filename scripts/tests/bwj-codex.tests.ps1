@@ -260,8 +260,8 @@ Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'high' -Curre
 # --- the stage sections --------------------------------------------------------------------------
 # The board's six sections are the cycle's stages, and a section is recognised by the NUMBER its name
 # starts with -- the words after it belong to the board and may change any day.
-Assert-Equal 3 (Get-StageFromSectionName -Name '3. In ontwikkeling - branch open') 'a numbered section yields its stage'
-Assert-Equal 3 (Get-StageFromSectionName -Name '3. Aan het bouwen')                'and still does after the words are rewritten -- the number is the only machine-read half'
+Assert-Equal 3 (Get-StageFromSectionName -Name '3. In development - branch open') 'a numbered section yields its stage'
+Assert-Equal 3 (Get-StageFromSectionName -Name '3. Building it')                  'and still does after the words are rewritten -- the number is the only machine-read half'
 Assert-Equal 6 (Get-StageFromSectionName -Name '  6. Completed')                   'leading whitespace does not hide the number'
 Assert-Equal 2 (Get-StageFromSectionName -Name '2.')                               'a bare number and dot is enough'
 Assert-True ($null -eq (Get-StageFromSectionName -Name 'Waiting for more info'))   'an unnumbered section is on no pipeline'
@@ -296,7 +296,7 @@ foreach ($case in @(@('OPEN', ''), @('OPEN', 'reopened'), @('CLOSED', 'completed
 # A task on an unnumbered board only is on no pipeline, which is how any other board is left alone.
 $onBoard = @(
     [pscustomobject]@{ project = [pscustomobject]@{ gid = '1201907543904785' }; section = [pscustomobject]@{ gid = '11'; name = 'Backlog' } },
-    [pscustomobject]@{ project = [pscustomobject]@{ gid = '1216936502427971' }; section = [pscustomobject]@{ gid = '22'; name = '4. Ontwikkeling klaar' } })
+    [pscustomobject]@{ project = [pscustomobject]@{ gid = '1216936502427971' }; section = [pscustomobject]@{ gid = '22'; name = '4. Development done' } })
 $sel = Select-StageMembership -Memberships $onBoard
 Assert-Equal 'stage-section'    $sel.Source                'a numbered section past an unnumbered one still resolves'
 Assert-Equal 4                  $sel.Membership.Stage      'and reports the stage the card is in now'
