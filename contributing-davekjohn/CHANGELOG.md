@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/ship-pr-titled-annotation-page-v1` · 20260903-012152
+
+`ship-pr` merges past a failing *not-required* check and relays the sentence that check wrote about
+itself -- but only a *titled* annotation (`echo "::error title=X::Y"`), because GitHub's Actions runner
+writes its own with an empty title and "titled" is what tells an author's diagnosis from exit noise.
+That is a real contract on a consumer's own workflows, and until now it lived only in
+`Get-AuthoredFailureNote`'s docstring -- so a consumer whose advisory check goes red past `ship-pr`
+saw a blank reason line and concluded the relay was broken. The `ship-pr` skill now has a subsection
+stating what the relay reads, the one-line form that satisfies it, and that an untitled failure is
+silent on purpose; `CONTRIBUTING-portable.md` step 5 carries a short pointer to it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+This is the half of #1245's workflow repair that a consumer inherits: their advisory CI (a linter, a
+coverage job) can now be made to explain its own red mark in `ship-pr`'s console by emitting one
+`::error title=…::…` line, where before the reason was reachable only by opening the run.
+
+**Score:** 2
+
+#### Pull Request
+
+the shipped PR docs say what ship-pr's failure-note relay reads, and that an untitled failure is silent on purpose
+
+Plugins: contributing-davekjohn
+
+[PR #1258](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1258)
+
+---
+
 ### DEPLOY: `fix/open-pr-label-preflight-v1` · 20260903-005620
 
 `open-pr` now asks GitHub whether the label it is about to attach exists, and refuses there -- before
