@@ -55,7 +55,7 @@ cache holds a release and this directory is by definition ahead of it between re
 | directory | what lives there |
 |---|---|
 | [`lib/`](lib/) | the shared helpers every other directory dot-sources — no standalone entry points |
-| [`task/`](task/) | starting and parking work: the branch and its `contributing-davekjohn/development.md` |
+| [`task/`](task/) | starting and parking work: the branch and its `contributing-davekjohn/development-<branch>.md` |
 | [`release/`](release/) | moving work to the trunk and beyond: the PR, the merge, the fold, the cut |
 | [`lint/`](lint/) | the gates that run before a PR and in CI |
 | [`sync/`](sync/) | keeping the generated artefacts and the connected repos honest |
@@ -84,7 +84,7 @@ a test, reached by one of these rather than run directly.
 
 | script | what it does | skill |
 |---|---|---|
-| [`task/new-branch.ps1`](task/new-branch.ps1) | creates the branch **and** its `contributing-davekjohn/development.md`, in one move — a branch is never entry-less | `new-branch` |
+| [`task/new-branch.ps1`](task/new-branch.ps1) | creates the branch **and** its `contributing-davekjohn/development-<branch>.md`, in one move — a branch is never entry-less | `new-branch` |
 | [`task/park-branch.ps1`](task/park-branch.ps1) | commits outstanding work and pushes, with no PR — for handing a branch to another machine | `park` |
 | [`task/adopt-config.ps1`](task/adopt-config.ps1) | reads the config blueprint and places or proposes each seam answer | `adopt-config` |
 | [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
@@ -119,7 +119,7 @@ from one another because they overrule different kinds of judgement.
 2. **The test gate** — every `tests/*.tests.ps1` suite.
 3. **The scaffold gate** — refuses an entry still carrying the wording `new-branch.ps1` wrote, or one whose
    description, body or any tier reason is still empty once HTML comments are stripped.
-4. **The step-list gate** — refuses while `contributing-davekjohn/development.md` has an unresolved step above its DEPLOY heading. `ship-pr.ps1`
+4. **The step-list gate** — refuses while `contributing-davekjohn/development-<branch>.md` has an unresolved step above its DEPLOY heading. `ship-pr.ps1`
    refuses at the merge for the same reason, and **this one has no `-Force`**: the `- [~]` dropped mark is
    the way past a step that turned out not to be needed.
 

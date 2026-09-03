@@ -323,3 +323,75 @@ jobs:
             echo
             echo 'The full diagnostic is in the **Why the review failed** step of this job.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # WHY A SECOND DIAGNOSTIC STEP EXISTS -- issue #1245, and it is the COMPLEMENT of the one above
+      # rather than a variation on it. That step is gated on `execution_file != ''`, so everything it
+      # knows comes from a result message the SDK wrote. When the action fails BEFORE the SDK is
+      # reached there is no such file, the step above is SKIPPED, and this workflow writes no titled
+      # annotation at all -- which is the one state that defeats the relay built for exactly this
+      # reader.
+      #
+      # THE MECHANISM, MEASURED RATHER THAN INFERRED. Since #1103 `ship-pr` prints what a failing
+      # advisory check said about itself, and `Get-AuthoredFailureNote` selects **a failure annotation
+      # carrying a TITLE**. That rule is deliberate and documented in the lib: the runner writes its
+      # own with an EMPTY title, and its docstring names *"Action failed with error: ..."* as one of
+      # them. A pre-SDK failure produces precisely that shape and nothing else, so the operator meets
+      # a red tick with no reason -- the #966 silence again, in a class the 429 work never reached.
+      #
+      # Measured on run 33663986438 (September 2, 2026, PR #1249): step *Run Claude Code Review*
+      # `failure`, step *Why the review failed* `skipped`, and the job's three annotations were a
+      # Node-20 warning plus two UNTITLED failures -- "Process completed with exit code 1" and
+      # "Action failed with error: Claude Code is not installed on this repository". The reason was
+      # sitting in the API the whole time, in the one field the relay does not read.
+      #
+      # AND THE REPAIR GOES HERE, NOT IN THE LIB -- the rule the lens already carries from #1112. The
+      # relay is generic on purpose: it repeats what an author wrote and cannot know which authors are
+      # reliable, so teaching it to read UNTITLED annotations would relay "Process completed with exit
+      # code 1" in every consumer repo, which is the reassuring-looking note that says nothing that
+      # `Get-AuthoredFailureNote`'s own asserts exist to prevent. A workflow that wants to be heard
+      # writes a title. This one now does.
+      #
+      # WHAT IT CLAIMS, AND THE BOUND ON THAT -- the standing rule of this file, after #974, #1055,
+      # #1112 and #1164 each corrected a sentence written here. It states only what the EMPTY OUTPUT
+      # proves: the SDK produced no result, so the failure is in the setup around it and not in the
+      # diff, and no `api_error_status` exists to read -- a 429 or 529 arrives WITH a result message
+      # and is therefore the other step's business, never this one's. It does NOT name the cause. It
+      # cannot: the cause is in the runner's untitled annotation and in the step log, and this step
+      # can read neither. Naming today's cause -- the app installation -- would be the #966 mistake
+      # with the sign flipped, an assertion the run never proved. The example is cited as an example.
+      #
+      # NO JOB-SUMMARY DUPLICATE OF THE LOG, unlike the step above, because there is no log to
+      # duplicate: nothing was captured, so the summary carries the same sentence and the pointer.
+      - name: Why the review never started
+        # Same reasoning as the step above: the job is already red, and a broken diagnostic must not
+        # become the story.
+        continue-on-error: true
+        if: failure() && steps.claude-review.outputs.execution_file == ''
+        shell: bash
+        run: |
+          short='the review never started'
+          headline='The review never started: the action produced no execution log, so the SDK was never reached and no API status exists. The failure is in the SETUP around it -- the GitHub App installation, the credential, or the action inputs -- and is nothing to do with this diff. A re-run repeats it until that setup changes.'
+
+          # ESCAPED EVEN THOUGH EVERY CHARACTER HERE IS A LITERAL, and that is #1118's lesson rather
+          # than belt-and-braces. The runner percent-DECODES a command's data, so an unescaped `%0A`
+          # renders as a newline, and a workflow command counts at the START of a line. On literals
+          # the substitution is a no-op -- but #1118 was precisely the branch that did not need
+          # escaping until somebody interpolated a value into it, and it was then the only branch
+          # without the guard. `pr-issues.tests.ps1` pins that EVERY emission site escapes, so this
+          # one cannot quietly become that branch.
+          #
+          # There is no first-line cut beside it, unlike the step above, and that difference IS
+          # deliberate: the cut bounds free text arriving from upstream, and this sentence is a
+          # single line written here. An edit that appends anything read at run time needs it.
+          echo "::error title=claude-review -- ${short}::${headline//%/%25}"
+
+          {
+            echo "### claude-review: ${short}"
+            echo
+            echo "$headline"
+            echo
+            echo 'The cause is the runner error line in the **Run Claude Code Review** step log --'
+            echo 'this step cannot read it, so it is not repeated here. The measured instance is the'
+            echo 'Claude Code GitHub App not being installed on the repository (a 401 on the app-token'
+            echo 'exchange, issue #1245), which is an account-level install and not a repo change.'
+          } >> "$GITHUB_STEP_SUMMARY"

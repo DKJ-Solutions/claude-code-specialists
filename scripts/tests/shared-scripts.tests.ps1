@@ -701,7 +701,7 @@ if ($args -contains 'create') {
 
     # Scenario B: override path -- repo-config defines all four optional #101 functions.
     $rcOverride = @'
-$script:RepoName = 'DaveKJohn/claude-code-specialists'
+$script:RepoName = 'DKJ-Solutions/claude-code-specialists'
 function Get-RepoName { return $script:RepoName }
 function Get-RepoBlobUrl { return "https://github.com/$($script:RepoName)/blob/main/" }
 $script:LintScript = 'scripts\lint\check-plugin-integrity.ps1'
@@ -900,7 +900,7 @@ Everything merged since the last release, furthest reach first.
     # not a workaround: it is exactly the migration that collapse documents for a repo keeping its
     # changelog at the root, and the same shape fold-changelog.tests.ps1 already patches in.
     $rcMinimal = @'
-$script:RepoName = 'DaveKJohn/claude-code-specialists'
+$script:RepoName = 'DKJ-Solutions/claude-code-specialists'
 function Get-RepoName { return $script:RepoName }
 function Get-ChangelogPath { return 'CHANGELOG.md' }
 '@

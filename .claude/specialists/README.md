@@ -55,7 +55,7 @@ just like inline text.
   `.claude/agents/` directory: they come from the `team-alpha` plugin of this very marketplace,
   enabled via [`settings.json`](../settings.json) and invocable as `@team-alpha:<name>`.
 - **`settings.json`** — the harness config: `extraKnownMarketplaces` (the `github` source
-  `DaveKJohn/claude-code-specialists` — the repo points to itself) + `enabledPlugins`
+  `DKJ-Solutions/claude-code-specialists` — the repo points to itself) + `enabledPlugins`
   (`team-alpha@claude-code-specialists`). [Sylvester #15](lenses/05-15-extension.md)'s domain.
 
 ## How a specialist is structured

@@ -245,7 +245,7 @@ shared scripts call) in **`contributing-davekjohn`**; see the
 
 **And since August 26, 2026 one hook that acts rather than reports**, which is a real widening of that list
 and named as such: `cycle-autopark` (a **Stop** hook, in `contributing-davekjohn`) commits and pushes the
-branch's `development.md` to `origin` after every turn, until a PR publishes it
+branch's `development-<branch>.md` to `origin` after every turn, until a PR publishes it
 ([#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900)). It writes to git, so it is not
 read-only — but it is still not a *guardrail*: it blocks nothing, refuses nothing, and exits 0 on every
 outcome. What earns it a place beside the three above is that it is repo-neutral and touches exactly one
@@ -303,7 +303,7 @@ The full picture, top-level folder by folder:
   [`CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) is the centre of it: the standard branch +
   PR workflow, which holds with no plugin installed, and this repo's answers to the workflow's seams on
   top of it. Beside it sit [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md), the open branch's
-  `development.md` while one is open, and `releases/` — what a cut *generated*
+  `development-<branch>.md` while one is open, and `releases/` — what a cut *generated*
   (`changelog/<X>.x/<X.Y.Z>.md`, the complete note per version, and `github/<X>.x/<X.Y.Z>.md`, that
   version's GitHub Release body), the hand-written note per version under `audience/`, the dated list of
   every release ever cut in
@@ -359,17 +359,23 @@ had the real one, and the 11,684 lines across those ten files were a second copy
 it. One repository, one product, one changelog.
 
 **One canonical channel — mind the old repo names.** The marketplace is named `claude-code-specialists`
-(repo `DaveKJohn/claude-code-specialists`) and that is the only channel **for a reader who registers it
+(repo `DKJ-Solutions/claude-code-specialists`) and that is the only channel **for a reader who registers it
 themselves**; use that name in `extraKnownMarketplaces`. If this copy reached you through an
 organisation's own marketplace, that channel is the canonical one for you and this paragraph is about
 the public source it was mirrored from — do not register a second one alongside it. This repo has been renamed twice — first from `claude-specialists`, then from
 `davekjohns-workshop` (August 3, 2026) — and an old name keeps pointing at the same repo via a
 **GitHub rename redirect**, so a marketplace still registered under one of them refers to exactly the
-same repo. There is **no second source** to mirror to. However, the local marketplace clone of such an
+same repo. **And on September 2, 2026 the owner changed as well** — the repo was transferred from the
+personal account `DaveKJohn` into the **`DKJ-Solutions`** organisation, so
+`DaveKJohn/claude-code-specialists` now resolves through a **transfer redirect** and a registration under
+the old owner keeps working exactly like one under an old name. That redirect carries one condition the
+rename redirects do not: it holds only for as long as nothing is created at the old path, so
+**`DaveKJohn/claude-code-specialists` must never be recreated.** There is **no second source** to mirror
+to. However, the local marketplace clone of such an
 old registration can lag behind (it was once cloned at an older commit and doesn't converge to the new
 `HEAD` on its own), so an install on that channel silently yields an older plugin version. If you run
 into this: update the marketplace registration (a marketplace update) or re-add it under
-`claude-code-specialists` — a fresh install should always use `DaveKJohn/claude-code-specialists`.
+`claude-code-specialists` — a fresh install should always use `DKJ-Solutions/claude-code-specialists`.
 
 ## Versioning
 

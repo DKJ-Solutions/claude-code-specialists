@@ -527,7 +527,20 @@ while ($true) {
                 $suiteFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
                     'api', "repos/$repo/commits/$sha/check-suites")
                 if ($suiteFacts.ExitCode -eq 0) {
-                    $suiteNote = Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$pr"
+                    # THE ONE CAUSE THAT IS CHECKABLE RATHER THAN GUESSED (#1247). A conflicting PR has no
+                    # refs/pull/<n>/merge for a pull_request workflow to run against, so GitHub creates no
+                    # suite for it -- ever, and neither a reopen nor a fresh head changes that. It is a
+                    # SECOND read because it answers a different question from the suite list, and it is
+                    # guarded on its own so a failure here still leaves the #1234 wording intact.
+                    $mergeable = ''
+                    try {
+                        $mergeRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                            'pr', 'view', "$pr", '--repo', $repo, '--json', 'mergeable', '--jq', '.mergeable')
+                        if ($mergeRead.ExitCode -eq 0) { $mergeable = ($mergeRead.Output -join '').Trim() }
+                    } catch {
+                        $mergeable = ''
+                    }
+                    $suiteNote = Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$pr" -Mergeable $mergeable
                 }
             }
         } catch {
@@ -797,7 +810,11 @@ $shipCycleRead = {
     param([string]$Rel)
     Get-GitFileTextAtRef -Ref $shipCycleRef -Path $Rel -RepoRoot $shipCycleRoot
 }
-$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead
+# -Branch IS MANDATORY ON THIS ARM IN PRACTICE (#1255). The Reader arm deliberately does NOT default to
+# HEAD -- it resolves against a tree this script is not standing in -- so without the branch the resolver
+# would look for the pre-#1255 shared name and miss this branch's own document entirely. The failure would
+# be the silent one the paragraph above describes: no path, no text, and a gate reading "no document".
+$shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead -Branch $branch
 $shipCycleText    = & $shipCycleRead $shipProgressRel
 if ($null -ne $shipCycleText) {
     $shipSteps = @(Get-BranchProgressFindings -Text $shipCycleText)

@@ -526,8 +526,8 @@ try {
     Assert-Equal 'feat/my-task-v1' $headBranch1 'HEAD is on the new branch, with its version completed'
     # branch/branch-deployment.md, from the lib rather than written out here: the test must fail if the
     # writer and the readers stop agreeing about the path, not merely if this literal goes stale.
-    $entryPath    = Join-Path $fixtureBC ((Get-BranchFilePaths).Deployment)
-    $progressPath = Join-Path $fixtureBC ((Get-BranchFilePaths).Cycle)
+    $entryPath    = Join-Path $fixtureBC ((Get-BranchFilePaths -Branch 'feat/my-task-v1').Deployment)
+    $progressPath = Join-Path $fixtureBC ((Get-BranchFilePaths -Branch 'feat/my-task-v1').Cycle)
     Assert-True (Test-Path -LiteralPath $entryPath) 'entry file created at the fixed branch/ path'
     Assert-True (Test-Path -LiteralPath $progressPath) 'and the step list beside it -- a branch gets both files or neither'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'feat-my-task.md'))) 'nothing is written to the repo root any more'
@@ -644,7 +644,7 @@ try {
     Assert-True (Test-Phrase -Text $rE.Out -Phrase 'Unknown branch prefix') 'warning about the unknown prefix in the output'
     $headBranchE = (& git -C $fixtureE rev-parse --abbrev-ref HEAD).Trim()
     Assert-Equal 'wip/experiment-v1' $headBranchE 'branch still created and checked out despite unknown prefix'
-    $entryPathE = Join-Path $fixtureE ((Get-BranchFilePaths).Deployment)
+    $entryPathE = Join-Path $fixtureE ((Get-BranchFilePaths -Branch 'wip/experiment-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathE) 'entry file still created (fallback type)'
     # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
     # reader is handed that rather than the whole file.
@@ -667,7 +667,7 @@ try {
     $rF = Invoke-NewBranchWithAdversarialField -Dir $fixtureF -Name 'feat/injection-check' -Field Title -Value $maliciousTitle
     Assert-Equal 0 $rF.Code 'malicious title: new-branch exit 0'
 
-    $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths).Deployment)
+    $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths -Branch 'feat/injection-check-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathF) 'malicious title: entry file created anyway'
     # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
     # reader is handed that rather than the whole file.
@@ -714,7 +714,7 @@ try {
     $intentText = 'Skeleton + routing done; next: wire the API client.'
     $rH = Invoke-NewBranch -Dir $fixtureH -Name 'feat/park-intent' -Title 'Parked work' -Intent $intentText
     Assert-Equal 0 $rH.Code '-Intent: new-branch exit 0'
-    $entryPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Deployment)
+    $entryPathH = Join-Path $fixtureH ((Get-BranchFilePaths -Branch 'feat/park-intent-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
     # The ENTRY half of the document -- see the split at the first fixture for why every entry-shaped
     # reader is handed that rather than the whole file.
@@ -726,7 +726,7 @@ try {
     Assert-Equal 0 @($intentImpact.Rows | Where-Object { $_.Why }).Count '-Intent: no tier reason is written for the author -- the status is not an answer'
     Assert-True (@(Get-EntryScaffoldFindings -EntryText $entryTextH -Wording (Get-EntryScaffoldWording)).Count -gt 0) '-Intent: so the gate still refuses the entry until somebody writes what the change does'
 
-    $progressPathH = Join-Path $fixtureH ((Get-BranchFilePaths).Cycle)
+    $progressPathH = Join-Path $fixtureH ((Get-BranchFilePaths -Branch 'feat/park-intent-v1').Cycle)
     $progressTextH = [System.IO.File]::ReadAllText($progressPathH, [System.Text.Encoding]::UTF8)
     Assert-True ($progressTextH -match [regex]::Escape($intentText)) '-Intent: the intent is recorded in the step list instead'
     Assert-True (-not ($progressTextH -match 'what has been done so far')) '-Intent: and it replaces that section placeholder rather than sitting beside it'
@@ -790,8 +790,8 @@ try {
     } finally {
         $ErrorActionPreference = $prevEap
     }
-    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Deployment) '-Park: park commit contains the changelog entry'
-    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths).Cycle) '-Park: and the step list -- parking the description without the plan defeats the flag'
+    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths -Branch 'feat/parked-branch-v1').Deployment) '-Park: park commit contains the changelog entry'
+    Assert-True ($parkCommitFiles -contains (Get-BranchFilePaths -Branch 'feat/parked-branch-v1').Cycle) '-Park: and the step list -- parking the description without the plan defeats the flag'
     Assert-True (-not ($parkCommitFiles -contains 'stray.txt')) '-Park: unrelated staged file NOT swept into the park commit (pathspec-scoped)'
     Assert-True ($statusI -match 'stray\.txt') '-Park: unrelated file still left staged for the caller''s own commit'
 
@@ -833,12 +833,12 @@ try {
     $rJ = Invoke-NewBranchWithAdversarialField -Dir $fixtureJ -Name 'feat/intent-injection' -Field Intent -Value $maliciousIntent
     Assert-Equal 0 $rJ.Code 'malicious intent: new-branch exit 0'
 
-    $entryPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Deployment)
+    $entryPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths -Branch 'feat/intent-injection-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathJ) 'malicious intent: entry file created anyway'
     # ASSERTED ON THE STEP LIST, because that is where an intent lands now. The boundary under test is
     # unchanged -- free text crossing a native process boundary via an env var rather than argv -- only the
     # file it ends up in moved, and asserting on the old one would have quietly stopped testing anything.
-    $progressPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths).Cycle)
+    $progressPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths -Branch 'feat/intent-injection-v1').Cycle)
     $progressTextJ = [System.IO.File]::ReadAllText($progressPathJ, [System.Text.Encoding]::UTF8)
     Assert-True ($progressTextJ.Contains($maliciousIntent)) 'malicious intent: FULLY and unchanged in the step list (no argv splitting)'
     Assert-True (Test-Path -LiteralPath $sentinelPathJ) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"
@@ -874,7 +874,7 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     # No -Title and no -Intent, and an UNKNOWN prefix -- so all four knobs are exercised at once.
     $rK = Invoke-NewBranch -Dir $fixtureK -Name 'wip/dutch-stub'
     Assert-Equal 0 $rK.Code 'configured wording: new-branch exit 0'
-    $entryPathK = Join-Path $fixtureK ((Get-BranchFilePaths).Deployment)
+    $entryPathK = Join-Path $fixtureK ((Get-BranchFilePaths -Branch 'wip/dutch-stub-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathK) 'configured wording: entry file created'
     $entryTextK = [System.IO.File]::ReadAllText($entryPathK, [System.Text.Encoding]::UTF8)
     # NONE OF THE THREE PROSE STRINGS IS WRITTEN ANY MORE -- neither the repo's nor the built-in one. The
@@ -922,7 +922,7 @@ Write-Output `$t.Type
 
     $rL = Invoke-NewBranch -Dir $fixtureL -Name 'feat/broken-config'
     Assert-Equal 0 $rL.Code 'broken repo-config: new-branch still exits 0'
-    $entryPathL = Join-Path $fixtureL ((Get-BranchFilePaths).Deployment)
+    $entryPathL = Join-Path $fixtureL ((Get-BranchFilePaths -Branch 'feat/broken-config-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathL) 'broken repo-config: the entry file is still written'
     $entryTextL = [System.IO.File]::ReadAllText($entryPathL, [System.Text.Encoding]::UTF8)
     # The subject here is that the entry is WRITTEN at all despite the broken config -- the placeholders it
@@ -933,23 +933,32 @@ Write-Output `$t.Type
     Assert-True (Test-EntryDeclaresType -EntryText (Get-DevelopmentEntryText -Text $entryTextL) -Type 'Feat') 'broken repo-config: and the branch type is still stated'
     Assert-True (Test-Phrase -Text $rL.Out -Phrase 'could not be loaded') 'broken repo-config: says so out loud instead of failing silently'
 
-    # --- (m) A BRANCH STACKED ON AN UNFOLDED ONE (inbound #615) ------------------------------------
+    # --- (m) A BRANCH STACKED ON AN UNFOLDED ONE (inbound #615, ANSWERED DIFFERENTLY SINCE #1255) ---
     #     The reported defect: both idempotency tests were true for any branch created off a branch
     #     whose entry was written but not yet folded -- "is the entry filled" and "is the owner not the
     #     trunk" -- so both files were skipped and the skip was printed under the NEW branch's name.
     #     The branch silently started out carrying the previous branch's entry as its own, and the
     #     first reader who could notice it was whoever read CHANGELOG.md after the fold.
     #
-    #     These asserts are on the OWNER the files declare, not on the message, because the owner is
-    #     what every downstream reader (the fold, the scaffold gate, the step-list gate) keys on.
-    Write-Host "new-branch.ps1 -- stacked on an unfolded branch: the files are rewritten, not skipped (#615)" -ForegroundColor Cyan
+    #     THE REPAIR AT THE TIME WAS TO REWRITE THE FILE AND SAY WHOSE IT WAS, because there was one
+    #     shared path and the two branches had to share it. Since #1255 the name carries the branch, so
+    #     the child writes its OWN document and the parent's is not touched at all: the situation #615
+    #     described cannot arise, rather than being handled well. That is a stronger outcome than the
+    #     one this scenario used to assert, and asserting the old one would now be asserting a hazard
+    #     back into existence.
+    #
+    #     WHAT IS STILL WORTH MEASURING, and why this scenario is rewritten rather than deleted: that
+    #     the two documents are genuinely separate and each declares its own branch. The old asserts
+    #     would pass vacuously against a script that simply wrote nothing.
+    Write-Host "new-branch.ps1 -- stacked on an unfolded branch: each branch gets its OWN document (#615, #1255)" -ForegroundColor Cyan
     $fixtureM = New-Fixture -Label 'm'
     $rM1 = Invoke-NewBranch -Dir $fixtureM -Name 'docs/parent' -Title 'The parent branch'
     Assert-Equal 0 $rM1.Code 'stacked: the parent branch is created'
-    $entryPathM    = Join-Path $fixtureM ((Get-BranchFilePaths).Deployment)
-    $progressPathM = Join-Path $fixtureM ((Get-BranchFilePaths).Cycle)
-    # Committed on the parent, which is the ordinary case: git holds that entry, so replacing it in the
-    # child's working tree costs nothing. That is exactly the distinction the write path measures.
+    $entryPathM    = Join-Path $fixtureM ((Get-BranchFilePaths -Branch 'docs/parent-v1').Deployment)
+    $progressPathM = Join-Path $fixtureM ((Get-BranchFilePaths -Branch 'docs/parent-v1').Cycle)
+    # Committed on the parent, which is the ordinary case: git holds that entry. Kept from the original
+    # scenario because it is what made the old rewrite safe, and because a stacked branch in real use is
+    # cut from a committed parent.
     $prevEapM = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -959,28 +968,72 @@ Write-Output `$t.Type
 
     $rM2 = Invoke-NewBranch -Dir $fixtureM -Name 'feat/child' -Title 'The stacked child branch'
     Assert-Equal 0 $rM2.Code 'stacked: the child branch is created'
+    $childPathM = Join-Path $fixtureM ((Get-BranchFilePaths -Branch 'feat/child-v1').Deployment)
+    Assert-True (Test-Path -LiteralPath $childPathM) 'stacked: the child got a document of its own'
+    Assert-True (Test-Path -LiteralPath $entryPathM) "stacked: and the parent's is still there -- untouched, not rewritten"
     $entryTextM    = [System.IO.File]::ReadAllText($entryPathM,    [System.Text.Encoding]::UTF8)
     $progressTextM = [System.IO.File]::ReadAllText($progressPathM, [System.Text.Encoding]::UTF8)
-    Assert-Equal 'feat/child-v1' (Get-BranchFileDeclaredBranch -Text $entryTextM)    'stacked: the document declares the CHILD branch, not the parent'
-    Assert-True (Test-Phrase -Text $rM2.Out -Phrase "'docs/parent-v1'") 'stacked: the output names the branch whose document was replaced'
+    $childTextM    = [System.IO.File]::ReadAllText($childPathM,    [System.Text.Encoding]::UTF8)
+    Assert-Equal 'docs/parent-v1' (Get-BranchFileDeclaredBranch -Text $entryTextM) "stacked: the parent's document still declares the parent"
+    Assert-Equal 'feat/child-v1'  (Get-BranchFileDeclaredBranch -Text $childTextM) 'stacked: and the child s declares the child'
+    Assert-True ($childPathM -ne $entryPathM) 'stacked: they are two paths, which is what removes the collision'
     Assert-True (-not (Test-Phrase -Text $rM2.Out -Phrase 'already written')) 'stacked: and does NOT report the files as already written for this branch'
 
     # And the half that must not be overwritten: an entry that was never committed exists in exactly one
     # place, so the write is refused there and said out loud instead. The defect being repaired was the
     # silence and the wrong name -- not the keeping, which is why keeping is still a correct outcome here.
-    Write-Host "new-branch.ps1 -- stacked on UNCOMMITTED work: kept, and said out loud (#615)" -ForegroundColor Cyan
+    # SINCE #1255 THERE IS NOTHING TO REFUSE IN THE ORDINARY CASE, for the same reason as (m): the child
+    # writes its own name, so the parent's uncommitted document is not a file the write path even looks
+    # at. Asserting the warning here would be asserting that the two branches still share a path.
+    Write-Host "new-branch.ps1 -- stacked on UNCOMMITTED work: the parent's document is not in the way (#615, #1255)" -ForegroundColor Cyan
     $fixtureN = New-Fixture -Label 'n'
     $rN1 = Invoke-NewBranch -Dir $fixtureN -Name 'docs/uncommitted-parent' -Title 'Never committed'
     Assert-Equal 0 $rN1.Code 'stacked/dirty: the parent branch is created'
-    $entryPathN = Join-Path $fixtureN ((Get-BranchFilePaths).Deployment)
+    $entryPathN = Join-Path $fixtureN ((Get-BranchFilePaths -Branch 'docs/uncommitted-parent-v1').Deployment)
     $entryTextN1 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
 
     $rN2 = Invoke-NewBranch -Dir $fixtureN -Name 'feat/dirty-child' -Title 'Stacked on uncommitted work'
-    Assert-Equal 0 $rN2.Code 'stacked/dirty: the child branch is still created -- this is a warning, not a stop'
+    Assert-Equal 0 $rN2.Code 'stacked/dirty: the child branch is still created'
     $entryTextN2 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
-    Assert-Equal $entryTextN1 $entryTextN2 'stacked/dirty: the uncommitted entry is left exactly as it was'
-    Assert-True (Test-Phrase -Text $rN2.Out -Phrase 'UNCOMMITTED') 'stacked/dirty: the output says the work is uncommitted'
-    Assert-True (Test-Phrase -Text $rN2.Out -Phrase "'docs/uncommitted-parent-v1'") 'stacked/dirty: and names whose work it is'
+    Assert-Equal $entryTextN1 $entryTextN2 'stacked/dirty: the uncommitted entry is left exactly as it was -- the outcome #615 asked for'
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixtureN ((Get-BranchFilePaths -Branch 'feat/dirty-child-v1').Deployment))) 'stacked/dirty: and the child still got a document of its own'
+
+    # --- (n2) A FOREIGN DOCUMENT AT THE PRE-#1255 SHARED NAME IS NOT A TARGET AT ALL ---------------
+    # WHAT THIS MEASURES, and it is not what it was written to measure. The scenario was added expecting
+    # to still exercise #615's dirty-foreign guard through the legacy path, on the reasoning that a
+    # branch open across the change keeps writing the shared name. Half of that is right: it does, but
+    # ONLY when that document declares it. Get-BranchFileTargetRel picks a legacy name for one reason --
+    # "it already declares THIS branch" -- so a shared document belonging to somebody ELSE is never the
+    # target, and the write path does not look at it. The guard cannot fire here, and asserting that it
+    # does was asserting a mechanism that no longer runs.
+    #
+    # SO THE GUARANTEE IS STRONGER THAN THE GUARD WAS, and that is what is asserted instead: the foreign
+    # document is untouched because nothing aimed at it, not because something checked and relented. The
+    # foreign-owner branch in new-branch.ps1 is kept anyway -- see the note there -- but this scenario no
+    # longer claims to reach it.
+    Write-Host "new-branch.ps1 -- a foreign document at the pre-#1255 shared name is never targeted (#615, #1255)" -ForegroundColor Cyan
+    $fixtureN2 = New-Fixture -Label 'n2'
+    $sharedRelN2  = (Get-BranchFilePaths).SharedFile
+    $sharedPathN2 = Join-Path $fixtureN2 ($sharedRelN2 -replace '/', '\')
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $sharedPathN2)
+    $bt = [char]96
+    $sharedTextN2 = @(
+        '# Development: ' + $bt + 'docs/legacy-owner-v1' + $bt + ' * 20260901-120000',
+        '',
+        '### PLAN',
+        '',
+        '### DEPLOY: ' + $bt + 'docs/legacy-owner-v1' + $bt,
+        ''
+    ) -join "`r`n"
+    [System.IO.File]::WriteAllText($sharedPathN2, $sharedTextN2, (New-Object System.Text.UTF8Encoding($false)))
+    # Deliberately NOT committed: that is what makes it unrecoverable and what the guard keys on.
+    $rN3 = Invoke-NewBranch -Dir $fixtureN2 -Name 'feat/onto-legacy' -Title 'Cut beside a legacy shared document'
+    Assert-Equal 0 $rN3.Code 'legacy/foreign: the branch is created'
+    Assert-Equal $sharedTextN2 ([System.IO.File]::ReadAllText($sharedPathN2, [System.Text.Encoding]::UTF8)) 'legacy/foreign: the uncommitted foreign document is byte-for-byte untouched'
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixtureN2 ((Get-BranchFilePaths -Branch 'feat/onto-legacy-v1').Deployment))) 'legacy/foreign: and this branch got its own document instead'
+    # NOT A WARNING, and asserted so the silence is a measured outcome rather than an unnoticed one: there
+    # is nothing to warn about, because nothing was at risk.
+    Assert-True (-not (Test-Phrase -Text $rN3.Out -Phrase 'UNCOMMITTED')) 'legacy/foreign: and says nothing about uncommitted work -- none was in the way'
 
     # --- (o) THE PUSH IS THE DEFAULT (#900) -- no switch, and the branch is on origin ---------------
     # The pair (i) above and this one are the whole change: (i) proves -Park still behaves, this proves
@@ -998,7 +1051,7 @@ Write-Output `$t.Type
     # Scoped exactly as -Park was: the document and nothing else. The same pathspec discipline, now
     # running unasked, which is precisely why it must not widen.
     $filesO = Get-HeadCommitFiles -Dir $fixtureO
-    Assert-True ($filesO -contains (Get-BranchFilePaths).Cycle) 'default push: the commit carries the development document'
+    Assert-True ($filesO -contains (Get-BranchFilePaths -Branch 'feat/pushed-by-default-v1').Cycle) 'default push: the commit carries the development document'
     Assert-Equal 1 $filesO.Count 'default push: and carries nothing else -- one document, not a sweep'
 
     # --- (p) -NoPush: the escape valve, with an origin sitting right there ---------------------------
@@ -1030,7 +1083,7 @@ Write-Output `$t.Type
     Assert-True (Test-Phrase -Text $rQ.Out -Phrase "no 'origin' remote") 'no origin: and says why nothing was pushed'
     $branchesQ = ((& git -C $fixtureQ branch --list 'feat/no-remote-here-v1') -join '').Trim()
     Assert-True ([bool]$branchesQ) 'no origin: the branch exists locally all the same'
-    Assert-True (Test-Path -LiteralPath (Join-Path $fixtureQ ((Get-BranchFilePaths).Cycle))) 'no origin: and its document was written'
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixtureQ ((Get-BranchFilePaths -Branch 'feat/no-remote-here-v1').Cycle))) 'no origin: and its document was written'
 
     # --- (r) -Park still runs, and now announces that it changed nothing ----------------------------
     # Kept accepted rather than removed: this script is mirrored into every consumer's plugin cache,

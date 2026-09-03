@@ -891,12 +891,51 @@ $missNoId = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions
 Assert-True ($missNoId -like '*no Actions check suite*') 'no PR number: the diagnosis is unchanged'
 Assert-True ($missNoId -notlike '*gh pr close *') 'and no command is printed with a missing argument'
 
+# --- The conflicting PR: the one cause that is checkable rather than guessed (issue #1247) ---------
+# Measured September 2, 2026. A pull_request workflow runs against refs/pull/<n>/merge, which a
+# conflicting PR does not have -- so no suite is created for it, and #1247 read that as an Actions
+# outage across the whole org. PR #1243 (CONFLICTING) had no merge ref and 0 suites, and stayed at 0
+# through a close/reopen AND a freshly pushed head; #1240 and #1249, opened either side of it, each had
+# a merge ref and three suites. These asserts pin the DIAGNOSIS; the refusal is untouched, again.
+Write-Host "Get-MissingCheckSuiteNote -- the conflicting PR (#1247)" -ForegroundColor Cyan
+
+$missConflict = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '1243' -Mergeable 'CONFLICTING'
+Assert-True ($missConflict -like '*CONFLICTING*') 'a conflicting PR is named as such, in GitHub''s own word'
+Assert-True ($missConflict -like '*refs/pull/*') 'and the note says WHICH commit does not exist, since that is the whole mechanism'
+Assert-True ($missConflict -like '*Resolve the conflict*') 'the repair named is the one that works -- resolve, then push'
+# THE POINT OF THE BRANCH, not a nicety: the reopen is measured to do nothing here, and printing it
+# beside the real repair leaves the reader to choose between them with the cheap one listed first.
+Assert-True ($missConflict -notlike '*gh pr close 1243 && gh pr reopen 1243*') 'and the reopen is WITHHELD rather than offered beside it'
+Assert-True ($missConflict -like '*measured*') 'while saying the reopen was measured doing nothing, so the reader does not try it anyway'
+Assert-True ($missConflict -like '*no Actions check suite*') 'the #1234 finding still leads -- the conflict explains it, it does not replace it'
+
+# EVERY OTHER ANSWER LEAVES THE #1234 WORDING EXACTLY AS IT WAS. UNKNOWN is GitHub still computing the
+# merge, and reading it as a conflict would be this function guessing at a cause -- the failure it
+# exists to end. An absent argument is the back-compat path every existing caller takes.
+foreach ($state in @('MERGEABLE', 'UNKNOWN', '', '   ')) {
+    $missOther = Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '1233' -Mergeable $state
+    Assert-True ($missOther -like '*gh pr close 1233 && gh pr reopen 1233*') "mergeable '$state' still gets the reopen -- only CONFLICTING is decisive"
+    Assert-True ($missOther -notlike '*Resolve the conflict*') "mergeable '$state' is never told to resolve a conflict it may not have"
+}
+Assert-Equal $missNote (Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '1233') 'and the note is byte-identical to the pre-#1247 one when nothing is passed'
+
+# gh's answer arrives as JSON text through Invoke-NativeCapture, so tolerate what that hands back.
+Assert-True ((Get-MissingCheckSuiteNote -SuitesJson $suitesNoActions -PrNumber '9' -Mergeable ' conflicting ') -like '*Resolve the conflict*') 'the state is matched case-insensitively and trimmed, as gh output reaches it'
+
+# An Actions suite that EXISTS is still not this note's case, conflict or no conflict: there the
+# ordinary "the check has not reported yet" wording is the correct one and this must stay out of it.
+Assert-Equal '' (Get-MissingCheckSuiteNote -SuitesJson $suitesWithActions -PrNumber '1243' -Mergeable 'CONFLICTING') 'a conflicting PR that DOES have an Actions suite is not this note''s case either'
+
 # AND SHIP-PR'S PROBE ACTUALLY ASKS. Same reasoning and same failure mode as the #1044 and #1219
 # call-site asserts above: a reverted call site leaves every assert here green while the refusal goes
 # on sending the reader to YAML that is fine.
 Assert-True ($shipText -like '*Get-MissingCheckSuiteNote -SuitesJson*') 'ship-pr.ps1 asks whether an Actions suite exists before it words the step-3 refusal (#1234)'
 Assert-True ($shipText -like '*commits/$sha/check-suites*') 'and reads it for the commit the PR actually carries'
 Assert-True ($shipText -like '*Check the workflow, or merge manually once it is green.*') 'while the old wording survives for the one case it is correct for'
+# The #1247 half of the same guard: the conflict branch above is unreachable in production unless the
+# call site actually reads the state and passes it, and nothing else in this suite would notice.
+Assert-True ($shipText -like '*-Mergeable $mergeable*') 'ship-pr.ps1 passes the PR''s mergeable state, so the conflict branch is reachable at all (#1247)'
+Assert-True ($shipText -like "*'--json', 'mergeable'*") 'and reads it from gh rather than inferring it from the checkout'
 $idxSuiteNote = $shipText.IndexOf('Get-MissingCheckSuiteNote')
 $idxWatchArg  = $shipText.IndexOf("'--watch'")
 Assert-True ($idxSuiteNote -ge 0 -and $idxSuiteNote -lt $idxWatchArg) 'the read sits in the PRE-watch probe it diagnoses, not beside the post-watch notes'
@@ -1061,6 +1100,65 @@ foreach ($h in $headlines) {
     Assert-True ($room -ge $longestMeasuredReason) "the $($h.Length)-character headline leaves the console $room characters of reason -- more than the $longestMeasuredReason ever measured"
 }
 
+# --- THE PRE-SDK FAILURE CLASS: a titled annotation where there was none (#1245) -----------------
+#
+# The asserts above all describe a failure the SDK lived long enough to REPORT. When the action dies
+# before the SDK is reached, `execution_file` is empty, the *Why the review failed* step is skipped,
+# and the workflow used to write no titled annotation at all -- so `Get-AuthoredFailureNote` selected
+# nothing and ship-pr printed nothing beside the red mark. That is the #966 silence in a class the 429
+# work never reached, and it is not hypothetical: run 33663986438 (September 2, 2026) failed the
+# app-token exchange with a 401, and its only failure annotations were the runner's two UNTITLED ones.
+#
+# WHAT THESE PIN IS THE COVERAGE, not the wording. `failure()` has exactly two cases here and each
+# needs a step, so the guard is that BOTH gates exist and that the second one authors a title. A
+# rewrite of either sentence passes; deleting the second step, or renaming the output either gate
+# reads, does not.
+$wfGates = @([regex]::Matches($wfText, "steps\.claude-review\.outputs\.execution_file (!=|==) ''") |
+    ForEach-Object { $_.Groups[1].Value })
+Assert-NameSet @('!=', '==') $wfGates 'both halves of failure() are diagnosed -- a result message to read, and none'
+Assert-Equal 2 $wfGates.Count 'and exactly once each: two gates on the same output, so neither class falls between them'
+
+# The literals are read out of the workflow rather than re-typed, so this cannot drift from the file
+# it describes -- the same reason the headline loop above reads its own.
+$wfPreSdk = [regex]::Match($wfText, "(?s)- name: Why the review never started.*?\z")
+Assert-True $wfPreSdk.Success 'the pre-SDK step is still named as these asserts address it'
+$preShort = [regex]::Match($wfPreSdk.Value, "(?m)^\s*short='([^']*)'").Groups[1].Value
+$preHead  = [regex]::Match($wfPreSdk.Value, "(?m)^\s*headline='([^']*)'").Groups[1].Value
+Assert-True ($preShort -and $preHead) 'and still builds its annotation from a short title and a headline'
+Assert-True ($wfPreSdk.Value.Contains('::error title=claude-review -- ${short}::')) 'which it writes as a TITLED failure annotation -- the one field the relay reads'
+foreach ($punct in @(',', '::')) {
+    Assert-True (-not $preShort.Contains($punct)) "the title carries no '$punct' -- both are annotation-command syntax, as the step above notes"
+}
+
+# END TO END, through the function ship-pr actually calls: the annotation this step writes must come
+# back out as a sentence, where the runner's untitled 401 came back as ''.
+$annPreSdk = '[' +
+  '{"annotation_level":"warning","title":"","message":"Node.js 20 is deprecated."},' +
+  '{"annotation_level":"failure","title":"claude-review -- ' + $preShort + '","message":"' + $preHead + '"},' +
+  '{"annotation_level":"failure","title":"","message":"Process completed with exit code 1."},' +
+  '{"annotation_level":"failure","title":"","message":"Action failed with error: Claude Code is not installed on this repository. Please install the Claude Code GitHub App at https://github.com/apps/claude"}]'
+$notePreSdk = Get-AuthoredFailureNote -AnnotationsJson $annPreSdk -CheckName 'claude-review'
+Assert-True ($notePreSdk -like 'claude-review*') 'the pre-SDK note names its check'
+Assert-True ($notePreSdk -notlike '*claude-review: claude-review*') 'once, like the quota note -- the title already carries the job name'
+Assert-True ($notePreSdk.Contains($preShort)) 'and carries the title the workflow authored'
+Assert-True ($notePreSdk -notlike '*exit code 1*') 'not the runner exit noise'
+Assert-True ($notePreSdk -notlike '*not installed on this repository*') 'and not the runner UNTITLED error either -- relaying that is the lib change #1112 ruled out, so the workflow states its own case'
+
+# THE CAP, AND WHY THIS ONE IS AN ABSOLUTE RATHER THAN #1116's ARITHMETIC. The quota headlines leave
+# room for a reason the relay may cut; this one has NO reason appended -- there is no result message
+# to take one from -- so its whole note is literals from this repo and must arrive intact. If it ever
+# does not, the fix is a shorter sentence here, not a wider cap there.
+Assert-True ($notePreSdk.Length -lt $relayCap) "the pre-SDK note is $($notePreSdk.Length) characters against the relay's $relayCap -- it carries no reason, so it must arrive whole"
+Assert-True ($notePreSdk -notlike '*...') 'and therefore unmarked by the truncation ellipsis'
+
+# The claims it makes are bounded to what an EMPTY output proves, which is the standing rule of that
+# workflow after #974, #1055, #1112 and #1164. A quota status cannot be among them: a 429 or 529
+# arrives WITH a result message, so it is the other step's business and naming it here would be the
+# over-claim those four issues each repaired.
+foreach ($overclaim in @('429', '529', 'quota', 'resets')) {
+    Assert-True (-not $preHead.Contains($overclaim)) "the pre-SDK headline does not mention '$overclaim' -- that class arrives with a result message and is diagnosed by the other step"
+}
+
 # Unreadable in, empty out -- a diagnostic must never be the reason the warning beside it cannot print.
 foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"annotation_level":"failure"}]')) {
     Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson $bad -CheckName 'x') "an unreadable annotations payload ('$bad') costs the note and nothing else"
@@ -1105,11 +1203,99 @@ Assert-True (-not ($shortLines | Where-Object { $_ -like '*$status*' })) 'and no
 
 # 3. The percent axis. The runner percent-DECODES a command's data, so an unescaped %0A renders as a
 #    newline. `reason` was escaped from the start; `headline` needs it too now that it carries status.
+#
+#    AND THE COUNT IS PART OF THE PROPERTY, not bookkeeping around it -- which #1245 is why. That
+#    issue added a THIRD emission site, for the pre-SDK class whose headline is pure literal and so
+#    needs no escaping on today's text. Exempting it is the #1118 shape exactly: the branch nobody
+#    escaped was the branch nobody had interpolated into YET, and it was the one that broke. So the
+#    invariant is every site, and a new site raises this number deliberately rather than passing
+#    under a `-ge`.
 $errLines = @($reviewYml -split "`r?`n" | Where-Object { $_ -like '*::error title=claude-review*' })
-Assert-True ($errLines.Count -eq 2) 'the annotation is emitted from exactly two places -- one with a reason, one without'
-Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and BOTH escape the headline, which is the variable the case block interpolates the status into'
+Assert-True ($errLines.Count -eq 3) 'the annotation is emitted from exactly three places -- with a reason, without one, and the pre-SDK step that has none to take (#1245)'
+Assert-True (-not ($errLines | Where-Object { $_ -notlike '*${headline//%/%25}*' })) 'and EVERY ONE escapes the headline -- the variable the case block interpolates the status into, and the one a literal-only site is tempted to leave bare (#1245)'
 Assert-True (($errLines | Where-Object { $_ -like '*${reason//%/%25}*' }).Count -eq 1) 'while the reason keeps its own escape on the one line that carries it'
 
+
+Write-Host ""
+Write-Host "The label gate: does the label this PR would be given exist? (inbound #1221)" -ForegroundColor Cyan
+
+# THE PAYLOAD IS THE REAL SHAPE of `gh label list --json name`, which is a flat array of {name}.
+$labelJson = '[{"name":"documentation"},{"name":"question"},{"name":"inbound"}]'
+$labelNames = @(Get-LabelNames -Json $labelJson)
+Assert-Equal 3 $labelNames.Count 'every label name is read out of a gh label list payload'
+Assert-Equal 'documentation' $labelNames[0] 'and in the order gh gave them'
+
+# UNREADABLE IN, EMPTY OUT -- and the CALLER must read empty as "could not be asked", never as "the
+# label is missing". A single-record payload is in this list on purpose: 5.1 hands a one-element parsed
+# array to the pipeline as the record itself, which is the trap the assign-first/wrap-second shape
+# navigates.
+foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"colour":"red"}]')) {
+    Assert-Equal 0 (@(Get-LabelNames -Json $bad)).Count "an unreadable label payload ('$bad') yields no names rather than a wrong answer"
+}
+Assert-Equal 1 (@(Get-LabelNames -Json '[{"name":"bug"}]')).Count 'a ONE-record payload is read as one name, not flattened away'
+Assert-Equal 1 (@(Get-LabelNames -Json '[{"name":"bug"},{"name":"bug"}]')).Count 'a duplicated name is counted once'
+
+# THE MEASURED CASE. 'bug' and 'enhancement' were deleted org-wide in BWJ-ecommerce/smartwatchbanden on
+# September 1, 2026 because the issue TYPE now carries that classification, and the next PR died on
+# "could not add label: 'bug' not found" -- after every gate had run and the branch had been pushed.
+$missing = Get-MissingLabelNote -Labels $labelNames -Label 'bug' -Prefix 'fix' `
+                                -SeamPath 'scripts\lib\branch-info.ps1' -Repo 'BWJ-ecommerce/smartwatchbanden'
+Assert-True ($missing -ne '') "the measured case is caught: 'bug' is not among the repo's labels"
+Assert-True ($missing -like "*'bug' is not a label in BWJ-ecommerce/smartwatchbanden*") 'the note names the label and the repository'
+Assert-True ($missing -like "*'fix/'*") 'and the branch prefix that produced it'
+Assert-True ($missing -like '*branch-info.ps1*') 'and the repo-owned seam file that maps them, so the reader is sent to the edit'
+Assert-True ($missing -like '*before the push*') 'and says the refusal came before the push, which is the whole point of the gate'
+Assert-True ($missing -like '*gh label create*') 'the first remedy is paste-ready'
+Assert-True ($missing -like "*'documentation', 'question' and 'inbound'*") 'the labels that DO exist are named -- what turns the refusal into a repair when the answer is a rename'
+
+# A LABEL THAT EXISTS COSTS NOTHING AND SAYS NOTHING.
+Assert-Equal '' (Get-MissingLabelNote -Labels $labelNames -Label 'documentation' -Prefix 'docs' -Repo 'x/y') 'a label that exists produces no note'
+# CASE-INSENSITIVE, because GitHub is: it refuses to create 'Bug' beside 'bug', and `--label bug`
+# attaches the existing 'Bug'. Refusing a PR gh would have opened is the one direction this gate must
+# never fail in.
+Assert-Equal '' (Get-MissingLabelNote -Labels @('Bug') -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'a label that differs only in case is the same label to GitHub, so it is not refused'
+
+# NOTHING TO JUDGE AGAINST IS NOT A REFUSAL -- an old gh with no --json, a network hiccup, a repo with
+# no labels at all. A diagnostic must never be the reason a PR cannot be opened.
+Assert-Equal '' (Get-MissingLabelNote -Labels @() -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'an empty label list is "unknowable" and not "absent"'
+Assert-Equal '' (Get-MissingLabelNote -Labels $null -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'and so is no list at all'
+Assert-Equal '' (Get-MissingLabelNote -Labels $labelNames -Label '' -Prefix 'fix' -Repo 'x/y') 'and so is an empty label -- that is the nameless-PR guard subject, not this gate'
+
+# THE FALLBACK HAS THE SAME HOLE ONE LAYER DOWN, which the report named: open-pr substitutes 'question'
+# for an unknown prefix, and that is a GitHub DEFAULT label a repo may equally have deleted. The check
+# is on the label that would be SENT, whatever produced it.
+$fallbackNote = Get-MissingLabelNote -Labels @('documentation') -Label 'question' -Prefix '' -Repo 'x/y'
+Assert-True ($fallbackNote -ne '') "the unknown-prefix fallback is checked too, not trusted"
+Assert-True ($fallbackNote -like '*unknown-prefix fallback*') 'and the note says that is where the label came from, since there is no prefix to name'
+Assert-True ($fallbackNote -notlike "*''/*") 'and it never prints an empty prefix as if it were one'
+
+# ABOVE TEN LABELS THE COUNT REPLACES THE LIST. A label set is unbounded in a way a commit's check
+# suites are not, and this note is read once in a terminal.
+$many = @(1..12 | ForEach-Object { "label-$_" })
+$manyNote = Get-MissingLabelNote -Labels $many -Label 'bug' -Prefix 'fix' -Repo 'x/y'
+Assert-True ($manyNote -like '*12 labels do exist*') 'a large label set is counted rather than listed'
+Assert-True ($manyNote -like '*gh label list --repo x/y*') 'and the command that lists them is given instead'
+Assert-True ($manyNote -notlike '*label-7*') 'so the refusal cannot become a wall of names'
+
+# AND open-pr.ps1 ACTUALLY RUNS IT, BEFORE THE PUSH. Without this assert every check above stays green
+# while the label is resolved one line before `gh pr create` again -- which IS the defect, not a
+# regression in the helper. Same reasoning as the #919 ordering assert above and the #1044 call-site one
+# below: the script is the one caller no suite gets to run.
+$idxLabelGate = $openPrText.IndexOf('Get-MissingLabelNote -Labels')
+$idxPush      = $openPrText.IndexOf("Invoke-NativeCapture -FilePath 'git' -Arguments @('push'")
+# LastIndexOf BEFORE the push, not IndexOf: -GatesOnly calls Invoke-WorkflowGates near the top of the
+# script and exits, so the first occurrence is not the one on the push path.
+$idxGates     = if ($idxPush -ge 0) { $openPrText.LastIndexOf('Invoke-WorkflowGates -RepoRoot', $idxPush) } else { -1 }
+$idxCreate    = $openPrText.IndexOf("@('pr', 'create'")
+Assert-True ($idxLabelGate -ge 0) 'open-pr.ps1 asks whether the label exists (inbound #1221)'
+Assert-True ($idxPush -gt $idxLabelGate) 'and it asks BEFORE the push, which is the whole repair -- a failed create after the push leaves a pushed branch with no PR'
+Assert-True ($idxGates -gt $idxLabelGate) 'and before the lint and test gates, so the author hears it in seconds rather than after the suites'
+Assert-True ($idxCreate -gt $idxLabelGate) 'and the create still gets the label that was checked'
+Assert-True ($openPrText -like "*@('label', 'list', '--json', 'name', '--limit', '500'*") 'the query names --limit, because gh label list defaults to 30 and a truncated list would refuse a label that exists'
+$idxResolve = $openPrText.IndexOf('$label = $info.Label')
+Assert-True ($idxResolve -ge 0 -and $idxResolve -lt $idxPush) 'the label is RESOLVED before the push too -- a check on a label resolved later would be checking nothing'
+Assert-True (([regex]::Matches($openPrText, '\$label = \$info\.Label')).Count -eq 1) 'and resolved in exactly one place, so the checked label and the sent label cannot differ'
+Assert-True ($openPrText -like '*if (-not $existingPr) {*') 'the gate is on the create path only -- an existing PR keeps its own labels and is never sent one'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

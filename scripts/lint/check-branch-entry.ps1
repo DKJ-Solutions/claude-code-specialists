@@ -180,7 +180,11 @@ $safeName = if (Get-Command Get-BranchInfo -ErrorAction SilentlyContinue) {
     (Get-BranchInfo -Branch $Branch).SafeName
 } else { $Branch -replace '/', '-' }
 
-$entryRel  = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
+# -Branch IS PASSED RATHER THAN LEFT TO DEFAULT (#1255), and this is the one caller where that is not
+# merely tidier. This gate runs in CI, where the checkout is a detached HEAD at the merge or head ref --
+# so the resolver's HEAD fallback would find no branch name at all and fall back to the shared name. The
+# branch is already resolved above, from the parameter the workflow passes.
+$entryRel  = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot -Branch $Branch
 $entryPath = Join-Path $repoRoot $entryRel
 if (-not (Test-Path -LiteralPath $entryPath)) {
     $entryPath = Join-Path $repoRoot ($safeName + '.md')

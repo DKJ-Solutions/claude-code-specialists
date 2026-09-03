@@ -75,7 +75,7 @@ carries the type.
 
 Creating the branch and creating its changelog entry file are no longer two separate manual steps —
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
-again on an existing branch simply resumes it) and writes `contributing-davekjohn/development.md` in the
+again on an existing branch simply resumes it) and writes `contributing-davekjohn/development-<branch>.md` in the
 same run — one document holding both jobs: the step phases, and the `### DEPLOY:` section that is the entry.
 It also **completes the version suffix**, appending `-v1` to a name that carries none, so a second cycle on
 the same subject is a deliberately typed `-v2`. **One script since August 7, 2026** —
@@ -112,7 +112,7 @@ table above).
 [#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
 [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). The PR is called
 `<branch-type>: <the entry's Branch title>`, so the prefix mirrors the branch type by construction and the
-words are the ones already in the DEPLOY section of `contributing-davekjohn/development.md`. `-Title` is still accepted and ignored, with a
+words are the ones already in the DEPLOY section of `contributing-davekjohn/development-<branch>.md`. `-Title` is still accepted and ignored, with a
 warning naming the title the entry gives.
 
 **That rule used to live in this very paragraph, and was violated five PRs in a row.** It read "the title
@@ -159,7 +159,7 @@ started.
 
 **The PR body fills itself in** via `open-pr.ps1` — simply leave out `-Body`. The script ticks the
 right "Type of change" box (from the branch prefix), fills "What does this change do?" with the
-description from the changelog entry (the DEPLOY section of `contributing-davekjohn/development.md`), and ticks the two checklist items
+description from the changelog entry (the DEPLOY section of `contributing-davekjohn/development-<branch>.md`), and ticks the two checklist items
 it can honestly verify ("Changelog entry written" + "Requested by Dave"). The first is judged on the file
 actually **holding** an entry, not on its existing — a branch cut before August 23, 2026 carries the trunk's
 old empty copy, so a self-ticking box keyed on existence would tick for a branch that wrote nothing. Only
@@ -413,7 +413,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 
 ### Tooling & account
 
-- **GitHub CLI (`gh`)** is used for PRs. This repo lives under **`DaveKJohn`** and is
+- **GitHub CLI (`gh`)** is used for PRs. This repo lives under the **`DKJ-Solutions`** org and is
   **public** — a deliberate choice, so the remote `github` marketplace source can be read without gh auth.
   If you get `Repository not found`, first run `gh auth setup-git`.
 - This repo is **public**: nothing confidential belongs in it (no personal information, credentials,
@@ -433,7 +433,7 @@ entitled to its own. Do not read a consumer without these scripts as misconfigur
 Derek prefers not to touch the git commands by hand. His toolbox:
 
 - `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-NoPush]` — create (or
-  idempotently resume) the branch and, in the same move, write its `contributing-davekjohn/development.md`.
+  idempotently resume) the branch and, in the same move, write its `contributing-davekjohn/development-<branch>.md`.
   `-Intent` records where you left off / what is next **as the opening paragraph of `PLAN`, without a
   heading** — above the phases until #908/#925 (August 26, 2026), which is the one region the preamble
   rule refuses, so the scaffolder wrote a document its own branch-entry gate rejected. Deliberately not in
@@ -447,7 +447,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   [Step 3 above](#classifying-naming-and-creating-a-branch).
 - `scripts/task/park-cycle.ps1 [-Quiet]` — **Derek does not run this**, and it is here so he recognises its
   commits. A Stop hook (`cycle-autopark.ps1`) invokes it after every turn and it pushes
-  `contributing-davekjohn/development.md`, and only that file, for the life of the branch — the plan
+  `contributing-davekjohn/development-<branch>.md`, and only that file, for the life of the branch — the plan
   and the phase state being what another device actually needs. **It becomes a no-op the moment a PR
   exists**, because the DEPLOY lock (#884) refuses the merge once that document diverges from what the PR
   published; a pusher that kept going would block every merge in the repo. Same reason its fail-safe runs
@@ -485,5 +485,5 @@ remains [Rendall #06](05-06-extension.md)'s tool, run on `main` after the merge.
 GitHub chore? Derek builds a script for it.
 
 In short: the **how** (branching, PRs, merging, cleanup, automation) is portable; the **what** (this
-prefix table, the `scripts/release/*` pipeline with the plugin lint gate, the public `DaveKJohn` repo,
+prefix table, the `scripts/release/*` pipeline with the plugin lint gate, the public `DKJ-Solutions` repo,
 and the fold exception) belongs to this repo.

@@ -427,7 +427,7 @@ are marked as such:
 - **`contributing-davekjohn/`, if you ran that workflow, stays too — permanently, by design** (issue #885).
   Uninstalling `contributing-davekjohn` in Step 2 takes the plugin's skills and scripts; it does not remove
   this folder, and no future teardown of that plugin may either — the folder holds your own changelog and
-  release history, not the plugin's. `development.md` inside it is a precision on that permanence,
+  release history, not the plugin's. `development-<branch>.md` inside it is a precision on that permanence,
   not an exception to it: it belongs to whichever branch was open, the fold already removed it at that
   branch's merge, and an uninstall does not bring it back.
 - **Lenses you filled in stay**, including the orchestrator's — they are your writing. The `@`-import that

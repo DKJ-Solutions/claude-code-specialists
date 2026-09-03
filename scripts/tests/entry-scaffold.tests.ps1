@@ -221,9 +221,12 @@ try {
 # thing that can say the run finished at all. So it is asserted, once, here.
 Assert-Equal 0 $script:roundTripCode 'the round-trip run finished -- a fixture missing one of the shared libs cannot pass silently any more'
 
-# ONE DOCUMENT, at a fixed path: contributing-davekjohn/development.md, not feat-round-trip-v1.md in the
-# root and not a pair under branch/. The path comes from the same lib the readers use.
-$writtenDoc = Join-Path $fixture ((Get-BranchFilePaths).File)
+# ONE DOCUMENT, AT THE NAME THIS BRANCH OWNS: contributing-davekjohn/development-feat-round-trip-v1.md,
+# not feat-round-trip-v1.md in the root and not a pair under branch/. The path comes from the same lib the
+# readers use -- and since #1255 that lib has to be TOLD the branch, because the name carries it. Asked
+# without one it answers the pre-#1255 shared name, which is a real answer for callers that want the
+# layout's shape and the wrong one here.
+$writtenDoc = Join-Path $fixture ((Get-BranchFilePaths -Branch 'feat/round-trip-v1').File)
 Assert-True (Test-Path -LiteralPath $writtenDoc) 'the writer produced the development document in the fixture'
 # BOTH HALVES ANSWER SEPARATELY, which is the claim the merge has to keep. Split-Development is what
 # every reader in the system uses to find the boundary, so asserting through it is asserting the contract

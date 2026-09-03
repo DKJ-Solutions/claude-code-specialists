@@ -285,8 +285,16 @@ function Test-IsChangelogEntryFile {
 # carrying the trunk's reset copy of the new file beside the pair holding its real work. So a mixed tree
 # folds and clears exactly the files it has, which is the same
 # "recognise both, write one" rule the paragraph above states for the root form.
-$branchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot
-$branchCycleRel      = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot
+#
+# AND SINCE #1255 THE BRANCH IS HANDED IN WHERE THE CALLER NAMED ONE, which matters here more than at any
+# other call site: this script runs ON THE TRUNK, after the merge. Left to default to HEAD the resolver
+# would look for the TRUNK's document, find none, and fall through to discovery -- which answers correctly
+# while exactly one unfolded document is present and picks the alphabetically first of several when the
+# folds have been blocked for a while. -Branch makes it exact instead of merely usually right. Empty (a
+# fold-all run) it degrades to that discovery on purpose: that mode is asking "what is here", not "where is
+# this branch's".
+$branchDeploymentRel = Resolve-BranchFilePath -Kind Deployment -RepoRoot $repoRoot -Branch $Branch
+$branchCycleRel      = Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot -Branch $Branch
 $branchDeploymentPath = Join-Path $repoRoot $branchDeploymentRel
 $branchDeploymentFilled = (Test-Path -LiteralPath $branchDeploymentPath) -and
     (Test-BranchChangelogIsFilled -Text ([System.IO.File]::ReadAllText($branchDeploymentPath)))
@@ -330,6 +338,30 @@ else {
     $reserved = @("CHANGELOG.md", "CLAUDE.md", "README.md")
     $entryFiles = @()
     if ($branchDeploymentFilled) { $entryFiles += $branchDeploymentRel }
+    # EVERY PER-BRANCH DOCUMENT IN THE FOLDER, not only the one the resolver names (#1255). Until the
+    # documents were named per branch this loop could not exist and did not need to: there was ONE shared
+    # path, so the resolver's single answer was all there could be. Now the trunk can carry several at once
+    # -- which is precisely the state a run of blocked folds leaves behind -- and folding one per invocation
+    # would leave the rest sitting unfolded with nothing saying so. That is the silent half-state this
+    # script's own header keeps naming, so fold-all sweeps the pattern.
+    #
+    # THE THREE TESTS ARE THE SAME ONES APPLIED EVERYWHERE ELSE HERE, deliberately, rather than a fourth
+    # definition: it must DECLARE a branch, that branch must not be the trunk (a reset document is not an
+    # entry), and it must be FILLED. The legacy 'development-cycle.md' matches this pattern too and needs no
+    # exception -- if it passes all three it IS an unfolded entry and folding it is right.
+    $foldAllPaths = Get-BranchFilePaths
+    $foldAllTrunk = Get-BranchTrunkName
+    $foldAllDir   = Join-Path $repoRoot ([string]$foldAllPaths.Directory -replace '/', '\')
+    if (Test-Path -LiteralPath $foldAllDir -PathType Container) {
+        foreach ($devDoc in @(Get-ChildItem -LiteralPath $foldAllDir -Filter ([string]$foldAllPaths.Pattern) -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
+            $devRel = "$([string]$foldAllPaths.Directory)/$($devDoc.Name)"
+            if ($entryFiles -contains $devRel) { continue }
+            $devText = [System.IO.File]::ReadAllText($devDoc.FullName, [System.Text.Encoding]::UTF8)
+            $devDeclared = Get-BranchFileDeclaredBranch -Text $devText
+            if (-not $devDeclared -or $devDeclared -eq $foldAllTrunk) { continue }
+            if (Test-BranchChangelogIsFilled -Text $devText) { $entryFiles += $devRel }
+        }
+    }
     $entryFiles += @(Get-ChildItem -Path $repoRoot -Filter "*.md" -File |
         Where-Object { $reserved -notcontains $_.Name } |
         Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |

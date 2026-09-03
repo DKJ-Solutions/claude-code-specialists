@@ -90,10 +90,53 @@ infrastructure.
   cost half the box. Since July 15, 2026, the repo ruleset
   **`main-ci-gate`** (renamed from `main-ci-poort` by Dave on July 26, 2026; found at GitHub →
   Settings → Rules) enforces that gate as a **required status check**: a PR to `main` only merges
-  on a green `lint-en-tests` job. The bypass list (Repository admin + the Write role, "Always
-  allow") keeps the direct fold/release commits on `main` possible — the work account `davekokbwj`
-  has write rights, not admin. That Write bypass is safe as long as there are no external
-  collaborators and must be revisited as soon as there are.
+  on a green `lint-en-tests` job. The bypass list is what keeps the direct fold/release commits on
+  `main` possible, and it is not a convenience: a required status check **cannot** be satisfied by a
+  direct push, because the check has to be green before the push is accepted and a push is what would
+  trigger it. Until September 2, 2026 it held *Repository admin + the Write role, "Always allow"* —
+  the work account `davekokbwj` has write rights, not admin — and that Write bypass is safe as long
+  as there are no external collaborators, to be revisited as soon as there are.
+
+  **THAT LIST IS EMPTY RIGHT NOW, AND THE TRANSFER IS WHY** (September 2, 2026,
+  [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244)). Moving the repo into
+  the `DKJ-Solutions` org carried the ruleset across **intact** — active, `~DEFAULT_BRANCH`,
+  `deletion` + `non_fast_forward` + `required_status_checks` on `lint-en-tests` — and dropped only its
+  bypass list: `bypass_actors: null`, `current_user_can_bypass: never`, which means nobody can push to
+  `main` directly, `DaveKJohn` as repo admin included. All three direct-on-`main` exceptions are dead
+  until Dave restores it at Settings → Rules → `main-ci-gate` → Bypass list.
+
+  **It does not stop at the three exceptions — it blocks MERGES too, by a chain reaction**, and that is
+  the part worth reading before anybody concludes the damage is bounded. A PR still merges; its fold
+  cannot push; so the merged branch's development document **stays on `origin/main`**. The trunk then
+  carries a live branch document that should have been deleted, and while the fold stays blocked they
+  accumulate.
+
+  **The second half of this chain reaction is fixed as of September 3, 2026, and the sentence that used
+  to be here is dated rather than swept.** It read: *"That path is fixed by design — the design's safety
+  argument being that the fold removes it at the merge — so ... every open branch has its own file at that
+  same path, and every subsequent PR conflicts on it."* That was true, and it was the shared-path design's
+  defect rather than this ruleset's: the conflict happened on **every** merge, blocked fold or not, and a
+  conflicting PR gets no check suite at all, so it could never go green and never merge
+  ([#1255](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1255)). The document is named
+  per branch now, so two branches never write the same path and a leftover on the trunk collides with
+  nobody. **What this ruleset still costs is the leftover itself** — an unfolded entry sitting on `main`
+  with nothing saying so — which is the half #1244 owns and this change does not repair.
+
+  **The hazard that made it urgent is worth keeping, because it is what a reader would otherwise
+  rediscover.** Resolving that conflict in favour of the incoming branch **destroys an unfolded DEPLOY
+  entry**, the only copy of that change's changelog text — and *keep mine* is exactly what a session hits
+  this reaches for. Measured on PR #1249, where the trunk's conflicting file turned out to belong to
+  PR #1250 and `deleted by us` meant *"our fold deleted a different document at the same path"*. It was
+  untangled by keeping theirs, running #1250's pending fold, and letting both held folds ride out through
+  the open PR. Per-branch names remove the situation rather than the hazard's teeth: there is no longer a
+  resolution in which one branch's document can stand in for another's.
+
+  **The generalisable half, beside the one below it: a setting that is present and active is not proof
+  that the thing you depend on inside it survived.** [#1239](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1239)
+  made *"does `main-ci-gate` still exist"* the post-transfer check, and it existed — enforcement, target,
+  rules and required check all unchanged. What does not survive a transfer is the **sub-field**, and a
+  ruleset reporting `active` reads as a clean bill of health while the one array the fold model runs on
+  is gone. So check the field you actually rely on, not the object that contains it.
 - **`.github/workflows/claude.yml` + `.github/workflows/claude-code-review.yml`** — the two Claude Code
   workflows, added August 14, 2026 via
   [PR #658](https://github.com/DaveKJohn/claude-code-specialists/pull/658). The first answers an
@@ -127,7 +170,13 @@ infrastructure.
   14, 2026). The question decides whether that App token can reach the trunk past the required check, and
   the REST endpoints all refuse: `bypass_actors` is returned to admins only, and the work account
   `davekokbwj` has `admin: false, maintain: false, push: true`. It was answered anyway, from three
-  measurements that survive a redacted field:
+  measurements that survive a redacted field.
+
+  **All three readings below are from before the transfer and none of them reproduces today** — the list
+  is empty, so `bypass_actors` is `null` rather than two redacted nodes, `current_user_can_bypass` reads
+  `never` rather than `always`, and `updated_at` is the transfer's own stamp. The conclusion still holds
+  trivially (an empty list names no App), and **the method is what this entry is for**: it is how a
+  question about a field you cannot read gets answered instead of guessed at.
   - **GraphQL redacts the entries but not the array.** `repository.rulesets.bypassActors` came back as
     `nodes: [null, null]` — the contents are hidden from a non-admin, the **count** is not. Exactly two
     actors.
@@ -234,6 +283,63 @@ infrastructure.
   that removes the overlap is not automatically the fix.** Here it would have moved the loss from a marked
   truncation in one reader's view to an unmarked one in another's, and delivered the same text to the
   reader it was meant to help.
+  **AND THE RELAY IS ONLY AS GOOD AS THE WORKFLOW HAVING SPOKEN AT ALL** — issue
+  [#1245](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1245), September 2, 2026, and it is
+  the first entry in this narrative about a failure the diagnostic step never *saw*. Every measurement
+  above describes a run the SDK lived long enough to report on. The **Why the review failed** step is
+  gated on `execution_file != ''`, so when the action dies before the SDK is reached that step is
+  **skipped**, the workflow writes no titled annotation, and `Get-AuthoredFailureNote` — correctly —
+  selects nothing. The operator meets a red tick with a blank reason line: the #966 silence again, in the
+  one class all of the 429 work could not reach.
+
+  **Measured rather than reasoned about.** Run `33663986438` (PR #1249): step *Run Claude Code Review*
+  `failure` after 16s, step *Why the review failed* `skipped`, and the job's annotations were a Node-20
+  warning plus two **untitled** failures — *"Process completed with exit code 1"* and *"Action failed with
+  error: Claude Code is not installed on this repository"*. The reason was in the API the whole time, in
+  the one field the relay does not read. The cause was #1245's own subject: the Claude Code GitHub App did
+  not follow the transfer into `DKJ-Solutions`, so the app-token exchange returned 401.
+
+  **The repair is the second diagnostic step, and its placement is the #1112 rule applied again.** The
+  tempting change is to let the relay fall back to an untitled annotation — and it is the wrong one, for
+  the reason its own asserts already state: it would relay *"Process completed with exit code 1"* in every
+  consuming repo, which is the reassuring-looking note that says nothing. A workflow that wants to be heard
+  writes a title. So the workflow now has the **complementary** gate, `execution_file == ''`, and
+  `pr-issues.tests.ps1` pins that both halves of `failure()` exist — a class cannot fall between them
+  again.
+
+  **What that second sentence may CLAIM is the interesting constraint**, and it is the standing rule of
+  that file rather than a new one. It states only what an **empty output** proves: the SDK produced no
+  result, so the failure is in the setup around it and not in the diff, and no `api_error_status` exists —
+  a 429 or 529 arrives *with* a result message and is therefore the other step's business. It does **not**
+  name the cause, because it cannot: the cause is in the runner's untitled annotation and in the step log,
+  and the step can read neither. Naming today's cause in the sentence would be #966's mistake with the sign
+  flipped — an assertion the run never proved — so the app installation is cited in the job summary as *the
+  measured instance*, not as the diagnosis. The asserts pin that too: the headline may not mention 429,
+  529, quota or a reset.
+
+  **And the escape went in even though every character of that headline is a literal**, which is the
+  #1118 lesson taken at face value rather than re-learned. On literals `${headline//%/%25}` is a no-op —
+  but #1118 was precisely the branch nobody escaped because nobody had interpolated into it *yet*, and it
+  was then the only branch without the guard. So the test pins the emission-site **count** rather than a
+  `-ge`: a new site raises the number deliberately, and cannot slip in unescaped.
+
+  **The transferable half, and it is #1245's own sentence: after a transfer, verify the CAPABILITY, not
+  the artefact that represents it.** The post-transfer checklist checked that the Actions secret survived,
+  and it had — so the check came back clean while both workflows depending on it were dead anyway, because
+  the dependency that broke was one layer further out than the check reached. Its sibling
+  [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244) is the same shape on the same
+  day: `main-ci-gate` present and active while the bypass list it depended on was gone. **Both failure
+  modes are silent by design** — one check is advisory, the other's absence only shows when somebody tries
+  to use it — which is why *"the artefact is still there"* is the one form of verification a transfer
+  defeats.
+
+  **What is NOT in this repo's gift**, stated because the temptation is to close the loop: the app install
+  is an **account-level** action on the `DKJ-Solutions` organisation, like the spend limit #1164 turned out
+  to need. A session can make the failure legible and cannot make it stop. The consumer-facing half — that
+  no shipped *page* states the titled-annotation contract, only the code enforcing it — is
+  [#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251), deliberately not folded in
+  here.
+
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
@@ -313,7 +419,7 @@ infrastructure.
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
   it in isolation — mirroring the `release-lib` setup. **Never edit between the sentinels by hand.**
 - **`.claude/settings.json`** — this repo's harness config: the `extraKnownMarketplaces` (the
-  `github` source `DaveKJohn/claude-code-specialists`) and `enabledPlugins` with which the repo enables
+  `github` source `DKJ-Solutions/claude-code-specialists`) and `enabledPlugins` with which the repo enables
   its own `team-alpha` plugin (the core team).
 - **The manifests** `.claude-plugin/marketplace.json` and every `<plugin>/.claude-plugin/plugin.json`
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with
@@ -794,7 +900,7 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
-the DEPLOY section of `contributing-davekjohn/development.md`, so everything else it asked was already answered four lines lower. Measured
+the DEPLOY section of `contributing-davekjohn/development-<branch>.md`, so everything else it asked was already answered four lines lower. Measured
 over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
 single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
 `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and

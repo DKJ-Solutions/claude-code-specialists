@@ -1,7 +1,10 @@
-# `development.md` — the portable half
+# `development-<branch>.md` — the portable half
 
-Everything a branch needs to carry lives in **one file**: `contributing-davekjohn/development.md`,
-inside the workflow's own root folder, where everything portable gathers. It has two halves with two
+Everything a branch needs to carry lives in **one file**:
+`contributing-davekjohn/development-<branch>.md` — one document per branch, named after it, inside the
+workflow's own root folder where everything portable gathers. (It was the single shared
+`development.md` until September 3, 2026; [see below](#why-the-name-carries-the-branch) for what that
+cost and why it changed.) It has two halves with two
 different readers, and they are sections of one document rather than two files:
 
 | half | subject | who reads it | lifetime |
@@ -16,7 +19,7 @@ at the moment the branch is created. You do not create it by hand, and you do no
 **How to read this page.** It travels with the plugin, so two conventions keep it true in every tree it
 lands in — the same two `RELEASES-portable.md` states for itself. *This repo* always names the **source
 repo** the page was written in
-([claude-code-specialists](https://github.com/DaveKJohn/claude-code-specialists)) — its measurements travel
+([claude-code-specialists](https://github.com/DKJ-Solutions/claude-code-specialists)) — its measurements travel
 as the evidence behind the rules, never as your repo's own record. And links into the source's script tree
 are **absolute** on purpose; the file every adopting repo has of its own is named in code rather than
 linked, because the copy that matters is yours.
@@ -258,7 +261,7 @@ something Claude's own output demonstrates, and for a branch that is the gate ou
 depend on:
 
 ```text
-/goal every step above the DEPLOY heading in contributing-davekjohn/development.md is resolved
+/goal every step above the DEPLOY heading in contributing-davekjohn/development-<branch>.md is resolved
 and open-pr reports the lint and test gates green, or stop after 20 turns
 ```
 
@@ -322,7 +325,7 @@ See [the lib](../scripts/lib/release-lib.ps1).    <- correct where it sits BESID
 ```
 
 **You do not have to work out which one you are.** The guidance block at the top of your own
-`contributing-davekjohn/development.md` states your repo's answer in one sentence, composed by
+`contributing-davekjohn/development-<branch>.md` states your repo's answer in one sentence, composed by
 `new-branch` from the same seam `open-pr`'s link gate resolves against — so the file you are typing in and
 the gate that refuses cannot disagree about the base.
 
@@ -478,38 +481,50 @@ generic guidance, identical in every branch document in every repo, and the CI g
 is refused as branch content the moment the entry is written. Move it under one of the four — `PLAN` for a
 parking note — and the gate goes quiet.
 
-## Why the name is fixed
+## Why the name carries the branch
 
-`development.md` is the same on every branch, which looks like it should collide the moment two
-branches exist. It cannot: **git already tracks this file per branch**, so each branch carries its own
-version of the same path and a checkout swaps them. The per-branch filename this replaced was solving a
-problem version control had already solved, and it cost a repo root that filled up with other people's
-in-flight work.
+**One document per branch: `contributing-davekjohn/development-<branch>.md`**, where `<branch>` is the
+branch name with its slashes flattened — `fix/thing-v1` becomes `development-fix-thing-v1.md`. Two
+branches therefore never write the same path.
 
-**`<branchname>-changelog.md` was weighed and declined** (Dave, August 6, 2026), so this is a decision
-rather than an oversight. Two things speak against it today, and a third that has since expired is kept below:
+**This reversed a decision, and the reversal was measured** (September 3, 2026). The name used to be the
+fixed `development.md`, on the argument that it could not collide because *git already tracks this file per
+branch, so each branch carries its own version of the same path and a checkout swaps them.* That is true of
+**checkout** and says nothing about **merge**, which is where the collision actually lives. Every merge to
+the trunk puts the merged branch's document there, and every other open branch then conflicts with it —
+`add/add` if it has never taken the trunk in, `modify/delete` afterwards — without anybody touching those
+branches.
 
-1. **It reinstates the derived filename, which was a trap.** The system this replaced had a written rule
-   forbidding a `-v2` suffix, because the fold looked the entry up by the exact branch name and a suffix
-   broke the match *and* the cleanup that followed it. Today the fold reads the branch from the document's
-   own heading — a fact stated in the document instead of guessed from a filename. The version suffix is
-   now the *convention* rather than the thing that breaks it.
-2. **It solves a collision that does not happen**, per the paragraph above.
+**What that cost is why this is not a tidiness change.** A conflicting pull request has no merge ref, so the
+forge creates **no check suite at all** for it; where a green required check is what permits a merge, a check
+that was never created can never go green. The pull request cannot merge, so it stays open, so the next merge
+conflicts it again. Measured in this workflow's own source repo: all four open pull requests were conflicting
+and this document was the *only* conflicting path in three of them.
 
-**The third argument has since expired, and it is left here rather than quietly dropped**, because it was
-the decisive one at the time. It ran: unique names would make the reset state impossible, since the warning
-on the trunk exists only because the file exists there — no file, no reference, no warning, and nothing
-standing between the fold and a file it must not treat as a change. On August 23, 2026 (Dave) the document
-became branch-lifetime and the trunk stopped carrying a copy at all, so that is now simply what happens.
-The decision still stands on the two arguments above; a reader meeting it should know it stands on two
-rather than three.
+**The fold is not the answer, and that was measured before this was written.** Simulating a completed fold —
+the trunk with the document deleted — against those same four pull requests cleared the two `add/add` cases
+and left the two `modify/delete` cases conflicting. Deleting the trunk copy changes the conflict's *shape*,
+not its existence. Nor is a `.gitattributes` merge strategy, which this page used to recommend as the cheap
+repair: a forge computes mergeability with its own machinery rather than your merge drivers, and a `union`
+merge of this document would produce one declaring two branches — which is the one thing every reader of it
+resolves on.
 
-**The one real case for unique names, kept here on purpose:** if you take `main` in during the window
-between another branch's merge and its fold, that branch's entry is briefly on `main` and conflicts with
-yours. The conflict is visible and the resolution is trivial — keep yours; theirs will be folded from
-`main` — and the window is small because the fold runs straight after the merge. **Deliberately not
-pre-empted.** If it ever actually bites, the cheap repair is a merge strategy for the file in
-`.gitattributes`, not renaming the mechanism.
+**The old decision's second half was right and is preserved.** The pre-August-2026 per-branch form cost *a
+repo root that filled up with other people's in-flight work* — and that was about the **root**, not about the
+filename. These documents live in the workflow's own folder, beside `CHANGELOG.md`, so the root is untouched
+and a relative link written in a DEPLOY section still resolves after the fold.
+
+**And the trap that form set is deliberately not rebuilt.** It made the fold guess the branch out of the
+*filename*, which is why a `-v2` suffix was once forbidden: a suffix broke the match and the cleanup after
+it. Here the filename is a **write convention and a read candidate, never the authority**. The resolver
+still identifies a document by the branch it **declares** in its own heading, and it discovers candidates by
+pattern rather than by trusting a name — so a branch renamed after its document was written still resolves,
+a document written by hand under a mismatched name still resolves, and `-v2` costs nothing.
+
+**One argument for the fixed name expired earlier and is recorded so nobody reinstates it.** It ran: unique
+names would make the reset state impossible, since the warning on the trunk exists only because the file
+exists there. On August 23, 2026 (Dave) the document became branch-lifetime and the trunk stopped carrying a
+copy at all, so there is no reset state to protect.
 
 ## On the trunk there is no file at all
 

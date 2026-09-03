@@ -169,7 +169,7 @@ single release train, and that dissolved with the reorganisation rather than nee
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
 its own `team-alpha` plugin (the core team), with the `github` marketplace source
-`DaveKJohn/claude-code-specialists` — so the repo points at itself. That way work here runs against
+`DKJ-Solutions/claude-code-specialists` — so the repo points at itself. That way work here runs against
 exactly the product it maintains. One consequence to be aware of: a session reads the plugins from the
 **local marketplace clone**, and that clone advances on a `claude plugin marketplace update` — **not on
 a push**. So an agent def you modify on a branch takes effect after merge, push *and* that refresh, and
@@ -273,7 +273,7 @@ The constitution above, concretely implemented here:
 - **Five more gates arrive with the workflow plugin**, and all of them read the branch's own document.
   Four run locally: the **scaffold gate** refuses to push an entry still carrying the wording
   `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
-  `contributing-davekjohn/development.md` has an unresolved step above its DEPLOY heading, the
+  `contributing-davekjohn/development-<branch>.md` has an unresolved step above its DEPLOY heading, the
   **backing gate** refuses to push when that plan reads as finished while nothing is committed on the
   branch behind it and the work sits uncommitted in the working copy, and the
   **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
@@ -299,7 +299,13 @@ The constitution above, concretely implemented here:
      carried a name the bound did not list — which put its own fold outside the exception it runs under.
      So the bound is still exactly two paths and still checkable after the fact, because the commit prints
      the path it actually touched; it is simply no longer a spelling that goes stale under the tooling it
-     governs. Today's writer is `contributing-davekjohn/development.md`.
+     governs. Today's writer is `contributing-davekjohn/development-<branch>.md` — **one document per
+     branch since September 3, 2026** (#1255), where it was the single `development.md`. That fixed path
+     did not collide on checkout, which is what the old reasoning said, but it collided on *merge*: every
+     merge to `main` left every other open PR conflicting on it, and a conflicting PR gets no check suite
+     at all, so it could never go green and could never merge. The bound is unchanged and so is the reason
+     it is named by its resolver rather than spelled out — this is the fifth rename, and the resolver is
+     what keeps a branch opened before it from folding outside the exception.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
      bumps all plugin versions in lockstep, generates the release notes in `contributing-davekjohn/releases/`,
      **empties the changelog down to its intro**, commits that on `main`, and tags `vX.Y.Z`.

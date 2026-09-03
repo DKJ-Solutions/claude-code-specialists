@@ -1,6 +1,6 @@
 # The contribution cycle — the portable half
 
-This is the cycle the `contributing-davekjohn` scripts run: an issue, a branch, its `contributing-davekjohn/development.md`, a Pull
+This is the cycle the `contributing-davekjohn` scripts run: an issue, a branch, its `contributing-davekjohn/development-<branch>.md`, a Pull
 Request that has to get past its gates, a merge, and a fold. **It is written to be read in any repo that
 enables this plugin**, which is why it names the *seam* wherever a repo owns the answer, rather than stating
 one repo's answer as the rule.
@@ -94,7 +94,7 @@ this plugin reads either**, so that alignment is a convention you keep rather th
 Creating the branch writes its working document, so **a branch is never entry-less**. It has two halves
 with two different readers:
 
-| half of `contributing-davekjohn/development.md` | subject | lifetime |
+| half of `contributing-davekjohn/development-<branch>.md` | subject | lifetime |
 |---|---|---|
 | `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | removed at the merge; never folded |
 | `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
@@ -255,6 +255,13 @@ step 6 checks out the trunk in the tree the script was started from, so the sess
 lane ([`skills/worktree-lane/SKILL.md`](skills/worktree-lane/SKILL.md)) or nothing at all. Both halves, and
 the two larger shapes that were declined, are in the
 [`ship-pr` skill](skills/ship-pr/SKILL.md#the-wait-runs-in-the-background-and-that-is-the-default).
+
+**A *not-required* check that fails does not block the merge — `ship-pr` merges past it and relays what
+that check wrote about itself**, but only a **titled** failure annotation (`echo "::error
+title=<name>::<why>"`). GitHub's runner writes untitled ones, so an advisory check that fails without a
+titled `::error::` line is silent beside the red mark on purpose. The
+[`ship-pr` skill](skills/ship-pr/SKILL.md#when-a-not-required-check-fails-the-merge-proceeds-and-ship-pr-relays-the-reason)
+has the one-line form and the reasoning.
 
 **Whether a finished branch is allowed to run through that motion on its own, or has to wait for a person's
 word, is your repo's rule** — and one of the few things on this page that no seam can answer, because it is

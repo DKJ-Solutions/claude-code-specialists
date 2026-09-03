@@ -55,10 +55,17 @@ to do what the paragraph it introduces forbids.
 
 **Both remedies #669 proposed were weighed and declined.** *Shipping this directory in the package* hands
 a consumer a file they may open but which is not the source — precisely the confusion the inbound route
-exists to remove. *Repointing it at `DaveKJohn/claude-code-specialists`* would add 178 references to a
-personal repo, straight against C4 of the same report. And for the only reader who can act on it — a
+exists to remove. *Repointing it at this repo* would add 178 references to a repo the reader cannot write
+to, straight against C4 of the same report. And for the only reader who can act on it — a
 maintainer here — the pointer is redundant: `shared:<name>` maps to `agent-shared/<name>.md` by
 construction. Measured: dropping it takes those 178 lines from **17,332 to 13,027 bytes**.
+
+**Half of that middle reason expired on September 2, 2026, and the decision stands on what is left.** It
+was written as *"178 references to a **personal** repo"* — and this repo is no longer personal, having been
+transferred from `DaveKJohn` into the `DKJ-Solutions` organisation. The account type was never what made
+the pointer wrong, though: a consumer still cannot write here, and the other two reasons are each
+sufficient on their own. Recorded rather than swept, because a find-and-replace would have left the
+sentence arguing from a premise that no longer exists.
 
 **Owning the line is what makes it a rule rather than a habit.** The builder and lint check 7 both compare
 the whole file against the expander's output, so a reworded sentinel is rebuilt by the one and reported by

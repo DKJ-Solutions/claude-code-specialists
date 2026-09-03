@@ -17,7 +17,7 @@
           releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is a
                                  second file beside it, not this one; see the closing advice)
           (releases/audience/ is NOT placed -- the first cut creates it when it writes the note there)
-          (development.md is NOT placed -- it lives only while a branch is open)
+          (development-<branch>.md is NOT placed -- one per branch, living only while that branch is open)
 
     AND IT ANSWERS ONE SEAM, FOR A FRESH ADOPTION ONLY (issue #1150). Get-ReleaseNoteRoot's shared
     fallback is 'releases/notes' at the repo root, and it deliberately does not move -- a repo that
@@ -205,7 +205,7 @@ $folderReadme = @(
     '| here | what it holds |',
     '|---|---|',
     '| [`CONTRIBUTING.md`](CONTRIBUTING.md) | this repo''s answers to the contribution cycle |',
-    '| `development.md` | the branch''s own document, present only while a branch is open: its plan, and the DEPLOY section that folds into the changelog |',
+    '| `development-<branch>.md` | the branch''s own document, one per branch and present only while that branch is open: its plan, and the DEPLOY section that folds into the changelog |',
     '| [`CHANGELOG.md`](CHANGELOG.md) | this folder''s own pending-changes list, isolated from any changelog you already keep at your repo root |',
     # The third item is conditional for the same reason the sentence further down is (issue #1150): the
     # hand-written notes are only in this folder where the note-root seam points into it, and claiming
@@ -240,7 +240,7 @@ $folderContributing = @(
     '',
     '## The rules a session needs in this folder',
     '',
-    '- `development.md` belongs to the **current branch**, and exists only while one is open.',
+    '- `development-<branch>.md` belongs to the **branch it is named after**, and exists only while that branch is open. One per branch since #1255: a shared name collided on every merge, and a conflicting pull request gets no check suite at all.',
     '  `new-branch` creates it, the fold removes it at the merge, so the trunk carries no copy -- if you',
     '  are looking at this folder and the file is not there, that is the trunk in its normal state.',
     '- **Four `##` headings and never a fifth** -- PLAN, CREATE, TEST, DEPLOY are its whole top level, and',
@@ -346,7 +346,7 @@ $entryGateWorkflow = @(
     '      - name: Fetch the shared workflow scripts',
     '        uses: actions/checkout@v5',
     '        with:',
-    '          repository: DaveKJohn/claude-code-specialists',
+    '          repository: DKJ-Solutions/claude-code-specialists',
     '          ref: main',
     '          path: .workflow-scripts',
     '',
@@ -409,7 +409,7 @@ $targets = @(
     # not use. The seam answer above replaces it: the destination is now stated where the cut reads it
     # rather than implied by a placeholder, and the directory appears when there is a note to put in it.
     #
-    # NO development.md, AND THAT IS THE ADOPTION'S HALF OF THE LIFETIME RULE (Dave, August 23, 2026).
+    # NO development-<branch>.md, AND THAT IS THE ADOPTION'S HALF OF THE LIFETIME RULE (Dave, August 23, 2026).
     # This placed the document in its reset state so a consumer's first look at the folder was also their
     # reference for what a branch gets. The document is branch-lifetime now -- new-branch creates it, the
     # fold removes it -- so placing one here would put a file on their trunk that their own first fold then

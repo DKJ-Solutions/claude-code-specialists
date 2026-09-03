@@ -27,9 +27,12 @@
 
     IT IS REMOVED RATHER THAN REPOINTED, and #669's own two proposals were both weighed and declined.
     Shipping agent-shared/ in the package hands a consumer a file they may open but which is not the
-    source -- exactly the confusion the inbound route exists to remove. Repointing it at
-    DaveKJohn/claude-code-specialists would add 178 references to a personal repo, straight against C4 on
-    the same report. And for the one reader who CAN act on it -- a maintainer of this repo -- the pointer
+    source -- exactly the confusion the inbound route exists to remove. Repointing it at this repo would
+    add 178 references to a repo the reader cannot write to, straight against C4 on the same report.
+    (That reason read "a personal repo" until 2026-09-02, when the repo was transferred from DaveKJohn
+    into the DKJ-Solutions org. The account type was never what made the pointer wrong, and the other
+    two reasons each carry the decision on their own.)
+    And for the one reader who CAN act on it -- a maintainer of this repo -- the pointer
     is redundant: 'shared:<name>' maps to plugins/teams/agent-shared/<name>.md by construction, which is what
     Get-SharedBlockText does one function up. Measured: dropping it takes those 178 lines from 17,332 to
     13,027 bytes.
