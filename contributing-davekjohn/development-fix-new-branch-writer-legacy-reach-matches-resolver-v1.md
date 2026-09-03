@@ -33,19 +33,73 @@
 
 ### PLAN
 
+#### The defect (#1259)
+
+`new-branch.ps1`'s writer decides which document a rerun keeps writing to via a local
+`Get-BranchFileTargetRel`, fed a hand-written `-Legacy` list of **three** names
+(`SharedFile`, `LegacyCycle`, `OlderCycle`). `Resolve-BranchFilePath` -- the reader every gate
+and the fold share -- reaches **seven** legacy names: those three plus `PriorNameFile`
+(`contributing-davekjohn/development-cycle.md`, pre-#963) and the pre-#886
+`workflow-davekjohn/` set (`PriorFolderFile`, `PriorFolderLegacyCycle`,
+`PriorFolderOlderCycle`).
+
+A branch working in one of those four unrecognised names -- created before Aug 27 (`development-cycle.md`)
+or before Aug 26 (`workflow-davekjohn/`) -- gets a second document written beside its work on any
+idempotent rerun (`-Intent`, `-Park`). Nothing errors; the reader still finds the older file, so it
+is quiet. Verified against `main` at `57df1e95` (post-#1261), where the writer list is exactly the
+three names above.
+
+#### Root cause and the fix
+
+The two lists are maintained by hand in two files; #886 and #963 grew the reader's and left the
+writer's behind. Fix closes the class: one ordered source, `Get-BranchFileLegacyNames -Kind`, in
+`entry-scaffold-lib.ps1`, consumed by both `Resolve-BranchFilePath` and the writer call. The writer
+keeps its own strict `Get-BranchFileTargetRel` (declares-**this**-branch only, never a reset or
+foreign file) -- only its input list is shared. The resolver is still deliberately not called from the
+writer (its fallback loops would keep a reset legacy name alive).
+
+#### Out of scope
+
+The resolver's *discovered* set (other `development-*.md` files in the folder, #1255) stays reader-only:
+it needs a directory listing, the writer's question is "does an old name declare this exact branch",
+and a renamed branch's old document declares its old name regardless. Not part of #1259.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `Get-BranchFileLegacyNames -Kind <File|Cycle|Deployment>` added to `entry-scaffold-lib.ps1`
+      (root + `plugins/workflows/` mirror), returning the ordered legacy-candidate list
+- [x] `Resolve-BranchFilePath` consumes it in `$candidates` in place of the seven inline entries
+- [x] `new-branch.ps1` writer call passes it to `-Legacy`; the two stale comments ("two old names")
+      refreshed (root + mirror)
 
 ### TEST
 
+- [x] Regression coverage: a branch whose document sits at `development-cycle.md` and at a
+      `workflow-davekjohn/` name, each declaring the branch -> the writer keeps that file, no second
+      document
+- [x] `check-plugin-integrity.ps1` + all suites green (as CI runs them); shared-scripts drift lint clean
+
 ### DEPLOY: `fix/new-branch-writer-legacy-reach-matches-resolver-v1`
 
-**Score:**
+`new-branch`'s writer now reaches the same legacy document names its reader does. It chose which file
+a rerun keeps writing to from a three-name list (`development.md`, `branch/branch-cycle.md`,
+`branch/branch-progress.md`), while `Resolve-BranchFilePath` -- shared by every gate and the fold --
+reads four more: `development-cycle.md` (pre-#963) and the pre-#886 `workflow-davekjohn/` set. A
+branch working in one of those four got a second, empty development document written beside its work
+on any idempotent rerun (`-Intent`, `-Park`); nothing errored, because the reader still found the
+older file. Both lists are now one ordered source, `Get-BranchFileLegacyNames`, so the next rename
+cannot leave the writer behind again -- the drift that opened the gap when #886 and #963 grew the
+reader alone.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- internal workflow tooling. A consumer inherits the fix through a plugin update, but only a
+consumer holding a branch created before the late-August document renames could ever have hit the
+split, and the reader's wider reach kept even that non-destructive.
+
+**Score:** N/A
 
 #### Pull Request
 
