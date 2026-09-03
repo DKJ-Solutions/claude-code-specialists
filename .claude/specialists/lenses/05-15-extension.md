@@ -446,6 +446,36 @@ infrastructure.
   mirrored into the workflow plugin and also driven by `unfolded-entry-sessioncheck.ps1`. Advisory, not
   in `main-ci-gate`. The full reasoning is in the `#1244` chain-reaction passage on the `ci.yml` bullet
   above; the detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`.
+- **`scripts/lint/check-git-identity.ps1`** — the split-identity check (issue
+  [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026): does
+  this checkout commit as the same account it acts as on the tracker? The claim rule's `@me` resolves
+  through the GitHub API, so it writes whichever account `gh` holds, and nothing compared that against
+  `git config user.name`. Measured on DAVE-KOK-BWJ, where `gh` is `DaveKJohn` and `git` is `davekokbwj`:
+  the documented idiom put the wrong account on #1314, and the cross-device tell in
+  [Derek's lens](05-05-extension.md#branch--repo-hygiene) — a branch whose commits name a different
+  account than the checkout — fires there **by construction**, so it reads "built elsewhere" off a branch
+  that never moved.
+
+  **It has ONE caller and deliberately no CI half**, which is where it differs from every other check on
+  this page: the finding is a fact about the *machine*, not about the tree, and a runner authenticates as
+  a bot and commits as one — a mismatch by design that would fire on every push. The moment that matters
+  is a session's start, just before it claims an issue and begins committing, so
+  `git-identity-sessioncheck.ps1` (workflow plugin) is the whole delivery. It is in no gate and never
+  will be.
+
+  **Two design points that look arbitrary and are not.** It compares *names*, not emails, although GitHub
+  attributes a commit by email — because `gh api user` returns a null email for an account with no public
+  one and `gh api user/emails` needs the `user` scope, which this family's tokens do not carry; widening a
+  token scope to print an advisory line is the wrong trade, and `gh auth status` reads the active account
+  from the keyring with no network at all. And it fires **only when `user.name` is a valid GitHub username
+  by GitHub's own rule** — 39 characters, single hyphens, none at either end. That guard is the whole
+  reason the check is shippable: `user.name` is free text and usually holds a person's name, so an
+  unconditional comparison would fire forever in every consumer that spells its name normally, which is
+  precisely the shape of the stale-path check
+  [declined further down this page](#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026)
+  at 124 findings all false. The three accounts in this family are all login-shaped, so the measured case
+  is still caught. `git-identity-gate.tests.ps1` walks both edges of that rule, and passes both identities
+  in explicitly — a suite that read the machine's own would assert something different on every checkout.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and

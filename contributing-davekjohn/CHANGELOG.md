@@ -32,6 +32,94 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/lint-gate-wall-clock` · 20260903-164154
+
+`Invoke-WorkflowGates` (`scripts/lib/gate-lib.ps1`) now times the real lint run and prints
+`lint gate: integrity check passed in Xs.` / `... FAILED in Xs.`, the direct parallel to the test
+half's `test gate: all N suites passed in Xs`. Timed around the child run only -- the evidence-cache
+fast path keeps its `already proved ... -- skipped.` line with no seconds. So a session recording
+"the full gate cost ~Ys" now has a lint figure to name beside the test figure, which is the half
+#1314 found missing when three conflicting "full gate" numbers were quoted for one test set. The
+figure is formatted invariant-culture (the `Format-GateSeconds` / #1159 concern), inlined because
+`gate-lib` does not dot-source `native-capture-lib`.
+
+Closes [#1319](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1319).
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer running the `contributing-davekjohn` workflow plugin picks up the mirrored `gate-lib.ps1`
+on the next plugin update: their `open-pr` / `-GatesOnly` run gains the same lint-gate seconds line,
+symmetric with the test-gate timing they already see. Console output only -- no behaviour, gate
+verdict or exit code changes.
+
+**Score:** 2
+
+#### Pull Request
+
+Lint gate prints its own wall-clock
+
+Plugins: contributing-davekjohn
+
+[PR #1324](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1324)
+
+---
+
+### DEPLOY: `fix/git-identity-mismatch-unchecked` · 20260903-163646
+
+On a checkout where `gh` is authenticated as one GitHub account and `git config user.name` reads
+another, nothing said so. Two things broke from that, both silently. The claim rule -- `gh issue edit
+<n> --add-assignee @me`, stated in Chris's persona body and in this folder's contributing page --
+resolves `@me` through the GitHub API, so it wrote the account `gh` held while every commit on the
+branch read the other one: measured on DAVE-KOK-BWJ, where claiming #1314 with the documented idiom put
+`DaveKJohn` on work whose commits all said `davekokbwj`, and it had to be corrected by hand. And Derek's
+cross-device tell -- a branch whose commits name a different account than the checkout, which the lens
+teaches as the signature of work built on another device -- fires on such a machine **by construction**,
+so a later session reads "built elsewhere" off a branch that never left the room.
+
+`scripts/lint/check-git-identity.ps1` now reports the split, from a SessionStart hook in every repo that
+has this plugin, at the one moment it matters: just before a session claims an issue and starts
+committing. It prints both accounts, both ways out, and the by-name claim to use in the meantime; it
+repairs nothing itself, because which of the two accounts is right is not a script's call. The claim rule
+in both places that state it now names what `@me` actually binds to -- the defect was its definition,
+which said "the account the session is logged in as" where the claim's own job needs the account the
+commits will name -- and the tell in the lens has gained the precondition it always depended on.
+
+Two things it deliberately does not do. It compares names rather than emails, although GitHub attributes
+a commit by email: `gh api user` returns a null email for an account with no public one and
+`gh api user/emails` needs the `user` token scope, and widening a scope to print an advisory line is the
+wrong trade. And it fires only when `user.name` is a valid GitHub username by GitHub's own rule --
+because that free-text field usually holds a person's name, and an unconditional comparison would fire
+forever in every repo that spells its name normally, which is the shape of the stale-path check this repo
+declined at 124 findings all false.
+
+Closes [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Both halves travel. The check and its hook ship in the workflow plugin, so a consumer with a split
+identity is told at session start instead of discovering it from a tracker that disagrees with its own
+branches -- and one with a single account never sees a line, which is what the login-shape guard buys. The
+claim rule's corrected definition ships in Chris's persona body, which every consumer loads on every turn,
+so the instruction they read is the one that matches what the tracker will actually record. Most consumers
+run one account and will notice nothing; for the ones that do not, this is the difference between a claim
+that means something and a claim that names the wrong person.
+
+**Score:** 2
+
+#### Pull Request
+
+Report when gh and git commit as different accounts
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1322](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1322)
+
+---
+
 ### DEPLOY: `fix/test-gate-summary-omits-lanes` · 20260903-162227
 
 `Invoke-TestSuiteGate` printed the parallel lane count only on the opening line nobody quotes and left

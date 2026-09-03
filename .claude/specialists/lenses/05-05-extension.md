@@ -358,6 +358,21 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   numbers and the ticks disagree. Read the note with `git log -1 --pretty=%B origin/<branch>`: the reporter
   that used to print it under each parked branch went with `/lock` and `/handover` on August 27, 2026
   ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957)).
+
+  **THAT TELL HAS A PRECONDITION, AND THE MACHINE IT WAS MEASURED ON DOES NOT MEET IT**
+  ([#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026). It
+  reads a difference between the commits' account and "this checkout" as evidence of a *second device* --
+  which holds only where this checkout's own two identities agree. On DAVE-KOK-BWJ they do not: `gh` is
+  authenticated as `DaveKJohn` while `git config user.name` reads `davekokbwj`, so a branch built there --
+  same machine, same session -- produces exactly the signature above, and a later session applying the tell
+  reads "built elsewhere" off a branch that never left the room. Note which half of the sentence names
+  which: the account it calls "this checkout" is the **gh** one, and the `git` one is what every commit
+  carries. So establish the precondition before using the tell --
+  [`check-git-identity.ps1`](../../../scripts/lint/check-git-identity.ps1) answers it and reports a split
+  from a SessionStart hook, so where it is silent the tell is diagnostic and where it fires the tell proves
+  nothing until the two are reconciled. What survives on a split machine is the rest of the bullet, which
+  never depended on an account: the `Backing:` line's own numbers, and the park commit you read before
+  rebuilding a line.
 - **Working in parallel from multiple machines** (lesson of July 16, 2026, when PR #46 and #47
   crossed each other): merging different branches in parallel is safe — the lint gate and CI protect
   `main` independently of which machine merges. Two rules keep it that way: **never the same branch

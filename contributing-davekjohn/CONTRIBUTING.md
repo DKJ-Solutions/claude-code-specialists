@@ -164,6 +164,16 @@ share, so an unassigned issue is indistinguishable from an untouched one, which 
 built twice and discovered at the merge. A claim with no branch and no recent activity is a question for
 Dave rather than a locked door.
 
+**`@me` writes whichever account `gh` holds, which is not always the one your commits will name.** It
+resolves through the GitHub API, while the branch a second session correlates the claim with carries the
+`git config user.name` identity — so a checkout with both claims under one name and commits under the other,
+and nothing reports it. Measured September 3, 2026 ([#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315)):
+`gh` was authenticated as `DaveKJohn` while `git` committed as `davekokbwj`, so the idiom above put the wrong
+account on #1314 and it had to be corrected by hand. Since then
+[`check-git-identity.ps1`](../scripts/lint/check-git-identity.ps1) reports the split from a SessionStart hook
+in every repo that has this plugin, so a session is told before it claims anything. Where it fires, **claim by
+name** until the two agree.
+
 **These rules are Chris's, stated here rather than owned here.** The filing bar, the six inbound checks and
 the claim live in the orchestrator's persona body, which ships with `team-alpha` — so where this paragraph
 and that body disagree, the body is the source and this is the bug. They are written out anyway because a
