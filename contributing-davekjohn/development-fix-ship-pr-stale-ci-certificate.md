@@ -73,9 +73,60 @@ A green required check certifies the merge of the branch into main AS OF THE MOM
   check, not a behavioural one). Reworded the paragraph to describe the same fact without the
   literal function name; no logic changed.
 
+#### Re-anchor after Marlowe's red-team + Chris's verification (issue #1292, same branch, after Tycho's 46 asserts landed on `f8b156d0`)
+
+- [x] **The bias was backwards, not just imprecise.** `Get-CertifyingRunTimestamp` anchored on the
+  earliest required check's own `startedAt`, reasoned as "conservative because queueing only pushes
+  it LATER than the true ref-fix moment". That direction under-refuses: a LATER anchor makes
+  `git log --since=<anchor>` MISS commits landed in the gap, so a genuinely stale certificate reads
+  as SOUND -- the one failure this whole gate exists to prevent. Two reasons the gap is far larger
+  than "sub-minute" here, neither visible to the original 45-PR sample (which measured staleness
+  *after* anchoring on `startedAt`): `windows-latest` provisioning routinely costs over a minute, and
+  "re-run failed jobs" (ordinary practice here) re-runs the SAME commit while `startedAt` jumps
+  forward by however long the operator waited -- seconds to hours.
+- [x] **Verified rather than taken on faith**, per the assignment: found a genuine `run_attempt > 1`
+  in this repo (`gh api .../actions/runs?event=pull_request&per_page=100&page=2..5`), then compared
+  `/actions/runs/<id>` against `/actions/runs/<id>/attempts/1` and `/attempts/2` directly. Run
+  `33652133970`: the RUN object's `created_at` stayed `2026-09-02T15:59:52Z` across the re-run
+  (matching attempt 1 exactly) while `run_started_at` moved to `2026-09-02T21:15:50Z` -- over five
+  hours later. `/attempts/2` on its own reports ITS OWN `created_at` of `2026-09-02T21:15:51Z`,
+  matching its own late start -- the value that would have reintroduced the identical bias. So the
+  repair reads the RUN object (or the runs list, which returns the same shape), never a per-attempt
+  one. This holds; nothing needed walking back.
+- [x] **Replaced `Get-CertifyingRunTimestamp`** with two pure functions in
+  `scripts/lib/pr-issues-lib.ps1`: `Get-RequiredCheckRunIds` (extracts the distinct Actions run id(s)
+  behind named checks from the already-fetched `$checkFactsJson`'s `link` field) and
+  `Get-CertifyingRunCreatedAt` (earliest of already-fetched `created_at` values, zero-time still
+  guarded). `ship-pr.ps1` step 3b now: finds the run id(s) from data in memory (no new call), asks
+  `gh api repos/<repo>/actions/runs/<id> --jq '.created_at'` per unique run id (the one new network
+  call), then reduces to the earliest.
+- [x] **Softened the two overclaims the red-team flagged**: a `pull_request` run exists at all only
+  for a MERGEABLE PR (GitHub creates none for a merge conflict -- harmless, an unmergeable PR cannot
+  ship anyway), and "GitHub fixes THE merge ref" is this repo's own practical experience with a
+  single-job workflow, not a documented contract (`actions/checkout#27` records two jobs of one event
+  resolving different merge commits) -- reworded to reason from "a run's `created_at` cannot postdate
+  its own ref-fix moment" rather than from a guarantee GitHub does not make.
+- [x] **Reconsidered the unreadable-anchor posture, deliberately, per the assignment's own
+  instruction not to just keep it.** Chose a SPLIT rather than one answer for the whole step: with NO
+  required check named at all, WARN and skip (this predicate has nothing to protect on a repo with no
+  ruleset -- refusing there would permanently block `ship-pr` on every such consumer, and
+  `Get-MergeBlockVerdict` already cannot tell "no ruleset" from "unreadable" either). Once a required
+  check IS named, every subsequent read -- the run id, its `created_at`, the `git fetch`, the
+  `git log` -- now FAILS CLOSED with `-SkipStaleCheck` as the valve, the opposite of the retired
+  build's warn-and-ship: at that point there is a specific certificate to verify, and not verifying
+  it must never read as sound.
+- [x] Re-synced the mirror (`scripts/sync/build-shared-scripts.ps1`, `diff`-confirmed identical) and
+  re-ran `pr-issues.tests.ps1` + the lint gate + the full 61-suite gate once each -- see the TEST
+  section below for the numbers Tycho's tests needed to match the re-anchor.
+
 ### TEST
 
 #### For Tycho: what is testable here and what is not
+
+**The three bullets immediately below are Tycho's own, from `f8b156d0`, and describe
+`Get-CertifyingRunTimestamp` -- the function the re-anchor above replaced. Left as written, as the
+true record of that commit, rather than rewritten to match the current code; the follow-up bullet
+after them says what changed and to what it now corresponds.**
 
 - [x] `Get-CertifyingRunTimestamp` and `Get-StaleCertificateVerdict` (both in
   `scripts/lib/pr-issues-lib.ps1`) covered in `scripts/tests/pr-issues.tests.ps1`, in their own
@@ -114,6 +165,36 @@ A green required check certifies the merge of the branch into main AS OF THE MOM
   kept in the session scratchpad, not a script in this repo -- nothing to add a test for. This is a
   named, stated gap, not a silent one.
 
+#### Tests updated for the re-anchor (same file, after Tycho's commit)
+
+- [x] Replaced the `Get-CertifyingRunTimestamp` section (above) with two sections matching the new
+  functions: `Get-RequiredCheckRunIds` (run id extraction from a check's `link`: single/multiple
+  named checks, two checks sharing one run deduplicated to one id, a link naming no Actions run
+  skipped, non-named checks ignored even with a resolvable run, every unreadable-JSON shape, a
+  nameless record) and `Get-CertifyingRunCreatedAt` (single value, earliest-of-two, the zero-time
+  shape still skipped -- carried over from Tycho's own case verbatim in spirit, since a zero anchor
+  voiding every certificate is the one wrong answer neither version may produce -- every-value-zero,
+  blank/whitespace/null, omitted, empty array, and an unparseable value both alone and beside a real
+  one). `Get-StaleCertificateVerdict`'s own section is untouched -- that function did not move.
+- [x] Updated the step 3b wiring section: the two call-signature anchors now name
+  `Get-RequiredCheckRunIds`/`Get-CertifyingRunCreatedAt` instead of the retired function, added an
+  anchor for the one new `gh api .../actions/runs/<id> --jq '.created_at'` call, and added anchors for
+  BOTH halves of the reconsidered fail-closed split: the `if ($staleCheckNames.Count -eq 0)` warn
+  branch (nothing known to protect), and each of the four new FAILS-CLOSED refusal paths (no run
+  found, the `created_at` read failing, every fetched value unparseable, `git fetch`/`git log`
+  failing) -- the last two checked as one contiguous literal fragment spanning the refusal text and
+  `-SkipStaleCheck` on purpose, since those two are single-line messages with no wrap point to
+  reflow; the other two stop at existence, because their `-SkipStaleCheck` mention sits across a
+  line-wrap in a here-string and pinning that wrap would fail on a future reflow for no semantic
+  reason -- exactly Sylvester's own caution about position-based fragility, applied to a case a
+  literal-fragment anchor can still walk into if the literal spans a wrap point.
+- [x] One assert of my own needed the same 5.1 fix this file's OWN header warns about: a single-run
+  case indexed `(Get-RequiredCheckRunIds ...)[0]` without wrapping the call in `@(...)` first, so
+  PowerShell returned the bare string "111" instead of a one-element array and `[0]` indexed its
+  first CHARACTER ("1") rather than its first element. Not a defect in the library function -- caught
+  by running the suite, not review, and fixed at the call site.
+- [x] 606 asserts total in `pr-issues.tests.ps1` after the re-anchor (up from 585 before it), 0 failed.
+
 Ran `scripts/tests/pr-issues.tests.ps1` standalone: 585 asserts, all green (0 pre-existing failures).
 Then the full gate exactly as CI/`open-pr.ps1`/`cut-release.ps1` run it -- `check-plugin-integrity.ps1`
 (0 errors) followed by `Invoke-TestSuiteGate` over all 61 `scripts/tests/*.tests.ps1` suites, parallel:
@@ -124,6 +205,14 @@ not in the suite, and re-running through the repo's own `Invoke-TestSuiteGate` g
 above.) No production code touched -- test file only, so no mirror sync was needed (`scripts/tests/**`
 is not among the mirrored paths in `plugins/workflows/contributing-davekjohn/scripts/`, confirmed by
 listing that tree before editing).
+
+**Re-run after the re-anchor above, once each as asked (not the three duplicate runs the first pass
+produced):** mirror re-synced (`build-shared-scripts.ps1`, `diff`-confirmed identical on
+`ship-pr.ps1` and `pr-issues-lib.ps1`) -- `scripts/tests/pr-issues.tests.ps1` alone: 606 asserts, 0
+failed. `check-plugin-integrity.ps1`: 0 errors (run twice -- once before the `SKILL.md` rewrite for
+the corrected mechanism, once after, since that edit landed after the first pass; both clean).
+`Invoke-TestSuiteGate` over all 61 suites, parallel, exactly as CI runs it: 61/61 passed in 360s, 0
+failures, nothing already red.
 
 ### DEPLOY: `fix/ship-pr-stale-ci-certificate`
 

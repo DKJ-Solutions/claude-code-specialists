@@ -113,14 +113,18 @@
          already moved this tree to the trunk, so the next branch belongs in a lane because that is where
          you build, not because staying here would cost you your checkout.
      3b. HAS 'main' MOVED SINCE THE RUN THAT CERTIFIED THIS PR? (issue #1292) A required check tests
-         GitHub's merge ref as it stood when the run was CREATED and is never refreshed if 'main' moves
-         afterward, so a green check can go STALE between the run and the merge -- measured at 31.1% of
-         recent merges (14/45), median staleness 16.1 minutes, max 146.6 (PR #1268 itself). Refuses (with
-         -SkipStaleCheck as the valve) when 'main' gained a first-parent commit since the earliest
-         required check's own startedAt; a network read that fails here WARNS rather than refuses, since
-         this is not the read that has to fail closed -- the required-check-list read at step 3 already
-         did. See the comment at the step for the full corrected mechanism and why "the branch is behind"
-         (#1292's own filed predicate) is the wrong, wider question.
+         GitHub's merge ref roughly as it stood when the run was CREATED and is never refreshed if 'main'
+         moves afterward, so a green check can go STALE between the run and the merge -- measured at
+         31.1% of recent merges (14/45), median staleness 16.1 minutes, max 146.6 (PR #1268 itself).
+         Refuses (with -SkipStaleCheck as the valve) when 'main' gained a first-parent commit since the
+         earliest certifying run's own `created_at` -- NOT a check's `startedAt`, which under-refuses:
+         a red-team caught that the first build anchored on the later, wrong-direction timestamp.
+         With no required check named at all this step WARNS and does nothing, matching how the rest of
+         this script already treats "no ruleset" versus "unreadable"; once one IS named, every read from
+         there on (the run, its `created_at`, the fetch, the log) FAILS CLOSED, because at that point
+         there is something specific to verify and not verifying it must never read as sound. See the
+         comment at the step for the full corrected mechanism and why "the branch is behind" (#1292's own
+         filed predicate) is the wrong, wider question.
       4. TWO GATES, THEN MERGE. The step-list gate refuses while development.md has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
@@ -204,9 +208,11 @@
 
 .PARAMETER SkipStaleCheck
     Escape valve for the step-3b certificate-staleness check (issue #1292): merge even though 'main'
-    has gained a commit since the run that certified this PR started. Use it only when that window is
-    known-harmless (e.g. the gained commits are docs-only) -- the check exists because the ordinary
-    remedy (bring the branch up to date and let CI re-run) is cheap and this valve skips it.
+    has gained a commit since the run that certified this PR was created, OR that check could not be
+    completed at all (the run behind a required check, its 'created_at', the fetch, or the log). Use it
+    only when the situation is known-harmless (e.g. the gained commits are docs-only, or you have
+    confirmed by hand that the certificate is sound) -- the ordinary remedy (bring the branch up to date
+    and let CI re-run) is cheap and this valve skips it.
 
 .PARAMETER PollSeconds
     Poll interval (seconds) for the CI watch. Default 15.
@@ -881,9 +887,9 @@ if ($waitReport) {
 # "the required check runs on the branch head", which is wrong: ci.yml triggers on 'pull_request', so
 # the check tests GitHub's MERGE REF -- the branch already merged into the base tip -- and the merge
 # result genuinely is tested. What #1292's own verification comment found instead is a green check
-# going STALE: GitHub fixes the merge ref at the moment the run is CREATED and never refreshes it when
-# the base moves afterward ('pull_request' does not re-fire on that), and this repo's ruleset has
-# `strict_required_status_checks_policy: false`, so a stale green check still satisfies the gate.
+# going STALE: GitHub fixes that merge ref roughly at the moment the run is CREATED and never refreshes
+# it when the base moves afterward ('pull_request' does not re-fire on that), and this repo's ruleset
+# has `strict_required_status_checks_policy: false`, so a stale green check still satisfies the gate.
 # Measured on PR #1268 (the instance): the test block PR #1268's own branch predated reached 'main' 45s
 # before #1268's own CI run finished and 14m45s after that run started, and #1268 then merged on that
 # same certificate 2h11m later.
@@ -898,30 +904,55 @@ if ($waitReport) {
 # 2 carried a scripts/**/scripts/tests/** change in the window -- the subset that can actually turn the
 # trunk red -- but this gate does NOT filter on that: predicting which file a future test depends on is
 # not this script's to do, and the predicate below is already cheap enough (one fetch, one first-parent
-# log) that narrowing it further would trade a real safety margin for a rarer refusal on no measured
-# benefit. Repo-settings option 1 from the same issue (`strict_required_status_checks_policy: true`)
-# remains available and closes the gap completely -- it is Dave's call, not this script's, and is not
-# made here.
+# log, and now one extra gh call per certifying run) that narrowing it further would trade a real safety
+# margin for a rarer refusal on no measured benefit. Repo-settings option 1 from the same issue
+# (`strict_required_status_checks_policy: true`) remains available and closes the gap completely -- it
+# is Dave's call, not this script's, and is not made here.
 #
-# THE TIMESTAMP IS THE EARLIEST REQUIRED CHECK'S OWN startedAt (Get-CertifyingRunTimestamp), not the
-# run's creation time: using the check's own start is the CONSERVATIVE direction, because queueing only
-# pushes startedAt LATER than the moment the merge ref was actually fixed -- a commit landing in that
-# (typically sub-minute) queueing gap is rarely missed, rather than a sound certificate being wrongly
-# voided. Read from $checkFactsJson and $requiredFactsJson, ALREADY IN MEMORY from the wait above -- no
-# new gh call for the timestamp itself, only a re-parse of $requiredFactsJson for the names
-# Get-MergeBlockVerdict does not expose.
+# THE ANCHOR IS THE CERTIFYING RUN'S OWN created_at, NOT A CHECK'S startedAt -- RE-ANCHORED AFTER A
+# RED-TEAM CAUGHT THE FIRST VERSION'S BIAS THE WRONG WAY ROUND (September 3, 2026). The first build read
+# a required check's own `startedAt`, reasoned as "conservative because queueing only pushes it LATER
+# than the true ref-fix moment, so a commit landing in that gap is rarely missed". That sentence had the
+# DIRECTION right and the CHOICE backwards: a LATER anchor makes the `git log --since=<anchor>` below
+# MISS commits that landed in the gap -- a genuinely stale certificate then reads as SOUND, which is the
+# one failure this gate exists to prevent. The gap is far larger than "sub-minute" here for two reasons
+# the original 45-PR sample could not see (it measured staleness AFTER anchoring on startedAt, so it was
+# silent on the size of the startedAt-vs-ref-fix gap itself): `windows-latest` provisioning, which every
+# run here pays, routinely costs over a minute; and "re-run failed jobs" against a flaky suite (ordinary
+# practice in this repo) re-runs the SAME commit while `startedAt` jumps forward by however long the
+# operator waited -- the gap can go from seconds to hours. Verified on a genuine re-run in this repo's
+# own history (run 33652133970): the RUN object's `created_at` stayed at 2026-09-02T15:59:52Z across a
+# re-run whose `run_started_at` moved to 21:15:50Z, over five hours later -- while the PER-ATTEMPT
+# sub-resource (`.../attempts/2`) reports ITS OWN `created_at` matching that late start, which is the
+# value that would have reintroduced the identical bias. So Get-CertifyingRunCreatedAt is fed the RUN
+# object's `created_at` (what the runs LIST/GET endpoint returns), never a per-attempt one. See its own
+# header for the full argument, including why this now favours OVER-refusing rather than under-refusing
+# -- the safe direction for a gate whose only job is catching "green PR, red trunk".
 #
-# THE ONE NEW NETWORK CALL is a `git fetch origin main`, so this local clone's view of 'main' is
-# current at the moment this check actually runs (this script's own clone can otherwise be arbitrarily
-# stale, which would silently under-refuse). First-parent, because a merge commit's own author/commit
-# date is not when its contents landed relative to the certifying run -- first-parent walks 'main's own
-# history the same way every fold and release commit on it already does.
+# TWO THINGS THIS DOES NOT CLAIM. A `pull_request` run exists at all only for a MERGEABLE PR -- GitHub
+# creates none for one with a merge conflict, which is harmless here: an unmergeable PR cannot be
+# shipped by this script either way, whichever gate refuses it first. And "GitHub fixes THE merge ref"
+# is this repo's own practical experience with a single-job workflow, not a documented contract --
+# different jobs of one triggering event have been observed resolving different merge commits in the
+# wild (actions/checkout#27) -- so this reasons from "a run's created_at cannot postdate its own
+# ref-fix moment", which holds regardless, rather than from a guarantee GitHub does not make.
 #
-# FAILS CLOSED ON THE PREDICATE, NOT ON THE NETWORK. If the required check's timestamp cannot be read,
-# or the fetch/log fails, this WARNS AND SHIPS rather than inventing a verdict -- the same posture the
-# unreadable-body case at the DEPLOY lock and the unreadable-worktree-list case at step 0 already take
-# for a read that is not itself the safety-critical one. Get-MergeBlockVerdict's OWN read is the one
-# that fails closed on an unreadable required-check list, above, and has already run by this point.
+# THE RUN ID COMES FROM DATA ALREADY IN MEMORY. $checkFactsJson's `link` field (already fetched for the
+# wait above) names the Actions run behind each check, so Get-RequiredCheckRunIds reads it rather than
+# this step searching for the run fresh -- the one NEW network call per certifying run is the `gh api
+# .../actions/runs/<id>` for its `created_at`.
+#
+# THE FAIL-CLOSED LINE MOVED WITH THE BIAS, AND IT IS DRAWN IN TWO PLACES ON PURPOSE. Not knowing which
+# check (if any) is required is a state this script already tolerates elsewhere -- Get-MergeBlockVerdict
+# itself cannot tell "this ruleset requires nothing" from "the required-check list did not read", and a
+# repo on the GitHub Free plan (documented below, "A repo with no required check at all") has NO required
+# check to protect in the first place. So $staleCheckNames.Count -eq 0 WARNS and this step is skipped --
+# refusing here would permanently block ship-pr on every repo without a ruleset, for a predicate that has
+# nothing to check in that repo. But once a required check IS named, this step knows exactly what it is
+# protecting, and every read from there on (the run id, the run's created_at, the fetch, the log) FAILS
+# CLOSED: an unresolved read at that point is not "nothing to verify", it is "something to verify that
+# could not be verified", and treating that as sound is the exact bias this whole re-anchor exists to
+# close. -SkipStaleCheck is the valve for all of it, named in every refusal below.
 if ($SkipStaleCheck) {
     Write-Host "ship-pr: -SkipStaleCheck set -- not checking whether 'main' moved since the certifying run." -ForegroundColor DarkYellow
 } else {
@@ -935,33 +966,81 @@ if ($SkipStaleCheck) {
             $staleCheckNames = @()
         }
     }
-    $certifiedSince = $null
-    if ($staleCheckNames.Count -gt 0 -and $checkFactsJson) {
-        $certifiedSince = Get-CertifyingRunTimestamp -ChecksJson $checkFactsJson -RequiredNames $staleCheckNames
-    }
-    if ($null -eq $certifiedSince) {
-        Write-Host "  stale-CI check: could not read a required check's start time -- not checked (this is not a finding)." -ForegroundColor DarkGray
+
+    if ($staleCheckNames.Count -eq 0) {
+        # NO RULESET, OR AN UNREADABLE ONE -- INDISTINGUISHABLE HERE, AND NEITHER REFUSES. See the
+        # comment above the block: with no required check named there is nothing this predicate can
+        # protect, so warning rather than refusing matches how the rest of this script already treats
+        # that exact ambiguity.
+        Write-Host "  stale-CI check: no required check name is known -- not checked (no ruleset, or unreadable; this is not a finding)." -ForegroundColor DarkGray
     } else {
+        $staleRunIds = @(Get-RequiredCheckRunIds -ChecksJson $checkFactsJson -Names $staleCheckNames)
+        if ($staleRunIds.Count -eq 0) {
+            Write-Error @"
+stale-CI check: no GitHub Actions run could be found behind the required check(s)
+($(Format-CheckNameList -Names $staleCheckNames)) -- NOT merged (issue #1292).
+
+A required check is named, so this predicate has something to protect, but its 'link' does not name a
+resolvable Actions run (an external CI service posting its own status has no run to date-check this
+way). -SkipStaleCheck ships anyway once you have confirmed by hand that 'main' has not moved in a way
+that matters, or that the check in question is not subject to this staleness mechanism.
+"@
+            exit 1
+        }
+
+        $createdAtValues = @()
+        $createdAtReadFailed = $false
+        foreach ($runId in $staleRunIds) {
+            $runRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @('api', "repos/$repo/actions/runs/$runId", '--jq', '.created_at')
+            if ($runRead.ExitCode -eq 0) {
+                $createdAtValues += (($runRead.Output -join '').Trim())
+            } else {
+                $createdAtReadFailed = $true
+            }
+        }
+        if ($createdAtReadFailed) {
+            Write-Error @"
+stale-CI check: could not read 'created_at' for at least one run behind PR #$pr's required check(s) --
+NOT merged (issue #1292).
+
+Run id(s) asked: $($staleRunIds -join ', '). -SkipStaleCheck ships on the old certificate anyway.
+"@
+            exit 1
+        }
+
+        $certifiedSince = Get-CertifyingRunCreatedAt -CreatedAtValues $createdAtValues
+        if ($null -eq $certifiedSince) {
+            Write-Error @"
+stale-CI check: the run(s) behind PR #$pr's required check(s) reported no readable 'created_at' -- NOT
+merged (issue #1292). Run id(s) asked: $($staleRunIds -join ', '). -SkipStaleCheck ships on the old
+certificate anyway.
+"@
+            exit 1
+        }
+
         $fetchMain = Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', 'origin', 'main', '--quiet')
         if ($fetchMain.ExitCode -ne 0) {
             $fetchMain.Output | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
-            Write-Host "  stale-CI check: 'git fetch origin main' failed -- not checked (this is not a finding)." -ForegroundColor DarkYellow
-        } else {
-            $sinceStr = $certifiedSince.ToString('yyyy-MM-ddTHH:mm:ssZ')
-            $mainLog = Invoke-NativeCapture -FilePath 'git' -Arguments @('log', 'origin/main', '--first-parent', '--since', $sinceStr, '--pretty=format:%H')
-            if ($mainLog.ExitCode -ne 0) {
-                Write-Host "  stale-CI check: could not read the history of 'origin/main' -- not checked (this is not a finding)." -ForegroundColor DarkYellow
-            } else {
-                $newMainCommits = @($mainLog.Output | Where-Object { $_ -and "$_".Trim() })
-                $staleVerdict = Get-StaleCertificateVerdict -NewMainCommits $newMainCommits
-                if ($staleVerdict.Stale) {
-                    $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object { $_.Substring(0, 8) }) -join ', '
-                    Write-Error @"
+            Write-Error "stale-CI check: 'git fetch origin main' failed -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
+            exit 1
+        }
+        $sinceStr = $certifiedSince.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        $mainLog = Invoke-NativeCapture -FilePath 'git' -Arguments @('log', 'origin/main', '--first-parent', '--since', $sinceStr, '--pretty=format:%H')
+        if ($mainLog.ExitCode -ne 0) {
+            Write-Error "stale-CI check: could not read the history of 'origin/main' -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
+            exit 1
+        }
+
+        $newMainCommits = @($mainLog.Output | Where-Object { $_ -and "$_".Trim() })
+        $staleVerdict = Get-StaleCertificateVerdict -NewMainCommits $newMainCommits
+        if ($staleVerdict.Stale) {
+            $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object { $_.Substring(0, 8) }) -join ', '
+            Write-Error @"
 stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
 started (issue #1292) -- NOT merged.
 
 The required check(s) ($(Format-CheckNameList -Names $staleCheckNames)) tested GitHub's merge ref as it
-stood when that run began; anything landed on 'main' since is untested against this branch. Newest
+stood when that run was created; anything landed on 'main' since is untested against this branch. Newest
 first: $shownShas
 
 Bring the branch up to date so CI re-runs against the current 'main', then re-run ship-pr:
@@ -974,11 +1053,9 @@ Bring the branch up to date so CI re-runs against the current 'main', then re-ru
 (e.g. the gained commits are docs-only). There is no re-run of the wait for this gate: fixing it means
 bringing the branch forward, not retrying the same read.
 "@
-                    exit 1
-                }
-                Write-Host "  stale-CI check: 'main' has not moved since the certifying run -- certificate still holds." -ForegroundColor DarkGray
-            }
+            exit 1
         }
+        Write-Host "  stale-CI check: 'main' has not moved since the certifying run -- certificate still holds." -ForegroundColor DarkGray
     }
 }
 

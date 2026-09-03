@@ -117,7 +117,7 @@ The six steps, stopping on the first failure:
 | `-NoResolves` | Passed through to `open-pr`: declare that this PR closes no issue. |
 | `-SkipLint` | Passed through to `open-pr`: skip the lint gate. An escape valve. |
 | `-SkipTests` | Passed through to `open-pr`: skip the test gate. An escape valve. |
-| `-SkipStaleCheck` | Skip step 3b's certificate-staleness check (issue #1292): merge even though `main` gained a commit after the run that certified this PR started. Use it only when that window is known-harmless — e.g. the commits `main` gained are docs-only. |
+| `-SkipStaleCheck` | Skip step 3b's certificate-staleness check (issue #1292): merge even though `main` gained a commit after the run that certified this PR was created, or that check could not be completed at all. Use it only when the situation is known-harmless — e.g. the commits `main` gained are docs-only, or you have confirmed by hand that the certificate is sound. |
 | `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from the two above — those skip a tool, this overrules a judgement about content. |
 | `-RefreshBody` | Passed through to `open-pr`: on a branch whose PR is **already open**, rewrite that PR's description from the current changelog entry. Opt-in, so a body edited on github.com is never overwritten unasked. No effect when the PR is created in this run. |
 | `-PollSeconds` | Poll interval in seconds for the CI wait. Default 15. |
@@ -456,16 +456,40 @@ test depends on is not this script's to do, and the predicate is already cheap e
 first-parent log) that narrowing it further would trade a real safety margin for a rarer refusal on no
 measured benefit.
 
-**The timestamp is the earliest required check's own `startedAt`**, not the run's creation time: using
-the check's own start is the conservative direction, since queueing only pushes it *later* than the
-moment the merge ref was actually fixed. Read from data step 3 already holds in memory — no new `gh`
-call for the timestamp itself, only one `git fetch origin main` so this check reads a current `main`.
+**The anchor is the certifying run's own `created_at`, not a check's `startedAt` — re-anchored after a
+red-team caught the first build's bias the wrong way round.** The original reasoning ("conservative,
+because queueing only pushes `startedAt` *later* than the ref-fix moment") had the direction right and
+the choice backwards: a *later* anchor makes `git log --since=<anchor>` **miss** commits that landed in
+the gap, so a genuinely stale certificate reads as sound — the one failure this gate exists to prevent.
+The gap is far larger than "sub-minute" in this repo for two reasons the original 45-PR sample could
+not see: `windows-latest` provisioning routinely costs over a minute between a run's creation and a
+job's `startedAt`, and "re-run failed jobs" against a flaky suite (ordinary practice here) re-runs the
+*same* commit while `startedAt` jumps forward by however long the operator waited — seconds to hours.
+Verified on a genuine re-run in this repo's own history: the run object's `created_at` stayed fixed
+across the re-run while `run_started_at` moved over five hours later, and reading the per-attempt
+sub-resource directly (`.../attempts/2`) would have reintroduced the identical bias by reporting its
+own late `created_at`. Step 3b finds the run behind each required check from the `link` already in
+`$checkFactsJson` (no new call for that), then asks `gh api repos/<repo>/actions/runs/<id>` for that
+run's `created_at` — the one new network call per certifying run — before the `git fetch origin main`
+that reads a current `main`.
 
-**Fails closed on the predicate, not on the network.** If the required check's timestamp cannot be
-read, or the fetch/log fails, step 3b warns and ships rather than inventing a verdict — the same
-posture the unreadable-body case at the DEPLOY lock and the unreadable-worktree-list case at step 0
-already take. The read that has to fail closed is `Get-MergeBlockVerdict`'s own, on the required-check
-list, and it has already run by this point.
+**Two things this does not claim.** A `pull_request` run exists at all only for a *mergeable* PR —
+GitHub creates none for one with a merge conflict, which is harmless here: an unmergeable PR cannot be
+shipped by this script either way. And "GitHub fixes *the* merge ref" is this repo's own practical
+experience with a single-job workflow, not a documented contract — different jobs of one triggering
+event have been observed resolving different merge commits in the wild
+([`actions/checkout#27`](https://github.com/actions/checkout/issues/27)) — so the reasoning holds on
+"a run's `created_at` cannot postdate its own ref-fix moment" rather than on a guarantee GitHub does
+not make.
+
+**The fail-closed line is drawn in two places, deliberately, and it moved with the re-anchor.** With no
+required check named at all, step 3b warns and does nothing — this predicate has nothing to protect on
+a repo with no ruleset (the GitHub Free plan case above), and refusing there would permanently block
+`ship-pr` on every such consumer; `Get-MergeBlockVerdict` already cannot tell "no ruleset" from
+"unreadable" either, so this matches that existing posture. Once a required check *is* named, though,
+every subsequent read — the run id, its `created_at`, the fetch, the log — now **fails closed**: the
+first build warned and shipped on an unresolved read here, which is exactly the under-refusing bias the
+re-anchor exists to close, so an unresolved read now refuses with `-SkipStaleCheck` as the valve.
 
 **Repo-settings option 1 from the same issue** (`strict_required_status_checks_policy: true`) remains
 available and closes the gap completely by forcing a re-run on every base move; it is the repo owner's
