@@ -47,7 +47,6 @@ the same one-line shape with no such comment.
 
 - [x] `scripts/tests/source-repo-guard.tests.ps1` -- 40 asserts pass.
 - [x] `scripts/tests/test-suite-gate.tests.ps1` -- 56 pass, 0 fail; the per-process fixture scan still sees `srguard-$PID-matcher-...`.
-- [ ] Lint + tests green, then PR + merge + fold.
 
 ### DEPLOY: `fix/matcher-fixture-drop-stale-oneline-comment`
 
