@@ -32,6 +32,65 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ci-trunk-pending-run-displaced` · 20260903-140852
+
+`.github/workflows/ci.yml` now keys each push to `main` on its own commit (`github.sha`), so no trunk
+commit's CI run shares a concurrency group with any other push. Pull requests are untouched -- still
+keyed on `github.ref`, still cancelling superseded runs, so the ~7m40s reruns PR #933 measured stay
+saved.
+
+**What was wrong.** The block keyed one group on the ref, i.e. one group for the whole trunk, and relied
+on a conditional `cancel-in-progress` to stop the fold commit cancelling the merge commit's run. That
+field governs only the **in-progress** run. A concurrency group also drops a **pending** one when a third
+arrival queues into it, and that path does not consult the field at all -- so the guard could not cover
+the way the cancellation actually happened. Measured over the 28 most recent `merge:` commits on the
+trunk: **14 `success`, 14 `cancelled`**. Half the trunk's merge commits had never been gated. The
+cancelled runs had **zero jobs allocated**, which is the proof they never left the queue: run
+`33742497546` (merge `371af75b`, PR #1268) was created `10:06:15Z` and cancelled `10:06:23Z`.
+
+**And it was never only folds displacing merges**, which is what the reading beyond #1294's report added:
+`0ab47d2d`, `2c54de74` and `e0175372` went down in one chain, so on a busy day only the **last push of
+each ~15-minute window** ran. The tip was always gated; nothing between it and the previous tip ever was
+-- which is why that day's two `failure` runs on `main` named no commit.
+
+`.github/workflows/unfolded-entry.yml` keeps the opposite arrangement on purpose (a shared trunk group,
+`cancel-in-progress: true`): it is required by nothing and superseding its run is how the ~6s ship window
+stops reading as a stale red. Its comment, and the `Get-UnfoldedTrunkEntry` docstring in
+`entry-scaffold-lib.ps1`, both credited *ci.yml's* field for that swallowing; both now name the workflow
+that actually does it.
+
+New suite `scripts/tests/workflow-concurrency.tests.ps1` pins the grouping key in both workflows and in
+both directions -- 12 asserts, mutation-checked. The subject is deliberately the **key** and not the
+field: an assert on `cancel-in-progress` would have been green for the entire life of the defect.
+
+**The cost is deliberate.** Every push to `main` now runs, where roughly half were dropped: 27 runs where
+13 ran, on September 3. Whether the fold commit needs a full run of its own is left open as
+[#1300](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1300).
+
+The lesson is split per CLAUDE.md's source-is-the-default rule: the portable fact (`cancel-in-progress`
+governs the in-progress run only) is a hard rule in Sylvester's manual, the repo-specific half (this
+trunk's rhythm is what made it bite) is on the `ci.yml` bullet of his lens.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- CI plumbing for this repo's own trunk. No subscriber of any service reaches it. The portable half
+does travel to consumers, as a hard rule in the system-administration manual, but it is a rule for
+whoever maintains a workflow rather than anything a subscriber sees.
+
+**Score:** N/A
+
+#### Pull Request
+
+Trunk pushes each get their own CI concurrency group, so no merge commit's run is displaced while pending
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1304](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1304)
+
+---
+
 ### DEPLOY: `fix/publish-commit-inherits-gpgsign-v1` · 20260903-140140
 
 The commit `publish-to-business.ps1` makes in its temp clone now pins `commit.gpgsign=false`, beside
