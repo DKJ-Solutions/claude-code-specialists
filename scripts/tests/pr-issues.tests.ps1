@@ -1710,6 +1710,21 @@ Assert-True ($shipText -like '*could not read the history of ''origin/main'' -- 
 Assert-True ($shipText -like "*'git fetch origin main' failed -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway.*") 'the failed-fetch refusal names -SkipStaleCheck in the same single-line message'
 Assert-True ($shipText -like "*could not read the history of 'origin/main' -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway.*") 'the failed-log refusal names -SkipStaleCheck in the same single-line message'
 
+# AND THE FAILED FETCH KEEPS GIT'S OWN DIAGNOSIS (issue #1334). The refusal above says the fetch failed;
+# only git says WHY -- the auth error, the host, the reason. The flag that would drop it was added here on
+# a credential argument #1330 had measured as false 23 minutes earlier (git anonymizes the URL itself via
+# transport_anonymize_url), which is the fourth call site #1313 warned would copy that retired reasoning.
+# The call is asserted WHOLE, as one literal fragment, so re-adding -DiscardStderr anywhere in it fails
+# this suite -- an assert on the flag's absence would pass on a call that no longer exists.
+Assert-True ($shipText -like "*Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', 'origin', 'main', '--quiet')*") 'step 3b''s fetch of main runs WITHOUT -DiscardStderr, so git''s own failure output survives'
+Assert-True ($shipText -like '*$fetchMain.Output | Where-Object*') 'and the failure path prints that captured output before the refusal, rather than discarding it'
+Assert-True ($shipText -like '*native-capture-lib.ps1*') 'the comment points at the seam holding the measurement, so the next reader meets it rather than the retired rule'
+
+# THE git log THREE LINES BELOW KEEPS THE FLAG, on an independent reason: its output is PARSED into
+# $newMainCommits, so a stray line becomes a fake SHA. That one is not the defect and must not be swept
+# along with it.
+Assert-True ($shipText -like "*-DiscardStderr -Arguments @('log', 'origin/main', '--first-parent'*") 'the PARSED git log keeps -DiscardStderr -- a different call with a different reason'
+
 # The stale-certificate refusal itself names the commit count, the PR, and the remedy -- the facts a
 # reader needs to act on it. Unchanged by the re-anchor, since Get-StaleCertificateVerdict did not move.
 Assert-True ($shipText -like '*gained $($staleVerdict.Count) commit(s) after the run that certified PR*') 'the refusal states how many commits and which PR they voided the certificate for'
