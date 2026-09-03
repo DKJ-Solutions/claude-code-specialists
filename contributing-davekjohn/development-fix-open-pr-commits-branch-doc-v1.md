@@ -102,12 +102,16 @@ only if git itself fails -- so naming it one would make the four-plus-one gate c
 written up where a consumer reads it: open-pr's own `.DESCRIPTION`, a new section on the `open-pr` skill
 page, `CONTRIBUTING-portable.md`'s PR step, and step 3.2 here.
 
-One latent defect came with the extraction: `Write-Error` inside the commit arm terminates under
+One latent defect was found during the extraction: `Write-Error` inside the commit arm terminates under
 `$ErrorActionPreference = 'Stop'`, which every caller sets. Inline in a function returning a bare bool
 that only ever fed an `exit`, that was harmless; in a function whose return value a caller reads, it
 makes the return dead code -- and it broke `park-cycle.ps1`'s documented "ALWAYS EXITS 0" contract,
-since it runs on a Stop hook. Both messages are now non-terminating, the same repair
-`Invoke-WorkflowGates` carries for the same reason.
+since it runs on a Stop hook. **That repair is not this branch's to claim**: PR #1283 landed it on
+`main` for all three of `Invoke-GitPark`'s messages while this branch was parked. What this branch does
+is carry it across the split -- two of the three messages now sit in `Invoke-GitParkCommit`, the push
+message stays with the pusher, and each half records the reasoning where its own caller reads it. The
+merge of `main` is where the two met, and resolving it by hand was the only way to keep both the split
+and all three repairs.
 
 **Score:** 3
 
