@@ -814,7 +814,7 @@ foreach ($lf in $linkFiles) {
     # the whole of this repair. It was the repo root while the changelog was, and CHANGELOG.md moved into
     # contributing-davekjohn/ on August 27 -- so the special case went on demanding the root form that the
     # fold then breaks. Measured: a DEPLOY link written as '../plugins/...' -- correct for BOTH
-    # development.md and the changelog, which now sit in one directory -- was refused as dead, and the form
+    # the branch's development document and the changelog, which now sit in one directory -- was refused as dead, and the form
     # this check accepted resolved from contributing-davekjohn/ after the fold and was dead there. Precisely
     # the failure the paragraph above says this case exists to prevent, running backwards.
     #
@@ -1616,8 +1616,8 @@ function Test-IsDeclaredSectionHeading([string]$Line) {
 #
 # AND THE ENTRY IS A SECTION OF A DOCUMENT, NOT A DOCUMENT (August 23, 2026). Both branch files used to open
 # with an H2, so the structural test -- the only thing that tells an entry from a root doc -- said yes to the
-# step list too, and it had to be excluded by PATH. development.md opens with an H1, so that test now
-# says no to the WHOLE file, which would have quietly dropped every branch entry out of this check rather
+# step list too, and it had to be excluded by PATH. The branch document's own heading sits a level above an
+# entry's, so that test now says no to the WHOLE file, which would have quietly dropped every branch entry out of this check rather
 # than merely mis-reporting it. The exclusion is gone and the entry is read out of the document instead --
 # Split-Development, the same boundary the fold and the two gates use.
 #

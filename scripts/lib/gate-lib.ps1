@@ -258,7 +258,7 @@ function Get-GateTreeMovedNote {
         backgrounds itself precisely so the session can get on with something else. Measured on
         PR #1144 -- one suite of 55 went red inside a backgrounded ship's gate and green standalone on
         the same commit seconds later, while prune-merged.ps1 had the trunk checked out beside it. The
-        suite walks every *.md under contributing-davekjohn/, and development.md exists on the branch
+        suite walks every *.md under contributing-davekjohn/, and the branch's development document exists on the branch
         and not on the trunk, so a file in the walked set vanished and reappeared mid-run. That one
         script stopped taking the checkout in #1147; the class it belongs to did not.
 

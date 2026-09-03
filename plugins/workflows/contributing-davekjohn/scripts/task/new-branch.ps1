@@ -71,7 +71,7 @@
 
 .PARAMETER Intent
     (Optional) the direction of the branch -- what still needs to happen and where you left off.
-    Recorded in development.md as the opening paragraph of its FIRST PHASE (PLAN), without a heading
+    Recorded in the branch's development document as the opening paragraph of its FIRST PHASE (PLAN), without a heading
     of its own; typically given together with -Park when parking a branch for later / another device (#162).
     It deliberately does not touch the DEPLOY section: an intent is a status, and that section's text folds
     verbatim into CHANGELOG.md.
@@ -469,9 +469,9 @@ if (-not $branchType) {
 # Request' heading from the PR's own mergedAt. Gone here rather than computed and dropped at the call, so
 # there is no unused local left behind to look like something the writer forgot to pass.
 
-# THE BRANCH'S WORKING DOCUMENT LIVES AT contributing-davekjohn/development.md, NOT IN THE REPO ROOT
-# UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder August 14,
-# 2026; merged from two files into one on August 23, 2026).
+# THE BRANCH'S WORKING DOCUMENT LIVES UNDER contributing-davekjohn/, NAMED FOR THE BRANCH, NOT IN THE
+# REPO ROOT UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder
+# August 14, 2026; merged from two files into one on August 23, 2026).
 # ONE NAME PER BRANCH SINCE #1255 (September 3, 2026), where it was one fixed path. The fixed path did not
 # collide on CHECKOUT, which is what the old reasoning said; it collided on MERGE, which is what it did not.
 # See the block in entry-scaffold-lib.ps1 for the measurement.

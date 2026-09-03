@@ -125,7 +125,7 @@
          there is something specific to verify and not verifying it must never read as sound. See the
          comment at the step for the full corrected mechanism and why "the branch is behind" (#1292's own
          filed predicate) is the wrong, wider question.
-      4. TWO GATES, THEN MERGE. The step-list gate refuses while development.md has an unresolved
+      4. TWO GATES, THEN MERGE. The step-list gate refuses while the branch's development document has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
          review approved and what step 5 folds into CHANGELOG.md. Both are checked here rather than
@@ -1476,7 +1476,7 @@ if ($ff.ExitCode -ne 0) { Remove-ShipFoldWorktree -Path $foldTree; Write-Error "
 # IT IS DECLINED, AND THE DECIDING FACT WAS MEASURED RATHER THAN ARGUED. The pathspec above is not merely
 # weakened by that flow -- git refuses to express it at all:
 #
-#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md contributing-davekjohn/development.md
+#     $ git commit -m "merge: feat/x (#1)" -- CHANGELOG.md contributing-davekjohn/feat-x.md
 #     fatal: cannot do a partial commit during a merge.
 #
 # The only commit git will make while MERGE_HEAD exists is a whole-index one, and in the same test it swept
