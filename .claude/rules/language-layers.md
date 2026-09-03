@@ -153,12 +153,14 @@ plus a repository admin role, where it once held repository admin plus the Write
 ([#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244),
 [#1290](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1290); the mechanics live in
 [the system-administration lens](../specialists/lenses/05-15-extension.md)). And on that same
-September 3 Dave turned on `strict_required_status_checks_policy` on that rule
+September 3 Dave turned on `strict_required_status_checks_policy` on that rule and reverted it about
+45 minutes later
 ([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)) — a third change to
-that ruleset, distinct from the transfer and the bypass refill — so, read as a field-by-field
-inventory of what the moves touched, this paragraph is now one field short. The language point this
+that ruleset, distinct from the transfer and the bypass refill, and a same-day round trip rather
+than a standing one — so this paragraph is now one row short of a full field-by-field inventory of
+what the moves touched, even though the setting it would add is back where it started. The language point this
 paragraph exists to make is untouched — the job id `lint-en-tests` is still the live name of an external
 object this repo may cite but not unilaterally rename. What the correction adds is the reason a
 field-by-field re-check is worth repeating rather than citing: it is a **snapshot**, and this one went
-stale three times: twice under moves nobody read as touching it — the transfer emptying the list, the
-refill changing its shape — and once when `strict` was switched on with no row here to update.
+stale three times: twice under standing moves — the transfer emptying the list, the refill changing
+its shape — and once transiently, when `strict` went on and back off the same day.

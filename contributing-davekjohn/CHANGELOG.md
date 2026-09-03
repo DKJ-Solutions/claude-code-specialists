@@ -169,46 +169,43 @@ Drop the stale one-line constraint comment on New-MatcherFixture
 
 ### DEPLOY: `docs/record-strict-ci-gate` · 20260903-175320
 
-`main-ci-gate` now enforces `strict_required_status_checks_policy`, and
-`DKJ-Solutions/claude-code-specialists` now allows auto-merge and branch auto-update. The three
-fields were changed by `gh api` out-of-band on 2026-09-03 (Dave's call on
-[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)); this branch is the
-docs record of that change.
+On 2026-09-03 option 1 of
+[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325) was applied by `gh api`
+and **reverted the same day, about 45 minutes later**, after research on the thread disproved it.
+The doc paragraphs this PR shipped were corrected by the follow-up branch
+`docs/correct-strict-ci-gate-record`; the net change to the repo is nil.
 
 - ruleset `main-ci-gate`, `required_status_checks` rule: `strict_required_status_checks_policy`
-  `false` to `true`
+  `false` -> `true` (~15:10 UTC) -> `false` (~15:55 UTC)
 - repo `DKJ-Solutions/claude-code-specialists`: `allow_auto_merge` and `allow_update_branch` both
-  `false` to `true`
+  `false` -> `true` -> `false`, same window
 
-With `strict` on, a PR must be up to date with `main` before it can merge; `allow_auto_merge` and
-`allow_update_branch` let GitHub run the convergence loop unattended -- update the behind branch,
-re-run `lint-en-tests` against the fresh tree, merge when green -- so the operator arms auto-merge
-once instead of standing between CI rounds. The cost is a full extra `lint-en-tests` run for every
-branch that falls behind `main` while its own CI runs. `ship-pr.ps1`'s step-3b stale-CI certificate
-gate (PR #1316) is unchanged: its detection is correct and it remains the portable safety net for
-consumers, whom a repo-settings change does not reach; `-SkipStaleCheck` stays the valve for a
-known-harmless window. This enacts option 1 of
-[#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292) ("require branches to
-be up to date") for this repo; #1292 stays open as the broader merge-queue question. Recorded in
-`.claude/specialists/lenses/05-15-extension.md` (the `main-ci-gate` / `ci.yml` bullet) and in
-`.claude/rules/language-layers.md` (the closing verification-lesson paragraph, which now notes this
-as the third change to that ruleset in two days).
+**Why option 1 does not converge.** GitHub performs no server-side base-sync of a PR branch outside a
+merge queue: `allow_update_branch` only renders an "Update branch" button for a human with write
+access, and auto-merge flips the merge switch only once "up to date" is already satisfied -- it never
+syncs the base itself. So `strict` turns the ~44% behind-at-merge rate into a hard, repeating,
+server-side block with no automatic resolution and no valve (`-SkipStaleCheck` lives in
+`ship-pr.ps1` and cannot touch a refusal that is GitHub's). Confirmed live in the 45-minute window:
+[PR #1316](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1316) itself had to be
+landed with `gh pr merge --admin`. `allow_auto_merge` was reverted too, not just `strict`, because
+strict-off with auto-merge on would merge on a stale-but-green certificate -- reintroducing exactly
+[#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292)'s defect. #1292 (the
+red-trunk mechanism issue) stays open and assigned in its own right.
 
-This branch ships only documentation; the settings change was applied and verified out-of-band and
-is already in force, so a maintainer feels the new merge behaviour regardless of this entry. What
-the entry buys is that the next session reading the `main-ci-gate` / `ci.yml` bullet finds the
-convergence-race resolution -- and the reason step 3b was deliberately left alone -- recorded with
-its #1325 / #1292 / #1316 chain intact, rather than re-deriving it or re-proposing the script-side
-fix the #1325 verdict rejected.
+The real fix is a GitHub merge queue, which tests each PR against the projected merge and is
+available to this repo (public, org-owned); its prerequisite is a `merge_group` trigger in
+`.github/workflows/ci.yml`. The keep-`strict`-or-adopt-a-merge-queue decision stays open on #1325.
+`ship-pr.ps1` step 3b is unchanged and stays the mechanism and the portable net for consumers. The
+reasoning is recorded in `.claude/specialists/lenses/05-15-extension.md` (the `main-ci-gate` /
+`ci.yml` bullet) and `.claude/rules/language-layers.md`.
 
 **Score:** 2
 
 #### What makes this deploy extra special
 
-A change to this repo's own GitHub ruleset and merge settings reaches no consumer: it ships no
-plugin change, no script change, and no page a consumer adopts. The portable consumer-side
-mechanism -- `ship-pr.ps1` step 3b -- is explicitly unchanged, and no earlier release note told
-consumers to adopt anything this retires.
+The settings this recorded were reverted the same day, so no consumer is reached either way: no
+plugin change, no script change, no page a consumer adopts. `ship-pr.ps1` step 3b -- the portable
+mechanism -- is explicitly unchanged, and no release note ever pointed consumers at these settings.
 
 **Score:** N/A
 
