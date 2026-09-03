@@ -1649,13 +1649,7 @@ foreach ($ef in @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
 $branchDocForHeadings = Resolve-BranchFilePath -Kind Deployment -RepoRoot $RepoRoot
 # The other per-branch documents in the folder, found by pattern because no list can name them. Same sweep
 # check 13b runs, and for the same reason -- see the block above.
-$branchDocPathsForHeadings = Get-BranchFilePaths
-$branchDocDirForHeadings = Join-Path $RepoRoot ([string]$branchDocPathsForHeadings.Directory -replace '/', '\')
-$branchDocSweep = @()
-if (Test-Path -LiteralPath $branchDocDirForHeadings -PathType Container) {
-    $branchDocSweep = @(Get-ChildItem -LiteralPath $branchDocDirForHeadings -Filter ([string]$branchDocPathsForHeadings.Pattern) -File -ErrorAction SilentlyContinue |
-        ForEach-Object { "$([string]$branchDocPathsForHeadings.Directory)/$($_.Name)" } | Sort-Object)
-}
+$branchDocSweep = @(Get-PerBranchDocumentRels -RepoRoot $RepoRoot)
 $entryHeadingRels = @($branchDocForHeadings) + @($branchDocSweep) | Select-Object -Unique
 foreach ($bdRel in $entryHeadingRels) {
     if (-not $bdRel) { continue }
@@ -1841,12 +1835,7 @@ if (Test-CheckEnabled 'branch-template') {
         # at, and the run reported 'absent, which is the trunk between branches'. A gate that answers
         # 'nothing here' when it did not look is worse than no gate, so the subject is the SET.
         $btPaths = Get-BranchFilePaths
-        $btDir   = Join-Path $RepoRoot ([string]$btPaths.Directory -replace '/', '\')
-        $btRels  = @([string]$btPaths.SharedFile)
-        if (Test-Path -LiteralPath $btDir -PathType Container) {
-            $btRels += @(Get-ChildItem -LiteralPath $btDir -Filter ([string]$btPaths.Pattern) -File -ErrorAction SilentlyContinue |
-                ForEach-Object { "$([string]$btPaths.Directory)/$($_.Name)" } | Sort-Object)
-        }
+        $btRels  = @([string]$btPaths.SharedFile) + @(Get-PerBranchDocumentRels -RepoRoot $RepoRoot)
         $btDocs = @()
         foreach ($btRel in ($btRels | Select-Object -Unique)) {
             $btFull = Join-Path $RepoRoot ($btRel -replace '/', '\')

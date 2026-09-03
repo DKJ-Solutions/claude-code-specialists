@@ -80,7 +80,7 @@ jobs:
       # THE FOLD COMMIT SKIPS THIS STEP -- issue #1300. ship-pr pushes twice per branch: the merge
       # commit, then the fold commit, whose tree differs by exactly two non-executable things -- the
       # entry appended to contributing-davekjohn/CHANGELOG.md and the removed
-      # contributing-davekjohn/development-<branch>.md. Since #1294 keyed every push to `main` on its own
+      # contributing-davekjohn/<branch>.md. Since #1294 keyed every push to `main` on its own
       # commit, that second push otherwise runs a full ~15-minute suite over a tree whose only untested
       # delta is changelog prose. That entry is a verbatim copy of the branch document's DEPLOY section,
       # which check 4 of the lint gate (still run above) link-scans on the PR and branch-entry.yml

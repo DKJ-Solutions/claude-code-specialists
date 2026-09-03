@@ -802,8 +802,13 @@ Assert-Equal $known[$known.Count - 1] (Get-PrTemplateCanonicalPlaceholder) `
 # literal path -- a template is scaffolded once and read on every branch, so it cannot name one branch's
 # document. The assert follows the shape for the same reason it followed the name before: to catch a
 # placeholder left describing a document that no longer exists.
-Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'development-<branch>\.md') `
+Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'contributing-davekjohn/<branch>\.md') `
     'and it names the document by its current filename shape'
+# THE PRE-#1335 FORM IS STILL RECOGNISED, and that is the append-only rule this list exists for: a template
+# scaffolded on the day the prefix went is still carrying it, and dropping the form is exactly the defect
+# #952 measured -- a rewrite that left the tolerated set matching only the repos needing no tolerance.
+Assert-True ($known -contains "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->") `
+    'the pre-#1335 prefixed form is still recognised'
 
 $canonical = Get-PrTemplateCanonicalPlaceholder
 Assert-True ($known -contains $canonical) `

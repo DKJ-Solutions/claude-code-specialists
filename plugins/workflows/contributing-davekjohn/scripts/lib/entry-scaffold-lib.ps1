@@ -3224,12 +3224,18 @@ function Get-EntryRetiredSectionHeadings {
 # so what a reader meets at '###' is unchanged: the question, and the PR.
 $script:EntryWrittenSectionKeys = @('What', 'PullRequest')
 
-# What the TEMPLATE shows where a real entry carries its creation stamp. Its own value rather than a reuse
-# of the 'Branch ID' guidance comment: that one is a hint ABOUT the field and this one stands IN the field,
-# so a template reader sees the shape of the line instead of a sentence where a timestamp goes.
-$script:EntryIdTemplatePlaceholder = '<timestamp of the moment this branch was created>'
+# --- RETIRED, SEPTEMBER 3, 2026 (#1335): $script:EntryIdTemplatePlaceholder --------------------------
+#
+# It was what the reference copy of the development document showed where a real one carries its CREATION
+# stamp -- '<timestamp of the moment this branch was created>'. The document's heading is the branch name
+# and nothing else now, so there is no stamp on it in either state and nothing for a placeholder to stand
+# in for. Removed rather than left defined and unread, which is this file's own rule.
+#
+# THE MERGE STAMP IS UNTOUCHED, and the pair the comment below describes is now a single: the entry's
+# 'Pull Request' heading still carries the moment it landed, which is the stamp the changelog's own
+# ordering reads (Get-EntryHeadingStamp).
 
-# And its counterpart at the other end of the branch's life (Dave, August 19, 2026): what the template
+# Its counterpart at the other end of the branch's life (Dave, August 19, 2026): what the template
 # shows beside 'Pull Request', where a folded entry carries the moment it landed. The pair is the point --
 # the cycle file's heading stamps the branch's first moment, this section's heading its last -- and each
 # stamp sits in the document that owns that moment.
@@ -3316,10 +3322,10 @@ function Get-EntryIdSeparator {
     return $script:EntryIdSeparator
 }
 
-function Get-EntryIdTemplatePlaceholder {
-    <# The stamp the template's heading carries in place of a real one. #>
-    return $script:EntryIdTemplatePlaceholder
-}
+# --- RETIRED, SEPTEMBER 3, 2026 (#1335): Get-EntryIdTemplatePlaceholder ------------------------------
+#
+# The getter for the creation-stamp placeholder retired above. Its only caller was Format-Development's
+# trunk state, and that heading carries no stamp any more.
 
 function Get-EntryMergeStampTemplatePlaceholder {
     <# The same, for the 'Pull Request' heading: what the template shows where a folded entry carries the
@@ -3547,8 +3553,9 @@ function Get-FoldedEntryForBranch {
         cycle reaches legitimately. The entry TEXT is not a key either: two branches may describe the same change in
         the same words, and refusing that would refuse honest work.
 
-        MATCHED BETWEEN THE BACKTICKS, NOT BY SUBSTRING. '`feat/a-v1`' must not answer for 'feat/a', and
-        a substring test says it does -- so the name is compared to what the heading actually delimits.
+        MATCHED AS A WHOLE NAME, NOT BY SUBSTRING. 'feat/a-v1' must not answer for 'feat/a', and a substring
+        test says it does -- so the name is compared to what the heading actually delimits: the backticks
+        where an entry has them, and the token after the title word's colon where it does not (#1335).
         Headings inside fenced code are skipped for the reason every other reader in this file skips
         them: a changelog entry quoting a heading in an example is describing one, not being one.
 
@@ -3575,9 +3582,15 @@ function Get-FoldedEntryForBranch {
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if ($fenced[$i]) { continue }
         if (-not $headingRx.IsMatch($lines[$i])) { continue }
-        $names = [regex]::Matches($lines[$i], '`([^`]+)`')
+        # BOTH DELIMITINGS (#1335). Every entry folded before September 3, 2026 names its branch between
+        # backticks; every one after it names it bare, after the title word and before the optional merge
+        # stamp. The name is still MATCHED rather than substring-tested in both -- 'feat/a-v1' must not
+        # answer for 'feat/a' -- which for the bare shape means taking the whole token and comparing it.
+        $names = @([regex]::Matches($lines[$i], '`([^`]+)`') | ForEach-Object { $_.Groups[1].Value })
+        $bare = [regex]::Match($lines[$i], ':\s+([^\s`]+)')
+        if ($bare.Success) { $names += $bare.Groups[1].Value }
         $isMine = $false
-        foreach ($n in $names) { if ($n.Groups[1].Value.Trim() -eq $wanted) { $isMine = $true } }
+        foreach ($n in $names) { if (([string]$n).Trim() -eq $wanted) { $isMine = $true } }
         if (-not $isMine) { continue }
 
         $pr = 0
@@ -4205,12 +4218,20 @@ function Resolve-EntryType {
         # and a colon -- '## DEPLOY: `feat/x-v1`' -- while every entry written before August 23, 2026 puts
         # the branch first and the title last. What keeps a STEP LIST from reading as an entry is unchanged:
         # its own heading says 'Development', which is not one of these titles, in either position.
+        # THREE SHAPES SINCE #1335, and the guard is still the title word. Today's heading is unbackticked
+        # -- '### DEPLOY: feat/x' -- and the prefix is read up to the first slash exactly as before; the
+        # backticked title-first form and the pre-August-23 branch-first form are both still read, because
+        # every entry already in CHANGELOG.md and on every branch in flight carries one of them. What keeps
+        # a STEP LIST from reading as an entry is what it always was: its own heading carries no title word
+        # at all -- since #1335 it carries nothing but the branch name.
         $titleAlt = ((@($clTitles) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|')
-        $branchRx = '(?:(?:' + $titleAlt + '):\s*`([^`/]+)/[^`]*`)|(?:`([^`/]+)/[^`]*`\s+(?:' + $titleAlt + ')\b)'
+        $branchRx = '(?:(?:' + $titleAlt + '):\s+([^\s`/]+)/[^\s`]*)' +
+            '|(?:(?:' + $titleAlt + '):\s*`([^`/]+)/[^`]*`)' +
+            '|(?:`([^`/]+)/[^`]*`\s+(?:' + $titleAlt + ')\b)'
         if ($headingLine[0] -match $branchRx) {
-            # Whichever of the two alternatives matched -- the unmatched group is empty, not absent, because
-            # both are capture groups in one alternation.
-            $prefix = (@($Matches[1], $Matches[2]) | Where-Object { $_ } | Select-Object -First 1)
+            # Whichever of the three alternatives matched -- the unmatched groups are empty, not absent,
+            # because all three are capture groups in one alternation.
+            $prefix = (@($Matches[1], $Matches[2], $Matches[3]) | Where-Object { $_ } | Select-Object -First 1)
             $prefix = ([string]$prefix).Trim()
             $canonical = @($known | Where-Object {
                 $_ -and ([string]$_).ToLowerInvariant() -eq $prefix.ToLowerInvariant()
@@ -4970,7 +4991,12 @@ $script:BranchFileDefaults = [ordered]@{
     # #963 ASKED FOR TWO DIFFERENT WORDS and that is worth recording rather than smoothing over: its title
     # said 'Development', its body said 'Developing'. Dave settled it on 'Development' the same day, which
     # is also #958's word, so the file, the heading and the identifiers all say one thing.
-    ProgressTitle  = 'Development'
+    #
+    # NO ProgressTitle ANY MORE (Dave, #1335, September 3, 2026). The document's heading is the branch name
+    # and nothing else -- '## feat/x' -- so there is no title left to word. The key is GONE rather than set
+    # to an empty string, which is this map's own rule for a retired setting: a consumer who overrode it
+    # gets a script-contract failure naming it, instead of a translation that silently stops being printed.
+    # ChangelogTitle above is untouched: the entry's heading still leads with 'DEPLOY:'.
     # The word before the backticked branch name in the ENTRY's heading only -- '## Branch `feat/x`
     # changelog'. EMPTY SINCE THE RENAME (Dave, August 19, 2026): the lead word existed to stop
     # '## `feat/x` changelog' reading as a changelog OF that branch, and '## `feat/x` deployment' says
@@ -5246,6 +5272,13 @@ function Get-BranchFilePaths {
         PR conflicting on this one file, and a conflicting PR gets no check suite at all -- so it could
         never go green and could never merge.
 
+        AND THE PREFIX WENT ON SEPTEMBER 3, 2026 (Dave, #1335): 'development-<slug>.md' -> '<slug>.md'. The
+        seventh rename, the same answer as the six before it -- PriorPerBranchFile is the name every branch
+        open on the day carries, read and never written. What it costs is the thing the prefix was quietly
+        doing: it made 'development-*.md' a glob that could not reach this folder's own permanent pages, and
+        with the prefix gone that narrowing has to be stated instead of assumed. ReservedNames below is where
+        it is stated, and the block there says which page makes it load-bearing.
+
         PATTERN IS THE ONE ROW THAT IS NOT A NAME, and it arrived with that same change because a per-branch
         set cannot be listed in advance. Resolve-BranchFilePath sweeps this glob over Directory to find every
         OTHER per-branch document in the folder -- a branch renamed after new-branch ran, a document written
@@ -5288,7 +5321,7 @@ function Get-BranchFilePaths {
     # not loaded. A git branch name cannot contain the characters Windows forbids in a filename, so the
     # slash is the only one that has to go.
     $slug = if ($Branch) { $Branch -replace '/', '-' } else { '' }
-    $perBranch = if ($slug) { "contributing-davekjohn/development-$slug.md" } else { 'contributing-davekjohn/development.md' }
+    $perBranch = if ($slug) { "contributing-davekjohn/$slug.md" } else { 'contributing-davekjohn/development.md' }
     return [pscustomobject]@{
         Directory        = 'contributing-davekjohn'
         File             = $perBranch
@@ -5296,7 +5329,24 @@ function Get-BranchFilePaths {
         # branch. Resolve-BranchFilePath sweeps it and then asks each hit which branch it DECLARES, which is
         # what keeps the filename from becoming the authority -- see the block above on the trap the old
         # per-branch form set.
-        Pattern          = 'development-*.md'
+        #
+        # IT IS EVERY MARKDOWN FILE IN THE FOLDER SINCE #1335, and that is why ReservedNames arrived with it.
+        # 'development-*.md' carried its own guard: the prefix was a word no other page here begins with, so
+        # the glob could not reach README.md, CONTRIBUTING.md or CHANGELOG.md. A bare '<slug>.md' has no
+        # prefix left to be narrow about, so the narrowing moves from the glob to an explicit exclusion --
+        # and it is NOT optional. CHANGELOG.md is the file that makes it load-bearing: it is full of folded
+        # '### DEPLOY: <branch>' headings, so it DECLARES a branch by every test in this file. A sweep that
+        # reached it would hand the fold the changelog as this branch's document, and the fold moves the
+        # document into the changelog and then deletes it.
+        Pattern          = '*.md'
+        # THE FOLDER'S OWN PERMANENT PAGES, excluded from the sweep above. Fixed rather than read from the
+        # seams, the same call Directory itself gets: Get-ChangelogPath may point anywhere, and a lib that
+        # went looking for a repo root to resolve it is a lib that can find the wrong tree. What a fixed list
+        # costs is a repo that renamed one of these three AND parked it in this folder -- which is the same
+        # repo that would have to fork Get-BranchFilePaths anyway, since these names are the interface four
+        # scripts read. Matched case-insensitively, because Windows will hand back 'Readme.md' for a file
+        # committed as 'README.md'.
+        ReservedNames    = @('README.md', 'CONTRIBUTING.md', 'CHANGELOG.md')
         # THE PRE-#1255 SHARED NAME, read and never written. Every branch open on September 3, 2026 carries
         # it, here and in every consumer, and they meet this change through a plugin update rather than by
         # choosing to -- the same answer the five renames before this one got.
@@ -5316,6 +5366,16 @@ function Get-BranchFilePaths {
         # write to this exact name; the declare-test resolves that correctly too, because the file would
         # declare that branch.
         PriorNameFile    = 'contributing-davekjohn/development-cycle.md'
+        # THE PRE-#1335 PER-BRANCH NAME, read and never written -- 'development-<slug>.md'. Branch-dependent,
+        # unlike every other legacy row here, which is why Get-BranchFileLegacyNames had to learn -Branch:
+        # a caller on the -Reader arm cannot sweep a directory, so this name has to be NAMED for it. On the
+        # tree arm the Pattern sweep would find it anyway; naming it costs one candidate and removes the
+        # difference between the two arms.
+        #
+        # EMPTY WHERE NO BRANCH WAS GIVEN, not 'development-.md'. A caller asking for the SHAPE of the layout
+        # has no branch to build this from, and a candidate list containing a path nothing can ever have
+        # written is a path every reader still opens.
+        PriorPerBranchFile = if ($slug) { "contributing-davekjohn/development-$slug.md" } else { '' }
         LegacyCycle      = 'contributing-davekjohn/branch/branch-cycle.md'
         LegacyDeployment = 'contributing-davekjohn/branch/branch-deployment.md'
         OlderCycle       = 'contributing-davekjohn/branch/branch-progress.md'
@@ -5345,6 +5405,12 @@ function Test-IsPerBranchDocumentPath {
         already listed are still listed there, because the two callers do not list the same set and
         collapsing them here would quietly widen one of them. This is the addition, not a replacement.
 
+        SINCE #1335 THE PATTERN ALSO COVERS THE PRE-#1255 SHARED NAME, and that is accepted rather than
+        excluded back out. 'development.md' fell outside 'development-*.md' -- the hyphen -- and falls inside
+        '*.md'. It is a branch development document, both callers use this predicate to exempt exactly that
+        kind of file, and both list the shared name themselves anyway, so nothing downstream changes. What
+        does NOT fall inside is this folder's permanent pages: see ReservedNames.
+
         Separator-agnostic: callers build $rel from a Windows path in one check and from the seam's forward
         slashes in the other, and an exclusion that compares the two raw matches nothing -- the lesson
         check 20 in that gate already paid for once.
@@ -5356,7 +5422,55 @@ function Test-IsPerBranchDocumentPath {
     $dir   = [string]$paths.Directory
     # The pattern is a filename glob; anchor it to the folder so a same-named file elsewhere in the tree is
     # not swept in. -like rather than a regex because Pattern is authored as a glob and stays readable as one.
-    return ($norm -like "$dir/$([string]$paths.Pattern)")
+    #
+    # THE LEAF IS SPLIT OFF FIRST, AND IT HAS TO BE (#1335). '*' in -like matches a '/' as happily as any
+    # other character, so the anchored form '<dir>/*.md' also matched '<dir>/releases/history.md' -- a
+    # SUBDIRECTORY, waved through as a per-branch document. It never showed while the glob carried the word
+    # 'development-'; the moment it became '*.md' the release history started resolving its links from the
+    # wrong base and 26 of them were reported dead. Measured on this change's first gate run. So the
+    # directory is matched as a whole segment and the glob is applied to the filename alone.
+    $slash = $norm.LastIndexOf('/')
+    if ($slash -lt 0) { return $false }
+    if ($norm.Substring(0, $slash) -ne $dir) { return $false }
+    if ($norm.Substring($slash + 1) -notlike ([string]$paths.Pattern)) { return $false }
+    # AND THE FOLDER'S OWN PAGES ARE NOT PER-BRANCH DOCUMENTS (#1335). Since the glob became '*.md' this
+    # predicate would otherwise answer true for CHANGELOG.md, README.md and CONTRIBUTING.md -- and both its
+    # callers in the lint gate use it to EXEMPT a file from a check, so a wrong true is silence rather than
+    # noise: exactly the direction this function's own docstring says costs the most.
+    if (@($paths.ReservedNames) -contains $norm.Substring($slash + 1)) { return $false }
+    return $true
+}
+
+function Get-PerBranchDocumentRels {
+    <#
+        Every per-branch development document actually present in $RepoRoot, repo-relative, forward slashes,
+        sorted -- the folder's own permanent pages excluded.
+
+        ONE SWEEP, FOUR CALLERS (#1335), and it is a function for the same reason Resolve-BranchFilePath is:
+        Resolve-BranchFilePath discovers sibling documents, Get-UnfoldedTrunkEntry hunts leftovers on the
+        trunk, and check-plugin-integrity.ps1 sweeps twice -- for heading levels and for branch-type
+        headings. All four had the same three lines inline, which was survivable while the glob carried its
+        own guard in the word 'development-'. It does not any more: the exclusion is now the only thing
+        between this sweep and CHANGELOG.md, and a guard maintained in four copies is a guard that will hold
+        in three.
+
+        NOT THE DECLARE-TEST. This answers "which files could be one", by name; every caller then asks each
+        hit which branch it DECLARES, which is what keeps the filename from becoming the authority.
+
+        A MISSING DIRECTORY IS AN EMPTY ANSWER, not an error: a consumer that has not run the workflow
+        folder's adopter yet has no folder, and every caller here is a reader.
+    #>
+    param([Parameter(Mandatory)][string]$RepoRoot)
+    $paths = Get-BranchFilePaths
+    $dir = Join-Path $RepoRoot ([string]$paths.Directory -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
+    $reserved = @($paths.ReservedNames)
+    return @(
+        Get-ChildItem -LiteralPath $dir -Filter ([string]$paths.Pattern) -File -ErrorAction SilentlyContinue |
+            Where-Object { $reserved -notcontains $_.Name } |
+            ForEach-Object { "$([string]$paths.Directory)/$($_.Name)" } |
+            Sort-Object
+    )
 }
 
 function Get-BranchFileLegacyNames {
@@ -5372,21 +5486,28 @@ function Get-BranchFileLegacyNames {
         the writer's at three names. This function is the single ordered source so the next rename cannot
         do that again.
 
-        THE ORDER IS NEWEST-PREDECESSOR FIRST. SharedFile is the pre-#1255 shared name every branch open
+        THE ORDER IS NEWEST-PREDECESSOR FIRST. PriorPerBranchFile is the pre-#1335 'development-<slug>.md';
+        SharedFile is the pre-#1255 shared name every branch open
         on September 3, 2026 carries; PriorNameFile is the pre-#963 filename; then the current folder's
         branch/ pair; then the whole pre-#886 workflow-davekjohn/ set, last and never written. It matches
         the slice Resolve-BranchFilePath used to inline, so the resolver's behaviour is unchanged.
 
         $legacyKind FOLLOWS THE RESOLVER: 'File' and 'Cycle' both read the Cycle-named legacy files (the
-        step list's history), 'Deployment' reads the Deployment-named ones (the entry's). Every name here
-        is a branch-independent constant, so this calls Get-BranchFilePaths with no -Branch.
+        step list's history), 'Deployment' reads the Deployment-named ones (the entry's).
+
+        ONE OF THEM IS BRANCH-DEPENDENT SINCE #1335, which is why -Branch arrived. Every other name here is a
+        constant; 'development-<slug>.md' is not, and it is the newest predecessor of all -- every branch open
+        on September 3, 2026 carries it. Omitted, -Branch simply leaves that candidate out, which is the right
+        answer for a caller asking about the SHAPE of the layout rather than about a branch.
     #>
     param(
-        [Parameter(Mandatory)][ValidateSet('File', 'Cycle', 'Deployment')][string]$Kind
+        [Parameter(Mandatory)][ValidateSet('File', 'Cycle', 'Deployment')][string]$Kind,
+        [string]$Branch = ''
     )
-    $paths = Get-BranchFilePaths
+    $paths = Get-BranchFilePaths -Branch $Branch
     $legacyKind = if ($Kind -eq 'File') { 'Cycle' } else { $Kind }
     return @(
+        [string]$paths.PriorPerBranchFile,
         [string]$paths.SharedFile,
         [string]$paths.PriorNameFile,
         [string]$paths."Legacy$legacyKind",
@@ -5513,17 +5634,15 @@ function Resolve-BranchFilePath {
     # enumerate. A caller on that arm knows its branch and passes it, so $current is the name it needs, and
     # the shared name below covers a branch that predates this change. Widening it would mean a second
     # scriptblock in every -Reader caller for a case none of them has.
+    #
+    # THE SWEEP ITSELF MOVED TO Get-PerBranchDocumentRels (#1335), with three other callers. It is the same
+    # listing it always was, plus the exclusion the widened glob made necessary -- see ReservedNames in
+    # Get-BranchFilePaths for why CHANGELOG.md is the file that makes it load-bearing here in particular:
+    # the pass below returns the first candidate declaring a non-trunk branch, and every folded entry in the
+    # changelog declares one.
     $discovered = @()
     if ($PSCmdlet.ParameterSetName -eq 'Tree') {
-        $dirFull = Join-Path $RepoRoot ([string]$paths.Directory -replace '/', '\')
-        if (Test-Path -LiteralPath $dirFull -PathType Container) {
-            $discovered = @(
-                Get-ChildItem -LiteralPath $dirFull -Filter ([string]$paths.Pattern) -File -ErrorAction SilentlyContinue |
-                    ForEach-Object { "$([string]$paths.Directory)/$($_.Name)" } |
-                    Where-Object { $_ -ne $current } |
-                    Sort-Object
-            )
-        }
+        $discovered = @(Get-PerBranchDocumentRels -RepoRoot $RepoRoot | Where-Object { $_ -ne $current })
     }
     # $current is this branch's own name; $discovered is every OTHER per-branch document in the folder
     # (tree arm only). Then the legacy names -- SharedFile, PriorNameFile, the branch/ pair, and the
@@ -5535,7 +5654,7 @@ function Resolve-BranchFilePath {
     # list as nested Object[] elements -- an array subexpression does not flatten a sub-array reached
     # through a variable or a call -- and the foreach below would then hand a whole array to the reader as
     # one $rel. Concatenation flattens each operand one level, which is exactly the depth here.
-    $candidates = @($current) + @($discovered) + @(Get-BranchFileLegacyNames -Kind $Kind)
+    $candidates = @($current) + @($discovered) + @(Get-BranchFileLegacyNames -Kind $Kind -Branch $Branch)
 
     # Read once per candidate and remember it: the second loop asks the same question again, and on the
     # -Reader arm one question is a child process rather than a Test-Path.
@@ -5628,11 +5747,12 @@ function Get-BranchFileWording {
 
 function Format-BranchFileHeadingLine {
     <#
-        The heading line both branch files open with -- '## `feat/x` changelog', '# `main` progress'.
+        The heading line the development document and its DEPLOY section open with -- '## feat/x',
+        '### DEPLOY: feat/x'.
 
-        ONE FORMATTER FOR FOUR CALLERS, because the two files and their two states all write this line and
+        ONE FORMATTER FOR BOTH, because the document and its entry both write this line and
         Get-BranchFileDeclaredBranch READS it back. The branch name is the file's only machine-read fact
-        outside the step marks, so the writer and the reader agreeing about the backticks is not a nicety.
+        outside the step marks, so the writer and the reader agreeing about the shape is not a nicety.
 
         THE BRANCH IS NAMED IN THE HEADING, not on a line below it (Dave, August 6, 2026). The heading has
         to say which branch this file belongs to anyway, so a separate '**Branch:**' line was the same fact
@@ -5641,7 +5761,10 @@ function Format-BranchFileHeadingLine {
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Branch,
-        [Parameter(Mandatory)][string]$Title,
+        # EMPTY IS THE DOCUMENT'S OWN HEADING SINCE #1335 -- '## feat/x', the branch and nothing else. It was
+        # mandatory-and-non-empty while both headings carried a title word; the entry's heading still does
+        # ('### DEPLOY: feat/x'), so the parameter stays and only its floor moves.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Title,
         [int]$Level = 2,
         [string]$Suffix = '',
         [string]$Lead = ''
@@ -5659,10 +5782,21 @@ function Format-BranchFileHeadingLine {
     # for three days in August 2026) and no caller sets it; it is kept rather than removed because a
     # consumer may have configured one, and a seam that silently stopped being read is worse than one that
     # still means something. Get-BranchFileDeclaredBranch reads past whatever stands here; see its regex.
+    # NO BACKTICKS SINCE #1335 (Dave), AND NO TITLE ON THE DOCUMENT'S OWN HEADING: '## feat/x' and
+    # '### DEPLOY: feat/x' where they read '## Development: `feat/x` * <stamp>' and '### DEPLOY: `feat/x`'.
+    #
+    # WHAT THE BACKTICKS WERE DOING IS THE PART THAT HAD TO BE REPLACED RATHER THAN DELETED. They were this
+    # format's only delimiter, and four readers used them to find where the branch name starts and ends:
+    # Get-BranchFileDeclaredBranch, Get-DevelopmentEntryPattern, Get-EntryDeclaredType and
+    # Get-FoldedEntryForBranch. Each of the four now reads the bare shape too, and each does it with a
+    # narrower anchor than 'a word in backticks somewhere on the line' -- the entry's heading by its title
+    # word, the document's by the heading being nothing BUT a branch-shaped token. Every backticked shape is
+    # still read: a branch open across this change carries one, here and in every consumer.
     $shown = if ($Branch) { $Branch } else { Get-BranchTrunkName }
     $line = ('#' * $Level) + ' '
     if ($Lead) { $line += $Lead + ' ' }
-    $line += $Title + ': `' + $shown + '`'
+    if ($Title) { $line += $Title + ': ' }
+    $line += $shown
     if ($Suffix) { $line += ' ' + $Suffix }
     return $line
 }
@@ -5685,7 +5819,8 @@ function Format-BranchFileHeader {
         subsequent .Add() throws. Measured on this function's first run.
     #>
     param(
-        [Parameter(Mandatory)][string]$Title,
+        # EMPTY SINCE #1335 for its one caller: the document's heading is the branch name alone.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Title,
         [Parameter(Mandatory)][AllowEmptyString()][string]$Branch,
         [Parameter(Mandatory)][pscustomobject]$Wording,
         # The creation stamp, already formatted with its separator. Here rather than composed by the caller
@@ -5817,9 +5952,9 @@ function Add-BranchProgressSection {
 
 function Format-Development {
     <#
-        contributing-davekjohn/development.md, whole: the branch's own name and creation stamp, the
-        guidance that explains the marks and the arc, the three phases that carry the steps, and the DEPLOY
-        section that IS the changelog entry.
+        The branch's development document, whole: its heading, which since #1335 is the branch's own name
+        and nothing else, the guidance that explains the marks and the arc, the three phases that carry the
+        steps, and the DEPLOY section that IS the changelog entry.
 
         ONE DOCUMENT SINCE AUGUST 23, 2026 (Dave), REPLACING Format-BranchProgressScaffold AND
         Format-EntryBlock'S OWN FILE. The step list and the entry lived in two files under branch/; they are
@@ -5860,7 +5995,10 @@ function Format-Development {
     param(
         [AllowEmptyString()][string]$Branch = '',
         [string]$Intent = '',
-        [string]$Id = '',
+        # NO -Id ANY MORE (#1335). It was the branch's creation stamp and its only destination was the
+        # heading suffix this document no longer carries. Removed rather than accepted and ignored, which is
+        # this file's own rule for a knob whose last reader has gone: a caller still passing it now gets a
+        # parameter-binding error instead of a stamp that silently goes nowhere.
         # Passed straight through to Format-EntryBlock -- a migration rendering a finished entry into this
         # document has all four in hand, and the scaffolder has none of them.
         [string]$Description = '',
@@ -5883,14 +6021,14 @@ function Format-Development {
     $shown  = if ($Branch) { $Branch } else { $trunk }
     $onTrunk = ($shown -eq $trunk)
 
-    # THE STAMP IS A PLACEHOLDER ON THE TRUNK AND A REAL ONE ON A BRANCH. It used to be the template's
-    # marker; the trunk state is the reference now, so it is the trunk state that shows what will be there.
-    $stamp = $Id
-    if ($onTrunk) { $stamp = Get-EntryIdTemplatePlaceholder }
-    $suffix = if ($stamp) { "$($script:EntryIdSeparator) $stamp" } else { '' }
-
+    # NO CREATION STAMP AND NO TITLE IN THE HEADING SINCE #1335 (Dave). It read
+    # '## Development: `feat/x` * 20260903-152650'; it is '## feat/x'. The stamp was the branch's birth
+    # moment, written here and read by nothing -- the changelog's own ordering keys on the MERGE stamp
+    # (Get-EntryHeadingStamp, on the Pull Request heading), and the one place the creation stamp was ever
+    # used was a measurement taken by hand over 38 merged branches. So it goes, and -Id goes with it rather
+    # than being kept as a parameter no caller can spend.
     $lines = New-Object System.Collections.Generic.List[string]
-    foreach ($line in (Format-BranchFileHeader -Title $w.ProgressTitle -Branch $shown -Wording $w -Suffix $suffix)) {
+    foreach ($line in (Format-BranchFileHeader -Title '' -Branch $shown -Wording $w)) {
         $lines.Add($line)
     }
     $lines.Add('')
@@ -6119,12 +6257,44 @@ function Get-BranchFileDeclaredBranch {
     $label = (Get-BranchFileWording).BranchLabel
     $lineRx = '^\*\*' + [regex]::Escape([string]$label) + ':\*\*\s*`([^`]+)`\s*$'
 
+    # THE TWO UNBACKTICKED SHAPES (#1335), and they are separate patterns because they are separately safe.
+    # The heading lost its delimiters, so "a word in backticks somewhere on this line" is not available any
+    # more and each shape has to bring its own anchor.
+    #
+    #   $entryRx  -- '### DEPLOY: feat/x', optionally with the merge stamp after it. ANCHORED ON THE TITLE
+    #                WORD, which is as narrow as the backticks were: an ordinary heading does not open with
+    #                the entry's own title and a colon. Every word this title has carried is accepted, for
+    #                the reason Get-BranchFileRetiredChangelogTitles exists.
+    #   $bareRx   -- '## feat/x', the document's own heading: the whole heading is one token and nothing
+    #                else. THE SLASH IS REQUIRED, and that is the honest narrowing rather than a guess about
+    #                branch names. Without it this pattern reads '## Overview' as the branch 'Overview' --
+    #                the exact class of false positive inbound #1099 was filed for, now reachable again
+    #                because the format stopped delimiting. A prefixed branch is what this workflow's own
+    #                branch table requires ('feat/', 'fix/', 'docs/'), and a repo whose branches carry no
+    #                slash is NOT stranded: its document's DEPLOY heading still declares it through
+    #                $entryRx a few lines further down, which is why the loop below keeps looking instead of
+    #                stopping at the first heading it fails to read.
+    $clTitles = @(@([string](Get-BranchFileWording).ChangelogTitle) + @(Get-BranchFileRetiredChangelogTitles) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $titleAlt = ((@($clTitles) | ForEach-Object { [regex]::Escape([string]$_) }) -join '|')
+    # The tail is '<sep> anything', not '<sep> one token': the merge stamp is one token in a real entry and
+    # a whole sentence in the reference state ('<timestamp of the moment this branch was merged>'). A tail
+    # that only accepted the real one read the reference document as declaring no branch at all -- which is
+    # the reset state, and reads as "ours to overwrite". Caught on this function's first run.
+    $entryRx = if ($titleAlt) {
+        '^#{1,3}\s+(?:[^`:]*\s)?(?:' + $titleAlt + '):\s+([^\s`]+)(?:\s+' +
+            [regex]::Escape($script:EntryIdSeparator) + '\s+.*)?\s*$'
+    } else { $null }
+    $bareRx = '^#{1,3}\s+([^\s`]+/[^\s`]+)\s*$'
+
     $fallback = ''
     $sawHeading = $false
     foreach ($line in ($Text -split '\r?\n')) {
         if ($line -match $anyHeadingRx) {
             if (-not ($OpeningHeadingOnly -and $sawHeading)) {
                 if ($line -match $headingRx) { return $Matches[1] }
+                if ($entryRx -and $line -match $entryRx) { return $Matches[1] }
+                if ($line -match $bareRx) { return $Matches[1] }
             }
             $sawHeading = $true
         }
@@ -6288,8 +6458,8 @@ function Get-DevelopmentEntryPattern {
         branch's plan and starts being the entry that folds into CHANGELOG.md.
 
         IT IS NOT ENOUGH TO MATCH THE LEVEL, which is why this is a function rather than a constant. PLAN,
-        CREATE and TEST are H2 headings too; what separates the fourth is that it carries the BRANCH NAME in
-        backticks and the entry's own title word. Both come from the wording seam, so a repo that translated
+        CREATE and TEST are H2 headings too; what separates the fourth is that it carries the entry's own
+        title word, a colon and the BRANCH NAME. The title word comes from the wording seam, so a repo that translated
         'DEPLOY' is matched by its own word -- and every title this document has carried is accepted, because
         a branch created before a rename still has to be foldable.
 
@@ -6315,9 +6485,14 @@ function Get-DevelopmentEntryPattern {
     # stamp -- '## DEPLOY: `feat/x-v1` * 20260823-101500'. Every entry written before August 23, 2026 puts
     # the branch first and the title last, with nothing after it. A branch in flight carries the old shape
     # right now, here and in every consumer, so both are matched and only the first is produced.
-    $current = $level + '(?:[^`]*\s)?(?:' + $titleRx + '):\s*`[^`]+`'
-    $legacy  = $level + '(?:[^`\s]+\s+)?`[^`]+`\s+(?:' + $titleRx + ')\s*$'
-    return '(?:' + $current + ')|(?:' + $legacy + ')'
+    # THE BACKTICKS WENT ON SEPTEMBER 3, 2026 (#1335), so today's shape is '### DEPLOY: feat/x' -- and what
+    # keeps this pattern narrow is unchanged, because it was never the backticks doing that work. The title
+    # word and its colon are the anchor: PLAN, CREATE and TEST carry neither, at either level. The branch
+    # name is matched as a bare token, and the optional tail is the merge stamp the fold appends.
+    $backticked = $level + '(?:[^`]*\s)?(?:' + $titleRx + '):\s*`[^`]+`'
+    $current    = $level + '(?:[^`:]*\s)?(?:' + $titleRx + '):\s+[^\s`]+'
+    $legacy     = $level + '(?:[^`\s]+\s+)?`[^`]+`\s+(?:' + $titleRx + ')\s*$'
+    return '(?:' + $current + ')|(?:' + $backticked + ')|(?:' + $legacy + ')'
 }
 
 function Split-Development {
@@ -6478,7 +6653,7 @@ function Get-UnfoldedTrunkEntry {
         to this branch" means -- the same drift Resolve-BranchFilePath exists to prevent for the
         sibling question.
 
-        THE INVARIANT IT ENFORCES: on the trunk, contributing-davekjohn/ carries no development-*.md at
+        THE INVARIANT IT ENFORCES: on the trunk, contributing-davekjohn/ carries no per-branch document at
         all. new-branch.ps1 creates one on a branch, the fold removes it at the merge (Dave,
         August 23, 2026 -- the document is branch-lifetime). So a WRITTEN one whose declared branch is
         not the branch under HEAD is a leftover: on the trunk that is every written one, on a feature
@@ -6499,7 +6674,7 @@ function Get-UnfoldedTrunkEntry {
         that the next commit resolves.
 
         WIDE READING OF THE DECLARED BRANCH, deliberately. Every file considered here sits at the fixed
-        development-*.md path and is a known-shape branch document, so the -OpeningHeadingOnly narrowing
+        per-branch document path and is a known-shape branch document, so the -OpeningHeadingOnly narrowing
         the release cut's ROOT scan needs (inbound #1099) does not apply -- there is no arbitrary prose
         to misread here.
     #>
@@ -6524,16 +6699,14 @@ function Get-UnfoldedTrunkEntry {
     }
 
     $paths = Get-BranchFilePaths
-    $dir = Join-Path $RepoRoot ([string]$paths.Directory -replace '/', '\')
-    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
 
-    # The per-branch pattern, plus the pre-#1255 shared name explicitly: 'development-*.md' requires the
-    # hyphen, so 'development.md' -- carried by every branch open across the #1255 change -- is not in
-    # the glob and has to be named. The declare-test below is what admits or rejects each hit.
-    $candidateRels = @(
-        Get-ChildItem -LiteralPath $dir -Filter ([string]$paths.Pattern) -File -ErrorAction SilentlyContinue |
-            ForEach-Object { "$([string]$paths.Directory)/$($_.Name)" }
-    ) + @([string]$paths.SharedFile) | Sort-Object -Unique
+    # The per-branch sweep, plus the pre-#1255 shared name explicitly. Since #1335 the glob is '*.md' and
+    # Get-PerBranchDocumentRels is what keeps it off this folder's own pages -- CHANGELOG.md above all,
+    # which declares a branch in every folded entry it holds and would otherwise be reported here as a
+    # leftover to fold. 'development.md' is inside the glob now and named anyway, at no cost: Sort-Object
+    # -Unique collapses the duplicate, and naming it keeps this list readable as the set it means.
+    $candidateRels = @(Get-PerBranchDocumentRels -RepoRoot $RepoRoot) +
+        @([string]$paths.SharedFile) | Sort-Object -Unique
 
     $findings = New-Object System.Collections.Generic.List[object]
     foreach ($rel in $candidateRels) {

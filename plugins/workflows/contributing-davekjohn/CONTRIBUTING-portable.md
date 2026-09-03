@@ -1,6 +1,6 @@
 # The contribution cycle — the portable half
 
-This is the cycle the `contributing-davekjohn` scripts run: an issue, a branch, its `contributing-davekjohn/development-<branch>.md`, a Pull
+This is the cycle the `contributing-davekjohn` scripts run: an issue, a branch, its `contributing-davekjohn/<branch>.md`, a Pull
 Request that has to get past its gates, a merge, and a fold. **It is written to be read in any repo that
 enables this plugin**, which is why it names the *seam* wherever a repo owns the answer, rather than stating
 one repo's answer as the rule.
@@ -94,12 +94,12 @@ this plugin reads either**, so that alignment is a convention you keep rather th
 Creating the branch writes its working document, so **a branch is never entry-less**. It has two halves
 with two different readers:
 
-| half of `contributing-davekjohn/development-<branch>.md` | subject | lifetime |
+| half of `contributing-davekjohn/<branch>.md` | subject | lifetime |
 |---|---|---|
 | `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | removed at the merge; never folded |
-| `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
+| `## DEPLOY: <branch>` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
 
-**One document per branch, named after it** — `development-<branch>.md`, the branch name with its slashes
+**One document per branch, named after it** — `<branch>.md`, the branch name and nothing else, with its slashes
 flattened, so two branches never write the same path. It was the fixed `development.md` until September 3,
 2026, on the argument that git already tracks it per branch: true of **checkout**, and silent about
 **merge**, which is where the collision actually lives — every merge to the trunk left every *other* open
@@ -131,7 +131,7 @@ source repo's.
 one go. The entry is one heading with two `###` sections under it:
 
 ```text
-## DEPLOY: `<your branch>` · <stamp>
+## DEPLOY: <your branch> · <stamp>
 
 ### What makes this deploy extra special
 ### Pull Request
@@ -784,7 +784,7 @@ recommendation.** On August 27, 2026 it deleted its root `CONTRIBUTING.md` and k
 `CLAUDE.md`, on the grounds that an always-on document already stated the same three rules — never
 directly on the trunk, a branch + PR, the required CI check — and a second copy is a thing to keep in
 sync rather than a safety net. **Nothing in this workflow depends on that choice**: every gate reads your
-branch's own `development-<branch>.md`, never a contributing page, so both answers work.
+branch's own `<branch>.md`, never a contributing page, so both answers work.
 
 **The recommendation is still the root page, for two reasons that have nothing to do with the gates.**
 GitHub links a root `CONTRIBUTING.md` from the new-issue and new-pull-request pages and from the

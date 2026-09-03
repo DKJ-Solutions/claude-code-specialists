@@ -1030,7 +1030,10 @@ Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine "$entryH DEPLOY: ``x``") 'st
 # '<timestamp of the moment this branch was merged>'. Compared as if it were a moment, that is a silent
 # wrong answer in the one document whose subject is when things landed.
 Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine ("$entryH DEPLOY: ``x`` $stampSep " + (Get-EntryMergeStampTemplatePlaceholder))) 'stamp: the template''s placeholder is not a stamp'
-Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine ("$entryH DEPLOY: ``x`` $stampSep " + (Get-EntryIdTemplatePlaceholder))) 'stamp: nor is the creation placeholder'
+# The CREATION placeholder is retired with the heading that carried it (#1335), so it is asserted as the
+# literal it was rather than through a getter. The rule it proves outlives it: anything that is not
+# Format-EntryMergeStamp's own shape reads as no stamp, whatever prose stands in that position.
+Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine ("$entryH DEPLOY: ``x`` $stampSep <timestamp of the moment this branch was created>")) 'stamp: nor is the retired creation placeholder'
 Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine "$entryH DEPLOY: ``x`` $stampSep 2026-09-03 10:47") 'stamp: nor a date in any other shape -- only what Format-EntryMergeStamp writes'
 Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine '') 'stamp: an empty line is not a heading and answers empty'
 # COMPOSED FROM THE SAME PARTS AS THE DOCUMENT, for the reason the fixture two screens up has now paid for
@@ -1738,26 +1741,29 @@ try {
     Remove-Item -Recurse -Force -LiteralPath $resolveFx -ErrorAction SilentlyContinue
 }
 
-# THE TWO STAMPS SIT AT THE TWO ENDS OF THE BRANCH'S LIFE. The creation stamp is the cycle file's, written
-# by the scaffolder; the landing stamp is the entry's, written by the fold. Neither may appear in the
-# other's document -- that is the whole reason the ID moved out of the entry heading.
-$stampedCycle = ((Format-Development -Branch 'feat/x-v1' -Id '20260819-171500') -join "`n")
-Assert-True ((($stampedCycle -split "`n")[0]) -match ('^#{' + (Get-BranchCycleHeadingLevel) + '} Development: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the document heading carries its title, the branch and the creation stamp'
+# ONE STAMP, AT THE END OF THE BRANCH'S LIFE (#1335). There were two: a creation stamp on the document's
+# own heading and a landing stamp on the entry's, and the second is the one anything ever read back. The
+# document's heading is now the branch and nothing else, which is what these two asserts hold -- the first
+# is the shape Dave asked for, the second is the reason the old shape can go without loss.
+$stampedCycle = ((Format-Development -Branch 'feat/x-v1') -join "`n")
+Assert-Equal ('#' * (Get-BranchCycleHeadingLevel) + ' feat/x-v1') (($stampedCycle -split "`n")[0]) 'the document heading is the branch name and nothing else -- no title, no backticks, no stamp'
+Assert-True (-not (($stampedCycle -split "`n")[0] -match '\d{8}-\d{6}')) 'and it carries no creation stamp, which nothing ever read back'
 $bareEntry = ((Format-EntryBlock -Branch 'feat/x-v1' -Description 'A title' -Type 'Enhancement') -join "`n")
 Assert-True (-not ($bareEntry -match '\d{8}-\d{6}')) 'and a freshly scaffolded entry carries no stamp anywhere -- the fold has not run'
+Assert-True ($bareEntry -match ('(?m)^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: feat/x-v1')) 'the ENTRY heading keeps its title word and loses only the backticks'
 
-# THE REFERENCE COPY SHOWS BOTH STAMPS AS PLACEHOLDERS, which is what separates it from a branch's file now
-# that the guidance is unconditional: it is the only difference left, and it is the honest one -- neither
-# moment exists for the trunk.
+# THE REFERENCE COPY SHOWS THE LANDING STAMP AS A PLACEHOLDER, which is what separates it from a branch's
+# file now that the guidance is unconditional: it is the only difference left, and it is the honest one --
+# that moment does not exist for the trunk.
 $templateCycle = ((Format-Development -Branch '') -join "`n")
-Assert-True ($templateCycle.Contains((Get-EntryIdTemplatePlaceholder))) 'the reference copy shows the creation stamp as a placeholder'
-Assert-True ($templateCycle.Contains((Get-EntryMergeStampTemplatePlaceholder))) 'and the landing stamp as one'
+Assert-True ($templateCycle.Contains((Get-EntryMergeStampTemplatePlaceholder))) 'the reference copy shows the landing stamp as a placeholder'
+Assert-Equal (Get-BranchTrunkName) (Get-BranchFileDeclaredBranch -Text $templateCycle) 'and it still declares the trunk, so the resolver keeps reading it as a reset document'
 
 # THE RESTAMP, WHICH IS THE HALF A READER CAN BREAK. A stamped section heading is still the section: if
 # any of the six matchers had kept its bare '\s*$', the entry would report the section as ABSENT -- read
 # by the gates as "not answered yet" and by the fold as nothing to fill.
 $stamped = Set-EntryMergeStamp -EntryText $bareEntry -Stamp '20260819-171500'
-Assert-True ($stamped -match ('(?m)^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: `feat/x-v1` ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the fold stamps the landing moment onto the entry''s own heading'
+Assert-True ($stamped -match ('(?m)^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: feat/x-v1 ' + [regex]::Escape((Get-EntryIdSeparator)) + ' 20260819-171500$')) 'the fold stamps the landing moment onto the entry''s own heading'
 Assert-True (-not ($stamped -match '(?m)^### Pull Request .+\d{8}-\d{6}')) 'and not onto the Pull Request heading, where it sat for four days'
 # Get-EntrySectionAnswer, not -Body: the guidance comment is unconditional since August 23, 2026, so the
 # RAW body opens with the form. The answer reader strips it, which is what open-pr composes the PR title
