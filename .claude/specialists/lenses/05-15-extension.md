@@ -233,6 +233,33 @@ infrastructure.
   rules and required check all unchanged. What does not survive a transfer is the **sub-field**, and a
   ruleset reporting `active` reads as a clean bill of health while the one array the fold model runs on
   is gone. So check the field you actually rely on, not the object that contains it.
+
+  **AND ON SEPTEMBER 3, 2026 A DIFFERENT SUB-FIELD OF THAT RULESET MOVED — `strict`, TURNED ON
+  DELIBERATELY** ([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325),
+  Dave's call). The stale-CI certificate gate in `ship-pr.ps1` step 3b
+  ([PR #1316](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1316)) detects a real
+  race it cannot win on this trunk — `lint-en-tests` runs ~13m47s–16m09s while `main` gains a merge
+  every ~15–25 min, so re-running CI to refresh the certificate is a chase the operator keeps
+  losing. The verdict rejected every script-side change and turned three knobs across two objects
+  with `gh api`:
+  - ruleset `main-ci-gate` → `required_status_checks` rule: `strict_required_status_checks_policy`
+    `false` → `true`
+  - repo `DKJ-Solutions/claude-code-specialists`: `allow_auto_merge` and `allow_update_branch` both
+    `false` → `true`
+
+  With `strict` on, a PR must be up to date with `main` before it merges, and `allow_auto_merge` +
+  `allow_update_branch` let GitHub run that loop unattended — update the behind branch, re-run
+  `lint-en-tests` against the fresh tree, merge when green — so the operator arms auto-merge once and
+  stops being the thing between CI rounds (`allow_update_branch` supplies the "automatically update
+  branch" half a bare `strict` + auto-merge lacks, which the verdict flagged). It costs a full extra
+  `lint-en-tests` run for every branch that falls behind `main` while its own CI runs — on a busy
+  day, most of them — accepted with the
+  [#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292) fire-rate and #1325
+  convergence numbers both in view. `ship-pr.ps1` step 3b is unchanged: detection is correct and it
+  stays the portable net for consumers, whom a repo-settings change never reaches, with
+  `-SkipStaleCheck` the honest valve for a known-harmless window. This enacts option 1 of #1292
+  ("require branches to be up to date") for this repo; #1292 stays open as the broader merge-queue
+  question.
 - **`.github/workflows/claude.yml` + `.github/workflows/claude-code-review.yml`** — the two Claude Code
   workflows, added August 14, 2026 via
   [PR #658](https://github.com/DaveKJohn/claude-code-specialists/pull/658). The first answers an
