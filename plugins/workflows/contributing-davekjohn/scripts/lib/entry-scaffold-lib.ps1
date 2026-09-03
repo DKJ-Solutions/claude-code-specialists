@@ -3435,9 +3435,9 @@ function Get-FoldedEntryForBranch {
 
         THE BRANCH NAME IS THE KEY, AND THE STAMP IS NOT. The fold writes the stamp at fold time, so the
         duplicate carried a different one -- which is exactly why nothing matched. The branch name is
-        sound instead: a second cycle on the same subject is '-v2' by construction (new-branch completes
-        the name and says so), so two entries naming one branch is not a state the cycle can reach
-        legitimately. The entry TEXT is not a key either: two branches may describe the same change in
+        sound instead: a second cycle on the same subject is '-v2' by convention -- typed by hand, since
+        new-branch stopped completing the suffix -- so two entries naming one branch is not a state the
+        cycle reaches legitimately. The entry TEXT is not a key either: two branches may describe the same change in
         the same words, and refusing that would refuse honest work.
 
         MATCHED BETWEEN THE BACKTICKS, NOT BY SUBSTRING. '`feat/a-v1`' must not answer for 'feat/a', and

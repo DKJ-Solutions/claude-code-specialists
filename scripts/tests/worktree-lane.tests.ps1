@@ -186,26 +186,27 @@ try {
     $laneA = Join-Path "$fa-lanes" 'feat--lane-a'
     Assert-True (Test-Path -LiteralPath $laneA -PathType Container) "open: lane directory created"
     Assert-Equal 2 (Get-WorktreeCount -Dir $fa) "open: git registers exactly two worktrees"
-    # WITH THE VERSION SUFFIX new-branch COMPLETES (August 23, 2026): the lane opens whatever branch the
-    # shared scaffolder decides on, so this asserts through it rather than around it.
-    Assert-True (Test-BranchExists -Dir $fa -Name 'feat/lane-a-v1') "open: branch created"
-    Assert-Equal 'feat/lane-a-v1' (Get-HeadBranch -Dir $laneA) "open: the LANE is on the new branch"
+    # THE NAME IS USED AS GIVEN since new-branch stopped completing a '-v1' suffix (Dave, September 3,
+    # 2026): the lane opens whatever branch the shared scaffolder decides on, and it now decides on the
+    # name verbatim, so this asserts through it rather than around it.
+    Assert-True (Test-BranchExists -Dir $fa -Name 'feat/lane-a') "open: branch created"
+    Assert-Equal 'feat/lane-a' (Get-HeadBranch -Dir $laneA) "open: the LANE is on the new branch"
     Assert-Equal 'main' (Get-HeadBranch -Dir $fa) "open: the PRIMARY still sits on main (the load-bearing guarantee)"
     # The -RepoRoot delegation: the dossier belongs to the lane, and the primary must not have gained
     # a copy. Asserting only the first half would pass for a script that wrote into both.
-    # The name carries the branch since #1255, and the lane's branch is 'feat/lane-a-v1'. Written out
+    # The name carries the branch since #1255, and the lane's branch is 'feat/lane-a'. Written out
     # rather than derived, deliberately: this suite is asserting that worktree-lane delegated -RepoRoot
     # correctly, and a path computed from the same lib the script used would agree with it either way.
-    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development-feat-lane-a-v1.md')) "open: the development document is written in the lane"
+    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development-feat-lane-a.md')) "open: the development document is written in the lane"
     # THE NAME THIS COULD ACTUALLY GAIN, which is the per-branch one (#1255). Checking the pre-#1255
     # shared name here would pass whatever the script did, because nothing writes that name any more --
     # a negative assert against a path no writer can produce is not a measurement.
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development-feat-lane-a-v1.md'))) "open: the primary did NOT gain one"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development-feat-lane-a.md'))) "open: the primary did NOT gain one"
     # AND THE LANE IS ON ORIGIN THE MOMENT IT OPENS (#900). Asserted here rather than left to
     # new-branch's own suite, because a lane is the case that needs it most: opening one is by definition
     # work running beside something else, which is exactly when the other side cannot see a local branch.
     # The -RepoRoot delegation is what has to carry the push through, and nothing else covers that pair.
-    Invoke-Git @('-C', "$fa.git", 'rev-parse', '--verify', '--quiet', 'refs/heads/feat/lane-a-v1') | Out-Null
+    Invoke-Git @('-C', "$fa.git", 'rev-parse', '--verify', '--quiet', 'refs/heads/feat/lane-a') | Out-Null
     Assert-True ($LASTEXITCODE -eq 0) "open: the lane's branch is already on origin"
 
     # --- (b) A refused branch name rolls the lane back completely -----------------------------------
@@ -269,9 +270,9 @@ try {
     $rF = Invoke-WorktreeLane -Dir $fd -From $laneD -Arguments @('-HandBack')
     Assert-Equal 0 $rF.Code "hand back: exit 0"
     Assert-Equal 1 (Get-WorktreeCount -Dir $fd) "hand back: the lane is deregistered"
-    Assert-Equal 'feat/lane-d-v1' (Get-HeadBranch -Dir $fd) "hand back: the branch is checked out in the primary"
+    Assert-Equal 'feat/lane-d' (Get-HeadBranch -Dir $fd) "hand back: the branch is checked out in the primary"
     Assert-True ($rF.Out -match 'ship-pr') "hand back: names the next step"
-    Assert-True (Test-BranchExists -Dir $fd -Name 'feat/lane-d-v1') "hand back: the branch itself survives"
+    Assert-True (Test-BranchExists -Dir $fd -Name 'feat/lane-d') "hand back: the branch itself survives"
 
     # --- (g) HandBack refuses when the target is the primary --------------------------------------
     Write-Host "worktree-lane.ps1 -HandBack -- refuses to hand back the primary" -ForegroundColor Cyan
