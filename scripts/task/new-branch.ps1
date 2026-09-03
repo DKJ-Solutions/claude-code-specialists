@@ -89,6 +89,33 @@
     valve for the rare branch that must not be visible yet -- since #900 the creation push is what
     happens by default, and this is the only way to opt out of it.
 
+.PARAMETER NoVersionSuffix
+    (Optional switch) take -Name VERBATIM: skip the '-v1' completion the suffix block below describes.
+    For a caller that is not NAMING a branch -- the branch already exists under a name somebody else
+    chose, and all this run is here to do is write the document for it.
+
+    THE CASE IT EXISTS FOR IS A BOT'S BRANCH (inbound #1224, September 3, 2026). Dependabot opens its own
+    PR on its own branch, so steps 1-3 of the branchflow have already happened, and what a consumer wants
+    from this script is only the document -- which is exactly what it is otherwise right for: idempotent
+    on an existing branch, and the one writer of the format the CI gate reads, so a consumer scaffolding
+    that document by hand is the thing to avoid. Without this switch the run instead completed the name,
+    MISSED the branch -- the completion happens before the exists-check, so the resume path of #1139 never
+    sees it -- created a second branch '<name>-v1', committed the document there and pushed it. That
+    leaves the entry on a branch the pull request does not point at, the gate still red on the real one,
+    and a stray remote branch to delete by hand. Measured on BWJ-ecommerce/smartwatchbanden PRs #462 and
+    #463, both of whose documents had to be written out by hand instead.
+
+    IT IS NOT THE SUFFIX BEING RECONSIDERED, and nothing about the default changes: the reasoning below
+    stands, and a caller that does not name this switch cannot tell the difference. All this adds is a way
+    for a caller that is not naming anything to say so.
+
+    WHY A SWITCH RATHER THAN 'VERBATIM WHEN THE BRANCH EXISTS ON ORIGIN', which the report names as the
+    alternative and rejects. Two reasons beyond its own. It reads intent out of a coincidence: a name that
+    happens to be taken is not a statement that the caller does not own it. And this script's own resume
+    path is built on exactly that coincidence -- #1139 resumes 'feat/x-v1' from origin all day -- so the
+    magic version would change what every one of those runs is called, in a file that reaches three
+    consumers by plugin update rather than by choice.
+
 .PARAMETER Park
     (Optional switch) ACCEPTED AND DOES NOTHING SINCE #900 (August 26, 2026): what it used to ask for is
     now the default, so a run that names it gets exactly what a run that does not get. Kept rather than
@@ -101,6 +128,10 @@
 
 .EXAMPLE
     ./scripts/task/new-branch.ps1 -Name feat/spotify-dashboard -Title "Spotify dashboard" -Intent "Skeleton + routing done; next: wire the API client."
+
+.EXAMPLE
+    # The branch already exists under a name this run does not own -- write its document, nothing else.
+    ./scripts/task/new-branch.ps1 -Name dependabot/npm_and_yarn/browserslist-4.28.8 -NoVersionSuffix -Title "Bump browserslist to 4.28.8"
 #>
 [CmdletBinding()]
 param(
@@ -122,6 +153,11 @@ param(
     # what it PREVENTS rather than as -Local or -Offline: the one thing it turns off is the push, and a
     # reader who wants the branch off the remote is looking for that word.
     [switch]$NoPush,
+    # 'THIS NAME IS NOT MINE TO COMPLETE' (inbound #1224). Named for what it turns OFF, like -NoPush two
+    # lines up, and it turns off exactly one thing: the completion in the suffix block below. Every rule
+    # around it -- Test-BranchName, the trunk refusal, the exists-check, the base measurement -- runs
+    # unchanged, in the same order, on the name as given. See .PARAMETER NoVersionSuffix.
+    [switch]$NoVersionSuffix,
     [switch]$Park
 )
 
@@ -242,10 +278,21 @@ if ($Name -eq $trunk) {
 # branch-info.ps1 is REPO-OWNED and does not travel, so enforcing there states the rule to this repo alone
 # while this script is the shared one; and a hard refusal breaks every branch in flight, here and in three
 # consumers, which meet this convention through a plugin update rather than by choosing to.
-if ($Name -notmatch '-v\d+$') {
+#
+# AND A CALLER THAT IS NOT NAMING ANYTHING OPTS OUT (-NoVersionSuffix, inbound #1224). Everything above is
+# about how a NEW cycle is named, and it assumed the caller owns the name. A caller wrapping this script
+# for a branch a bot already opened does not, and had no way to say so: the completion runs BEFORE the
+# exists-check below, so the resume path never saw the real branch and the run forked '<name>-v1' beside
+# it. The switch is checked here and nowhere else -- the completion is the whole of what it turns off, and
+# the name it skips completing still goes through every rule above and below it.
+if (-not $NoVersionSuffix -and $Name -notmatch '-v\d+$') {
     $completed = "$Name-v1"
     Write-Host "Branch name completed: '$Name' -> '$completed' (a development cycle carries its version; a second cycle on the same subject is '-v2', typed deliberately)." -ForegroundColor Cyan
     $Name = $completed
+} elseif ($NoVersionSuffix -and $Name -notmatch '-v\d+$') {
+    # Said out loud, because the switch turns off a line that otherwise always prints: a run that says
+    # nothing here is indistinguishable from a run whose name already ended in '-vN'.
+    Write-Host "Branch name taken verbatim: '$Name' (-NoVersionSuffix -- this name is not this run's to complete)." -ForegroundColor Cyan
 }
 
 # --- THE BASE THIS BRANCH IS CUT FROM, MEASURED AND REPORTED (inbound #1046) -----------------------

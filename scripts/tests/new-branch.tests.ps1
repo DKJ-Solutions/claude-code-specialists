@@ -360,7 +360,8 @@ function Invoke-NewBranch {
         [string]$Title,
         [string]$Intent,
         [switch]$Park,
-        [switch]$NoPush
+        [switch]$NoPush,
+        [switch]$NoVersionSuffix
     )
     $scriptPath = Join-Path $Dir 'scripts\task\new-branch.ps1'
     $callArgs = @('-Name', $Name)
@@ -368,6 +369,7 @@ function Invoke-NewBranch {
     if ($PSBoundParameters.ContainsKey('Intent')) { $callArgs += @('-Intent', $Intent) }
     if ($Park)   { $callArgs += '-Park' }
     if ($NoPush) { $callArgs += '-NoPush' }
+    if ($NoVersionSuffix) { $callArgs += '-NoVersionSuffix' }
 
     $prevPd  = $env:CLAUDE_PROJECT_DIR
     $prevEap = $ErrorActionPreference
@@ -1245,6 +1247,59 @@ Write-Output `$t.Type
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'already existed -- checked out') 'local resume: reports the resume'
     Assert-True (-not (Test-Phrase -Text $rW2.Out -Phrase 'behind origin/main')) 'local resume: and is NOT handed the trunk gap under the branch name'
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'Base not compared') 'local resume: says why the base was not compared'
+
+    # --- (x) -NoVersionSuffix: A NAME THIS RUN DOES NOT OWN (inbound #1224) ------------------------
+    # THE REPORTED SCENARIO, REPRODUCED WHOLE. Dependabot has already opened its branch and its PR; a
+    # consumer's wrapper calls this script for the DOCUMENT alone. Because the completion ran before the
+    # exists-check, the name it looked up was never the one on origin -- so #1139's resume path could not
+    # fire, and the run forked '<name>-v1', wrote the document there and pushed it. The entry ended up on
+    # a branch the PR does not point at.
+    #
+    # THE MARKER FILE IS THE ASSERT, for the reason Add-OriginBranch gives: a fork and a resume print the
+    # same clean run and scaffold the same bytes, so 'did the branch's own work arrive' is the only
+    # readable difference. Here it doubles as proof the run landed on the BOT's branch and not a fork of
+    # its name.
+    Write-Host "new-branch.ps1 -- -NoVersionSuffix takes a name this run does not own (#1224)" -ForegroundColor Cyan
+    $fixVerb  = New-Fixture -Label 'x'
+    $bareVerb = New-BareOrigin -Dir $fixVerb -Label 'x'
+    Publish-FixtureTrunk -Dir $fixVerb
+    $botBranch = 'dependabot/npm_and_yarn/browserslist-4.28.8'
+    Add-OriginBranch -Bare $bareVerb -Label 'x' -Branch $botBranch -MarkerFile 'bot-work.txt'
+    Assert-True (Test-BranchOnRemote -Bare $bareVerb -Ref "refs/heads/$botBranch") 'verbatim name: the bot branch is on origin'
+
+    $rX = Invoke-NewBranch -Dir $fixVerb -Name $botBranch -Title 'Bump browserslist to 4.28.8' -NoVersionSuffix
+    Assert-Equal 0 $rX.Code 'verbatim name: exit 0'
+    $headX = (& git -C $fixVerb rev-parse --abbrev-ref HEAD).Trim()
+    Assert-Equal $botBranch $headX 'verbatim name: HEAD is on the bot branch itself, NOT on a completed fork of its name'
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixVerb 'bot-work.txt')) "verbatim name: the bot's own work is in the checkout -- a fork could not have produced it"
+    # NO SECOND BRANCH ANYWHERE. The defect's whole shape was a stray '<name>-v1' left behind locally and
+    # on the remote, so both namespaces are read rather than just the one HEAD happens to be on.
+    $localRefsX = @(& git -C $fixVerb for-each-ref --format='%(refname:short)' refs/heads)
+    Assert-True ($localRefsX -notcontains "$botBranch-v1") 'verbatim name: no completed second branch was created locally'
+    Assert-True (-not (Test-BranchOnRemote -Bare $bareVerb -Ref "refs/heads/$botBranch-v1")) 'verbatim name: and none was pushed to origin either'
+    # AND THE DOCUMENT LANDED ON THE BRANCH THE PR POINTS AT, which is the thing the consumer wanted from
+    # this script in the first place -- named off the branch, so the gate reading it finds the branch it
+    # is actually on.
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixVerb ((Get-BranchFilePaths -Branch $botBranch).Deployment))) 'verbatim name: the document is written for the bot branch'
+    # IT SAYS SO. The switch turns off a line that otherwise always prints, and silence there is
+    # indistinguishable from a name that already ended in '-vN'.
+    Assert-True (Test-Phrase -Text $rX.Out -Phrase 'taken verbatim') 'verbatim name: the run says the name was taken as given'
+    Assert-True (-not (Test-Phrase -Text $rX.Out -Phrase 'Branch name completed')) 'verbatim name: and does not claim to have completed anything'
+
+    # THE HARD REJECTS STILL RUN, which is the ordering this switch must not disturb. Test-BranchName
+    # deliberately runs on the name AS GIVEN, ahead of the completion, so -NoVersionSuffix cannot move
+    # anything past it -- but nothing proved that until the switch existed to try it with.
+    $rXMain = Invoke-NewBranch -Dir $fixVerb -Name 'main' -NoVersionSuffix
+    Assert-Equal 1 $rXMain.Code '-NoVersionSuffix -Name main: still refused'
+    Assert-True (Test-Phrase -Text $rXMain.Out -Phrase "must not be 'main'") '-NoVersionSuffix -Name main: and by the same rule as before'
+    $rXFinal = Invoke-NewBranch -Dir $fixVerb -Name 'fix/final-answer' -NoVersionSuffix
+    Assert-Equal 1 $rXFinal.Code "-NoVersionSuffix with the token 'final': still refused"
+
+    # AND THE DEFAULT IS UNTOUCHED. Every caller that does not name the switch has to be unable to tell it
+    # was added -- the report asks for a way out, not for the suffix to be reconsidered.
+    $rXDefault = Invoke-NewBranch -Dir $fixVerb -Name 'fix/still-completed' -Title 'Still completed'
+    Assert-Equal 0 $rXDefault.Code 'default unchanged: exit 0'
+    Assert-Equal 'fix/still-completed-v1' ((& git -C $fixVerb rev-parse --abbrev-ref HEAD).Trim()) 'default unchanged: a run without the switch still gets its version completed'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

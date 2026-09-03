@@ -432,7 +432,7 @@ entitled to its own. Do not read a consumer without these scripts as misconfigur
 
 Derek prefers not to touch the git commands by hand. His toolbox:
 
-- `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-NoPush]` — create (or
+- `scripts/task/new-branch.ps1 -Name <branch-name> [-Title "…"] [-Intent "…"] [-NoPush] [-NoVersionSuffix]` — create (or
   idempotently resume) the branch and, in the same move, write its `contributing-davekjohn/development-<branch>.md`.
   `-Intent` records where you left off / what is next **as the opening paragraph of `PLAN`, without a
   heading** — above the phases until #908/#925 (August 26, 2026), which is the one region the preamble
@@ -445,6 +445,13 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   nothing, and is there so a consumer's typed habit does not fail on a missing parameter. A repo with no
   `origin` creates the branch as before and says why nothing was pushed. See
   [Step 3 above](#classifying-naming-and-creating-a-branch).
+  **`-NoVersionSuffix` takes the name verbatim** (inbound
+  [#1224](https://github.com/DaveKJohn/claude-code-specialists/issues/1224), September 3, 2026) — Derek
+  does not type it here, because in this repo he is always the one naming the branch. It is for a caller
+  that is *not*: a bot has already opened the branch and its PR, and the only thing missing is the
+  document. Without it the completion ran before the branch was looked up, so the run forked
+  `<name>-v1` beside the bot's branch and wrote the entry on the fork instead. Reported from a consumer
+  wrapping this script for Dependabot.
 - `scripts/task/park-cycle.ps1 [-Quiet]` — **Derek does not run this**, and it is here so he recognises its
   commits. A Stop hook (`cycle-autopark.ps1`) invokes it after every turn and it pushes
   `contributing-davekjohn/development-<branch>.md`, and only that file, for the life of the branch — the plan

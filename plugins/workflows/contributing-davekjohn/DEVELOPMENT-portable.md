@@ -107,6 +107,26 @@ suite.
 something is a prediction, and the prediction is wrong often enough that the next round has to be called
 `final-2`. A number makes no claim about being the last one.
 
+**And a caller that is not naming anything says so with `-NoVersionSuffix`.** Everything above is about
+how a *new* cycle is named, and all of it assumes the caller owns the name. Sometimes nobody does: a bot
+opened the branch and its pull request already, and the only thing still missing is this document. That
+caller passes the switch and the name is taken exactly as given — nothing else changes, the validator and
+the hard rejects still run first on the name as typed, and a caller that does not pass it cannot tell the
+switch exists.
+
+**Without it that caller could not use `new-branch` at all**, which is worth naming because the failure was
+silent rather than a refusal. The completion runs *before* the branch is looked up, so the name being
+searched for was never the one on `origin`: the run created a **second** branch `<name>-v1`, wrote the
+document there and pushed it — leaving the entry on a branch the pull request does not point at, the gate
+still red on the real one, and a stray remote branch to delete by hand. Reported from a consumer against
+two Dependabot pull requests whose documents had to be written out by hand instead.
+
+**The switch is explicit rather than inferred, and that was a choice.** "Take the name verbatim when the
+branch already exists on `origin`" needs nothing typed and is wrong: a name that happens to be taken is not
+a statement that the caller does not own it, and `new-branch`'s own resume path is built on exactly that
+coincidence — it resumes a parked `feat/x-v1` from `origin` all day. Inferring would quietly change what
+every one of those runs is called.
+
 ## The step list: PLAN, CREATE, TEST
 
 The plan is yours. It is never folded and never travels, so it may hold whatever helps you pick the branch

@@ -38,8 +38,9 @@ The script:
    nothing else -- it does not look for the lowest free number**, and that restraint is the design.
    `new-branch` is idempotent, so a second run on the same subject *resumes* that branch instead of
    opening another one, which is what the `-Park` flow needs; a scan would turn every rerun into a new
-   branch. A bump is therefore a decision you state by typing `-v2`. The full reasoning, and why this
-   is a completion rather than a refusal in the validator, is in
+   branch. A bump is therefore a decision you state by typing `-v2`. **`-NoVersionSuffix` skips this step
+   entirely**, for a caller that is not naming anything -- see the parameter below. The full reasoning, and
+   why this is a completion rather than a refusal in the validator, is in
    [`DEVELOPMENT-portable.md`](../../DEVELOPMENT-portable.md#the-version-suffix).
 3. **Asks whether this is a resume or a cut**, reading *both* ref namespaces -- `refs/heads/<name>` and
    `refs/remotes/origin/<name>`. That question comes first because the answer decides whether step 4 has
@@ -418,6 +419,25 @@ Two optional parameters cover the "start now, continue later (maybe on another d
   for the rare branch that must not be visible yet. **Since
   [#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900) the push is the default**, so this
   is the only way to opt out of it.
+- **`-NoVersionSuffix`** -- take `-Name` **verbatim**: skip the `-v1` completion of step 2. For a caller
+  that is not *naming* a branch, because the branch already exists under a name somebody else chose and
+  all this run is here to do is write the document for it. **A bot's branch is the case it exists for**:
+  Dependabot opens its own branch and its own pull request, so steps 1-3 of the branchflow have already
+  happened, and this script is otherwise exactly right for the rest -- it is idempotent on an existing
+  branch and it is the one writer of the format the CI gate reads, so scaffolding that document by hand
+  is what to avoid.
+
+  Without the switch that caller could not use the script at all, and it failed **silently** rather than
+  refusing: the completion runs before the branch is looked up, so the name searched for was never the one
+  on `origin`. The run created a second branch `<name>-v1`, wrote the document there and pushed it --
+  entry on a branch the pull request does not point at, gate still red on the real one, stray remote
+  branch to delete by hand.
+
+  Nothing else changes: the hard rejects still run first, on the name as typed, and a run that does not
+  pass the switch cannot tell it exists. It is an explicit switch rather than *"verbatim when the branch
+  exists on `origin`"* because that reads intent out of a coincidence -- and this script's own resume path
+  is built on that same coincidence.
+
 - **`-Park`** -- **accepted and does nothing.** What it used to ask for is what now happens without it, and
   it prints one line saying so. Kept rather than removed because this script is mirrored into every
   consumer's plugin cache, where a `-Park` typed from a doc or a habit would otherwise fail on a parameter
