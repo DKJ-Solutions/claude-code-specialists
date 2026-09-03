@@ -242,7 +242,7 @@ to repair a PowerShell file.
   written line back and check the code points rather than trusting the substitution. No gate can stand in
   for that read-back, because a mangled repair passes an ASCII check by construction.
 
-The general shape behind all seven, worth carrying to the next one: when a mistake cannot announce itself,
+The general shape behind all nine, worth carrying to the next one: when a mistake cannot announce itself,
 the assert is the announcement. Prefer a test over a comment for anything in this class.
 
 ## Sylvester is lazy
