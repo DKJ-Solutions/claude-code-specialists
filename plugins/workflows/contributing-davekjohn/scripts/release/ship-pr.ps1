@@ -1018,18 +1018,34 @@ certificate anyway.
             exit 1
         }
 
-        # -DiscardStderr ON THE FETCH, and not only for tidiness: a failing git fetch echoes the remote
-        # URL, which in a repo cloned over HTTPS with a credential in the URL is a secret -- the same
-        # lesson and the same guard as new-branch.ps1's own base-freshness fetch. So this path prints
-        # nothing of git's own output; the refusal below says everything an operator can act on.
-        $fetchMain = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('fetch', 'origin', 'main', '--quiet')
+        # NO -DiscardStderr ON THE FETCH, AND THE REASON IT ONCE CARRIED IS THE POINT (issue #1334).
+        # This line shipped with a security justification -- "a failing git fetch echoes the remote URL,
+        # which in a repo cloned over HTTPS with a credential in the URL is a secret" -- cited from
+        # new-branch.ps1's base-freshness fetch. That reason is WRONG, measured on git 2.55.0.windows.5
+        # (issues #1313, #1330): git anonymizes the URL itself through transport_anonymize_url, so
+        # `user:token@host`, `token@host` and an unresolvable host all come back as a bare
+        # `https://host/o/r.git`. None of the three leaked.
+        #
+        # THE MEASUREMENT LIVES AT ONE SEAM, and this comment points at it rather than restating it:
+        # scripts/lib/native-capture-lib.ps1, under "-DiscardStderr IS NOT A CREDENTIAL GUARD". Read it
+        # before reaching for this flag on any call that talks to a remote -- the same measurement is
+        # why #1313's proposal to add it to three other fetches was DECLINED, for removing git's own
+        # diagnosis from three failure paths in exchange for nothing.
+        #
+        # SO GIT'S WORDS STAY, AND THE REFUSAL PRINTS THEM. 'fetch failed' on its own leaves an operator
+        # with no auth error, no host and no git reason. This is the cheaper end of that loss -- step 3b
+        # runs BEFORE the merge, so a reader can retry, where at the fold step the PR is already merged
+        # and git's reason is all they have -- but it is the same loss for the same nothing.
+        $fetchMain = Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', 'origin', 'main', '--quiet')
         if ($fetchMain.ExitCode -ne 0) {
+            $fetchMain.Output | Where-Object { $_ -and "$_".Trim() } | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkYellow }
             Write-Error "stale-CI check: 'git fetch origin main' failed -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
             exit 1
         }
         $sinceStr = $certifiedSince.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        # -DiscardStderr for the same reason the gh api call above carries it: this output is PARSED
-        # (it becomes $newMainCommits below), so a git warning merged into it would break the parse.
+        # -DiscardStderr for the same reason the gh api call above carries it, and NOT for the reason the
+        # fetch above deliberately does without: this output is PARSED (it becomes $newMainCommits below),
+        # so a git warning merged into it would break the parse.
         $mainLog = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('log', 'origin/main', '--first-parent', '--since', $sinceStr, '--pretty=format:%H')
         if ($mainLog.ExitCode -ne 0) {
             Write-Error "stale-CI check: could not read the history of 'origin/main' -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
