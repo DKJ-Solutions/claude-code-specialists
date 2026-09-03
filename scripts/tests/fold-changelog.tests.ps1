@@ -722,14 +722,18 @@ Assert-True ($clF -match 'the real one')            'fenced: the REAL declaratio
 Assert-True ($clF -match 'quoted, not declared')    'fenced: and the quoted table survives inside its fence'
 Assert-True ($rF.Output -notmatch 'no significance') 'fenced: the real row was read, so nothing is reported missing'
 
-Write-Host "The branch document: folded from the fixed path, then REMOVED" -ForegroundColor Cyan
+Write-Host "The branch document: folded from the branch's own path, then REMOVED" -ForegroundColor Cyan
 #      The split (Dave, August 6, 2026) made the entry findable at a fixed path instead of one named after
 #      the branch. Clearing it then meant rewriting it to an empty state, because deleting it would have left
 #      the trunk missing a file the next branch expected.
 # THAT SECOND HALF WAS REVERSED ON AUGUST 23, 2026 (Dave): the document exists for the lifetime of a branch,
-# so the fold DELETES it and the trunk carries no copy between branches. What the fixed path still buys is
-# unchanged -- two branches in flight cannot collide, and the repo root does not fill with other people's work.
-# ONE DOCUMENT SINCE THE SAME DAY, and writing it through the real formatter is the point: the fold has
+# so the fold DELETES it and the trunk carries no copy between branches. AND THE FIRST HALF WAS REVERSED ON
+# SEPTEMBER 3, 2026 (#1255): the name carries the branch again, so the path is one per branch rather than
+# fixed. What the fixed path was defended with -- "two branches in flight cannot collide" -- is true of
+# CHECKOUT and says nothing about MERGE, which is where the collision lives: every merge to the trunk left
+# every OTHER open PR conflicting on that one path, and a conflicting PR gets no check suite at all, so it
+# could never go green and could never merge.
+# ONE DOCUMENT SINCE AUGUST 23 TOO, and writing it through the real formatter is the point: the fold has
 # to find the entry as a SECTION of the branch's plan rather than as a file of its own. Writing an entry
 # file and then a cycle file to the same path -- which is what this fixture did the moment the two paths
 # became one -- silently left only the second, and the fold then correctly found nothing to fold.
