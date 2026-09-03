@@ -163,6 +163,11 @@ Write-Host "GATE-RESULT: `$r"
     Assert-True ($r.Text -match 'running all 3 test suites for the fixture') 'the count names 3 -- helper.ps1 is not a suite'
     Assert-True ($r.Text -notmatch 'MARKER-HELPER') 'and it was never run'
     Assert-True ($r.Text -match 'test gate: all 3 suites passed in \d') 'the summary states the verdict and the elapsed time'
+    # THE LANE COUNT IS ON THE SUMMARY LINE (issue #1318). The count line at :674 already carried it, but
+    # nobody quotes that line -- the summary is the one that reaches a branch doc or a changelog entry, and
+    # the seconds without the lanes are a draw from a 4.5x spread. The number is the resolved $MaxParallel
+    # (clamped to the suite count here), so it is machine-dependent -- assert its shape, not its value.
+    Assert-True ($r.Text -match 'test gate: all 3 suites passed in \d+s \(\d+ lanes?\)\.') 'the summary names the lane count the seconds depend on'
 
     # THE ATOMIC-BLOCK ASSERT. Not "both lines are present somewhere" -- an interleaving bug satisfies
     # that. Each marker must sit on the line directly after its OWN header, which is exactly the property
@@ -189,7 +194,7 @@ Write-Host "GATE-RESULT: `$r"
     Assert-True ($r.Text -match 'GATE-RESULT: False') 'one failing suite fails the whole gate'
     Assert-True ($r.Text -match '== z-broken\.tests\.ps1 == FAILED \(exit 3\)') 'its header carries the failure AND the real exit code'
     Assert-True ($r.Text -match '== a-first\.tests\.ps1 ==\r?\n') 'the passing sibling keeps its plain header'
-    Assert-True ($r.Text -match 'test gate: 1 of 2 suites FAILED in \d+s: z-broken\.tests\.ps1') 'and the closing summary names it'
+    Assert-True ($r.Text -match 'test gate: 1 of 2 suites FAILED in \d+s \(\d+ lanes?\): z-broken\.tests\.ps1') 'and the closing summary carries the lane count and names it (issue #1318 -- the red line too)'
     Assert-True ($r.Text -match 'MARKER-Z') 'the failing suite still prints its own output -- attributable without a second run'
 
     # --- 4. It really is parallel, and -MaxParallel 1 really is the way back ------------------------
@@ -246,6 +251,9 @@ Write-Host "GATE-RESULT: `$r"
     $ser = Invoke-Gate -TestsDir $slow -MaxParallel 1
     Assert-True ($ser.Text -match 'GATE-RESULT: True') '-MaxParallel 1 still passes them'
     Assert-True ($ser.Flat -match 'one at a time') 'and says which mode it is in'
+    # -MaxParallel 1 is the one deterministic lane count, so it is the one the summary can be asserted on
+    # exactly: singular 'lane', not 'lanes' (issue #1318).
+    Assert-True ($ser.Text -match 'test gate: all 6 suites passed in \d+s \(1 lane\)\.') 'the summary says one lane, singular, when the valve is closed'
     Assert-Equal 0 (Get-OverlapCount -StampDir $stamps) 'serially NOTHING overlaps -- the valve really queues them'
     # The one timing assert that is safe, because it is a floor the sleeps guarantee: six 1.2s suites in
     # sequence cannot come in under 7.2s of sleeping, however fast the machine is.
@@ -280,20 +288,23 @@ Write-Host "GATE-RESULT: `$r"
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'three suites plus a passing command: the gate returns true'
     Assert-True ($r.Flat -match 'running 1 repo test command') 'and it announces the command half separately'
     Assert-True ($r.Text -match 'CMD-MARKER-OK') 'the command''s own output is printed'
-    Assert-True ($r.Text -match 'test gate: all 4 suites passed in \d') 'the summary counts the command with the suites'
+    Assert-True ($r.Text -match 'test gate: all 4 suites passed in \d+s \(\d+ lanes?\)\.') 'the summary counts the command with the suites and still names the lane count (issue #1318)'
 
     $cmdBad = Join-Path $Fixture 'commands-bad.txt'
     [System.IO.File]::WriteAllText($cmdBad, "cmd /c exit 7`r`n", $Utf8NoBom)
     $r = Invoke-Gate -TestsDir $ok -CommandsFile $cmdBad
     Assert-True ($r.Text -match 'GATE-RESULT: False') 'a failing command fails the whole gate'
     Assert-True ($r.Text -match '== cmd /c exit 7 == FAILED \(exit 7\)') 'its header carries the NATIVE exit code, propagated through the child'
-    Assert-True ($r.Text -match 'test gate: 1 of 4 suites FAILED in \d+s: cmd /c exit 7') 'and the closing summary names the command'
+    Assert-True ($r.Text -match 'test gate: 1 of 4 suites FAILED in \d+s \(\d+ lanes?\): cmd /c exit 7') 'and the closing summary carries the lane count and names the command'
 
     # A repo whose whole suite is Get-TestCommands: no scripts\tests at all, and the gate still runs.
     $r = Invoke-Gate -TestsDir (Join-Path $Fixture 'no-such-dir') -CommandsFile $cmdOk
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'commands-only: a missing suites dir does not skip the gate'
     Assert-True ($r.Flat -notmatch 'test gate skipped') 'and it does not claim to have skipped'
     Assert-True ($r.Text -match 'test gate: all 1 suites passed in \d') 'the verdict counts the one command'
+    # THE EDGE THE LANE NOTE HAS TO RESPECT (issue #1318): a commands-only gate never resolves $MaxParallel
+    # -- its commands run one at a time -- so there is no pool count to state and the summary carries none.
+    Assert-True ($r.Flat -notmatch 'test gate: all 1 suites passed in \d+s \(') 'a commands-only gate states no lane count -- the pool never ran'
 
     # The two silent-success shapes the judging suffix exists to close (found in review). A bare
     # 'exit $LASTEXITCODE' coerced both to exit 0: the pure-PowerShell failure sets no native exit

@@ -37,17 +37,48 @@ Issue #1318: the green and red summary lines of Invoke-TestSuiteGate carry the s
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/native-capture-lib.ps1` -- `Invoke-TestSuiteGate`: build a `$laneNote` from the
+  resolved `$MaxParallel` (`" (N lanes)"`, singular `lane` at 1) and append it to BOTH summary lines,
+  green (`:807`) and red (`:811`), between the seconds and the closing `.`/`:`. Guarded on
+  `$suites.Count -gt 0` so a commands-only gate -- which never resolves `$MaxParallel` and runs its
+  commands one at a time -- states no lane count.
+- [x] Machine question decided NO: the comment records why -- CI passes
+  `-MaxParallel ([Environment]::ProcessorCount)` and a dev box takes `- 2`, so the lane number already
+  tells a hosted runner from a workstation without a hostname landing in a public repo's changelog.
+- [x] `scripts/sync/build-shared-scripts.ps1` -- mirrored the source change into the two plugin copies
+  (`contributing-davekjohn`, `team-shopify`); `-Check` clean.
+- [x] `scripts/tests/test-suite-gate.tests.ps1` -- asserts added/updated on the summary line: the green
+  line names the lane count (case 2, shape not value), the red line carries it before the colon
+  (cases 3 and 6), `-MaxParallel 1` prints singular `(1 lane)` (case 4), and a commands-only gate
+  carries no lane note (case 6). 52/52 pass.
+- [x] The lint gate's own wall-clock (issue #1318's second open question) is NOT touched here: it lives
+  in `gate-lib.ps1`, is a different function with its own caching/skip behaviour, and is filed
+  separately.
 
 ### TEST
 
+`scripts/tests/test-suite-gate.tests.ps1`: 52 pass, 0 fail. Siblings that name `Invoke-TestSuiteGate`
+at wiring level unaffected -- `gate-lib.tests.ps1` (111), `native-capture.tests.ps1` (60),
+`cut-release-guardrail.tests.ps1` (92) all green. `build-shared-scripts.ps1 -Check`: in sync. Full
+lint + test gate via `open-pr.ps1` below.
+
 ### DEPLOY: `fix/test-gate-summary-omits-lanes`
 
-**Score:**
+`Invoke-TestSuiteGate` printed the parallel lane count only on the opening line nobody quotes and left
+it off the summary line that gets copied into branch documents, changelog entries and commit messages
+-- so the seconds on that line were a draw from a spread of at least 4.5x with nothing stating the
+run's parallelism (issue #1318, the #1314 defect one step upstream). The lane count now rides both
+summary lines, green and red: `test gate: all 62 suites passed in 89s (16 lanes).` The machine is
+deliberately not added -- the lane number already separates a hosted runner (`ProcessorCount` lanes)
+from a workstation (`ProcessorCount - 2`). Source lib plus its two plugin mirrors;
+`test-suite-gate.tests.ps1` gains the summary-line asserts.
+
+**Score:** 2 -- a consumer who quotes a gate figure gets the lane count for free from now on, but it is
+a parenthetical on one line and nobody is blocked without it.
 
 #### What makes this deploy extra special
 
-**Score:**
+**Score:** N/A -- a one-line output change to a gate, proven by that gate's own suite.
 
 #### Pull Request
 
