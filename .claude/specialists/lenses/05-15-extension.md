@@ -305,6 +305,47 @@ infrastructure.
   decision sat on #1325 for a day as "Dave's", and both defects that would have fired on the first
   merge after it were in the tree the whole time, reachable and fixable without touching a setting.
 
+  **AND THE ANSWER IS NO — THE QUEUE'S CASE WAS DISCHARGED, NOT REJECTED** (Dave, September 3, 2026,
+  [#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355), the decision split out
+  of #1325 so it would not be buried in a closed thread). No merge queue is switched on for `main`, and
+  the three settings above stay `false`. **What settled it was the same day's CI sharding**
+  ([#1351](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1351)): the stale-certificate
+  event went from **31.9% at ~13 min** to **12.3% at ~5 min**, which is an expected **~37 seconds per
+  merge**. The queue's throughput objection had *also* been discharged by the same change — ~4 merges/hour
+  serial at 15-minute CI, against an observed trunk cadence of 2.4–4/hour, became ~12/hour — so this is a
+  no on price rather than on feasibility. Against ~37 seconds a yes buys a repo-settings change, a step-3b
+  rebuild that is dead code until the day of the flip, and a GitHub-side mechanism in the middle of a chain
+  `ship-pr.ps1` currently owns end to end.
+
+  **The generalisable half: an option whose case rests on a measured cost has to be re-argued the day that
+  cost is measured away, and the argument does not survive on its own momentum.** The queue was the
+  standing answer for a week because the number behind it was 31.9% at ~13 min. Nothing about the queue
+  changed on September 3; the problem it was sized against shrank by a factor of nearly seven in expected
+  cost — 31.9% × ~13 min is ~4.1 minutes per merge, against 12.3% × ~5 min for ~0.6 — and an option
+  carried forward without re-reading its own premise would have been built anyway.
+
+  **The third prerequisite is therefore recorded and deliberately NOT built** — the one #1355 exists to
+  keep out of a closed thread. `ship-pr.ps1` step 3b (`:885`) refuses before `gh pr merge` (`:1268`) is
+  ever reached, and nothing in `scripts/**` detects a queue: under one the staleness predicate still fires
+  at its normal rate, and the refusal is then **wrong**, because enqueueing *is* the converging remedy. The
+  queue subsumes the predicate while the predicate blocks the path to the queue, and the operator's only
+  way through would be `-SkipStaleCheck` on every ship. It stays unbuilt on this repo's
+  no-pre-emptive-fixes rule, and it is written here so a future yes inherits it rather than rediscovering
+  it at the first refusal. Its shape is still open: skip 3b when a queue is detected on the base branch,
+  drop the predicate here entirely (the queue is strictly stronger), or gate it on the flipped setting.
+
+  **And two things a future flip should not learn the hard way**, both read from `gh pr merge --help` on
+  the day of the decision. *"When targeting a branch that requires a merge queue, no merge strategy is
+  required"* — **not required is not rejected**, so whether `$mergeMethod`'s `--merge` (`ship-pr.ps1:304`)
+  is accepted against a queue-backed branch is still unestablished, and is the first thing to check on the
+  first ship after a flip. And the sentence beside it — *"If required checks have not yet passed,
+  auto-merge will be enabled"* — means a yes is plausibly **two** settings, because `allow_auto_merge` is
+  `false` here. `ship-pr` waits for green and should land on the straight-enqueue branch instead, so this
+  is the path the happy case never exercises, which is exactly why it is written down.
+
+  **What would reopen it:** the fire rate climbing back above ~25%, or CI cost past ~10 minutes. Until
+  then the queue is a priced-and-declined option, not an open question.
+
 - **`.github/workflows/claude.yml` + `.github/workflows/claude-code-review.yml`** — the two Claude Code
   workflows, added August 14, 2026 via
   [PR #658](https://github.com/DaveKJohn/claude-code-specialists/pull/658). The first answers an
