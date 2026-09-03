@@ -521,7 +521,7 @@ function Get-RosterIgnoredIds { return @() }
         @{ Function = 'Get-RosterIgnoredIds'; Lib = 'scripts\repo-config.ps1';     Scripts = @('check-roster-sync') },
         # BOTH CHANGELOG-SECTION SEAMS ARE GONE (August 5, 2026) -- Get-ChangelogTierHeadings and the legacy
         # single Get-ChangelogHeading (#178). They named which '## ' heading a merged entry was filed under,
-        # and the changelog has no section headings any more: an entry IS an H2, and the fold and release-lib
+        # and the changelog has no section headings any more: an entry IS an H3, and the fold and release-lib
         # derive the intro/list boundary from that structurally. Their absence from this list is the point --
         # if either came back, the count assert below would have to change too, which is the conversation
         # that should happen.

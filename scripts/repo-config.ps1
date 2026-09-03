@@ -162,7 +162,7 @@ function Get-RosterIgnoredIds {
 # one section per tier: '## Tier 2 - Pull Requests' and its two siblings, in that order, so a reader met
 # the changes that reach furthest first.
 #
-# CHANGELOG.md HAS NO SECTION HEADINGS ANY MORE. An entry IS an H2 and the document is an intro followed
+# CHANGELOG.md HAS NO SECTION HEADINGS ANY MORE. An entry IS an H3 and the document is an intro followed
 # by a flat list of them, ordered tier-descending then significance-descending -- which keeps exactly what
 # the three headings communicated, as an ordering rather than as structure. So there is no heading for
 # this map to name.

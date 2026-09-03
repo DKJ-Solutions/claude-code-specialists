@@ -84,7 +84,7 @@
          so history is excluded identically. Matching is case-insensitive, since PowerShell property
          access is and a working query must not be reported as broken.
 
-     13. entry-heading levels: an entry is an H2 with three named H3 sections, and a body heading may be
+     13. entry-heading levels: an entry is an H3 with two named H4 sections, and a body heading may be
          neither. At or above the entry's own level it becomes a SEPARATE entry the moment the fold pastes
          it into CHANGELOG.md -- one declaring no impact, so filed as an undeclared tier 0 -- or, at H1,
          climbs above every entry in the document (seen in v2.13.2). At the SECTION level it truncates the
@@ -549,9 +549,15 @@ function Get-HeadingSlugs {
 function Test-IsChangelogEntryFile {
     # A changelog entry file (new-branch.ps1) opens with its own heading; permanent root docs
     # (README, CHANGELOG, CONTRIBUTING, SECURITY, ...) open with an H1. Same structural signature
-    # fold-changelog-entry.ps1 keys off, and BOTH levels are accepted for the same reason it accepts
-    # them: an entry file lives only on a branch, so a branch created before August 5, 2026 still
-    # carries the older H3 shape, and the fold promotes it as it lands.
+    # fold-changelog-entry.ps1 keys off, and TWO levels are accepted for the same reason it accepts
+    # them: an entry file lives only on a branch, so a branch created under an older level still
+    # carries that era's shape, and the fold promotes it as it lands.
+    #
+    # WHICH SECOND LEVEL THAT SHOULD BE IS OPEN (#1344). The range is 'entry level PLUS one', written
+    # when an entry was an H2 and the legacy shape an H3. Since the August 26, 2026 shift it computes to
+    # H4 -- a level no entry has ever opened with -- while the H2 every entry written in the flat window
+    # (August 5-26, 2026) carries falls outside it. Test-BranchChangelogIsFilled took the other direction
+    # that day, entry level MINUS one, and is the one to compare against before changing this.
     #
     # THE LEVEL IS READ FROM THE FORMAT LIB, NOT RESTATED, and that repair is the point. This function
     # used to hardcode '^###\s' with a comment explaining that restating it was deliberate, because
@@ -1551,17 +1557,17 @@ Write-Coverage -Category 'record-query' -Checked $irChecked `
 #
 # EVERY LEVEL IS READ FROM THE FORMAT LIB (entry-scaffold-lib.ps1, via release-lib.ps1), because the levels
 # moved on August 5, 2026 and a hardcoded copy would have gone stale exactly the way this file's own
-# Test-IsChangelogEntryFile did. An entry heading is an H2; its three named sections are H3.
+# Test-IsChangelogEntryFile did. An entry heading is an H3; its two named sections are H4.
 #
 # WHAT IS NOW WRONG, AND WHY EACH HALF IS A REAL DEFECT RATHER THAN A STYLE RULE:
-#   - a heading AT OR ABOVE the entry's own level in a body. An H2 becomes a SEPARATE ENTRY -- Split-Changelog
+#   - a heading AT OR ABOVE the entry's own level in a body. An H3 becomes a SEPARATE ENTRY -- Split-Changelog
 #     splits on exactly that level -- and the phantom carries no impact table, so it reads as an undeclared
 #     tier 0 and gets its own block in the record. An H1 climbs above every entry in the document.
 #   - a SECTION-LEVEL heading that is not one of the entry's declared sections. This half is new with the
 #     format, and it is not cosmetic: Get-EntrySectionBody ends a section at the next heading of that level
-#     or above, so a stray H3 truncates whichever section it lands in -- and a MISTYPED section heading
+#     or above, so a stray H4 truncates whichever section it lands in -- and a MISTYPED section heading
 #     ('Who is this For') is the same shape, silently costing the entry the very declaration the tier and
-#     significance gates read. Use '#### ' or bold for a sub-heading; fix the spelling for a section.
+#     significance gates read. Use '##### ' or bold for a sub-heading; fix the spelling for a section.
 #
 # TWO PLACES, because they catch it at two different moments:
 #   - the root ENTRY FILES, which is where the author can still fix it on the PR. Line 1 is the entry's own
@@ -1588,7 +1594,7 @@ $ehSectionNames = @((Get-EntrySectionHeadings).Values) + @(Get-EntryRetiredSecti
 # every reader here takes both: entries carrying the previous one are all over CHANGELOG.md.
 $ehSectionNames += @(Get-EntryTierHigherHeading) + @(Get-EntryTierHigherRetiredHeadings)
 $ehSectionNames = @($ehSectionNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-# At or above the entry's own level: '#' .. '##' while an entry is an H2.
+# At or above the entry's own level: '#' .. '###' while an entry is an H3.
 $ehTooHighRx = '^#{1,' + $ehEntryLevel + '}\s'
 # AND THE SAME TAIL TOLERANCE THE LIB'S READERS GOT (August 19, 2026) -- this gate is one of them, and it
 # was the one left out. The 'Pull Request' heading carries the merge stamp now, so a folded entry reaches

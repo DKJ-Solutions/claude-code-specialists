@@ -324,8 +324,9 @@ if ($docSplit.Found) {
     # A tier-0 entry owes nothing, so the writer's own output must pass the gates it will meet.
     Assert-Equal 0 @(Get-EntryImpactFindings -EntryText $text).Count 'and a freshly scaffolded entry has no impact findings against it'
 
-    # THE SHAPE OF THE FILE: one H2 for the change, three H3 sections inside it. Asserted on a file the real
-    # writer produced rather than on Format-EntryBlock, because the two agreeing is the actual claim.
+    # THE SHAPE OF THE FILE: one heading for the change, its named sections one level under it. Asserted
+    # on a file the real writer produced rather than on Format-EntryBlock, because the two agreeing is
+    # the actual claim.
     $entryLines = @(($text -split "`r?`n") | Where-Object { $_.Trim() -ne '' })
     Assert-True ($entryLines[0] -match ('^#{' + (Get-EntryHeadingLevel) + '} ')) 'the entry opens with its own heading, at the entry level'
     Assert-True ($entryLines[0] -notmatch '^#{4}') 'and not one level deeper'
@@ -2212,8 +2213,9 @@ Assert-True (((Format-Development -Branch 'feat/x-v1' -Id '20260823-000000') -jo
 Assert-True ($audienceScaffold -notmatch '\{0\}') 'and the placeholder is resolved, not shipped'
 # IT STILL RESOLVES TO A NUMBER, which is the half that would fail silently. A heading the parser cannot
 # place reads as "no tier above 0" -- a claim about the change, made by a heading nobody read.
-# TODAY'S SHAPE: the entry heading IS tier 0's section, and the audience tier is an H3 under it. Built from
-# the seams rather than typed, so a level change cannot leave this assert testing yesterday.
+# TODAY'S SHAPE: the entry heading IS tier 0's section, and the audience tier sits at the entry's own
+# section level under it. Built from the seams rather than typed, so a level change cannot leave this
+# assert testing yesterday.
 $higherRead = Resolve-EntryImpact -EntryText (("#" * (Get-EntryHeadingLevel)) + " DEPLOY: ``feat/a`` " + (Get-EntryIdSeparator) + " 1`n`nwhy`n`n**Score:** 1`n`n" + ('#' * (Get-EntryTierSubLevel)) + ' ' + (Get-EntryTierHigherHeading) + "`n`nreaches them`n`n**Score:** 4`n")
 Assert-Equal 0 @($higherRead.Errors).Count 'the current shape parses without complaint in a repo that has an audience tier'
 Assert-Equal 2 (@($higherRead.Rows | Where-Object { [int]$_.Tier -eq 2 }).Count + 1) 'and resolve to this repo audience tier, so its score is not lost'

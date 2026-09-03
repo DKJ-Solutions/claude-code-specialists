@@ -19,13 +19,13 @@
     note further down says why. Get-EntryPlugins survives them: the `Plugins:` line still records
     which plugins an entry touched, and the release notes still read it.
 
-    THE FLAT CHANGELOG (Dave, August 5, 2026). CHANGELOG.md is an intro followed by ONE H2 PER CHANGE,
+    THE FLAT CHANGELOG (Dave, August 5, 2026). CHANGELOG.md is an intro followed by ONE ENTRY PER CHANGE,
     with no section headings at all -- the three '## Tier N - Pull Requests' sections and the
     '## Latest Release' block are gone. Four things follow from it in this file, and they are the whole
     of this change:
 
       * Split-Changelog parses no sections. The head is everything above the first entry heading; the
-        entries are the H2 blocks below it. There is no seam left to ask which headings count.
+        entries are the blocks at that level below it. There is no seam left to ask which headings count.
       * The TIER COMES FROM THE ENTRY, not from the heading above it. Get-PullRequestEntriesByTier reads
         each entry's impact table (falling back to the older 'Tier: N' line), which is why the fold stopped
         consuming either -- the entry is the only carrier now.
@@ -39,15 +39,17 @@
         row -- see Set-ReleaseInternalNoteLink.
 
     A CONSUMER MID-MIGRATION HAS A MIXED DOCUMENT, and this file reads only the new shape's structure.
-    That is deliberate rather than an oversight: an entry's own '### ' sections and a pre-format '### '
-    entry heading are indistinguishable, so a parser that accepted both would read every entry as four.
-    The tier DECLARATION is still read in both shapes (table or 'Tier: N'), which is the half that can be
-    recognised without ambiguity.
+    That is deliberate rather than an oversight: an entry's own sections sit exactly one level below its
+    heading, so a parser widened to accept that level too would read every entry as several. Depth alone
+    also stopped telling a PRE-FORMAT entry heading from a current one at the August 26, 2026 shift --
+    both are '### ' -- which is why that discrimination lives in Get-PreFlatChangelogRefusal, on whether
+    a block declares an entry's named sections. The tier DECLARATION is still read in both shapes (table
+    or 'Tier: N'), which is the half that can be recognised without ambiguity.
 
-    ENTRY HEADINGS ARE RE-LEVELLED AS A WHOLE, not on their first line. An entry now carries H3 sections
-    of its own, so shifting only the heading would put '### Type of change' at the same level as the entry
-    above it -- one entry rendering as four. Format-RankedEntries shifts every non-fenced heading in the
-    block by the same delta.
+    ENTRY HEADINGS ARE RE-LEVELLED AS A WHOLE, not on their first line. An entry now carries H4 sections
+    of its own, so shifting only the heading would leave those sections at the level the entry itself
+    sits at -- one entry rendering as several. Format-RankedEntries shifts every non-fenced heading in
+    the block by the same delta.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
 
@@ -411,7 +413,7 @@ function Split-Changelog {
         describing nothing.
 
         NO SECTIONS AT ALL (Dave, August 5, 2026). This parsed two sections, then N of them, and now none.
-        The document is an intro followed by one H2 per change, so the only boundary is the first entry
+        The document is an intro followed by one entry per change, so the only boundary is the first entry
         heading -- and that is derived STRUCTURALLY rather than read from a seam. Everything the seam
         version needed goes with it: the '## Releases' / '## Latest Release' lookup and its fatal throw,
         the per-section intro, the section index that let either order be valid, and the "which headings
