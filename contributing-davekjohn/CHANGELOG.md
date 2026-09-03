@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/open-pr-warn-issue-already-resolved-v1` · 20260903-121409
+
+`open-pr` now warns, before the push, when an issue the branch targets is already **CLOSED** or is
+already resolved by another **open or merged** PR -- the duplicate-work #1282 carried to a
+gate-green PR and found only at the merge conflict. The resolves gate was blind to it: it blocks
+only on a mentioned issue that is still open.
+
+A new pure helper `Get-TargetIssueWarnings` (`scripts/lib/pr-issues-lib.ps1`) takes the target
+numbers, the open-issue list open-pr already fetches, and one extra `gh pr list --search
+"<n> OR ... in:body" --state all` query, and returns one record per issue worth a word. It reads a
+rival PR body with the same `Get-ClosedIssueNumbers` the gate uses, so a bare mention does not
+count; a CLOSED rival PR (an abandoned attempt -- in #1282, the duplicate itself) and this branch's
+own PR are never reported. `open-pr.ps1` calls it in the resolves-gate block and emits one
+`Write-Warning` per record. Advisory only: a shared number or a reopened issue never blocks a PR.
+
+`new-branch.ps1` is unchanged -- it has no issue reference to check at creation, and already warns
+about a stale base "including an issue somebody else has just closed".
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an advisory line in a workflow script; no subscriber of any service notices it.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr warns when the target issue is already closed or resolved by another PR
+
+Plugins: contributing-davekjohn
+
+[PR #1288](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1288)
+
+---
+
 ### DEPLOY: `fix/drop-v1-suffix-completion-v1` · 20260903-120612
 
 `new-branch.ps1` no longer appends `-v1` to a branch name that carries no version suffix; the name is used
