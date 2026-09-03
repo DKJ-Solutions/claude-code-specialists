@@ -73,12 +73,17 @@ deliberately not added -- the lane number already separates a hosted runner (`Pr
 from a workstation (`ProcessorCount - 2`). Source lib plus its two plugin mirrors;
 `test-suite-gate.tests.ps1` gains the summary-line asserts.
 
-**Score:** 2 -- a consumer who quotes a gate figure gets the lane count for free from now on, but it is
-a parenthetical on one line and nobody is blocked without it.
+A consumer who quotes a gate figure gets the lane count for free from now on, but it is a parenthetical
+on one line and nobody is blocked without it.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:** N/A -- a one-line output change to a gate, proven by that gate's own suite.
+A one-line output change to a gate, proven by that gate's own suite -- no migration, no irreversible
+step, no visible result to judge by eye.
+
+**Score:** N/A
 
 #### Pull Request
 
