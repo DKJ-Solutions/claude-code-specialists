@@ -112,6 +112,19 @@
          The lane is printed with it, and it is advice rather than the condition it once was: step 2b has
          already moved this tree to the trunk, so the next branch belongs in a lane because that is where
          you build, not because staying here would cost you your checkout.
+     3b. HAS 'main' MOVED SINCE THE RUN THAT CERTIFIED THIS PR? (issue #1292) A required check tests
+         GitHub's merge ref roughly as it stood when the run was CREATED and is never refreshed if 'main'
+         moves afterward, so a green check can go STALE between the run and the merge -- measured at
+         31.1% of recent merges (14/45), median staleness 16.1 minutes, max 146.6 (PR #1268 itself).
+         Refuses (with -SkipStaleCheck as the valve) when 'main' gained a first-parent commit since the
+         earliest certifying run's own `created_at` -- NOT a check's `startedAt`, which under-refuses:
+         a red-team caught that the first build anchored on the later, wrong-direction timestamp.
+         With no required check named at all this step WARNS and does nothing, matching how the rest of
+         this script already treats "no ruleset" versus "unreadable"; once one IS named, every read from
+         there on (the run, its `created_at`, the fetch, the log) FAILS CLOSED, because at that point
+         there is something specific to verify and not verifying it must never read as sound. See the
+         comment at the step for the full corrected mechanism and why "the branch is behind" (#1292's own
+         filed predicate) is the wrong, wider question.
       4. TWO GATES, THEN MERGE. The step-list gate refuses while development.md has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
@@ -193,6 +206,14 @@
 .PARAMETER NoMerge
     Open the PR and stop (do not wait for CI, merge, or fold).
 
+.PARAMETER SkipStaleCheck
+    Escape valve for the step-3b certificate-staleness check (issue #1292): merge even though 'main'
+    has gained a commit since the run that certified this PR was created, OR that check could not be
+    completed at all (the run behind a required check, its 'created_at', the fetch, or the log). Use it
+    only when the situation is known-harmless (e.g. the gained commits are docs-only, or you have
+    confirmed by hand that the certificate is sound) -- the ordinary remedy (bring the branch up to date
+    and let CI re-run) is cheap and this valve skips it.
+
 .PARAMETER PollSeconds
     Poll interval (seconds) for the CI watch. Default 15.
 
@@ -224,6 +245,7 @@ param(
     [switch]$SkipTests,
     [switch]$Force,
     [switch]$NoMerge,
+    [switch]$SkipStaleCheck,
     [int]$PollSeconds = 15,
     [string]$Resolves = '',
     [switch]$NoResolves,
@@ -858,6 +880,196 @@ if ($waitReport) {
     # read") reads as a fault on a fresh repo whose owner has no prior for which parts of this toolchain
     # to trust -- and the reporter of #1083 read it as the no-ruleset case, which it is not.
     Write-Host "  waited $(Format-CheckDuration -Seconds $waitedSec) -- no readable check facts, so nothing to report about the wait" -ForegroundColor DarkGray
+}
+
+# --- Step 3b: has 'main' moved since the run that certified this PR? (issue #1292) ----------------
+# THE FILED REASON DID NOT HOLD, AND THIS FOLLOWS THE CORRECTED ONE, NOT THE ORIGINAL. #1292 reported
+# "the required check runs on the branch head", which is wrong: ci.yml triggers on 'pull_request', so
+# the check tests GitHub's MERGE REF -- the branch already merged into the base tip -- and the merge
+# result genuinely is tested. What #1292's own verification comment found instead is a green check
+# going STALE: GitHub fixes that merge ref roughly at the moment the run is CREATED and never refreshes
+# it when the base moves afterward ('pull_request' does not re-fire on that), and this repo's ruleset
+# has `strict_required_status_checks_policy: false`, so a stale green check still satisfies the gate.
+# Measured on PR #1268 (the instance): the test block PR #1268's own branch predated reached 'main' 45s
+# before #1268's own CI run finished and 14m45s after that run started, and #1268 then merged on that
+# same certificate 2h11m later.
+#
+# WHY THIS IS "HAS main MOVED SINCE THE RUN", NOT "IS THE BRANCH BEHIND main" -- #1292's own filed
+# option 2. Behind-ness at merge is the ordinary case and is harmless whenever 'main' advanced BEFORE
+# the certifying run started: the run then tested a merge ref that already held everything it needed
+# to, and refusing on it is pure friction. Measured on the last 45 merged PRs into this repo's 'main':
+# 20 (44.4%) were behind-at-merge, but only 14 (31.1%) actually had 'main' gain a first-parent commit
+# AFTER their certifying run began -- the narrower predicate that voids a certificate, and the one this
+# gate uses. Median staleness among those 14 was 16.1 minutes, max 146.6 (PR #1268 itself). Of the 14,
+# 2 carried a scripts/**/scripts/tests/** change in the window -- the subset that can actually turn the
+# trunk red -- but this gate does NOT filter on that: predicting which file a future test depends on is
+# not this script's to do, and the predicate below is already cheap enough (one fetch, one first-parent
+# log, and now one extra gh call per certifying run) that narrowing it further would trade a real safety
+# margin for a rarer refusal on no measured benefit. Repo-settings option 1 from the same issue
+# (`strict_required_status_checks_policy: true`) remains available and closes the gap completely -- it
+# is Dave's call, not this script's, and is not made here.
+#
+# THE ANCHOR IS THE CERTIFYING RUN'S OWN created_at, NOT A CHECK'S startedAt -- RE-ANCHORED AFTER A
+# RED-TEAM CAUGHT THE FIRST VERSION'S BIAS THE WRONG WAY ROUND (September 3, 2026). The first build read
+# a required check's own `startedAt`, reasoned as "conservative because queueing only pushes it LATER
+# than the true ref-fix moment, so a commit landing in that gap is rarely missed". That sentence had the
+# DIRECTION right and the CHOICE backwards: a LATER anchor makes the `git log --since=<anchor>` below
+# MISS commits that landed in the gap -- a genuinely stale certificate then reads as SOUND, which is the
+# one failure this gate exists to prevent. The gap is far larger than "sub-minute" here for two reasons
+# the original 45-PR sample could not see (it measured staleness AFTER anchoring on startedAt, so it was
+# silent on the size of the startedAt-vs-ref-fix gap itself): `windows-latest` provisioning, which every
+# run here pays, routinely costs over a minute; and "re-run failed jobs" against a flaky suite (ordinary
+# practice in this repo) re-runs the SAME commit while `startedAt` jumps forward by however long the
+# operator waited -- the gap can go from seconds to hours. Verified on a genuine re-run in this repo's
+# own history (run 33652133970): the RUN object's `created_at` stayed at 2026-09-02T15:59:52Z across a
+# re-run whose `run_started_at` moved to 21:15:50Z, over five hours later -- while the PER-ATTEMPT
+# sub-resource (`.../attempts/2`) reports ITS OWN `created_at` matching that late start, which is the
+# value that would have reintroduced the identical bias. So Get-CertifyingRunCreatedAt is fed the RUN
+# object's `created_at` (what the runs LIST/GET endpoint returns), never a per-attempt one. See its own
+# header for the full argument, including why this now favours OVER-refusing rather than under-refusing
+# -- the safe direction for a gate whose only job is catching "green PR, red trunk".
+#
+# TWO THINGS THIS DOES NOT CLAIM. A `pull_request` run exists at all only for a MERGEABLE PR -- GitHub
+# creates none for one with a merge conflict, which is harmless here: an unmergeable PR cannot be
+# shipped by this script either way, whichever gate refuses it first. And "GitHub fixes THE merge ref"
+# is this repo's own practical experience with a single-job workflow, not a documented contract --
+# different jobs of one triggering event have been observed resolving different merge commits in the
+# wild (actions/checkout#27) -- so this reasons from "a run's created_at cannot postdate its own
+# ref-fix moment", which holds regardless, rather than from a guarantee GitHub does not make.
+#
+# THE RUN ID COMES FROM DATA ALREADY IN MEMORY. $checkFactsJson's `link` field (already fetched for the
+# wait above) names the Actions run behind each check, so Get-RequiredCheckRunIds reads it rather than
+# this step searching for the run fresh -- the one NEW network call per certifying run is the `gh api
+# .../actions/runs/<id>` for its `created_at`.
+#
+# THE FAIL-CLOSED LINE MOVED WITH THE BIAS, AND IT IS DRAWN IN TWO PLACES ON PURPOSE. Not knowing which
+# check (if any) is required is a state this script already tolerates elsewhere -- Get-MergeBlockVerdict
+# itself cannot tell "this ruleset requires nothing" from "the required-check list did not read", and a
+# repo on the GitHub Free plan (documented below, "A repo with no required check at all") has NO required
+# check to protect in the first place. So $staleCheckNames.Count -eq 0 WARNS and this step is skipped --
+# refusing here would permanently block ship-pr on every repo without a ruleset, for a predicate that has
+# nothing to check in that repo. But once a required check IS named, this step knows exactly what it is
+# protecting, and every read from there on (the run id, the run's created_at, the fetch, the log) FAILS
+# CLOSED: an unresolved read at that point is not "nothing to verify", it is "something to verify that
+# could not be verified", and treating that as sound is the exact bias this whole re-anchor exists to
+# close. -SkipStaleCheck is the valve for all of it, named in every refusal below.
+if ($SkipStaleCheck) {
+    Write-Host "ship-pr: -SkipStaleCheck set -- not checking whether 'main' moved since the certifying run." -ForegroundColor DarkYellow
+} else {
+    $staleCheckNames = @()
+    if ($requiredFactsJson -and $requiredFactsJson.Trim()) {
+        try {
+            # Assign first, wrap second -- the 5.1 pitfall every parse in this file already avoids.
+            $parsedStaleNames = $requiredFactsJson | ConvertFrom-Json
+            $staleCheckNames = @(@($parsedStaleNames) | Where-Object { $_ -and $_.name } | ForEach-Object { [string]$_.name })
+        } catch {
+            $staleCheckNames = @()
+        }
+    }
+
+    if ($staleCheckNames.Count -eq 0) {
+        # NO RULESET, OR AN UNREADABLE ONE -- INDISTINGUISHABLE HERE, AND NEITHER REFUSES. See the
+        # comment above the block: with no required check named there is nothing this predicate can
+        # protect, so warning rather than refusing matches how the rest of this script already treats
+        # that exact ambiguity.
+        Write-Host "  stale-CI check: no required check name is known -- not checked (no ruleset, or unreadable; this is not a finding)." -ForegroundColor DarkGray
+    } else {
+        $staleRunIds = @(Get-RequiredCheckRunIds -ChecksJson $checkFactsJson -Names $staleCheckNames)
+        if ($staleRunIds.Count -eq 0) {
+            Write-Error @"
+stale-CI check: no GitHub Actions run could be found behind the required check(s)
+($(Format-CheckNameList -Names $staleCheckNames)) -- NOT merged (issue #1292).
+
+A required check is named, so this predicate has something to protect, but its 'link' does not name a
+resolvable Actions run (an external CI service posting its own status has no run to date-check this
+way). -SkipStaleCheck ships anyway once you have confirmed by hand that 'main' has not moved in a way
+that matters, or that the check in question is not subject to this staleness mechanism.
+"@
+            exit 1
+        }
+
+        $createdAtValues = @()
+        $createdAtReadFailed = $false
+        foreach ($runId in $staleRunIds) {
+            $runRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @('api', "repos/$repo/actions/runs/$runId", '--jq', '.created_at')
+            if ($runRead.ExitCode -eq 0) {
+                $createdAtValues += (($runRead.Output -join '').Trim())
+            } else {
+                $createdAtReadFailed = $true
+            }
+        }
+        if ($createdAtReadFailed) {
+            Write-Error @"
+stale-CI check: could not read 'created_at' for at least one run behind PR #$pr's required check(s) --
+NOT merged (issue #1292).
+
+Run id(s) asked: $($staleRunIds -join ', '). -SkipStaleCheck ships on the old certificate anyway.
+"@
+            exit 1
+        }
+
+        $certifiedSince = Get-CertifyingRunCreatedAt -CreatedAtValues $createdAtValues
+        if ($null -eq $certifiedSince) {
+            Write-Error @"
+stale-CI check: the run(s) behind PR #$pr's required check(s) reported no readable 'created_at' -- NOT
+merged (issue #1292). Run id(s) asked: $($staleRunIds -join ', '). -SkipStaleCheck ships on the old
+certificate anyway.
+"@
+            exit 1
+        }
+
+        # -DiscardStderr ON THE FETCH, and not only for tidiness: a failing git fetch echoes the remote
+        # URL, which in a repo cloned over HTTPS with a credential in the URL is a secret -- the same
+        # lesson and the same guard as new-branch.ps1's own base-freshness fetch. So this path prints
+        # nothing of git's own output; the refusal below says everything an operator can act on.
+        $fetchMain = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('fetch', 'origin', 'main', '--quiet')
+        if ($fetchMain.ExitCode -ne 0) {
+            Write-Error "stale-CI check: 'git fetch origin main' failed -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
+            exit 1
+        }
+        $sinceStr = $certifiedSince.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        # -DiscardStderr for the same reason the gh api call above carries it: this output is PARSED
+        # (it becomes $newMainCommits below), so a git warning merged into it would break the parse.
+        $mainLog = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('log', 'origin/main', '--first-parent', '--since', $sinceStr, '--pretty=format:%H')
+        if ($mainLog.ExitCode -ne 0) {
+            Write-Error "stale-CI check: could not read the history of 'origin/main' -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
+            exit 1
+        }
+
+        $newMainCommits = @($mainLog.Output | Where-Object { $_ -and "$_".Trim() })
+        $staleVerdict = Get-StaleCertificateVerdict -NewMainCommits $newMainCommits
+        if ($staleVerdict.Stale) {
+            # SUBSTRING GUARDED BY LENGTH, not assumed. -DiscardStderr above makes a non-SHA line in
+            # $newMainCommits unlikely, not impossible, and this refusal is the one place in the whole
+            # gate where a short string would otherwise turn a careful message into a raw .NET
+            # exception (Substring throwing "length must refer to a location within the string") --
+            # right before the sentence that tells the operator what to do. A short entry is shown
+            # whole rather than dropped, so the count and the list still agree.
+            $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object {
+                if ($_.Length -gt 8) { $_.Substring(0, 8) } else { $_ }
+            }) -join ', '
+            Write-Error @"
+stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
+started (issue #1292) -- NOT merged.
+
+The required check(s) ($(Format-CheckNameList -Names $staleCheckNames)) tested GitHub's merge ref as it
+stood when that run was created; anything landed on 'main' since is untested against this branch. Newest
+first: $shownShas
+
+Bring the branch up to date so CI re-runs against the current 'main', then re-run ship-pr:
+
+  git fetch origin main
+  git merge origin/main
+  <push, wait for CI to go green again, re-run ship-pr>
+
+-SkipStaleCheck ships on the old certificate anyway -- use it only when the window is known-harmless
+(e.g. the gained commits are docs-only). There is no re-run of the wait for this gate: fixing it means
+bringing the branch forward, not retrying the same read.
+"@
+            exit 1
+        }
+        Write-Host "  stale-CI check: 'main' has not moved since the certifying run -- certificate still holds." -ForegroundColor DarkGray
+    }
 }
 
 # --- Step 4: merge (no --admin: never bypass the CI gate) ----------------------------------------

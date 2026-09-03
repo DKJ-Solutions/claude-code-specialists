@@ -19,6 +19,15 @@
     for the wait to SAY which check governed it. The query cannot be tested and the selection can, so
     the selection lives here -- see that function's own header for the measurement behind it.
 
+    The third group (Get-RequiredCheckRunIds, Get-CertifyingRunCreatedAt and Get-StaleCertificateVerdict)
+    is issue #1292's corrected mechanism: a required check tests GitHub's merge ref roughly as it stood
+    when the run was created, and that ref is never refreshed if 'main' moves afterward -- so a green
+    check can go STALE between the run and the merge. Anchored on the run's own `created_at` rather than
+    a check's `startedAt` after a red-team caught the first version's bias the wrong way round (see
+    Get-CertifyingRunCreatedAt's own header). Finding the run behind a check, selecting the earliest
+    `created_at`, and deciding whether 'main' has since moved are all pure; only the git/gh reads that
+    feed them are not.
+
     Everything here is a PURE function of its input -- no git, no gh, no filesystem -- so the suite
     (scripts/tests/pr-issues.tests.ps1) can assert the whole decision table without a live remote.
     The parts that cannot be pure (asking GitHub which issues are still open, and asking it for the
@@ -1031,6 +1040,195 @@ function Get-MergeBlockVerdict {
         FailedRequired = @()
         FailedOther    = $failedOther
     }
+}
+
+function Get-RequiredCheckRunIds {
+    <#
+    .SYNOPSIS
+        The distinct GitHub Actions run ids behind a PR's NAMED checks (typically the required ones),
+        read from a `gh pr checks --json` payload's `link` field, in payload order and without
+        duplicates. Empty when none of the named checks carry a resolvable run link.
+
+    .DESCRIPTION
+        THE RE-ANCHOR ISSUE #1292's RED-TEAM FORCED (September 3, 2026): the retired
+        Get-CertifyingRunTimestamp read a check's own `startedAt` directly out of the checks payload,
+        reasoned as "conservative" on the claim that queueing only pushes it later than the moment the
+        merge ref was fixed. That reasoning had the failure DIRECTION backwards -- see
+        Get-CertifyingRunCreatedAt's own header for why -- and the fix needs the RUN behind the check
+        rather than the check's own timestamp, because it is the run's `created_at` that stays anchored
+        to the moment GitHub actually fixed the merge ref.
+
+        Get-FailedCheckRunRefs already reads this same `link` field (`.../actions/runs/<runId>/job/
+        <jobId>`) to find the run behind a FAILING check (#1103); this is the same read for a NAMED set
+        instead of a failing one. Kept separate rather than generalising that function, because its
+        callers want the JOB id too (for annotations) and this one never does -- asking gh for a run's
+        `created_at` needs only the RUN id.
+
+        A link that names no run (an external status check, or an unresolvable job/run URL) is skipped,
+        the same restraint Get-FailedCheckRunRefs applies and for the same reason: a key scraped out of
+        such a URL would address something that is not a GitHub Actions run at all. THAT SKIP IS WHY THE
+        CALLER TREATS AN EMPTY RESULT DIFFERENTLY DEPENDING ON WHAT IT ALREADY KNOWS: a required check
+        that is not a `pull_request`-triggered Actions run (an external CI service posting a commit
+        status) has no merge-ref-goes-stale mechanism to protect in the first place, which is a
+        different state from "the run exists and could not be read".
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,bucket,state,startedAt,completedAt,link` output -- the same
+        payload step 3 already reads for Get-CheckWaitReport and the failure diagnostics.
+
+    .PARAMETER Names
+        The check names to find a run id for -- typically the required check names, from whichever read
+        named them in the first place.
+    #>
+    param(
+        [string]$ChecksJson,
+        [string[]]$Names = @()
+    )
+
+    $wanted = @($Names | Where-Object { $_ -and ([string]$_).Trim() })
+    if ($wanted.Count -eq 0) { return @() }
+    if (-not $ChecksJson -or -not $ChecksJson.Trim()) { return @() }
+
+    try { $parsed = $ChecksJson | ConvertFrom-Json } catch { return @() }
+    # Assign first, wrap second -- the 5.1 pitfall every parse in this file already avoids.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.name -and ($wanted -contains [string]$_.name) })
+
+    $ids = New-Object System.Collections.Generic.List[string]
+    foreach ($r in $records) {
+        if (-not $r.PSObject.Properties['link']) { continue }
+        $link = [string]$r.link
+        if ($link -notmatch '/actions/runs/(\d+)') { continue }
+        $runId = $Matches[1]
+        if (-not $ids.Contains($runId)) { $ids.Add($runId) | Out-Null }
+    }
+    return @($ids)
+}
+
+function Get-CertifyingRunCreatedAt {
+    <#
+    .SYNOPSIS
+        The earliest 'created_at' among a set of already-fetched GitHub Actions run records -- the
+        moment (before any queueing, and stable across a re-run) closest to when GitHub fixed the merge
+        ref a required check tested. $null when none is readable.
+
+    .DESCRIPTION
+        RE-ANCHORED SEPTEMBER 3, 2026 AFTER A RED-TEAM CAUGHT THE FIRST VERSION'S BIAS (issue #1292).
+        The retired Get-CertifyingRunTimestamp read a required check's own `startedAt`, reasoned as
+        "conservative because queueing only pushes it LATER than the true ref-fix moment, so a commit
+        landing in that gap is rarely missed". That sentence had the DIRECTION right and the CHOICE
+        backwards: a LATER anchor makes the caller's `git log --since=<anchor>` MISS commits that landed
+        in the gap between the true ref-fix moment and the anchor -- so a genuinely stale certificate
+        reads as SOUND, which is the one failure mode this whole gate exists to prevent (a false SOUND
+        verdict lands a red trunk; a false STALE verdict only costs a re-run).
+
+        THE GAP IS FAR LARGER THAN "SUB-MINUTE" IN THIS REPO, for two independent reasons neither the
+        original 45-PR sample could see (that sample measured staleness AFTER anchoring on `startedAt`,
+        so it was silent on the size of the gap between `startedAt` and the true ref-fix moment):
+          - `windows-latest` runner provisioning, which every run here pays, routinely costs over a
+            minute between a run's creation and a job's `startedAt`.
+          - "Re-run failed jobs" against a flaky suite (ordinary practice in this repo) re-runs the SAME
+            commit -- GitHub does not recompute the merge ref -- while `startedAt` jumps forward by
+            however long the operator waited before re-running. The gap goes from seconds to hours.
+
+        VERIFIED RATHER THAN ASSUMED, on a genuine re-run in this repo's own history (run `33652133970`,
+        measured September 3, 2026): reading the RUN object (`GET .../actions/runs/<id>`, which is what
+        the runs LIST endpoint also returns) after a re-run reports `created_at` = `2026-09-02T15:59:52Z`
+        -- UNCHANGED from `run_attempt` 1 -- while `run_started_at` had moved to `2026-09-02T21:15:50Z`,
+        over five hours later. Reading `.../attempts/2` directly (the per-attempt sub-resource) instead
+        reports ITS OWN `created_at` of `2026-09-02T21:15:51Z`, matching its own late start -- which is
+        the value that would have reintroduced the identical bias. So the run object (or the runs list),
+        never the per-attempt one, is what a caller must read.
+
+        THE ERROR DIRECTION NOW FAVOURS OVER-REFUSING, WHICH IS THE SAFE SIDE FOR THIS GATE. A run's
+        `created_at` is at or before the moment it actually began work, so anchoring here can only make
+        the caller see a WIDER window of 'main' than the one truly at risk: a certificate this predicate
+        calls stale is never one that was actually still sound. The sole cost of being wrong is a rarer,
+        occasionally unnecessary refusal -- the direction this gate is supposed to fail in.
+
+        TWO THINGS THIS DOES NOT CLAIM, both worth stating plainly rather than assuming: a `pull_request`
+        run exists at all only for a MERGEABLE pull request -- GitHub creates none for one with a merge
+        conflict, which is harmless here because an unmergeable PR cannot be shipped by this script
+        either way. And "GitHub fixes THE merge ref" is this repo's own practical experience with a
+        single-job workflow, not a documented contract: different jobs of one triggering event have been
+        observed resolving different merge commits in the wild (actions/checkout#27), so this reasons
+        from "a run's created_at cannot postdate its own ref-fix moment" rather than from "there is
+        exactly one ref every job of a run agrees on".
+
+        PURE: the caller (ship-pr.ps1) finds which run(s) sit behind the required check(s) with
+        Get-RequiredCheckRunIds, asks gh for each run's `created_at`
+        (`gh api repos/<repo>/actions/runs/<id> --jq '.created_at'`), and hands the raw values here.
+        More than one value arises only when a ruleset requires checks from more than one distinct
+        triggering run; the earliest is the one closest to when ANY of them fixed a ref this branch is
+        being merged against.
+
+        THE ZERO-TIME CASE IS STILL GUARDED, via ConvertTo-CheckTimestamp, even though a run's
+        `created_at` is a real timestamp in every payload GitHub has been observed to send: the guard
+        costs nothing on the ordinary path and means an unreadable or placeholder value handed in by a
+        caller can never win as the earliest -- the same discipline Get-CheckWaitReport and the retired
+        Get-CertifyingRunTimestamp already applied, kept here because a zero anchor voiding EVERY
+        certificate is the one wrong answer this function must never produce.
+
+    .PARAMETER CreatedAtValues
+        Raw `created_at` values already fetched for the run(s) behind the required check(s). Unreadable
+        or zero-time entries are dropped rather than trusted.
+    #>
+    param([string[]]$CreatedAtValues = @())
+
+    $timestamps = @()
+    foreach ($v in @($CreatedAtValues | Where-Object { $_ -and ([string]$_).Trim() })) {
+        $ts = ConvertTo-CheckTimestamp -Value $v
+        if ($null -ne $ts) { $timestamps += $ts }
+    }
+    if ($timestamps.Count -eq 0) { return $null }
+    return (@($timestamps | Sort-Object)[0])
+}
+
+function Get-StaleCertificateVerdict {
+    <#
+    .SYNOPSIS
+        Whether commits found on 'main' since the certifying run void this PR's CI certificate --
+        issue #1292's corrected predicate, replacing "the branch is behind" with "did 'main' move
+        since the run that certified it".
+
+    .DESCRIPTION
+        MEASURED, NOT GUESSED (issue #1292, September 3, 2026). The filed report proposed refusing a
+        branch that is BEHIND 'main' at merge time; verification found that predicate over-fires --
+        behind-ness at merge is the ordinary case in this repo (20 of the last 45 merged PRs, 44.4%)
+        and is harmless whenever 'main' advanced BEFORE the certifying run started, which most of it
+        did. The predicate that actually voids a certificate is narrower and strictly implied by
+        behind-ness:
+
+            has 'main' moved SINCE the run that went green?
+
+        Measured on the same 45 merged PRs: 14 (31.1%) had 'main' gain a first-parent commit after
+        their certifying run began -- the true fire rate of this gate -- with a median staleness of
+        16.1 minutes and a max of 146.6 (PR #1268 itself: the test block its own branch predated
+        reached 'main' 45s before #1268's run finished and 14m45s after that run started, and #1268
+        then merged on that same certificate 2h11m later). Of the 14, only 2 carried a
+        scripts/**/scripts/tests/** change in the commits 'main' gained -- the subset that could
+        actually turn the trunk red -- but this verdict does NOT filter on that: predicting which file
+        a future test depends on is not this script's to do, and the corrected predicate is already
+        cheap enough (one fetch, one first-parent log) that narrowing it further would trade a real
+        safety margin for a rarer refusal on no measured benefit.
+
+        PURE: the caller does the reading (`git fetch origin main`, then `git log origin/main
+        --first-parent --since=<Get-CertifyingRunCreatedAt's answer>`) and hands the resulting SHA list
+        here. Nothing here touches git or gh, so the verdict is asserted without a live remote -- the
+        same split Get-MergeBlockVerdict and Get-CheckWaitReport already follow in this file.
+
+    .PARAMETER NewMainCommits
+        The SHAs of first-parent commits on 'main' at or after the certifying run's own `created_at`
+        (Get-CertifyingRunCreatedAt), newest first (the order `git log` already produces). Empty (not
+        $null) means "main has not moved" -- the caller's own read decides that; this only counts what
+        it is handed.
+    #>
+    param([string[]]$NewMainCommits = @())
+
+    $commits = @($NewMainCommits | Where-Object { $_ -and ([string]$_).Trim() } | Select-Object -Unique)
+    if ($commits.Count -eq 0) {
+        return [pscustomobject]@{ Stale = $false; Count = 0; Commits = @() }
+    }
+    return [pscustomobject]@{ Stale = $true; Count = $commits.Count; Commits = $commits }
 }
 
 function Get-FailedCheckRunRefs {
