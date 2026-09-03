@@ -673,7 +673,11 @@ function Invoke-TestSuiteGate {
         queue positions 3-4 where they start at t0: a shard whose longest file was 183s took 183s, and one
         whose longest was 206s took 207s. So a sharded job is max(longest file) plus its provisioning, and
         no partition of whole files can beat its own longest member -- which is the same wall a
-        duration-aware bin-pack would reach, so recording durations to feed one buys nothing here.
+        duration-aware bin-pack would reach, so recording durations to FEED ONE buys nothing here.
+        RECORDING THEM FOR A DIFFERENT REASON DOES, and this function now does it (see below). A partition
+        cannot beat its longest file, but that only helps once you know WHICH file that is -- and #1358's
+        answer to that was wrong in both directions until the gate began reporting it: it named the wrong
+        suite as the heaviest, and it put seven others outside a band they are in.
         SO THE TWO PARAGRAPHS DO NOT DISAGREE, AND WHICH ONE APPLIES IS A QUESTION OF SCALE. Adding lanes
         (more shards) pays while a shard's lane-seconds exceed its longest file, and stops dead at that
         file. The trap is quoting the contention-bound paragraph after the shard count has already crossed
@@ -684,8 +688,10 @@ function Invoke-TestSuiteGate {
         took ~12.6% off all four by removing a duplicated AST walk from the script they invoke, without
         touching this function or any partition. A caller staring at a slow required check should price
         that before buying another runner.
-        ONE WARNING FOR WHOEVER RE-MEASURES, because this function is what makes the mistake easy: it
-        records no per-suite duration and buffers a suite's output until that suite completes, so a log
+        ONE WARNING FOR WHOEVER RE-MEASURES: READ THE TABLE THIS FUNCTION PRINTS, NOT THE LOG TIMESTAMPS.
+        Every suite's duration and the offset at which its lane opened are reported after the pool (#1364,
+        stated again below). THE WARNING OUTLIVED THE FIX because the misleading timestamps did: this
+        function buffers a suite's output until that suite completes, so a log
         timestamp is a FINISH time. Subtracting the shard's start yields a duration only for a suite that
         started at t0 -- queue positions 1..MaxParallel. Do it further down the queue and you are reading
         lane wait as runtime; that error put two files on a five-file "plateau" that has four, one of them

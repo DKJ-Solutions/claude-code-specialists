@@ -1059,8 +1059,12 @@ It retains 25,476 AST nodes for ~72MB of heap, which is the cost and is stated a
 
 #### The reconstruction trap — two of the five were never plateau members
 
-**The gate records no per-suite duration**, and it buffers each suite's output until that suite completes:
-`entry-scaffold`'s log lines all land within 2.7ms of each other. So a log timestamp gives a suite's
+**The gate recorded no per-suite duration** — it does now, and closing that is what
+[PR #1364](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1364) was for; read
+[the section below](#the-instrument-and-what-it-immediately-changed-september-3-2026) for what the first
+recording showed. The trap itself is unchanged and still worth knowing, because the misleading timestamps
+are still in every log: the gate buffers each suite's output until that suite completes, so
+`entry-scaffold`'s log lines all land within 2.7ms of each other. A log timestamp gives a suite's
 **finish** time, and subtracting the shard's start is a duration only for a suite that started at `t0`.
 
 With 4 lanes that means queue positions 1-4. Taken by stride over the 65-suite pool, the four
@@ -1077,11 +1081,59 @@ narrower than "check the numbers": a reconstruction is only as good as its `t0` 
 stated that assumption correctly for the four files it verified and then silently extended the method to two
 it had not.
 
-**What is left, and it is a decision rather than a measurement.** Splitting the four is still the only lever
-that reaches the report's ~195s target, and it is now a smaller job than filed: four files, not five, with
-the floor already ~30s lower. It redistributes rather than shrinks, and #714's pieces regrew, so it buys
-time once. Not built here -- the size of that change is Dave's call, and #1358 carries the corrected
-pricing.
+**And "four, not five" is itself only as good as the reconstruction it corrected** — see the section below,
+where the recorded numbers make the band about a dozen suites. The correction above stands as far as it
+goes: `entry-scaffold` really is not a member, and the four `check-plugin-integrity-*` figures really were
+exact. What it got wrong is the same thing it was correcting for, one level up — it re-derived a *membership
+list* from the same reconstructions instead of waiting for the instrument.
+
+### The instrument, and what it immediately changed (September 3, 2026)
+
+The section above ends by proposing a decision off reconstructions. **@maikel-bwj retitled
+[#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358) instead** — from a
+five-file plateau at named seconds to *"the band of heavy suite files ... **first make the gate record
+per-suite durations**"* — and that ordering was right. PR #1364 built it: `Invoke-TestSuiteGate` records
+each suite's duration **and the offset at which its lane opened**, prints them slowest first, and marks the
+one that set the makespan.
+
+**The first recorded run reordered the top of the list.** All 65 suites, **30 lanes on a 32-core
+workstation**, 91s total (reproduced at 92s):
+
+| suite | duration | lane opened |
+|---|---|---|
+| `new-branch.tests.ps1` | **89.7s** | +1.1s **← set the makespan** |
+| `check-plugin-integrity-links.tests.ps1` | 83.8s | +0.2s |
+| `check-plugin-integrity-docs.tests.ps1` | 82.8s | +0.2s |
+| `fold-changelog.tests.ps1` | 78.2s | +0.3s |
+| `check-plugin-integrity-entries.tests.ps1` | 78.1s | +0.2s |
+| `sync-main.tests.ps1` | 69.4s | +13.8s |
+| `prune-merged.tests.ps1` | 65.1s | +2.8s |
+| `check-plugin-integrity-commands.tests.ps1` | 61.1s | +0.2s |
+| `bootstrap-drift.tests.ps1` | 58.8s | +0.1s |
+| `roster-sync.tests.ps1` | 57.7s | +6.4s |
+| `shared-scripts.tests.ps1` | 54.3s | +12.5s |
+| `script-contract.tests.ps1` | 53.7s | +8.9s |
+
+Two facts nothing could see before: **`new-branch` sets the makespan**, where #1358 had it second behind
+`check-plugin-integrity-links`; and **seven suites in that band appear in none of the five** —
+`fold-changelog`, `sync-main`, `prune-merged`, `bootstrap-drift`, `roster-sync`, `shared-scripts`,
+`script-contract`. The retitle's wording is the accurate one.
+
+**State the lane count with any figure from this table.** It is a 30-lane workstation reading, not the
+4-lane shape the required check runs, and #1351 measured 3.7x between those regimes. CI prints its own
+table per shard now, so the comparison is a log read.
+
+**The lesson, which is Nolan's and not a one-off.** Two rounds of this issue were spent arguing about which
+files are expensive while the instrument that answers it did not exist and was cheap to build. A
+measurement whose method carries an unstated assumption does not merely risk being wrong — it *reads as
+data*, so the argument moves to what to do about it rather than to whether it is true. **Build the
+instrument before the argument**, and where a figure has to be derived, print the derivation's assumption
+next to it: the reason the table carries the lane offset at all is that a duration alone cannot be checked
+against the pool's makespan by a reader who does not know when the suite began.
+
+**Still open on #1358:** the split, now genuinely unpriced again. It is not four files and not five, the
+makespan-setter is a different suite than the report named, and nothing about it should be decided off this
+workstation table rather than a 4-lane CI one.
 
 ### Boundaries with the other roles
 

@@ -140,10 +140,20 @@ jobs:
       # twice (see Get-PsScriptCommandAsts in check-plugin-integrity.ps1): those four suites are ~100% lint
       # invocations -- 52 of them in the heaviest, at ~1.12s each on a workstation -- and they measured
       # 58.7/55.7/51.0/34.5s before and 50.8/48.9/44.7/30.3s after, with every assert count unchanged.
-      # BEWARE THE RECONSTRUCTION TRAP if you re-measure: the gate records no per-suite duration and
-      # buffers each suite's output until it completes, so a log timestamp gives the FINISH time.
-      # Subtracting the shard start is only valid for a suite in queue positions 1-4; do it for one
-      # further down the queue and you are reading its lane wait as its runtime.
+      # DO NOT RECONSTRUCT DURATIONS FROM LOG TIMESTAMPS -- THE GATE PRINTS THEM (#1358, PR #1364). Each
+      # shard's log carries a 'per-suite durations, slowest first' table holding every suite's duration,
+      # the offset at which its lane opened, and a marker on the one that set the makespan. Read that.
+      # WHY THE WARNING IS STILL HERE now that the table exists: the gate buffers each suite's output
+      # until that suite completes, so a log timestamp is a FINISH time and always was. Subtracting the
+      # shard start from it is a duration only for a suite in queue positions 1-4 -- and that is how the
+      # figures on #1358 came to name a five-file plateau, by extending the method to two suites sitting
+      # 5th and 9th in a 4-lane queue and reading their lane wait as runtime. The table is the answer to
+      # that; the timestamps are still there and still misleading.
+      #
+      # AND THE CORRECTED COUNT IS NOT 'FOUR' EITHER -- do not quote one from this comment's own history.
+      # The first RECORDED run named a different heaviest suite than #1358 did and put roughly a dozen
+      # files in the expensive band, seven of which appear in none of the five. Anything about which files
+      # are heavy comes from the table on a 4-lane run, not from a workstation and not from prose.
       #
       # fail-fast IS FALSE, DELIBERATELY. The default would cancel the surviving shards the moment one goes
       # red, which costs exactly the information this repo needs most from a red gate: these suites have a
