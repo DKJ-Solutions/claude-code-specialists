@@ -457,13 +457,13 @@ to 5. That is **tier 0 plus the single audience tier** `Get-ReleaseAudienceTier`
 August 19, 2026 neither says so out loud:
 
 ```text
-## DEPLOY: feat/short-name
+### DEPLOY: feat/short-name
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 Consumers must re-add the marketplace under its new name.
 
@@ -471,9 +471,9 @@ Consumers must re-add the marketplace under its new name.
 ```
 
 **Tier 0 is in every entry and is the one tier that can never be `N/A`** — every change reaches the people
-maintaining the repo at least a little. It answers directly under the DEPLOY heading; the `###` heading
+maintaining the repo at least a little. It answers directly under the DEPLOY heading; the `####` heading
 beside it means whichever audience tier the repo stated. A repo that has stated **none** gets the
-older shape instead, a `#### Tier N` sub-section per tier the model has, tier 0 among them. This block
+older shape instead, a `##### Tier N` sub-section per tier the model has, tier 0 among them. This block
 showed `#### Tier 1` above `#### Tier 2` and no tier 0 at all until August 13, 2026, which is a shape the
 scaffolder writes under no configuration.
 
