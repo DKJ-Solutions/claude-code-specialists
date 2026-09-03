@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/test-gate-summary-omits-lanes` · 20260903-162227
+
+`Invoke-TestSuiteGate` printed the parallel lane count only on the opening line nobody quotes and left
+it off the summary line that gets copied into branch documents, changelog entries and commit messages
+-- so the seconds on that line were a draw from a spread of at least 4.5x with nothing stating the
+run's parallelism (issue #1318, the #1314 defect one step upstream). The lane count now rides both
+summary lines, green and red: `test gate: all 62 suites passed in 89s (16 lanes).` The machine is
+deliberately not added -- the lane number already separates a hosted runner (`ProcessorCount` lanes)
+from a workstation (`ProcessorCount - 2`). Source lib plus its two plugin mirrors;
+`test-suite-gate.tests.ps1` gains the summary-line asserts.
+
+A consumer who quotes a gate figure gets the lane count for free from now on, but it is a parenthetical
+on one line and nobody is blocked without it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A one-line output change to a gate, proven by that gate's own suite -- no migration, no irreversible
+step, no visible result to judge by eye.
+
+**Score:** N/A
+
+#### Pull Request
+
+Invoke-TestSuiteGate summary line names its lane count
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1320](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1320)
+
+---
+
 ### DEPLOY: `docs/gate-figure-scope-and-machine-v1` · 20260903-161326
 
 A wall-clock figure for a gate reads as though it describes the gate. It does not: it describes one run,
