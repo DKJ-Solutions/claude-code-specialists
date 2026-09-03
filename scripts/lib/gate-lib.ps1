@@ -584,17 +584,33 @@ function Invoke-WorkflowGates {
                 # makes for the suites. -WorkingDirectory is NOT optional: Start-Process starts the child
                 # in [Environment]::CurrentDirectory, which does not follow Set-Location, so the caller's
                 # own location has to be passed for the child to see the tree the bare call gave it.
+                # WALL-CLOCK, so a "the full gate cost ~Ys" figure has a lint half to name beside the
+                # test half's "all N suites passed in Xs" (issue #1319). #1314 measured what its absence
+                # costs -- three "full gate" figures for one test set, one bundling an unstated lint
+                # cost and two, by their wording, not. Timed ONLY around the real run: the evidence-cache
+                # fast path above prints "skipped" and no seconds, the way Invoke-TestSuiteGate's own
+                # cache branch does.
+                $lintStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
                 $lintRun = Start-Process -FilePath 'powershell' `
                     -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $lintPath + '"')) `
                     -NoNewWindow -Wait -PassThru -WorkingDirectory (Get-Location).Path
+                $lintStopwatch.Stop()
+                # Invariant-culture format, for the reason Format-GateSeconds (native-capture-lib.ps1)
+                # states at length (issue #1159): '-f' renders in the current culture, so above 1000s a
+                # Dutch machine prints the seconds a thousandfold off and still plausible. gate-lib does
+                # not dot-source native-capture-lib -- its callers supply both libs -- so the one-line
+                # format is repeated here rather than that helper borrowed across a lib boundary.
+                $lintSeconds = [string]::Format([System.Globalization.CultureInfo]::InvariantCulture, '{0:N0}', $lintStopwatch.Elapsed.TotalSeconds)
                 if ($lintRun.ExitCode -ne 0) {
                     # A RED IS ONLY A FINDING IF THE TREE HELD STILL FOR IT (issue #1145). Printed before
                     # the error, so it frames the red rather than trailing it.
                     $movedNote = Get-GateTreeMovedNote -RepoRoot $RepoRoot -Gate 'lint' -Fingerprint $gateFingerprint -HeadMoves $gateHeadMoves -Failed
                     if ($movedNote) { Write-Warning $movedNote }
+                    Write-Host ("lint gate: integrity check FAILED in {0}s." -f $lintSeconds) -ForegroundColor Red
                     Write-Error "lint gate found errors - $FailureConsequence. Fix the errors, or run with -SkipLint to skip the gate." -ErrorAction Continue
                     return $false
                 }
+                Write-Host ("lint gate: integrity check passed in {0}s." -f $lintSeconds) -ForegroundColor Green
                 # Recorded only on a real pass. -SkipLint records nothing, deliberately: skipping a gate
                 # proves nothing about the tree, and writing evidence there would make the escape valve
                 # silently suppress the NEXT run's gate too.
