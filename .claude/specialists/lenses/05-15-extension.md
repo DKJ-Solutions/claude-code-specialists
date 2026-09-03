@@ -87,7 +87,28 @@ infrastructure.
   asserts that keep it from coming back are in `cut-release-guardrail.tests.ps1`. It passes
   `-MaxParallel ([Environment]::ProcessorCount)` deliberately: the lib's default holds two cores back so a
   developer's machine stays usable, and on a four-core runner nobody is sitting at, that reservation would
-  cost half the box. Since July 15, 2026, the repo ruleset
+  cost half the box.
+
+  **EVERY PUSH TO `main` IS ITS OWN CONCURRENCY GROUP, and before
+  [#1294](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1294) half of them were never
+  gated at all.** The block used to key one group on `github.ref`, i.e. one group for the whole trunk,
+  and leaned on `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` to keep the fold commit
+  from cancelling the merge commit's run. It did not, and could not — the portable half of why is a hard
+  rule in [Sylvester's manual](../../../plugins/teams/team-alpha/manuals/05-15-manual.md#sylvesters-hard-rules):
+  the field governs the *in-progress* run, while a group also drops a **pending** one when a third
+  arrives. **What made it bite here is this repo's own trunk rhythm**, which is the repo-specific half:
+  `ship-pr` pushes twice per branch 6s apart, a run takes ~15 minutes, and `windows-latest` queues for
+  seconds — so the merge commit's run had not started when the fold displaced it. Measured
+  September 3, 2026 over the last 28 `merge:` commits: **14 `success`, 14 `cancelled`**, the cancelled
+  ones with zero jobs allocated. And it was never only folds displacing merges — `0ab47d2d`, `2c54de74`
+  and `e0175372` went down in one chain, so on a busy day only the **last push of each ~15-minute
+  window** ran. The tip was always gated; nothing between it and the previous tip was, which is why that
+  day's two `failure` runs on `main` named no commit. The repair keys pushes on `github.sha` and leaves
+  the PR half exactly as #932 measured it. **It costs runner minutes on purpose** — 27 runs where 13 ran
+  — and whether the *fold* commit needs a full run of its own is deliberately left open
+  ([#1300](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1300)).
+
+  Since July 15, 2026, the repo ruleset
   **`main-ci-gate`** (renamed from `main-ci-poort` by Dave on July 26, 2026; found at GitHub →
   Settings → Rules) enforces that gate as a **required status check**: a PR to `main` only merges
   on a green `lint-en-tests` job. The bypass list is what keeps the direct fold/release commits on
@@ -167,8 +188,11 @@ infrastructure.
   plugin) tells the next specialists session at start rather than leaving it to Chris's manual
   `verify-stand-against-repo` check. Neither calls `gh`: a written entry on the trunk is folded or it is a
   defect, whatever the branch's PR state, and the fold is local. The one false positive it can raise is the
-  ship window — `ship-pr` pushes the merge commit and then, seconds later, the fold commit — which the CI
-  workflow's `cancel-in-progress: true` swallows and a session reads as a finding that resolves itself. The
+  ship window — `ship-pr` pushes the merge commit and then, seconds later, the fold commit — which **this
+  workflow's own** `cancel-in-progress: true` swallows and a session reads as a finding that resolves
+  itself. Read *this* workflow's, not `ci.yml`'s: since
+  [#1294](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1294) `ci.yml` keys every push to
+  the trunk on its own commit, so it swallows nothing. The
   detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`, one definition for both callers.
 
   **#1244 IS OPEN AGAIN, AND WHAT REOPENED IT IS THE MIS-READING DIRECTLY ABOVE** — so the cost is still

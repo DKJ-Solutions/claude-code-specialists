@@ -6386,9 +6386,10 @@ function Get-UnfoldedTrunkEntry {
         THE ONE FALSE POSITIVE IT CAN RAISE is the ship window. ship-pr.ps1 pushes the merge commit and
         then, seconds later, the fold commit that clears the document. Between the two the just-merged
         document is on the trunk and this reports it -- correctly, because the trunk genuinely carries
-        an unfolded entry at that instant. The CI workflow's cancel-in-progress swallows the merge
-        commit's run; a session that starts in that window gets an accurate finding that the next
-        commit resolves.
+        an unfolded entry at that instant. unfolded-entry.yml's own cancel-in-progress swallows the
+        merge commit's run there -- ci.yml's does not, and since #1294 cannot: each push to the trunk
+        runs in a group of its own. A session that starts in that window gets an accurate finding
+        that the next commit resolves.
 
         WIDE READING OF THE DECLARED BRANCH, deliberately. Every file considered here sits at the fixed
         development-*.md path and is a known-shape branch document, so the -OpeningHeadingOnly narrowing

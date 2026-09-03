@@ -126,6 +126,24 @@ and safe hook construction.
   skill counters `/reload-plugins`/`/reload-skills` print are not evidence either way (see
   INSTALL.md's "Staying up to date" section for the detail). Note: this applies to plugin
   content; changes to `CLAUDE.md` imports and settings still load only on a restart.
+- **A `concurrency` group's guarantee is not what `cancel-in-progress` says — that field governs only
+  the IN-PROGRESS run.** A group holds at most one running job plus one *pending* one, and when a third
+  arrival queues into it, GitHub drops the waiting run without consulting the field at all. So
+  `cancel-in-progress: false` does **not** mean "every event in this group gets processed"; it means
+  "a running job is not killed". Anything queued behind it is still expendable.
+  **The failure mode is a guard that reads as deliberate and does nothing.** Measured in this system's
+  own source repo (issue #1294): `ci.yml` made the field conditional specifically so a trunk push would
+  never cancel another, with a comment naming the hazard and the stake — and half the trunk's merge
+  commits were cancelled anyway, 14 of the last 28, because on a runner that queues for seconds the
+  displaced run had never started. The proof is in the run record: the cancelled runs had **zero jobs
+  allocated**, so they were dropped from the queue rather than killed mid-flight, which no reading of
+  `cancel-in-progress` covers. Nothing was red, no check reported, and the comment above the block was
+  the most convincing thing in the file.
+  **So when a group must not lose an event, key the group so those events do not share one** — per
+  commit, per delivery id, per whatever makes each arrival its own group — rather than expressing the
+  intent in a field that cannot carry it. Where a shared group is genuinely wanted, say in the comment
+  which arrivals are expendable, because some will be. And verify it the only way that works: read the
+  conclusions of the runs the group has actually produced, not the YAML.
 
 ## Nine PowerShell traps that produce well-formed wrong output
 

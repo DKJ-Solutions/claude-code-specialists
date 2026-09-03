@@ -20,13 +20,19 @@
 # push is what would trigger it). So this reports on every push to main and blocks nothing: a red run,
 # plus GitHub's failure e-mail, is the signal that a fold was skipped.
 #
-# cancel-in-progress: true, WHICH IS THE OPPOSITE OF ci.yml's push-to-main choice, and safe here for
-# the reason ci.yml's is not. ship-pr pushes to main twice per branch -- the merge commit, then the
-# fold commit that clears the document, measured 6s apart on #932. Between the two, main genuinely
-# carries an unfolded entry and this check is correctly red; the fold commit's push then supersedes
-# that run. ci.yml cannot cancel its own merge-commit run because a cancelled check is not a passing
-# one and `lint-en-tests` is the required check the merge gates on. This check is required by nothing,
-# so cancelling the superseded run just swallows the ship window instead of leaving a stale red.
+# cancel-in-progress: true AND A GROUP SHARED ACROSS THE TRUNK -- both the opposite of ci.yml, which
+# since #1294 keys each push to main on its own commit precisely so that no run of its is displaced.
+# ship-pr pushes to main twice per branch -- the merge commit, then the fold commit that clears the
+# document, measured 6s apart on #932. Between the two, main genuinely carries an unfolded entry and
+# this check is correctly red; the fold commit's push then supersedes that run, and HERE that is the
+# behaviour wanted. ci.yml needs every trunk commit gated because a cancelled check is not a passing
+# one; this check is required by nothing and gates no commit, so swallowing the superseded run beats
+# leaving a stale red on a state that resolved itself seconds later.
+#
+# THE SUPERSEDING IS NOT ALL THIS VALUE'S WORK, which is what #1294 turned out to be about: a
+# concurrency group also drops a PENDING run when a third arrives, whatever `cancel-in-progress` says.
+# Here both paths reach the same wanted outcome, so the value stays `true` -- it states the intent
+# rather than resting on queue mechanics that were never written down as a guarantee.
 #
 # WINDOWS, LIKE ci.yml and branch-entry.yml, and for the same reason: the scripts target Windows
 # PowerShell 5.1, so they run under `shell: powershell` (5.1) rather than pwsh.
