@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/branch-document-name-and-headings · 20260903-193027
+
+The branch's development document is named after the branch and nothing else, and both of its headings
+lost their decoration. Where a branch got `contributing-davekjohn/development-feat-thing-v1.md`, headed
+`` ## Development: `feat/thing-v1` · 20260903-152650 ``, it now gets
+`contributing-davekjohn/feat-thing-v1.md`, headed `## feat/thing-v1`. The entry heading keeps its title
+word and loses the backticks:
+`### DEPLOY: feat/thing-v1`. Asked for in
+[#1335](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1335).
+
+**Everything removed was load-bearing, which is where the work actually was.** The backticks were this
+format's only delimiter and four readers used them to find where the branch name starts and ends -- the
+idempotency and resolution test, the splitter that finds the DEPLOY heading, the reader that takes the
+change type off the branch prefix, and the duplicate-fold guard. Each now reads the bare shape with a
+narrower anchor than "a word in backticks somewhere on the line": the entry's heading by its title word
+and colon, the document's by the heading being nothing but a branch-shaped token. And the `development-`
+prefix was quietly making `development-*.md` a glob that could not reach this folder's own pages, so that
+narrowing is now stated -- `ReservedNames` excludes `CHANGELOG.md`, `README.md` and `CONTRIBUTING.md` from
+one shared sweep, `Get-PerBranchDocumentRels`, which four call sites read instead of repeating the glob.
+`CHANGELOG.md` is the one that makes it load-bearing: it is full of folded DEPLOY headings, so it declares
+a branch by every test in the lib, and the fold moves a document into the changelog and then deletes it.
+
+Every earlier shape is still read, exactly as at the six renames before this one: a branch open across
+this change keeps its prefixed filename, its backticked headings and its creation stamp, and folds
+normally.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer's open branches are untouched -- they keep the old name and the old headings, and the readers
+still recognise both -- so the update arrives without a migration. New branches get the shorter name and
+the plainer headings. The creation stamp is gone from the document heading and is not replaced: nothing
+ever read it back, and the stamp the changelog orders by is the merge stamp, which is unchanged.
+
+**Score:** 2
+
+#### Pull Request
+
+Development document: bare branch-name filename and headings
+
+Plugins: contributing-davekjohn
+
+[PR #1339](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1339)
+
+---
+
 ### DEPLOY: `fix/ship-pr-fetch-drops-diagnosis` · 20260903-184031
 
 `ship-pr.ps1`'s stale-CI check (step 3b) no longer swallows git's own words when its
