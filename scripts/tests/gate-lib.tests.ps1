@@ -495,6 +495,27 @@ try {
     Assert-True (Test-GateEvidence -RepoRoot $r15pass -Gate 'lint') 'and records the lint pass'
     Assert-True (-not (Test-GateEvidence -RepoRoot $r15pass -Gate 'tests')) 'but -SkipTests records no test evidence -- the escape valve proves nothing about the tree'
 
+    # 15d-clock. THE LINT GATE PRINTS ITS OWN WALL-CLOCK (issue #1319). Without it a "the full gate
+    # cost ~Ys" figure has a number for the test half ("all N suites passed in Xs") and nothing for
+    # the lint half. Captured off the information stream (6>&1); the boolean the function returns
+    # still flows down the pipe as the last element and is not what these cases read.
+    $r15clock = New-GitFixture
+    Set-FixtureFile -Dir $r15clock -Name $script:FixtureLintScript -Content "exit 0`n"
+    $clockPass = & { Invoke-WorkflowGates -RepoRoot $r15clock -SkipTests -Context 'test' -FailureConsequence 'x' } 6>&1 2>$null | Out-String
+    Assert-True ($clockPass -match 'lint gate: integrity check passed in \d+s\.') 'a real lint run prints its own elapsed seconds, the way the test gate does'
+
+    # The second run is served from the evidence cache: it prints the skip line and NO seconds, since
+    # nothing ran to time -- the same distinction Invoke-TestSuiteGate makes on its own cache branch.
+    $clockCached = & { Invoke-WorkflowGates -RepoRoot $r15clock -SkipTests -Context 'test' -FailureConsequence 'x' } 6>&1 2>$null | Out-String
+    Assert-True ($clockCached -match 'lint gate: already proved against this exact tree -- skipped\.') 'the cache-hit fast path still prints its skip line'
+    Assert-True ($clockCached -notmatch 'check (passed|FAILED) in \d+s\.') 'and prints no elapsed figure -- nothing ran to time'
+
+    # A failing lint run reports its seconds too, so both verdicts carry the number.
+    $r15clockFail = New-GitFixture
+    Set-FixtureFile -Dir $r15clockFail -Name $script:FixtureLintScript -Content "exit 1`n"
+    $clockFail = & { Invoke-WorkflowGates -RepoRoot $r15clockFail -SkipTests -Context 'test' -FailureConsequence 'x' } 6>&1 2>$null | Out-String
+    Assert-True ($clockFail -match 'lint gate: integrity check FAILED in \d+s\.') 'a failing lint run also prints its elapsed seconds'
+
     # 15e. THE SHAPE OF THE RETURN VALUE ITSELF -- a CRITICAL regression found in code review and
     # fixed the same day (August 30, 2026). A lint gate invoked as `& powershell -File $lintPath`
     # was safe as a top-level statement in open-pr.ps1: the child's stdout went straight to the

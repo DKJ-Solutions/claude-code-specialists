@@ -34,6 +34,15 @@
     the run is how the ship window (main genuinely carrying an unfolded entry for ~6s) stops reading as
     a stale red. An assert on each keeps a later sweep from "harmonising" the two.
 
+    THE FOLD COMMIT'S SUITES ARE SKIPPED (#1300), and that lives here because it is the other half of
+    the #1294 trade-off the concurrency block above is about: per-commit keying gated every trunk
+    commit and doubled the runner minutes, and the fold commit's suite run is the part of that which
+    tests nothing new. The condition is COMMIT-KIND (head_commit.message starts with 'fold:') and not
+    a path filter, because paths-ignore would also skip a merge commit whose branch touched only the
+    two paths a fold touches. The asserts pin: the suite step carries that `if:`, it is gated on the
+    push event so a PR is untouched, and the lint step above it is NOT gated -- the fold commit still
+    carries a green `lint-en-tests` of its own.
+
     Pure ASCII (repo convention for .ps1).
 #>
 $ErrorActionPreference = 'Stop'
@@ -75,6 +84,29 @@ Assert-True ($ci -notmatch 'cancel-in-progress:\s*true\s*$') 'and it is not a pl
 # look considered. Naming the issue is what lets a reader find the 14/14 measurement.
 Assert-True ($ci -like '*#1294*') 'the block cites the issue whose measurement explains the key'
 Assert-True ($ci -like '*PENDING*') 'and states the mechanism (a pending run is dropped), which is the part cancel-in-progress does not cover'
+
+Write-Host "== ci.yml: the fold commit runs lint only, not the suites (#1300) ==" -ForegroundColor Cyan
+
+# The suite step is the expensive half, and it is the one skipped on a fold commit. Match the step by
+# its name so the assert points at the right block, then check the condition sits on it.
+$suiteStep = [regex]::Match($ci, '(?ms)- name: Test suites.*?shell: powershell')
+Assert-True ($suiteStep.Success) 'the Test suites step is still in ci.yml'
+Assert-True ($suiteStep.Success -and $suiteStep.Value -match "if:[^\r\n]*startsWith\(github\.event\.head_commit\.message,\s*'fold:'\)") `
+    'the Test suites step is skipped when the head commit is a fold: commit'
+Assert-True ($suiteStep.Success -and $suiteStep.Value -match "if:[^\r\n]*github\.event_name == 'push'") `
+    "and that skip is gated on the push event, so a PR still runs the suites (the required check is untouched)"
+
+# The lint step must NOT carry the condition -- it is what keeps a green lint-en-tests on the fold
+# commit, the trunk tip after a ship, and re-scans CHANGELOG.md's links once the entry has landed.
+$lintStep = [regex]::Match($ci, '(?ms)- name: Lint gate.*?exit \$LASTEXITCODE')
+Assert-True ($lintStep.Success) 'the Lint gate step is still in ci.yml'
+Assert-True ($lintStep.Success -and $lintStep.Value -notmatch "startsWith\(github\.event\.head_commit\.message") `
+    'the Lint gate step is NOT skipped on a fold commit -- the fold still carries a green check of its own'
+
+# paths-ignore is the mechanism a later reader reaches for first, and it is the wrong one here: it
+# would also skip a merge commit whose branch touched only the two paths a fold touches.
+Assert-True ($ci -notmatch '(?m)^\s*paths-ignore:') 'the fold skip is not expressed as a path filter'
+Assert-True ($ci -like '*#1300*') 'ci.yml cites the issue that sized the fold-commit trade-off'
 
 Write-Host "== unfolded-entry.yml: the OPPOSITE arrangement, and correct there ==" -ForegroundColor Cyan
 

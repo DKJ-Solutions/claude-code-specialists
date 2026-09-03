@@ -270,11 +270,18 @@ finally {
 # can go stale in silence, a failing assert cannot.
 . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
 
-# Both are invoked from the plugin by a SessionStart hook, so a refusal would fail every session start in
+# Each is invoked from the plugin by a SessionStart hook, so a refusal would fail every session start in
 # this repo. That reason is specific to being a hook -- it does not extend to a script somebody runs.
+#
+# check-git-identity.ps1 joined them on September 3, 2026 (issue #1315) on exactly that reason and no
+# other: git-identity-sessioncheck.ps1 runs it from '${CLAUDE_PLUGIN_ROOT}/scripts/lint/', which is the
+# released copy, so Assert-OwnCopy would refuse it -- and thereby the hook -- at every session start here.
+# It has no second caller: there is no CI half, deliberately, because a runner acts and commits as a bot
+# and would report a mismatch on every push.
 $guardExempt = @(
     'scripts\sync\check-roster-sync.ps1',
-    'scripts\sync\check-script-contract.ps1'
+    'scripts\sync\check-script-contract.ps1',
+    'scripts\lint\check-git-identity.ps1'
 )
 
 $entryPoints = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |

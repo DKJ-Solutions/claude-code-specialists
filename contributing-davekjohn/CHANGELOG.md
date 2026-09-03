@@ -32,6 +32,229 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/park-commit-fixture-pins-signing` · 20260903-170154
+
+`scripts/tests/park-commit.tests.ps1` no longer depends on the machine's `commit.gpgsign`: its
+fixture pins signing off, beside the `user.name`, `user.email` and `core.autocrlf` pins that were
+already there. With signing forced on and the agent not answering, the suite went `16 passed, 12
+failed` -- naming the park continuation clause, which decides nothing about signing -- and because the
+test gate is repo-wide it blocked `open-pr.ps1` on unrelated branches. It now passes 28/28 with
+signing still forced on. The lib is deliberately left signable: `Invoke-GitParkCommit` commits the
+user's real work under their own identity, so the pin belongs to the fixture, which is where #1287
+put it for the sibling suite. A sweep of the other 13 commit-making suites found no further instance.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Third instance of one class, and the first two were each found the same way -- by blocking a gate on
+a branch about something else entirely. What makes it worth more than its one line is the sweep that
+came with it: every commit-making suite is now pinned, measured rather than assumed, so this class
+has no fourth instance left to find.
+
+**Score:** N/A
+
+#### Pull Request
+
+Pin commit.gpgsign off in the park-commit suite fixture
+
+[PR #1327](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1327)
+
+---
+
+### DEPLOY: `fix/lint-gate-wall-clock` · 20260903-164154
+
+`Invoke-WorkflowGates` (`scripts/lib/gate-lib.ps1`) now times the real lint run and prints
+`lint gate: integrity check passed in Xs.` / `... FAILED in Xs.`, the direct parallel to the test
+half's `test gate: all N suites passed in Xs`. Timed around the child run only -- the evidence-cache
+fast path keeps its `already proved ... -- skipped.` line with no seconds. So a session recording
+"the full gate cost ~Ys" now has a lint figure to name beside the test figure, which is the half
+#1314 found missing when three conflicting "full gate" numbers were quoted for one test set. The
+figure is formatted invariant-culture (the `Format-GateSeconds` / #1159 concern), inlined because
+`gate-lib` does not dot-source `native-capture-lib`.
+
+Closes [#1319](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1319).
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer running the `contributing-davekjohn` workflow plugin picks up the mirrored `gate-lib.ps1`
+on the next plugin update: their `open-pr` / `-GatesOnly` run gains the same lint-gate seconds line,
+symmetric with the test-gate timing they already see. Console output only -- no behaviour, gate
+verdict or exit code changes.
+
+**Score:** 2
+
+#### Pull Request
+
+Lint gate prints its own wall-clock
+
+Plugins: contributing-davekjohn
+
+[PR #1324](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1324)
+
+---
+
+### DEPLOY: `fix/git-identity-mismatch-unchecked` · 20260903-163646
+
+On a checkout where `gh` is authenticated as one GitHub account and `git config user.name` reads
+another, nothing said so. Two things broke from that, both silently. The claim rule -- `gh issue edit
+<n> --add-assignee @me`, stated in Chris's persona body and in this folder's contributing page --
+resolves `@me` through the GitHub API, so it wrote the account `gh` held while every commit on the
+branch read the other one: measured on DAVE-KOK-BWJ, where claiming #1314 with the documented idiom put
+`DaveKJohn` on work whose commits all said `davekokbwj`, and it had to be corrected by hand. And Derek's
+cross-device tell -- a branch whose commits name a different account than the checkout, which the lens
+teaches as the signature of work built on another device -- fires on such a machine **by construction**,
+so a later session reads "built elsewhere" off a branch that never left the room.
+
+`scripts/lint/check-git-identity.ps1` now reports the split, from a SessionStart hook in every repo that
+has this plugin, at the one moment it matters: just before a session claims an issue and starts
+committing. It prints both accounts, both ways out, and the by-name claim to use in the meantime; it
+repairs nothing itself, because which of the two accounts is right is not a script's call. The claim rule
+in both places that state it now names what `@me` actually binds to -- the defect was its definition,
+which said "the account the session is logged in as" where the claim's own job needs the account the
+commits will name -- and the tell in the lens has gained the precondition it always depended on.
+
+Two things it deliberately does not do. It compares names rather than emails, although GitHub attributes
+a commit by email: `gh api user` returns a null email for an account with no public one and
+`gh api user/emails` needs the `user` token scope, and widening a scope to print an advisory line is the
+wrong trade. And it fires only when `user.name` is a valid GitHub username by GitHub's own rule --
+because that free-text field usually holds a person's name, and an unconditional comparison would fire
+forever in every repo that spells its name normally, which is the shape of the stale-path check this repo
+declined at 124 findings all false.
+
+Closes [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Both halves travel. The check and its hook ship in the workflow plugin, so a consumer with a split
+identity is told at session start instead of discovering it from a tracker that disagrees with its own
+branches -- and one with a single account never sees a line, which is what the login-shape guard buys. The
+claim rule's corrected definition ships in Chris's persona body, which every consumer loads on every turn,
+so the instruction they read is the one that matches what the tracker will actually record. Most consumers
+run one account and will notice nothing; for the ones that do not, this is the difference between a claim
+that means something and a claim that names the wrong person.
+
+**Score:** 2
+
+#### Pull Request
+
+Report when gh and git commit as different accounts
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1322](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1322)
+
+---
+
+### DEPLOY: `fix/test-gate-summary-omits-lanes` · 20260903-162227
+
+`Invoke-TestSuiteGate` printed the parallel lane count only on the opening line nobody quotes and left
+it off the summary line that gets copied into branch documents, changelog entries and commit messages
+-- so the seconds on that line were a draw from a spread of at least 4.5x with nothing stating the
+run's parallelism (issue #1318, the #1314 defect one step upstream). The lane count now rides both
+summary lines, green and red: `test gate: all 62 suites passed in 89s (16 lanes).` The machine is
+deliberately not added -- the lane number already separates a hosted runner (`ProcessorCount` lanes)
+from a workstation (`ProcessorCount - 2`). Source lib plus its two plugin mirrors;
+`test-suite-gate.tests.ps1` gains the summary-line asserts.
+
+A consumer who quotes a gate figure gets the lane count for free from now on, but it is a parenthetical
+on one line and nobody is blocked without it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A one-line output change to a gate, proven by that gate's own suite -- no migration, no irreversible
+step, no visible result to judge by eye.
+
+**Score:** N/A
+
+#### Pull Request
+
+Invoke-TestSuiteGate summary line names its lane count
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1320](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1320)
+
+---
+
+### DEPLOY: `docs/gate-figure-scope-and-machine-v1` · 20260903-161326
+
+A wall-clock figure for a gate reads as though it describes the gate. It does not: it describes one run,
+and two facts that the number never implies decide what it is worth to anybody else -- **what ran inside
+it**, and **which machine ran it**. One branch made the case by writing three *"full gate"* figures for
+one test set (608s, 471s, 360s), of which the first bundled the lint gate with the suites and the other
+two, by their own wording, did not; all three were then quoted as answering the same question.
+
+Two rules now say so, both portable. Nolan's manual carries the measurement discipline -- name the
+components and give them separately as well as summed, name the machine and its lane count, and never let
+a local reading stand in for the gate that blocks the merge, whose own history is queryable.
+`DEVELOPMENT-portable.md` rule 8 carries it for the DEPLOY section specifically, because a figure written
+there folds into `CHANGELOG.md` and onward into a release document, outliving the branch that measured
+it.
+
+The measurement behind them is in Nolan's lens, and its second half is the one that changes how a
+disagreement gets read: this repo's CI, measured per step over the twelve most recent trunk runs, costs
+**936s** median (lint 30s, suites 906s) on four cores against ~476s locally at sixteen -- about 2x -- but
+its own band is **676-983s**. That 1.45x spread inside one environment is *wider* than the 360-608s
+spread the three branch figures were being reconciled across. So the disagreement they looked like was
+never large enough to be a finding, and scope and machine have to be settled before a gap between two
+figures counts as one.
+
+Closes [#1314](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1314).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Both rules travel by plugin update, and the discipline is one a consumer needs the first time it writes a
+gate timing into a changelog entry -- which is the first branch it ships. It changes no script and no
+gate, so nothing refuses on it; what it changes is whether a number written on day one is still readable
+on day ninety. The figures quoted are the source repo's own and are labelled as such, so a consumer on a
+different box has the shape without inheriting the seconds.
+
+**Score:** 2
+
+#### Pull Request
+
+A gate wall-clock figure names what it included and which machine produced it
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1317](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1317)
+
+---
+
+### DEPLOY: `feat/ci-fold-commit-lint-only` · 20260903-155604
+
+The `fold:` commit's CI run drops from the full ~15-minute suite to a lint-only run of about a
+minute. That is roughly half of every ship's trunk runner time on `windows-latest` (billed at 2x),
+recovered without giving back anything #1294 bought: every trunk commit still carries a green
+`lint-en-tests`, and the folded `CHANGELOG.md` is still link-scanned by that lint run. The skip is
+keyed on the commit message (`fold:`), not a path filter, so no merge commit can fall through it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a CI-internal change to this repo's own `.github/workflows/`; no subscriber of any consuming
+service sees it.
+
+**Score:** N/A
+
+#### Pull Request
+
+CI on the fold commit runs lint only, not the full suites
+
+[PR #1310](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1310)
+
+---
+
 ### DEPLOY: `docs/traps-count-closing-line-v1` · 20260903-151947
 
 Sylvester's manual said "Nine PowerShell traps" in its heading and "All nine" in its opening line, then
