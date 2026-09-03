@@ -32,7 +32,12 @@
          is not passed;
      11. the script's OWN commit does not depend on the machine's commit.gpgsign (#1297): with
          signing forced on and the signing agent unreachable, the run still exits 0 and its commit
-         lands. #1287 pinned the commits the fixture makes; this covers the other half.
+         lands. #1287 pinned the commits the fixture makes; this covers the other half;
+     12. a credential pasted into -TargetRepo never reaches the output (#1313): against an
+         unreachable target, so the banner, the clone failure and the thrown command line are all
+         exercised, the token is absent and the userinfo shows as '***@' -- and a URL WITHOUT
+         userinfo is printed untouched, so an ordinary run does not read as though something were
+         hidden.
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/publish-to-business.tests.ps1
 
@@ -530,6 +535,30 @@ signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureKeyNotARealKeyFixtureKe
     Assert-True ($probeCode -ne 0) 'the forced signing config really does break an unpinned commit'
     Assert-Equal 0 $r.ExitCode 'the publish exits 0 with signing on and the signing agent unreachable'
     Assert-Equal ($beforeSigning + 1) (Get-TargetCommitCount -BareDir $filterBareDir) 'and its commit landed on the target'
+
+    # --- 12. a credential in -TargetRepo never reaches the output (#1313) --------------------------
+    # THE TARGET IS DELIBERATELY UNREACHABLE, so the run walks every path that prints the URL: the
+    # "Target :" banner before anything happens, the clone failure, and the throw that carries the
+    # command line. A reachable target would only prove the banner.
+    #
+    # THE TOKEN IS THE ASSERT, not the mask: a future refactor that composes the line differently
+    # still has to keep the secret out, and only searching for the secret itself measures that. The
+    # mask is asserted too, because output with neither would also pass a token-absent test -- and
+    # would mean the run failed before it printed anything.
+    Write-Host 'publish-to-business: a credential in -TargetRepo is masked everywhere' -ForegroundColor Cyan
+    $secret    = 'SUPERSECRETTOKENabc123'
+    $credUrl   = "https://someuser:$secret@no-such-host-for-tests-xyz.invalid/o/r.git"
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $credUrl)
+    Assert-True ($r.Output -notmatch [regex]::Escape($secret)) 'the token appears nowhere in the output'
+    Assert-Match $r.Output ([regex]::Escape('***@no-such-host-for-tests-xyz.invalid')) 'the userinfo is shown masked instead'
+    Assert-True ($r.Output -notmatch 'someuser') 'and the username goes with it -- userinfo is masked whole'
+
+    # THE OTHER HALF: masking must not touch a URL that has no userinfo, or every ordinary run reads
+    # as though something were hidden. Same unreachable-host shape, no credential.
+    $plainUrl = 'https://no-such-host-for-tests-xyz.invalid/o/r.git'
+    $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $plainUrl)
+    Assert-Match $r.Output ([regex]::Escape($plainUrl)) 'a URL without userinfo is printed unchanged'
+    Assert-True ($r.Output -notmatch '\*\*\*@') 'and nothing is masked in it'
 } finally {
     if (Test-Path -LiteralPath $fixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $fixtureRoot -ErrorAction SilentlyContinue
