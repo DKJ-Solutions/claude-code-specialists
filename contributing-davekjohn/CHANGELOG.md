@@ -349,10 +349,17 @@ before its first assert. The alias is deleted rather than corrected: named after
 could only mislead the next reader, and `$case.Branch` says exactly what it is.
 
 **This was a green PR that landed a red trunk**, which is worth stating plainly because no gate
-reported it. #1268's branch was cut before `7b783516` (#1259) added this block, so its required check
-passed on a tree that did not contain the test its own change breaks. The merge commit is the first
-thing that holds both, and the merge is not gated -- the check runs on the branch head, and a branch
-is not required to be current with `main` before it merges. Every suite is green again on the merge
+reported it. #1268's branch was cut before `7b783516` added this block -- that commit reached `main`
+via PR #1267, for issue #1259 -- so nothing its branch held ever ran the test its change breaks. CI
+does test the merged tree: `ci.yml` runs on `pull_request`, whose checkout is GitHub's *merge ref*,
+the branch already merged into the base tip. What fails is that the ref is fixed when the run is
+**created** and `pull_request` does not re-fire when the base moves, so a green check goes **stale**.
+This run started `07:39:34Z` and went green `07:55:08Z`; the block reached `main` at `07:54:19Z` --
+14m45s into the run, under a minute before it ended -- and #1268 merged `10:06:12Z` on that
+2h11m-old certificate, which `strict_required_status_checks_policy: false` accepts. Nor was the merge
+commit ungated: its own `push` run was created `10:06:15Z` and **cancelled 8 seconds later** by the
+fold push behind it, a separate defect that cost half the trunk's merge commits their gate and is
+repaired in #1294. The stale certificate itself is #1292. Every suite is green again on the merge
 result; 187 asserts in this suite, 61 suites in the gate.
 
 **Score:** 3
