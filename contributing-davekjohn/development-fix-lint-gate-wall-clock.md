@@ -33,19 +33,66 @@
 
 ### PLAN
 
+Issue #1319: `Invoke-WorkflowGates` (`scripts/lib/gate-lib.ps1`) runs the lint gate and prints only a
+pass/fail line -- no elapsed figure -- while its test half prints `test gate: all N suites passed in
+Xs`. So a session writing down "the full gate cost ~Ys" has a number for the test half and none for
+the lint half; #1314 measured the consequence (three conflicting "full gate" figures for one test
+set).
+
+Decisions taken on the issue's three open points:
+
+- **Print the seconds.** It is the direct parallel to the test gate and makes the "was lint included"
+  half of #1314's DEPLOY rule answerable from the output instead of by inference. Not mutually
+  exclusive with "the rule already says cite lint separately" -- the rule stays; this makes it
+  cheaper to satisfy.
+- **On the `gate-lib.ps1` line, not inside `check-plugin-integrity.ps1`.** Matches where the test
+  gate times itself (the gate helper `Invoke-TestSuiteGate`, not the suites), and leaves
+  `check-plugin-integrity.ps1` -- which CI and standalone runs also invoke -- untouched.
+- **Real runs only.** The evidence-cache fast path keeps its `already proved ... -- skipped.` line
+  with no seconds, the way `Invoke-TestSuiteGate`'s own cache branch does.
+- Format is invariant-culture (`[string]::Format([CultureInfo]::InvariantCulture, '{0:N0}', ...)`),
+  the concern `Format-GateSeconds` documents under #1159; inlined rather than borrowed because
+  `gate-lib` does not dot-source `native-capture-lib`.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/gate-lib.ps1`: wrap the real lint run in a `Stopwatch`, print
+  `lint gate: integrity check passed in Xs.` (green) / `... FAILED in Xs.` (red) on the two verdicts.
+- [x] Rebuild the plugin mirror (`scripts/sync/build-shared-scripts.ps1`) -- mirror back in sync.
+- [x] `scripts/tests/gate-lib.tests.ps1`: new sub-case 15d-clock -- a real run prints its seconds on
+  both verdicts, the cache-hit run prints the skip line and no elapsed figure.
 
 ### TEST
 
+- [x] `scripts/tests/gate-lib.tests.ps1` -- 115 pass, 0 fail (case 15e still confirms `Write-Host`
+  lines do not pollute the function's return value).
+- [x] Standing gate as coverage: `open-pr` runs `check-plugin-integrity.ps1` and every suite before
+  the push. Hand-run of the lint gate on this branch went green -- `0 error(s)` -- which is also the
+  run this change times; it printed `lint gate: integrity check passed in Xs.` as intended.
+
 ### DEPLOY: `fix/lint-gate-wall-clock`
 
-**Score:**
+`Invoke-WorkflowGates` (`scripts/lib/gate-lib.ps1`) now times the real lint run and prints
+`lint gate: integrity check passed in Xs.` / `... FAILED in Xs.`, the direct parallel to the test
+half's `test gate: all N suites passed in Xs`. Timed around the child run only -- the evidence-cache
+fast path keeps its `already proved ... -- skipped.` line with no seconds. So a session recording
+"the full gate cost ~Ys" now has a lint figure to name beside the test figure, which is the half
+#1314 found missing when three conflicting "full gate" numbers were quoted for one test set. The
+figure is formatted invariant-culture (the `Format-GateSeconds` / #1159 concern), inlined because
+`gate-lib` does not dot-source `native-capture-lib`.
+
+Closes [#1319](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1319).
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer running the `contributing-davekjohn` workflow plugin picks up the mirrored `gate-lib.ps1`
+on the next plugin update: their `open-pr` / `-GatesOnly` run gains the same lint-gate seconds line,
+symmetric with the test-gate timing they already see. Console output only -- no behaviour, gate
+verdict or exit code changes.
+
+**Score:** 2
 
 #### Pull Request
 
