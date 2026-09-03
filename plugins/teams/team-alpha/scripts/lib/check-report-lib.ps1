@@ -101,7 +101,7 @@
 #>
 
 # --- Scope: naming WHICH repo a finding is about (inbound #203) ----------------------------------
-# A finding is only actionable when you know which repo it concerns. The three SessionStart hooks
+# A finding is only actionable when you know which repo it concerns. The SessionStart hooks
 # filter their child's output down to the signal lines, and that filter threw away the one line
 # naming the inspected repo -- so on 2026-07-27 a script-contract alarm sent an investigation into
 # the wrong repo. The check was right; it was right ABOUT ANOTHER REPO than the session it reported

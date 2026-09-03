@@ -270,11 +270,14 @@ finally {
 # can go stale in silence, a failing assert cannot.
 . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
 
-# Both are invoked from the plugin by a SessionStart hook, so a refusal would fail every session start in
-# this repo. That reason is specific to being a hook -- it does not extend to a script somebody runs.
+# All three are invoked from the plugin by a SessionStart hook, so a refusal would fail every session
+# start in this repo. That reason is specific to being a hook -- it does not extend to a script somebody
+# runs. check-unfolded-entry.ps1 joined the list with issue #1270, for the same reason as the other two:
+# unfolded-entry-sessioncheck.ps1 runs it from ${CLAUDE_PLUGIN_ROOT} at every session start.
 $guardExempt = @(
     'scripts\sync\check-roster-sync.ps1',
-    'scripts\sync\check-script-contract.ps1'
+    'scripts\sync\check-script-contract.ps1',
+    'scripts\sync\check-unfolded-entry.ps1'
 )
 
 $entryPoints = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |

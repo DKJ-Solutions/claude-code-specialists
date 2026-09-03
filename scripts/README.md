@@ -19,8 +19,9 @@ Three consequences worth knowing before you touch anything:
   The cache holds the last *released* mirror, so it lags this directory by however many merges have landed
   since. Two silent failures measured on one day; see below. **Every shared entry point refuses outright**
   ([`lib/source-repo-guard-lib.ps1`](lib/source-repo-guard-lib.ps1)) and names the local path to run
-  instead — with exactly two exceptions, `sync/check-roster-sync.ps1` and `sync/check-script-contract.ps1`:
-  both are invoked from the plugin by a SessionStart hook, so a refusal there would fail every session
+  instead — with exactly three exceptions, `sync/check-roster-sync.ps1`, `sync/check-script-contract.ps1`
+  and `sync/check-unfolded-entry.ps1`:
+  all are invoked from the plugin by a SessionStart hook, so a refusal there would fail every session
   start in this repo. That reason is specific to being a hook and extends to nothing else.
   **The rule is held by a test rather than by this sentence** —
   [`tests/source-repo-guard.tests.ps1`](tests/source-repo-guard.tests.ps1) derives the entry points from
@@ -102,11 +103,12 @@ a test, reached by one of these rather than run directly.
 | [`maintenance/measure-skill.ps1`](maintenance/measure-skill.ps1) | what a skill costs — always-on and on-invoke tokens against a stored baseline, and the wall-clock of the script behind it | `measure-skill` |
 | [`maintenance/measure-always-on.ps1`](maintenance/measure-always-on.ps1) | what the always-on **document** path costs — `CLAUDE.md` plus everything it `@`-imports, per document and per section | `measure-skill` |
 
-Four scripts here are **read-only checks a SessionStart hook invokes** rather than something anyone runs by
-hand: `sync/check-roster-sync.ps1`, `sync/check-script-contract.ps1`, `sync/build-config-blueprint.ps1`
-(run by the lint's blueprint check) and `lint/check-consumer-drift.ps1` (run per consumer by
-`check-connectors.ps1`). Their absence from the table above is a fact about how they are reached, not an
-omission.
+Five scripts here are **read-only checks a SessionStart hook invokes** rather than something anyone runs by
+hand: `sync/check-roster-sync.ps1`, `sync/check-script-contract.ps1`, `sync/check-unfolded-entry.ps1`
+(the trunk carries a branch's development document a fold should have removed — #1270),
+`sync/build-config-blueprint.ps1` (run by the lint's blueprint check) and `lint/check-consumer-drift.ps1`
+(run per consumer by `check-connectors.ps1`). Their absence from the table above is a fact about how they
+are reached, not an omission.
 
 ## The gates, and what each one refuses
 

@@ -99,6 +99,22 @@ function Get-SharedScriptPairs {
             # invokes it as a procedure, so there is no procedure to write down.
             Skill  = ''
         },
+        @{
+            # Travels in the WORKFLOW plugin for the same reason check-script-contract does: it reports on
+            # the branch/fold workflow, which a repo that never enabled the workflow plugin does not have.
+            # THE DEFECT (issue #1270): a fold that never runs after a merge is silent. A PR brought up to
+            # date and merged from the GitHub UI never touches ship-pr.ps1, so nothing folds -- the branch's
+            # development document stays committed on the trunk and its `### DEPLOY:` entry never reaches
+            # CHANGELOG.md. cut-release.ps1 refuses to cut over it; nothing surfaced it earlier. This is the
+            # session-start signal (unfolded-entry-sessioncheck.ps1). Local and offline: the fold removes the
+            # document, so its mere presence on the trunk ref is the whole finding -- no gh, no merge lookup.
+            Name   = 'check-unfolded-entry'
+            Source = 'scripts\sync\check-unfolded-entry.ps1'
+            Plugin = 'contributing-davekjohn'
+            # No skill, same statement as check-script-contract above: it runs from a SessionStart hook and
+            # reports. Nobody invokes it as a procedure.
+            Skill  = ''
+        },
         # RETIRED, AUGUST 7, 2026: 'new-changelog-entry'. It was new-branch's child step, and this entry
         # noted that it had no skill of its own because that skill documented both. The name stopped being
         # true when the branch/ split gave it a step list to write, and again when it gained the templates
@@ -189,8 +205,9 @@ function Get-SharedScriptPairs {
             # The gap declared here on August 4, 2026 is closed. It was mirrored because three repos had
             # each written their own copy -- three people needing it and none with a page to read -- and
             # that same argument is why the page had to follow the mirror rather than wait for someone to
-            # ask for it. With this, check 18 covers every shared entry point except check-script-contract,
-            # whose empty Skill is a statement rather than a gap.
+            # ask for it. With this, check 18 covers every shared entry point except check-script-contract
+            # and check-unfolded-entry, whose empty Skill is a statement (each runs from a SessionStart
+            # hook) rather than a gap.
             Skill  = 'fix-mojibake'
             # -Check is this script's documented report-only mode ("change nothing, exit 1 if any file
             # would change"), so it can be timed without repairing anything.

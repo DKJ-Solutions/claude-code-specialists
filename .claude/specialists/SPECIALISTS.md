@@ -68,9 +68,10 @@ routes; every specialist executes according to the shared safety rules and their
 
 
 
-**Where this actually runs.** This roster is a set of Claude Code subagents plus three informational
+**Where this actually runs.** This roster is a set of Claude Code subagents plus four informational
 
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`) and
+SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`,
+`unfolded-entry-sessioncheck`) and
 
 one Stop hook that acts rather than reports (`cycle-autopark`, #900 -- it pushes the branch's development
 

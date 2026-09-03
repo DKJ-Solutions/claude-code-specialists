@@ -1128,7 +1128,7 @@ Write-Coverage -Category 'shared-script' -Checked $sharedPairs.Count `
 # `b`)<!-- /skills:all --> remain...`, with the same code path serving both the inline form and a
 # block bullet-list form. AUTHOR CONDITION, because of this: every backtick-quoted token anywhere
 # inside the span counts as a claimed name -- so the span must be wrapped tightly enough to contain
-# ONLY skill names, nothing else in backticks (e.g. NOT the three SessionStart hook names in that
+# ONLY skill names, nothing else in backticks (e.g. NOT the four SessionStart hook names in that
 # same README sentence, which sit outside the parenthesized skill list and so outside the span).
 #
 # A literal example of the marker syntax in a doc (e.g. Tessa's convention writeup) must NOT be

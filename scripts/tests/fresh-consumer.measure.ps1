@@ -5,7 +5,7 @@
 .DESCRIPTION
     Builds a synthetic consumer in the state a real one is in right after enabling the plugin and
     restarting -- its own CLAUDE.md, no lenses, no repo-config, no orchestrator import -- then runs
-    the three SessionStart hooks against it exactly as the harness does: cwd on the consumer,
+    the four SessionStart hooks against it exactly as the harness does: cwd on the consumer,
     CLAUDE_PLUGIN_ROOT on the plugin. With -WithBootstrap it runs specialists-init's bootstrap.ps1
     first, which is the "happy path" comparison.
 
@@ -131,11 +131,12 @@ try {
 
     # Each hook, run the way the harness runs it. The overrides exist for exactly this purpose:
     # connector needs to be told where the workshop is (a scratch fixture has no sibling checkout),
-    # the other two take the consumer path directly.
+    # the other three take the consumer path directly.
     $runs = @(
         @{ Name = 'connector-sessioncheck';       Args = @('-WorkshopPathOverride', $repoRoot, '-SkipDrift') },
         @{ Name = 'roster-sessioncheck';          Args = @('-ConsumerPathOverride', $FixtureRoot) },
-        @{ Name = 'script-contract-sessioncheck'; Args = @('-ConsumerPathOverride', $FixtureRoot) }
+        @{ Name = 'script-contract-sessioncheck'; Args = @('-ConsumerPathOverride', $FixtureRoot) },
+        @{ Name = 'unfolded-entry-sessioncheck';  Args = @('-ConsumerPathOverride', $FixtureRoot) }
     )
 
     $totalErrors = 0
