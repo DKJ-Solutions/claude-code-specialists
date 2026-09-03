@@ -35,19 +35,63 @@
 
 Bypass restored and verified; update the stale claim in Rendall's lens and record the divergence lesson.
 
+#### Where this came from
+
+A session was asked to sync `main` with origin and resolve its merge problems. The working copy stood on
+`main`, 39 commits behind, with an unmerged `CHANGELOG.md` and no `MERGE_HEAD` to abort -- the residue of a
+fold commit held locally while `GH013` blocked its push. That same fold had since landed from elsewhere, so
+the held copy was a duplicate of `eb4a4ae7` (identical entry, identical `· 20260902-210200` timestamp).
+Two things came out of untangling it: three docs claim a bypass state that no longer holds, and nothing
+anywhere says what to do when a fold cannot push.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Date Rendall's bypass paragraph (`05-06`, was *"gone at the moment of writing"*) and add the
+      fold-side rule: a blocked fold is waited out, never committed locally
+- [x] Date Sylvester's `THAT LIST IS EMPTY RIGHT NOW` paragraph (`05-15`) and keep it, naming the push's
+      own answer -- `GH013` vs `Bypassed rule violations` -- as the measurement that tells the two states
+      apart without admin rights
+- [x] Close the `#1244 owns this and this change does not repair it` loose end in `05-15`, now that both
+      stranded folds (#1253, #1261) have landed
+- [~] `.claude/rules/language-layers.md:151` left alone -- it states what the transfer *did*, in the past
+      tense, and is still accurate
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` + all suites, via `open-pr.ps1`
+- [x] The restored bypass verified by the act rather than the settings page: `79897ba9` pushed to `main`
+      answering `Bypassed rule violations for refs/heads/main`, where the same commit answered `GH013`
+      the day before
+- [x] `git ls-tree origin/main contributing-davekjohn/` returns no branch document -- the trunk is clear
+
 ### DEPLOY: `docs/fold-hold-divergence-lesson-v1`
 
-**Score:**
+Three docs stated that `main-ci-gate`'s bypass list is empty, which stopped being true on September 3,
+2026 when Dave restored it. Each is dated rather than swept, per this repo's convention, and the two
+lenses gain what the day actually taught.
+
+The load-bearing addition is a rule that did not exist: **a fold whose push is blocked is waited out, not
+committed locally.** Holding it looks like a neutral pause and is not one -- it is a `main` commit living
+on a single machine, and `main` is what every other machine syncs. Measured the same day: a held fold met
+the same fold landing from elsewhere, and `git pull` produced a duplicate entry plus an unmerged
+`CHANGELOG.md` with no `MERGE_HEAD`. A session went into untangling it, and the trunk leftovers the hold
+was meant to prevent had accumulated anyway. Waiting costs a visible unfolded document; holding costs a
+duplicate commit on the shared trunk, and only one of those is cheap to undo.
+
+Sylvester's lens also gains the measurement that identifies the condition without admin rights: the push
+answers `GH013 ... Required status check "lint-en-tests" is expected` when the list is empty, and
+`Bypassed rule violations for refs/heads/main` when it is not. Nothing in the GitHub UI distinguishes
+them for an account that cannot read the ruleset.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+It is written from the wreckage rather than from a design discussion. Every claim in it was measured on
+the working copy that had to be repaired, including the one that matters most -- that the two folds the
+blockage stranded folded unchanged once the bypass returned, which is the whole argument for waiting.
+
+**Score:** N/A
 
 #### Pull Request
 
