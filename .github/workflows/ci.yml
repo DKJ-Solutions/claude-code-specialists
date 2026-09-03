@@ -40,9 +40,12 @@ on:
 # THE EXTRA RUNNER MINUTES ARE THE POINT, NOT AN OVERSIGHT: every push to `main` now runs, where before
 # roughly half were dropped -- 27 runs instead of 13 on September 3. The PR saving above is untouched,
 # because the push half never shared a group with a PR in the first place (`github.ref` is
-# refs/pull/N/merge there and refs/heads/main here), so none of what #932 measured is reopened. Whether
-# the FOLD commit needs a full run of its own is a separate question with its own trade-off, and it is
-# deliberately not answered here.
+# refs/pull/N/merge there and refs/heads/main here), so none of what #932 measured is reopened.
+#
+# THE FOLD COMMIT'S HALF OF THAT COST IS TRIMMED IN THE JOB BELOW -- issue #1300. It keeps its lint run
+# and skips the ~13-minute suites, because the only thing its tree adds over the merge commit's is
+# changelog prose the PR already checked. The `if:` sits on the step, not here: the run still has to
+# happen so the fold commit (the trunk tip after a ship) carries a green `lint-en-tests` of its own.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -73,7 +76,25 @@ jobs:
       # dot-source. Leaving it out here would make CI -- the one caller that actually blocks the
       # merge -- the one gate that cannot see a repo's extra test commands, silently. Guarded,
       # because this workflow may be copied into a repo that has no repo-config yet.
+      #
+      # THE FOLD COMMIT SKIPS THIS STEP -- issue #1300. ship-pr pushes twice per branch: the merge
+      # commit, then the fold commit, whose tree differs by exactly two non-executable things -- the
+      # entry appended to contributing-davekjohn/CHANGELOG.md and the removed
+      # contributing-davekjohn/development-<branch>.md. Since #1294 keyed every push to `main` on its own
+      # commit, that second push otherwise runs a full ~15-minute suite over a tree whose only untested
+      # delta is changelog prose. That entry is a verbatim copy of the branch document's DEPLOY section,
+      # which check 4 of the lint gate (still run above) link-scans on the PR and branch-entry.yml
+      # shape-checks there -- so the suites add nothing on the fold, while the lint step keeps the trunk
+      # tip carrying a green check of its own.
+      #
+      # THE CONDITION IS COMMIT-KIND, NOT A PATH FILTER. `paths-ignore` on the push trigger would also
+      # skip a *merge* commit whose branch happened to touch only those two paths (a docs/ branch editing
+      # the changelog intro) -- a narrow reopening of #1294's gap. `head_commit.message` names the commit
+      # kind exactly. A PR never matches (`github.event_name` is not 'push' there), so the `main`
+      # ruleset's required `lint-en-tests` check is untouched; on a push a skipped step still reports the
+      # job green.
       - name: Test suites (scripts/tests/*.tests.ps1)
+        if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'fold:')) }}
         shell: powershell
         run: |
           . ./scripts/lib/native-capture-lib.ps1
