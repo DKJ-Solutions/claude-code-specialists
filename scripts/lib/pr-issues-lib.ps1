@@ -490,6 +490,109 @@ function Get-ResolvesDecision {
     }
 }
 
+function Get-TargetIssueWarnings {
+    <#
+    .SYNOPSIS
+        Advisory notes that the issue(s) a branch targets may already be DONE -- the issue is
+        CLOSED, or another PR already carries a closing keyword for it. One record per issue that
+        has something to say; an empty array when there is nothing.
+
+    .DESCRIPTION
+        The blind spot Get-ResolvesDecision leaves, and the one issue #1282 measured. That gate
+        answers "does this PR declare what it closes" and blocks ONLY on a mentioned issue that is
+        still OPEN. The two states that mean the branch ITSELF may be a duplicate pass it in
+        silence: the target issue CLOSED while the branch was in flight, or another open/merged PR
+        that already says `Closes #<n>` for it. In #1282's own run a branch was cut to fix #1270,
+        #1270 was closed by PR #1276 thirty-seven minutes later, and the duplicate reached a
+        gate-green PR -- found only at the merge conflict.
+
+        PURE, like everything else in this file: the caller asks GitHub which issues are open and
+        for the candidate PRs' bodies, and hands both in. Two independent signals, reported
+        together per issue:
+
+          - IsClosed    -- OpenIssues was determinable AND this number is not in it.
+          - ClaimingPrs -- other PRs (never this branch's own) in OPEN or MERGED state whose body
+                           carries a closing keyword for this number. Read with the same
+                           Get-ClosedIssueNumbers the resolves gate uses, so a bare mention of the
+                           number in a PR body does NOT count, and a CLOSED rival PR -- an
+                           abandoned attempt, which in #1282 was the duplicate itself -- does not
+                           either.
+
+        ADVISORY BY CONSTRUCTION: this returns facts, the caller writes warnings, and nothing here
+        blocks. A shared number, an issue reopened after a wrong close, a PR body quoting
+        `Closes #<n>` as prose: every false-match story ends with an author who reads one line and
+        carries on, and none of them may wedge a real PR. That is the call #1282 asked for -- a
+        warning, not a refusal -- and the same one the branch-entry CI gate makes.
+
+    .PARAMETER TargetIssues
+        The numbers this branch targets: what the development document mentions, plus any explicit
+        -Resolves. Non-positive numbers and duplicates are dropped.
+
+    .PARAMETER OpenIssues
+        The open issue numbers, from the caller's single `gh issue list` query. $null means "could
+        not be determined", and then IsClosed is never set on any record -- the same not-blocking
+        treatment Get-ResolvesDecision gives an undeterminable state.
+
+    .PARAMETER OtherPrsJson
+        `gh pr list --search "<n> OR <n> ... in:body" --state all --json number,state,headRefName,body`
+        output. Empty or unparseable -> no ClaimingPrs (the caller has already said the check could
+        not run). Assign-first/wrap-second on the parse, the 5.1 trap every parse in this file
+        navigates.
+
+    .PARAMETER CurrentBranch
+        This branch's name, so its own already-open PR -- whose body legitimately carries the
+        closing keyword on a resumed run -- is not reported as a rival claimant.
+    #>
+    param(
+        [int[]]$TargetIssues = @(),
+        [int[]]$OpenIssues = $null,
+        [string]$OtherPrsJson = '',
+        [string]$CurrentBranch = ''
+    )
+
+    $targets = @($TargetIssues | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+    if ($targets.Count -eq 0) { return @() }
+
+    $open = if ($null -eq $OpenIssues) { $null } else { @($OpenIssues | Where-Object { $_ -gt 0 }) }
+
+    $prs = @()
+    if ($OtherPrsJson -and $OtherPrsJson.Trim()) {
+        try {
+            $parsedPrs = $OtherPrsJson | ConvertFrom-Json
+            $prs = @(@($parsedPrs) | Where-Object { $_ -and $_.number })
+        } catch {
+            $prs = @()
+        }
+    }
+
+    $warnings = @()
+    foreach ($n in $targets) {
+        $isClosed = ($null -ne $open) -and ($open -notcontains $n)
+
+        $claiming = @()
+        foreach ($pr in $prs) {
+            $head = if ($pr.PSObject.Properties['headRefName']) { [string]$pr.headRefName } else { '' }
+            if ($CurrentBranch -and $head -eq $CurrentBranch) { continue }
+            $state = if ($pr.PSObject.Properties['state']) { ([string]$pr.state).Trim().ToUpperInvariant() } else { '' }
+            if ($state -ne 'OPEN' -and $state -ne 'MERGED') { continue }
+            $body = if ($pr.PSObject.Properties['body']) { [string]$pr.body } else { '' }
+            if (@(Get-ClosedIssueNumbers -Text $body) -contains $n) {
+                $claiming += [pscustomobject]@{ Number = [int]$pr.number; State = $state }
+            }
+        }
+        $claiming = @($claiming | Sort-Object -Property Number -Unique)
+
+        if ($isClosed -or $claiming.Count -gt 0) {
+            $warnings += [pscustomobject]@{
+                Issue       = $n
+                IsClosed    = $isClosed
+                ClaimingPrs = $claiming
+            }
+        }
+    }
+    return @($warnings)
+}
+
 function Format-CheckDuration {
     <#
     .SYNOPSIS
