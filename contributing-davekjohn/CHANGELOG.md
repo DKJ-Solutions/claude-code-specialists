@@ -32,6 +32,54 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/asana-mirror-split-group-races-on-one-issue` · 20260903-151904
+
+`asana-mirror.yml`'s concurrency comment now names what splitting the group COST, not only what it
+bought. Splitting `closed`/`reopened` away from `labeled`/`unlabeled` (#1301) stopped a triage burst
+displacing a pending close or reopen -- but it also means those two classes can now run CONCURRENTLY on
+one issue, where the single group serialised them. `Sync-AsanaTaskStage` has no compare-and-set, so the
+later WRITE wins regardless of which EVENT was later, and the one answer that loses is `needs-info`: a
+`state` run holding a pre-label reading resolves a forward floor, forward moves need no permission, and
+the card leaves the hold somebody just put it in. Reconciliation sweep (d) puts it back within a day,
+because it passes `-Labels` into `Resolve-TargetStage` and so re-derives the hold with `AllowBackward`.
+
+The block is unchanged otherwise and the key is untouched: the queue holds one pending run, so
+serialise-and-drop versus run-everything is a real trade with no third option, and the split takes the
+better side of it. What was missing was the half that is not visible in the key.
+
+Five asserts keep it that way: three that the comment states the property, and two -- read through the
+PowerShell parser rather than as text -- that `Resolve-TargetStage` is still called at exactly two
+sites and that BOTH of them still pass `-Labels` as a real argument. The parser is the point rather
+than a flourish: a regex over the call's span is satisfied by any nearby mention of `-Labels`, so it
+would pass while the argument was gone, which is the exact silence the assert exists to break.
+
+The comment also keeps the two declines apart. The queue holding one pending run is why the KEY stays
+split; it says nothing about the write path. `Sync-AsanaTaskStage` is left alone on separate grounds --
+a compare-and-set would close the window properly, but it is a change to the write path for a failure
+sweep (d) already heals within a day.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The template travels into a consumer's `.github/`, so a consumer reading their own `asana-mirror.yml`
+now gets the whole trade rather than the half that improved. Nothing they run changes. The failure it
+prevents is a maintainer collapsing the key back to one group -- reading a comment that only lists the
+split's benefits and concluding the split was free -- which would silently restore the unrecoverable
+dropped `reopened` that #1301 was filed for.
+
+**Score:** 1
+
+#### Pull Request
+
+asana-mirror's concurrency comment names the overlap its split introduces
+
+Plugins: bwj-codex
+
+[PR #1311](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1311)
+
+---
+
 ### DEPLOY: `docs/changelog-1268-mechanism-corrected-v1` · 20260903-150501
 
 `CHANGELOG.md`'s account of the #1268 red trunk no longer states three mechanisms that do not hold.
