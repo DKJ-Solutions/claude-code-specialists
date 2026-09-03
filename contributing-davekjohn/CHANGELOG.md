@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/carry-1255-rename-into-portable-pages-v1` · 20260903-104428
+
+The #1255 rename -- one branch document per branch, `development-<branch>.md` -- is carried into the six
+places that still taught the retired argument it replaced. Four are shipped payload
+(`skills/new-branch/SKILL.md`, `CONTRIBUTING-portable.md` twice, `scripts/README.md`), and two are read
+only here (the release lens, and a comment in `fold-changelog.tests.ps1`). Each now names the reversal,
+dates it, and separates *checkout* from *merge* -- which is the part that matters, because the sentence
+they carried was not merely stale: it was the reasoning #1255 disproved, offered as current.
+
+Nothing executable changed. The paths and the code blocks on these pages were already per-branch when
+#1255 landed; what was missed was the paragraph explaining why, which is why no gate caught it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`skills/new-branch/SKILL.md` is the page a consumer's session reads **immediately before creating a
+branch** -- it is the skill body, so it lands in context at the exact moment the reader is about to act on
+it, and it stated a fixed filename while the script it documents writes one per branch. A consumer who
+followed its reasoning learned the argument that produced the defect: that the document cannot collide
+because git tracks it per branch. That holds for checkout and says nothing about merge, where every merge
+to the trunk left every other open pull request conflicting on one path -- and a conflicting PR gets no
+check suite at all, so it can never go green and can never merge. Consumers now get the reversal, dated,
+with a link to the measurement behind it.
+
+**Score:** 3
+
+#### Pull Request
+
+Carry the #1255 per-branch rename into the six pages that still teach the retired fixed-name argument
+
+Plugins: contributing-davekjohn
+
+[PR #1277](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1277)
+
+---
+
 ### DEPLOY: `fix/pr-placeholder-list-append-only-v1` · 20260903-102422
 
 `Get-PrDescriptionPlaceholderDefaults` recognises the pre-#1255 placeholder again. That string --

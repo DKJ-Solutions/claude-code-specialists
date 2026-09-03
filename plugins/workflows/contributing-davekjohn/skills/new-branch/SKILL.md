@@ -173,8 +173,16 @@ contributing-davekjohn/development-feat-x-v1.md
   ## DEPLOY: `feat/x-v1`            what the change DOES   -- folded verbatim into CHANGELOG.md
 ```
 
-**A fixed name, not one per branch.** Git already tracks this file per branch, so two branches in flight
-cannot collide on it and the repo root stops filling up with other people's work. **And it exists only
+**One document per branch, named after it** -- `development-<branch>.md`, the branch name with its
+slashes flattened, so two branches never write the same path. It was the fixed `development.md` until
+September 3, 2026 ([#1255](https://github.com/DaveKJohn/claude-code-specialists/issues/1255)), on the
+argument that git already tracks the file per branch. That is true of **checkout** and says nothing about
+**merge**, which is where the collision actually lives: every merge to the trunk put the merged branch's
+document there and left every *other* open pull request conflicting on that one path without anybody
+touching those branches -- and a conflicting PR gets no check suite at all, so a required check can never
+go green and the PR can never merge. What that cost, and why the fold is not the answer either, was
+measured before the reversal rather than assumed; both are written up in
+[`DEVELOPMENT-portable.md`](../../DEVELOPMENT-portable.md#why-the-name-carries-the-branch). **And it exists only
 while a branch is open** (Dave, August 23, 2026): this script creates it, the fold removes it at the merge,
 so on the trunk there is no copy at all. It used to be rewritten to an empty state carrying a warning not
 to write there; that placeholder is gone, and `DEVELOPMENT-portable.md` is where the whole form can
