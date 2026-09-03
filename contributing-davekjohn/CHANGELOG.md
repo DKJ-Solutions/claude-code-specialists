@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/park-commit-fixture-pins-signing` · 20260903-170154
+
+`scripts/tests/park-commit.tests.ps1` no longer depends on the machine's `commit.gpgsign`: its
+fixture pins signing off, beside the `user.name`, `user.email` and `core.autocrlf` pins that were
+already there. With signing forced on and the agent not answering, the suite went `16 passed, 12
+failed` -- naming the park continuation clause, which decides nothing about signing -- and because the
+test gate is repo-wide it blocked `open-pr.ps1` on unrelated branches. It now passes 28/28 with
+signing still forced on. The lib is deliberately left signable: `Invoke-GitParkCommit` commits the
+user's real work under their own identity, so the pin belongs to the fixture, which is where #1287
+put it for the sibling suite. A sweep of the other 13 commit-making suites found no further instance.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Third instance of one class, and the first two were each found the same way -- by blocking a gate on
+a branch about something else entirely. What makes it worth more than its one line is the sweep that
+came with it: every commit-making suite is now pinned, measured rather than assumed, so this class
+has no fourth instance left to find.
+
+**Score:** N/A
+
+#### Pull Request
+
+Pin commit.gpgsign off in the park-commit suite fixture
+
+[PR #1327](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1327)
+
+---
+
 ### DEPLOY: `fix/lint-gate-wall-clock` · 20260903-164154
 
 `Invoke-WorkflowGates` (`scripts/lib/gate-lib.ps1`) now times the real lint run and prints
