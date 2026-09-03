@@ -23,12 +23,12 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 
 `CHANGELOG.md` (repo root) is an **intro, then `## [Unreleased]`, then one `###` per change, with no other
 section headings at all**
-(Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
-`## DEPLOY: feat/x` — with two `###` sections under it since August 16, 2026:
+(Dave, August 5, 2026). A change *is* the `###`, and since August 6, 2026 its heading names the **branch** —
+`### DEPLOY: feat/x` — with two `####` sections under it since August 16, 2026:
 `What makes this deploy extra special` and `Pull Request`, which carries the PR title and which the fold
 completes from the merge. **The entry holds both tiers, and since August 19, 2026 neither names itself**:
 tier 0 answers directly under the DEPLOY heading, under no heading of its own, and
-`### What makes this deploy extra special` beside it means whichever single audience tier the repo has
+`#### What makes this deploy extra special` beside it means whichever single audience tier the repo has
 stated. They replaced the impact table because not
 every change has a tier 1 or a tier 2 and a missing row read as an omission, and they stopped naming numbers
 because the author filling one in is answering the question, not classifying a reader. Everything above
@@ -70,8 +70,8 @@ entries rather than off which section they sit in.
 #### How it works
 
 - **`contributing-davekjohn/<branch>.md`** — written when the branch is created. One document with two
-  halves: `## PLAN` / `## CREATE` / `## TEST` carry the step list, and the fourth phase,
-  `## DEPLOY: <branch>`, IS the entry — **nothing around it**, so it pastes into `CHANGELOG.md` in one
+  halves: `### PLAN` / `### CREATE` / `### TEST` carry the step list, and the fourth phase,
+  `### DEPLOY: <branch>`, IS the entry — **nothing around it**, so it pastes into `CHANGELOG.md` in one
   go. **One document per branch since September 3, 2026** ([#1255](https://github.com/DaveKJohn/claude-code-specialists/issues/1255))
   — the branch name with its slashes flattened, and **nothing but that since later the same day**
   ([#1335](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1335), which dropped the
@@ -104,9 +104,13 @@ entries rather than off which section they sit in.
   (or a pre-format entry's `Tier: N` line) travels into `CHANGELOG.md` intact, because with no heading above
   the entry, stripping the declaration would leave every downstream reader taking it as tier 0 — silent,
   correct-looking, and wrong in the direction that empties a release document. The outward-facing renderers
-  strip both themselves, at the moment they render. A **pre-format `###` entry file is promoted to `##`** as
-  it lands, because an `###` in a flat list of `##`s is not an entry boundary and would be absorbed into the
-  entry above it, inheriting that entry's PR link. The
+  strip both themselves, at the moment they render. An entry file written at **any** other level is
+  **re-levelled to `###`** as it lands — the whole block by one delta, so its own sections move down with
+  it — because a heading at the wrong level in that list is not an entry boundary and would be absorbed
+  into the entry above it, inheriting that entry's PR link. It used to promote a single legacy level by a
+  regex range, which missed the flat H2 window entirely and, where it did match, lifted the heading onto
+  its own sections so one entry read as four
+  ([#953](https://github.com/DKJ-Solutions/claude-code-specialists/issues/953)). The
   PR number, url **and merge timestamp** are retrieved via one
   `gh pr list` on the branch name from the entry (only possible after the merge).
   **The date is the fold's** (Dave, August 5, 2026): the scaffolder runs at
@@ -130,8 +134,8 @@ keeping: the `##` trap was seen in **v2.13.2**, where a body's two subheadings c
 extra release categories next to `## Fixes`, and it is the same
 [fold/release blind spot as #234](https://github.com/DaveKJohn/claude-code-specialists/issues/234) — the
 artifact a reader finally sees is assembled past every gate that could have judged it. **The trap got worse
-and gained a sibling on August 5, 2026**: a body `##` is now read as a *separate change* rather than as a
-stray category, and a body `###` collides with the entry's own named sections — where a *misspelled* section
+and gained a sibling on August 5, 2026**: a body `###` is now read as a *separate change* rather than as a
+stray category, and a body `####` collides with the entry's own named sections — where a *misspelled* section
 heading costs the entry its declaration in silence. Both halves are now gated by
 `check-plugin-integrity.ps1`'s check 13, in the entry file and in `CHANGELOG.md`, so neither depends on
 anyone remembering this paragraph. **This repo has no release categories any more**: the grouping came from
@@ -229,7 +233,7 @@ The note roots, all three under `contributing-davekjohn/releases/` since #914 (A
 at the repo root now holds nothing but the release list:
 - **`changelog/<X>.x/<X.Y.Z>.md`** — the full release notes: **every** pending entry, tier 0
   included, ordered by **tier** and, inside a tier, ranked — one flat list at `CHANGELOG.md`'s own levels
-  (`## <title>` → `### What makes this deploy extra special`), with no tier heading in between since
+  (`### <title>` → `#### What makes this deploy extra special`), with no tier heading in between since
   August 25, 2026 ([#881](https://github.com/DaveKJohn/claude-code-specialists/issues/881)): this is the
   document a hand-written note is copied *from*, so it pastes at the level it was written at. Literally the
   whole changelog, which is what makes this the record rather than a summary of one — including each entry's
@@ -579,8 +583,8 @@ consumer tier joined it.
 
 #### The entry, and the shape `CHANGELOG.md` receives
 
-**The document is one change per `##` heading, with no section headings at all** (Dave, August 5,
-2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `##`. The three
+**The document is one change per `###` heading, with no section headings at all** (Dave, August 5,
+2026). `CHANGELOG.md` is an intro followed by a **flat ranked list**: a change *is* the `###`. The three
 `## Tier N - Pull Requests` sections it replaced said exactly one thing — how far each change reaches —
 and the entries now say that themselves, in a form that also carries what the change is worth.
 **What the sections communicated visually was kept as the ordering** — furthest reach first, highest
@@ -603,7 +607,7 @@ that ignores impact should not be named for it — and still accepts `-Score`/`-
 because every consumer's fold passes them today and a removed parameter would throw on the trunk.
 
 **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
-names the **branch** — `## DEPLOY: feat/x` — and its `###` sections answer in order.
+names the **branch** — `### DEPLOY: feat/x` — and its `####` sections answer in order.
 
 **It was six sections until August 16, 2026 and is two since** (Dave). Four of them said something the
 document already said: `Branch ID` is the timestamp the heading now carries, `Branch type` is the prefix
@@ -611,7 +615,7 @@ of the branch that same heading names, `Significance` was a heading over sub-sec
 the answer to the question above it, and `Branch title` was never a branch title — it is the PR title, and
 it moved into the `Pull Request` section where the rest of the PR's facts already live. What remains is
 the DEPLOY heading's own text (tier 0's answer, under no heading of its own, with
-`### What makes this deploy extra special` beside it for the audience tier, each closing with `**Score:**`)
+`#### What makes this deploy extra special` beside it for the audience tier, each closing with `**Score:**`)
 and `Pull Request` — the title, then the `Plugins:` line and the
 `[PR #N](…)` footer the **fold** writes underneath it, with the landing moment stamped on the `### DEPLOY:` heading. `Plugins:` stays a plain line,
 because a heading around one fact is more structure than content.
@@ -823,17 +827,17 @@ branch prefix, which this repo has measured does not predict impact.
 **weighs** for that document's reader, and therefore **where in it** the entry sits — so the most
 consequential change leads instead of sitting third under whichever heading its branch prefix produced.
 Both are declared in the entry's **DEPLOY section** — tier 0 directly under its heading, and the audience
-tier under `### What makes this deploy extra special` beside it — each carrying why it matters there and then
+tier under `#### What makes this deploy extra special` beside it — each carrying why it matters there and then
 its score:
 
 ```text
-## DEPLOY: feat/x
+### DEPLOY: feat/x
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 Nobody but this repo's own developers can observe it.
 

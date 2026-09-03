@@ -167,9 +167,9 @@ route moved to a page the model is allowed to read.
 
 ```text
 contributing-davekjohn/feat-x-v1.md
-  # feat/x-v1
-  ## PLAN / ## CREATE / ## TEST      what still MUST HAPPEN -- the step list, gated before the PR
-  ## DEPLOY: feat/x-v1            what the change DOES   -- folded verbatim into CHANGELOG.md
+  ## feat/x-v1
+  ### PLAN / ### CREATE / ### TEST      what still MUST HAPPEN -- the step list, gated before the PR
+  ### DEPLOY: feat/x-v1            what the change DOES   -- folded verbatim into CHANGELOG.md
 ```
 
 **One document per branch, named after it** -- `<branch>.md`, the branch name and nothing else, with its
@@ -195,7 +195,7 @@ instruction: the entry is a NAMED SECTION with the branch in its heading, so the
 the step gate counts only above it, and the scaffold gate reads only inside it.
 
 **The DEPLOY section holds the entry block and nothing around it** — no preamble, no warning. That is what
-makes it pasteable in one go. Its heading names the **branch** (`## DEPLOY: feat/x-v1`), which is also
+makes it pasteable in one go. Its heading names the **branch** (`### DEPLOY: feat/x-v1`), which is also
 how the fold finds the PR.
 
 **The guidance is in the document.** Every field carries an HTML comment saying what a good answer looks
@@ -212,10 +212,10 @@ guidance travels inside it, through the same plugin update that carries the scri
 Two sections, one of them filled in for you:
 
 ```text
-## DEPLOY: <your branch>                      <- what this branch delivers to main
+### DEPLOY: <your branch>                      <- what this branch delivers to main
                                                 <- tier 0 answers HERE, under no heading of its own
-### What makes this deploy extra special            <- your audience tier: the same, or N/A
-### Pull Request · <stamp>  <- the title you gave -Title; the fold adds the number and the moment it landed
+#### What makes this deploy extra special            <- your audience tier: the same, or N/A
+#### Pull Request · <stamp>  <- the title you gave -Title; the fold adds the number and the moment it landed
 ```
 
 **Two sections, and the headings carry what three more used to.** `Branch title`, `Branch ID` and
@@ -225,7 +225,7 @@ the type is the prefix of the branch the heading already names. All three are st
 older entry carries them, so nothing already written stops folding.
 
 **One stamp, at the end of the branch's life** (Dave, September 3, 2026). There were two: a creation stamp
-on the document's own heading and a landing stamp on the `## DEPLOY:` heading. The creation stamp is gone
+on the document's own heading and a landing stamp on the `### DEPLOY:` heading. The creation stamp is gone
 with the rest of that heading — the document's own name says which branch it is, and nothing ever read the
 moment it was created back. The landing stamp stays and is the one that matters: the fold writes it from
 the PR's own merge timestamp, and it is what orders the changelog. Neither was ever typed by hand.
@@ -275,11 +275,11 @@ waiting for a reason and a score. In a repo whose audience is tier 2 that is the
 why it is not three, is the knob further down:
 
 ```text
-## DEPLOY: <your branch>
+### DEPLOY: <your branch>
 
 **Score:**
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 **Score:**
 ```
@@ -287,7 +287,7 @@ why it is not three, is the knob further down:
 **Neither tier names a number** (Dave, August 19, 2026), and both resolve to one when read: the DEPLOY
 heading's own text is tier 0, and the section beside it means the single audience tier your repo has
 stated. A repo that has stated **none** gets the older shape instead — a plain question as a heading with a
-`#### Tier N` sub-section under it for every tier the model has, tier 0 among them — because a heading with
+`##### Tier N` sub-section under it for every tier the model has, tier 0 among them — because a heading with
 no tier to resolve to would read as tier 0 and empty its release documents.
 
 Two questions, two audiences. **The tier says how far the change reaches**, and therefore which release
@@ -340,13 +340,13 @@ Below is a finished pair. It looks the same whichever audience tier your repo an
 the second heading being a question rather than a number:
 
 ```text
-## DEPLOY: <your branch>
+### DEPLOY: <your branch>
 
 The routine version bump stops needing a developer.
 
 **Score:** 4
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 Consumers must re-add the marketplace under its new name; installs break without it.
 

@@ -96,8 +96,8 @@ with two different readers:
 
 | half of `contributing-davekjohn/<branch>.md` | subject | lifetime |
 |---|---|---|
-| `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | removed at the merge; never folded |
-| `## DEPLOY: <branch>` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
+| `### PLAN` · `### CREATE` · `### TEST` | what still **must happen** — the step list | removed at the merge; never folded |
+| `### DEPLOY: <branch>` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
 
 **One document per branch, named after it** — `<branch>.md`, the branch name and nothing else, with its slashes
 flattened, so two branches never write the same path. It was the fixed `development.md` until September 3,
@@ -128,25 +128,25 @@ questions this page deliberately cannot answer for you — check your own table 
 source repo's.
 
 **The DEPLOY section holds the entry block and nothing around it**, so it pastes into your changelog in
-one go. The entry is one heading with two `###` sections under it:
+one go. The entry is one heading with two `####` sections under it:
 
 ```text
-## DEPLOY: <your branch> · <stamp>
+### DEPLOY: <your branch> · <stamp>
 
-### What makes this deploy extra special
-### Pull Request
+#### What makes this deploy extra special
+#### Pull Request
 ```
 
-**The headings carry what three sections used to.** The `##` names the branch — so the branch *type* is its
-prefix — and the stamp on that same heading is the moment the branch landed, written by the fold. The moment
-it *began* is stamped on the document's own `#` heading. A section restating any of them would be one fact
-in two places.
+**The headings carry what three sections used to.** The `###` names the branch — so the branch *type* is its
+prefix — and the stamp on that same heading is the moment the branch landed, written by the fold. That is
+the only stamp: the document's own heading is the branch and nothing else, because nothing ever read the
+moment it began back. A section restating any of them would be one fact in two places.
 
 **The entry holds both tiers, and neither names a number.** Tier 0's reason goes directly under the DEPLOY
-heading — that heading IS its section; the audience tier gets `### What makes this deploy extra special`, and it
+heading — that heading IS its section; the audience tier gets `#### What makes this deploy extra special`, and it
 means the one tier your repo has stated in `Get-ReleaseAudienceTier`. Each carries its reason and its
 `**Score:**`; that is the description, written once per audience rather than once as prose and again per tier.
-**A repo that has stated no audience tier gets the older shape instead** — a `#### Tier N` sub-section for
+**A repo that has stated no audience tier gets the older shape instead** — a `##### Tier N` sub-section for
 every tier the model has, tier 0 included — because a heading with no tier to resolve to would read as tier 0
 and empty your release documents.
 
@@ -669,8 +669,8 @@ generalise from rather than one repo's five hours. Until then, the rules travel 
 
 ## Significance — two questions, one per reach
 
-Every entry answers one reach per block — the DEPLOY heading's own text for tier 0, `### What makes this PR
-extra special` for your audience tier. **The tier says how far the change reaches**, and therefore which
+Every entry answers one reach per block — the DEPLOY heading's own text for tier 0, `#### What makes this
+deploy extra special` for your audience tier. **The tier says how far the change reaches**, and therefore which
 release document the entry appears in:
 
 | tier | who notices |
