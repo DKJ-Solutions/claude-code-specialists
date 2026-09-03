@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/fold-fixed-filename-cost-stale · 20260903-203524
+
+Two present-tense claims in `fold-changelog-entry.ps1` outlived the rename that made them false, and
+both are now stated the way the code actually works. The block explaining why the fold reads the branch
+from the development document's heading argued from what a *fixed* filename cost -- true from August 23
+to September 3, 2026, and retired the moment #1335 gave the document the branch's own name again. It now
+leads with the live reason instead: the filename is a write convention and a read candidate, never the
+authority, which is the same answer `Resolve-BranchFilePath` gives one level down and buys the same
+thing here -- a renamed branch, or a hand-written document under a mismatched name, still folds against
+the right PR. The old cost is kept below it as dated history rather than deleted, because it is why the
+branch line is in the document at all. Fifteen lines on, the explicit-target arm's claim that the
+document "is not named after anything" was corrected the same way.
+
+No behaviour changes: every edit is a comment.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing reaches a consumer's run. The plugin mirror moves with the source, so a maintainer reading the
+fold in the plugin cache gets the same corrected reasoning -- which is the whole point of repairing a
+comment that a later reader would otherwise take as the current argument and defend.
+
+**Score:** 1
+
+#### Pull Request
+
+Correct the stale fixed-filename framing in the fold's branch-owner block
+
+Plugins: contributing-davekjohn
+
+[PR #1346](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1346)
+
+---
+
 ### DEPLOY: `docs/correct-strict-ci-gate-record` · 20260903-201419
 
 Two paragraphs added by PR #1333 are corrected to record that option 1 of
