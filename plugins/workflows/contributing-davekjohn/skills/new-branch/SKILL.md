@@ -33,13 +33,12 @@ The script:
 1. Validates the branch name via the shared SSOT helper `Test-BranchName`
    (`scripts/lib/branch-info.ps1`) -- hard-rejects an empty name, `main`, or a name containing
    `final`; soft-warns (but proceeds) on an unknown prefix.
-2. **Completes the version suffix**, after that validation rather than inside it: a name with no
-   `-v<N>` gets `-v1` appended, and an explicit `-vN` is left exactly as typed. **It appends `-v1` and
-   nothing else -- it does not look for the lowest free number**, and that restraint is the design.
-   `new-branch` is idempotent, so a second run on the same subject *resumes* that branch instead of
-   opening another one, which is what the `-Park` flow needs; a scan would turn every rerun into a new
-   branch. A bump is therefore a decision you state by typing `-v2`. The full reasoning, and why this
-   is a completion rather than a refusal in the validator, is in
+2. **Uses the name exactly as given** -- it does *not* complete a `-v<N>` suffix (it did, from
+   August 23 to September 3, 2026; in 209 branches that reached a merge with it, none was ever bumped
+   to `-v2`, and the completion was the direct cause of inbound #1224). A `-v<N>` suffix is still valid
+   and still the honest way to say "another round of this" -- it is simply typed by hand now, and
+   nothing rejects it. `new-branch` stays idempotent, so a second run on the same name *resumes* that
+   branch instead of opening another one, which is what the `-Park` flow needs. The full reasoning is in
    [`DEVELOPMENT-portable.md`](../../DEVELOPMENT-portable.md#the-version-suffix).
 3. **Asks whether this is a resume or a cut**, reading *both* ref namespaces -- `refs/heads/<name>` and
    `refs/remotes/origin/<name>`. That question comes first because the answer decides whether step 4 has

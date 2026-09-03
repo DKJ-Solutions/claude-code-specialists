@@ -62,7 +62,7 @@ adopt it; this page reaches you with every plugin update.
 ## The heading
 
 ```markdown
-# Development: `feat/thing-v1` · 20260823-101500
+# Development: `feat/thing` · 20260823-101500
 ```
 
 The **title comes first, then a colon, then the branch** (Dave, August 23, 2026). Both this heading and the
@@ -83,25 +83,21 @@ still recognised. Every shape the heading has ever had is read; only today's is 
 
 ### The version suffix
 
-A branch name ends in **`-v<N>`**, and a second development cycle on the same subject keeps the name and
-bumps the number — `feat/thing-v1`, then `feat/thing-v2`. `new-branch` **completes** a name that has none
-by appending `-v1`; give it an explicit `-vN` and it is left exactly as typed.
+A branch name **may** end in **`-v<N>`**, and a second development cycle on the same subject keeps the name
+and bumps the number — `feat/thing`, then `feat/thing-v2`. It is **typed by hand**: `new-branch` uses the
+name exactly as given and nothing rejects a `-vN`.
 
-**It appends `-v1` and nothing else — it does not look for the lowest free number**, and that restraint is
-the design rather than a shortcut. `new-branch` is idempotent: running it again on the same subject
-*resumes* that branch, which is what makes it safe to reach for twice and what the `-Park` flow needs. A
-version scan would turn every rerun into a new branch — measured on the first draft, where the second run
-landed on `-v2` and the assert that HEAD had not moved failed. **So a bump is a decision you state by
-typing `-v2`**, which is also exactly how the rule was given.
+**`new-branch` used to complete `-v1`** on any name that carried no suffix — from August 23 to
+September 3, 2026. It was dropped because the case it served had not occurred: in 209 branches that reached
+a merge carrying the suffix, none was ever bumped to `-v2`, while every caller paid for the rewrite. It was
+also the direct cause of inbound #1224 — a consumer wrapping the script for a branch whose name it does
+**not** own (a Dependabot PR branch) had a second branch, `<their-name>-v1`, created, committed to and
+pushed, leaving the entry on a branch the pull request does not point at.
 
-**Why a completion and not a refusal in the name validator.** Two reasons. `branch-info.ps1` is
-**repo-owned** and does not travel, so enforcing there states the rule to one repo while `new-branch` is
-the shared script every consumer runs. And a hard refusal breaks every branch in flight: they have no
-suffix right now, and they meet this convention through a plugin update rather than by choosing to.
-
-**The completion runs after the name is validated**, not before — otherwise `-Name main` becomes
-`main-v1` and every hard reject waves it through. Measured on the first draft, by the scaffolder's own
-suite.
+`new-branch` stays idempotent: running it again on the same name *resumes* that branch, which is what
+makes it safe to reach for twice and what the `-Park` flow needs. Nothing scans for the lowest free
+number — **a bump is a decision you state by typing `-v2`**, which is also exactly how the rule was given.
+The `final` refusal in `branch-info.ps1` points you at a hand-typed `-vN` as the honest form.
 
 **It is the same rule `final` was already refused for.** A branch named for being the last word on
 something is a prediction, and the prediction is wrong often enough that the next round has to be called

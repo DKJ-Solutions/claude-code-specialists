@@ -518,12 +518,14 @@ try {
     Write-Host "new-branch.ps1 -- valid name: branch + entry created" -ForegroundColor Cyan
     $fixtureBC = New-Fixture -Label 'bc'
 
-    $r1 = Invoke-NewBranch -Dir $fixtureBC -Name 'feat/my-task' -Title 'First title'
+    $r1 = Invoke-NewBranch -Dir $fixtureBC -Name 'feat/my-task-v1' -Title 'First title'
     Assert-Equal 0 $r1.Code 'valid name: new-branch exit 0'
     $headBranch1 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
-    # WITH THE VERSION SUFFIX new-branch COMPLETES (August 23, 2026). '-v1' is appended when the name
-    # carries none, so a second cycle on the same subject is '-v2' -- typed deliberately, never guessed.
-    Assert-Equal 'feat/my-task-v1' $headBranch1 'HEAD is on the new branch, with its version completed'
+    # THE NAME IS USED EXACTLY AS GIVEN (Dave, September 3, 2026). new-branch stopped completing a '-v1'
+    # suffix: in 209 branches that reached a merge carrying it, none was ever bumped to '-v2', and the
+    # completion was the direct cause of inbound #1224. A '-vN' suffix is still valid and still typed by
+    # hand for a second cycle -- the explicit-passthrough and no-completion cases are covered in (b2) below.
+    Assert-Equal 'feat/my-task-v1' $headBranch1 'HEAD is on the branch named -- verbatim, no suffix completion'
     # branch/branch-deployment.md, from the lib rather than written out here: the test must fail if the
     # writer and the readers stop agreeing about the path, not merely if this literal goes stale.
     $entryPath    = Join-Path $fixtureBC ((Get-BranchFilePaths -Branch 'feat/my-task-v1').Deployment)
@@ -598,7 +600,7 @@ try {
     Assert-True (-not ($progressText1 -match '(?m)^## Steps\s*$\s*_\(')) 'it is the scaffolded shape, not the reset placeholder'
 
     Write-Host "new-branch.ps1 -- idempotent (second run, same name)" -ForegroundColor Cyan
-    $r2 = Invoke-NewBranch -Dir $fixtureBC -Name 'feat/my-task' -Title 'Second title (should be ignored)'
+    $r2 = Invoke-NewBranch -Dir $fixtureBC -Name 'feat/my-task-v1' -Title 'Second title (should be ignored)'
     Assert-Equal 0 $r2.Code 'idempotent second run: exit 0'
     Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already existed') 'second run reports the branch already existed (checkout, not -b)'
     Assert-True (Test-Phrase -Text $r2.Out -Phrase 'already written') 'second run reports the branch files were already written'
@@ -607,9 +609,9 @@ try {
     # it is true (inbound #817).
     Assert-True (-not (Test-Phrase -Text $r2.Out -Phrase (Get-BranchFilesRereadNote))) 'a run that KEPT both files prints no re-read note -- nothing went stale'
     $headBranch2 = (& git -C $fixtureBC rev-parse --abbrev-ref HEAD).Trim()
-    # AND THE RERUN RESUMES IT RATHER THAN BUMPING, which is the property the completion had to be built
-    # around: a scan for the lowest FREE version would make every rerun a new branch, and new-branch is
-    # documented idempotent. Measured here on the first draft, which landed the second run on '-v2'.
+    # AND THE RERUN RESUMES IT RATHER THAN CUTTING A SECOND BRANCH: new-branch is documented idempotent, and
+    # a rerun on the same name checks that name out again. Nothing here scans for a free '-vN' -- a bump is a
+    # decision the caller states by typing '-v2'.
     Assert-Equal 'feat/my-task-v1' $headBranch2 'HEAD stays on the same branch after the second run'
     # THE WHOLE DOCUMENT, byte for byte, which is the stronger claim now that the plan and the entry are one
     # file: a rerun that rewrote the shape would take somebody's ticked steps with it.
@@ -636,10 +638,27 @@ try {
     $status = ((& git -C $fixtureBC status --porcelain) -join "`n")
     Assert-True ($status -match '\?\? contributing-davekjohn/') 'the branch files are untracked -- no git add/commit performed'
 
+    # --- (b2) THE VERSION SUFFIX IS NOT COMPLETED, IN BOTH DIRECTIONS (Dave, September 3, 2026) -------
+    # new-branch no longer appends '-v1'. This block is the guard against a restore: a bare name must stay
+    # bare, and an explicit '-vN' must be left exactly as typed. The first half is what inbound #1224 was
+    # about -- a caller wrapping this script for a branch whose name it does not own must get that name.
+    Write-Host "new-branch.ps1 -- no -v1 completion, and an explicit -vN is left as given" -ForegroundColor Cyan
+    $fixtureBv = New-Fixture -Label 'bv'
+    $rBare = Invoke-NewBranch -Dir $fixtureBv -Name 'feat/no-suffix-here' -Title 'No suffix'
+    Assert-Equal 0 $rBare.Code 'bare name: new-branch exit 0'
+    Assert-Equal 'feat/no-suffix-here' (& git -C $fixtureBv rev-parse --abbrev-ref HEAD).Trim() 'bare name: HEAD is on the name as given -- no -v1 appended'
+    Assert-True (-not (Test-Phrase -Text $rBare.Out -Phrase 'Branch name completed')) 'bare name: and the run does not announce a completion'
+    Assert-True (Test-Path -LiteralPath (Join-Path $fixtureBv ((Get-BranchFilePaths -Branch 'feat/no-suffix-here').Deployment))) 'bare name: the branch document is written under the unsuffixed name'
+
+    $fixtureBv2 = New-Fixture -Label 'bv2'
+    $rV2 = Invoke-NewBranch -Dir $fixtureBv2 -Name 'fix/second-cycle-v2' -Title 'Second cycle'
+    Assert-Equal 0 $rV2.Code 'explicit -v2: new-branch exit 0'
+    Assert-Equal 'fix/second-cycle-v2' (& git -C $fixtureBv2 rev-parse --abbrev-ref HEAD).Trim() 'explicit -v2: left exactly as typed'
+
     # --- (e) Soft warn on unknown prefix: branch + entry still created, fallback type, exit 0 -------
     Write-Host "new-branch.ps1 -- unknown prefix: soft warn, no hard reject" -ForegroundColor Cyan
     $fixtureE = New-Fixture -Label 'e'
-    $rE = Invoke-NewBranch -Dir $fixtureE -Name 'wip/experiment'
+    $rE = Invoke-NewBranch -Dir $fixtureE -Name 'wip/experiment-v1'
     Assert-Equal 0 $rE.Code 'unknown prefix: new-branch exit 0 (soft warn)'
     Assert-True (Test-Phrase -Text $rE.Out -Phrase 'Unknown branch prefix') 'warning about the unknown prefix in the output'
     $headBranchE = (& git -C $fixtureE rev-parse --abbrev-ref HEAD).Trim()
@@ -664,7 +683,7 @@ try {
     [System.IO.File]::WriteAllText($sentinelPath, "sentinel`n", (New-Object System.Text.UTF8Encoding $false))
     $maliciousTitle = 'evil\" ; Remove-Item -Recurse -Force X #$(whoami)'
 
-    $rF = Invoke-NewBranchWithAdversarialField -Dir $fixtureF -Name 'feat/injection-check' -Field Title -Value $maliciousTitle
+    $rF = Invoke-NewBranchWithAdversarialField -Dir $fixtureF -Name 'feat/injection-check-v1' -Field Title -Value $maliciousTitle
     Assert-Equal 0 $rF.Code 'malicious title: new-branch exit 0'
 
     $entryPathF = Join-Path $fixtureF ((Get-BranchFilePaths -Branch 'feat/injection-check-v1').Deployment)
@@ -712,7 +731,7 @@ try {
     Write-Host "new-branch.ps1 -- -Intent recorded in the step list, not the entry" -ForegroundColor Cyan
     $fixtureH = New-Fixture -Label 'h'
     $intentText = 'Skeleton + routing done; next: wire the API client.'
-    $rH = Invoke-NewBranch -Dir $fixtureH -Name 'feat/park-intent' -Title 'Parked work' -Intent $intentText
+    $rH = Invoke-NewBranch -Dir $fixtureH -Name 'feat/park-intent-v1' -Title 'Parked work' -Intent $intentText
     Assert-Equal 0 $rH.Code '-Intent: new-branch exit 0'
     $entryPathH = Join-Path $fixtureH ((Get-BranchFilePaths -Branch 'feat/park-intent-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathH) '-Intent: entry file created'
@@ -771,7 +790,7 @@ try {
         $ErrorActionPreference = $prevEap
     }
 
-    $rP = Invoke-NewBranch -Dir $fixtureI -Name 'feat/parked-branch' -Title 'Parked' -Intent 'WIP; continue on the laptop.' -Park
+    $rP = Invoke-NewBranch -Dir $fixtureI -Name 'feat/parked-branch-v1' -Title 'Parked' -Intent 'WIP; continue on the laptop.' -Park
     Assert-Equal 0 $rP.Code '-Park: new-branch exit 0'
     Assert-True (Test-Phrase -Text $rP.Out -Phrase 'parked on origin') '-Park: reports the branch was parked on origin'
 
@@ -830,7 +849,7 @@ try {
     [System.IO.File]::WriteAllText($sentinelPathJ, "sentinel`n", (New-Object System.Text.UTF8Encoding $false))
     $maliciousIntent = 'evil\" ; Remove-Item -Recurse -Force X #$(whoami)'
 
-    $rJ = Invoke-NewBranchWithAdversarialField -Dir $fixtureJ -Name 'feat/intent-injection' -Field Intent -Value $maliciousIntent
+    $rJ = Invoke-NewBranchWithAdversarialField -Dir $fixtureJ -Name 'feat/intent-injection-v1' -Field Intent -Value $maliciousIntent
     Assert-Equal 0 $rJ.Code 'malicious intent: new-branch exit 0'
 
     $entryPathJ = Join-Path $fixtureJ ((Get-BranchFilePaths -Branch 'feat/intent-injection-v1').Deployment)
@@ -872,7 +891,7 @@ function Get-EntryFallbackType     { return $script:EntryFallbackType }
     [System.IO.File]::WriteAllText((Join-Path $fixtureK 'scripts\repo-config.ps1'), $customConfig, (New-Object System.Text.UTF8Encoding $false))
 
     # No -Title and no -Intent, and an UNKNOWN prefix -- so all four knobs are exercised at once.
-    $rK = Invoke-NewBranch -Dir $fixtureK -Name 'wip/dutch-stub'
+    $rK = Invoke-NewBranch -Dir $fixtureK -Name 'wip/dutch-stub-v1'
     Assert-Equal 0 $rK.Code 'configured wording: new-branch exit 0'
     $entryPathK = Join-Path $fixtureK ((Get-BranchFilePaths -Branch 'wip/dutch-stub-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathK) 'configured wording: entry file created'
@@ -920,7 +939,7 @@ Write-Output `$t.Type
     $fixtureL = New-Fixture -Label 'l'
     [System.IO.File]::WriteAllText((Join-Path $fixtureL 'scripts\repo-config.ps1'), "function Get-EntryBodyHeading { `n", (New-Object System.Text.UTF8Encoding $false))
 
-    $rL = Invoke-NewBranch -Dir $fixtureL -Name 'feat/broken-config'
+    $rL = Invoke-NewBranch -Dir $fixtureL -Name 'feat/broken-config-v1'
     Assert-Equal 0 $rL.Code 'broken repo-config: new-branch still exits 0'
     $entryPathL = Join-Path $fixtureL ((Get-BranchFilePaths -Branch 'feat/broken-config-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $entryPathL) 'broken repo-config: the entry file is still written'
@@ -952,7 +971,7 @@ Write-Output `$t.Type
     #     would pass vacuously against a script that simply wrote nothing.
     Write-Host "new-branch.ps1 -- stacked on an unfolded branch: each branch gets its OWN document (#615, #1255)" -ForegroundColor Cyan
     $fixtureM = New-Fixture -Label 'm'
-    $rM1 = Invoke-NewBranch -Dir $fixtureM -Name 'docs/parent' -Title 'The parent branch'
+    $rM1 = Invoke-NewBranch -Dir $fixtureM -Name 'docs/parent-v1' -Title 'The parent branch'
     Assert-Equal 0 $rM1.Code 'stacked: the parent branch is created'
     $entryPathM    = Join-Path $fixtureM ((Get-BranchFilePaths -Branch 'docs/parent-v1').Deployment)
     $progressPathM = Join-Path $fixtureM ((Get-BranchFilePaths -Branch 'docs/parent-v1').Cycle)
@@ -966,7 +985,7 @@ Write-Output `$t.Type
         & git -C $fixtureM commit -q -m 'parent entry' 2>$null | Out-Null
     } finally { $ErrorActionPreference = $prevEapM }
 
-    $rM2 = Invoke-NewBranch -Dir $fixtureM -Name 'feat/child' -Title 'The stacked child branch'
+    $rM2 = Invoke-NewBranch -Dir $fixtureM -Name 'feat/child-v1' -Title 'The stacked child branch'
     Assert-Equal 0 $rM2.Code 'stacked: the child branch is created'
     $childPathM = Join-Path $fixtureM ((Get-BranchFilePaths -Branch 'feat/child-v1').Deployment)
     Assert-True (Test-Path -LiteralPath $childPathM) 'stacked: the child got a document of its own'
@@ -987,12 +1006,12 @@ Write-Output `$t.Type
     # at. Asserting the warning here would be asserting that the two branches still share a path.
     Write-Host "new-branch.ps1 -- stacked on UNCOMMITTED work: the parent's document is not in the way (#615, #1255)" -ForegroundColor Cyan
     $fixtureN = New-Fixture -Label 'n'
-    $rN1 = Invoke-NewBranch -Dir $fixtureN -Name 'docs/uncommitted-parent' -Title 'Never committed'
+    $rN1 = Invoke-NewBranch -Dir $fixtureN -Name 'docs/uncommitted-parent-v1' -Title 'Never committed'
     Assert-Equal 0 $rN1.Code 'stacked/dirty: the parent branch is created'
     $entryPathN = Join-Path $fixtureN ((Get-BranchFilePaths -Branch 'docs/uncommitted-parent-v1').Deployment)
     $entryTextN1 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
 
-    $rN2 = Invoke-NewBranch -Dir $fixtureN -Name 'feat/dirty-child' -Title 'Stacked on uncommitted work'
+    $rN2 = Invoke-NewBranch -Dir $fixtureN -Name 'feat/dirty-child-v1' -Title 'Stacked on uncommitted work'
     Assert-Equal 0 $rN2.Code 'stacked/dirty: the child branch is still created'
     $entryTextN2 = [System.IO.File]::ReadAllText($entryPathN, [System.Text.Encoding]::UTF8)
     Assert-Equal $entryTextN1 $entryTextN2 'stacked/dirty: the uncommitted entry is left exactly as it was -- the outcome #615 asked for'
@@ -1027,7 +1046,7 @@ Write-Output `$t.Type
     ) -join "`r`n"
     [System.IO.File]::WriteAllText($sharedPathN2, $sharedTextN2, (New-Object System.Text.UTF8Encoding($false)))
     # Deliberately NOT committed: that is what makes it unrecoverable and what the guard keys on.
-    $rN3 = Invoke-NewBranch -Dir $fixtureN2 -Name 'feat/onto-legacy' -Title 'Cut beside a legacy shared document'
+    $rN3 = Invoke-NewBranch -Dir $fixtureN2 -Name 'feat/onto-legacy-v1' -Title 'Cut beside a legacy shared document'
     Assert-Equal 0 $rN3.Code 'legacy/foreign: the branch is created'
     Assert-Equal $sharedTextN2 ([System.IO.File]::ReadAllText($sharedPathN2, [System.Text.Encoding]::UTF8)) 'legacy/foreign: the uncommitted foreign document is byte-for-byte untouched'
     Assert-True (Test-Path -LiteralPath (Join-Path $fixtureN2 ((Get-BranchFilePaths -Branch 'feat/onto-legacy-v1').Deployment))) 'legacy/foreign: and this branch got its own document instead'
@@ -1044,7 +1063,7 @@ Write-Output `$t.Type
     $fixtureO = New-Fixture -Label 'o'
     $bareO = New-BareOrigin -Dir $fixtureO -Label 'o'
 
-    $rO = Invoke-NewBranch -Dir $fixtureO -Name 'feat/pushed-by-default' -Title 'Pushed by default'
+    $rO = Invoke-NewBranch -Dir $fixtureO -Name 'feat/pushed-by-default-v1' -Title 'Pushed by default'
     Assert-Equal 0 $rO.Code 'default push: new-branch exit 0'
     Assert-True (Test-Phrase -Text $rO.Out -Phrase 'parked on origin') 'default push: reports the branch reached origin -- with no switch given'
     Assert-True (Test-BranchOnRemote -Bare $bareO -Ref 'refs/heads/feat/pushed-by-default-v1') 'default push: the branch ref really is on origin'
@@ -1062,7 +1081,7 @@ Write-Output `$t.Type
     $fixtureP = New-Fixture -Label 'p'
     $bareP = New-BareOrigin -Dir $fixtureP -Label 'p'
 
-    $rNp = Invoke-NewBranch -Dir $fixtureP -Name 'feat/kept-local' -Title 'Kept local' -NoPush
+    $rNp = Invoke-NewBranch -Dir $fixtureP -Name 'feat/kept-local-v1' -Title 'Kept local' -NoPush
     Assert-Equal 0 $rNp.Code '-NoPush: new-branch exit 0'
     Assert-True (Test-Phrase -Text $rNp.Out -Phrase 'local only') '-NoPush: says the branch stayed local'
     Assert-True (-not (Test-BranchOnRemote -Bare $bareP -Ref 'refs/heads/feat/kept-local-v1')) '-NoPush: the branch ref is NOT on origin'
@@ -1078,7 +1097,7 @@ Write-Output `$t.Type
     # assert that keeps it: a repo with no remote is a legitimate repo.
     Write-Host "new-branch.ps1 -- no 'origin' remote: the branch is created anyway (#900)" -ForegroundColor Cyan
     $fixtureQ = New-Fixture -Label 'q'
-    $rQ = Invoke-NewBranch -Dir $fixtureQ -Name 'feat/no-remote-here' -Title 'No remote here'
+    $rQ = Invoke-NewBranch -Dir $fixtureQ -Name 'feat/no-remote-here-v1' -Title 'No remote here'
     Assert-Equal 0 $rQ.Code 'no origin: new-branch exit 0 -- the missing remote is not a failure'
     Assert-True (Test-Phrase -Text $rQ.Out -Phrase "no 'origin' remote") 'no origin: and says why nothing was pushed'
     $branchesQ = ((& git -C $fixtureQ branch --list 'feat/no-remote-here-v1') -join '').Trim()
@@ -1093,7 +1112,7 @@ Write-Output `$t.Type
     $fixtureR = New-Fixture -Label 'r'
     $bareR = New-BareOrigin -Dir $fixtureR -Label 'r'
 
-    $rR = Invoke-NewBranch -Dir $fixtureR -Name 'feat/park-is-default' -Title 'Park is default' -Park
+    $rR = Invoke-NewBranch -Dir $fixtureR -Name 'feat/park-is-default-v1' -Title 'Park is default' -Park
     Assert-Equal 0 $rR.Code '-Park: still exit 0'
     Assert-True (Test-Phrase -Text $rR.Out -Phrase 'the switch is accepted and changes nothing') '-Park: says out loud that it is the default now'
     Assert-True (Test-BranchOnRemote -Bare $bareR -Ref 'refs/heads/feat/park-is-default-v1') '-Park: and the push happened -- same outcome as (o), which is the point'
@@ -1116,7 +1135,7 @@ Write-Output `$t.Type
     Publish-FixtureTrunk -Dir $fixStale
     Add-OriginCommits -Bare $bareStale -Label 's' -Count 3
 
-    $rS = Invoke-NewBranch -Dir $fixStale -Name 'feat/cut-from-stale' -Title 'Cut from stale'
+    $rS = Invoke-NewBranch -Dir $fixStale -Name 'feat/cut-from-stale-v1' -Title 'Cut from stale'
     # A WARNING AND NOT A REFUSAL, which is the whole shape of the first step: the branch still exists.
     Assert-Equal 0 $rS.Code 'stale base: new-branch exit 0 -- this warns, it does not refuse'
     $branchesS = ((& git -C $fixStale branch --list 'feat/cut-from-stale-v1') -join '').Trim()
@@ -1145,7 +1164,7 @@ Write-Output `$t.Type
     $null = New-BareOrigin -Dir $fixCurrent -Label 't'
     Publish-FixtureTrunk -Dir $fixCurrent
 
-    $rT = Invoke-NewBranch -Dir $fixCurrent -Name 'feat/cut-from-current' -Title 'Cut from current'
+    $rT = Invoke-NewBranch -Dir $fixCurrent -Name 'feat/cut-from-current-v1' -Title 'Cut from current'
     Assert-Equal 0 $rT.Code 'current base: new-branch exit 0'
     Assert-True (Test-Phrase -Text $rT.Out -Phrase 'Base is current with origin/main') 'current base: says so, so silence is never ambiguous'
     Assert-True (-not (Test-Phrase -Text $rT.Out -Phrase 'behind origin/main')) 'current base: and warns about nothing'
@@ -1158,7 +1177,7 @@ Write-Output `$t.Type
     $fixNoTrack = New-Fixture -Label 'u'
     $null = New-BareOrigin -Dir $fixNoTrack -Label 'u'
 
-    $rU = Invoke-NewBranch -Dir $fixNoTrack -Name 'feat/never-fetched' -Title 'Never fetched'
+    $rU = Invoke-NewBranch -Dir $fixNoTrack -Name 'feat/never-fetched-v1' -Title 'Never fetched'
     Assert-Equal 0 $rU.Code 'no tracking trunk: new-branch exit 0'
     Assert-True (Test-Phrase -Text $rU.Out -Phrase 'Base not compared') 'no tracking trunk: says the question could not be asked'
     Assert-True (-not (Test-Phrase -Text $rU.Out -Phrase 'behind origin/main')) 'no tracking trunk: and claims no gap it cannot measure'

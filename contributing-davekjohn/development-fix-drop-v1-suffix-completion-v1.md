@@ -33,21 +33,64 @@
 
 ### PLAN
 
-Drop the unconditional -v1 completion in new-branch.ps1: 209 branches carried it, 0 ever bumped to -v2. A hand-typed -vN is still left as given and still the remedy the 'final' refusal points at. Resolves inbound #1224.
+Drop the unconditional `-v1` completion in `new-branch.ps1`. It ran from August 23, 2026; in 209 branches
+that reached a merge carrying the suffix, none was ever bumped to `-v2`, so the completion served a case
+that had not occurred while charging every caller for it. It was also the direct cause of inbound #1224 --
+a consumer wrapping the script for a branch whose name it does not own (a Dependabot PR branch) had a
+second branch `<their-name>-v1` created, committed to and pushed.
+
+A `-v<N>` suffix stays valid and is still what the `final` refusal in `branch-info.ps1` points at -- it is
+simply typed by hand now, never added. `new-branch` stays idempotent.
+
+Decision by Dave, September 3, 2026 (option B of the discussion on issue #1224).
+
+#### Scope
+
+- `scripts/task/new-branch.ps1` (+ plugin mirror) -- remove the completion block; the name flows through
+  as given.
+- `scripts/release/open-pr.ps1` (+ mirror) -- the "already merged" note no longer says new-branch
+  completes the follow-up name.
+- `scripts/lib/entry-scaffold-lib.ps1` (+ mirror) -- one comment that said "-v2 by construction" now says
+  "by convention".
+- Test suites: `new-branch.tests.ps1` (inputs carry `-v1` explicitly where the test is not about
+  completion; new block (b2) guards both directions), `worktree-lane.tests.ps1` (lane branch names lose
+  the `-v1`).
+- Docs: `05-05-extension.md`, `new-branch/SKILL.md`, `open-pr/SKILL.md`, `DEVELOPMENT-portable.md`,
+  `contributing-davekjohn/CONTRIBUTING.md`.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `new-branch.ps1` + plugin mirror: completion block removed, validation comment trimmed, a
+  "DO NOT RESTORE" note left in its place; mirrors held byte-identical.
+- [x] `open-pr.ps1` + mirror, `entry-scaffold-lib.ps1` + mirror: stale "completes the name" wording fixed.
+- [x] Docs updated across the five surfaces that described the suffix as automatic.
+- [x] Final grep sweep: no `new-branch completes` / `every branch name ends in -v<N>` references left.
 
 ### TEST
 
+- [x] `new-branch` suite -- 175 asserts pass, including the new (b2) block (bare name stays bare; explicit
+  `-v2` left as given).
+- [x] `worktree-lane` (35), `entry-scaffold` (669), `branch-info` (40), `branch-document-path` (24),
+  `park-cycle` (82), `worktree-lib` (44) -- all pass.
+- [x] Full lint gate + all suites via `open-pr.ps1`.
+
 ### DEPLOY: `fix/drop-v1-suffix-completion-v1`
 
-**Score:**
+`new-branch.ps1` no longer appends `-v1` to a branch name that carries no version suffix; the name is used
+exactly as given. A `-v<N>` suffix stays valid and is typed by hand for a second cycle on a subject.
+Resolves inbound #1224 -- a consumer wrapping `new-branch` for a branch whose name it does not own
+(Dependabot) no longer gets a second branch created. Behaviour change for everyone who runs `new-branch`
+here and in the three consuming repos, reached through a plugin update.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+For a repo consuming the workflow plugin: `new-branch` stops rewriting the branch name it is handed, which
+is what inbound #1224 needed. A consumer not wrapping it for foreign branches still sees the change --
+their branches stop gaining `-v1` -- noticed the next time they branch.
+
+**Score:** 3
 
 #### Pull Request
 
