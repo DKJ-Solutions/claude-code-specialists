@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/script-comments-branch-document-name` · 20260903-195451
+
+Fifteen comment lines across nine shared workflow scripts stopped naming the branch's development
+document by the retired fixed path `development.md`. Narrative comments now say "the branch's
+development document"; docstrings and worked examples name the current `contributing-davekjohn/<branch>.md`.
+Two comments that did not merely name the old path but argued from it -- `fold-changelog-entry.ps1`
+calling it "a FIXED path" and `open-pr.ps1` giving "every branch's document is called development.md"
+as the reason for a repo-relative path -- were rewritten to hold. Deliberate history (the six/seven
+rename records, the `SharedFile` legacy-name field, the append-only placeholder list, the
+glob-reachability notes) keeps the old spellings. Asked for in
+[#1337](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1337).
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- comment accuracy in the workflow scripts; no consumer-visible behaviour changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+Script comments name the branch document by its current per-branch path
+
+Plugins: contributing-davekjohn
+
+[PR #1340](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1340)
+
+---
+
 ### DEPLOY: feat/branch-document-name-and-headings · 20260903-193027
 
 The branch's development document is named after the branch and nothing else, and both of its headings
