@@ -80,6 +80,16 @@ them worth following.
 - [x] The local parts (75s lint, 401s suites at sixteen lanes) are attributed to the report throughout
       rather than re-run. Re-running them proves nothing `open-pr`'s own gate will not, and pre-running a gate
       is the waiting rule's own named waste.
+- [x] And the run that dropped step produced the sharpest instance the rule has: `open-pr`
+      measured **all 62 suites in 89s** at sixteen lanes -- same machine and same day as the
+      report's 401s, a **4.5x** spread with no code between them, larger than the local-vs-CI
+      factor this branch leads with. Added to the lens' evidence section; DEPLOY is left
+      untouched, because the PR published it and the DEPLOY lock reads that section at the merge.
+      The tooling half -- `Invoke-TestSuiteGate` prints the lane count only on its opening line,
+      never on the summary line a session actually quotes, which is the shape #1314's three
+      figures have verbatim -- is filed as
+      [#1318](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1318) rather than
+      fixed here: script change, wants a test, and this branch is documentation.
 - [~] Dropped: "lint + the full suite set green" is not a step by rule 5 of
       `DEVELOPMENT-portable.md` -- `open-pr` runs both gates as part of the push, so at the moment
       the step gate reads this list the step cannot be done, and ticking it would report a result

@@ -996,6 +996,24 @@ sibling of the unit, sample, factor and copy rules), and the DEPLOY-section half
 rule 8, because a figure written there folds into `CHANGELOG.md` and then into a release document. This
 section is the evidence they cite, which is this repo's convention for where a measurement lives.
 
+**And this branch's own gate produced the sharpest instance available, after the rule was written.**
+`open-pr` on `docs/gate-figure-scope-and-machine-v1` ran `check-plugin-integrity.ps1` clean and then
+**all 62 suites in 89s** — same machine as the report, same sixteen lanes, same day. Against the
+report's **401s** that is a **4.5x** spread with no code between them, which is a larger factor than
+either the CI comparison above (2x) or the load pair in the docstring (421s against ~200s idle). The
+suite count also moved from 61 to 62 in the hours between the two readings, which is why nothing in
+the rule is anchored to a suite count: the population changes under the figure as well as around it.
+
+**The tooling states one of the two facts, and on the wrong line.**
+[`Invoke-TestSuiteGate`](../../../scripts/lib/native-capture-lib.ps1) prints the lane count when it
+*starts* — `test gate: running all 62 test suites for the gate (16 at a time)...` — and its summary
+line carries only the count and the seconds: `test gate: all 62 suites passed in 89s.` The summary is
+the line that gets quoted, and #1314's own three figures have exactly its shape
+(*"61/61 passed in 471s"*). So the repo's gate hands a session a figure stripped of the fact the rule
+above requires, on the one line anybody copies. Filed as
+[#1318](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1318) rather than fixed here:
+it is a script change, this branch is documentation, and the fix wants a test.
+
 **The three figures themselves needed no repair.** They sit only in
 `contributing-davekjohn/development-fix-ship-pr-stale-ci-certificate.md`, in its CREATE and TEST
 sections; `fold-changelog-entry.ps1` folds **only** DEPLOY and removes the document, so none of them
