@@ -353,9 +353,6 @@ function New-MatcherFixture {
     # A one-file scratch script for the asserts below. $PID for the same reason New-Tree carries it: the
     # test gate runs suites in parallel, and two runs sharing a fixed path delete each other's file.
     param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Body)
-    # ONE LINE, and the test-suite gate is why: it scans line by line for a GetTempPath+Join-Path pair
-    # carrying a per-process discriminator, so a backtick continuation puts the $PID out of its sight and
-    # reports a path that is in fact per-process. Same single-line shape New-Tree above uses.
     $p = Join-Path ([System.IO.Path]::GetTempPath()) ("srguard-$PID-matcher-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.ps1')
     Set-Content -LiteralPath $p -Value $Body -Encoding UTF8
     return $p
