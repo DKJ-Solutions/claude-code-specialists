@@ -6328,3 +6328,93 @@ function Test-BranchChangelogIsFilled {
     }
     return $false
 }
+
+function Get-UnfoldedTrunkEntry {
+    <#
+        Every per-branch development document under contributing-davekjohn/ that is a WRITTEN entry and
+        does NOT belong to the branch the caller is on -- i.e. a fold that never ran after a merge,
+        leaving the entry stranded on the trunk with nothing saying so. Issue #1270, the residual
+        #1244 left behind: a PR merged from the GitHub UI (or any path that skips ship-pr.ps1) never
+        folds, and no gate downstream catches the leftover.
+
+        WHY THIS IS A FUNCTION AND NOT A ONE-LINER IN THE CHECK. Two callers need the identical answer
+        with the identical exclusions: the CI workflow on push to main, and the SessionStart hook that
+        ships in the workflow plugin. A second definition would be free to disagree about what "belongs
+        to this branch" means -- the same drift Resolve-BranchFilePath exists to prevent for the
+        sibling question.
+
+        THE INVARIANT IT ENFORCES: on the trunk, contributing-davekjohn/ carries no development-*.md at
+        all. new-branch.ps1 creates one on a branch, the fold removes it at the merge (Dave,
+        August 23, 2026 -- the document is branch-lifetime). So a WRITTEN one whose declared branch is
+        not the branch under HEAD is a leftover: on the trunk that is every written one, on a feature
+        branch it is every one except that branch's own -- a leftover rides into a checkout on the
+        trunk's tree through an ordinary merge and then sits beside the working branch's document.
+
+        NOT A gh CALL, deliberately. Whether the leftover's branch is merged, closed or still open does
+        not change the answer: a written entry on the trunk is folded or it is a defect, and the fold
+        is local. Staying offline is what lets the SessionStart hook run this in a consumer with no
+        token and no network.
+
+        THE ONE FALSE POSITIVE IT CAN RAISE is the ship window. ship-pr.ps1 pushes the merge commit and
+        then, seconds later, the fold commit that clears the document. Between the two the just-merged
+        document is on the trunk and this reports it -- correctly, because the trunk genuinely carries
+        an unfolded entry at that instant. The CI workflow's cancel-in-progress swallows the merge
+        commit's run; a session that starts in that window gets an accurate finding that the next
+        commit resolves.
+
+        WIDE READING OF THE DECLARED BRANCH, deliberately. Every file considered here sits at the fixed
+        development-*.md path and is a known-shape branch document, so the -OpeningHeadingOnly narrowing
+        the release cut's ROOT scan needs (inbound #1099) does not apply -- there is no arbitrary prose
+        to misread here.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # The branch whose own document is expected and therefore excluded. Empty -> resolve HEAD; on
+        # the trunk that resolves to the trunk name, which no document declares, so nothing is excluded
+        # and every written entry counts as a leftover.
+        [string]$CurrentBranch = ''
+    )
+    if (-not $CurrentBranch) {
+        # Best effort and silent on failure: a tree that is not a git checkout, or a detached HEAD,
+        # leaves this empty and every written document is then treated as a leftover -- which is the
+        # right default for a CI checkout of the trunk.
+        try {
+            $head = (& git -C $RepoRoot rev-parse --abbrev-ref HEAD 2>$null)
+            if ($LASTEXITCODE -eq 0 -and $head) {
+                $head = ([string]$head).Trim()
+                if ($head -and $head -ne 'HEAD') { $CurrentBranch = $head }
+            }
+        } catch { }
+    }
+
+    $paths = Get-BranchFilePaths
+    $dir = Join-Path $RepoRoot ([string]$paths.Directory -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
+
+    # The per-branch pattern, plus the pre-#1255 shared name explicitly: 'development-*.md' requires the
+    # hyphen, so 'development.md' -- carried by every branch open across the #1255 change -- is not in
+    # the glob and has to be named. The declare-test below is what admits or rejects each hit.
+    $candidateRels = @(
+        Get-ChildItem -LiteralPath $dir -Filter ([string]$paths.Pattern) -File -ErrorAction SilentlyContinue |
+            ForEach-Object { "$([string]$paths.Directory)/$($_.Name)" }
+    ) + @([string]$paths.SharedFile) | Sort-Object -Unique
+
+    $findings = New-Object System.Collections.Generic.List[object]
+    foreach ($rel in $candidateRels) {
+        if (-not $rel) { continue }
+        $full = Join-Path $RepoRoot ($rel -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
+        $text = [System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8)
+        # A reset stub declares the trunk and Test-BranchChangelogIsFilled is false for it -- not a
+        # leftover, just the shape the fold leaves on a shared-name branch mid-transition.
+        if (-not (Test-BranchChangelogIsFilled -Text $text)) { continue }
+        $declared = Get-BranchFileDeclaredBranch -Text $text
+        if (-not $declared) { continue }
+        if ($declared -eq $CurrentBranch) { continue }
+        $findings.Add([pscustomobject]@{
+            Rel            = $rel
+            DeclaredBranch = $declared
+        }) | Out-Null
+    }
+    return $findings.ToArray()
+}

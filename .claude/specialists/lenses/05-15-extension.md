@@ -120,7 +120,22 @@ infrastructure.
   ([#1255](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1255)). The document is named
   per branch now, so two branches never write the same path and a leftover on the trunk collides with
   nobody. **What this ruleset still costs is the leftover itself** — an unfolded entry sitting on `main`
-  with nothing saying so — which is the half #1244 owns and this change does not repair.
+  with nothing saying so — which is the half #1244 owns and the per-branch rename did not repair.
+
+  **That half is no longer silent as of September 3, 2026**
+  ([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270)). `check-unfolded-entry.ps1`
+  reports a written `contributing-davekjohn/development-*.md` on the trunk whose declared branch is not the
+  one under HEAD — the invariant being that the fold removes it at the merge, so on `main` there should be
+  none. It runs from two places, because neither reaches the whole population on its own: a CI workflow
+  (`.github/workflows/unfolded-entry.yml`, `push` to `main`, **not** in `main-ci-gate` — the same
+  Dave's-call reasoning as `branch-entry.yml`, and a required check cannot gate a push anyway) catches it
+  regardless of who merged or how, and a SessionStart hook (`unfolded-entry-sessioncheck.ps1`, workflow
+  plugin) tells the next specialists session at start rather than leaving it to Chris's manual
+  `verify-stand-against-repo` check. Neither calls `gh`: a written entry on the trunk is folded or it is a
+  defect, whatever the branch's PR state, and the fold is local. The one false positive it can raise is the
+  ship window — `ship-pr` pushes the merge commit and then, seconds later, the fold commit — which the CI
+  workflow's `cancel-in-progress: true` swallows and a session reads as a finding that resolves itself. The
+  detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`, one definition for both callers.
 
   **The hazard that made it urgent is worth keeping, because it is what a reader would otherwise
   rediscover.** Resolving that conflict in favour of the incoming branch **destroys an unfolded DEPLOY
@@ -340,6 +355,11 @@ infrastructure.
   [#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251), deliberately not folded in
   here.
 
+- **`.github/workflows/unfolded-entry.yml` + `scripts/lint/check-unfolded-entry.ps1`** — the
+  skipped-fold gate (issue #1270). The workflow runs the check on every `push` to `main`; the check is
+  mirrored into the workflow plugin and also driven by `unfolded-entry-sessioncheck.ps1`. Advisory, not
+  in `main-ci-gate`. The full reasoning is in the `#1244` chain-reaction passage on the `ci.yml` bullet
+  above; the detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
