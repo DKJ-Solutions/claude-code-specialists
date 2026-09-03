@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/asana-mirror-concurrency-drops-state-event` · 20260903-142021
+
+`asana-mirror.yml`'s concurrency key is now split into two groups per issue instead of one, so a burst
+of label events on an issue can no longer drop a pending `closed` or `reopened` run. `cancel-in-progress`
+was never what protected them: a group holds one in-progress run plus one *pending* one, and a third
+arrival drops the waiting one without consulting that field -- the mechanism measured on this repo's own
+`ci.yml` in #1294. `labeled`/`unlabeled` keep the shared per-issue group and coalesce, which is correct
+for them: their card move is recomputed from live state, so the last arrival of a burst lands the card
+where the whole burst put it. `closed`/`reopened` get a group of their own, because their comment is
+keyed on the event and a dropped one is a comment nobody ever posts -- and a dropped `reopened` is
+unrecoverable, since no sweep comments on a reopen and the reopen is the only thing that grants a
+backward move. The comment above the block now names which arrivals are expendable, and the bwj-codex
+suite pins the split.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running the Asana mirror keeps a reopen notice that could previously vanish without trace:
+no red run, no failed check, just a `cancelled` run nobody investigates and a card left in the wrong
+column. The daily reconciliation sweep never covered this one -- it comments only on closed issues and
+only ever moves a card forward.
+
+**Score:** 3
+
+#### Pull Request
+
+asana-mirror's concurrency group is split, so a triage burst can no longer drop a pending close or reopen
+
+Plugins: bwj-codex
+
+[PR #1305](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1305)
+
+---
+
 ### DEPLOY: `fix/ci-trunk-pending-run-displaced` · 20260903-140852
 
 `.github/workflows/ci.yml` now keys each push to `main` on its own commit (`github.sha`), so no trunk
