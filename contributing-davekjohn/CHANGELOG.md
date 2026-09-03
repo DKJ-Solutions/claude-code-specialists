@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/merge-queue-decision · 20260903-230954
+
+The merge-queue question for `main` is answered and closed: **no queue**. #1351's CI sharding took the
+stale-certificate event from 31.9% at ~13 min to 12.3% at ~5 min -- an expected ~37 seconds per merge --
+and against that a queue buys a repo-settings change, a `ship-pr.ps1` step-3b rebuild that is dead code
+until the day of the flip, and a GitHub-side mechanism in the middle of a chain the repo's own scripts
+own end to end. The throughput objection had been discharged by the same change, so this is a no on
+price rather than on feasibility.
+
+The reasoning lives in the merge-queue block of Sylvester's lens, beside #1325's history: the decision
+and its price, the generalisable half (an option whose case rests on a measured cost has to be
+re-argued the day that cost is measured away), the **third prerequisite left deliberately unbuilt** with
+its three candidate shapes, two things a future flip should not learn the hard way (`--merge` may or may
+not be accepted against a queue-backed branch; `allow_auto_merge` is `false`, so a yes is plausibly two
+settings), and the condition that would reopen it -- fire rate back above ~25%, or CI past ~10 minutes.
+
+Two stale claims went with it: `ci.yml` no longer says the decision is open, and
+`merge-queue-prereq.tests.ps1` now says why its two guards stay despite the no.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a consumer of the plugins. The lens is repo-local, and the two other edits
+are a workflow comment and a test-suite header; no plugin payload changes and no released behaviour
+differs.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the merge-queue decision for main: no queue, and why
+
+[PR #1359](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1359)
+
+---
+
 ### DEPLOY: fix/ship-pr-watch-before-registration · 20260903-225906
 
 `ship-pr` no longer mistakes a `gh pr checks --watch` that started before the CI checks registered
