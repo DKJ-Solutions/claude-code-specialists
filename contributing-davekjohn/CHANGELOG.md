@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/entry-file-detector-ranges-down · 20260903-220538
+
+Both copies of `Test-IsChangelogEntryFile` -- in `fold-changelog-entry.ps1` and in
+`check-plugin-integrity.ps1` -- built their level range as `entry level .. entry level + 1`. After the
+August 26, 2026 shift that resolved to `^#{3,4}\s`: it matched the current H3 shape and an H4 no entry
+has ever opened with, and missed the flat-window H2 (`## <title>`) that every entry written between
+August 5 and 26, 2026 carries. `Test-BranchChangelogIsFilled` took the other direction on that same
+day, so two predicates answering "is this an entry file" disagreed. The range now runs down
+(`entry level - 1 .. entry level`, `^#{2,3}\s`), matching `Test-BranchChangelogIsFilled`. Fold-all mode
+and check 13 (`[entry-heading]`) now recognise a flat-window entry file instead of skipping it
+silently. Test fixtures that pinned the phantom H4 (`New-LegacyEntryFile`, the check-13 "pre-format"
+fixture) now write the flat-window H2 that actually sits on parked branches. Comments-only prose about
+these levels stays with #1341.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a fold-all recognition fix in the release tooling. A subscriber of a consuming service never
+sees it.
+
+**Score:** N/A
+
+#### Pull Request
+
+range the entry-file detector down from the entry level so a flat-window H2 entry is recognised
+
+Plugins: contributing-davekjohn
+
+[PR #1349](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1349)
+
+---
+
 ### DEPLOY: feat/merge-queue-prerequisites · 20260903-214122
 
 Both prerequisites a GitHub merge queue needs are now in the tree, so the queue can be switched on
