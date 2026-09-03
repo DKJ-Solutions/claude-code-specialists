@@ -5114,8 +5114,8 @@ function Get-BranchFilePaths {
         see the old pair would strand a half-finished branch with its entry unfolded and its step list
         unread, which is the silent half-state this repo keeps rediscovering.
 
-        SO: recognise four names, write one. Resolve-BranchFilePath is the reader; every WRITER uses File
-        and nothing writes a legacy name again.
+        SO: recognise every predecessor, write one. Resolve-BranchFilePath is the reader; every WRITER uses
+        File and nothing writes a legacy name again.
 
         THE FOLDER ITSELF RENAMED ON AUGUST 26, 2026 (#886): 'workflow-davekjohn/' ->
         'contributing-davekjohn/'. That is the same class of change as the two above and gets the same
@@ -5128,7 +5128,35 @@ function Get-BranchFilePaths {
         'development.md', following its own heading -- see ProgressTitle in $script:BranchFileDefaults.
         Fifth rename, same answer, and by now the answer is the pattern rather than a decision each time:
         the prior name joins the names that are READ and nothing writes it again. PriorNameFile is that
-        entry. Eight names read, one written.
+        entry.
+
+        AND THE DOCUMENT BECAME ONE PER BRANCH ON SEPTEMBER 3, 2026 (#1255): 'development.md' ->
+        'development-<slug>.md', the slug being the branch with its slashes flattened. Sixth rename, same
+        answer -- SharedFile is the pre-#1255 shared name, read and never written, and every branch open on
+        the day of the change is carrying it, here and in every consumer. What the fixed name actually cost
+        is worth naming, because the reasoning for it said the wrong thing: it did not collide on CHECKOUT,
+        which git handles per branch. It collided on MERGE. Every merge to the trunk left every other open
+        PR conflicting on this one file, and a conflicting PR gets no check suite at all -- so it could
+        never go green and could never merge.
+
+        PATTERN IS THE ONE ROW THAT IS NOT A NAME, and it arrived with that same change because a per-branch
+        set cannot be listed in advance. Resolve-BranchFilePath sweeps this glob over Directory to find every
+        OTHER per-branch document in the folder -- a branch renamed after new-branch ran, a document written
+        by hand, a leftover from a fold that was blocked -- and then asks each hit which branch it DECLARES,
+        which is what keeps the filename from becoming the authority (the trap the pre-August-2026
+        per-branch form set, and the reason a '-v2' suffix was once forbidden). Test-IsPerBranchDocumentPath
+        reads the same glob, for the mirror-image reason: the lint gate's two exclusion checks each held a
+        fixed list, and a list cannot answer a pattern -- the moment the documents were named per branch,
+        every one of them fell out of both checks silently.
+
+        THE READ SET IS DELIBERATELY NOT COUNTED HERE ANY MORE. This narrative said 'four names' after the
+        August 19 rename, 'seven' after #886 and 'eight' after #963, and #1255 then added SharedFile without
+        touching the number -- a hand-maintained count in prose beside a table that grows once per rename.
+        Since #1259 there is one ordered source to read instead: Get-BranchFileLegacyNames returns the legacy
+        candidates for a given -Kind, Resolve-BranchFilePath tries this branch's own name and the Pattern
+        sweep ahead of them, and new-branch's writer feeds that same list to its own target-picking so a
+        rerun on an old name keeps writing there. The half that never changes is the half worth stating:
+        one name is written, File, and nothing writes a legacy name again.
 
         WHY THERE IS NO 'workflow-davekjohn/development.md' IN THIS TABLE, since its absence looks like an
         omission next to the five PriorFolder* rows: that pair never existed. The folder was renamed on
