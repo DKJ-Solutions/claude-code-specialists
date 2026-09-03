@@ -59,6 +59,9 @@ A green required check certifies the merge of the branch into main AS OF THE MOM
   failed fetch/log -- that read is not the one that has to fail closed; the required-check-list
   read at step 3 already does. Repo-settings option 1 from #1292
   (`strict_required_status_checks_policy: true`) is untouched -- Dave's call, not this branch's.
+  **Superseded by the re-anchor below: the warn-and-ship posture on an unresolved read was reversed
+  once a required check is named -- see `#### Re-anchor after Marlowe's red-team...` under this same
+  heading for what actually ships now.**
 - [x] Synced the mirror via `scripts/sync/build-shared-scripts.ps1` (the repo's own generator, not
   a hand copy) -- `plugins/workflows/contributing-davekjohn/scripts/{release/ship-pr.ps1,
   lib/pr-issues-lib.ps1}` are byte-identical to the root copies (`diff` confirmed).
@@ -118,6 +121,45 @@ A green required check certifies the merge of the branch into main AS OF THE MOM
 - [x] Re-synced the mirror (`scripts/sync/build-shared-scripts.ps1`, `diff`-confirmed identical) and
   re-ran `pr-issues.tests.ps1` + the lint gate + the full 61-suite gate once each -- see the TEST
   section below for the numbers Tycho's tests needed to match the re-anchor.
+
+#### Review round (Victor, Edith, Sebastian on the re-anchored diff) -- six repairs, one blocking
+
+- [x] **BLOCKING (Sebastian): credential leak on a failing `git fetch origin main`.** No
+  `-DiscardStderr` on that call, and its `Output` (stderr merged in) was echoed verbatim on failure --
+  a failing fetch echoes the remote URL, a secret on an HTTPS clone with an embedded credential. Same
+  lesson and same guard as `new-branch.ps1`'s own base-freshness fetch (its comment names it
+  explicitly). Added `-DiscardStderr`, dropped the raw-output echo; the refusal message already said
+  everything actionable. Sebastian found a pre-existing sibling at the fold-step fetch and filed it
+  separately as **#1313** rather than folding it in here -- left alone, not this branch's.
+- [x] **`git log` missing `-DiscardStderr` (Victor and Sebastian, independently).** Its output feeds
+  `$newMainCommits` -> `Get-StaleCertificateVerdict`, the same PARSED-output reasoning the `gh api`
+  call three lines up already states for itself. Added the flag.
+- [x] **Hardened the refusal regardless of the above (Victor).** He reproduced a non-SHA line reaching
+  `Output` turning `$_.Substring(0, 8)` into a raw `.NET` exception ("length must refer to a location
+  within the string") right before the refusal that was supposed to print -- fails safe (nothing
+  merges) but with a stack trace instead of the message. Guarded with a length check: a short entry is
+  shown whole rather than dropped, so the count and the list still agree.
+- [x] **`SKILL.md` step-3b summary said `started` (Victor).** The exact wrong-direction anchor word
+  this branch's re-anchor replaced, three paragraphs above the detailed section that already said
+  `created` correctly. One word, fixed.
+- [x] **`SKILL.md`'s `-Force` row cross-reference broke on insertion (Edith).** "Deliberately separate
+  from the two above" pointed at `-SkipTests`/`-SkipStaleCheck` once my row landed between
+  `-SkipTests` and `-Force` -- and "those skip a tool" is false of `-SkipStaleCheck`. Named
+  `-SkipLint`/`-SkipTests` explicitly instead of positionally, per Edith's stated preference (the next
+  insertion breaks a positional reference again).
+- [x] **This CREATE section's own stale claim (Edith).** The bullet above describing step 3b's first
+  build still stated its now-superseded warn-and-ship posture as current fact. Left the bullet as the
+  true record of that commit (matching the convention already set in TEST) and added a one-line
+  forward pointer to the `#### Re-anchor` subsection above, which is what actually ships now.
+- [x] **Not acted on, deliberately.** Edith's 10+ flagged `github.com/DaveKJohn/...` links: verified by
+  Chris as 200s (GitHub redirects the old org path) against 1,586 identical links tree-wide -- withdrawn,
+  not touched. Victor's note on `$staleCheckNames.Count -eq 0` warning rather than refusing (the same
+  ambiguity `Get-MergeBlockVerdict` itself cannot resolve): judged deliberate by both Victor and Chris:
+  refusing there would permanently block `ship-pr` on every ruleset-less consumer, which this payload
+  reaches. Checked that the tradeoff is already explicit in the comment above that branch (it names the
+  ambiguity and the cost of refusing) rather than left to be inferred -- it was; no change made.
+- [x] Re-synced the mirror again (`diff`-confirmed identical) and re-ran the lint gate + the full
+  61-suite gate once each after these six repairs -- numbers in TEST below.
 
 ### TEST
 
@@ -213,6 +255,14 @@ failed. `check-plugin-integrity.ps1`: 0 errors (run twice -- once before the `SK
 the corrected mechanism, once after, since that edit landed after the first pass; both clean).
 `Invoke-TestSuiteGate` over all 61 suites, parallel, exactly as CI runs it: 61/61 passed in 360s, 0
 failures, nothing already red.
+
+**Re-run again after the Victor/Edith/Sebastian review round's six repairs (credential-leak fix,
+`-DiscardStderr` on `git log`, the `Substring` length guard, the two `SKILL.md` wording fixes, the
+CREATE forward-pointer):** re-synced (`diff`-confirmed identical), `pr-issues.tests.ps1` alone: 606
+asserts, 0 failed (the assertions target refusal TEXT, not the exact `Invoke-NativeCapture` argument
+list, so adding `-DiscardStderr` and the length guard needed no test changes). `check-plugin-
+integrity.ps1`: 0 errors. `Invoke-TestSuiteGate` over all 61 suites, once as asked: 61/61 passed in
+398s, 0 failures.
 
 ### DEPLOY: `fix/ship-pr-stale-ci-certificate`
 

@@ -88,7 +88,7 @@ The six steps, stopping on the first failure:
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
 
    **Then, has `main` moved since the run that certified this PR (step 3b)?** A required check tests
-   GitHub's merge ref as it stood when its run started and is never refreshed if `main` moves
+   GitHub's merge ref as it stood when its run was created and is never refreshed if `main` moves
    afterward, so a green check can go stale before the merge. See
    [Has `main` moved since the certifying run?](#has-main-moved-since-the-certifying-run-1292).
 4. **Merge** (`gh pr merge`), but first the **step-list gate again**: the phases above the DEPLOY heading in
@@ -118,7 +118,7 @@ The six steps, stopping on the first failure:
 | `-SkipLint` | Passed through to `open-pr`: skip the lint gate. An escape valve. |
 | `-SkipTests` | Passed through to `open-pr`: skip the test gate. An escape valve. |
 | `-SkipStaleCheck` | Skip step 3b's certificate-staleness check (issue #1292): merge even though `main` gained a commit after the run that certified this PR was created, or that check could not be completed at all. Use it only when the situation is known-harmless — e.g. the commits `main` gained are docs-only, or you have confirmed by hand that the certificate is sound. |
-| `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from the two above — those skip a tool, this overrules a judgement about content. |
+| `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from `-SkipLint`/`-SkipTests` — those skip a tool, this overrules a judgement about content. |
 | `-RefreshBody` | Passed through to `open-pr`: on a branch whose PR is **already open**, rewrite that PR's description from the current changelog entry. Opt-in, so a body edited on github.com is never overwritten unasked. No effect when the PR is created in this run. |
 | `-PollSeconds` | Poll interval in seconds for the CI wait. Default 15. |
 

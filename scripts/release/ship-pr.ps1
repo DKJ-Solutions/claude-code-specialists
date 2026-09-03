@@ -1018,14 +1018,19 @@ certificate anyway.
             exit 1
         }
 
-        $fetchMain = Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', 'origin', 'main', '--quiet')
+        # -DiscardStderr ON THE FETCH, and not only for tidiness: a failing git fetch echoes the remote
+        # URL, which in a repo cloned over HTTPS with a credential in the URL is a secret -- the same
+        # lesson and the same guard as new-branch.ps1's own base-freshness fetch. So this path prints
+        # nothing of git's own output; the refusal below says everything an operator can act on.
+        $fetchMain = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('fetch', 'origin', 'main', '--quiet')
         if ($fetchMain.ExitCode -ne 0) {
-            $fetchMain.Output | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
             Write-Error "stale-CI check: 'git fetch origin main' failed -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
             exit 1
         }
         $sinceStr = $certifiedSince.ToString('yyyy-MM-ddTHH:mm:ssZ')
-        $mainLog = Invoke-NativeCapture -FilePath 'git' -Arguments @('log', 'origin/main', '--first-parent', '--since', $sinceStr, '--pretty=format:%H')
+        # -DiscardStderr for the same reason the gh api call above carries it: this output is PARSED
+        # (it becomes $newMainCommits below), so a git warning merged into it would break the parse.
+        $mainLog = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('log', 'origin/main', '--first-parent', '--since', $sinceStr, '--pretty=format:%H')
         if ($mainLog.ExitCode -ne 0) {
             Write-Error "stale-CI check: could not read the history of 'origin/main' -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway."
             exit 1
@@ -1034,7 +1039,15 @@ certificate anyway.
         $newMainCommits = @($mainLog.Output | Where-Object { $_ -and "$_".Trim() })
         $staleVerdict = Get-StaleCertificateVerdict -NewMainCommits $newMainCommits
         if ($staleVerdict.Stale) {
-            $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object { $_.Substring(0, 8) }) -join ', '
+            # SUBSTRING GUARDED BY LENGTH, not assumed. -DiscardStderr above makes a non-SHA line in
+            # $newMainCommits unlikely, not impossible, and this refusal is the one place in the whole
+            # gate where a short string would otherwise turn a careful message into a raw .NET
+            # exception (Substring throwing "length must refer to a location within the string") --
+            # right before the sentence that tells the operator what to do. A short entry is shown
+            # whole rather than dropped, so the count and the list still agree.
+            $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object {
+                if ($_.Length -gt 8) { $_.Substring(0, 8) } else { $_ }
+            }) -join ', '
             Write-Error @"
 stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
 started (issue #1292) -- NOT merged.
