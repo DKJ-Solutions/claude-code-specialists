@@ -32,6 +32,33 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/prune-merged-recycled-sentence-v1` · 20260903-144031
+
+`prune-merged`'s kept-branch reason no longer claims a recycled name it never checked for. When a
+branch is kept because its name is in the merged set but its tip is not, the message now names
+what was measured -- "a merged PR used this name, but not this commit" -- and offers a recycled
+name or a post-merge commit as the possible causes, instead of asserting the first and (in the
+remote pass) calling the head "live work". Wording only; the refusal to delete is unchanged.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `prune-merged -IncludeRemote` gets a kept-head reason that is actionable
+instead of one that sends them hunting for a recycled name that may not exist.
+
+**Score:** 2
+
+#### Pull Request
+
+prune-merged names what it measured instead of asserting a recycled name
+
+Plugins: contributing-davekjohn
+
+[PR #1308](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1308)
+
+---
+
 ### DEPLOY: `fix/asana-mirror-concurrency-drops-state-event` · 20260903-142021
 
 `asana-mirror.yml`'s concurrency key is now split into two groups per issue instead of one, so a burst
