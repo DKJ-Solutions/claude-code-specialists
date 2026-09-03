@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/gate-records-per-suite-durations · 20260904-000118
+
+The test gate now reports **how long each suite took**, not just the pool total. After the suites finish it
+prints a table sorted slowest first, and marks the one suite that set the run's wall clock -- the only one
+whose shortening moves the total.
+
+Each row carries a second figure that matters more than it looks: **when that suite's lane opened**. The
+gate runs suites in parallel and holds each one's output until it exits, so a log timestamp has always been
+a *finish* time. Reading a duration out of it silently assumes the suite started when the run did, which is
+only true for the first few. That assumption produced a real error: a five-file "plateau" reported against
+this pool had four members, because two of the five were 5th and 9th in a four-lane queue and their lane
+wait was being read as runtime. One of them was reported at 189s and takes 17s.
+
+The header says so where it can be seen -- *"a late start is lane wait, not runtime"* -- and the numbers no
+longer need reconstructing. The first recorded run already reorders the top of the list and shows the
+expensive band is around a dozen suites rather than five.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is a measuring instrument shipped *because* a measurement went wrong, and it was asked for by the person
+whose issue the measurement contradicted -- @maikel-bwj retitled #1358 to put this first rather than
+defending the original numbers. The test for it is the nice part: the serial six-suite run separates a
+recorded duration from a reconstructed one by 6x (largest lane offset +7.3s against a largest duration of
+1.4s), so the assert fails loudly if anyone ever reintroduces the finish-time reading.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record per-suite durations in the test gate
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1364](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1364)
+
+---
+
 ### DEPLOY: fix/shared-ast-pass-and-plateau-facts · 20260903-234119
 
 The lint gate parses and walks this repo's script set **once** per run instead of twice. Two checks that
