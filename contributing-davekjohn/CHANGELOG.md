@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/unfolded-entry-on-main-unguarded-v1` · 20260903-104728
+
+A merge that skips the fold -- a PR merged from the GitHub UI, or any path that bypasses `ship-pr.ps1`
+-- used to leave the branch's `### DEPLOY:` entry trapped in `contributing-davekjohn/development-*.md`
+on `main`, with `CHANGELOG.md` never receiving it and a release cut in that window silently missing the
+change. Measured on #1266: PRs #1253 and #1261 sat unfolded for ~10 hours.
+
+`check-unfolded-entry.ps1` now reports any written `development-*.md` on the trunk whose declared branch
+is not the one checked out (the invariant: the fold removes it at the merge, so `main` carries none).
+It runs from two places because neither covers the whole population: `.github/workflows/unfolded-entry.yml`
+on every `push` to `main` catches it regardless of who merged or how (advisory -- making it required is
+Dave's repo-settings call, and a required check cannot gate a push anyway), and the SessionStart hook
+`unfolded-entry-sessioncheck.ps1` tells the next specialists session at start instead of relying on
+Chris's manual `verify-stand-against-repo` check. Neither calls `gh`. The one false positive -- the
+seconds between `ship-pr`'s merge commit and its fold commit -- is swallowed by the workflow's
+`cancel-in-progress` and reads to a session as a finding that resolves itself.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- an internal CI guard and a session hook; no subscriber of any service notices it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Guard against a skipped fold leaving an unfolded entry on main
+
+Plugins: contributing-davekjohn
+
+[PR #1276](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1276)
+
+---
+
 ### DEPLOY: `docs/carry-1255-rename-into-portable-pages-v1` · 20260903-104428
 
 The #1255 rename -- one branch document per branch, `development-<branch>.md` -- is carried into the six
