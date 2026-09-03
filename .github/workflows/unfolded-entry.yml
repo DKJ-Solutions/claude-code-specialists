@@ -9,7 +9,7 @@
 # is caught regardless of who merged or how.
 #
 # WHY A SEPARATE WORKFLOW AND NOT A JOB IN ci.yml -- and why `push` only, never `pull_request`. On a PR
-# the branch legitimately carries its own development-*.md, so a check for "a development document on
+# the branch legitimately carries its own per-branch document, so a check for "a development document on
 # this ref" would be red on every PR. It is only a defect on the TRUNK, where the fold is supposed to
 # have removed it. That makes the trigger the whole point of the check, and a trigger belongs to a
 # workflow rather than to a job -- the same reasoning branch-entry.yml states for the opposite case.

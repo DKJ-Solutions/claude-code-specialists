@@ -463,11 +463,11 @@ if (-not $branchType) {
     Write-Host "Unknown branch prefix '$($info.Prefix)' - 'Branch type' set to '$branchType', adjust this by hand if needed." -ForegroundColor Yellow
 }
 
-# THE BRANCH ID, STAMPED AT CREATION. A timestamp is what the field's own hint asks for, and it is the
-# one identifier available here that needs no state and cannot collide with a branch created on another
-# machine. THE SECOND IS PART OF IT deliberately: two branches created in the same minute is not a
-# hypothetical in a repo whose whole workflow is "notice it once, script it the second time".
-$branchId = (Get-Date).ToString('yyyyMMdd-HHmmss')
+# NO BRANCH ID ANY MORE (Dave, #1335, September 3, 2026). It was a creation timestamp, stamped onto the
+# document's own heading, and the heading is the branch name and nothing else now. Nothing ever read it
+# back: the changelog orders entries by the MERGE stamp, which the fold writes onto the entry's 'Pull
+# Request' heading from the PR's own mergedAt. Gone here rather than computed and dropped at the call, so
+# there is no unused local left behind to look like something the writer forgot to pass.
 
 # THE BRANCH'S WORKING DOCUMENT LIVES AT contributing-davekjohn/development.md, NOT IN THE REPO ROOT
 # UNDER THE BRANCH'S NAME (Dave, August 6, 2026; moved under the workflow's own root folder August 14,
@@ -510,13 +510,16 @@ function Get-BranchFileTargetRel {
     return $Current
 }
 
-# -Legacy IS Resolve-BranchFilePath's OWN LEGACY LIST (#1259): the pre-#1255 shared name, the pre-#963
-# filename, the branch/ pair, and the pre-#886 workflow-davekjohn/ set -- in the reader's order. The
-# shared name leads because on the day of #1255 every branch in flight is working in it, and a rerun
-# that did not see it would split that work across two documents; the names behind it are the earlier
-# renames, each protecting a branch that never moved off its old name.
+# -Legacy IS Resolve-BranchFilePath's OWN LEGACY LIST (#1259): the pre-#1335 'development-<slug>.md', the
+# pre-#1255 shared name, the pre-#963 filename, the branch/ pair, and the pre-#886 workflow-davekjohn/ set
+# -- in the reader's order. The newest predecessor leads because on the day of a rename every branch in
+# flight is working in it, and a rerun that did not see it would split that work across two documents; the
+# names behind it are the earlier renames, each protecting a branch that never moved off its old name.
+#
+# -Branch IS PASSED SINCE #1335, and it has to be: the newest predecessor is the first legacy name in this
+# system's history that is branch-DEPENDENT, so a list built without a branch simply does not contain it.
 $cycleRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.File `
-    -Legacy (Get-BranchFileLegacyNames -Kind 'Cycle') -Branch $branch
+    -Legacy (Get-BranchFileLegacyNames -Kind 'Cycle' -Branch $branch) -Branch $branch
 $cyclePath = Join-Path $repoRoot ($cycleRel -replace '/', '\')
 
 if (-not (Test-Path -LiteralPath $branchDirPath)) {
@@ -633,15 +636,15 @@ if ($cycleTaken) {
         # NO DATE IN THE ENTRY, DELIBERATELY (Dave, August 5, 2026). This runs when the BRANCH is created, so
         # any date it writes is the branch's birth date -- and the changelog records what LANDED when. The
         # entry's date is the fold's to add, from the PR's own merge timestamp, together with the PR number.
-        # The CREATION stamp does belong here: it is the document's own heading, and this document is created
-        # with the branch and reset with the merge.
+        # SINCE #1335 THAT HOLDS FOR THE DOCUMENT'S HEADING TOO: the creation stamp used to sit there on the
+        # reasoning that the document is created with the branch. It is the branch name alone now.
         # THE LINK BASE IS THIS REPO'S OWN (inbound #967), not a constant. In the source repo it resolves to
         # the root and the sentence is word for word what it always said; in a consumer on the shipped
         # defaults it resolves to the workflow folder -- the same directory this document is in -- where the
         # old wording told the author to write the one link form the fold would break.
         $linkDestDirRel = ((Split-Path (Get-SeamValue -Name 'Get-ChangelogPath' `
             -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)) -Parent) -replace '\\', '/').Trim('/')
-        $cycleText = ((Format-Development -Branch $branch -Intent $Intent -Id $branchId `
+        $cycleText = ((Format-Development -Branch $branch -Intent $Intent `
             -Description $description -Type $branchType -Body $body `
             -LinkDestDirRel $linkDestDirRel) -join "`n") + "`n"
         [System.IO.File]::WriteAllText($cyclePath, $cycleText, $Utf8NoBom)

@@ -559,7 +559,7 @@ try {
     # reset with the branch. Still asserted as the WHOLE line -- the stronger claim, because it proves
     # nothing at all was appended.
     $headLine1 = ($entryText1 -split "`r?`n")[0]
-    Assert-True ($headLine1 -match ('^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: `feat/my-task-v1`$')) 'entry heading names its title and the branch, whole and at the entry level'
+    Assert-True ($headLine1 -match ('^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: feat/my-task-v1$')) 'entry heading names its title and the branch, whole and at the entry level'
     Assert-Equal 'First title' (Get-EntryDescription -EntryText $entryText1) 'and the title given to new-branch is the PR title'
     Assert-True (Test-EntryDeclaresType -EntryText $entryText1 -Type 'Feat') 'and the branch type is readable -- off the branch the heading names'
     # NO DATE AND NO STAMP, which is the same claim in two shapes: a 'yyyy-MM-dd' would read as the landing
@@ -704,7 +704,7 @@ try {
     Assert-Equal $maliciousTitle (Get-EntryDescription -EntryText $entryTextF) 'malicious title: FULLY and unchanged in its section, and nothing appended (no argv splitting)'
     # ...and the heading is untouched by it, which is new ground the split opened: a payload that escaped its
     # section would show up here first.
-    Assert-True ((($entryTextF -split "`r?`n")[0]) -match ('^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: `feat/injection-check-v1`$')) 'malicious title: and the heading still names the branch, nothing more'
+    Assert-True ((($entryTextF -split "`r?`n")[0]) -match ('^' + ('#' * (Get-EntryHeadingLevel)) + ' DEPLOY: feat/injection-check-v1$')) 'malicious title: and the heading still names the branch, nothing more'
     Assert-True (Test-EntryDeclaresType -EntryText $entryTextF -Type 'Feat') 'malicious title: and the type still reads off that heading rather than absorbing part of the payload'
 
     Assert-True (Test-Path -LiteralPath $sentinelPath) "sentinel file 'X' UNTOUCHED -- no 'Remove-Item' executed via a broken argv"

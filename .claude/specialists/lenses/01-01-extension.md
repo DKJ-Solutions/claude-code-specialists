@@ -40,7 +40,7 @@ product: agent defs, manuals, docs, and tooling.
   or it is complete, current, and **transcribes a cause that does not exist**. So before treating a
   briefing as the work list, read the repo's own answer — `git status`/`git log`, the **pending entries**
   in [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md) (one `###` per change under
-  `## [Unreleased]`, furthest reach first), **`contributing-davekjohn/development-<branch>.md` on the trunk** (it
+  `## [Unreleased]`, furthest reach first), **`contributing-davekjohn/<branch>.md` on the trunk** (it
   exists only while a branch is open, so a copy sitting on `main` is a silent half-state — since
   [#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270) also caught automatically
   by `check-unfolded-entry.ps1` below, but read it yourself too: a session that starts mid-ship sees the
