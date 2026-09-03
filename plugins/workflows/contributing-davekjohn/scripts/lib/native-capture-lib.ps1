@@ -226,6 +226,30 @@ function Invoke-NativeCapture {
         EAP and the environment are always restored (finally), whether the command succeeds, fails, or
         throws.
 
+        -DiscardStderr IS NOT A CREDENTIAL GUARD, AND THAT WAS MEASURED (issue #1313). The reason to
+        pass it is the one above: stderr merged into output a caller then PARSES. It is tempting to
+        reach for it as a security flag as well -- a git call that talks to the remote writes all of
+        its output to stderr, and its failure line quotes the remote URL -- but git redacts that URL
+        itself. Measured on git 2.55.0.windows.5: `user:token@host`, `token@host` and an unresolvable
+        host all came back as a bare `https://host/o/r.git`, because the "unable to access" and
+        "Authentication failed" messages go through transport_anonymize_url, which strips userinfo. A
+        token somewhere ELSE in the URL (a query string, a path segment) is printed verbatim -- also
+        measured -- but that is not a shape any remote of this family uses.
+
+        SO THE TRADE RUNS THE OTHER WAY on a network call, and #1313 is the worked example: it proposed
+        the flag for the `git fetch` in ship-pr.ps1's fold step, in worktree-lane.ps1 and in
+        prune-merged.ps1, and applying it would have removed git's own diagnosis from three failure
+        paths -- one of them the step where the PR is ALREADY MERGED and git's reason is all a reader
+        has -- in exchange for nothing. Declined on that measurement, and the same measurement is why
+        Invoke-GitPark's `git push` keeps stderr on purpose (#1143): git's words there are the answer.
+
+        WHERE A CREDENTIAL REALLY DOES REACH A LOG is where WE compose the line rather than git. A URL
+        an operator handed us, interpolated into our own Write-Host or our own throw message, gets no
+        redaction from anybody -- that was the standing half of #1313, in publish-to-business.ps1, and
+        the fix there is to mask the userinfo before printing (Format-UrlForDisplay), not to drop
+        stderr. If you are about to print a URL, mask it; if you are about to hide git's output, ask
+        what the reader is left with.
+
         -Utf8: DECODE THE OUTPUT AS UTF-8 INSTEAD OF WITH THE CONSOLE CODE PAGE (issue #907,
         August 26, 2026). Windows PowerShell 5.1 decodes a native child's stdout with
         [Console]::OutputEncoding, so the SAME command returns different strings on cp65001 and cp850.
