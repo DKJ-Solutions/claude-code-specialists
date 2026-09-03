@@ -700,8 +700,23 @@ try {
         $Message = "publish: marketplace from $sourceSha ($versionList)"
     }
 
+    # commit.gpgsign pinned beside the identity rather than inherited from the machine (#1297, the
+    # residual of #1287 -- which pinned only the commits the TEST FIXTURE makes, never this one, made
+    # by the script itself). Inheriting a global commit.gpgsign=true made a locked signing agent fail
+    # the publish for a reason unrelated to publishing, and green in CI, where no signing is
+    # configured at all, while red on the machine somebody would act on it.
+    # Off rather than on, because the author two lines up is deliberately synthetic: a signature by
+    # the operator's own key could never verify against marketplace-publisher <publisher@localhost>.
+    # Measured before pinning: the target repo carries no rulesets and every commit it holds is
+    # already unsigned -- so this states the behaviour that target receives, it does not change it.
+    # AND THEREFORE NOT A RULE FOR THE OTHER COMMIT PATHS. The park, fold, release and sync-main
+    # commits are the operator's OWN, in the operator's own repo and under the operator's identity;
+    # there a locked agent SHOULD fail the commit rather than quietly land it unsigned. The synthetic
+    # author is the whole difference, which is what makes the pin right here and wrong there. Swept
+    # September 3, 2026: those four, and no fifth.
     Invoke-Git -WorkingDirectory $temp -Arguments @('-c', 'user.name=marketplace-publisher',
                                                     '-c', 'user.email=publisher@localhost',
+                                                    '-c', 'commit.gpgsign=false',
                                                     'commit', '-m', $Message) -Quiet | Out-Null
 
     if ($cloned) {

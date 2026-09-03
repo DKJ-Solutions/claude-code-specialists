@@ -29,7 +29,10 @@
          description survives the manifest rewrite, a description holding a '\u'-shaped Windows path
          round-trips instead of being folded into an invalid escape (#1131), an undeclared plugin
          folder is a hard stop, and the list comes from Get-BusinessMarketplacePlugins when -Plugins
-         is not passed.
+         is not passed;
+     11. the script's OWN commit does not depend on the machine's commit.gpgsign (#1297): with
+         signing forced on and the signing agent unreachable, the run still exits 0 and its commit
+         lands. #1287 pinned the commits the fixture makes; this covers the other half.
 
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/publish-to-business.tests.ps1
 
@@ -474,6 +477,59 @@ function Get-BusinessMarketplacePlugins { return @('core', 'extra') }
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
     Assert-Equal 0 $r.ExitCode 'a run without -Plugins exits 0 once the seam answers'
     Assert-Match $r.Output 'Excluded from this target: flow' 'and the seam is what excluded the workflow'
+
+    # 17. THE SCRIPT'S OWN COMMIT UNDER A MACHINE THAT SIGNS (#1297). Until the pin, that commit set a
+    #     synthetic identity on the command line and left commit.gpgsign to the machine -- so with
+    #     signing on and the signing agent locked, git could not write the commit object, Invoke-Git
+    #     threw, and the run exited 1. What made it expensive is that the failure named the wrong
+    #     subject: the asserts that went red were the subset-filter ones above, on a branch touching
+    #     neither this script nor this suite. #1287 pinned Invoke-FixtureGit, i.e. the commits the
+    #     FIXTURE makes; this is the other half, the commit the script under test makes itself.
+    #
+    #     GIT_CONFIG_GLOBAL is how the ambient config is forced without touching this machine's own:
+    #     it REPLACES the global config file for this process and everything it spawns, and the child
+    #     powershell running the script under test is exactly that. It is restored in the finally,
+    #     removed rather than set to '' when it was unset, because an empty value is a config path.
+    #     CI is where this matters least and would be caught least: no signing is configured there,
+    #     so this test is the only thing that exercises the pinned path at all.
+    '# a change to publish under forced signing' |
+        Set-Content -LiteralPath (Join-Path $filterDir 'README.md') -Encoding Ascii
+    Invoke-FixtureGit -Dir $filterDir -GitArgs @('add', '-A') | Out-Null
+    Invoke-FixtureGit -Dir $filterDir -GitArgs @('commit', '-m', 'fixture: something to publish under forced signing') | Out-Null
+
+    $fakeGlobal = Join-Path $fixtureRoot 'signing-on.gitconfig'
+    @'
+[commit]
+gpgsign = true
+[gpg]
+format = ssh
+[gpg "ssh"]
+program = definitely-no-such-signing-program
+[user]
+signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureKeyNotARealKeyFixtureKeyNotAReal
+'@ | Set-Content -LiteralPath $fakeGlobal -Encoding Ascii
+
+    $beforeSigning = Get-TargetCommitCount -BareDir $filterBareDir
+    $prevGlobal    = $env:GIT_CONFIG_GLOBAL
+    $prevEap       = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $env:GIT_CONFIG_GLOBAL = $fakeGlobal
+        # The guard on the guard, and it is not decoration: without it a green assert below is
+        # equally well explained by the forced config never applying, which is the silent way a
+        # regression test for an ambient-config bug rots. An UNPINNED commit must fail here.
+        & git -C $filterDir -c user.name=probe -c user.email=probe@localhost `
+              commit --allow-empty -m 'probe: an unpinned commit under forced signing' 2>&1 | Out-Null
+        $probeCode = $LASTEXITCODE
+        $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
+    } finally {
+        $ErrorActionPreference = $prevEap
+        if ($prevGlobal) { $env:GIT_CONFIG_GLOBAL = $prevGlobal }
+        else { Remove-Item -LiteralPath 'env:GIT_CONFIG_GLOBAL' -ErrorAction SilentlyContinue }
+    }
+    Assert-True ($probeCode -ne 0) 'the forced signing config really does break an unpinned commit'
+    Assert-Equal 0 $r.ExitCode 'the publish exits 0 with signing on and the signing agent unreachable'
+    Assert-Equal ($beforeSigning + 1) (Get-TargetCommitCount -BareDir $filterBareDir) 'and its commit landed on the target'
 } finally {
     if (Test-Path -LiteralPath $fixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $fixtureRoot -ErrorAction SilentlyContinue
