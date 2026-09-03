@@ -74,6 +74,33 @@ exact) are kept, and the overreach is named as the same error one level up.
       3.7x between that and the 4-lane CI shape, and this document's own standing rule is that a gate
       figure without its lane count says nothing.
 
+#### And a third falsified claim arrived mid-branch, from another session
+
+While this branch waited on CI, [PR #1363](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1363)
+(`docs/shard-floor-is-the-slowest-file`, @maikel-bwj) merged **after** #1364 and added a docstring paragraph
+to `Invoke-TestSuiteGate` -- the very function #1364 had just instrumented -- stating *"it records no
+per-suite duration"*, plus *"recording durations to feed one buys nothing here."*
+
+**Git merged it cleanly, because the two edits sat in different parts of the same docstring.** So `main`
+carried both *"PER-SUITE DURATIONS ARE RECORDED, NOT RECONSTRUCTED"* and *"it records no per-suite
+duration"*, 21 lines apart in one comment block. Neither branch was wrong when written; #1363 was cut
+before #1364 existed and landed after it.
+
+- [x] `../scripts/lib/native-capture-lib.ps1`: the warning now opens **READ THE TABLE THIS FUNCTION
+      PRINTS, NOT THE LOG TIMESTAMPS** and keeps the rest of #1363's paragraph intact -- its shard-scale
+      crossover, its plateau evidence and its 3.6-4.0x local-to-CI ratio are all correct and none of it
+      needed touching.
+- [x] Same file: *"recording durations to feed one buys nothing"* is kept for the **bin-pack** it was
+      written about, where it is true, and separated from the reason recording them does pay -- a
+      partition cannot beat its longest file, but that only helps once you know which file that is.
+- [x] Both mirrors regenerated again after the reconciliation.
+- [x] `../.github/workflows/ci.yml`: #1363's `~35s -> ~20s` provisioning correction is kept (theirs is
+      the newer measurement); the paragraph is checked to read as one argument rather than two stitched
+      together.
+- [x] Same file: the phrase *"a five-file plateau with four members"* no longer asserts a corrected
+      count. The recorded run disproved *"four"* as thoroughly as it disproved *"five"*, so the comment
+      now names the error and sends the reader to the table instead of to any number in prose.
+
 ### TEST
 
 - [x] Full local gate (lint + all 65 suites) via `open-pr.ps1`, then the same gate as CI. No script
