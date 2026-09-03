@@ -576,11 +576,109 @@ if ($trunkReturn.Return) {
     Write-Host "ship-pr: staying on '$branch' -- $($trunkReturn.Reason)." -ForegroundColor DarkGray
 }
 
+function Wait-CheckRegistration {
+    <#
+    .SYNOPSIS
+        Poll `gh pr checks <pr>` until at least one check is registered, then return the seconds
+        waited. Refuse (exit 1) if none registers within the budget.
+
+    .DESCRIPTION
+        Step 3's registration wait, lifted into a function so the watch loop below can RE-ENTER it
+        (issue #1350). `gh pr checks --watch` can start before GitHub has created the Actions check
+        suite: it then prints `no checks reported` in its own output and exits non-zero -- an exit
+        that CLAIMS a check failed when none has. Observed on PR #1348 (September 3, 2026), seconds
+        after open-pr pushed a new head onto a busy Actions queue: the plain probe here had just
+        broken out on the pushed-over head's stale suites, and the watch, the next call in the file,
+        found the new head bare. `no checks reported` means the same thing from either call -- nothing
+        is registered -- so both go through this one wait, and the #1234 / #1247 timeout diagnostic
+        is written once rather than duplicated at the watch site.
+
+        THE MERGE DECISION IS UNTOUCHED, for the same reason every sibling of this note gives: this
+        cannot let a merge through, it only decides that "nothing has registered yet" is answered by
+        the wait and not by the merge verdict further down the file.
+
+    .PARAMETER AlreadyWaited
+        Seconds a previous call (the initial probe) has already spent, so the 180s budget is shared
+        across the probe and any watch fallback rather than restarting from zero on the fallback.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Pr,
+        [Parameter(Mandatory)][string]$Repo,
+        [Parameter(Mandatory)][string]$Branch,
+        [int]$PollSeconds = 15,
+        [int]$MaxWaitSec = 180,
+        [int]$AlreadyWaited = 0
+    )
+    $waited = $AlreadyWaited
+    while ($true) {
+        $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$Pr", '--repo', $Repo)
+        if (($probe.Output | Out-String) -notmatch 'no checks reported') { return $waited }
+        if ($waited -ge $MaxWaitSec) {
+            # WHICH REFUSAL THIS IS -- issue #1234, and the same move #1044 and #1219 made one step later in
+            # this file. The refusal is unchanged and cannot let a merge through; only the sentence beside it
+            # moves. "Check the workflow" claims the repo's YAML is wrong, and the state that most often
+            # produces this has healthy workflows -- GitHub simply created no Actions check suite for the
+            # commit. Reading the suite list separates the two, and only the second is about the workflow.
+            #
+            # THE SHA IS READ LOCALLY, for the reason step 4's DEPLOY lock gives for the same read: step 1's
+            # open-pr.ps1 pushed $Branch before this point on every path through here, so refs/heads/<branch>
+            # IS the PR's head commit, and a gh headRefOid read would say the same thing over the network in
+            # a diagnostic that must not need a live token to word a refusal.
+            #
+            # Best-effort by construction, like all three notes below -- the lost watch, the stalled run and
+            # the authored failure: every read is guarded and any failure degrades to the wording that was
+            # already here.
+            $suiteNote = ''
+            try {
+                $shaRead = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('rev-parse', "refs/heads/$Branch")
+                $sha = if ($shaRead.ExitCode -eq 0) { ($shaRead.Output -join '').Trim() } else { '' }
+                if ($sha) {
+                    # -DiscardStderr because this output is PARSED: a gh warning merged into it would break
+                    # the parse and cost the note. Nothing here reads anything but an app slug, all of which
+                    # are ASCII, so the console code page cannot change the answer and -Utf8 would buy nothing.
+                    $suiteFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                        'api', "repos/$Repo/commits/$sha/check-suites")
+                    if ($suiteFacts.ExitCode -eq 0) {
+                        # THE ONE CAUSE THAT IS CHECKABLE RATHER THAN GUESSED (#1247). A conflicting PR has no
+                        # refs/pull/<n>/merge for a pull_request workflow to run against, so GitHub creates no
+                        # suite for it -- ever, and neither a reopen nor a fresh head changes that. It is a
+                        # SECOND read because it answers a different question from the suite list, and it is
+                        # guarded on its own so a failure here still leaves the #1234 wording intact.
+                        $mergeable = ''
+                        try {
+                            $mergeRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                                'pr', 'view', "$Pr", '--repo', $Repo, '--json', 'mergeable', '--jq', '.mergeable')
+                            if ($mergeRead.ExitCode -eq 0) { $mergeable = ($mergeRead.Output -join '').Trim() }
+                        } catch {
+                            $mergeable = ''
+                        }
+                        $suiteNote = Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$Pr" -Mergeable $mergeable
+                    }
+                }
+            } catch {
+                $suiteNote = ''
+            }
+            if ($suiteNote) {
+                Write-Error "No CI check registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. $suiteNote"
+            } else {
+                Write-Error "No CI check registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
+            }
+            exit 1
+        }
+        Write-Host "  (no check registered yet -- waited ${waited}s/${MaxWaitSec}s)" -ForegroundColor DarkYellow
+        Start-Sleep -Seconds $PollSeconds
+        $waited += $PollSeconds
+    }
+}
+
 # --- Step 3: wait for the required CI check ------------------------------------------------------
 # The CI checks can lag a few seconds behind the push: `gh pr checks` prints "no checks reported"
 # and exits 0 while none are registered yet -- indistinguishable by exit code from "all passed", so
 # a bare --watch could return immediately and let the merge below run straight into a BLOCKED wall.
 # First poll (on the TEXT, not the exit code) until at least one check is registered, then --watch it.
+# That poll is Wait-CheckRegistration, a function so the watch loop can RE-ENTER it: `--watch` can win
+# the race the poll just lost and come back saying `no checks reported` itself (#1350), and the answer
+# to that is this same wait, not the merge verdict.
 # Deliberately does NOT name a check: this step watches whatever checks the PR has and reads the exit
 # code, so naming one here would be a claim about the consumer's CI that this script cannot keep.
 #
@@ -624,67 +722,13 @@ Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor
 Write-Host "  Nothing here needs the session -- background this run and the wait costs nothing." -ForegroundColor DarkGray
 Write-Host "  Step 2b has already put this tree where a finished chain leaves it, so the close-out is honest (#1073)." -ForegroundColor DarkGray
 Write-Host "  The next piece of work still belongs in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
+# The wait itself is Wait-CheckRegistration (defined above), so the watch loop below can re-enter the
+# SAME wait when `--watch` starts before the checks register (#1350). $maxWaitSec stays a script
+# variable because that re-entry passes it, and $waited carries the seconds already spent so the 180s
+# budget is shared across the probe and any fallback rather than restarting.
 $maxWaitSec = 180
-$waited = 0
-while ($true) {
-    $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--repo', $repo)
-    if (($probe.Output | Out-String) -notmatch 'no checks reported') { break }
-    if ($waited -ge $maxWaitSec) {
-        # WHICH REFUSAL THIS IS -- issue #1234, and the same move #1044 and #1219 made one step later in
-        # this file. The refusal is unchanged and cannot let a merge through; only the sentence beside it
-        # moves. "Check the workflow" claims the repo's YAML is wrong, and the state that most often
-        # produces this has healthy workflows -- GitHub simply created no Actions check suite for the
-        # commit. Reading the suite list separates the two, and only the second is about the workflow.
-        #
-        # THE SHA IS READ LOCALLY, for the reason step 4's DEPLOY lock gives for the same read: step 1's
-        # open-pr.ps1 pushed $branch before this point on every path through here, so refs/heads/<branch>
-        # IS the PR's head commit, and a gh headRefOid read would say the same thing over the network in
-        # a diagnostic that must not need a live token to word a refusal.
-        #
-        # Best-effort by construction, like all three notes below -- the lost watch, the stalled run and
-        # the authored failure: every read is guarded and any failure degrades to the wording that was
-        # already here.
-        $suiteNote = ''
-        try {
-            $shaRead = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('rev-parse', "refs/heads/$branch")
-            $sha = if ($shaRead.ExitCode -eq 0) { ($shaRead.Output -join '').Trim() } else { '' }
-            if ($sha) {
-                # -DiscardStderr because this output is PARSED: a gh warning merged into it would break
-                # the parse and cost the note. Nothing here reads anything but an app slug, all of which
-                # are ASCII, so the console code page cannot change the answer and -Utf8 would buy nothing.
-                $suiteFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
-                    'api', "repos/$repo/commits/$sha/check-suites")
-                if ($suiteFacts.ExitCode -eq 0) {
-                    # THE ONE CAUSE THAT IS CHECKABLE RATHER THAN GUESSED (#1247). A conflicting PR has no
-                    # refs/pull/<n>/merge for a pull_request workflow to run against, so GitHub creates no
-                    # suite for it -- ever, and neither a reopen nor a fresh head changes that. It is a
-                    # SECOND read because it answers a different question from the suite list, and it is
-                    # guarded on its own so a failure here still leaves the #1234 wording intact.
-                    $mergeable = ''
-                    try {
-                        $mergeRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
-                            'pr', 'view', "$pr", '--repo', $repo, '--json', 'mergeable', '--jq', '.mergeable')
-                        if ($mergeRead.ExitCode -eq 0) { $mergeable = ($mergeRead.Output -join '').Trim() }
-                    } catch {
-                        $mergeable = ''
-                    }
-                    $suiteNote = Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$pr" -Mergeable $mergeable
-                }
-            }
-        } catch {
-            $suiteNote = ''
-        }
-        if ($suiteNote) {
-            Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. $suiteNote"
-        } else {
-            Write-Error "No CI check registered for PR #$pr after ${maxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
-        }
-        exit 1
-    }
-    Write-Host "  (no check registered yet -- waited ${waited}s/${maxWaitSec}s)" -ForegroundColor DarkYellow
-    Start-Sleep -Seconds $PollSeconds
-    $waited += $PollSeconds
-}
+$waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
+    -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec
 # --watch now blocks until the registered check finishes; exit 0 = all passed, non-zero = SOMETHING
 # failed. WHICH something is the whole question, and the answer is NOT in that exit code (#943). This
 # line used to read "branch protection blocks the merge until green, so a non-zero here means we must
@@ -721,6 +765,30 @@ while ($true) {
     $watchAttempt++
     $checks = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo)
     $checks.Output | ForEach-Object { Write-Host $_ }
+
+    # THE WATCH STARTED BEFORE THE CHECKS REGISTERED -- issue #1350, PR #1348 (September 3, 2026). A
+    # non-zero `--watch` exit whose own output still says `no checks reported` is not a verdict:
+    # nothing is registered to have failed. The probe above broke out of its wait -- it saw the head
+    # open-pr had just pushed over (its stale suites), or a gh error it could not tell from a table --
+    # and this call, moments later, found the new head had no suites yet. `no checks reported` means
+    # the same thing here as it does in the probe, so the answer is the SAME registration wait, not
+    # Get-MergeBlockVerdict: the verdict would read the empty payload as an unreadable required-check
+    # list and print "Fix CI and re-run" about the one thing that had not happened.
+    #
+    # THE SAME SHAPE AS #1219's DROPPED SOCKET, with a different cause -- a watch that started too
+    # early rather than one that died mid-run -- and bounded the same way. $waited carries the 180s
+    # budget across, this spin costs at least one poll interval, and Wait-CheckRegistration owns the
+    # timeout refusal (#1234 / #1247), so a race that will not settle ends in that refusal rather than
+    # in this loop. Placed BEFORE the fact-pair reads below because with no checks there is nothing for
+    # them to read -- two gh calls saved on every fallback spin.
+    if ($checks.ExitCode -ne 0 -and (($checks.Output | Out-String) -match 'no checks reported')) {
+        Write-Host "ship-pr: the watch started before the checks registered -- back to the registration wait (#1350)." -ForegroundColor DarkYellow
+        Start-Sleep -Seconds $PollSeconds
+        $waited += $PollSeconds
+        $waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
+            -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec -AlreadyWaited $waited
+        continue
+    }
 
     # ONE pair of reads, serving both remaining questions: which check governed the wait (#831, the
     # line printed further down) and, on a failure, whether what failed is a check the ruleset
