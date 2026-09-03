@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/language-layers-bypass-restored-v1` · 20260903-133806
+
+`.claude/rules/language-layers.md` said the `DKJ-Solutions` org transfer had "dropped the
+bypass actors to empty" as the current state. Dave refilled `main-ci-gate`'s bypass list on
+September 3, 2026, with a shape the July field-by-field re-check had not seen --
+`OrganizationAdmin` plus a repository admin role, where it once held repository admin plus the
+Write role. The paragraph now states the restore beside the emptying, names the new list
+shape, and points at the system-administration lens for the mechanics. Its language point --
+`lint-en-tests` is an external name this repo may cite but not rename -- is unchanged; the
+"a re-check is a snapshot" observation is now backed by two stale readings instead of one.
+
+The two other passages #1290 named were already repaired by #1286.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal governance-rule document. No subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+record the main-ci-gate bypass restore in the language-layers rule
+
+#### Pull Request
+
+record the main-ci-gate bypass restore in the language-layers rule
+
+[PR #1295](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1295)
+
+---
+
 ### DEPLOY: `fix/open-pr-commits-branch-doc-v1` · 20260903-125359
 
 `open-pr.ps1` read the branch's development document from the **working tree** -- the scaffold,
