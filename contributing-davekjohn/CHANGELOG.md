@@ -32,6 +32,38 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/new-branch-writer-legacy-reach-matches-resolver-v1` · 20260903-095419
+
+`new-branch`'s writer now reaches the same legacy document names its reader does. It chose which file
+a rerun keeps writing to from a three-name list (`development.md`, `branch/branch-cycle.md`,
+`branch/branch-progress.md`), while `Resolve-BranchFilePath` -- shared by every gate and the fold --
+reads four more: `development-cycle.md` (pre-#963) and the pre-#886 `workflow-davekjohn/` set. A
+branch working in one of those four got a second, empty development document written beside its work
+on any idempotent rerun (`-Intent`, `-Park`); nothing errored, because the reader still found the
+older file. Both lists are now one ordered source, `Get-BranchFileLegacyNames`, so the next rename
+cannot leave the writer behind again -- the drift that opened the gap when #886 and #963 grew the
+reader alone.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- internal workflow tooling. A consumer inherits the fix through a plugin update, but only a
+consumer holding a branch created before the late-August document renames could ever have hit the
+split, and the reader's wider reach kept even that non-destructive.
+
+**Score:** N/A
+
+#### Pull Request
+
+new-branch's writer reaches the same legacy document names its resolver reads
+
+Plugins: contributing-davekjohn
+
+[PR #1267](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1267)
+
+---
+
 ### DEPLOY: `fix/development-doc-per-branch-path-v1` · 20260903-014524
 
 The branch's development document is named after its branch -- `contributing-davekjohn/development-<branch>.md`

@@ -1035,6 +1035,58 @@ Write-Output `$t.Type
     # is nothing to warn about, because nothing was at risk.
     Assert-True (-not (Test-Phrase -Text $rN3.Out -Phrase 'UNCOMMITTED')) 'legacy/foreign: and says nothing about uncommitted work -- none was in the way'
 
+    # --- (n3) THE WRITER REACHES EVERY LEGACY NAME THE READER DOES (#1259) --------------------------
+    # THE DRIFT THIS LOCKS. new-branch's writer chose which document a rerun keeps writing to from a
+    # hand-written legacy list, and Resolve-BranchFilePath -- shared by every gate and the fold -- read
+    # from another. #886 (the workflow-davekjohn/ folder rename) and #963 (development-cycle.md ->
+    # development.md) grew the reader's list and left the writer's at three names, so a branch working in
+    # 'development-cycle.md' or anywhere under 'workflow-davekjohn/' got a SECOND, empty document written
+    # beside its work on any idempotent rerun. Nothing errored, because the reader still found the old one.
+    # Both sides now read Get-BranchFileLegacyNames; this asserts the writer against the two names the old
+    # list missed, one per rename.
+    #
+    # THE SHAPE: create the branch, move its document to the legacy name (heading still declares the
+    # branch, so the declare-test finds it), commit, then rerun new-branch. Fixed, the rerun keeps
+    # writing to the legacy name and says "already written"; broken, it would create the per-branch
+    # name beside it.
+    $legacyNameCases = @(
+        @{ Label = 'pre-#963 filename';  Branch = 'feat/on-pre963';      LegacyRel = (Get-BranchFilePaths).PriorNameFile }
+        @{ Label = 'pre-#886 folder';    Branch = 'feat/on-pre886';      LegacyRel = (Get-BranchFilePaths).PriorFolderFile }
+    )
+    foreach ($case in $legacyNameCases) {
+        Write-Host "new-branch.ps1 -- the writer keeps writing to the $($case.Label), as the reader does (#1259)" -ForegroundColor Cyan
+        $fx = New-Fixture -Label ("n3-" + ($case.Branch -replace '[^a-z0-9]', ''))
+        $vBranch = "$($case.Branch)-v1"
+
+        $mk1 = Invoke-NewBranch -Dir $fx -Name $case.Branch -Title 'On a legacy name'
+        Assert-Equal 0 $mk1.Code "$($case.Label): the branch is created"
+        $perBranchRel  = (Get-BranchFilePaths -Branch $vBranch).File
+        $perBranchPath = Join-Path $fx ($perBranchRel -replace '/', '\')
+        $legacyPath    = Join-Path $fx ($case.LegacyRel -replace '/', '\')
+
+        # Move the branch's document onto the legacy name. Its heading already declares $vBranch, which is
+        # what the declare-test keys on -- the path is all that changes. Remove-Item rather than `git rm`:
+        # a no-origin fixture never commits the document (new-branch only commits on the push path), so it
+        # is untracked here and `git rm` would no-op.
+        $docText = [System.IO.File]::ReadAllText($perBranchPath, [System.Text.Encoding]::UTF8)
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $legacyPath)
+        [System.IO.File]::WriteAllText($legacyPath, $docText, (New-Object System.Text.UTF8Encoding($false)))
+        Remove-Item -LiteralPath $perBranchPath -Force
+        $prevEap = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & git -C $fx add -A 2>$null | Out-Null
+            & git -C $fx commit -q -m 'move document onto the legacy name' 2>$null | Out-Null
+        } finally { $ErrorActionPreference = $prevEap }
+        Assert-Equal $vBranch (Get-BranchFileDeclaredBranch -Text $docText) "$($case.Label): the moved document still declares its branch"
+
+        $mk2 = Invoke-NewBranch -Dir $fx -Name $case.Branch -Title 'On a legacy name'
+        Assert-Equal 0 $mk2.Code "$($case.Label): the rerun exits 0"
+        Assert-True (Test-Phrase -Text $mk2.Out -Phrase 'already written') "$($case.Label): the rerun sees the legacy document and writes nothing"
+        Assert-True (-not (Test-Path -LiteralPath $perBranchPath)) "$($case.Label): NO second document at the per-branch name -- the split #1259 describes does not happen"
+        Assert-Equal $docText ([System.IO.File]::ReadAllText($legacyPath, [System.Text.Encoding]::UTF8)) "$($case.Label): the legacy document is byte-for-byte untouched"
+    }
+
     # --- (o) THE PUSH IS THE DEFAULT (#900) -- no switch, and the branch is on origin ---------------
     # The pair (i) above and this one are the whole change: (i) proves -Park still behaves, this proves
     # that a run naming NOTHING behaves identically. Asserted with a bare origin rather than trusting the
