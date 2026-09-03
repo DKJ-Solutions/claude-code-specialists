@@ -54,7 +54,7 @@ an absent link is a fact rather than an oversight.
 
 | Script | What it is | Skill |
 |---|---|---|
-| `task/new-branch.ps1` | creates the branch AND writes its `contributing-davekjohn/development-<branch>.md`, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
+| `task/new-branch.ps1` | creates the branch AND writes its `contributing-davekjohn/<branch>.md`, in one move — a branch is never entry-less | [`new-branch`](../skills/new-branch/SKILL.md) |
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-config`](../skills/adopt-config/SKILL.md) |
 | `task/adopt-workflow-folder.ps1` | scaffolds `contributing-davekjohn/` — the folder docs, the releases root and the branch dossier | [`adopt-workflow-folder`](../skills/adopt-workflow-folder/SKILL.md) |

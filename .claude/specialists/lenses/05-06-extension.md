@@ -24,7 +24,7 @@ rewrite when copying. Managing branches, PRs, and merges up to and including the
 `CHANGELOG.md` (repo root) is an **intro, then `## [Unreleased]`, then one `###` per change, with no other
 section headings at all**
 (Dave, August 5, 2026). A change *is* the `##`, and since August 6, 2026 its heading names the **branch** —
-`` ## DEPLOY: `feat/x` `` — with two `###` sections under it since August 16, 2026:
+`## DEPLOY: feat/x` — with two `###` sections under it since August 16, 2026:
 `What makes this deploy extra special` and `Pull Request`, which carries the PR title and which the fold
 completes from the merge. **The entry holds both tiers, and since August 19, 2026 neither names itself**:
 tier 0 answers directly under the DEPLOY heading, under no heading of its own, and
@@ -41,7 +41,7 @@ documents [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508
 count is now held by the lint against `Get-EntrySectionHeadings`, so this cannot silently drift again; the
 NAMES are not, and deliberately, for the reason that check's own comment records. **The shape itself is
 written once**, by the formatters in `scripts/lib/entry-scaffold-lib.ps1` — and the copy of
-`contributing-davekjohn/development-<branch>.md` sitting on the trunk is what that produces, held to it by the
+`contributing-davekjohn/<branch>.md` sitting on the trunk is what that produces, held to it by the
 lint. Read it there rather than trusting any prose, this paragraph included.
 
 **Two sections went in the same movement, and each for a measured reason.**
@@ -69,11 +69,13 @@ entries rather than off which section they sit in.
 
 #### How it works
 
-- **`contributing-davekjohn/development-<branch>.md`** — written when the branch is created. One document with two
+- **`contributing-davekjohn/<branch>.md`** — written when the branch is created. One document with two
   halves: `## PLAN` / `## CREATE` / `## TEST` carry the step list, and the fourth phase,
-  `` ## DEPLOY: `<branch>` ``, IS the entry — **nothing around it**, so it pastes into `CHANGELOG.md` in one
+  `## DEPLOY: <branch>`, IS the entry — **nothing around it**, so it pastes into `CHANGELOG.md` in one
   go. **One document per branch since September 3, 2026** ([#1255](https://github.com/DaveKJohn/claude-code-specialists/issues/1255))
-  — the branch name with its slashes flattened, so two branches never write the same path. It used to be one
+  — the branch name with its slashes flattened, and **nothing but that since later the same day**
+  ([#1335](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1335), which dropped the
+  `development-` prefix and the decoration on both headings) — so two branches never write the same path. It used to be one
   fixed path on every branch, on the argument that git already tracks it per branch; that is true of
   *checkout* and says nothing about *merge*, which is where the collision lives — every merge to `main` left
   every **other** open PR conflicting on that one path, and a conflicting PR gets no check suite at all, so
@@ -140,7 +142,7 @@ itself.
 improvement, the entry comes into being **at the moment the branch is created** — no
 separate later scaffolding step: [Derek #05](05-05-extension.md#classifying-naming-and-creating-a-branch)'s
 `new-branch.ps1` checks out the branch and, in the same move, calls the shared
-`scripts/task/new-branch.ps1 -Title "…"` (which writes `contributing-davekjohn/development-<branch>.md`, filling in
+`scripts/task/new-branch.ps1 -Title "…"` (which writes `contributing-davekjohn/<branch>.md`, filling in
 the title, the branch name and the type from the prefix automatically) as a child step. A branch is never
 entry-less. Whoever builds on the
 branch (often [Tessa #16](06-16-extension.md) or [Sylvester #15](05-15-extension.md)) fills in the
@@ -148,7 +150,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
 
 #### Lifecycle
 
-1. **Branch** → `contributing-davekjohn/development-<branch>.md` is written *at branch creation* (Derek's `new-branch.ps1`); you
+1. **Branch** → `contributing-davekjohn/<branch>.md` is written *at branch creation* (Derek's `new-branch.ps1`); you
    fill in the description and keep the step list current while building. Never touch `CHANGELOG.md`.
 2. **Merge to `main`** ([Derek #05](05-05-extension.md#merging-to-main)) → the entry travels
    along. Rendall runs `fold-changelog-entry.ps1 -Branch <name> -Push` on `main`: that folds, commits
@@ -162,7 +164,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
    **this** repo's direct-on-`main` exception, which is what the path-scoped commit exists to keep honest,
    and the branch part of the two-machine lesson sits with
    [Derek #05](05-05-extension.md#branch--repo-hygiene).
-   The fold also **resets `contributing-davekjohn/development-<branch>.md`** to its empty state and names it in the
+   The fold also **resets `contributing-davekjohn/<branch>.md`** to its empty state and names it in the
    same commit, so the trunk is ready for the next branch instead of showing the merged one's ticked-off
    steps. One write clears both halves, which is why the commit's scope is two paths rather than three.
 3. **More branches merged** → each brings its entry; each gets inserted at the position its own impact
@@ -446,7 +448,7 @@ red the moment the section was opened, which is what forced the second commit in
 pair land half-done.
 
 Guardrails: on a clean `main`, no unfolded entry — neither a pre-split file in the root nor a filled
-`contributing-davekjohn/development-<branch>.md`, which is its own check because a filled one looks like the reset
+`contributing-davekjohn/<branch>.md`, which is its own check because a filled one looks like the reset
 state at a glance until you read the branch name in its heading — lint gate green, and the tag must not
 exist yet. There is deliberately **no release branch and no `release` prefix** — the release
 does not touch the branch workflow. A shared agent-def change still lands here first, gets
@@ -601,7 +603,7 @@ that ignores impact should not be named for it — and still accepts `-Score`/`-
 because every consumer's fold passes them today and a removed parameter would throw on the trunk.
 
 **And since August 6, 2026 the entry is the branch's own dossier, folded in as it stands.** The heading
-names the **branch** — `` ## DEPLOY: `feat/x` `` — and its `###` sections answer in order.
+names the **branch** — `## DEPLOY: feat/x` — and its `###` sections answer in order.
 
 **It was six sections until August 16, 2026 and is two since** (Dave). Four of them said something the
 document already said: `Branch ID` is the timestamp the heading now carries, `Branch type` is the prefix
@@ -825,7 +827,7 @@ tier under `### What makes this deploy extra special` beside it — each carryin
 its score:
 
 ```text
-## DEPLOY: `feat/x`
+## DEPLOY: feat/x
 
 The routine version bump stops needing a developer.
 
@@ -1000,7 +1002,7 @@ the tier ladder and the release cut are one particular way of running a release,
 release management. Rendall's craft in such a repo is whatever *that* repo's release process is.
 
 - `scripts/task/new-branch.ps1 [-Title <string>] [-Intent <string>]` — write the branch's
-  `contributing-davekjohn/development-<branch>.md`. `-Intent` records where you left off / what is next **at the
+  `contributing-davekjohn/<branch>.md`. `-Intent` records where you left off / what is next **at the
   top of that document**, not in the DEPLOY section (#162): an intent is a status, and that section's text
   folds verbatim into `CHANGELOG.md`. Idempotent, judged on what the document says it belongs to rather
   than on its existing — it exists on `main` by design. Shared/mirrored to the plugin

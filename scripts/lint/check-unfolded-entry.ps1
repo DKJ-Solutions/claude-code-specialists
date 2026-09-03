@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Gate: does the trunk carry an unfolded changelog entry -- a development-*.md that a merge left
+    Gate: does the trunk carry an unfolded changelog entry -- a per-branch development document that a merge left
     behind because its fold never ran? (issue #1270)
 
 .DESCRIPTION
@@ -13,7 +13,7 @@
 
     IT ADDS NO RULE OF ITS OWN. It calls Get-UnfoldedTrunkEntry in entry-scaffold-lib.ps1, which is the
     one definition of "a written entry stranded on the trunk". The invariant: on the trunk,
-    contributing-davekjohn/ carries no development-*.md -- new-branch.ps1 creates one on a branch, the
+    contributing-davekjohn/ carries no per-branch development document -- new-branch.ps1 creates one on a branch, the
     fold removes it at the merge. A written one whose declared branch is not the branch under HEAD is a
     leftover.
 
@@ -31,7 +31,7 @@
         powershell -NoProfile -File scripts/lint/check-unfolded-entry.ps1
         powershell -NoProfile -File scripts/lint/check-unfolded-entry.ps1 -Branch main
 
-    Exit 0 when the trunk is clean (or the only development-*.md present is the branch you are on);
+    Exit 0 when the trunk is clean (or the only per-branch document present is the branch you are on);
     exit 1 with the file(s) and the branch each declares otherwise.
 
     Pure ASCII, per this repo's script-layer convention.
@@ -81,7 +81,7 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 # $Branch is passed through as-is, empty included. Get-UnfoldedTrunkEntry resolves HEAD itself, with
 # its own try/catch -- so this script needs no git call and does not fall over on a fixture tree that
 # is not a checkout (the SessionStart hook's case). An empty current branch excludes nothing, and
-# every written development-*.md is then reported: the right answer for a CI checkout of the trunk, and
+# every written per-branch document is then reported: the right answer for a CI checkout of the trunk, and
 # the CI workflow passes -Branch main explicitly anyway.
 if ($Branch -eq 'HEAD') { $Branch = '' }
 

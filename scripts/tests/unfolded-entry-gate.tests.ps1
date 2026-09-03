@@ -103,7 +103,7 @@ try {
     $onMain = New-Tree -Label 'onmain'
     Set-Doc -Dir $onMain -Branch 'feat/alpha'
     $f = @(Get-UnfoldedTrunkEntry -RepoRoot $onMain -CurrentBranch 'main')
-    Assert-True ($f.Count -eq 1 -and $f[0].DeclaredBranch -eq 'feat/alpha' -and $f[0].Rel -match 'development-feat-alpha\.md$') `
+    Assert-True ($f.Count -eq 1 -and $f[0].DeclaredBranch -eq 'feat/alpha' -and $f[0].Rel -match 'contributing-davekjohn/feat-alpha\.md$') `
         'a written per-branch doc, HEAD = main -- one finding naming the file and the branch it declares'
 
     $onOwn = New-Tree -Label 'onown'
