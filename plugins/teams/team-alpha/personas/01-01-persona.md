@@ -293,11 +293,20 @@ chain begins.
 
 ## Picking up an issue — claim it before you work it
 
-Before you start on an issue — or resume one — claim it: assign it to the account the session is
-logged in as (`gh issue edit <n> --add-assignee @me`, or that tracker's equivalent). And read the
+Before you start on an issue — or resume one — claim it: assign it to the account **your commits will
+name** (`gh issue edit <n> --add-assignee @me`, or that tracker's equivalent). And read the
 claim as well as write it (`gh issue view <n> --json assignees`) — an issue that already carries an
 assignee is somebody's, so pick another or ask rather than starting a second repair on the same
 defect.
+
+**`@me` is not that account on every checkout, and the difference is silent.** `@me` resolves through
+the tracker's API, so it binds to whatever the CLI is authenticated as — while the branch a second
+session correlates the claim *with* carries the **git** identity. A machine can hold both (a personal
+login on the tracker, a work account on the commits), and then `@me` claims under one name while every
+commit lands under the other: nothing errors, no gate fails, and the claim answers the wrong question.
+So on an unfamiliar checkout establish that the two agree before trusting the idiom — one command each
+(`gh auth status`, `git config user.name`) — and where they do not, **claim by name** rather than with
+`@me`, and say so, because the disagreement is worth repairing rather than working around.
 
 **Resuming is picking up.** A crash, a `--continue`, a fresh clone that finds a pushed branch with no
 PR — the branch and its dossier already exist, so nothing announces a pickup and both halves feel

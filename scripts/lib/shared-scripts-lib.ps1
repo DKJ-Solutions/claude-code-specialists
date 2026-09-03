@@ -655,6 +655,29 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # The split-identity check (issue #1315). `@me` in the claim rule resolves through the
+            # GitHub API, so it writes whichever account gh holds -- and nothing compared that against
+            # the identity git commits as. Measured: gh authenticated as DaveKJohn while
+            # git config user.name read davekokbwj, so the documented claim idiom put the wrong account
+            # on #1314. Its one automatic caller is the SessionStart hook
+            # git-identity-sessioncheck.ps1, which reports it before the session claims anything.
+            #
+            # ADVISORY, AND DELIBERATELY IN NO GATE: it reports a fact about the MACHINE rather than
+            # about the diff, and a CI runner acts and commits as a bot -- a mismatch by design.
+            #
+            # NO SKILL, on the same reasoning check-unfolded-entry gives above: the caller is automatic
+            # and nobody invokes it as a procedure. One command in its .SYNOPSIS answers it early.
+            Name   = 'check-git-identity'
+            Source = 'scripts\lint\check-git-identity.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = ''
+            # A fixture root, plus the two identity overrides the suite needs to put this in front of
+            # every state without a keyring or a git identity of its own.
+            SkillParamsExempt = @('RootOverride', 'GhAccountOverride', 'GitUserNameOverride')
+            # Timeable with no arguments: two local process reads and a report, no write and no network.
+            MeasureArgs = @()
+        },
+        @{
             # The pre-task sync (inbound #787, August 20, 2026). THE HIGHEST-RISK SCRIPT IN A SHOPIFY
             # CONSUMER, and it was written twice by hand before it shipped -- destructively the first
             # time, in both repos. A live theme has no locking and no merge, so work starts by mirroring
