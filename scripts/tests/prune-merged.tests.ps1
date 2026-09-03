@@ -640,7 +640,8 @@ try {
     Assert-True ((Get-LocalBranches -Dir $dirO) -contains 'sync/live-2026-09-01') 'recycled: THE BRANCH SURVIVES -- its name was merged once, its commits never were'
     Assert-True ($rO.Out -notmatch 'Deleted sync/live-2026-09-01') 'recycled: and nothing claims to have deleted it'
     Assert-True ($rO.Out -match 'Kept sync/live-2026-09-01') 'recycled: it is reported kept, like any other unproven branch'
-    Assert-True ($rO.Out -match 'the name was recycled') 'recycled: with the reason that names what actually happened -- the lookup came up FULL, not empty'
+    Assert-True ($rO.Out -match 'used this name, but not this commit') 'recycled: the reason names what was measured -- the lookup came up FULL, this commit was not in it'
+    Assert-True ($rO.Out -match 'no proof for this tip \(a recycled name, or a commit added') 'recycled: and offers the causes without asserting one (issue #1296)'
 
     # --- (p) A GENUINE squash merge is still proven -- by the head commit (inbound #1191) -----------
     #     The other direction, and the reason (b) exists at all: a branch whose tip is deliberately not
@@ -677,7 +678,8 @@ try {
     Assert-Equal 0 $rQ.Code '-IncludeRemote recycled: exit 0'
     Assert-True ($rQ.Out -notmatch 'git push origin --delete sync/live-recycled') '-IncludeRemote recycled: NO delete command for a head whose name was merged but whose commit was not'
     Assert-True ($rQ.Out -match 'Kept origin/sync/live-recycled') '-IncludeRemote recycled: it is labelled kept instead'
-    Assert-True ($rQ.Out -match 'the name was recycled') '-IncludeRemote recycled: with the reason, so the reader is not left to re-derive it'
+    Assert-True ($rQ.Out -match 'used this name, but not this commit') '-IncludeRemote recycled: with the reason, so the reader is not left to re-derive it'
+    Assert-True ($rQ.Out -match 'no proof for this tip') '-IncludeRemote recycled: and it names the measurement, not "live work" -- a post-merge commit lands here too (issue #1296)'
     Assert-True ($rQ.Out -match 'git push origin --delete sync/live-finished') '-IncludeRemote recycled: and the head that IS proven still gets its paste-ready command -- the pass is not simply refusing everything'
 
     # --- (r) The proof is the shared lib's, not a second copy of it (issue #1194) --------------------
