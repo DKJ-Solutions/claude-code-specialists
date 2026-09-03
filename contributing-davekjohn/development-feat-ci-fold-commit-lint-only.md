@@ -33,21 +33,43 @@
 
 ### PLAN
 
-Sizing done on #1300; chosen option B. Next: add job-level split in ci.yml + update workflow-concurrency.tests.ps1.
+Issue #1300, sized: after #1294 keyed every push to `main` on its own commit, `ship-pr`'s second
+push (the `fold:` commit) runs a full ~15-minute suite over a tree whose only delta from the merge
+commit is the changelog entry + the removed branch document -- neither executable. The entry is a
+verbatim copy of the branch document's DEPLOY section, which `check-plugin-integrity.ps1` check 4
+already link-scans on the PR and `branch-entry.yml` shape-checks there. Dave chose option B: the fold
+commit keeps its lint run and skips the suites.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `.github/workflows/ci.yml`: `if:` on the Test suites step so it is skipped when the head commit
+  of a push to `main` starts with `fold:`; lint step left unconditional; concurrency-block trailer
+  updated from "deliberately not answered here" to point at this split.
+- [x] `scripts/tests/workflow-concurrency.tests.ps1`: assert the suite step carries the commit-kind
+  condition and is gated on the push event, the lint step does not, no `paths-ignore`, and ci.yml
+  cites #1300.
 
 ### TEST
 
+- [x] `workflow-concurrency.tests.ps1` green (19 asserts).
+- [ ] `open-pr` gate green (lint + full suites) before the PR.
+
 ### DEPLOY: `feat/ci-fold-commit-lint-only`
 
-**Score:**
+The `fold:` commit's CI run drops from the full ~15-minute suite to a lint-only run of about a
+minute. That is roughly half of every ship's trunk runner time on `windows-latest` (billed at 2x),
+recovered without giving back anything #1294 bought: every trunk commit still carries a green
+`lint-en-tests`, and the folded `CHANGELOG.md` is still link-scanned by that lint run. The skip is
+keyed on the commit message (`fold:`), not a path filter, so no merge commit can fall through it.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- a CI-internal change to this repo's own `.github/workflows/`; no subscriber of any consuming
+service sees it.
+
+**Score:** N/A
 
 #### Pull Request
 
