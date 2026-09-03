@@ -191,10 +191,10 @@ function New-EntryFile {
 
 function New-LegacyEntryFile {
     <#
-        An entry file in the shape written BEFORE this format: a heading ONE LEVEL DEEPER than an entry,
-        carrying the type (and a scaffolded date) as middot fields, with a 'Tier: N' line under it
-        instead of an impact table. Why that level and not the digit it was written at is at the
-        composition below.
+        An entry file in the shape written BEFORE this format: a heading carrying the type (and a
+        scaffolded date) as middot fields, with a 'Tier: N' line under it instead of an impact table.
+        Why the heading sits one level BELOW an entry rather than at the digit it was written at is at
+        the composition below.
 
         NOT A HISTORICAL CURIOSITY. An entry file lives only on a branch, so any branch created before this
         change still carries one -- this repo had exactly such a branch parked on the remote when the change
@@ -203,13 +203,15 @@ function New-LegacyEntryFile {
     param([string]$Dir, [string]$Name, [string]$Title, [string]$Tier = '0', [switch]$NoTierLine, [string]$ExtraBody = '')
     $md = [char]0x00B7
     $tierLine = if ($NoTierLine) { '' } else { "Tier: $Tier`n`n" }
-    # ONE LEVEL DEEPER THAN AN ENTRY, expressed as that relationship rather than as a number. What makes this
-    # shape legacy is not the digit 3 but that it is NOT the entry level -- which is why the fold has to
-    # promote it before pasting, or it would be absorbed into the entry above and inherit its PR link. Written
-    # as a literal '###' until August 26, 2026, when the entry level moved to 3 and this fixture quietly
-    # became a CURRENT-shape entry: nothing to promote, so two asserts about the promotion went red while the
-    # mechanism they test was untouched.
-    $legacyH = '#' * ((Get-EntryHeadingLevel) + 1)
+    # ONE LEVEL SHALLOWER THAN AN ENTRY -- the flat-window level (August 5-26, 2026), expressed as that
+    # relationship rather than as a number. What makes this shape legacy is not a digit but that it is NOT the
+    # entry level, so the fold has to re-level it before pasting or it would be absorbed into the entry above
+    # and inherit its PR link. It was '(Get-EntryHeadingLevel) + 1' from August 26, 2026 until issue #1344 --
+    # an H4 no entry has ever opened with, chosen to keep "one deeper than the entry" true after the level
+    # moved to 3. That followed the old detector range rather than the tree: the shape that actually sits on
+    # parked branches is the flat-window H2, and 'entryLevel - 1' is both a real level and the one
+    # Test-IsChangelogEntryFile recognises after #1344.
+    $legacyH = '#' * ((Get-EntryHeadingLevel) - 1)
     $body = "$legacyH $Title $md Feat $md 2026-01-01`n`n$tierLine" + "Demo entry body.`n" + $ExtraBody
     [System.IO.File]::WriteAllText((Join-Path $Dir $Name), $body, $Utf8NoBom)
 }
@@ -416,6 +418,19 @@ Assert-True ($r3.ExitCode -eq 0)                                            'fol
 Assert-True (Test-Path (Join-Path $dir3 'my-loose-notes.md'))               'a hyphenated H1 doc is not treated as an entry'
 
 # ---------------------------------------------------------------------------------------------------
+Write-Host "fold-all -- a flat-window entry file (one level below the entry level) IS folded (issue #1344)" -ForegroundColor Cyan
+#      Test-IsChangelogEntryFile ranged UP from the entry level ('#{level,level+1}'), so once the level
+#      reached 3 fold-all recognised H3-or-H4 and no longer the H2 every flat-window entry (August 5-26,
+#      2026) carries -- and a root entry file at that level was skipped SILENTLY, never folded, nothing said.
+$dir3b = New-FoldFixture -Label 'flatwindow-foldall'
+New-LegacyEntryFile -Dir $dir3b -Name 'feat-parked-in-the-flat-window.md' -Title 'Parked in the flat window' -Tier '1'
+$r3b = Invoke-Fold -Dir $dir3b
+Assert-True ($r3b.ExitCode -eq 0)                                           'fold-all (flat-window entry) exits 0'
+Assert-True (-not (Test-Path (Join-Path $dir3b 'feat-parked-in-the-flat-window.md'))) 'the flat-window entry file is recognised and removed'
+Assert-True ((Get-Changelog -Dir $dir3b) -match 'Parked in the flat window') 'and its content lands in CHANGELOG.md'
+Assert-Equal 1 @(Get-EntryOrder -Changelog (Get-Changelog -Dir $dir3b)).Count 'folded as exactly one entry -- the block was re-levelled whole, not split'
+
+# ---------------------------------------------------------------------------------------------------
 Write-Host "-Branch mode -- folds exactly the named entry" -ForegroundColor Cyan
 $dir4 = New-FoldFixture -Label 'branchmode'
 New-EntryFile -Dir $dir4 -Name 'fix-explicit-target.md' -Title 'Explicit target'
@@ -610,9 +625,9 @@ Assert-True ($clU -match '(?m)^\|\s*0\s*\|\s*-\s*\|\s*-\s*\|')   'unscored table
 Write-Host "A pre-format entry keeps its Tier: line and is re-levelled to the entry level" -ForegroundColor Cyan
 #      Both halves matter, and both are inversions of the old behaviour. The line SURVIVES because nothing
 #      above the entry states the tier any more -- consuming it would make the entry read back as tier 0 and
-#      drop silently out of the release documents. And the heading is RE-LEVELLED, because a heading deeper
-#      than the entry level is not an entry boundary in that list: it would be absorbed into the block above
-#      and inherit its PR link.
+#      drop silently out of the release documents. And the heading is RE-LEVELLED, because a heading below the
+#      entry level is not an entry boundary in that list: it would be absorbed into the block above and
+#      inherit its PR link.
 $dirL = New-FoldFixture -Label 'impact-legacy'
 New-EntryFile       -Dir $dirL -Name 'feat-current.md' -Title 'Written in the new format' -Rows '| 1 | 3 | fine |'
 Invoke-Fold -Dir $dirL -Branch 'feat/current' | Out-Null
@@ -624,8 +639,8 @@ Assert-True ($clL -match '(?m)^Tier: 2$') 'legacy entry: its Tier: line is CARRI
 $orderL = @(Get-EntryOrder -Changelog $clL)
 Assert-Equal 2 $orderL.Count 'legacy entry: it is an entry boundary in its own right'
 Assert-True ($orderL[0] -match 'Written before the table') 'legacy entry: and its tier-2 line still ranks it above the tier-1 entry'
-Assert-True ($clL -notmatch ('(?m)^' + ('#' * ((Get-EntryHeadingLevel) + 1)) + ' Written before the table')) 'legacy entry: nothing is left at the old level'
-Assert-True ($rL.Output -match ('written with its entry heading at H' + ((Get-EntryHeadingLevel) + 1))) 'legacy entry: the re-levelling is reported, and it names the level the author actually wrote'
+Assert-True ($clL -notmatch ('(?m)^' + ('#' * ((Get-EntryHeadingLevel) - 1)) + ' Written before the table')) 'legacy entry: nothing is left at the old level'
+Assert-True ($rL.Output -match ('written with its entry heading at H' + ((Get-EntryHeadingLevel) - 1))) 'legacy entry: the re-levelling is reported, and it names the level the author actually wrote'
 
 Write-Host "A stray 'Plugins:' line in the entry does not survive the fold, and the fold says so (issue #1015)" -ForegroundColor Cyan
 #      THE DOUBLING THIS FIXES. fold-changelog-entry.ps1 appends the ONE authoritative 'Plugins:' line,

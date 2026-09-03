@@ -205,11 +205,13 @@ try {
     Assert-True (-not ($r34d.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: both fenced examples are mentions, not uses -- neither level is reported'
 
     # A PRE-FORMAT entry file, which is not history: an entry file lives only on a branch, so a branch
-    # created before the format changed still carries that era's heading level, and this repo had one
-    # parked on the remote the day the format landed. It must still be RECOGNISED (line 1 is skipped
-    # whatever its level, because the fold re-levels it) while its body is judged by the same rules.
+    # opened in the flat window (August 5-26, 2026) still carries the shape from then -- the entry one level
+    # below the current heading -- and this repo had one parked on the remote the day the format landed. It
+    # must still be RECOGNISED (line 1 is skipped whatever its level, because the fold re-levels it) while
+    # its body is judged by the same rules. The heading is composed as 'entryLevel - 1' rather than typed:
+    # the detector ranges DOWN from the current level since issue #1344, and a literal would pin yesterday's.
     $s34Legacy = @(
-        "$s34SectH An older entry " + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
+        ('#' * ((Get-EntryHeadingLevel) - 1)) + " An older entry " + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
         ''
         'Body prose.'
         ''
@@ -217,7 +219,7 @@ try {
     )
     [System.IO.File]::WriteAllText($s34Entry, (($s34Legacy -join "`n") + "`n"), $Utf8NoBom)
     $r34e = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($r34e.Out -match '\[entry-heading\].*1 unfolded entry\(ies\)') 'scenario 34: a pre-format entry file is still recognised as an entry file'
+    Assert-True ($r34e.Out -match '\[entry-heading\].*1 unfolded entry\(ies\)') 'scenario 34: a pre-format flat-window entry file is still recognised as an entry file'
     Assert-True ($r34e.Out -match 'entry-heading.*fix-a-branch-name\.md:5') 'scenario 34: and its body is judged by the same rules'
     Assert-True (-not ($r34e.Out -match 'fix-a-branch-name\.md:1')) 'scenario 34: while its own heading on line 1 is NOT reported -- that is the entry, and the fold re-levels it'
     Remove-Item -LiteralPath $s34Entry -Force

@@ -550,14 +550,9 @@ function Test-IsChangelogEntryFile {
     # A changelog entry file (new-branch.ps1) opens with its own heading; permanent root docs
     # (README, CHANGELOG, CONTRIBUTING, SECURITY, ...) open with an H1. Same structural signature
     # fold-changelog-entry.ps1 keys off, and TWO levels are accepted for the same reason it accepts
-    # them: an entry file lives only on a branch, so a branch created under an older level still
-    # carries that era's shape, and the fold promotes it as it lands.
-    #
-    # WHICH SECOND LEVEL THAT SHOULD BE IS OPEN (#1344). The range is 'entry level PLUS one', written
-    # when an entry was an H2 and the legacy shape an H3. Since the August 26, 2026 shift it computes to
-    # H4 -- a level no entry has ever opened with -- while the H2 every entry written in the flat window
-    # (August 5-26, 2026) carries falls outside it. Test-BranchChangelogIsFilled took the other direction
-    # that day, entry level MINUS one, and is the one to compare against before changing this.
+    # them: an entry file lives only on a branch, so a branch opened in the flat window
+    # (August 5-26, 2026) still carries the shape from then -- the entry at H2 -- and the fold promotes
+    # it to the current level as it lands.
     #
     # THE LEVEL IS READ FROM THE FORMAT LIB, NOT RESTATED, and that repair is the point. This function
     # used to hardcode '^###\s' with a comment explaining that restating it was deliberate, because
@@ -569,9 +564,15 @@ function Test-IsChangelogEntryFile {
     # reported clean, and check 11 stopped excluding entry files from its scan set. Exactly the
     # duplicated-fact failure the rest of this file exists to prevent, in the helper that answers
     # "what is an entry".
+    #
+    # THE RANGE RUNS DOWN FROM THE CURRENT LEVEL, NOT UP -- '#{entryLevel-1,entryLevel}'. After the
+    # August 26, 2026 shift the current entry level is 3, so 'entryLevel+1' resolved to an H4 no entry
+    # has ever opened with while the flat-window H2 fell outside the range: fold-all and check 13 stopped
+    # seeing an H2 entry file, silently (issue #1344). This matches the direction Test-BranchChangelogIsFilled
+    # took on the same day.
     param([Parameter(Mandatory = $true)][string]$Path)
     $entryLevel = Get-EntryHeadingLevel
-    $rx = '^#{' + $entryLevel + ',' + ($entryLevel + 1) + '}\s'
+    $rx = '^#{' + ($entryLevel - 1) + ',' + $entryLevel + '}\s'
     foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         return ($line -match $rx)

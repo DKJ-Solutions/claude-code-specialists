@@ -254,34 +254,33 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 }
 
 function Test-IsChangelogEntryFile {
-    # A changelog entry file (created by new-branch.ps1) always opens with its own heading, and
-    # since August 26, 2026 that heading is an H3 ('### DEPLOY: `<branch>`') rather than the H2 it carried
-    # in the flat window. Repo-root meta docs (CONTRIBUTING.md, SECURITY.md, ...) open with an H1 ('# ...').
+    # A changelog entry file (created by new-branch.ps1) always opens with its own heading, an H3
+    # ('### <title>') since the August 26, 2026 level shift. Repo-root meta docs (CONTRIBUTING.md,
+    # SECURITY.md, a future CODE_OF_CONDUCT.md, ...) open with an H1 ('# ...').
     # Fold-all mode keys off this structural signature so it only ever folds a genuine entry, never
     # whatever other *.md happens to sit in the repo root. Deliberately independent of the branch-
     # prefix table: consumer-extended prefixes (Shopify's style/, liquid/, ...) still fold, since an
     # entry from any prefix is written in this same format. The denylist below stays as a cheap
     # first filter; this is the actual gate.
     #
-    # TWO LEVELS ARE ACCEPTED, and the range is built from the lib rather than written out, so the two
-    # scripts cannot end up recognising different things. An entry file lives only on a branch, so an
-    # older level is not distant history: a branch created before a shift still carries one, and refusing
-    # to recognise it would silently leave that entry unfolded -- the exact half-state this repo keeps
-    # rediscovering. The re-leveller below moves whatever it finds to the current level as it lands.
+    # TWO LEVELS ARE ACCEPTED, and the range is built from the lib rather than written out, so this and
+    # check-plugin-integrity.ps1 cannot end up recognising different things. An entry file lives only on a
+    # branch, so a branch opened in the flat window (August 5-26, 2026) still carries the shape from then:
+    # the entry at H2. Refusing to recognise it would silently leave that entry unfolded in the root --
+    # the exact half-state this repo keeps rediscovering -- so the range runs DOWN from the current level,
+    # not up: '#{entryLevel-1,entryLevel}'. This is the same direction Test-BranchChangelogIsFilled took on
+    # August 26 and for the same reason; 'entryLevel+1' (an H4 no entry has ever opened with, per the #953
+    # post-mortem further down this file) was the stale reading, issue #1344. The fold PROMOTES a
+    # below-level entry to the current level as it lands, whole block at once, via Set-EntryHeadingLevel
+    # (see the loop below).
     #
-    # WHICH SECOND LEVEL THAT SHOULD BE IS OPEN (#1344). This computes 'entry level PLUS one', which was
-    # the pre-flat legacy shape while an entry was an H2, and since August 26, 2026 resolves to H4 -- a
-    # level no entry has ever opened with, per the #953 post-mortem further down this file -- while the H2
-    # every flat-window entry carries falls outside it. Test-BranchChangelogIsFilled took the other
-    # direction that day, entry level MINUS one, and is the one to compare against before changing this.
-    #
-    # The bound is a RANGE from the current level, not a hardcoded pair: a prefix match on the shallower
-    # of the two looks like it would cover the deeper one as well, and it does not -- '^###' followed by
-    # '\s' fails on '#### ', which is why the run of '#' has to be spelled as a quantifier.
+    # The bound is a RANGE, not a hardcoded '{2,3}': '^#{2,3}\s' looks like it also matches an H4 by
+    # prefix, but it does not -- '^#{2,3}' consumes at most three '#' and then needs '\s', which fails on
+    # the fourth '#', which is why the alternation has to be spelled as a quantifier over the whole run.
     param([Parameter(Mandatory = $true)][string]$Path)
     $entryLevel  = Get-EntryHeadingLevel
-    $legacyLevel = $entryLevel + 1
-    $rx = '^#{' + $entryLevel + ',' + $legacyLevel + '}\s'
+    $legacyLevel = $entryLevel - 1
+    $rx = '^#{' + $legacyLevel + ',' + $entryLevel + '}\s'
     foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         return ($line -match $rx)
