@@ -162,7 +162,7 @@ $script:ContractRecords = @(
        Returns = "an array of '<group>-<id>' ids deliberately kept out of the roster -- normally empty, @(), since every enabled specialist belongs in the roster" },
     # RETIRED, AUGUST 5, 2026: Get-ChangelogTierHeadings and the legacy single Get-ChangelogHeading (#178).
     # Both answered which '## ' heading a merged entry is filed under, and CHANGELOG.md has no section
-    # headings any more -- an entry IS an H2 and the document is an intro plus a flat ranked list of them.
+    # headings any more -- an entry IS an H3 and the document is an intro plus a flat ranked list of them.
     # The fold and release-lib derive the intro/list boundary structurally now (the first entry heading),
     # so nothing reads either function.
     #

@@ -121,7 +121,8 @@ try {
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'reset state') 'reset: the state the fold leaves behind is not an entry'
 
     # THE CASE A HEADING TEST PASSES AND THIS ONE MUST NOT. A freshly scaffolded entry already carries
-    # the H2 and the section headings, which is exactly why the hand-written gates reached for the score.
+    # its own heading and the section headings, which is exactly why the hand-written gates reached for
+    # the score.
     $scaffolded = New-Consumer -Label 'scaffolded'
     Set-Entry -Dir $scaffolded -Lines (Format-EntryBlock -Branch 'feat/thing' -Description '' -Type 'Feat' -Body '')
     $r = Invoke-Gate -Dir $scaffolded -Branch 'feat/thing'

@@ -3060,7 +3060,7 @@ function Get-EntryInsertOffset {
     # guarantee is load-bearing exactly here.
     return $SectionText.Length
 }
-# --- The entry's own shape: one H2 per change, with named sections ---------------------------------
+# --- The entry's own shape: one H3 per change, with named sections ---------------------------------
 #
 # ONE HEADING PER CHANGE, AND THE DOCUMENT HAS NO OTHERS (Dave, August 5, 2026). CHANGELOG.md used to open
 # with '## Latest Release' and three '## Tier N - Pull Requests' sections, with each change an '### ' inside
@@ -3521,15 +3521,14 @@ function Get-ChangelogUnreleasedPattern {
 
 function Get-EntryHeadingPattern {
     <#
-        The anchored regex that matches an entry's OWN heading and nothing else -- '^##\s' while the entry
-        level is 2. Built from Get-EntryHeadingLevel so the parser, the splitter and the re-leveller cannot
+        The anchored regex that matches an entry's OWN heading and nothing else -- '^###\s' while the entry
+        level is 3. Built from Get-EntryHeadingLevel so the parser, the splitter and the re-leveller cannot
         end up looking for different things.
 
         THE EXACT LEVEL, NOT A RANGE, and that is the one decision in this whole file that cannot be
-        loosened. An entry carries H3 sections of its own ('### What does this change do?'), so a pattern
-        accepting H3 as well would read every entry as four. It is safe as an exact match for the mirror
-        image of the same reason: '^##' followed by '\s' cannot match '### ', because the third character
-        is a '#'.
+        loosened. An entry carries H4 sections of its own, so a pattern accepting the section level as well
+        would read every entry as several. It is safe as an exact match for the mirror image of the same
+        reason: '^###' followed by '\s' cannot match '#### ', because the fourth character is a '#'.
     #>
     return '^#{' + (Get-EntryHeadingLevel) + '}\s'
 }
@@ -3644,13 +3643,13 @@ function Set-EntryHeadingLevel {
 
         WHY THE WHOLE BLOCK AND NOT JUST THE FIRST LINE. Until August 5, 2026 an entry was a heading plus
         prose, so re-levelling meant rewriting one line -- and the renderer did exactly that, with a '^'
-        anchored to the start of the block. An entry now carries three H3 sections of its own
-        ('### What does this change do?' and its siblings), so shifting only the heading would leave those
-        sections at the level of the ENTRY above them: one entry rendering as four, in well-formed markdown
-        that no parser would complain about.
+        anchored to the start of the block. An entry now carries two named H4 sections of its own (the
+        'What' question and 'Pull Request'), so shifting only the heading would leave those sections at
+        the level of the ENTRY above them: one entry rendering as several, in well-formed markdown that
+        no parser would complain about.
 
         SHIFTED BY A DELTA, NOT SET TO A LEVEL. Every non-fenced heading moves by the same amount, which
-        preserves the structure inside the entry whatever it is -- an H4 sub-heading in a body stays one
+        preserves the structure inside the entry whatever it is -- an H5 sub-heading in a body stays one
         level below the section it is in. Setting levels absolutely would need this function to know which
         headings are which, and it does not need to know.
 
@@ -3922,8 +3921,8 @@ function Get-EntrySectionBody {
 
         FENCE-AWARE, and the FIRST occurrence outside a fence wins, for the reason every reader in this file
         is: an entry documenting this format quotes these headings inside a fence, and the entry for this
-        very change does. A section ends at the next heading of ANY level, so a '#### ' sub-heading inside a
-        body is kept while the next '### ' or '## ' closes it.
+        very change does. A section ends at the next heading AT ITS OWN LEVEL OR ABOVE, so a '##### '
+        sub-heading inside a body is kept while the next '#### ' or '### ' closes it.
 
         THE SECTION'S RETIRED NAMES ARE ACCEPTED ALONGSIDE ITS CURRENT ONE, and that is not politeness
         towards history: 'Type of change' became 'Branch type' and 'What does this change do?' became the
@@ -4295,7 +4294,7 @@ function Resolve-EntryType {
 
 function Add-EntrySection {
     <#
-        Private: one section of the entry -- the H3 heading, its guidance comment directly underneath, and
+        Private: one section of the entry -- the H4 heading, its guidance comment directly underneath, and
         the value (if any) under that. Appends to the caller's list.
 
         THE COMMENT SITS TIGHT AGAINST THE HEADING, with no blank line between them, and that is the
@@ -4341,7 +4340,7 @@ function Add-EntrySection {
 
 function Format-EntryBlock {
     <#
-        The whole entry as an array of LINES: the H2 DEPLOY heading, then its H3 sections in order.
+        The whole entry as an array of LINES: the H3 DEPLOY heading, then its H4 sections in order.
 
         IT IS A SECTION OF A DOCUMENT SINCE AUGUST 23, 2026, NOT A DOCUMENT. Format-Development writes
         the branch's plan and then calls this for its fourth phase -- so the entry is produced by one
@@ -4473,7 +4472,7 @@ function Format-EntryBlock {
 # $script:DefaultChangelogHeading, Resolve-ChangelogTierSections and Get-ChangelogTierSections answered
 # one question -- which '## ' heading a merged entry is filed under -- for the three readers that had to
 # agree about it: the fold, release-lib's parser and the release cut. CHANGELOG.md has no section
-# headings any more. An entry IS an H2 and the document is an intro plus a ranked list of them, so the
+# headings any more. An entry IS an H3 and the document is an intro plus a ranked list of them, so the
 # question has no subject: there is no heading to name, and therefore nothing for three readers to
 # disagree about.
 #
@@ -5021,8 +5020,9 @@ $script:BranchFileDefaults = [ordered]@{
     # Format-Development, which writes it under the phase the first step lives in.
     FirstStep      = 'TODO: the first step of this branch'
     # THE PHASES OF THE STEP LIST (Dave, August 14, 2026; issue #655). A branch moves through a
-    # recognisable arc instead of an ad-hoc list. They are the file's own H2 sections since August 19,
-    # 2026, where they were H4s under a '### Steps' wrapper -- which changes nothing mechanically:
+    # recognisable arc instead of an ad-hoc list. They are the file's own sections since August 19, 2026
+    # -- H2s until the August 26 shift and H3s since -- where they were H4s under a '### Steps' wrapper,
+    # which changes nothing mechanically:
     # Get-BranchProgressFindings reads lines beginning with a step mark, so a heading of any level is
     # invisible to the gate and the arc is drawn on top of an untouched mechanism.
     #
@@ -6458,8 +6458,8 @@ function Get-DevelopmentEntryPattern {
         branch's plan and starts being the entry that folds into CHANGELOG.md.
 
         IT IS NOT ENOUGH TO MATCH THE LEVEL, which is why this is a function rather than a constant. PLAN,
-        CREATE and TEST are H2 headings too; what separates the fourth is that it carries the entry's own
-        title word, a colon and the BRANCH NAME. The title word comes from the wording seam, so a repo that translated
+        CREATE and TEST sit at the cycle file's section level too; what separates the fourth is that it
+        carries the entry's own title word, a colon and the BRANCH NAME. The title word comes from the wording seam, so a repo that translated
         'DEPLOY' is matched by its own word -- and every title this document has carried is accepted, because
         a branch created before a rename still has to be foldable.
 
@@ -6567,8 +6567,8 @@ function Test-BranchChangelogIsFilled {
         THE TEST IS THE BRANCH NAME, NOT THE HEADING LEVEL, since August 23, 2026 -- and the change was
         forced rather than chosen. Until the merge there were two files: the entry opened with an H2 when it
         was written and an H1 when it was reset, so one look at the first non-blank line answered this. One
-        document cannot do that. Its H1 is its title in both states, and the H2 below it is a section of it,
-        so the level says nothing about whether anybody has been working here.
+        document cannot do that. Its title heading is its title in both states, and the heading below it is
+        a section of it, so the level says nothing about whether anybody has been working here.
 
         WHAT DOES SAY SO is the name in the heading, which is the same fact new-branch already uses for
         idempotency: the trunk's name means nobody's branch, any other name means somebody's. One predicate

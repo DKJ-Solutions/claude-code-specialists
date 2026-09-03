@@ -60,7 +60,7 @@
 
 .PARAMETER Title
     (Optional) the branch title -- the human-readable name of the change, written into the
-    entry's 'Branch title' section. That is where the heading's old job went: the entry's H2
+    entry's 'Branch title' section. That is where the heading's old job went: the entry's H3
     names the BRANCH. Left empty, the section is left empty and open-pr refuses the PR until somebody
     writes it, which is strictly better than a placeholder that can be ticked past.
 
@@ -446,7 +446,7 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 # errored out if it could not. Asking git again would be a second answer to a settled question.
 $branch = $Name
 
-# -Title IS THE BRANCH TITLE. The entry's H2 names the branch, and the human-readable name of
+# -Title IS THE BRANCH TITLE. The entry's H3 names the branch, and the human-readable name of
 # the change is a section under it -- the one open-pr.ps1 now composes the PR title from, so what is
 # typed here is what the PR is called. Give it WITHOUT a type prefix: the branch already carries the
 # type and open-pr puts it in front.

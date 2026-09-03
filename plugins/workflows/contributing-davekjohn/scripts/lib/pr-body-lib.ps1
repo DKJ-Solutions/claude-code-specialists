@@ -42,11 +42,14 @@ function Get-EntryDescription {
         description short -- returning something plausible rather than failing, which is the worst shape.
 
         THIS IS A PRE-MERGED-FORMAT READER, AND ITS HEURISTIC IS WHY. The rule above holds only while the
-        entry's own heading IS an H3. In the merged development format the heading is an H2
-        (`## DEPLOY: ...`), so the first '### ' line is a section INSIDE the body and this function returns
-        the tail from there -- which is exactly the plausible-rather-than-failing shape the paragraph above
-        warns about, arrived at from the other direction (inbound
-        https://github.com/DaveKJohn/claude-code-specialists/issues/853). It is not repaired here on
+        entry's own heading IS the first '### ' line. In the merged development format as it stood between
+        August 23 and 26, 2026 that heading was an H2 (`## DEPLOY: ...`), so the first '### ' line was a
+        section INSIDE the body and this function returned the tail from there -- exactly the
+        plausible-rather-than-failing shape the paragraph above warns about, arrived at from the other
+        direction (inbound https://github.com/DaveKJohn/claude-code-specialists/issues/853). The August 26
+        shift moved DEPLOY back to '### ' and its sections to '#### ', so the collision is gone for now --
+        by where the levels happen to sit, not by anything this function knows: the '###' below is written
+        out rather than read from Get-EntryHeadingLevel. It is not repaired here on
         purpose: Get-PrDescription now recognises that heading itself, so the merged format never reaches
         this fallback, and widening this function would change what a pre-dossier entry returns -- the one
         shape it exists for. If you find yourself needing it for a newer format, that is a sign the caller
@@ -110,8 +113,9 @@ function Get-PrDescription {
         WHAT THAT REPAIRS, measured in a consumer and reproduced here (inbound
         https://github.com/DaveKJohn/claude-code-specialists/issues/853): returning '' sent the caller to
         Get-EntryDescription, whose contract is "everything after the entry's compact '### ' heading". That
-        was right while the entry's own heading WAS an H3. Under the merged format the first '### ' line is
-        a section INSIDE the body -- 'What makes this deploy extra special' -- so the fallback returned the
+        was right while the entry's own heading WAS an H3. Under the merged format as it then stood the
+        first '### ' line was a section INSIDE the body -- 'What makes this deploy extra special' -- so
+        the fallback returned the
         tail from there: about a quarter of the entry, with the opening argument silently gone. The fold was
         unaffected (CHANGELOG.md received the entry complete), so nothing was lost permanently; what was
         lost is the review moment, in a body that looked complete and passed every gate.
