@@ -32,6 +32,163 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/record-strict-ci-gate` · 20260903-175320
+
+`main-ci-gate` now enforces `strict_required_status_checks_policy`, and
+`DKJ-Solutions/claude-code-specialists` now allows auto-merge and branch auto-update. The three
+fields were changed by `gh api` out-of-band on 2026-09-03 (Dave's call on
+[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)); this branch is the
+docs record of that change.
+
+- ruleset `main-ci-gate`, `required_status_checks` rule: `strict_required_status_checks_policy`
+  `false` to `true`
+- repo `DKJ-Solutions/claude-code-specialists`: `allow_auto_merge` and `allow_update_branch` both
+  `false` to `true`
+
+With `strict` on, a PR must be up to date with `main` before it can merge; `allow_auto_merge` and
+`allow_update_branch` let GitHub run the convergence loop unattended -- update the behind branch,
+re-run `lint-en-tests` against the fresh tree, merge when green -- so the operator arms auto-merge
+once instead of standing between CI rounds. The cost is a full extra `lint-en-tests` run for every
+branch that falls behind `main` while its own CI runs. `ship-pr.ps1`'s step-3b stale-CI certificate
+gate (PR #1316) is unchanged: its detection is correct and it remains the portable safety net for
+consumers, whom a repo-settings change does not reach; `-SkipStaleCheck` stays the valve for a
+known-harmless window. This enacts option 1 of
+[#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292) ("require branches to
+be up to date") for this repo; #1292 stays open as the broader merge-queue question. Recorded in
+`.claude/specialists/lenses/05-15-extension.md` (the `main-ci-gate` / `ci.yml` bullet) and in
+`.claude/rules/language-layers.md` (the closing verification-lesson paragraph, which now notes this
+as the third change to that ruleset in two days).
+
+This branch ships only documentation; the settings change was applied and verified out-of-band and
+is already in force, so a maintainer feels the new merge behaviour regardless of this entry. What
+the entry buys is that the next session reading the `main-ci-gate` / `ci.yml` bullet finds the
+convergence-race resolution -- and the reason step 3b was deliberately left alone -- recorded with
+its #1325 / #1292 / #1316 chain intact, rather than re-deriving it or re-proposing the script-side
+fix the #1325 verdict rejected.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A change to this repo's own GitHub ruleset and merge settings reaches no consumer: it ships no
+plugin change, no script change, and no page a consumer adopts. The portable consumer-side
+mechanism -- `ship-pr.ps1` step 3b -- is explicitly unchanged, and no earlier release note told
+consumers to adopt anything this retires.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record strict CI checks + auto-merge on main-ci-gate
+
+[PR #1333](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1333)
+
+---
+
+### DEPLOY: `fix/ship-pr-stale-ci-certificate` · 20260903-174847
+
+A required check certifies GitHub's **merge ref** -- the branch already merged into the trunk -- as that
+ref stood when the run was **created**. `pull_request` does not re-fire when the base moves, and
+`main-ci-gate` carries `strict_required_status_checks_policy: false`, so a check that went green before
+`main` advanced still satisfies the gate hours later. `ship-pr.ps1` step 3b now refuses that merge: after
+the required check goes green and before step 4 merges, it reads the certifying run's `created_at`, asks
+whether `main` has gained a first-parent commit since, and stops -- with `-SkipStaleCheck` as the valve.
+
+Measured on PR #1268, the merge that produced [#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292):
+its CI run started `07:39:34Z`, the test block its own change breaks reached `main` at `07:54:19Z` -- 45
+seconds before that run finished, and 14m45s after it started -- and it merged at `10:06:12Z` on that same
+green check, 2h11m stale.
+
+**The predicate is not the one the report proposed, and that is the substance of the change.** #1292 asked
+for a refusal when the branch is *behind* `origin/main`. Behind-ness is the ordinary case here -- 20 of the
+last 45 merged PRs, 44.4% -- and it is harmless whenever `main` advanced *before* the certifying run, which
+most of it did. What actually voids a certificate is narrower, and strictly implied by behind-ness: **did
+`main` move since the run that went green?** That fires on 14 of the same 45 (31.1%), median staleness 16.1
+minutes, max 146.6.
+
+**The anchor is the run's `created_at` and not a check's `startedAt`, and the difference is the whole safety
+property.** The first build used `startedAt`, reasoning that queueing only pushes it later so the error
+would be conservative. It is the opposite: a later anchor makes `git log --since` **miss** commits that
+landed in the gap, so a stale certificate passes as sound -- the exact failure this step exists to catch.
+Two things make that gap large rather than sub-second: `windows-latest` provisioning, and a re-run, which
+resets the timestamp without GitHub recomputing the merge ref. Verified on run `33652133970` -- top-level
+`created_at` held at `15:59:52Z` across a re-run whose `run_started_at` moved to `21:15:50Z`, five hours
+later, while the `/attempts/2` sub-resource reports its *own* `created_at` matching that late start, which
+is precisely the value that would have reintroduced the identical bias.
+
+Once a required check is named, every subsequent read fails closed -- no resolvable run id, an unreadable
+`created_at`, a failed fetch, a failed log -- naming `-SkipStaleCheck` in each refusal. Where the ruleset
+requires nothing at all it warns and ships, deliberately: this file is plugin payload, and refusing forever
+in a consumer that has no ruleset is the worse failure.
+
+Two defects were found in review and repaired here rather than filed. The new `git fetch origin main`
+lacked `-DiscardStderr` and echoed its captured output on failure, which on an HTTPS clone with a
+credential in the remote URL prints a secret -- the lesson [`../scripts/task/new-branch.ps1`](../scripts/task/new-branch.ps1)
+already carries. And the parsed `git log` read lacked the same flag, where a stray line becomes a fake SHA
+and the refusal's `Substring(0, 8)` turns a careful message into a .NET trace. The pre-existing sibling of
+the first, at this same file's fold-step fetch, is
+[#1313](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1313).
+
+What this change deliberately does **not** do is touch `main-ci-gate`. Enabling
+`strict_required_status_checks_policy` is #1292's own option 1 and GitHub's built-in answer to this, but it
+is a repo-settings change and therefore Dave's -- and it is not an alternative to this step so much as a
+complement, since it would protect this repo only.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing a subscriber sees. `ship-pr.ps1` is plugin payload, so what reaches a consumer is one new refusal
+-- the trunk moved while their PR sat green -- and one new flag to override it. For them the gate is what a
+ruleset cannot be: a consuming repo has no `main-ci-gate` to make strict, so this step is the only place
+the staleness is caught on their side at all.
+
+**Score:** N/A
+
+#### Pull Request
+
+ship-pr refuses to merge on a CI certificate main has outrun
+
+Plugins: contributing-davekjohn
+
+[PR #1316](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1316)
+
+---
+
+### DEPLOY: `fix/publish-to-business-credential-in-url` · 20260903-172545
+
+A credential pasted into `publish-to-business.ps1`'s `-TargetRepo` no longer reaches the console or a
+CI log: the userinfo is masked at every print and in the thrown command line. The reported hazard in
+`ship-pr.ps1`, `worktree-lane.ps1` and `prune-merged.ps1` was measured against git and declined --
+git redacts userinfo itself (`transport_anonymize_url`), so dropping stderr there would have cost
+git's own diagnosis, including at the fold step where the PR is already merged, and bought nothing.
+The measurement is now stated at the seam in `native-capture-lib.ps1` and the overstated comment in
+`new-branch.ps1` that the report leaned on is corrected, so the next reader neither re-files it nor
+applies the guard on a reason that does not hold.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the declined half that matters. The issue arrived with a plausible reason, a documented
+in-repo precedent, and a one-line fix at three named call sites -- and the fix was wrong at all
+three, while the one call site the report never mentioned was leaking for real. What separated them
+was ten minutes of holding the reason against git instead of against the report. The repair therefore
+changes what the tree *says* as much as what it does: a comment that read as a rule is now a
+measurement, and the seam tells the next caller which question to ask.
+
+**Score:** N/A
+
+#### Pull Request
+
+Mask a credential-laden -TargetRepo in publish-to-business's output
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1330](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1330)
+
+---
+
 ### DEPLOY: `fix/suite-gate-fixture-assert-line-scoped` · 20260903-172201
 
 `test-suite-gate.tests.ps1`'s per-process fixture assert folded backtick continuations before judging

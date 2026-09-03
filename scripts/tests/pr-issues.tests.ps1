@@ -1504,6 +1504,220 @@ Assert-True ($shipText -like '*rules/branches/main*') 'the trunk rules are read 
 Assert-True ($shipText -like '*current_user_can_bypass*') 'and the bypass from the ruleset detail, which is the only endpoint carrying it'
 Assert-True ($shipText -like '*orgs/$($rec.Source)/rulesets/*') 'an Organization ruleset is read from the org endpoint'
 Assert-True ($shipText -like '*this is the cheap place to stop*') 'the refusal says nothing was merged, which is the fact the reader needs first'
+
+
+# --- Get-RequiredCheckRunIds: which Actions run sits behind a named check? (issue #1292 re-anchor) ---
+# THE RE-ANCHOR: the retired Get-CertifyingRunTimestamp read a check's own startedAt directly out of
+# the checks payload -- a red-team caught that startedAt under-refuses (it can only be LATER than the
+# true ref-fix moment, so a commit landing in that gap silently reads as tested when it was not). The
+# repair instead finds the RUN behind a required check from its 'link', so the caller can ask that
+# run's own created_at, which stays anchored across a re-run in a way startedAt does not (see
+# Get-CertifyingRunCreatedAt's own header for the measured instance).
+Write-Host ""
+Write-Host "Get-RequiredCheckRunIds -- the run(s) behind named checks (issue #1292 re-anchor)" -ForegroundColor Cyan
+
+$oneLinked = '[{"name":"lint-en-tests","link":"https://github.com/o/r/actions/runs/111/job/222"}]'
+Assert-Equal '111' (@(Get-RequiredCheckRunIds -ChecksJson $oneLinked -Names @('lint-en-tests'))[0]) 'a single named check resolves its run id from the link'
+
+# No names at all -- nothing to look up, so no read of the payload is even attempted.
+Assert-Equal 0 @(Get-RequiredCheckRunIds -ChecksJson $oneLinked -Names @()).Count 'no names -> empty'
+Assert-Equal 0 @(Get-RequiredCheckRunIds -ChecksJson $oneLinked).Count 'Names omitted (defaults to empty) -> empty'
+
+# Every unreadable ChecksJson shape collapses to empty, same posture as every other reader in this file.
+foreach ($bad in @('', '   ', 'not json', 'null', '[]', '{}')) {
+    Assert-Equal 0 @(Get-RequiredCheckRunIds -ChecksJson $bad -Names @('lint-en-tests')).Count "unreadable ChecksJson ('$bad') -> empty"
+}
+Assert-Equal 0 @(Get-RequiredCheckRunIds -Names @('lint-en-tests')).Count 'ChecksJson omitted -> empty'
+
+# A name absent from the checks payload -- nothing in the payload can answer for it.
+Assert-Equal 0 @(Get-RequiredCheckRunIds -ChecksJson $oneLinked -Names @('claude-review')).Count 'a name matching no record -> empty'
+
+# TWO NAMED CHECKS, DIFFERENT RUNS -- both ids come back, in payload order.
+$twoLinked = @'
+[
+  {"name":"lint-en-tests","link":"https://github.com/o/r/actions/runs/111/job/222"},
+  {"name":"claude-review","link":"https://github.com/o/r/actions/runs/333/job/444"}
+]
+'@
+$twoIds = @(Get-RequiredCheckRunIds -ChecksJson $twoLinked -Names @('lint-en-tests', 'claude-review'))
+Assert-Equal (('111', '333') -join ',') ($twoIds -join ',') 'two named checks -> both run ids, in payload order'
+
+# TWO NAMED CHECKS, THE SAME RUN -- one id, not two: two jobs of one workflow run share a run id, and
+# the caller must not ask gh for the same run's created_at twice.
+$sameRun = @'
+[
+  {"name":"lint-en-tests","link":"https://github.com/o/r/actions/runs/111/job/222"},
+  {"name":"claude-review","link":"https://github.com/o/r/actions/runs/111/job/555"}
+]
+'@
+$dedupedIds = @(Get-RequiredCheckRunIds -ChecksJson $sameRun -Names @('lint-en-tests', 'claude-review'))
+Assert-Equal 1 $dedupedIds.Count 'two checks from the SAME run -> one id, deduplicated'
+Assert-Equal '111' $dedupedIds[0] 'and it is the shared run id'
+
+# A LINK NAMING NO ACTIONS RUN IS SKIPPED, not a crash and not a bogus id -- an external status check
+# (e.g. a third-party CI service) has no Actions run behind it at all.
+$externalLink = '[{"name":"netlify","link":"https://app.netlify.com/deploy/abc123"}]'
+Assert-Equal 0 @(Get-RequiredCheckRunIds -ChecksJson $externalLink -Names @('netlify')).Count 'a link naming no Actions run resolves nothing'
+
+# NON-NAMED CHECKS ARE IGNORED even when they carry a resolvable run -- only the caller's own -Names
+# take part, so a check outside the ruleset cannot smuggle its run in.
+$withNonRequired = @'
+[
+  {"name":"lint-en-tests","link":"https://github.com/o/r/actions/runs/111/job/222"},
+  {"name":"netlify","link":"https://github.com/o/r/actions/runs/999/job/888"}
+]
+'@
+$onlyRequired = @(Get-RequiredCheckRunIds -ChecksJson $withNonRequired -Names @('lint-en-tests'))
+Assert-Equal (@('111') -join ',') ($onlyRequired -join ',') "a non-required check's run id does not ride along"
+
+# A record with no name is skipped rather than throwing, same as every other reader in this file.
+Assert-Equal 0 @(Get-RequiredCheckRunIds -ChecksJson '[{"link":"https://github.com/o/r/actions/runs/111/job/222"}]' -Names @('lint-en-tests')).Count 'a nameless record cannot match a required name'
+
+
+# --- Get-CertifyingRunCreatedAt: the earliest already-fetched created_at (issue #1292 re-anchor) -----
+# PURE reduction over values the caller has already fetched (`gh api .../actions/runs/<id>
+# --jq '.created_at'`) for each id Get-RequiredCheckRunIds named. Anchored on created_at rather than a
+# check's startedAt specifically because created_at stays fixed across a re-run and startedAt does not
+# -- verified on a genuine re-run in the source repo's own history; see the function's own header.
+Write-Host ""
+Write-Host "Get-CertifyingRunCreatedAt -- the earliest already-fetched created_at (issue #1292 re-anchor)" -ForegroundColor Cyan
+
+Assert-Equal ([datetime]::Parse('2026-09-02T15:59:52Z').ToUniversalTime().Ticks) `
+    ((Get-CertifyingRunCreatedAt -CreatedAtValues @('2026-09-02T15:59:52Z')).Ticks) `
+    'a single value returns its own timestamp'
+
+# THE EARLIEST WINS, because a ruleset can require checks from more than one distinct triggering run;
+# the earliest is closest to when ANY of them fixed a ref this branch is being merged against.
+$earliestCreated = Get-CertifyingRunCreatedAt -CreatedAtValues @('2026-09-02T15:59:52Z', '2026-09-02T10:00:00Z')
+Assert-Equal ([datetime]::Parse('2026-09-02T10:00:00Z').ToUniversalTime().Ticks) $earliestCreated.Ticks 'two values -> the EARLIER one wins, not the first in the array'
+
+# THE ZERO-TIME SHAPE (issue #977's `0001-01-01T00:00:00Z`) MUST STILL BE SKIPPED, NOT TREATED AS THE
+# EARLIEST -- a zero anchor would otherwise always be the minimum and would void every certificate,
+# exactly the failure the retired Get-CertifyingRunTimestamp's own asserts caught, carried over here.
+$skippingZeroCreated = Get-CertifyingRunCreatedAt -CreatedAtValues @('0001-01-01T00:00:00Z', '2026-09-02T10:00:00Z')
+Assert-Equal ([datetime]::Parse('2026-09-02T10:00:00Z').ToUniversalTime().Ticks) $skippingZeroCreated.Ticks 'a zero-time value is skipped rather than winning as the earliest'
+
+# When EVERY value is zero-time, blank, unparseable, or absent, none can answer -- $null, never the
+# floor of the type.
+Assert-True ($null -eq (Get-CertifyingRunCreatedAt -CreatedAtValues @('0001-01-01T00:00:00Z'))) 'every value unstarted-shaped -> $null, never the epoch'
+Assert-True ($null -eq (Get-CertifyingRunCreatedAt -CreatedAtValues @('', '   ', $null))) 'blank/whitespace/null values -> $null'
+Assert-True ($null -eq (Get-CertifyingRunCreatedAt)) 'no values at all (default) -> $null'
+Assert-True ($null -eq (Get-CertifyingRunCreatedAt -CreatedAtValues @())) 'an explicit empty array -> $null'
+Assert-True ($null -eq (Get-CertifyingRunCreatedAt -CreatedAtValues @('not a date'))) 'an unparseable value -> $null'
+
+# An unparseable value beside a real one costs nothing -- the real one still wins.
+$mixedCreated = Get-CertifyingRunCreatedAt -CreatedAtValues @('not a date', '2026-09-02T10:00:00Z')
+Assert-Equal ([datetime]::Parse('2026-09-02T10:00:00Z').ToUniversalTime().Ticks) $mixedCreated.Ticks 'an unparseable value beside a real one -> the real one wins'
+
+
+# --- Get-StaleCertificateVerdict: has 'main' moved since the certifying run? (issue #1292) ----------
+# PURE: the caller does the git reading (fetch + first-parent log since the certifying timestamp) and
+# hands the resulting SHA list here. This is the whole decision table, without a live remote.
+Write-Host ""
+Write-Host "Get-StaleCertificateVerdict -- has 'main' moved since the certifying run? (issue #1292)" -ForegroundColor Cyan
+
+$noCommits = Get-StaleCertificateVerdict -NewMainCommits @()
+Assert-Equal $false $noCommits.Stale        'no new commits -> not stale'
+Assert-Equal 0      $noCommits.Count        'and the count is zero'
+Assert-Equal 0      @($noCommits.Commits).Count 'and the commit list is empty, not $null'
+
+$defaulted = Get-StaleCertificateVerdict
+Assert-Equal $false $defaulted.Stale 'the default (no -NewMainCommits at all) reads the same as an explicit empty list'
+
+$nullPassed = Get-StaleCertificateVerdict -NewMainCommits $null
+Assert-Equal $false $nullPassed.Stale 'an explicit $null is treated the same as no commits, not as a crash'
+
+$oneCommit = Get-StaleCertificateVerdict -NewMainCommits @('aaaaaaaa1111111111111111111111111111aaaa')
+Assert-Equal $true $oneCommit.Stale  'one commit -> stale'
+Assert-Equal 1     $oneCommit.Count  'and the count is one'
+Assert-Equal 'aaaaaaaa1111111111111111111111111111aaaa' $oneCommit.Commits[0] 'and the SHA itself comes through'
+
+$shaA = 'a1111111111111111111111111111111111111a'
+$shaB = 'b2222222222222222222222222222222222222b'
+$shaC = 'c3333333333333333333333333333333333333c'
+$severalCommits = Get-StaleCertificateVerdict -NewMainCommits @($shaA, $shaB, $shaC)
+Assert-Equal $true $severalCommits.Stale 'several commits -> stale'
+Assert-Equal 3     $severalCommits.Count 'with the right count'
+Assert-Equal (($shaA, $shaB, $shaC) -join ',') (($severalCommits.Commits) -join ',') 'and the SHAs come through in the order git produced them'
+
+# DUPLICATE SHAs ARE DE-DUPLICATED (piped through Select-Object -Unique), so a commit that shows up
+# twice in the log read (e.g. a caller that re-queries) does not inflate the count.
+$dupedCommits = Get-StaleCertificateVerdict -NewMainCommits @($shaA, $shaA, $shaB)
+Assert-Equal $true $dupedCommits.Stale 'duplicates still read as stale'
+Assert-Equal 2     $dupedCommits.Count 'but the duplicate is not counted twice'
+
+# NULL/EMPTY/WHITESPACE ENTRIES ARE FILTERED OUT AND DO NOT INFLATE THE COUNT -- git's own output is
+# newline-split by the caller and could hand through a blank line at the end.
+$withBlanks = Get-StaleCertificateVerdict -NewMainCommits @($shaA, '', '   ', $null, $shaB)
+Assert-Equal $true $withBlanks.Stale 'blank/whitespace/null entries beside real SHAs still read as stale'
+Assert-Equal 2     $withBlanks.Count 'and they are not counted as commits themselves'
+
+# Blanks alone -> no commits at all, not a stale verdict manufactured from nothing.
+$onlyBlanks = Get-StaleCertificateVerdict -NewMainCommits @('', '   ', $null)
+Assert-Equal $false $onlyBlanks.Stale 'only blank/whitespace/null entries -> not stale'
+Assert-Equal 0      $onlyBlanks.Count 'with a count of zero'
+
+
+# --- ship-pr.ps1's step 3b: the wiring, as far as a suite without a live remote can reach it --------
+# THE ACTUAL git fetch/gh api/git log/refusal WIRING DRIVES A REAL REMOTE AND IS NOT COVERED HERE -- the
+# same known gap this file's own header states for step 3's wait, step 4's merge, and every other live
+# git/gh call in this script. What follows is what IS assertable without one: that step 3b calls the
+# pure functions above with the arguments the re-anchor actually needs, that it reuses the check facts
+# step 3 already fetched to find the run(s) rather than searching fresh, that -SkipStaleCheck actually
+# gates the whole block, and that EVERY refusal path the re-anchor added -- not only the stale-certificate
+# one -- prints a recognisable sentence and names the valve. Anchors are literal code fragments (a call
+# with its actual argument names, an exact printed sentence) rather than a text-position ordering, per
+# Sylvester's own caution: his FIRST build of this step broke an existing ordering assert in this file by
+# mentioning a function name earlier in a doc comment, so a position-based assert here would carry the
+# identical fragility on the very branch that pointed it out.
+#
+# THE FAIL-CLOSED LINE MOVED WITH THE RE-ANCHOR, AND BOTH SIDES OF IT ARE ASSERTED: no required check
+# named still WARNS (nothing to protect there -- refusing would permanently block a repo with no
+# ruleset), but once one IS named, every read that follows -- the run id, its created_at, the fetch, the
+# log -- FAILS CLOSED rather than warning, which is the opposite of what the retired
+# Get-CertifyingRunTimestamp build did.
+Write-Host ""
+Write-Host "ship-pr.ps1's step 3b -- what is assertable without a live remote (issue #1292 re-anchor)" -ForegroundColor Cyan
+
+Assert-True ($shipText -like '*Get-RequiredCheckRunIds -ChecksJson $checkFactsJson -Names $staleCheckNames*') 'step 3b finds the run(s) behind the required check(s) from the check facts step 3 already fetched -- no fresh search'
+Assert-True ($shipText -like '*Get-CertifyingRunCreatedAt -CreatedAtValues $createdAtValues*') 'and reduces the fetched created_at values with the re-anchored selector, not the retired startedAt one'
+Assert-True ($shipText -like '*Get-StaleCertificateVerdict -NewMainCommits $newMainCommits*') 'and hands the freshly fetched main history to the verdict function, unchanged by the re-anchor'
+Assert-True ($shipText -like '*$requiredFactsJson | ConvertFrom-Json*') 'the required check names for the stale check are parsed from the already-fetched required-checks payload, not a second gh call'
+Assert-True ($shipText -like '*''api'', "repos/$repo/actions/runs/$runId", ''--jq'', ''.created_at''*') 'the one NEW network call per certifying run asks for that run''s own created_at, not a check''s startedAt'
+
+# -SkipStaleCheck actually gates the block: the whole read-and-refuse path sits behind the switch.
+Assert-True ($shipText -like '*if ($SkipStaleCheck) {*') 'the escape valve is an if/else around the whole step, not a flag checked deep inside it'
+Assert-True ($shipText -like '*-SkipStaleCheck set -- not checking whether*') 'and taking the escape valve says so out loud rather than silently skipping'
+
+# NO REQUIRED CHECK NAMED -> WARN, NOT REFUSE. Nothing this predicate can protect in that repo (no
+# ruleset, or an unreadable one -- indistinguishable here), so refusing would permanently block ship-pr
+# on every repo without one.
+Assert-True ($shipText -like '*if ($staleCheckNames.Count -eq 0) {*') 'an unknown required-check state is branched on explicitly, not folded into the refusal path'
+Assert-True ($shipText -like '*no required check name is known -- not checked*') 'and it warns rather than refuses -- there is nothing here for the predicate to protect'
+
+# ONCE A REQUIRED CHECK IS NAMED, EVERY SUBSEQUENT READ FAILS CLOSED -- the opposite posture from the
+# retired build, which warned on an unresolved anchor. Each refusal below names the valve.
+Assert-True ($shipText -like '*no GitHub Actions run could be found behind the required check(s)*') 'an unresolvable run behind a NAMED required check refuses -- known certificate, not verified'
+Assert-True ($shipText -like '*could not read ''created_at'' for at least one run*') 'a failed created_at read refuses too, for the same reason'
+Assert-True ($shipText -like '*reported no readable ''created_at''*') 'and an unparseable created_at across every run refuses as well'
+Assert-True ($shipText -like '*''git fetch origin main'' failed -- NOT merged*') 'a failed fetch of ''main'' now refuses rather than warning'
+Assert-True ($shipText -like '*could not read the history of ''origin/main'' -- NOT merged*') 'and so does a failed git log, for the same reason'
+
+# The two SINGLE-LINE refusals (git fetch, git log) can be checked as one contiguous literal fragment
+# spanning the refusal text AND the valve, safely -- there is no line wrap between them to reflow. The
+# other two are here-strings whose wrap point is a formatting detail, not a fact worth pinning down to
+# an exact line break, so for those the existence checks above are as far as this suite goes.
+Assert-True ($shipText -like "*'git fetch origin main' failed -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway.*") 'the failed-fetch refusal names -SkipStaleCheck in the same single-line message'
+Assert-True ($shipText -like "*could not read the history of 'origin/main' -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway.*") 'the failed-log refusal names -SkipStaleCheck in the same single-line message'
+
+# The stale-certificate refusal itself names the commit count, the PR, and the remedy -- the facts a
+# reader needs to act on it. Unchanged by the re-anchor, since Get-StaleCertificateVerdict did not move.
+Assert-True ($shipText -like '*gained $($staleVerdict.Count) commit(s) after the run that certified PR*') 'the refusal states how many commits and which PR they voided the certificate for'
+Assert-True ($shipText -like '*stale-CI certificate*') 'and leads with a recognisable, greppable name for the failure'
+Assert-True ($shipText -like '*git merge origin/main*') 'the remedy tells the operator how to bring the branch forward'
+Assert-True ($shipText -like '*-SkipStaleCheck ships on the old certificate anyway*') 'and the escape valve is documented right beside the refusal it bypasses'
+Assert-True ($shipText -like '*exit 1*') 'a stale certificate is a hard refusal (an exit code), not a warning that lets the merge through'
+
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

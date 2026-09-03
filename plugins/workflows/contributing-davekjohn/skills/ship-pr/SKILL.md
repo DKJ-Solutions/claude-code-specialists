@@ -86,6 +86,11 @@ The six steps, stopping on the first failure:
    that cannot go home stays where it is and says why. See
    [And stopping now leaves the checkout on the trunk](#and-stopping-now-leaves-the-checkout-on-the-trunk-1073).
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
+
+   **Then, has `main` moved since the run that certified this PR (step 3b)?** A required check tests
+   GitHub's merge ref as it stood when its run was created and is never refreshed if `main` moves
+   afterward, so a green check can go stale before the merge. See
+   [Has `main` moved since the certifying run?](#has-main-moved-since-the-certifying-run-1292).
 4. **Merge** (`gh pr merge`), but first the **step-list gate again**: the phases above the DEPLOY heading in
    `contributing-davekjohn/development-<branch>.md` must
    have nothing unresolved left in them, or the merge does not happen. Not belt-and-braces — the rule is
@@ -112,7 +117,8 @@ The six steps, stopping on the first failure:
 | `-NoResolves` | Passed through to `open-pr`: declare that this PR closes no issue. |
 | `-SkipLint` | Passed through to `open-pr`: skip the lint gate. An escape valve. |
 | `-SkipTests` | Passed through to `open-pr`: skip the test gate. An escape valve. |
-| `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from the two above — those skip a tool, this overrules a judgement about content. |
+| `-SkipStaleCheck` | Skip step 3b's certificate-staleness check (issue #1292): merge even though `main` gained a commit after the run that certified this PR was created, or that check could not be completed at all. Use it only when the situation is known-harmless — e.g. the commits `main` gained are docs-only, or you have confirmed by hand that the certificate is sound. |
+| `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from `-SkipLint`/`-SkipTests` — those skip a tool, this overrules a judgement about content. |
 | `-RefreshBody` | Passed through to `open-pr`: on a branch whose PR is **already open**, rewrite that PR's description from the current changelog entry. Opt-in, so a body edited on github.com is never overwritten unasked. No effect when the PR is created in this run. |
 | `-PollSeconds` | Poll interval in seconds for the CI wait. Default 15. |
 
@@ -425,6 +431,69 @@ line beside the red mark means the job left no sentence behind — not that the 
 advisory workflow has something useful to say about a failure, give it a titled `::error::` line and
 `ship-pr` carries it to the operator's console; the first titled failure in the job wins, and warnings
 are not read.
+
+## Has `main` moved since the certifying run? ([#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292))
+
+**The filed reason did not hold, and step 3b follows the corrected one.** #1292 reported "the required
+check runs on the branch head" — it does not: `ci.yml`-style CI on `pull_request` tests GitHub's
+**merge ref**, the branch already merged into the base tip, so the merge result genuinely is tested.
+What verification found instead is a green check going **stale**: GitHub fixes the merge ref at the
+moment the run is **created** and never refreshes it if the base moves afterward (`pull_request` does
+not re-fire on that), and a ruleset without `strict_required_status_checks_policy: true` lets a stale
+green check satisfy the gate regardless. Measured on the instance: a test block that PR #1268's branch
+predated reached `main` 45 seconds before #1268's own CI run finished and 14m45s after that run
+started, and #1268 merged on that same certificate 2h11m later.
+
+**Why this is "has `main` moved since the run", not "is the branch behind `main`"** — the report's own
+filed option. Behind-ness at merge is the ordinary case and is harmless whenever `main` advanced
+*before* the certifying run started: the run then tested a merge ref that already held everything it
+needed to. Measured on the source repo's last 45 merged PRs: 20 (44.4%) were behind-at-merge, but only
+14 (31.1%) actually had `main` gain a first-parent commit *after* their certifying run began — the
+narrower predicate step 3b uses. Median staleness among those 14 was 16.1 minutes, max 146.6 (PR #1268
+itself). Of the 14, 2 carried a `scripts/**`/`scripts/tests/**` change in the window — the subset that
+can actually turn a trunk red — but step 3b does not filter on that: predicting which file a future
+test depends on is not this script's to do, and the predicate is already cheap enough (one fetch, one
+first-parent log) that narrowing it further would trade a real safety margin for a rarer refusal on no
+measured benefit.
+
+**The anchor is the certifying run's own `created_at`, not a check's `startedAt` — re-anchored after a
+red-team caught the first build's bias the wrong way round.** The original reasoning ("conservative,
+because queueing only pushes `startedAt` *later* than the ref-fix moment") had the direction right and
+the choice backwards: a *later* anchor makes `git log --since=<anchor>` **miss** commits that landed in
+the gap, so a genuinely stale certificate reads as sound — the one failure this gate exists to prevent.
+The gap is far larger than "sub-minute" in this repo for two reasons the original 45-PR sample could
+not see: `windows-latest` provisioning routinely costs over a minute between a run's creation and a
+job's `startedAt`, and "re-run failed jobs" against a flaky suite (ordinary practice here) re-runs the
+*same* commit while `startedAt` jumps forward by however long the operator waited — seconds to hours.
+Verified on a genuine re-run in this repo's own history: the run object's `created_at` stayed fixed
+across the re-run while `run_started_at` moved over five hours later, and reading the per-attempt
+sub-resource directly (`.../attempts/2`) would have reintroduced the identical bias by reporting its
+own late `created_at`. Step 3b finds the run behind each required check from the `link` already in
+`$checkFactsJson` (no new call for that), then asks `gh api repos/<repo>/actions/runs/<id>` for that
+run's `created_at` — the one new network call per certifying run — before the `git fetch origin main`
+that reads a current `main`.
+
+**Two things this does not claim.** A `pull_request` run exists at all only for a *mergeable* PR —
+GitHub creates none for one with a merge conflict, which is harmless here: an unmergeable PR cannot be
+shipped by this script either way. And "GitHub fixes *the* merge ref" is this repo's own practical
+experience with a single-job workflow, not a documented contract — different jobs of one triggering
+event have been observed resolving different merge commits in the wild
+([`actions/checkout#27`](https://github.com/actions/checkout/issues/27)) — so the reasoning holds on
+"a run's `created_at` cannot postdate its own ref-fix moment" rather than on a guarantee GitHub does
+not make.
+
+**The fail-closed line is drawn in two places, deliberately, and it moved with the re-anchor.** With no
+required check named at all, step 3b warns and does nothing — this predicate has nothing to protect on
+a repo with no ruleset (the GitHub Free plan case above), and refusing there would permanently block
+`ship-pr` on every such consumer; `Get-MergeBlockVerdict` already cannot tell "no ruleset" from
+"unreadable" either, so this matches that existing posture. Once a required check *is* named, though,
+every subsequent read — the run id, its `created_at`, the fetch, the log — now **fails closed**: the
+first build warned and shipped on an unresolved read here, which is exactly the under-refusing bias the
+re-anchor exists to close, so an unresolved read now refuses with `-SkipStaleCheck` as the valve.
+
+**Repo-settings option 1 from the same issue** (`strict_required_status_checks_policy: true`) remains
+available and closes the gap completely by forcing a re-run on every base move; it is the repo owner's
+call, not this script's, and step 3b does not touch it.
 
 ## The merge method is repo policy
 
