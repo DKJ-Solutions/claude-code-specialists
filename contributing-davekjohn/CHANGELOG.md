@@ -432,6 +432,37 @@ Plugins: contributing-davekjohn
 
 ---
 
+### DEPLOY: `fix/branch-file-paths-docstring-covers-1255-v1` · 20260903-103107
+
+`Get-BranchFilePaths`'s docstring narrative stopped at #963 and never explained the two rows #1255
+added. `SharedFile` and `Pattern` are both load-bearing -- one is a legacy candidate
+`Resolve-BranchFilePath` reads, the other drives its per-branch discovery sweep and
+`Test-IsPerBranchDocumentPath` -- so a reader following the narrative to understand the returned table
+found no reason for either. Three paragraphs now cover the sixth rename, `Pattern` as the one row that
+is not a name, and why the read set is no longer counted in prose at all: the number had been `four`,
+then `seven`, then `eight`, and #1255 added a name without touching it. Since #1259 there is one
+ordered source -- `Get-BranchFileLegacyNames` -- so the docstring points at it instead of carrying a
+count that goes stale on the next rename. No behaviour changed; the plugin mirror moved with it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a docstring inside a shared script lib. No subscriber of a service reads it, and nothing about
+what the scripts do changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+Get-BranchFilePaths's docstring reaches the per-branch rename
+
+Plugins: contributing-davekjohn
+
+[PR #1274](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1274)
+
+---
+
 ### DEPLOY: `fix/pr-placeholder-list-append-only-v1` · 20260903-102422
 
 `Get-PrDescriptionPlaceholderDefaults` recognises the pre-#1255 placeholder again. That string --
@@ -468,37 +499,6 @@ the PR placeholder list is append-only again
 Plugins: contributing-davekjohn
 
 [PR #1271](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1271)
-
----
-
-### DEPLOY: `fix/branch-file-paths-docstring-covers-1255-v1` · 20260903-103107
-
-`Get-BranchFilePaths`'s docstring narrative stopped at #963 and never explained the two rows #1255
-added. `SharedFile` and `Pattern` are both load-bearing -- one is a legacy candidate
-`Resolve-BranchFilePath` reads, the other drives its per-branch discovery sweep and
-`Test-IsPerBranchDocumentPath` -- so a reader following the narrative to understand the returned table
-found no reason for either. Three paragraphs now cover the sixth rename, `Pattern` as the one row that
-is not a name, and why the read set is no longer counted in prose at all: the number had been `four`,
-then `seven`, then `eight`, and #1255 added a name without touching it. Since #1259 there is one
-ordered source -- `Get-BranchFileLegacyNames` -- so the docstring points at it instead of carrying a
-count that goes stale on the next rename. No behaviour changed; the plugin mirror moved with it.
-
-**Score:** 2
-
-#### What makes this deploy extra special
-
-N/A -- a docstring inside a shared script lib. No subscriber of a service reads it, and nothing about
-what the scripts do changed.
-
-**Score:** N/A
-
-#### Pull Request
-
-Get-BranchFilePaths's docstring reaches the per-branch rename
-
-Plugins: contributing-davekjohn
-
-[PR #1274](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1274)
 
 ---
 
@@ -571,6 +571,57 @@ Plugins: contributing-davekjohn
 
 ---
 
+### DEPLOY: `fix/claude-review-presdk-failure-silent-v1` · 20260903-015507
+
+`claude-review` no longer goes red in silence when it fails **before** the Claude SDK is reached. That
+class — a bad credential, missing action inputs, or the GitHub App not being installed — leaves
+`execution_file` empty, which skipped the **Why the review failed** step entirely, so the workflow wrote
+no titled annotation and `ship-pr`'s relay had nothing to print. The operator got a red tick and a blank
+reason line, indistinguishable from a workflow with nothing to say.
+
+**The workflow now has the complementary gate**, and the tests pin that both halves of `failure()` are
+covered so a class cannot fall between them again. The repair went into the workflow rather than into
+`Get-AuthoredFailureNote`, for the reason #1112 settled: teaching the relay to read *untitled*
+annotations would relay "Process completed with exit code 1" in every consuming repo. A workflow that
+wants to be heard writes a title.
+
+**What the new sentence may claim is the constraint, not its wording.** It states only what an empty
+output proves — the SDK produced no result, so this is the setup and not the diff, and no
+`api_error_status` exists to read. It does not name the cause, because the step cannot read it: the cause
+is in the runner's untitled annotation and the step log. The app installation is cited in the job summary
+as the *measured instance*, never as the diagnosis, which is #966's mistake with the sign flipped.
+
+**The failure that produced this is still live and is not repairable here.** The Claude Code GitHub App
+did not follow the transfer into `DKJ-Solutions`, so both `claude.yml` and `claude-code-review.yml` are
+inert on a 401 — an account-level install, like the spend limit #1164 needed. The transferable lesson,
+now in the system-administration lens beside its sibling #1244: **after a transfer, verify the
+capability, not the artefact that represents it.** #1239's checklist confirmed the Actions secret
+survived, and it had — while both workflows depending on it were dead anyway, one layer further out than
+the check reached.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing here reaches that reader. `.github/workflows/claude-code-review.yml` is this repo's own CI
+and ships to nobody, and `pr-issues-lib.ps1` was deliberately not touched, so no plugin mirror moved.
+
+The half a consumer *does* inherit is split out rather than folded in: `ship-pr` relays only a **titled**
+annotation, and no shipped page says so — `annotation` appears in three shipped `.ps1` files and zero
+shipped `.md`, so a consumer's own advisory check can go red with a blank reason and no way to learn that
+`echo "::error title=X::Y"` is the whole price of admission. That is
+[#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251).
+
+**Score:** N/A
+
+#### Pull Request
+
+claude-review names a pre-SDK failure instead of going red in silence
+
+[PR #1253](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1253)
+
+---
+
 ### DEPLOY: `fix/development-doc-per-branch-path-v1` · 20260903-014524
 
 The branch's development document is named after its branch -- `contributing-davekjohn/development-<branch>.md`
@@ -623,57 +674,6 @@ Name each branch's development document after its branch, so merges stop conflic
 Plugins: contributing-davekjohn
 
 [PR #1261](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1261)
-
----
-
-### DEPLOY: `fix/claude-review-presdk-failure-silent-v1` · 20260903-015507
-
-`claude-review` no longer goes red in silence when it fails **before** the Claude SDK is reached. That
-class — a bad credential, missing action inputs, or the GitHub App not being installed — leaves
-`execution_file` empty, which skipped the **Why the review failed** step entirely, so the workflow wrote
-no titled annotation and `ship-pr`'s relay had nothing to print. The operator got a red tick and a blank
-reason line, indistinguishable from a workflow with nothing to say.
-
-**The workflow now has the complementary gate**, and the tests pin that both halves of `failure()` are
-covered so a class cannot fall between them again. The repair went into the workflow rather than into
-`Get-AuthoredFailureNote`, for the reason #1112 settled: teaching the relay to read *untitled*
-annotations would relay "Process completed with exit code 1" in every consuming repo. A workflow that
-wants to be heard writes a title.
-
-**What the new sentence may claim is the constraint, not its wording.** It states only what an empty
-output proves — the SDK produced no result, so this is the setup and not the diff, and no
-`api_error_status` exists to read. It does not name the cause, because the step cannot read it: the cause
-is in the runner's untitled annotation and the step log. The app installation is cited in the job summary
-as the *measured instance*, never as the diagnosis, which is #966's mistake with the sign flipped.
-
-**The failure that produced this is still live and is not repairable here.** The Claude Code GitHub App
-did not follow the transfer into `DKJ-Solutions`, so both `claude.yml` and `claude-code-review.yml` are
-inert on a 401 — an account-level install, like the spend limit #1164 needed. The transferable lesson,
-now in the system-administration lens beside its sibling #1244: **after a transfer, verify the
-capability, not the artefact that represents it.** #1239's checklist confirmed the Actions secret
-survived, and it had — while both workflows depending on it were dead anyway, one layer further out than
-the check reached.
-
-**Score:** 3
-
-#### What makes this deploy extra special
-
-N/A — nothing here reaches that reader. `.github/workflows/claude-code-review.yml` is this repo's own CI
-and ships to nobody, and `pr-issues-lib.ps1` was deliberately not touched, so no plugin mirror moved.
-
-The half a consumer *does* inherit is split out rather than folded in: `ship-pr` relays only a **titled**
-annotation, and no shipped page says so — `annotation` appears in three shipped `.ps1` files and zero
-shipped `.md`, so a consumer's own advisory check can go red with a blank reason and no way to learn that
-`echo "::error title=X::Y"` is the whole price of admission. That is
-[#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251).
-
-**Score:** N/A
-
-#### Pull Request
-
-claude-review names a pre-SDK failure instead of going red in silence
-
-[PR #1253](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1253)
 
 ---
 
