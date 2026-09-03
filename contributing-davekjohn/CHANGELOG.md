@@ -32,6 +32,67 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/open-pr-commits-branch-doc-v1` · 20260903-125359
+
+`open-pr.ps1` read the branch's development document from the **working tree** -- the scaffold,
+step-list, backing, impact and link gates, and the PR body it composes -- and then pushed **HEAD**. On
+a dirty document those are two different files, and every downstream reader takes the committed one:
+the `branch-entry` CI check, the fold, and ship-pr's DEPLOY lock. So the run published a PR body
+describing a DEPLOY section the branch did not carry, and CI failed on arrival. It now commits that
+document first, through the new `Invoke-GitParkCommit` in `park-lib.ps1` -- the stage-and-commit half
+of a park, without the push, bounded to the resolved document path(s) exactly as `park-cycle`'s bound 1
+is.
+
+Measured on PR #1267: `branch-entry` run 100563684253 failed on `7b783516`, and run 100564770379
+passed on `f1c02ea7` once the document had been committed by hand. The `DIRTY tree` warning (#1026)
+covered it only as a soft risk, and the backing gate could not see it at all --
+`Get-BranchBackingFinding` requires `Committed -eq 0`, so a dirty document *alongside* committed code
+raised nothing.
+
+Committing rather than refusing was the choice, because this script is the documented owner of the
+step that publishes that document, `park-cycle` already commits exactly this path automatically for
+the life of the branch, and a refusal would have charged the author a full lint + test gate re-run:
+committing moves HEAD, which invalidates the gate-evidence fingerprint the next run would otherwise
+reuse. Placing it above `Invoke-WorkflowGates` also makes that function's dirty-tree warning honest --
+a remaining dirty count is now real unpublished work.
+
+It is deliberately **not** called a gate. Its normal outcome is an act rather than a verdict -- it errors
+only if git itself fails -- so naming it one would make the four-plus-one gate count in
+[`CLAUDE.md`](../CLAUDE.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md) wrong on the day it landed. It is
+written up where a consumer reads it: open-pr's own `.DESCRIPTION`, a new section on the `open-pr` skill
+page, `CONTRIBUTING-portable.md`'s PR step, and step 3.2 here.
+
+One latent defect was found during the extraction: `Write-Error` inside the commit arm terminates under
+`$ErrorActionPreference = 'Stop'`, which every caller sets. Inline in a function returning a bare bool
+that only ever fed an `exit`, that was harmless; in a function whose return value a caller reads, it
+makes the return dead code -- and it broke `park-cycle.ps1`'s documented "ALWAYS EXITS 0" contract,
+since it runs on a Stop hook. **That repair is not this branch's to claim**: PR #1283 landed it on
+`main` for all three of `Invoke-GitPark`'s messages while this branch was parked. What this branch does
+is carry it across the split -- two of the three messages now sit in `Invoke-GitParkCommit`, the push
+message stays with the pusher, and each half records the reasoning where its own caller reads it. The
+merge of `main` is where the two met, and resolving it by hand was the only way to keep both the split
+and all three repairs.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing a subscriber sees. The fix is entirely inside the workflow tooling: a consumer running
+`open-pr` stops meeting a guaranteed red CI check on a branch whose document was written but not
+committed, which they notice the first time it does not happen.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr commits the branch document it derives the PR body from, so what CI reads is what was gated
+
+Plugins: contributing-davekjohn
+
+[PR #1293](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1293)
+
+---
+
 ### DEPLOY: `fix/legacy-name-test-hardcodes-v1-suffix` · 20260903-123526
 
 `new-branch.tests.ps1` no longer builds the expected document name from a `-v1` suffix that
