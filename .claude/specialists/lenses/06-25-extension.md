@@ -1020,6 +1020,69 @@ sections; `fold-changelog-entry.ps1` folds **only** DEPLOY and removes the docum
 reaches the trunk, and a grep over `scripts/`, `plugins/` and `contributing-davekjohn/` finds them
 nowhere else. The convention gap was the whole issue.
 
+### Inside the invocation — where a plateau suite's time actually goes (September 3, 2026)
+
+[#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358) reported a plateau of five
+suite files at 189-232s and named two candidate levers: split the files further, or reduce the
+**per-invocation** cost of the 168 child `powershell` runs the four `check-plugin-integrity-*` suites make.
+It left the second unpriced in its own words -- *"it is not obvious without measuring which half of that
+~4.5s per invocation is the lint's own work."* Measured, on an idle 32-core workstation, over the fixture
+those suites build:
+
+| | per invocation | share |
+|---|---|---|
+| process spawn | 0.097s | 7% |
+| parse of the lint's 3419 lines | 0.115s | 8% |
+| dot-source its 11 libs | 0.071s | 5% |
+| **fixed overhead before any check runs** | **0.283s** | **21%** |
+| the 30 checks' own work | 1.079s | 79% |
+| **total** | **1.362s** | |
+
+**So it is a fifth, not a half** — and that answers the question in the direction that closes the lever
+rather than opening it. Removing all of the fixed overhead would need the suites to stop spawning a process
+per assert, and the lint calls `exit`, so in-process invocation is a rewrite of the fixture's contract for
+21%. Not proposed.
+
+**The 4.5s in the report was a CI figure divided by an invocation count**, which folds four-lane contention
+on a four-core runner into what looks like a per-call cost. The two agree once the machine is stated: 52
+invocations x 1.12s is 58.7s, and that is what the heaviest suite measures standalone here. **Those suites
+are ~100% their lint invocations**, to within a second, which is the fact that makes per-invocation cost the
+whole lever for them.
+
+**What was actually duplicated was the AST walk, not the parse either comment worried about.** Two
+non-skippable checks -- barred-skill and shopify-cli -- each called `ParseFile` and then
+`FindAll(CommandAst)` over the same file set. Over this repo's 184 script files one such pass is 1.413s, of
+which the **walk is 1.157s** and the parse only 0.256s; a second pass off a shared cache is 0.014s. Sharing
+it (`Get-PsScriptCommandAsts`) measured **-12.6%** across the four suites -- 58.7/55.7/51.0/34.5s to
+50.8/48.9/44.7/30.3s -- with every assert count unchanged at 108/95/78/59, and ~1.4s off the real lint gate.
+It retains 25,476 AST nodes for ~72MB of heap, which is the cost and is stated at the accessor.
+
+#### The reconstruction trap — two of the five were never plateau members
+
+**The gate records no per-suite duration**, and it buffers each suite's output until that suite completes:
+`entry-scaffold`'s log lines all land within 2.7ms of each other. So a log timestamp gives a suite's
+**finish** time, and subtracting the shard's start is a duration only for a suite that started at `t0`.
+
+With 4 lanes that means queue positions 1-4. Taken by stride over the 65-suite pool, the four
+`check-plugin-integrity-*` files sit at positions 3, 3, 3 and 4 of their shards -- so **#1358's figures for
+them are exact, exactly as it claimed**. But `entry-scaffold` is 5th of 16 in its shard and `new-branch` 9th
+of 16, so both reconstructions include lane wait. Standalone here `entry-scaffold` is **17.0s**, against the
+51-59s of the suites whose CI numbers are sound; at their measured 3.6-4.0x local-to-CI ratio it predicts
+~65s, not the 189s reported. `new-branch` at 52.8s predicts ~190-210s and is plausibly a real member.
+
+**So the plateau is four files, not five, and `entry-scaffold` should not be split.** This is
+[Chris's fifth intake pattern](01-01-extension.md#the-dave-rules) again -- the finding is real and its
+**size** is wrong -- on a report this team wrote itself, which is where it keeps happening. The lesson is
+narrower than "check the numbers": a reconstruction is only as good as its `t0` assumption, and the report
+stated that assumption correctly for the four files it verified and then silently extended the method to two
+it had not.
+
+**What is left, and it is a decision rather than a measurement.** Splitting the four is still the only lever
+that reaches the report's ~195s target, and it is now a smaller job than filed: four files, not five, with
+the floor already ~30s lower. It redistributes rather than shrinks, and #714's pieces regrew, so it buys
+time once. Not built here -- the size of that change is Dave's call, and #1358 carries the corrected
+pricing.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup
