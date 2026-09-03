@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/gate-durations-close-the-trap · 20260904-002930
+
+Two documents were telling readers to do the thing that had just been fixed. `ci.yml`'s floor comment and
+the performance lens both said *"the gate records no per-suite duration"* and instructed the next reader to
+reconstruct one from log timestamps -- written hours before PR #1364 made the gate print those durations
+directly, and left standing by it.
+
+That is the wrong way round to be stale: the sentence does not merely go out of date, it actively
+recommends the method that produced the bad numbers on #1358 in the first place. Both now point at the
+per-shard table the gate prints, and both keep the warning with its reason intact, because the buffered
+output still makes a log timestamp a finish time for anyone who reads the log instead of the table.
+
+The lens also closed with *"the plateau is four files, not five"*, a conclusion re-derived from the same
+reconstructions it was correcting. The recorded run puts about a dozen suites in the band and a different
+suite at the top, so that section now records the instrument and what it changed -- and keeps the parts of
+the earlier correction that survived.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+It is a branch whose entire subject is prose this chain wrote a few hours earlier and then invalidated by
+succeeding. Worth doing rather than filing, because a stale sentence that names a *method* is worse than
+one that names a number: the number is checkable, the method just gets followed. The lesson kept in the
+lens is the one that generalises past this issue -- build the instrument before the argument, and print a
+derivation's assumption next to the figure it produced.
+
+**Score:** N/A
+
+#### Pull Request
+
+Close the reconstruction trap in the docs that still describe it as open
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1365](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1365)
+
+---
+
 ### DEPLOY: docs/shard-floor-is-the-slowest-file · 20260904-001420
 
 [#1354](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1354) reported that the shard
