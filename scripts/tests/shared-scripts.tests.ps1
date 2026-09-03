@@ -606,6 +606,8 @@ if ($args -contains 'create') {
     git init --quiet 2>&1 | Out-Null
     git config user.email 'tycho@test.local' 2>&1 | Out-Null
     git config user.name 'Tycho Test' 2>&1 | Out-Null
+    # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+    git config commit.gpgsign false 2>&1 | Out-Null
     git remote add origin $prBareRemote 2>&1 | Out-Null
     git add -A 2>&1 | Out-Null
     git commit --quiet -m 'initial' 2>&1 | Out-Null

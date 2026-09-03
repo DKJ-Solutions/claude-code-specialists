@@ -196,6 +196,8 @@ function New-Fixture {
         & git -C $dir init -q 2>$null | Out-Null
         & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
         & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
+        # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
         # symbolic-ref instead of checkout -b: works on a still-unborn HEAD regardless of git's own
         # init.defaultBranch setting, and gives no error if HEAD happens to already be named 'main'.
         & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
@@ -276,6 +278,8 @@ function Add-OriginCommits {
         & git clone -q --branch main $Bare $clone 2>$null | Out-Null
         & git -C $clone config user.email 'other-session@local.invalid' 2>$null | Out-Null
         & git -C $clone config user.name 'Other Session' 2>$null | Out-Null
+        # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+        & git -C $clone config commit.gpgsign false 2>$null | Out-Null
         for ($i = 1; $i -le $Count; $i++) {
             [System.IO.File]::WriteAllText((Join-Path $clone "upstream-$i.txt"), "$i`n", (New-Object System.Text.UTF8Encoding $false))
             & git -C $clone add -A 2>$null | Out-Null
@@ -314,6 +318,8 @@ function Add-OriginBranch {
         & git clone -q --branch main $Bare $clone 2>$null | Out-Null
         & git -C $clone config user.email 'other-device@local.invalid' 2>$null | Out-Null
         & git -C $clone config user.name 'Other Device' 2>$null | Out-Null
+        # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+        & git -C $clone config commit.gpgsign false 2>$null | Out-Null
         & git -C $clone checkout -q -b $Branch 2>$null | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $clone $MarkerFile), "parked elsewhere`n", (New-Object System.Text.UTF8Encoding $false))
         & git -C $clone add -A 2>$null | Out-Null

@@ -33,19 +33,47 @@
 
 ### PLAN
 
+#1287: a test fixture that sets a local git identity but not `commit.gpgsign` inherits the
+machine's global signing config. On a machine with `commit.gpgsign=true` and a locked signing
+agent, every fixture commit fails -- and because the helpers run under `EAP=Continue` piped to
+`Out-Null`, it fails silently: the fixture never sets up, and the failing assert names the script
+under test instead of the fixture. CI is unaffected (no signing config there), so the suites are
+green in CI and red on the machine where someone would act on the result. `native-capture` and
+`source-repo-guard` already guard against exactly this; the rest do not.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Pin `commit.gpgsign false` in every test fixture that sets a git identity and commits,
+      matching the existing `core.autocrlf` guard: `entry-scaffold`, `find-specialist-mentions`,
+      `fold-changelog`, `new-branch` (3 sites), `park-branch`, `park-cycle`, `shared-scripts`,
+      `sync-main`, `sync-rules`, plus the two `Invoke-FixtureGit` copies (`gate-lib`,
+      `prune-merged`) and four more the issue's `grep` missed because they pass `config` as array
+      elements or `-c` flags (`cut-release-drive`, `publish-to-business`, `round-baseline`,
+      `worktree-lane`).
+- [~] One shared fixture-git helper -- dropped: the repo already handles this class inline per
+      file (the two existing gpgsign guards and every `core.autocrlf` guard are inline with a
+      comment), and the test lens deliberately keeps each suite's fixture self-contained. A
+      cross-suite helper is a larger refactor out of proportion to the bug and is not this fix.
 
 ### TEST
 
+- [x] Reproduced #1287 with a throwaway `GIT_CONFIG_GLOBAL` forcing `commit.gpgsign=true` and a
+      broken signer: fixture baseline commit fails (0 commits) without the guard, succeeds with it.
+- [x] Ran all 15 touched suites -- every one green.
+
 ### DEPLOY: `fix/fixture-git-inherits-gpgsign-v1`
 
-**Score:**
+A locked commit-signing agent no longer fails test suites for a reason unrelated to their subject:
+every git fixture that commits now pins `commit.gpgsign=false` locally, the way it already pins
+`core.autocrlf`, so a fixture's throwaway commits never depend on the developer's signing setup.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- test-fixture hygiene; no subscriber of any consuming service notices this.
+
+**Score:** N/A
 
 #### Pull Request
 
