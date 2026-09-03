@@ -73,6 +73,23 @@ function New-Fixture {
         # here writes the "LF will be replaced by CRLF" notice to stderr, which is fixture noise in a
         # suite that decides nothing about line endings. Same choice as gate-lib.tests.ps1.
         & git -C $dir config core.autocrlf false 2>$null | Out-Null
+        # AND commit.gpgsign, FOR THE SAME REASON ONE STEP FURTHER (issue #1323). Inherited, it is not
+        # noise but a hard failure: on a machine with signing forced on, every commit in this suite
+        # needs the signing agent to answer, and when it does not `git commit` fails -- 12 of 28 asserts
+        # went red as `park: committing failed`, naming the park continuation clause, which decides
+        # nothing about signing either. Green in CI, where no signing is configured, and red on the
+        # machine where somebody would act on it; and because the test gate is repo-wide it blocked
+        # open-pr on branches touching neither this suite nor park-lib.
+        #
+        # REPO-LOCAL COVERS BOTH COMMITTERS, which is why this is the whole repair and #1297's residual
+        # has no counterpart here. The fixture's own `init` below is one; every Invoke-GitParkCommit
+        # call in this suite is the other, and it commits INTO this repo, so one setting governs it.
+        #
+        # AND THE LIB IS DELIBERATELY LEFT SIGNABLE. #1297 had to weigh whether its production path
+        # should keep signing; here it is not a question -- Invoke-GitParkCommit commits the user's real
+        # work on their real branch under their own identity, so pinning signing off inside it would be
+        # wrong. The fixture is the layer that owns this, exactly as #1287 concluded.
+        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
         & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
         Set-Content -LiteralPath (Join-Path $dir 'README.md') -Value '# fixture' -Encoding utf8
         & git -C $dir add -A 2>$null | Out-Null
