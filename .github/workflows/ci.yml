@@ -120,11 +120,46 @@ jobs:
   suites:
     runs-on: windows-latest
     strategy:
-      # FOUR, AND THE FLOOR IS WHY IT IS NOT MORE. The gate's cost within a shard is still its slowest
-      # FILE (#714), which is ~51s for the heaviest of the check-plugin-integrity-* four, so past roughly
-      # four shards the returns stop and each extra runner still pays its own ~35s of provisioning and
-      # checkout. Four gives 16 suites per shard over 4 lanes -- the pool's 2968 lane-seconds spread over
-      # 16 lanes, or ~190s plus setup, which is the ~200s the same pool already reaches on a workstation.
+      # FOUR, AND THE FLOOR IS WHY IT IS NOT MORE -- BUT THE FLOOR IS FIVE TIMES WHAT THIS COMMENT USED
+      # TO SAY (issue #1354, September 3, 2026). The cost within a shard is still its slowest FILE, which
+      # is the #714 regime; what was wrong was the number. This block claimed '~51s for the heaviest of
+      # the check-plugin-integrity-* four', which mis-read #714's own figure: ~51s was the makespan of all
+      # FOUR of them together across four lanes on a WORKSTATION in August 2026, and it has since gone
+      # stale in both directions -- those suites now run the real lint 168 times where #714 measured 111,
+      # and the lint itself grew checks 28, 29 and 30. MEASURED TODAY: the heaviest single file,
+      # check-plugin-integrity-links.tests.ps1, is 213-251s on this runner (exact, not inferred -- the
+      # stride puts it at queue position 4, so it starts at t0) and 237s standalone on an 18-core
+      # workstation with the whole box to itself. Those two agreeing is the point: its 52 lint
+      # invocations are a SERIAL chain of child processes, so no lane count, shard count or faster
+      # machine touches it.
+      #
+      # WHY THAT MEANS FOUR RATHER THAN MORE, and why #1354 was closed without raising this number. The
+      # bound comes from the exact side and needs no simulation: the max shard measured 283s and 286s
+      # against a 232s longest file, and no partition of whole files can beat its own longest file -- so
+      # the entire prize available to more shards OR to a duration-aware bin-pack is AT MOST ~50s of a
+      # ~298s required check, and the bin-pack would buy its share with new persisted state in a lib
+      # mirrored into two plugins. Simulating over reconstructed per-suite durations agrees and adds the
+      # shape: the max shard goes 263s at four shards and then 232s at six, eight, ten and twelve --
+      # flat, because 232s IS the longest file -- while five shards comes out WORSE than four, because
+      # the stride's max depends on which heavy files happen to co-locate and the assignment reshuffles
+      # whenever a suite is added. That last point is the real argument against tuning this number: a
+      # shard count fitted to today's 65-file list is luck with an expiry date.
+      #
+      # THAT SIMULATION IS DIRECTIONAL ONLY, AND SAYING SO IS THE POINT. Reconstructing a duration by
+      # inverting this gate's schedule assumes a lane refills the instant a suite completes; it does not,
+      # because the gate prints the finished suite's whole captured output first. So every INFERRED start
+      # runs early and every inferred duration is inflated, worst where the suite is cheap --
+      # entry-scaffold.tests.ps1 reconstructs at 189s and runs in 32.2s standalone. Only the four suites
+      # at queue positions 3-4 are exact. The lever that would actually pay is splitting the band of heavy
+      # files (#714's lever, applying a second time to the files its own split created), and its first
+      # task is making the gate RECORD per-suite durations, because nothing here does today -- which is
+      # why this had to be inverted out of a log at all. Tracked on its own; do not re-derive it from the
+      # numbers above.
+      #
+      # The other figures here were checked while correcting the one above: four gives 16-17 suites per
+      # shard over 4 lanes, and the per-runner provisioning-and-checkout overhead is ~20s, not the ~35s
+      # this block used to assume (measured as job duration minus the gate's own reported seconds, eight
+      # shard jobs across two runs).
       #
       # fail-fast IS FALSE, DELIBERATELY. The default would cancel the surviving shards the moment one goes
       # red, which costs exactly the information this repo needs most from a red gate: these suites have a

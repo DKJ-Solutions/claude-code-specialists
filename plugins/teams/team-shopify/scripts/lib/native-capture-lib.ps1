@@ -655,6 +655,24 @@ function Invoke-TestSuiteGate {
         So the caller may now ask for a quarter of the pool and run four of itself. ci.yml does; every
         other caller passes neither parameter and gets the whole pool, unchanged, down to the wording of
         its summary line.
+
+        AND SHARDING HANDS THE GATE STRAIGHT BACK TO THE #714 REGIME -- measured, and the reason a caller
+        should not keep raising its shard count (issue #1354, September 3, 2026). The paragraph above is
+        about the WHOLE pool, where 4 lanes against 2968 lane-seconds is contention. Inside one shard that
+        is no longer true: a quarter of the pool over the same 4 lanes is ~740 lane-seconds, which is the
+        same order as the slowest FILE, so each shard's wall clock collapses onto its own longest suite.
+        Measured on the first sharded runs -- a shard whose longest file was 183s took 183s, and one whose
+        longest was 206s took 207s, both read at t0 and so exact rather than inferred. Against a longest
+        file of 232s the max shard measured 283s and 286s, which bounds the prize for ANY partition change
+        at ~50s without needing a model; simulating over reconstructed durations agrees and adds that the
+        max shard is flat from six shards on, because 232s IS the longest file, and that a duration-aware
+        bin-pack reaches the same 232s and would buy persisted state for nothing.
+        SO THE TWO PARAGRAPHS DO NOT DISAGREE, AND WHICH ONE APPLIES IS A QUESTION OF SCALE. Adding lanes
+        (more shards) pays while a shard's lane-seconds exceed its longest file, and stops dead at that
+        file. Past that point the only lever left is the one #714 named -- split the slowest FILE -- and
+        THAT is what a caller staring at a slow required check should reach for, rather than another
+        runner. Both are honest readings of the same function; the trap is quoting the first one after
+        the shard count has already crossed over into the second.
         WHY THE FUNCTION PARTITIONS RATHER THAN THE CALLER -- and why a STRIDE: both at the partition
         itself, below the suite glob. WHY THIS DOES NOT PAY #714's BILL TWICE: the four
         check-plugin-integrity suites build a fixture EACH, in a per-process directory (that file's own
