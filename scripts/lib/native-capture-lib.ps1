@@ -788,11 +788,26 @@ function Invoke-TestSuiteGate {
     # a number, and one it reports at every run cannot go stale in a document. The count includes the
     # Get-TestCommands entries: each is a suite of the repo's own stack, judged by the same exit-code rule.
     $elapsed = Format-GateSeconds $sw.Elapsed.TotalSeconds
+    # THE LANE COUNT RIDES THE SAME LINE AS THE SECONDS, green and red (issue #1318, the #1314 defect one
+    # step upstream). This summary line is the one a session copies into a branch document, a changelog
+    # entry or a commit message -- and the seconds on their own are a draw from a distribution that spans
+    # at least 4.5x, because the run's parallelism is not stated. $modeLabel already put the lanes on the
+    # opening line at :674, which nobody quotes; this carries the same number to the line everybody does,
+    # and the workflow's DEPLOY-section rule asks a quoted gate figure to name what produced it. Only when the pool
+    # actually ran: a commands-only gate never resolves $MaxParallel and runs its commands one at a time,
+    # so there is no lane count to state. The MACHINE is deliberately left off -- CI passes
+    # -MaxParallel ([Environment]::ProcessorCount) while a dev box takes ([Environment]::ProcessorCount - 2),
+    # so the lane number already tells a hosted runner from a workstation without naming either.
+    $laneNote = ''
+    if ($suites.Count -gt 0) {
+        $laneWord = if ($MaxParallel -eq 1) { 'lane' } else { 'lanes' }
+        $laneNote = " ($MaxParallel $laneWord)"
+    }
     if ($failedNames.Count -eq 0) {
-        Write-Host ("test gate: all {0} suites passed in {1}s." -f $total, $elapsed) -ForegroundColor Green
+        Write-Host ("test gate: all {0} suites passed in {1}s{2}." -f $total, $elapsed, $laneNote) -ForegroundColor Green
         return $true
     }
     $namesInOrder = @($failedNames | Sort-Object) -join ', '
-    Write-Host ("test gate: {0} of {1} suites FAILED in {2}s: {3}" -f $failedNames.Count, $total, $elapsed, $namesInOrder) -ForegroundColor Red
+    Write-Host ("test gate: {0} of {1} suites FAILED in {2}s{3}: {4}" -f $failedNames.Count, $total, $elapsed, $laneNote, $namesInOrder) -ForegroundColor Red
     return $false
 }

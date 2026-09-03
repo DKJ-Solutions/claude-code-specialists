@@ -651,6 +651,22 @@ this is exactly the file where out-of-band changes are routine.
    scores, which are claims about what the change *did*.
 7. **Never edit `CHANGELOG.md` from a branch.** Every branch would be editing the same region of the
    same file; that is the merge conflict this document exists to avoid.
+8. **A wall-clock figure in the DEPLOY section names what it included and which machine produced it.**
+   This section folds into `CHANGELOG.md` and from there into a release document, so a number written
+   here outlives the branch that measured it — and a gate timing is the kind that gets lifted and
+   re-quoted as a constant. Two facts make it re-usable, and the number implies neither: **what ran
+   inside it** (a lint gate and a test gate summed, or one of them alone) and **where** (how many
+   parallel lanes, on what kind of box). Measured instance: one branch wrote three *"full gate"* figures
+   — 608s, 471s and 360s — of which the first bundled lint with the suites and the other two, by their
+   own wording, did not, and all three were then read as answering the same question.
+
+   **Where the claim is about the gate that BLOCKS THE MERGE, quote that job's own figure, not a local
+   reading.** By rule 5 it only exists once the run is over, which is exactly why the local number is
+   the tempting one to write; but the two are not the same experiment, and the blocking job's history
+   covers many runs where a local reading is a single draw. In the source repo the same two gates cost
+   ~476s locally at sixteen lanes and a median **936s** across twelve CI runs on a four-core runner —
+   about 2x — with the CI band alone spanning 676–983s. A local figure is still worth writing down. It
+   simply says what your machine did, and has to say so.
 
 ## What happens at the merge
 

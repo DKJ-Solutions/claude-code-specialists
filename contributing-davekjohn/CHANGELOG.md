@@ -32,6 +32,86 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/test-gate-summary-omits-lanes` · 20260903-162227
+
+`Invoke-TestSuiteGate` printed the parallel lane count only on the opening line nobody quotes and left
+it off the summary line that gets copied into branch documents, changelog entries and commit messages
+-- so the seconds on that line were a draw from a spread of at least 4.5x with nothing stating the
+run's parallelism (issue #1318, the #1314 defect one step upstream). The lane count now rides both
+summary lines, green and red: `test gate: all 62 suites passed in 89s (16 lanes).` The machine is
+deliberately not added -- the lane number already separates a hosted runner (`ProcessorCount` lanes)
+from a workstation (`ProcessorCount - 2`). Source lib plus its two plugin mirrors;
+`test-suite-gate.tests.ps1` gains the summary-line asserts.
+
+A consumer who quotes a gate figure gets the lane count for free from now on, but it is a parenthetical
+on one line and nobody is blocked without it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A one-line output change to a gate, proven by that gate's own suite -- no migration, no irreversible
+step, no visible result to judge by eye.
+
+**Score:** N/A
+
+#### Pull Request
+
+Invoke-TestSuiteGate summary line names its lane count
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1320](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1320)
+
+---
+
+### DEPLOY: `docs/gate-figure-scope-and-machine-v1` · 20260903-161326
+
+A wall-clock figure for a gate reads as though it describes the gate. It does not: it describes one run,
+and two facts that the number never implies decide what it is worth to anybody else -- **what ran inside
+it**, and **which machine ran it**. One branch made the case by writing three *"full gate"* figures for
+one test set (608s, 471s, 360s), of which the first bundled the lint gate with the suites and the other
+two, by their own wording, did not; all three were then quoted as answering the same question.
+
+Two rules now say so, both portable. Nolan's manual carries the measurement discipline -- name the
+components and give them separately as well as summed, name the machine and its lane count, and never let
+a local reading stand in for the gate that blocks the merge, whose own history is queryable.
+`DEVELOPMENT-portable.md` rule 8 carries it for the DEPLOY section specifically, because a figure written
+there folds into `CHANGELOG.md` and onward into a release document, outliving the branch that measured
+it.
+
+The measurement behind them is in Nolan's lens, and its second half is the one that changes how a
+disagreement gets read: this repo's CI, measured per step over the twelve most recent trunk runs, costs
+**936s** median (lint 30s, suites 906s) on four cores against ~476s locally at sixteen -- about 2x -- but
+its own band is **676-983s**. That 1.45x spread inside one environment is *wider* than the 360-608s
+spread the three branch figures were being reconciled across. So the disagreement they looked like was
+never large enough to be a finding, and scope and machine have to be settled before a gap between two
+figures counts as one.
+
+Closes [#1314](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1314).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Both rules travel by plugin update, and the discipline is one a consumer needs the first time it writes a
+gate timing into a changelog entry -- which is the first branch it ships. It changes no script and no
+gate, so nothing refuses on it; what it changes is whether a number written on day one is still readable
+on day ninety. The figures quoted are the source repo's own and are labelled as such, so a consumer on a
+different box has the shape without inheriting the seconds.
+
+**Score:** 2
+
+#### Pull Request
+
+A gate wall-clock figure names what it included and which machine produced it
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1317](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1317)
+
+---
+
 ### DEPLOY: `feat/ci-fold-commit-lint-only` · 20260903-155604
 
 The `fold:` commit's CI run drops from the full ~15-minute suite to a lint-only run of about a
