@@ -32,6 +32,312 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/drop-v1-suffix-completion-v1` · 20260903-120612
+
+`new-branch.ps1` no longer appends `-v1` to a branch name that carries no version suffix; the name is used
+exactly as given. A `-v<N>` suffix stays valid and is typed by hand for a second cycle on a subject.
+Resolves inbound #1224 -- a consumer wrapping `new-branch` for a branch whose name it does not own
+(Dependabot) no longer gets a second branch created. Behaviour change for everyone who runs `new-branch`
+here and in the three consuming repos, reached through a plugin update.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+For a repo consuming the workflow plugin: `new-branch` stops rewriting the branch name it is handed, which
+is what inbound #1224 needed. A consumer not wrapping it for foreign branches still sees the change --
+their branches stop gaining `-v1` -- noticed the next time they branch.
+
+**Score:** 3
+
+#### Pull Request
+
+new-branch no longer auto-completes the -v1 suffix
+
+Plugins: contributing-davekjohn
+
+[PR #1268](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1268)
+
+---
+
+### DEPLOY: `fix/fixture-git-inherits-gpgsign-v1` · 20260903-115852
+
+A locked commit-signing agent no longer fails test suites for a reason unrelated to their subject:
+every git fixture that commits now pins `commit.gpgsign=false` locally, the way it already pins
+`core.autocrlf`, so a fixture's throwaway commits never depend on the developer's signing setup.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- test-fixture hygiene; no subscriber of any consuming service notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+Fixture git repos pin commit.gpgsign=false so a locked signing agent no longer fails unrelated suites
+
+[PR #1289](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1289)
+
+---
+
+### DEPLOY: `docs/date-1244-passage-and-roles-v1` · 20260903-114307
+
+Two statements in the sysadmin lens's `#1244` passage had gone stale and are now dated against a
+measurement rather than swept: **`#1244` is open**, not closed -- it was reopened because its closing
+evidence read a commit's *author* as its *pusher*, and the residual runs on as `#1278` -- and
+**`davekokbwj` holds admin**, not write. The second matters beyond bookkeeping: the whole `#1244`
+thread turns on which account holds which role, so a fold that pushes cleanly from that account now
+proves the **admin** bypass works and says nothing about the Write role. That is the exact
+mis-attribution the thread had to retract, and this lens is the document the retraction cites as its
+baseline.
+
+The measured picture the lens now carries: all three accounts are **org owners** of `DKJ-Solutions`,
+and the restored bypass list is `OrganizationAdmin` + a repository role with **no Write role** in it.
+So the bypass follows org ownership rather than a repo permission -- a wider grant that no repo-level
+setting displays -- and the old "safe while there are no external collaborators" caveat no longer
+guards what it was written to guard. Four knock-on statements in the same file's August 14 App passage
+were re-tensed for the same reason, and Rendall's lens, which said the bypass "is back" without saying
+it came back as a *different* pair, now says which pair.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report proposed dating two sentences; verifying it first turned up that the report's own role
+table had gone stale between filing and pickup, and that repairing only the two named spots would have
+left four more statements in the same passage contradicting them. Both are the house rule working as
+intended -- a reported *reason* is verified before it is repaired, and an inconsistency the repair
+creates is part of the repair.
+
+**Score:** N/A
+
+#### Pull Request
+
+Date the sysadmin lens's #1244 passage against the measured repo state
+
+[PR #1286](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1286)
+
+---
+
+### DEPLOY: `fix/ship-pr-fold-push-bypass-preflight-v1` · 20260903-113806
+
+`ship-pr` now asks, before it opens anything, whether the account running it will be allowed to push
+the fold -- and refuses when it will not, instead of merging and leaving the trunk merged-but-unfolded.
+
+The fold is a direct push by design, one of the three named exceptions to "never commit directly on the
+trunk", and a required status check cannot be satisfied by a direct push: the pushed commit carries no
+checks, so the ref update is refused before any workflow could run. An account can therefore be fully
+entitled to *merge* -- the PR's own check ran and passed -- and not entitled to *fold*. Measured on
+PR #1271: merged, checked out the trunk, folded, committed, `GH013 ... Required status check
+"lint-en-tests" is expected`. Not once, but on every run from that account, because the cause sits in
+the ruleset rather than in the run.
+
+Step 0b answers it for two `gh` reads. `rules/branches/<trunk>` gives the rules and deliberately does
+**not** filter by bypass -- measured: it returns `required_status_checks` to an account whose
+`current_user_can_bypass` is `always` -- so the ruleset detail is read for the second half, from the org
+endpoint when the ruleset is the org's. Three rule types block a fold, each by its own definition:
+`required_status_checks`, `pull_request` (so `pull_requests_only` bypass is not bypass here) and
+`update`. `deletion`, `non_fast_forward`, `required_linear_history` and `required_signatures` do not.
+
+It sits where the worktree check sits, and for that check's reason: nothing is gated, pushed, opened or
+merged yet, so refusing is free. The local check still runs first, so a network read never costs the one
+that needs no network. An unreadable ruleset warns rather than refusing -- the opposite posture to the
+merge verdict at step 3, because there an unread required-check list could put red code on the trunk,
+while here the thing at risk is a fold that can be redone from an account with bypass. And it takes
+neither remedy: it names them (grant the account bypass, or ship from an account that has it) and stops.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+It closes the second route into the one state this workflow has no detector for. `ship-pr` already
+refused, at exactly this point, when step 5 would not be able to *check out* the trunk (#1069); it now
+refuses when step 5 would not be able to *push* to it. Same step, same reasoning, same sentence -- and
+the failure it prevents is not a risk that might occur but one that fired on every run from one of the
+two accounts that ship this repo.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr refuses before the merge when it cannot push the fold
+
+Plugins: contributing-davekjohn
+
+[PR #1285](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1285)
+
+---
+
+### DEPLOY: `fix/park-write-error-terminates-eap-stop-v1` · 20260903-112308
+
+A failed `park` now reports its reason and lets the caller own the exit code, instead of throwing a
+raw terminating error past the message `Get-GitPushFailureMessage` was written to produce. The
+`cycle-autopark` Stop hook keeps its "always exits 0" contract when a park's push is rejected.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- workflow tooling internal to the park scripts. A consumer on the workflow plugin inherits the
+fix on their next update, but only in the failure path of a park; nothing changes for anyone not
+debugging one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Invoke-GitPark reports a failed park instead of throwing under EAP=Stop
+
+Plugins: contributing-davekjohn
+
+[PR #1283](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1283)
+
+---
+
+### DEPLOY: `fix/unfolded-entry-on-main-unguarded-v1` · 20260903-104728
+
+A merge that skips the fold -- a PR merged from the GitHub UI, or any path that bypasses `ship-pr.ps1`
+-- used to leave the branch's `### DEPLOY:` entry trapped in `contributing-davekjohn/development-*.md`
+on `main`, with `CHANGELOG.md` never receiving it and a release cut in that window silently missing the
+change. Measured on #1266: PRs #1253 and #1261 sat unfolded for ~10 hours.
+
+`check-unfolded-entry.ps1` now reports any written `development-*.md` on the trunk whose declared branch
+is not the one checked out (the invariant: the fold removes it at the merge, so `main` carries none).
+It runs from two places because neither covers the whole population: `.github/workflows/unfolded-entry.yml`
+on every `push` to `main` catches it regardless of who merged or how (advisory -- making it required is
+Dave's repo-settings call, and a required check cannot gate a push anyway), and the SessionStart hook
+`unfolded-entry-sessioncheck.ps1` tells the next specialists session at start instead of relying on
+Chris's manual `verify-stand-against-repo` check. Neither calls `gh`. The one false positive -- the
+seconds between `ship-pr`'s merge commit and its fold commit -- is swallowed by the workflow's
+`cancel-in-progress` and reads to a session as a finding that resolves itself.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- an internal CI guard and a session hook; no subscriber of any service notices it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Guard against a skipped fold leaving an unfolded entry on main
+
+Plugins: contributing-davekjohn
+
+[PR #1276](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1276)
+
+---
+
+### DEPLOY: `docs/carry-1255-rename-into-portable-pages-v1` · 20260903-104428
+
+The #1255 rename -- one branch document per branch, `development-<branch>.md` -- is carried into the six
+places that still taught the retired argument it replaced. Four are shipped payload
+(`skills/new-branch/SKILL.md`, `CONTRIBUTING-portable.md` twice, `scripts/README.md`), and two are read
+only here (the release lens, and a comment in `fold-changelog.tests.ps1`). Each now names the reversal,
+dates it, and separates *checkout* from *merge* -- which is the part that matters, because the sentence
+they carried was not merely stale: it was the reasoning #1255 disproved, offered as current.
+
+Nothing executable changed. The paths and the code blocks on these pages were already per-branch when
+#1255 landed; what was missed was the paragraph explaining why, which is why no gate caught it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`skills/new-branch/SKILL.md` is the page a consumer's session reads **immediately before creating a
+branch** -- it is the skill body, so it lands in context at the exact moment the reader is about to act on
+it, and it stated a fixed filename while the script it documents writes one per branch. A consumer who
+followed its reasoning learned the argument that produced the defect: that the document cannot collide
+because git tracks it per branch. That holds for checkout and says nothing about merge, where every merge
+to the trunk left every other open pull request conflicting on one path -- and a conflicting PR gets no
+check suite at all, so it can never go green and can never merge. Consumers now get the reversal, dated,
+with a link to the measurement behind it.
+
+**Score:** 3
+
+#### Pull Request
+
+Carry the #1255 per-branch rename into the six pages that still teach the retired fixed-name argument
+
+Plugins: contributing-davekjohn
+
+[PR #1277](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1277)
+
+---
+
+### DEPLOY: `fix/pr-placeholder-list-append-only-v1` · 20260903-102422
+
+`Get-PrDescriptionPlaceholderDefaults` recognises the pre-#1255 placeholder again. That string --
+`contributing-davekjohn/development.md` -- was the WRITTEN one from August 27 to September 3, 2026, so
+it is what every PR template scaffolded in that week carries right now, here and in every consumer
+that adopted a release in it. #1255 replaced it rather than appending, and an unrecognised placeholder
+is not a warning: open-pr leaves it in place and the PR body ships with no description at all. That is
+the exact outcome measured in #952, at 0 matches in smartwatchbanden, and the exact list that exists to
+prevent it.
+
+Nothing asserted the removal, and the reason is worth naming: the append-only guard added after #952
+derives the migrated string from the pre-`workflow-davekjohn` one, so it can only speak for forms that
+have a partner under the old folder name. Document renames have none -- the asymmetry is deliberate and
+correct -- so every rename of the document itself walked through the gap. The guard here is keyed on
+history instead: every form this family has ever published is pinned as a set, and the list must be a
+superset of it. Appending needs no edit; removing is the only thing that fails.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This reaches consumers, and it reaches the ones who did nothing wrong. A repo that adopted a release
+between August 27 and September 3 has the affected string checked into its own
+`.github/pull_request_template.md`, where an update does not rewrite it -- so without this the list
+tolerates only the templates that need no tolerance, which is the inversion #952 named. No migration to
+perform: the string is recognised again on the next update.
+
+**Score:** 3
+
+#### Pull Request
+
+the PR placeholder list is append-only again
+
+Plugins: contributing-davekjohn
+
+[PR #1271](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1271)
+
+---
+
+### DEPLOY: `fix/branch-file-paths-docstring-covers-1255-v1` · 20260903-103107
+
+`Get-BranchFilePaths`'s docstring narrative stopped at #963 and never explained the two rows #1255
+added. `SharedFile` and `Pattern` are both load-bearing -- one is a legacy candidate
+`Resolve-BranchFilePath` reads, the other drives its per-branch discovery sweep and
+`Test-IsPerBranchDocumentPath` -- so a reader following the narrative to understand the returned table
+found no reason for either. Three paragraphs now cover the sixth rename, `Pattern` as the one row that
+is not a name, and why the read set is no longer counted in prose at all: the number had been `four`,
+then `seven`, then `eight`, and #1255 added a name without touching it. Since #1259 there is one
+ordered source -- `Get-BranchFileLegacyNames` -- so the docstring points at it instead of carrying a
+count that goes stale on the next rename. No behaviour changed; the plugin mirror moved with it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a docstring inside a shared script lib. No subscriber of a service reads it, and nothing about
+what the scripts do changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+Get-BranchFilePaths's docstring reaches the per-branch rename
+
+Plugins: contributing-davekjohn
+
+[PR #1274](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1274)
+
+---
+
 ### DEPLOY: `docs/fold-hold-divergence-lesson-v1` · 20260903-101748
 
 Three docs stated that `main-ci-gate`'s bypass list is empty, which stopped being true on September 3,

@@ -757,6 +757,42 @@ foreach ($f in $oldFolderForms) {
         "and each has its counterpart under the current folder name -- a rename appends, it never replaces: '$migrated'"
 }
 
+# AND THE SAME RULE FOR EVERY OTHER RENAME, WHICH THE LOOP ABOVE CANNOT REACH (issue #1262,
+# September 3, 2026). That loop keys on the FOLDER rename -- it derives the migrated form from the
+# pre-#886 one -- so it can only speak for strings that have a 'workflow-davekjohn' partner. The
+# DOCUMENT renames have none, by the asymmetry stated above, and #1255 walked straight through the
+# gap: it REPLACED 'contributing-davekjohn/development.md' with the per-branch form instead of
+# appending, which is the #952 defect a second time, and every suite stayed green.
+#
+# So the history is pinned here as a set, and the assert is a superset test rather than an equality.
+# Appending a form -- what a rename is supposed to do -- needs no edit here; REMOVING one is the only
+# thing that fails, which is exactly the direction that keeps breaking. The strings are not derivable
+# from anything, only remembered, so they are written out in full like the legacy headings above.
+$publishedForms = @(
+    '<!-- Korte beschrijving van wat er verandert en waarom. -->',
+    '<!-- Short description of what changes and why. -->',
+    "<!-- Filled from branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from workflow-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from workflow-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
+    "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+    "<!-- Filled from contributing-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from contributing-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
+    "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+    "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
+)
+foreach ($published in $publishedForms) {
+    Assert-True ($known -contains $published) `
+        "a form this family has published is still recognised -- the list is append-only: '$published'"
+}
+# THE ONE THE PER-BRANCH RENAME DROPPED, named on its own line as well, because a loop reports the
+# string and not the reason. 'contributing-davekjohn/development.md' was the WRITTEN placeholder from
+# August 27 to September 3, 2026, so it is what every template scaffolded in that week carries right
+# now -- in this repo and in every consumer that adopted a release in it. Unrecognised, their PR
+# bodies lose their description silently, which is the outcome this whole list exists to prevent.
+Assert-True ($known -contains "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->") `
+    'the pre-#1255 shared-document form is still recognised, so a template scaffolded that week is still filled in'
 # THE WRITTEN ONE IS THE LAST ONE, asserted here rather than trusted, because Get-PrTemplateCanonicalPlaceholder
 # takes it by position and every rename appends. A form added in the wrong place silently changes which
 # placeholder a fresh template is scaffolded with, and nothing else would notice.

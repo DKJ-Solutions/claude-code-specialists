@@ -99,8 +99,15 @@ with two different readers:
 | `## PLAN` · `## CREATE` · `## TEST` | what still **must happen** — the step list | removed at the merge; never folded |
 | `` ## DEPLOY: `<branch>` `` | what the change **does** — the entry that folds into your changelog | folded at the merge, then removed with the rest |
 
-**A fixed name, not one per branch.** Git already tracks it per branch, so branches in flight cannot
-collide. **And it exists only while a branch is open**: `new-branch` creates it, the fold removes it at the
+**One document per branch, named after it** — `development-<branch>.md`, the branch name with its slashes
+flattened, so two branches never write the same path. It was the fixed `development.md` until September 3,
+2026, on the argument that git already tracks it per branch: true of **checkout**, and silent about
+**merge**, which is where the collision actually lives — every merge to the trunk left every *other* open
+pull request conflicting on that one path, and a conflicting PR gets no check suite at all, so a required
+check can never go green and the PR can never merge. What that cost, and why the fold is not the answer
+either, is in [`DEVELOPMENT-portable.md`](DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
+
+**And it exists only while a branch is open**: `new-branch` creates it, the fold removes it at the
 merge, so on the trunk there is no copy. It used to sit there in an empty state carrying a warning not to
 write in it; a repo updating from an older plugin still has that copy until its next fold clears it, and
 what marks it is the **trunk's name in its heading**, which is what stops the fold mistaking it for an
@@ -777,7 +784,7 @@ recommendation.** On August 27, 2026 it deleted its root `CONTRIBUTING.md` and k
 `CLAUDE.md`, on the grounds that an always-on document already stated the same three rules — never
 directly on the trunk, a branch + PR, the required CI check — and a second copy is a thing to keep in
 sync rather than a safety net. **Nothing in this workflow depends on that choice**: every gate reads your
-branch's own `development.md`, never a contributing page, so both answers work.
+branch's own `development-<branch>.md`, never a contributing page, so both answers work.
 
 **The recommendation is still the root page, for two reasons that have nothing to do with the gates.**
 GitHub links a root `CONTRIBUTING.md` from the new-issue and new-pull-request pages and from the

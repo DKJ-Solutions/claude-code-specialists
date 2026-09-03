@@ -637,6 +637,24 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # The skipped-fold gate (issue #1270). The fold runs from ship-pr.ps1 only, locally; a PR
+            # merged from the GitHub UI never folds and nothing downstream reported the leftover. This
+            # runs from .github/workflows/unfolded-entry.yml on every push to main (merger-independent)
+            # and from the SessionStart hook unfolded-entry-sessioncheck.ps1 in every consumer.
+            #
+            # NO SKILL, and none is wanted: both callers are automatic (a CI trigger, a session hook)
+            # and nobody invokes it as a procedure. Same call check-script-contract gets, for the same
+            # reason -- a person who wants the answer early runs the one command in its .SYNOPSIS.
+            Name   = 'check-unfolded-entry'
+            Source = 'scripts\lint\check-unfolded-entry.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = ''
+            # A fixture root, so the suite (and the hook) can judge a tree other than the checkout.
+            SkillParamsExempt = @('RootOverride')
+            # Timeable with no arguments: reads contributing-davekjohn/ and reports, no write of any kind.
+            MeasureArgs = @()
+        },
+        @{
             # The pre-task sync (inbound #787, August 20, 2026). THE HIGHEST-RISK SCRIPT IN A SHOPIFY
             # CONSUMER, and it was written twice by hand before it shipped -- destructively the first
             # time, in both repos. A live theme has no locking and no merge, so work starts by mirroring

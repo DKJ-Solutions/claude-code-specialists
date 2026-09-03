@@ -92,6 +92,9 @@ function New-GitFixture {
     Invoke-FixtureGit -Dir $dir 'config' 'core.autocrlf' 'false'
     Invoke-FixtureGit -Dir $dir 'config' 'user.email' 'tycho@example.test'
     Invoke-FixtureGit -Dir $dir 'config' 'user.name'  'Tycho'
+    # Pinned for the same reason: a machine with commit.gpgsign=true and a locked signing agent would
+    # otherwise fail every fixture commit, and the failing assert would name the script under test (#1287).
+    Invoke-FixtureGit -Dir $dir 'config' 'commit.gpgsign' 'false'
     [System.IO.File]::WriteAllText((Join-Path $dir 'tracked.txt'), "one`n", $Utf8NoBom)
     Invoke-FixtureGit -Dir $dir 'add' '-A'
     Invoke-FixtureGit -Dir $dir 'commit' '-qm' 'init'

@@ -93,9 +93,35 @@ infrastructure.
   on a green `lint-en-tests` job. The bypass list is what keeps the direct fold/release commits on
   `main` possible, and it is not a convenience: a required status check **cannot** be satisfied by a
   direct push, because the check has to be green before the push is accepted and a push is what would
-  trigger it. Until September 2, 2026 it held *Repository admin + the Write role, "Always allow"* —
-  the work account `davekokbwj` has write rights, not admin — and that Write bypass is safe as long
-  as there are no external collaborators, to be revisited as soon as there are.
+  trigger it. Until September 2, 2026 it held *Repository admin + the Write role, "Always allow"*. The
+  Write entry was there because the work account `davekokbwj` **then** held write rights and not admin —
+  that pairing is what identified the role at all (the August 14 reading further down this bullet) — and
+  the caveat attached to it was that a Write bypass is safe only while there are no external
+  collaborators.
+
+  **BOTH HALVES OF THAT SENTENCE ARE NOW DATED, AND THE ROLE TABLE IS THE PART TO READ**
+  ([#1284](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1284)). Measured
+  September 3, 2026, after the move into the `DKJ-Solutions` org:
+
+  ```
+  $ gh api orgs/DKJ-Solutions/memberships/<user> --jq .role   -> DaveKJohn, davekokbwj, maikel-bwj: all admin
+  $ gh api repos/DKJ-Solutions/claude-code-specialists/collaborators?affiliation=outside   -> empty
+  $ gh api repos/DKJ-Solutions/claude-code-specialists/rulesets/19008062
+      bypass_actors  [ {OrganizationAdmin, always}, {RepositoryRole 5, always} ]
+  ```
+
+  All three accounts are **org owners**, which is why each also reads `role_name: admin` on this repo, and
+  the restored list carries **no Write role**. Two consequences, the first being the one a reader takes
+  from the old sentence and gets wrong: **a direct push that succeeds from `davekokbwj` proves the admin
+  bypass works and says nothing about the Write role.** That is precisely the mis-attribution the #1244
+  thread had to retract, and this lens is the document that retraction cites as its pre-transfer baseline.
+  The second: the external-collaborator caveat no longer guards what it was written to guard, because the
+  bypass now rests on **org ownership** rather than a repo role — a wider grant, since an org owner
+  bypasses on every repo in the org, and one that nothing on this repo's settings page shows.
+
+  **Inferred, not measured: why the roles changed** — an elevation, or the transfer's own member mapping.
+  `orgs/DKJ-Solutions/audit-log` needs `admin:org` and answers 404 from a session, so the cause is not
+  readable here. The roles themselves are, and nothing above depends on the cause.
 
   **THAT LIST WAS EMPTY FOR ONE DAY, AND THE TRANSFER WAS WHY** (September 2–3, 2026,
   [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244)). Moving the repo into
@@ -128,16 +154,45 @@ infrastructure.
   ([#1255](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1255)). The document is named
   per branch now, so two branches never write the same path and a leftover on the trunk collides with
   nobody. **What this ruleset still costs is the leftover itself** — an unfolded entry sitting on `main`
-  with nothing saying so — which was the half #1244 owned and this change did not repair.
+  with nothing saying so — which was the half #1244 owned and the per-branch rename did not repair.
 
-  **#1244 is closed, so the cost is now only paid while a bypass is missing — and the response to that is
-  the part to get right.** Both leftovers it stranded (#1253 and #1261) folded unchanged the moment the
-  list came back, which is the evidence for the rule: a blocked fold is **waited out, not committed
-  locally**. Committing it makes a `main` commit that exists on one machine, and `main` is what every
+  **That half is no longer silent as of September 3, 2026**
+  ([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270)). `check-unfolded-entry.ps1`
+  reports a written `contributing-davekjohn/development-*.md` on the trunk whose declared branch is not the
+  one under HEAD — the invariant being that the fold removes it at the merge, so on `main` there should be
+  none. It runs from two places, because neither reaches the whole population on its own: a CI workflow
+  (`.github/workflows/unfolded-entry.yml`, `push` to `main`, **not** in `main-ci-gate` — the same
+  Dave's-call reasoning as `branch-entry.yml`, and a required check cannot gate a push anyway) catches it
+  regardless of who merged or how, and a SessionStart hook (`unfolded-entry-sessioncheck.ps1`, workflow
+  plugin) tells the next specialists session at start rather than leaving it to Chris's manual
+  `verify-stand-against-repo` check. Neither calls `gh`: a written entry on the trunk is folded or it is a
+  defect, whatever the branch's PR state, and the fold is local. The one false positive it can raise is the
+  ship window — `ship-pr` pushes the merge commit and then, seconds later, the fold commit — which the CI
+  workflow's `cancel-in-progress: true` swallows and a session reads as a finding that resolves itself. The
+  detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`, one definition for both callers.
+
+  **#1244 IS OPEN AGAIN, AND WHAT REOPENED IT IS THE MIS-READING DIRECTLY ABOVE** — so the cost is still
+  being paid, and the response to it is the part to get right. It *was* closed on September 3, 2026 on the
+  strength of a fold commit that pushed cleanly; that commit carried `davekokbwj` as author because that is
+  the git identity on the machine it was made on, while the **pusher** was `DaveKJohn` (admin). A commit's
+  author does not name its pusher and
+  `gh api "repos/DKJ-Solutions/claude-code-specialists/activity?ref=refs/heads/main"` does — read that
+  before concluding anything about which role got past the gate. The mechanism half therefore runs on as
+  [#1278](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1278). Both leftovers #1244
+  stranded (#1253 and #1261) *did* fold unchanged the moment the list came back, and that half is
+  untouched by the reopening — it is the evidence for the rule: a blocked fold is **waited out, not
+  committed locally**.
+
+  **What settles #1278 is a reading no admin session can take** — `current_user_can_bypass` on the ruleset,
+  from the account that will actually push. It reads `always` from this one because it is an org owner, and
+  that says nothing about any other account. Measured September 3, 2026, all three accounts are now org
+  owners and the list bypasses `OrganizationAdmin`, so on the face of it the gap #1278 reports is closed;
+  **that is an inference from the role table, not the measurement**, and the account itself has to confirm
+  it. Committing it makes a `main` commit that exists on one machine, and `main` is what every
   other machine syncs — measured September 3, 2026, where a held fold met the same fold landing from
   elsewhere and produced a duplicate entry and an unmerged `CHANGELOG.md` with no `MERGE_HEAD` to abort.
   The trunk leftover is visible and cheap; the duplicate commit is neither. Rendall's lens carries the
-  fold-side statement of this.
+  fold-side statement of this. `check-unfolded-entry.ps1` above is what makes "visible" literal.
 
   **The hazard that made it urgent is worth keeping, because it is what a reader would otherwise
   rediscover.** Resolving that conflict in favour of the incoming branch **destroys an unfolded DEPLOY
@@ -186,20 +241,24 @@ infrastructure.
   **The App is NOT in `main-ci-gate`'s bypass list, and the method is the part worth keeping** (August
   14, 2026). The question decides whether that App token can reach the trunk past the required check, and
   the REST endpoints all refuse: `bypass_actors` is returned to admins only, and the work account
-  `davekokbwj` has `admin: false, maintain: false, push: true`. It was answered anyway, from three
-  measurements that survive a redacted field.
+  `davekokbwj` **then held** `admin: false, maintain: false, push: true` (it holds admin today — the role
+  table on the `ci.yml` bullet above). It was answered anyway, from three measurements that survive a
+  redacted field.
 
   **All three readings below are from before the transfer and none of them reproduces today** — the list
-  is empty, so `bypass_actors` is `null` rather than two redacted nodes, `current_user_can_bypass` reads
-  `never` rather than `always`, and `updated_at` is the transfer's own stamp. The conclusion still holds
-  trivially (an empty list names no App), and **the method is what this entry is for**: it is how a
-  question about a field you cannot read gets answered instead of guessed at.
+  was emptied by the transfer and refilled on September 3 with a *different* pair, so `bypass_actors` no
+  longer resolves to Repository admin + Write, `current_user_can_bypass` no longer discriminates from this
+  account (it is an org owner now, so it reads `always` whatever the roles say), and `updated_at` is the
+  restore's stamp rather than July 26's. The conclusion still holds — the current pair is
+  `OrganizationAdmin` + a repository role, and neither is an App — and **the method is what this entry is
+  for**: it is how a question about a field you cannot read gets answered instead of guessed at.
   - **GraphQL redacts the entries but not the array.** `repository.rulesets.bypassActors` came back as
     `nodes: [null, null]` — the contents are hidden from a non-admin, the **count** is not. Exactly two
     actors.
-  - **`current_user_can_bypass: "always"`** on the REST ruleset, for an account holding nothing but
-    `push`, means the **Write role** is one of the two — it is the only thing that account has which
-    could grant bypass.
+  - **`current_user_can_bypass: "always"`** on the REST ruleset, for an account that at the time held
+    nothing but `push`, means the **Write role** is one of the two — it was the only thing that account
+    had which could grant bypass. **The inference is only as good as the role it rests on**, which is why
+    the same reading proves nothing once that account holds admin.
   - **`updated_at` dates the list.** The ruleset was last modified `2026-07-26T20:58`, and the Claude App
     arrived `2026-08-14T08:46`. A list untouched for nineteen days cannot name an actor that did not
     exist when it was written. The July 26 field-by-field re-check recorded in
@@ -213,9 +272,10 @@ infrastructure.
 
   **What this bounds.** The App cannot push to `main`, delete it, or force-push. It *can* create a branch
   and open a PR — which then merges only on a green `lint-en-tests`, like everyone else's. So the residual
-  is the ordinary route, and the read-only allowlist above closes the other end. The knob this actually
-  turns on is the **Write-role bypass**, whose condition is already stated in the `ci.yml` bullet above:
-  safe while there are no external collaborators.
+  is the ordinary route, and the read-only allowlist above closes the other end. The knob this turned on
+  was the **Write-role bypass** and its external-collaborator condition; since September 3, 2026 there is
+  no Write role in the list and the bypass rests on org ownership instead, so the knob to watch is **who
+  is an owner of `DKJ-Solutions`** — see the role table on the `ci.yml` bullet above.
 
   **A RED `claude-review` HAS ALWAYS NAMED ITS OWN REASON, AND NOBODY WAS READING IT** — issue
   [#1103](https://github.com/DaveKJohn/claude-code-specialists/issues/1103), August 29, 2026. The
@@ -357,6 +417,11 @@ infrastructure.
   [#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251), deliberately not folded in
   here.
 
+- **`.github/workflows/unfolded-entry.yml` + `scripts/lint/check-unfolded-entry.ps1`** — the
+  skipped-fold gate (issue #1270). The workflow runs the check on every `push` to `main`; the check is
+  mirrored into the workflow plugin and also driven by `unfolded-entry-sessioncheck.ps1`. Advisory, not
+  in `main-ci-gate`. The full reasoning is in the `#1244` chain-reaction passage on the `ci.yml` bullet
+  above; the detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and

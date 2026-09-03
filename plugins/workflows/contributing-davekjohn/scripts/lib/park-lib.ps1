@@ -536,6 +536,16 @@ function Invoke-GitPark {
         passed straight through to it -- so the scope still picks both the pathspec and the words, and the
         two halves cannot describe one commit differently. This function owns the push and the sentence
         that mentions it.
+
+        -ErrorAction Continue ON THE PUSH FAILURE MESSAGE, for the reason Invoke-GitParkCommit records
+        above and issue #1275 measured on all three of these messages before the split: every caller runs
+        under $ErrorActionPreference = 'Stop', where Write-Error TERMINATES. Left terminating, the
+        `return $false` below is dead code, the caller's `if (-not $ok)` arm never runs, park-cycle.ps1
+        exits non-zero on the ordinary divergence case -- breaking its documented "ALWAYS EXITS 0"
+        contract on a Stop hook -- and park-branch.ps1 emits the Get-GitPushFailureMessage sentence as a
+        raw error record instead of letting its own `if (-not $ok) { exit 1 }` report it. The message is
+        non-terminating and the CALLER decides what a red costs. Two of that issue's three messages moved
+        into the extracted half above; this is the third.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -559,7 +569,7 @@ function Invoke-GitPark {
         # Flattened before it is matched: with stderr merged in (2>&1) the captured output is an ARRAY that
         # can hold ErrorRecords as well as strings, and -match against an array returns the matching
         # elements rather than a boolean -- which an if() then reads as true for any non-empty result.
-        Write-Error (Get-GitPushFailureMessage -Output ($pushRes.Output | Out-String))
+        Write-Error (Get-GitPushFailureMessage -Output ($pushRes.Output | Out-String)) -ErrorAction Continue
         return $false
     }
 

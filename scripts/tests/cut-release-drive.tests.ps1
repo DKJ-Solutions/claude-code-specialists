@@ -243,6 +243,8 @@ $HistoryMajors
         Invoke-NativeCapture -FilePath 'git' -Arguments @('init', '--quiet', '--initial-branch=main') | Out-Null
         Invoke-NativeCapture -FilePath 'git' -Arguments @('config', 'user.email', 'fixture@example.invalid') | Out-Null
         Invoke-NativeCapture -FilePath 'git' -Arguments @('config', 'user.name', 'Fixture') | Out-Null
+        # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+        Invoke-NativeCapture -FilePath 'git' -Arguments @('config', 'commit.gpgsign', 'false') | Out-Null
         Invoke-NativeCapture -FilePath 'git' -Arguments @('add', '-A') | Out-Null
         Invoke-NativeCapture -FilePath 'git' -Arguments @('commit', '--quiet', '-m', 'fixture: initial') | Out-Null
     } finally { Pop-Location }

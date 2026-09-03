@@ -41,11 +41,14 @@ product: agent defs, manuals, docs, and tooling.
   briefing as the work list, read the repo's own answer — `git status`/`git log`, the **pending entries**
   in [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md) (one `###` per change under
   `## [Unreleased]`, furthest reach first), **`contributing-davekjohn/development-<branch>.md` on the trunk** (it
-  exists only while a branch is open, so a copy sitting on `main` is a silent half-state),
+  exists only while a branch is open, so a copy sitting on `main` is a silent half-state — since
+  [#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270) also caught automatically
+  by `check-unfolded-entry.ps1` below, but read it yourself too: a session that starts mid-ship sees the
+  transient before the fold commit lands),
   **`git ls-remote --heads origin` for parked branches** — a parked branch has no PR by design, so every
   other item in this list is blind to it; the mechanism and what to do when you find one are in
-  [Derek #05](05-05-extension.md#branch--repo-hygiene) — and the three gates
-  (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` + `check-script-contract.ps1`). Where the
+  [Derek #05](05-05-extension.md#branch--repo-hygiene) — and the four gates
+  (`check-roster-sync.ps1` + `check-plugin-integrity.ps1` + `check-script-contract.ps1` + `check-unfolded-entry.ps1`). Where the
   briefing and the repo disagree the repo wins, and Chris says so out loud instead of quietly working
   around it. **Do not classify that `ls-remote` output by hand — run
   `scripts/task/prune-merged.ps1 -IncludeRemote` instead**: it puts every head through the same two

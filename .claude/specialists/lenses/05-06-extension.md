@@ -72,8 +72,13 @@ entries rather than off which section they sit in.
 - **`contributing-davekjohn/development-<branch>.md`** — written when the branch is created. One document with two
   halves: `## PLAN` / `## CREATE` / `## TEST` carry the step list, and the fourth phase,
   `` ## DEPLOY: `<branch>` ``, IS the entry — **nothing around it**, so it pastes into `CHANGELOG.md` in one
-  go. A **fixed** path, the same on every branch: git already tracks it per branch, so two branches in
-  flight cannot collide on it, and the repo root stops filling up with other people's work.
+  go. **One document per branch since September 3, 2026** ([#1255](https://github.com/DaveKJohn/claude-code-specialists/issues/1255))
+  — the branch name with its slashes flattened, so two branches never write the same path. It used to be one
+  fixed path on every branch, on the argument that git already tracks it per branch; that is true of
+  *checkout* and says nothing about *merge*, which is where the collision lives — every merge to `main` left
+  every **other** open PR conflicting on that one path, and a conflicting PR gets no check suite at all, so
+  it could never go green and could never merge. The measurement is in
+  [`DEVELOPMENT-portable.md`](../../../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
 - **The fold takes that section, not the file** (August 23, 2026). It splits at the DEPLOY heading and
   leaves the plan where it is; publishing somebody's ticked checkboxes as a change description is exactly
   what that boundary prevents.
@@ -514,7 +519,14 @@ they land.
 `DKJ-Solutions` org carried `main-ci-gate` across intact and dropped its bypass list, and a required
 status check cannot be satisfied by a direct push — so for one day the cut could not run at all, and
 neither could a fold. Dave restored the list on September 3; the proof is the push itself, which now
-answers `Bypassed rule violations for refs/heads/main` where the day before it answered `GH013`. The
+answers `Bypassed rule violations for refs/heads/main` where the day before it answered `GH013`.
+**"Back" is not "back to what it was", and the difference decides who can cut**: the restored list is
+`OrganizationAdmin` + a repository role, with **no Write role** in it, so the bypass now follows org
+ownership rather than a repo permission. And that push proves it only for the account that made it —
+`Bypassed rule violations` from an owner says nothing about anyone else, which is the mis-reading that
+reopened #1244. The role table and the measurements are in
+[Sylvester's lens](05-15-extension.md); the reading that settles it for *your* account is
+`current_user_can_bypass` on the ruleset, taken from that account. The
 paragraph above described the route correctly throughout — it is the argument for why the cut is not a
 PR — and the blockage was never a reason to reopen the route question: the three objections at the top
 of this section are unchanged, and a release branch would still meet two gates it cannot satisfy by

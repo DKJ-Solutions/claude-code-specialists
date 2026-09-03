@@ -150,6 +150,8 @@ function New-Fixture {
     Invoke-FixtureGit -Arguments @('-C', $dir, 'init', '-q')
     Invoke-FixtureGit -Arguments @('-C', $dir, 'config', 'user.email', 'tycho-tests@local.invalid')
     Invoke-FixtureGit -Arguments @('-C', $dir, 'config', 'user.name', 'Tycho Tests')
+    # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+    Invoke-FixtureGit -Arguments @('-C', $dir, 'config', 'commit.gpgsign', 'false')
     # symbolic-ref instead of checkout -b: works on a still-unborn HEAD regardless of git's own
     # init.defaultBranch setting, and errors on nothing if HEAD is already named 'main'.
     Invoke-FixtureGit -Arguments @('-C', $dir, 'symbolic-ref', 'HEAD', 'refs/heads/main')

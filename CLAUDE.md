@@ -286,6 +286,15 @@ The constitution above, concretely implemented here:
   the measurements behind them are in
   [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
   sits at the point where it fires rather than in a list of its own.
+- **And one guard fires *after* the merge, on the trunk.** The fold runs from `ship-pr.ps1` only, so a
+  PR merged from the GitHub UI never folds it and the entry stays trapped in the development document on
+  `main`, with nothing saying so ([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270),
+  the residual [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244) left). Since
+  September 3, 2026 `check-unfolded-entry.ps1` reports a `contributing-davekjohn/development-*.md` sitting
+  on the trunk whose branch is not the one checked out — from a CI workflow on every `push` to `main`
+  (merger-independent, **advisory**, not in `main-ci-gate`) and from a SessionStart hook in every
+  consumer. It is Sylvester's; the reasoning is in
+  [his lens](.claude/specialists/lenses/05-15-extension.md#what-sylvester-owns-here).
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
   and that is why they are the three (Dave, August 23, 2026):

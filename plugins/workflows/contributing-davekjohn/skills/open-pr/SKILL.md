@@ -124,7 +124,7 @@ So a merged PR is now its own outcome, asked for as a fallback when the open loo
 
 ```text
 PR #9 for 'docs/audience-note-v1' is already merged -- nothing to open. https://github.com/.../pull/9
-A follow-up cycle on the same subject gets its own branch: new-branch completes the name with -v2.
+A follow-up cycle on the same subject gets its own branch -- name it with a -v2 suffix by hand.
 ```
 
 It exits **0** — nothing failed — and it stops **before** the gates, the push and the create, because

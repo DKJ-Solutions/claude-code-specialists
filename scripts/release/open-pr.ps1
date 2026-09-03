@@ -536,7 +536,7 @@ if (-not $existingPr) {
         $mergedPr = Get-ExistingPrRecord -Json ($mergedLookup.Output -join "`n")
         if ($mergedPr) {
             Write-Host "PR #$($mergedPr.number) for '$branch' is already merged -- nothing to open. $($mergedPr.url)" -ForegroundColor Green
-            Write-Host "A follow-up cycle on the same subject gets its own branch: new-branch completes the name with -v2." -ForegroundColor DarkGray
+            Write-Host "A follow-up cycle on the same subject gets its own branch -- name it with a -v2 suffix by hand." -ForegroundColor DarkGray
             exit 0
         }
     }

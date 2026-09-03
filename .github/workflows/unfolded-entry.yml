@@ -1,0 +1,57 @@
+# The skipped-fold gate: no unfolded changelog entry sits on the trunk (issue #1270).
+#
+# WHAT IT CATCHES. The fold (fold-changelog-entry.ps1) runs from exactly one place -- ship-pr.ps1,
+# locally. A PR merged from the GitHub UI, or any path that skips ship-pr, merges the branch's
+# development document into main and never folds it: the '### DEPLOY:' entry stays trapped, CHANGELOG.md
+# never receives it, and a release cut in that window misses the change. Nothing downstream reported it
+# (measured on #1266: PRs #1253 and #1261 sat unfolded on main for ~10 hours). The local gates cannot
+# close this -- they are escapable by not using the scripts -- so this runs in CI, and on `push` so it
+# is caught regardless of who merged or how.
+#
+# WHY A SEPARATE WORKFLOW AND NOT A JOB IN ci.yml -- and why `push` only, never `pull_request`. On a PR
+# the branch legitimately carries its own development-*.md, so a check for "a development document on
+# this ref" would be red on every PR. It is only a defect on the TRUNK, where the fold is supposed to
+# have removed it. That makes the trigger the whole point of the check, and a trigger belongs to a
+# workflow rather than to a job -- the same reasoning branch-entry.yml states for the opposite case.
+#
+# THIS CHECK IS NOT IN THE main RULESET, deliberately, exactly like branch-entry.yml. Making a check
+# REQUIRED is a repo-settings change and therefore Dave's, not a workflow's -- and a required status
+# check cannot gate a `push` anyway (the check has to be green before the push is accepted, and the
+# push is what would trigger it). So this reports on every push to main and blocks nothing: a red run,
+# plus GitHub's failure e-mail, is the signal that a fold was skipped.
+#
+# cancel-in-progress: true, WHICH IS THE OPPOSITE OF ci.yml's push-to-main choice, and safe here for
+# the reason ci.yml's is not. ship-pr pushes to main twice per branch -- the merge commit, then the
+# fold commit that clears the document, measured 6s apart on #932. Between the two, main genuinely
+# carries an unfolded entry and this check is correctly red; the fold commit's push then supersedes
+# that run. ci.yml cannot cancel its own merge-commit run because a cancelled check is not a passing
+# one and `lint-en-tests` is the required check the merge gates on. This check is required by nothing,
+# so cancelling the superseded run just swallows the ship window instead of leaving a stale red.
+#
+# WINDOWS, LIKE ci.yml and branch-entry.yml, and for the same reason: the scripts target Windows
+# PowerShell 5.1, so they run under `shell: powershell` (5.1) rather than pwsh.
+name: Unfolded entry
+
+# Least-privilege: this workflow only reads the working tree -- no gh, no network, no token.
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: unfolded-entry-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unfolded-entry:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: No unfolded changelog entry on the trunk
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-unfolded-entry.ps1 -Branch main
+          exit $LASTEXITCODE
