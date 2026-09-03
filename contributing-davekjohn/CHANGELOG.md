@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/ship-pr-watch-before-registration · 20260903-225906
+
+`ship-pr` no longer mistakes a `gh pr checks --watch` that started before the CI checks registered
+for a CI failure. Where the watch comes back saying `no checks reported` and exits non-zero -- seen
+right after a push onto a busy Actions queue -- the run now falls back into the same registration
+wait step 3 already runs, instead of refusing with `Fix CI and re-run` about a check that had not
+failed because it did not yet exist. The 180s budget is shared across the probe and the fallback, so
+a race that never settles still ends in the existing `#1234` refusal. No behaviour changes on a
+healthy run or on a genuine red check.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `ship-pr` immediately after a push, on a busy Actions queue, could lose the ship
+attempt to this transient and read a misleading "Fix CI and re-run" telling them to go look at CI
+that was in fact fine. It is non-deterministic and the workaround was to re-run `ship-pr`, so the
+cost was a wasted CI window rather than a broken merge.
+
+**Score:** 2
+
+#### Pull Request
+
+ship-pr falls back to the registration wait when --watch starts before the checks exist
+
+Plugins: contributing-davekjohn
+
+[PR #1353](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1353)
+
+---
+
 ### DEPLOY: feat/shard-ci-suites · 20260903-223535
 
 The required `lint-en-tests` check spent 95% of its wall clock in one step, and that step was starved of
