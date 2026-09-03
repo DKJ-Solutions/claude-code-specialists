@@ -910,6 +910,31 @@ $idxFacts     = $shipText.IndexOf('startedAt,completedAt,link')
 Assert-True ($idxFacts -gt $idxWatchCall -and $idxFacts -lt $idxLost) 'and the check facts are re-read per attempt, which is what the decision is made from'
 
 
+# --- issue #1350: the watch started BEFORE the checks registered ---------------------------------
+# Observed on PR #1348, September 3, 2026: `gh pr checks --watch` ran seconds after open-pr pushed a
+# new head, printed `no checks reported` in its own output and exited non-zero -- and ship-pr read
+# that transient as a CI verdict ("Fix CI and re-run"), because none of the three wording guards
+# covers "nothing is registered". The fix reuses step 3's registration wait: it is a function now
+# (Wait-CheckRegistration), so the watch loop can fall back into the SAME wait rather than through to
+# Get-MergeBlockVerdict. Text asserts, like the #1044 / #1219 call-site pins above -- the function is
+# script-local and dot-sourcing ship-pr.ps1 to reach it would run the whole ship.
+Write-Host "ship-pr.ps1 -- the watch re-enters the registration wait when it starts too early (#1350)" -ForegroundColor Cyan
+Assert-True ($shipText -like '*function Wait-CheckRegistration*') 'step 3''s registration wait is a function, so it can be re-entered (#1350)'
+Assert-True ($shipText -like "*-notmatch 'no checks reported'*") 'and it still breaks out on the TEXT, not the exit code, exactly as the inline loop did'
+$idxFn       = $shipText.IndexOf('function Wait-CheckRegistration')
+$idxFirstUse = $shipText.IndexOf('Wait-CheckRegistration -Pr')
+$idxReentry  = $shipText.LastIndexOf('Wait-CheckRegistration -Pr')
+Assert-True ($idxFn -ge 0 -and $idxFirstUse -gt $idxFn) 'the function is defined before it is called'
+Assert-True ($idxFirstUse -lt $idxWatchCall) 'step 3 runs the wait before the --watch call, as the inline loop did'
+Assert-True ($idxReentry -gt $idxWatchCall) 'and the watch loop re-enters that SAME wait after --watch (#1350)'
+Assert-True ($shipText -like '*back to the registration wait (#1350)*') 'the fallback says what it is doing, rather than wording the transient as a CI failure'
+$idxGuard = $shipText.IndexOf("-match 'no checks reported'")
+Assert-True ($idxGuard -gt $idxWatchCall -and $idxGuard -lt $idxReentry) 'the re-entry is guarded by the watch''s own no-checks output -- a real red check (a table, not that phrase) still falls through to the verdict'
+Assert-True ($shipText -like '*-AlreadyWaited $waited*') 'and it shares the 180s budget rather than restarting it, so a race that will not settle still ends in the #1234 refusal'
+$countSuiteNote = ([regex]::Matches($shipText, 'Get-MissingCheckSuiteNote -SuitesJson')).Count
+Assert-Equal 1 $countSuiteNote 'the #1234 / #1247 timeout diagnostic moved WITH the loop into the function -- written once, not duplicated at the watch site'
+
+
 # --- Get-MissingCheckSuiteNote: no Actions suite was ever created (issue #1234) --------------------
 # Measured on PR #1233, September 2, 2026, head b09c71b2: the step-3 probe ran its full 180s and
 # refused with "Check the workflow", while `gh run list` was empty and the commit's check-suite list
