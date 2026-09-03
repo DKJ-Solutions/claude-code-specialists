@@ -437,8 +437,13 @@ function Invoke-GitParkCommit {
 
         -Continuation IS THE CLAUSE THE TWO "nothing to do" LINES END WITH, and it exists because the
         sentence is only half this function's to write. 'pushing the existing commits as-is' is true for
-        Invoke-GitPark and a lie for a caller that does not push, so the pusher supplies it. Empty, the
-        lines stop after what this function actually did.
+        Invoke-GitPark and a lie for a caller that does not push, so the PUSHER supplies it and the
+        default says only what this function actually did. It reads as a parameter with one caller,
+        because it is: open-pr asks whether there is anything to commit BEFORE calling, so it never
+        reaches either line -- the word 'park' means nothing in that script and the line would print on
+        almost every run of it. That is a reason for the default to stay honest rather than a reason to
+        hard-code the pusher's clause: the next caller that does not push gets the truthful line without
+        having to discover this one.
 
         -ErrorAction Continue ON BOTH FAILURE MESSAGES, and it is the same lesson gate-lib.ps1's
         Invoke-WorkflowGates records: every caller here runs under $ErrorActionPreference = 'Stop', where

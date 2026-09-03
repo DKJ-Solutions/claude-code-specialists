@@ -68,10 +68,12 @@ The script:
    [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
    And the **label gate**: the label this PR would be given has to exist in your repository. See
    [The label gate](#the-label-gate-does-the-label-your-seam-names-still-exist) below.
-4. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
+4. **Commits your development document**, if it differs from `HEAD` — that one file and nothing else.
+   See [The document commit](#the-document-commit-what-the-pr-says-is-what-the-branch-carries) below.
+5. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
-5. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
+6. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
    branch prefix and a pre-filled PR body from `.github/pull_request_template.md` +
    the changelog entry file. If the branch already had an open PR, the push **is** the update and
    the create is skipped.
@@ -246,6 +248,38 @@ pushed by then, and merging it would publish the loss.
 
 An existing body that already says `Closes #332` also satisfies the resolves gate on its own, so you do
 not have to repeat a decision that is already published on the PR.
+
+## The document commit: what the PR says is what the branch carries
+
+**Every reader of your development document inside this script reads the WORKING TREE — the gates above
+and the PR body — and the push ships `HEAD`.** On a clean tree those are the same file. On a dirty one
+they are not, and the three readers *downstream* all take the committed copy: the `branch-entry` CI
+check, the fold, and `ship-pr`'s DEPLOY lock. So a document you had written but not committed produced
+a PR body describing a DEPLOY section that was not on the branch, and a CI check that had to fail on
+arrival.
+
+**Measured in the source repo on September 3, 2026 ([#1269](https://github.com/DaveKJohn/claude-code-specialists/issues/1269)),
+from PR #1267.** The run printed `WARNING: the gates below run against a DIRTY tree`, passed every gate
+against the filled-in working copy, pushed the empty scaffold, and published the filled-in body.
+`branch-entry` failed immediately; recovering took a second commit and a re-push.
+
+**So the script commits that file itself, just above the lint and test gates.** Bounded exactly as
+`park-cycle`'s bound 1 is: the resolved document path(s) and nothing else, never `git add -A`, and
+`git commit -- <paths>` leaves anything else you had staged staged and uncommitted. It prints one line
+when it commits, and nothing at all when the document was already committed. `-GatesOnly` never commits
+— that flag writes nothing by definition.
+
+**Why it commits rather than refusing**, since a fifth refusal was the obvious alternative. This script
+is the documented owner of the step that publishes this document, and `park-cycle` already commits
+exactly this path automatically for the life of the branch — so this is an act the workflow already
+performs, taken at the one moment it has to be true. A refusal would also charge you a full lint + test
+gate re-run for it: committing moves `HEAD`, which changes the gate-evidence fingerprint, so the run
+after the refusal cannot reuse what the refused one proved.
+
+**Neither existing signal covered it.** The dirty-tree warning is deliberately not a refusal — a dirty
+tree mid-flight is ordinary. And the backing gate refuses only when this document *is* the whole
+branch: it requires nothing else committed, so a dirty document **alongside** committed code raised
+nothing at all.
 
 ## The scaffold gate: has the entry actually been written?
 

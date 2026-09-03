@@ -38,6 +38,14 @@
     append is a hard stop (exit 1), because the branch is pushed by then and merging it would publish
     the loss.
 
+    IT COMMITS ONE FILE ON YOUR BEHALF -- the branch's development document, and nothing else (issue
+    #1269). Every reader of that document in this script reads the WORKING TREE, and the push ships
+    HEAD; the branch-entry CI check, the fold and ship-pr's DEPLOY lock all take the COMMITTED copy. So
+    a document written but not committed produced a PR body describing a section the branch did not
+    carry, and a CI check that had to fail. The commit happens just above the lint + test gate, is
+    bounded to the resolved document path(s), and leaves anything else you had staged staged. See the
+    document-commit block at that point for the measurement and for why it commits rather than refusing.
+
     Auto-fill (if you do NOT supply -Body): the script fills in the template itself as much as
     possible, so the PR never lands on github.com as an empty form:
       1. The template's description placeholder is replaced by the changelog entry
@@ -1081,7 +1089,7 @@ if (-not $existingPr) {
     }
 }
 
-# --- Document gate: the branch carries the document this PR describes (issue #1269) ----------------
+# --- The document commit: the branch carries the document this PR describes (issue #1269) ---------
 #
 # THE DEFECT, MEASURED ON PR #1267 (September 3, 2026). Every reader of the branch's development
 # document in this script reads the WORKING TREE -- the scaffold, step-list, backing, impact and link
@@ -1125,11 +1133,34 @@ foreach ($cand in @((Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot),
         $docRels += $rel
     }
 }
+
+# ASKED BEFORE IT IS ACTED ON, and the reason is the OUTPUT rather than the git calls it saves. The
+# shared helper announces 'park: nothing new to commit.' when there is nothing to do, which is right in
+# park-branch and park-cycle and confusing here: this script says nothing else about parking, and the
+# line would print on every run whose document was already committed -- i.e. almost all of them. Asking
+# first means the block is silent unless it acted, and drops two of its three git calls on that path.
+#
+# --untracked-files=all, because a branch made by hand rather than by new-branch has this document
+# untracked rather than modified, and `git diff` cannot see it. core.quotePath is forced for the habit
+# .claude/rules/language-layers.md states rather than for this call's own sake -- the answer here is
+# emptiness and nothing is compared -- so a later reader who starts comparing these paths inherits the
+# safe form instead of the one that decodes with the console code page.
+#
+# A GIT THAT CANNOT ANSWER IS TREATED AS DIRTY, deliberately the opposite of park-cycle's fail-safe. It
+# refuses to PUSH when the answer is unknown; the unknown answer here would let this script publish a PR
+# body it cannot vouch for, so it attempts the commit and lets the refusal below carry the reason.
+$docDirty = $false
 if ($docRels.Count -gt 0) {
+    $docStatus = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-c', 'core.quotePath=true', '-C', $repoRoot,
+                                                                   'status', '--porcelain', '--untracked-files=all', '--') + $docRels)
+    $docDirty = if ($docStatus.ExitCode -ne 0) { $true } else { [bool]((($docStatus.Output | Out-String)).Trim()) }
+}
+
+if ($docDirty) {
     $docCommit = Invoke-GitParkCommit -RepoRoot $repoRoot -Branch $branch -Scope 'BranchFiles' -Paths $docRels
     if (-not $docCommit.Ok) {
         Write-Error @"
-document gate: could not commit $($docRels -join ', ') - nothing pushed, no PR opened.
+document commit: could not commit $($docRels -join ', ') - nothing pushed, no PR opened.
 
 git's own reason is above. This PR's body is composed from that file and the CI check reads the
 committed copy of it, so opening the PR while the two disagree is a guaranteed red check on a body
@@ -1143,7 +1174,7 @@ Commit it yourself and run again:
         exit 1
     }
     if ($docCommit.Committed) {
-        Write-Host "document gate: committed $($docRels -join ', ') - the PR body, the branch and the CI check now read the same file." -ForegroundColor Green
+        Write-Host "document commit: committed $($docRels -join ', ') - the PR body, the branch and the CI check now read the same file." -ForegroundColor Green
     }
 }
 
