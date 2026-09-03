@@ -32,6 +32,74 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/merge-queue-prerequisites · 20260903-214122
+
+Both prerequisites a GitHub merge queue needs are now in the tree, so the queue can be switched on
+without breaking the trunk on its first merge -- the switch itself stays a repo-settings change and
+therefore Dave's ([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)).
+
+`.github/workflows/ci.yml` now triggers on `merge_group`. A required workflow without that trigger
+never runs for a queue entry, so `lint-en-tests` never reports, and GitHub's own warning is that the
+merge then fails -- a total merge outage on the trunk rather than a degradation. The trigger is inert
+until a queue exists, which is precisely why it lands first and on its own: nothing about the repo
+today would notice it missing. The suites run in full for a queue entry, because the fold-commit
+shortcut from [#1300](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1300) is gated
+on the `push` event and does not reach one -- and must not, since a queue entry is the projected merge
+being certified before it lands. The concurrency key needed no change: the `|| github.sha` arm that
+[#1294](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1294) built for trunk pushes
+already gives each queue entry its own group.
+
+`scripts/release/ship-pr.ps1` no longer takes `gh pr merge`'s exit code as proof that the PR merged.
+`gh pr merge --help` states it outright: against a queue-protected branch the PR is *added to the
+queue*, and gh exits 0 having enqueued it. Step 5 folds the changelog entry onto the trunk on the
+strength of that exit code, so the first ship after a queue was enabled would have written a fold
+commit for a PR that had not landed -- the entry on `main` ahead of its own merge. The state is now
+read with `gh pr view --json state` between the two steps, and a state positively read as anything
+other than `MERGED` refuses, with the queue named as the likeliest cause. **This half is also right
+with no queue anywhere**: "merged" had been an inference from an exit code, on the one script that
+writes to the trunk. A state that cannot be read is deliberately not a refusal -- the same shape as
+the DEPLOY lock a few lines above it -- because turning a network blip into a refusal between the
+merge and the fold would manufacture the trapped-entry state
+([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270)) the fold exists to
+prevent. The change is mirrored into the plugin copy, since consumers reach it by plugin update and a
+repo-settings change never reaches them at all.
+
+Both are pinned by the new `scripts/tests/merge-queue-prereq.tests.ps1`, because both are inert today,
+catastrophic on the day the queue is switched on, and silent in between -- nothing in the repo's
+present behaviour would notice either being removed.
+
+**Score:** 3
+
+A clear improvement, noticed the moment somebody touches this part: the ship path gains a real
+merged-state check today, and the queue decision on #1325 stops being blocked on work nobody had
+scoped. Not a 4 -- with no queue enabled, an ordinary ship looks exactly as it looked yesterday.
+
+#### What makes this deploy extra special
+
+The generalisable half, and the reason it is written down rather than merely done: **a settings switch
+that is somebody else's to flip does not make the code it will break somebody else's problem.** The
+merge-queue decision sat on #1325 for a day as "Dave's", and both defects that would have fired on the
+first merge after that flip were in the tree the whole time -- reachable, verifiable from `--help` on
+this machine, and fixable without touching a single setting. Waiting on the decision-maker was correct
+for the switch and wrong for everything else.
+
+The second prerequisite is the more interesting one, because it was not on the issue at all. It was
+found by asking what the *tooling* would do under the new arrangement rather than only what *GitHub*
+would do -- and the answer came from `gh pr merge --help`, one command away, on a path this repo runs
+several times a day.
+
+**Score:** N/A
+
+#### Pull Request
+
+Merge-queue prerequisites: the merge_group trigger in CI, and a merged-readback before the fold
+
+Plugins: contributing-davekjohn
+
+[PR #1348](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1348)
+
+---
+
 ### DEPLOY: fix/stale-heading-facts-in-scripts · 20260903-212305
 
 The August 26, 2026 level shift moved an entry to `###` and its sections to `####`, and left the prose
