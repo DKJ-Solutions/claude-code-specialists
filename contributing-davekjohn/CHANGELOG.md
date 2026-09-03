@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/publish-commit-inherits-gpgsign-v1` · 20260903-140140
+
+The commit `publish-to-business.ps1` makes in its temp clone now pins `commit.gpgsign=false`, beside
+the synthetic identity it already pinned. It used to inherit the machine's global signing config, so
+with signing on and the signing agent locked git could not write the commit object: the publish
+exited non-zero and five asserts went red naming the **subset filter**, which blocked a push on a
+branch touching neither this script nor its suite. It presents as a flake and is not one -- CI
+configures no signing at all, so it was green there and red only where somebody would act on it.
+
+Off rather than on, because the author is deliberately synthetic: a signature by the operator's own
+key could never verify against `marketplace-publisher <publisher@localhost>`. Measured rather than
+assumed -- the target repo carries no rulesets and every commit it already holds is unsigned.
+
+The residual of #1287, which pinned the commits the *fixture* makes and not the one the script makes
+itself. The four sibling commit paths keep inheriting the setting on purpose: they commit under the
+operator's own identity, where a locked agent *should* fail rather than quietly land it unsigned.
+
+**Score:** 2
+
+Small, and the trigger is a machine state the source repo does not currently hold -- but it is a
+failure that has already happened rather than one being guarded against in advance, and the cost was
+disproportionate to the fix: an unrelated branch could not be pushed, and the red asserts pointed at
+the wrong subject entirely.
+
+#### What makes this deploy extra special
+
+N/A. `scripts/` does not travel to the published marketplace and this script has no plugin mirror, so
+no consumer runs it or can observe the change.
+
+**Score:** N/A
+
+#### Pull Request
+
+The publish commit no longer inherits the machine's signing config
+
+[PR #1303](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1303)
+
+---
+
 ### DEPLOY: `fix/fold-insert-by-landing-stamp-v1` · 20260903-134449
 
 `fold-changelog-entry.ps1` inserted every entry at the **top** of `CHANGELOG.md`'s pending list, on the
