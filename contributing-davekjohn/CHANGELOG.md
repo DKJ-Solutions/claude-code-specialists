@@ -32,6 +32,34 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/drop-v1-suffix-completion-v1` · 20260903-120612
+
+`new-branch.ps1` no longer appends `-v1` to a branch name that carries no version suffix; the name is used
+exactly as given. A `-v<N>` suffix stays valid and is typed by hand for a second cycle on a subject.
+Resolves inbound #1224 -- a consumer wrapping `new-branch` for a branch whose name it does not own
+(Dependabot) no longer gets a second branch created. Behaviour change for everyone who runs `new-branch`
+here and in the three consuming repos, reached through a plugin update.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+For a repo consuming the workflow plugin: `new-branch` stops rewriting the branch name it is handed, which
+is what inbound #1224 needed. A consumer not wrapping it for foreign branches still sees the change --
+their branches stop gaining `-v1` -- noticed the next time they branch.
+
+**Score:** 3
+
+#### Pull Request
+
+new-branch no longer auto-completes the -v1 suffix
+
+Plugins: contributing-davekjohn
+
+[PR #1268](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1268)
+
+---
+
 ### DEPLOY: `fix/fixture-git-inherits-gpgsign-v1` · 20260903-115852
 
 A locked commit-signing agent no longer fails test suites for a reason unrelated to their subject:
