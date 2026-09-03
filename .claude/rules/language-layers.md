@@ -152,9 +152,13 @@ refilled the list on September 3, 2026, with a shape the July re-check had not s
 plus a repository admin role, where it once held repository admin plus the Write role
 ([#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244),
 [#1290](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1290); the mechanics live in
-[the system-administration lens](../specialists/lenses/05-15-extension.md)). The language point this
+[the system-administration lens](../specialists/lenses/05-15-extension.md)). And on that same
+September 3 Dave turned on `strict_required_status_checks_policy` on that rule
+([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)) — a third change to
+that ruleset, distinct from the transfer and the bypass refill — so, read as a field-by-field
+inventory of what the moves touched, this paragraph is now one field short. The language point this
 paragraph exists to make is untouched — the job id `lint-en-tests` is still the live name of an external
 object this repo may cite but not unilaterally rename. What the correction adds is the reason a
 field-by-field re-check is worth repeating rather than citing: it is a **snapshot**, and this one went
-stale twice under moves nobody read as touching it — once when the transfer emptied the list, again when
-the refill changed its shape.
+stale three times: twice under moves nobody read as touching it — the transfer emptying the list, the
+refill changing its shape — and once when `strict` was switched on with no row here to update.
