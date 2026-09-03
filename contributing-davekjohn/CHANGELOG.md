@@ -32,6 +32,28 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/suite-gate-fixture-assert-line-scoped` · 20260903-172201
+
+`test-suite-gate.tests.ps1`'s per-process fixture assert folded backtick continuations before judging
+a temp path, so a path whose `$PID`/GUID discriminator sat after a `-continuation is no longer
+reported as an offender. The guard no longer scans itself.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a test-suite internal assert; no subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+test-suite-gate fixture assert folds backtick continuations before judging a temp path
+
+[PR #1329](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1329)
+
+---
+
 ### DEPLOY: `fix/guard-coverage-comment-counts` · 20260903-171521
 
 The coverage assert in `../scripts/tests/source-repo-guard.tests.ps1` -- the one holding every registered
