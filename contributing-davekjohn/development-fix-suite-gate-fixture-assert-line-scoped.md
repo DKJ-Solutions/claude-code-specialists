@@ -52,7 +52,8 @@ backtick continuations before scanning, so the unit judged is a statement, not a
       discriminator in view, and a split bare literal is still caught.
 - [x] `scripts/tests/test-suite-gate.tests.ps1` green (56 pass, 0 fail); the temp-path scan count rose
       from ~52 to 93 as folding also surfaced statements split across `GetTempPath()`/`Join-Path`.
-- [ ] Lint + tests green, then PR + merge + fold.
+- [~] Lint + tests green, then PR + merge + fold -- dropped: this is the post-merge chain, not a
+      step of the branch's own plan; open-pr runs the gates.
 
 ### DEPLOY: `fix/suite-gate-fixture-assert-line-scoped`
 
