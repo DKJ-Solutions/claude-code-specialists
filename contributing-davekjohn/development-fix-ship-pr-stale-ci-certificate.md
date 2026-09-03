@@ -77,32 +77,53 @@ A green required check certifies the merge of the branch into main AS OF THE MOM
 
 #### For Tycho: what is testable here and what is not
 
-- [ ] `Get-CertifyingRunTimestamp` and `Get-StaleCertificateVerdict` (both in
-  `scripts/lib/pr-issues-lib.ps1`) are PURE functions of their input -- no git, no gh, no
-  filesystem -- and belong in `scripts/tests/pr-issues.tests.ps1` beside `Get-MergeBlockVerdict`
-  and `Get-CheckWaitReport`, which they were modelled on. Worth covering: a single required check,
-  multiple required checks (earliest wins), a required name absent from the checks payload, empty
-  `ChecksJson`/`RequiredNames`, an unparseable payload, a zero-time (`0001-01-01...`) `startedAt`
-  (the `ConvertTo-CheckTimestamp` case #977 measured), no commits (`Stale=$false`), one or more
-  commits (`Stale=$true`, `Count`, dedup via `Select-Object -Unique`), and blank/whitespace entries
-  in `-NewMainCommits` being dropped.
-- [ ] `ship-pr.ps1`'s own step 3b (the `git fetch`/`git log`/refusal wiring) is like every other
-  step in this script: it drives live `git`/`gh` against a real remote and is NOT covered by an
-  automated suite, by the same known test gap the file's own header states for the rest of the
-  orchestration. What IS assertable without a live remote, the way the suite already asserts
-  ordering and wording for the #831/#943/#1044/#1219 repairs in this same file: that step 3b's code
-  calls `Get-CertifyingRunTimestamp` and `Get-StaleCertificateVerdict`, that it reads
-  `$checkFactsJson`/`$requiredFactsJson` rather than re-fetching them, that `-SkipStaleCheck` skips
-  it, and that its refusal text names the commit count and the remedy. A text-position assert (the
-  wait-order pattern already in this suite) is fragile to comment edits -- this branch's own
-  regression above shows exactly that -- so prefer asserting on stable anchors (`-SkipStaleCheck`,
-  `Get-StaleCertificateVerdict -NewMainCommits`, the refusal's lead sentence) over line-order.
-  Whether that fragility is worth tightening further is Tycho's call, not decided here.
-- [ ] Not testable at all without a live remote: the actual behaviour of `git fetch origin main`
-  against a real GitHub repo, or a real `gh pr checks --required` payload shaped exactly like the
-  measurement's 45 sampled PRs. The measurement itself (31.1% fire rate, 44.4% behind-at-merge,
-  16.1/146.6 min staleness) was a one-off `gh`+`git` query kept in the session scratchpad, not a
-  script in this repo -- nothing to add a test for.
+- [x] `Get-CertifyingRunTimestamp` and `Get-StaleCertificateVerdict` (both in
+  `scripts/lib/pr-issues-lib.ps1`) covered in `scripts/tests/pr-issues.tests.ps1`, in their own
+  sections beside `Get-MergeBlockVerdict` and `Get-CheckWaitReport` (which they were modelled on).
+  46 new asserts. For `Get-CertifyingRunTimestamp`: a single required check, no required names,
+  `RequiredNames`/`ChecksJson` omitted, every unreadable-JSON shape (empty/whitespace/`not json`/
+  `null`/`[]`/`{}`), a required name absent from the payload, two required checks with different
+  `startedAt` (the earlier one wins, not the payload order), a non-required check with an EARLIER
+  timestamp being ignored, the zero-time `0001-01-01...` shape being SKIPPED rather than winning as
+  the earliest (both with one other real required check and with every required check zeroed, which
+  must answer `$null` rather than the epoch), and a nameless record. For
+  `Get-StaleCertificateVerdict`: empty array, the default with no argument at all, an explicit
+  `$null`, one commit, several commits (order preserved), duplicate SHAs de-duplicated via
+  `Select-Object -Unique`, and null/empty/whitespace entries mixed in with real SHAs (filtered, do
+  not inflate `Count`) and alone (`Stale=$false`, `Count=0`). Read past the summary given here into
+  the actual function body before writing these, per the assignment -- both match what is now
+  covered.
+- [x] `ship-pr.ps1`'s own step 3b (the `git fetch`/`git log`/refusal wiring) confirmed as the known,
+  stated test gap it is -- like every other live git/gh step in this script, not covered by an
+  automated suite, and not papered over as one. What IS assertable without a live remote is covered
+  in its own new section: that step 3b calls `Get-CertifyingRunTimestamp` with
+  `$checkFactsJson`/`$staleCheckNames` and `Get-StaleCertificateVerdict` with `$newMainCommits`
+  (proving it reuses the facts step 3 already fetched rather than asking `gh` again -- pinned by the
+  one occurrence of `$requiredFactsJson | ConvertFrom-Json` unique to this block), that
+  `-SkipStaleCheck` gates the whole block (`if ($SkipStaleCheck) {`) and says so when taken, that the
+  refusal names the commit count and the PR, leads with a greppable `stale-CI certificate` string,
+  gives the `git merge origin/main` remedy, documents the escape valve beside it, and is a hard
+  `exit 1` rather than a warning. Every one of these is a literal-code-fragment anchor (a call with
+  its real argument names, an exact printed sentence), not a text-position/line-order assert --
+  Sylvester's own caution taken literally, since his change broke exactly that kind of assert
+  elsewhere in this same file by mentioning a function name earlier in a new doc comment.
+- [x] Not testable at all without a live remote, confirmed rather than reopened: the actual
+  behaviour of `git fetch origin main` against a real GitHub repo, or a real `gh pr checks
+  --required` payload shaped exactly like the measurement's 45 sampled PRs. The measurement itself
+  (31.1% fire rate, 44.4% behind-at-merge, 16.1/146.6 min staleness) was a one-off `gh`+`git` query
+  kept in the session scratchpad, not a script in this repo -- nothing to add a test for. This is a
+  named, stated gap, not a silent one.
+
+Ran `scripts/tests/pr-issues.tests.ps1` standalone: 585 asserts, all green (0 pre-existing failures).
+Then the full gate exactly as CI/`open-pr.ps1`/`cut-release.ps1` run it -- `check-plugin-integrity.ps1`
+(0 errors) followed by `Invoke-TestSuiteGate` over all 61 `scripts/tests/*.tests.ps1` suites, parallel:
+61/61 passed in 471s, 0 failures, nothing already red before this branch's changes. (A first, ad hoc
+attempt at the full run -- a hand-rolled serial loop with `$ErrorActionPreference = 'Stop'` -- reported
+one suite failing on a `git` progress line written to stderr; that was a bug in that throwaway script,
+not in the suite, and re-running through the repo's own `Invoke-TestSuiteGate` gave the clean result
+above.) No production code touched -- test file only, so no mirror sync was needed (`scripts/tests/**`
+is not among the mirrored paths in `plugins/workflows/contributing-davekjohn/scripts/`, confirmed by
+listing that tree before editing).
 
 ### DEPLOY: `fix/ship-pr-stale-ci-certificate`
 
