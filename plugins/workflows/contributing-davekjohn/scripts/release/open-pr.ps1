@@ -1081,6 +1081,72 @@ if (-not $existingPr) {
     }
 }
 
+# --- Document gate: the branch carries the document this PR describes (issue #1269) ----------------
+#
+# THE DEFECT, MEASURED ON PR #1267 (September 3, 2026). Every reader of the branch's development
+# document in this script reads the WORKING TREE -- the scaffold, step-list, backing, impact and link
+# gates above, and the PR body composed below. The push two blocks down ships HEAD. On a dirty document
+# those are two different files, and all three downstream readers take the committed one: the
+# `branch-entry` CI check, the fold, and ship-pr's DEPLOY lock. So the run pushed an empty scaffold,
+# published a PR body describing a DEPLOY section that was not on the branch, and the CI check failed
+# on the first attempt (run 100563684253 on 7b783516; 100564770379 passed on f1c02ea7 once the document
+# was committed by hand).
+#
+# WHY THE EXISTING SIGNALS DO NOT COVER IT. Invoke-WorkflowGates below WARNS that the gates ran against
+# a dirty tree (#1026) and proceeds, which is right for a tree that is merely mid-flight. And the
+# backing gate above refuses only when this document is the work -- Get-BranchBackingFinding requires
+# `Committed -eq 0` -- so a dirty document ALONGSIDE committed code raises nothing at all. That was
+# #1267 exactly.
+#
+# WHY IT COMMITS RATHER THAN REFUSING, which was the other candidate in the issue. This script is the
+# documented owner of the step that publishes this document, and park-cycle.ps1 already commits exactly
+# this one path automatically for the life of the branch (its bound 1) -- so committing it here is an
+# act the system already performs, at the one moment it has to be true. A refusal would also charge the
+# author a full lint + test gate re-run for it: committing moves HEAD, which changes the gate-evidence
+# fingerprint, so the run after the refusal cannot reuse what this one proved.
+#
+# AND IT IS BOUNDED EXACTLY AS park-cycle's BOUND 1 IS: the resolved document path(s) and nothing else,
+# never `git add -A`. `git commit -- <paths>` commits those paths only, so anything else the author had
+# staged for their own next commit stays staged.
+#
+# ABOVE Invoke-WorkflowGates, DELIBERATELY. Committing first is what makes that function's dirty-tree
+# warning honest: after this block a remaining dirty count is real unpublished work, not the document
+# the gates just read. The cheap gates all sit above here, so a run this script was going to refuse
+# anyway makes no commit.
+$docRels = @()
+foreach ($cand in @((Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot),
+                    $entryPath.Substring($repoRoot.Length).TrimStart('\', '/'))) {
+    # Forward slashes, because these go to git; and only what exists, because Invoke-GitParkCommit's
+    # own pathspec filter is the second half of the same rule. $entryPath may still be a legacy root
+    # <SafeName>.md on a branch cut before the split, which is why it is asked for by variable rather
+    # than resolved a second time here.
+    $rel = ($cand -replace '\\', '/')
+    if ($rel -and $docRels -notcontains $rel -and (Test-Path -LiteralPath (Join-Path $repoRoot $rel))) {
+        $docRels += $rel
+    }
+}
+if ($docRels.Count -gt 0) {
+    $docCommit = Invoke-GitParkCommit -RepoRoot $repoRoot -Branch $branch -Scope 'BranchFiles' -Paths $docRels
+    if (-not $docCommit.Ok) {
+        Write-Error @"
+document gate: could not commit $($docRels -join ', ') - nothing pushed, no PR opened.
+
+git's own reason is above. This PR's body is composed from that file and the CI check reads the
+committed copy of it, so opening the PR while the two disagree is a guaranteed red check on a body
+that describes a section the branch does not carry (issue #1269).
+
+Commit it yourself and run again:
+
+  git add -- $($docRels -join ' ')
+  git commit
+"@
+        exit 1
+    }
+    if ($docCommit.Committed) {
+        Write-Host "document gate: committed $($docRels -join ', ') - the PR body, the branch and the CI check now read the same file." -ForegroundColor Green
+    }
+}
+
 # THE GATES BELOW CONSULT WHAT THEY ALREADY PROVED (August 16, 2026). ship-pr.ps1 calls this script,
 # so a branch opened in one step and shipped in a later one used to run both gates twice on a commit
 # nothing had touched -- measured at 249s of excess on 28.3% of 293 merged PRs, and routed around by

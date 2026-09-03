@@ -13,6 +13,12 @@
     deliberately; the other two run on their own, and Test-GitOriginConfigured below is the one thing
     that distinguishes them -- see its own note.
 
+    AND SINCE #1269 IT SUPPLIES THE COMMIT HALF ON ITS OWN, as Invoke-GitParkCommit -- stage and commit,
+    no push. Invoke-GitPark is that function plus the push; open-pr.ps1 is the caller that needs the
+    first without the second, because its own push is bounded against the credential-prompt hang (#1179)
+    and this file's is not. Read Invoke-GitParkCommit's own note for why that is a shared function rather
+    than a second copy of the pathspec.
+
     WHY ONE OWNER (issue #507, August 7, 2026). The two entry points had a copy each of the same four
     steps, and they had already drifted in the way that matters least to a script and most to a person:
     THEY WROTE THE IDENTICAL COMMIT MESSAGE. Both said `park: <branch> (work parked for later)` while
@@ -402,16 +408,16 @@ function Get-GitPushFailureMessage {
     return "park: git push failed -- git's own output is above."
 }
 
-function Invoke-GitPark {
+function Invoke-GitParkCommit {
     <#
-        Parks $Branch: stages what $Scope says, commits it when there is something staged, and pushes with
-        `git push -u`. Returns $true on success, $false with a message written by the caller's own
-        Write-Error -- the caller owns the exit code, because the two entry points differ in what a
-        failure means (park-branch stops; new-branch has already created the branch and the files).
+        The stage-and-commit half of a park, WITHOUT the push: stages what $Scope says and commits it when
+        there is something staged. Returns an object -- Ok (every git call succeeded) and Committed (a
+        commit was actually made) -- so a caller can tell "nothing to do" from "it failed", which a bare
+        bool cannot.
 
         NOTHING TO COMMIT IS NOT A FAILURE. A branch whose files were already committed locally but never
-        pushed is the real-world case park exists for (issue #175): the commit is skipped and the existing
-        commits are pushed as-is.
+        pushed is the real-world case park exists for (issue #175): the commit is skipped, Ok stays $true
+        and Committed comes back $false.
 
         THE PATHSPEC IS NAMED, NOT SWEPT, in the BranchFiles scope -- so anything the caller had already
         staged for their own next commit stays staged and uncommitted rather than riding along.
@@ -422,6 +428,26 @@ function Invoke-GitPark {
         the log unable to say which half a human wrote, which is the same class of defect this whole lib
         was extracted to end: one field describing two different things. Intent first where both are
         given, because a reader's own words outrank a generated line.
+
+        WHY IT IS A FUNCTION OF ITS OWN (issue #1269, September 3, 2026). open-pr.ps1 needs exactly these
+        steps and NOT the push: its own push is bounded against the credential-prompt hang (#1179), and
+        reusing Invoke-GitPark below would put an unbounded network call three lines in front of the
+        bounded one. A second copy of the staging dance was the alternative, and a second copy of a git
+        pathspec is the drift shape this lib was extracted to end.
+
+        -Continuation IS THE CLAUSE THE TWO "nothing to do" LINES END WITH, and it exists because the
+        sentence is only half this function's to write. 'pushing the existing commits as-is' is true for
+        Invoke-GitPark and a lie for a caller that does not push, so the pusher supplies it. Empty, the
+        lines stop after what this function actually did.
+
+        -ErrorAction Continue ON BOTH FAILURE MESSAGES, and it is the same lesson gate-lib.ps1's
+        Invoke-WorkflowGates records: every caller here runs under $ErrorActionPreference = 'Stop', where
+        Write-Error TERMINATES. That was harmless while this code sat inline in a function returning a
+        bare bool the callers only ever used to `exit`; it is a lie in a function that promises an object,
+        because the return would be dead code and the caller's own message would never print. It also
+        breaks park-cycle.ps1's documented "ALWAYS EXITS 0" contract -- it runs on a Stop hook, and a
+        terminating error there is a hook that interrupts the work it was added to protect. So the message
+        is emitted non-terminating and the CALLER decides what a failure costs.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -429,8 +455,13 @@ function Invoke-GitPark {
         [ValidateSet('Everything', 'BranchFiles')][string]$Scope = 'Everything',
         [string[]]$Paths = @(),
         [string]$Intent = '',
-        [string]$BodyNote = ''
+        [string]$BodyNote = '',
+        [string]$Continuation = ''
     )
+
+    # One composer for both "nothing to do" lines, so the caller's clause cannot be attached to one and
+    # forgotten on the other.
+    $tail = if ($Continuation.Trim()) { " -- $($Continuation.Trim())." } else { "." }
 
     $pathArgs = @()
     if ($Scope -eq 'BranchFiles') {
@@ -438,7 +469,7 @@ function Invoke-GitPark {
         # on a pathspec git cannot resolve.
         $pathArgs = @($Paths | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $RepoRoot $_)) })
         if ($pathArgs.Count -eq 0) {
-            Write-Host "park: nothing to stage in this scope -- pushing the existing commits as-is." -ForegroundColor Yellow
+            Write-Host "park: nothing to stage in this scope$tail" -ForegroundColor Yellow
         }
     }
 
@@ -451,7 +482,10 @@ function Invoke-GitPark {
     }
     if ($addRes) {
         $addRes.Output | ForEach-Object { Write-Host $_ }
-        if ($addRes.ExitCode -ne 0) { Write-Error "park: staging failed."; return $false }
+        if ($addRes.ExitCode -ne 0) {
+            Write-Error "park: staging failed." -ErrorAction Continue
+            return [pscustomobject]@{ Ok = $false; Committed = $false }
+        }
     }
 
     # `git diff --cached --quiet` exits 0 when nothing is staged and 1 when there is -- so this asks
@@ -460,24 +494,57 @@ function Invoke-GitPark {
     if ($pathArgs.Count -gt 0) { $diffArgs += @('--') + $pathArgs }
     $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments $diffArgs
 
-    if ($diffRes.ExitCode -ne 0) {
-        $msg = "park: $Branch ($($script:GitParkScopes[$Scope]))"
-        if ($Intent.Trim()) { $msg = "$msg`n`n$($Intent.Trim())" }
-        if ($BodyNote.Trim()) { $msg = "$msg`n`n$($BodyNote.Trim())" }
-        $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "git-park-msg-$PID.txt"
-        [System.IO.File]::WriteAllText($msgFile, $msg, (New-Object System.Text.UTF8Encoding $false))
-        try {
-            $commitArgs = @('-C', $RepoRoot, 'commit', '-F', $msgFile)
-            if ($pathArgs.Count -gt 0) { $commitArgs += @('--') + $pathArgs }
-            $commitRes = Invoke-NativeCapture -FilePath 'git' -Arguments $commitArgs
-            $commitRes.Output | ForEach-Object { Write-Host $_ }
-            if ($commitRes.ExitCode -ne 0) { Write-Error "park: committing failed."; return $false }
-        } finally {
-            Remove-Item -Path $msgFile -Force -ErrorAction SilentlyContinue
-        }
-    } else {
-        Write-Host "park: nothing new to commit -- pushing the existing commits as-is." -ForegroundColor Yellow
+    if ($diffRes.ExitCode -eq 0) {
+        Write-Host "park: nothing new to commit$tail" -ForegroundColor Yellow
+        return [pscustomobject]@{ Ok = $true; Committed = $false }
     }
+
+    $msg = "park: $Branch ($($script:GitParkScopes[$Scope]))"
+    if ($Intent.Trim()) { $msg = "$msg`n`n$($Intent.Trim())" }
+    if ($BodyNote.Trim()) { $msg = "$msg`n`n$($BodyNote.Trim())" }
+    $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "git-park-msg-$PID.txt"
+    [System.IO.File]::WriteAllText($msgFile, $msg, (New-Object System.Text.UTF8Encoding $false))
+    try {
+        $commitArgs = @('-C', $RepoRoot, 'commit', '-F', $msgFile)
+        if ($pathArgs.Count -gt 0) { $commitArgs += @('--') + $pathArgs }
+        $commitRes = Invoke-NativeCapture -FilePath 'git' -Arguments $commitArgs
+        $commitRes.Output | ForEach-Object { Write-Host $_ }
+        if ($commitRes.ExitCode -ne 0) {
+            Write-Error "park: committing failed." -ErrorAction Continue
+            return [pscustomobject]@{ Ok = $false; Committed = $false }
+        }
+    } finally {
+        Remove-Item -Path $msgFile -Force -ErrorAction SilentlyContinue
+    }
+
+    return [pscustomobject]@{ Ok = $true; Committed = $true }
+}
+
+function Invoke-GitPark {
+    <#
+        Parks $Branch: stages what $Scope says, commits it when there is something staged, and pushes with
+        `git push -u`. Returns $true on success, $false with a message written by the caller's own
+        Write-Error -- the caller owns the exit code, because the two entry points differ in what a
+        failure means (park-branch stops; new-branch has already created the branch and the files).
+
+        THE STAGE-AND-COMMIT HALF IS Invoke-GitParkCommit ABOVE since #1269, and every parameter here is
+        passed straight through to it -- so the scope still picks both the pathspec and the words, and the
+        two halves cannot describe one commit differently. This function owns the push and the sentence
+        that mentions it.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$Branch,
+        [ValidateSet('Everything', 'BranchFiles')][string]$Scope = 'Everything',
+        [string[]]$Paths = @(),
+        [string]$Intent = '',
+        [string]$BodyNote = ''
+    )
+
+    $commit = Invoke-GitParkCommit -RepoRoot $RepoRoot -Branch $Branch -Scope $Scope -Paths $Paths `
+                                   -Intent $Intent -BodyNote $BodyNote `
+                                   -Continuation 'pushing the existing commits as-is'
+    if (-not $commit.Ok) { return $false }
 
     # Push + set upstream tracking, so the branch is reachable (and continuable) from another device.
     # No PR: push != PR (the PR rule stays intact and separate).
