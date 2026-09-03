@@ -59,7 +59,8 @@ fixtures that pinned the phantom H4.
 - [x] `scripts/tests/fold-changelog.tests.ps1` -- `New-LegacyEntryFile` writes the flat-window H2 level (`(Get-EntryHeadingLevel) - 1`); the legacy-fold asserts follow
 - [x] `scripts/tests/check-plugin-integrity-entries.tests.ps1` -- the "pre-format entry file" fixture writes H2, and the label stops saying "H3"
 - [x] a fold-all run recognises a flat-window entry file (new assert block, `fold-changelog.tests.ps1`)
-- [x] `scripts/tests/*.tests.ps1` all green locally -- `test gate: all 63 suites passed in 351s`; lint gate 0 errors
+- [x] `scripts/tests/*.tests.ps1` all green locally -- `test gate: all 63 suites passed`; lint gate 0 errors
+- [x] merged `origin/main` twice for the stale-CI certificate; #1347 (issue #1341, prose half) landed in between and its comment/docstring rewrite of the same functions was resolved in favour of this branch's behaviour change, re-tested green
 
 ### DEPLOY: fix/entry-file-detector-ranges-down
 
