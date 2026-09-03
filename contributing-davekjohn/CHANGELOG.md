@@ -32,6 +32,32 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/park-write-error-terminates-eap-stop-v1` · 20260903-112308
+
+A failed `park` now reports its reason and lets the caller own the exit code, instead of throwing a
+raw terminating error past the message `Get-GitPushFailureMessage` was written to produce. The
+`cycle-autopark` Stop hook keeps its "always exits 0" contract when a park's push is rejected.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- workflow tooling internal to the park scripts. A consumer on the workflow plugin inherits the
+fix on their next update, but only in the failure path of a park; nothing changes for anyone not
+debugging one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Invoke-GitPark reports a failed park instead of throwing under EAP=Stop
+
+Plugins: contributing-davekjohn
+
+[PR #1283](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1283)
+
+---
+
 ### DEPLOY: `fix/unfolded-entry-on-main-unguarded-v1` · 20260903-104728
 
 A merge that skips the fold -- a PR merged from the GitHub UI, or any path that bypasses `ship-pr.ps1`
