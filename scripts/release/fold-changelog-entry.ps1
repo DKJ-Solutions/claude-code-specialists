@@ -2,7 +2,7 @@
 Folds one or more changelog entry files into CHANGELOG.md's flat list of changes, and then clears them.
 
 WHERE THE ENTRY COMES FROM (Dave, August 6, 2026; one file since August 23, 2026). A branch carries its
-whole working state in contributing-davekjohn/development.md, and the ENTRY is a section of it: the
+whole working state in contributing-davekjohn/<branch>.md, and the ENTRY is a section of it: the
 fourth phase, '## `<branch>` DEPLOY'. Split-Development is what finds the boundary, so this script
 holds no second definition of where an entry begins.
 
@@ -14,8 +14,8 @@ consumer, and they receive these scripts through a plugin update rather than by 
 every one, write one.
 
 AND THEY ARE ALL CLEARED THE SAME WAY: a folded entry's file is DELETED. That was briefly untrue. A root
-entry is named after its branch and has never survived its fold, while development.md is a FIXED path,
-and rewriting it to an empty state was how the trunk kept a document the next branch could expect to find.
+entry is named after its branch and has never survived its fold, while the branch document then sat at a
+fixed path, and rewriting it to an empty state was how the trunk kept a document the next branch could expect to find.
 Since August 23, 2026 (Dave) the document is branch-lifetime -- new-branch creates it, this script removes
 it, and between branches the trunk carries none. Removing it clears the step list with the entry, because
 they are sections of one file. What makes a second fold impossible is simply that there is nothing left to
@@ -282,7 +282,7 @@ function Test-IsChangelogEntryFile {
 }
 
 # THE ENTRY ARRIVES IN contributing-davekjohn/, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026).
-# new-branch.ps1 writes development.md; every branch created before the branch/ split -- here and in
+# new-branch.ps1 writes the branch's development document; every branch created before the branch/ split -- here and in
 # every consumer, who get these scripts through a plugin update rather than by choosing to -- carries a root
 # <branch-name>.md instead. Recognising only the new path would leave those entries sitting unfolded in the
 # root, which is precisely the silent half-state this repo keeps rediscovering. So both are discovered, in
@@ -319,11 +319,12 @@ $branchDeploymentFilled = (Test-Path -LiteralPath $branchDeploymentPath) -and
 # and folded the entry with neither number nor merge date -- silently, since a missing PR is a legitimate
 # outcome the script already prints and moves past.
 #
-# THE EXAMPLE USED TO BE SHARPER AND THE RENAME BLUNTED IT, which is worth a line rather than a quiet
-# edit: while the file was 'development-cycle.md' the mis-parse produced 'development/cycle' -- a
-# plausible-looking branch name, because the hyphen became the slash. 'development.md' yields a bare
-# 'development' with no slash in it, so the wrong answer is now obviously wrong rather than convincingly
-# wrong. The cost is unchanged; only the shape of the failure is milder.
+# WHY THE FILENAME IS NOT TRUSTED FOR THIS, worth a line because the name has moved under the reasoning
+# more than once: while the file was 'development-cycle.md' the mis-parse produced 'development/cycle' -- a
+# plausible-looking branch name, because the hyphen became the slash. The fixed 'development.md' that
+# briefly followed yielded a bare 'development' with no slash, an obviously wrong answer; the per-branch
+# '<branch>.md' name since #1335 flattens the branch's own slashes to hyphens, so a mis-parse is
+# convincingly wrong again. Reading the branch from the document's heading sidesteps every one of those shapes.
 #
 # READ BEFORE THE LOOP, WHICH IS ALSO BEFORE THE REMOVAL in it: on main after the merge the
 # progress file still names the branch that was just merged, which is exactly the fact needed here.
@@ -396,7 +397,7 @@ $changelogPath = Join-Path $repoRoot $changelogRel
 # noise and the most trust. Measured in a consumer on 2026-08-09, one day after they adopted the entry
 # convention:
 #
-#   Folded and removed: contributing-davekjohn/development.md (tier 1, significance 3 -- placed above 2 existing entries)
+#   Folded and removed: contributing-davekjohn/<branch>.md (tier 1, significance 3 -- placed above 2 existing entries)
 #   CHANGELOG.md updated.
 #
 # Exit 0, no warning. Their "2 existing entries" were two SECTION headings ('## Pull Requests',
@@ -529,8 +530,8 @@ foreach ($file in $entryFiles) {
     $fileContent = (Get-Content -Path $filePath -Raw -Encoding UTF8).TrimEnd()
 
     # THE ENTRY IS A SECTION OF THE FILE, NOT THE FILE (August 23, 2026). Until the merge this script read a
-    # document that was nothing but the entry, so the whole file was the block to fold. development.md
-    # holds the branch's plan above its entry, and folding the plan into CHANGELOG.md would publish somebody's
+    # document that was nothing but the entry, so the whole file was the block to fold. The branch's
+    # development document holds the branch's plan above its entry, and folding the plan into CHANGELOG.md would publish somebody's
     # ticked checkboxes as a change description.
     #
     # Split-Development owns where the boundary is, so the fold does not carry a second definition of it
@@ -862,7 +863,7 @@ foreach ($file in $entryFiles) {
 
     # DISPOSAL IS THE SAME FOR EVERY ENTRY AGAIN (Dave, August 23, 2026): a folded entry's file is deleted.
     # It was briefly asymmetric. A legacy ROOT entry is named after its branch, so once folded it has no
-    # reason to exist -- while development.md is a FIXED path, and rewriting it to an empty state was
+    # reason to exist -- while the branch document then sat at a fixed path, and rewriting it to an empty state was
     # how the trunk kept a file the next `git checkout -b` could expect to find. The document is
     # branch-lifetime now: new-branch creates it, this line removes it, and the trunk carries no copy at all.
     # So there is nothing for the next branch to inherit and nothing for a reader to mistake for work.
