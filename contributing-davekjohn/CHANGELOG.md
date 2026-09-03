@@ -102,6 +102,40 @@ Plugins: contributing-davekjohn
 
 ---
 
+### DEPLOY: `fix/publish-to-business-credential-in-url` · 20260903-172545
+
+A credential pasted into `publish-to-business.ps1`'s `-TargetRepo` no longer reaches the console or a
+CI log: the userinfo is masked at every print and in the thrown command line. The reported hazard in
+`ship-pr.ps1`, `worktree-lane.ps1` and `prune-merged.ps1` was measured against git and declined --
+git redacts userinfo itself (`transport_anonymize_url`), so dropping stderr there would have cost
+git's own diagnosis, including at the fold step where the PR is already merged, and bought nothing.
+The measurement is now stated at the seam in `native-capture-lib.ps1` and the overstated comment in
+`new-branch.ps1` that the report leaned on is corrected, so the next reader neither re-files it nor
+applies the guard on a reason that does not hold.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the declined half that matters. The issue arrived with a plausible reason, a documented
+in-repo precedent, and a one-line fix at three named call sites -- and the fix was wrong at all
+three, while the one call site the report never mentioned was leaking for real. What separated them
+was ten minutes of holding the reason against git instead of against the report. The repair therefore
+changes what the tree *says* as much as what it does: a comment that read as a rule is now a
+measurement, and the seam tells the next caller which question to ask.
+
+**Score:** N/A
+
+#### Pull Request
+
+Mask a credential-laden -TargetRepo in publish-to-business's output
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1330](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1330)
+
+---
+
 ### DEPLOY: `fix/suite-gate-fixture-assert-line-scoped` · 20260903-172201
 
 `test-suite-gate.tests.ps1`'s per-process fixture assert folded backtick continuations before judging
