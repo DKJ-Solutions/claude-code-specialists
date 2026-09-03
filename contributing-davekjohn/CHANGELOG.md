@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-pr-fetch-drops-diagnosis` · 20260903-184031
+
+`ship-pr.ps1`'s stale-CI check (step 3b) no longer swallows git's own words when its
+`git fetch origin main` fails. The flag that dropped them was added on a credential argument that
+#1330 had measured as false 23 minutes earlier -- git anonymizes the URL itself through
+`transport_anonymize_url`, so `user:token@host` prints as a bare `https://host/o/r.git` -- making this
+the fourth call site #1313 warned would copy that retired reasoning. An operator whose fetch fails now
+gets the auth error, the host and git's reason above the refusal, instead of `'git fetch origin main'
+failed` and nothing else. The comment now points at `native-capture-lib.ps1`'s seam, where the
+measurement lives, so the next reader meets it rather than the retired rule. The `git log` three lines
+below keeps its `-DiscardStderr` on its own independent reason: that output is parsed, and a stray line
+becomes a fake SHA.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+`ship-pr.ps1` is a mirrored shared script, so a consumer runs this exact file. The change is invisible
+until their fetch fails -- and at that moment it is the difference between a diagnosable failure and a
+retry in the dark.
+
+**Score:** 2
+
+#### Pull Request
+
+ship-pr's stale-CI fetch keeps git's own diagnosis
+
+Plugins: contributing-davekjohn
+
+[PR #1336](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1336)
+
+---
+
 ### DEPLOY: `fix/matcher-fixture-drop-stale-oneline-comment` · 20260903-181113
 
 A stale regression comment in `source-repo-guard.tests.ps1`'s `New-MatcherFixture` is removed.
