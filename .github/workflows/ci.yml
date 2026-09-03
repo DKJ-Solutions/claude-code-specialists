@@ -2,8 +2,10 @@
 # entry (the last is inert until a queue is enabled -- see the `merge_group` note on the trigger block).
 # This is the same guard that open-pr.ps1 runs locally, but inescapable -- even a PR that
 # originates outside the scripts (GitHub UI, or a forgotten -SkipLint) passes through here.
-# The scripts target Windows PowerShell 5.1, so we run on windows-latest with
-# `shell: powershell` (5.1), not pwsh.
+# The scripts target Windows PowerShell 5.1, so every job that RUNS one is on windows-latest with
+# `shell: powershell` (5.1), not pwsh. Since #1351 there is one job that runs none -- the
+# `lint-en-tests` summary at the foot of this file, which only compares two strings -- and it is on
+# ubuntu for that reason; see its own note.
 name: CI
 
 # Least-privilege (Sean's advice): this workflow only reads -- the GITHUB_TOKEN gets no write access.
@@ -73,8 +75,38 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# THREE JOBS, AND THE REQUIRED CHECK IS THE LAST ONE -- issue #1351, September 3, 2026.
+#
+# WHY IT IS THREE. This was one `lint-en-tests` job running lint then suites, and 95% of its wall clock
+# was the second half: on run 33798952362, 12m23s of 13m03s, reported by the gate itself as 'all 64 suites
+# passed in 742s (4 lanes)'. The same pool takes ~200s on 16-18 lanes on a workstation. Normalised, that is
+# 2968 lane-seconds here against ~3400 there -- comparable total work, so the 3.7x is LANE COUNT, and
+# `windows-latest` has four cores. The gate was contention-bound rather than critical-path-bound (see
+# Invoke-TestSuiteGate's own SHARDING banner), and the only way to give a four-core runner more lanes is to
+# use more runners. So the suites fan out over a matrix, the lint keeps its own job (running it once per
+# shard would pay 27s and print its output four times over), and a third job carries the NAME.
+#
+# THE NAME IS THE POINT: `main-ci-gate` requires a check called `lint-en-tests`, and GitHub names a check
+# after the job that reports it. Keeping a job by that exact name means this restructure needs NO ruleset
+# edit, no repo-settings change and nobody's permission -- which is the whole reason it could be done while
+# the merge-queue decision on #1325 is still open. Do not rename this job. Renaming it silently un-gates
+# `main`: the ruleset would wait forever for a check nobody reports, and every merge would block.
+#
+# `if: always()` PLUS AN EXPLICIT RESULT CHECK, AND BOTH HALVES ARE LOAD-BEARING. A job that `needs:` a
+# failed job is SKIPPED, not failed, and a skipped required check is not a reported failure -- so without
+# `always()` a red shard produces no verdict at all, and without the result check `always()` produces a
+# GREEN one. That combination is the single classic footgun of this pattern and it is the same silence
+# class as #1294's dropped runs: a check that reports success having measured nothing. It is asserted in
+# ci-shard.tests.ps1 in both directions rather than trusted to this comment.
+#
+# STRICT SUCCESS, NOT 'not failure'. `success` is required from every leg, so `skipped`, `cancelled` and
+# `neutral` all refuse. That is deliberate and it is why the fold-commit shortcut below stays on the STEP
+# rather than moving up to the job: a job-level `if:` would make `needs.suites.result` legitimately
+# `skipped` on a fold commit, and this job would then have to accept `skipped` from that leg -- one
+# accepted non-success away from accepting the one that matters. Four short runners on a fold commit cost
+# nothing on a public repo's standard runners; a summary job with an exception in it costs the gate.
 jobs:
-  lint-en-tests:
+  lint:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -84,6 +116,26 @@ jobs:
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-plugin-integrity.ps1
           exit $LASTEXITCODE
+
+  suites:
+    runs-on: windows-latest
+    strategy:
+      # FOUR, AND THE FLOOR IS WHY IT IS NOT MORE. The gate's cost within a shard is still its slowest
+      # FILE (#714), which is ~51s for the heaviest of the check-plugin-integrity-* four, so past roughly
+      # four shards the returns stop and each extra runner still pays its own ~35s of provisioning and
+      # checkout. Four gives 16 suites per shard over 4 lanes -- the pool's 2968 lane-seconds spread over
+      # 16 lanes, or ~190s plus setup, which is the ~200s the same pool already reaches on a workstation.
+      #
+      # fail-fast IS FALSE, DELIBERATELY. The default would cancel the surviving shards the moment one goes
+      # red, which costs exactly the information this repo needs most from a red gate: these suites have a
+      # measured history of red-under-the-gate/green-alone (#1033, and the two earlier sightings its
+      # comment names), and the standing response is to re-run the suite alone. Losing three shards' worth
+      # of verdicts to learn one of them failed turns one re-run into four.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v5
 
       # THE SAME SHARED GATE open-pr.ps1 AND cut-release.ps1 RUN, not a third copy of its loop. This step
       # held an inline copy until August 7, 2026 (issue #512), which is how it would have kept running the
@@ -121,12 +173,43 @@ jobs:
       # so the suites run in full. A queue entry IS the gate -- it is the projected merge being certified
       # before it lands -- so the fold-commit shortcut above, which skips the suites for a tree whose only
       # untested delta is changelog prose, has nothing to say about it (#1325).
-      - name: Test suites (scripts/tests/*.tests.ps1)
+      # THE SHARD IS TWO INTEGERS, NOT A LIST OF SUITES (issue #1351). The gate takes the partition from
+      # -Shard/-ShardCount and computes it over its own glob of scripts/tests, so this workflow never
+      # names a suite and cannot drift from the contents of that folder -- the same reason #512 deleted
+      # the inline loop this step used to hold. -ShardCount MUST equal the length of the matrix above;
+      # ci-shard.tests.ps1 asserts that by reading both numbers out of this file, because a mismatch is
+      # silent in the worst direction: a matrix of four against a count of five runs four fifths of the
+      # pool and reports four green shards, for ever.
+      - name: Test suites (shard ${{ matrix.shard }} of 4, scripts/tests/*.tests.ps1)
         if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'fold:')) }}
         shell: powershell
         run: |
           . ./scripts/lib/native-capture-lib.ps1
           if (Test-Path ./scripts/repo-config.ps1) { . ./scripts/repo-config.ps1 }
-          $gateOk = Invoke-TestSuiteGate -TestsDir ./scripts/tests -Context 'CI' -MaxParallel ([Environment]::ProcessorCount)
+          $gateOk = Invoke-TestSuiteGate -TestsDir ./scripts/tests -Context 'CI' -MaxParallel ([Environment]::ProcessorCount) -Shard ${{ matrix.shard }} -ShardCount 4
           if (-not $gateOk) { exit 1 }
           exit 0
+
+  # THE REQUIRED CHECK. Reports nothing of its own -- it exists so that `main-ci-gate`'s single required
+  # context still names one job while the work happens in five. See the banner above jobs: for why the
+  # name must not change, and why `always()` and the strict result check are both required.
+  lint-en-tests:
+    needs: [lint, suites]
+    if: always()
+    # ubuntu, deliberately: this job runs no PowerShell and never touches the repo, so the windows-latest
+    # note at the top of this file does not apply to it -- and a linux runner starts in seconds where a
+    # windows one costs a minute for the same two string comparisons.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every leg must have succeeded
+        shell: bash
+        run: |
+          echo "lint:   ${{ needs.lint.result }}"
+          echo "suites: ${{ needs.suites.result }}"
+          # A matrix job's aggregate result is 'success' only when EVERY entry succeeded, which is what
+          # makes one comparison enough for all four shards.
+          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.suites.result }}" != "success" ]; then
+            echo "::error::CI gate failed -- lint=${{ needs.lint.result }} suites=${{ needs.suites.result }}"
+            exit 1
+          fi
+          echo "CI gate green: lint and all 4 suite shards succeeded."

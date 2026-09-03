@@ -641,8 +641,37 @@ function Invoke-TestSuiteGate {
         the same reason the console is not isolated above: three sightings and no reproduction is a
         hazard to name, not yet a mechanism to fix.
 
+        SHARDING: -Shard/-ShardCount RUN ONE SLICE OF THE POOL (issue #1351, September 3, 2026). The
+        paragraph above says the lever is the slowest FILE and that splitting one is available where
+        narrowing it is not. That was the answer while the gate had lanes to spare. It does not hold on a
+        hosted runner, which is where the number that actually blocks a merge is produced: measured on run
+        33798952362, `lint-en-tests` spent 12m23s of its 13m03s in this function -- 'all 64 suites passed
+        in 742s (4 lanes)' -- against ~200s for the same pool on 16-18 lanes on a workstation. In
+        lane-seconds that is 2968 against ~3400: comparable total work, so the 3.7x is LANE COUNT, and
+        `windows-latest` has four cores. The gate was not critical-path-bound there (the #714 regime, where
+        its total equalled one file to a tenth of a second) but contention-bound, which is the one regime
+        where adding lanes is close to linear -- and the only way to add lanes to a four-core runner is to
+        use more than one runner.
+        So the caller may now ask for a quarter of the pool and run four of itself. ci.yml does; every
+        other caller passes neither parameter and gets the whole pool, unchanged, down to the wording of
+        its summary line.
+        WHY THE FUNCTION PARTITIONS RATHER THAN THE CALLER -- and why a STRIDE: both at the partition
+        itself, below the suite glob. WHY THIS DOES NOT PAY #714's BILL TWICE: the four
+        check-plugin-integrity suites build a fixture EACH, in a per-process directory (that file's own
+        header says so), so scattering them across shards duplicates no shared setup -- verified before
+        this was written, because a shared builder would have made a stride the worst possible split.
+        WHAT SHARDING CANNOT SLICE is Get-TestCommands, handled at its own comment below.
+        THE HAZARD IT REMOVES INCIDENTALLY: suites in different shards no longer share a console, so the
+        SetConsoleOutputCP class of cross-talk (inbound #821) cannot reach across a shard boundary. The
+        rule above still holds WITHIN one.
+        AND THE HAZARD IT ADDS: the fail-closed summary. Four green shards prove nothing unless something
+        refuses when one of them did not report -- a workflow-level concern, so it lives in ci.yml's own
+        banner rather than here, and it is the reason this function throws on a nonsensical (Shard,
+        ShardCount) instead of quietly selecting nothing.
+
         Returns $true when every suite exited 0, $false when any did not, and $true with a warning when
-        there is nothing to run -- an empty or missing directory is a repo without suites, not a failure.
+        there is nothing to run -- an empty or missing directory is a repo without suites, not a failure,
+        and neither is a shard that drew none of them.
     #>
     param(
         [Parameter(Mandatory)][string]$TestsDir,
@@ -650,8 +679,28 @@ function Invoke-TestSuiteGate {
         # 0 = decide from the machine. 1 = run them one at a time, which is the valve for debugging a
         # suite that only fails with 25 siblings competing for the disk -- a real possibility this
         # function introduces, so it ships with the way to rule it out.
-        [int]$MaxParallel = 0
+        [int]$MaxParallel = 0,
+        # WHICH SLICE OF THE POOL TO RUN, 1-based; 0 (both) = the whole pool, which is the unchanged
+        # behaviour every existing caller gets. See the SHARDING banner in the docstring for why the
+        # partition is computed HERE from two integers rather than taken as a list of suite names.
+        [int]$Shard = 0,
+        [int]$ShardCount = 0
     )
+
+    # BOTH OR NEITHER, AND IN RANGE -- REFUSED RATHER THAN INTERPRETED. Every wrong combination here has
+    # a plausible-looking silent reading, which is this file's own documented failure family (see the
+    # .Handle comment further down): -Shard 3 with no -ShardCount could defensibly mean "the whole pool",
+    # and -Shard 5 -ShardCount 4 selects nothing and would report a green gate over zero suites. A gate
+    # that silently ran none of its suites is exactly the shape of #1294's dropped runs -- green, and
+    # measuring nothing -- so this is the one input this function will not guess at. It throws rather
+    # than returning $false: a caller that passed nonsense has a bug, and a red gate would send its
+    # operator looking at the suites instead.
+    if (($Shard -gt 0) -ne ($ShardCount -gt 0)) {
+        throw "Invoke-TestSuiteGate: -Shard and -ShardCount go together -- got Shard=$Shard, ShardCount=$ShardCount."
+    }
+    if ($ShardCount -gt 0 -and ($Shard -lt 1 -or $Shard -gt $ShardCount)) {
+        throw "Invoke-TestSuiteGate: -Shard must be between 1 and -ShardCount ($ShardCount) -- got $Shard."
+    }
 
     # The repo's own extra test commands (inbound #644) -- read via Get-Command like every other optional
     # repo-config function, so a repo that defines nothing is untouched and a missing repo-config cannot
@@ -665,13 +714,64 @@ function Invoke-TestSuiteGate {
     if (Test-Path -LiteralPath $TestsDir) {
         $suites = @(Get-ChildItem -Path $TestsDir -Filter '*.tests.ps1' -File | Sort-Object Name)
     }
+    $poolTotal = $suites.Count
+
+    # THE PARTITION IS A STRIDE, NOT A CONTIGUOUS BLOCK, and that is the whole design (issue #1351).
+    # Taking suites 1-16 for shard 1, 17-32 for shard 2 and so on would pile correlated work into one
+    # shard: the heavy suites in this repo are heavy because they share a subject, and suites that share
+    # a subject share a NAME PREFIX and therefore sort adjacently. The four check-plugin-integrity-*
+    # suites are the measured case -- they are the pool's four most expensive files (#714 split them out
+    # of one ~160s file precisely because the gate parallelises per file), they are alphabetically
+    # consecutive, and a contiguous split puts all four in the same shard while another shard runs
+    # sixteen cheap ones. A stride puts them in four different shards, which is the balance this change
+    # exists to buy, WITHOUT this function having to know or store what anything costs. Verified on this
+    # repo's own 64-suite pool: 16/16/16/16, one heavy suite each.
+    #
+    # SORT ORDER IS THE CONTRACT. The stride is taken over the Sort-Object Name list above, so a given
+    # (Shard, ShardCount) always selects the same files -- a shard that goes red is re-runnable by hand
+    # with the same two integers. Adding a suite reshuffles the assignment, which is fine: nothing
+    # persists an assignment between runs, and every suite is independent by construction.
+    #
+    # WHY NOT A LIST OF SUITE NAMES FROM THE CALLER. That is the shape the workflow would have to keep
+    # in sync with the directory, and this repo has measured what happens to a second copy of a list
+    # nobody looks at (#512's inline gate copy, which would have kept running the suites one at a time
+    # for days after both local callers were parallelised). Two integers cannot drift from the contents
+    # of a folder.
+    if ($ShardCount -gt 1 -and $suites.Count -gt 0) {
+        $suites = @($suites | ForEach-Object -Begin { $i = 0 } -Process {
+            if (($i % $ShardCount) -eq ($Shard - 1)) { $_ }
+            $i++
+        })
+    }
+
+    # Get-TestCommands BELONGS TO ONE SHARD, NOT TO EVERY SHARD (issue #1351). These are the repo's own
+    # whole-stack commands -- 'npm test' and its kind -- and they are not a per-file pool this function
+    # can slice: running them in all four shards runs the consumer's entire test suite four times, for
+    # four times the wall clock this change exists to reduce, and any of them that writes outside its own
+    # process (a coverage file, a build artefact, a fixture database) would then have three concurrent
+    # writers. Shard 1 carries them. That leaves shard 1 the longest, which is the correct place for a
+    # cost that cannot be divided: it is bounded by the commands' own runtime either way, and the pool
+    # keeps flowing around it.
+    if ($ShardCount -gt 1 -and $Shard -ne 1 -and $extraCommands.Count -gt 0) {
+        Write-Host "test gate: $($extraCommands.Count) repo test command(s) run in shard 1 -- not repeated here." -ForegroundColor DarkGray
+        $extraCommands = @()
+    }
 
     # A repo with neither suites nor commands is a repo without tests, not a failure -- but each empty
     # half stays quiet once the OTHER half has something to run: a consumer whose whole suite is
     # Get-TestCommands legitimately has no scripts\tests at all.
+    #
+    # AND UNDER SHARDING AN EMPTY SLICE IS A THIRD THING, which neither warning below describes: more
+    # shards than suites is a workflow configured wider than the pool, not a repo without tests, and
+    # saying "no suites found in scripts\tests" of a directory holding sixty of them sends the reader
+    # to the wrong place. Still green -- there is genuinely nothing for THIS shard to run, and the
+    # summary job's fail-closed check is what makes an entire pool of empty shards impossible to
+    # mistake for a pass.
     if ($suites.Count -eq 0 -and $extraCommands.Count -eq 0) {
         if (-not (Test-Path -LiteralPath $TestsDir)) {
             Write-Warning "$TestsDir not found - test gate skipped."
+        } elseif ($ShardCount -gt 1 -and $poolTotal -gt 0) {
+            Write-Warning "shard $Shard of $ShardCount got none of the $poolTotal suites in $TestsDir - more shards than suites."
         } else {
             Write-Warning "no *.tests.ps1 suites found in $TestsDir - test gate had nothing to run."
         }
@@ -695,7 +795,12 @@ function Invoke-TestSuiteGate {
         if ($MaxParallel -gt $suites.Count) { $MaxParallel = $suites.Count }
 
         $modeLabel = if ($MaxParallel -eq 1) { 'one at a time' } else { "$MaxParallel at a time" }
-        Write-Host "test gate: running all $($suites.Count) test suites for $Context ($modeLabel)..." -ForegroundColor Cyan
+        # 'all N' IS A CLAIM, AND UNDER SHARDING IT IS A FALSE ONE. This line and the verdict at the foot
+        # of the function are the two a session copies into a branch document or a commit message, so a
+        # sliced run has to say so on both -- otherwise 'all 16 test suites' is on the record for a pool
+        # of 64, which reads as 48 suites having been deleted rather than as one shard of four.
+        $scopeLabel = if ($ShardCount -gt 1) { "shard $Shard/$ShardCount -- $($suites.Count) of $poolTotal" } else { "all $($suites.Count)" }
+        Write-Host "test gate: running $scopeLabel test suites for $Context ($modeLabel)..." -ForegroundColor Cyan
 
         $captureDir = Join-Path ([System.IO.Path]::GetTempPath()) ("test-suite-gate-$PID")
 
@@ -827,11 +932,17 @@ function Invoke-TestSuiteGate {
         $laneWord = if ($MaxParallel -eq 1) { 'lane' } else { 'lanes' }
         $laneNote = " ($MaxParallel $laneWord)"
     }
+    # THE SHARD RIDES THE SAME LINE, for the reason #1318 put the lane count here: this is the line that
+    # gets quoted, and a figure quoted without its scope is unreadable later. '742s (4 lanes)' and
+    # '186s (4 lanes)' say nothing about each other unless the second one also says it ran a quarter of
+    # the pool -- and the whole argument of #1351 is a comparison between those two numbers.
+    $shardNote = if ($ShardCount -gt 1) { " [shard $Shard/$ShardCount]" } else { '' }
     if ($failedNames.Count -eq 0) {
-        Write-Host ("test gate: all {0} suites passed in {1}s{2}." -f $total, $elapsed, $laneNote) -ForegroundColor Green
+        $passScope = if ($ShardCount -gt 1) { "{0} of $poolTotal" } else { 'all {0}' }
+        Write-Host ("test gate: $passScope suites passed in {1}s{2}{3}." -f $total, $elapsed, $laneNote, $shardNote) -ForegroundColor Green
         return $true
     }
     $namesInOrder = @($failedNames | Sort-Object) -join ', '
-    Write-Host ("test gate: {0} of {1} suites FAILED in {2}s{3}: {4}" -f $failedNames.Count, $total, $elapsed, $laneNote, $namesInOrder) -ForegroundColor Red
+    Write-Host ("test gate: {0} of {1} suites FAILED in {2}s{3}{4}: {5}" -f $failedNames.Count, $total, $elapsed, $laneNote, $shardNote, $namesInOrder) -ForegroundColor Red
     return $false
 }
