@@ -33,23 +33,95 @@
 
 ### PLAN
 
-Issue #1314: gate timings get written down with no statement of what was measured (lint+tests, or tests only) or where (a 16-lane dev box, or the 4-core CI runner), and are then read as stable constants. Add the portable rule in Nolan's manual, the DEPLOY-section half in DEVELOPMENT-portable.md, and record this repo's own CI measurement (n=12) in Nolan's lens.
+[#1314](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1314): a gate wall-clock figure
+gets written down with no statement of **what** was measured (a lint gate and a test gate summed, or one
+alone) or **where** (a 16-lane developer box, or the four-core CI runner), and is then re-quoted as a
+constant. The three figures the issue names die at the fold, so the durable half is a convention, not a
+repair to that branch's document. The issue's own comment sets the second question: whether a DEPLOY
+section -- which *does* fold into the trunk -- may quote a local figure at all.
+
+#### Where each half goes
+
+Per the source-is-the-default rule in `CLAUDE.md`, both halves are portable and neither belongs in a
+lens: a consumer running these gates meets this on day one. The lens gets the measurement that makes
+them worth following.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] The portable measurement rule, in Nolan's manual
+      (`plugins/teams/team-alpha/manuals/06-25-manual.md`): *"A gate figure names what it included and
+      which machine produced it"*, placed as the last of the measurement-discipline rules. Named by its
+      **axis** rather than an ordinal -- the four above it fail on the unit, the sample, the factor and
+      the copy, this one on the scope and the machine -- because "the fifth sibling" was written first
+      and does not survive a count: the third of them already calls itself *"the third sibling ... of the
+      three"*, so an ordinal here would have been the mis-sized-finding pattern this repo keeps
+      measuring.
+- [x] The DEPLOY-section half, as rule 8 in
+      `plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md`: a figure quoted there names its
+      scope and its machine, and where the claim is about the gate that *blocks the merge*, that job's
+      own figure is the one to quote -- it is a population where a local reading is a single draw. It
+      answers the issue comment's second question with "yes, with both facts named", not with a ban.
+- [x] The evidence, in Nolan's lens (`.claude/specialists/lenses/06-25-extension.md`): the three figures
+      with what each one's own wording covered, this repo's CI re-measured per step over n=12, and the
+      pointer to where the two rules now live.
 
 ### TEST
 
+- [x] The CI figures are this session's own measurement, not the report's: the twelve most recent
+      successful `lint-en-tests` runs on the trunk, per step from
+      `/actions/runs/<id>/jobs` -- lint 20/30/35s and suites 656/906/949s (min/median/max), 676/936/983s
+      together. The report's single run (27s + 825s = 852s) sits inside every one of those bands, which
+      is what makes it a draw rather than a contradiction.
+- [x] Two of the report's own claims were checked and corrected rather than carried: the suite count is
+      **62** today, not the 61 the branch measured, so no figure here is anchored to a suite count; and
+      run `33758987818` ran on `docs/traps-count-closing-line-v1`, not on the reporting branch's base as
+      the report has it -- so its figures are cited as a CI reading of the trunk-derived tree, and the
+      n=12 median carries the argument instead.
+- [x] The local parts (75s lint, 401s suites at sixteen lanes) are attributed to the report throughout
+      rather than re-run. Re-running them proves nothing `open-pr`'s own gate will not, and pre-running a gate
+      is the waiting rule's own named waste.
+- [~] Dropped: "lint + the full suite set green" is not a step by rule 5 of
+      `DEVELOPMENT-portable.md` -- `open-pr` runs both gates as part of the push, so at the moment
+      the step gate reads this list the step cannot be done, and ticking it would report a result
+      that does not exist yet. It is what the run reports, not what the branch plans.
+
 ### DEPLOY: `docs/gate-figure-scope-and-machine-v1`
 
-**Score:**
+A wall-clock figure for a gate reads as though it describes the gate. It does not: it describes one run,
+and two facts that the number never implies decide what it is worth to anybody else -- **what ran inside
+it**, and **which machine ran it**. One branch made the case by writing three *"full gate"* figures for
+one test set (608s, 471s, 360s), of which the first bundled the lint gate with the suites and the other
+two, by their own wording, did not; all three were then quoted as answering the same question.
+
+Two rules now say so, both portable. Nolan's manual carries the measurement discipline -- name the
+components and give them separately as well as summed, name the machine and its lane count, and never let
+a local reading stand in for the gate that blocks the merge, whose own history is queryable.
+`DEVELOPMENT-portable.md` rule 8 carries it for the DEPLOY section specifically, because a figure written
+there folds into `CHANGELOG.md` and onward into a release document, outliving the branch that measured
+it.
+
+The measurement behind them is in Nolan's lens, and its second half is the one that changes how a
+disagreement gets read: this repo's CI, measured per step over the twelve most recent trunk runs, costs
+**936s** median (lint 30s, suites 906s) on four cores against ~476s locally at sixteen -- about 2x -- but
+its own band is **676-983s**. That 1.45x spread inside one environment is *wider* than the 360-608s
+spread the three branch figures were being reconciled across. So the disagreement they looked like was
+never large enough to be a finding, and scope and machine have to be settled before a gap between two
+figures counts as one.
+
+Closes [#1314](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1314).
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+Both rules travel by plugin update, and the discipline is one a consumer needs the first time it writes a
+gate timing into a changelog entry -- which is the first branch it ships. It changes no script and no
+gate, so nothing refuses on it; what it changes is whether a number written on day one is still readable
+on day ninety. The figures quoted are the source repo's own and are labelled as such, so a consumer on a
+different box has the shape without inheriting the seconds.
+
+**Score:** 2
 
 #### Pull Request
 
 A gate wall-clock figure names what it included and which machine produced it
-

@@ -947,6 +947,61 @@ assert — was already written down twice, in two lenses the gate's own output p
 pointer now lives in `Invoke-TestSuiteGate`'s docstring, beside the converse rule from inbound #821 that
 was already there.
 
+### A figure with no scope and no machine — CI re-measured, n=12 (September 3, 2026)
+
+[#1314](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1314) was filed out of
+`fix/ship-pr-stale-ci-certificate`, which wrote **three** *"full gate"* figures for one test set and had
+each of them read as the same measurement:
+
+| written as | seconds | what its own wording covered |
+|---|---|---|
+| *"Full lint gate and all 61 test suites pass (608s, matching CI's own runner)"* | **608s** | lint **and** the suites, explicitly bundled |
+| *"`check-plugin-integrity.ps1` (0 errors) followed by `Invoke-TestSuiteGate` ... 61/61 passed in 471s"* | **471s** | the suites alone; lint's cost reported beside it, not in it |
+| *"`Invoke-TestSuiteGate` over all 61 suites, parallel, exactly as CI runs it: 61/61 passed in 360s"* | **360s** | ditto |
+
+**The three are not interchangeable and nothing on the branch said which was which.** The report's own
+re-run on that tree put the parts at **75s** of lint and **401s** of suites at sixteen lanes
+(`[Environment]::ProcessorCount - 2` on an 18-thread box) — 476s together, close enough to 471s that
+either reading is available: 471s folding lint in despite its wording, or the 111s gap to 360s being
+ordinary load variance, which the
+[`Invoke-TestSuiteGate` docstring](../../../scripts/lib/native-capture-lib.ps1) already documents at that
+scale (421s/419s against ~200s idle).
+
+**And none of the three is "matching CI's own runner", which is the half worth keeping.**
+[`ci.yml`](../../../.github/workflows/ci.yml) runs lint and the suites as **two sequential steps** with
+`-MaxParallel ([Environment]::ProcessorCount)` on `windows-latest` — four cores, as the step's own
+comment says, because a hosted runner has nobody sitting at it. Measured here over the twelve most recent
+successful `lint-en-tests` runs on the trunk, per step from the jobs API:
+
+| | min | median | max |
+|---|---|---|---|
+| lint step | 20s | **30s** | 35s |
+| test-suites step | 656s | **906s** | 949s |
+| the two together | 676s | **936s** | 983s |
+
+**CI costs about 2x the local reading — and that is the smaller of the two findings.** 936s against the
+local 476s is a difference in *lanes*, not in the change: sixteen against four. The larger finding is the
+**band**: 676–983s is a 1.45x spread inside one environment, wider than the 360–608s spread the three
+branch figures were being reconciled across. So the disagreement those three figures looked like was
+never big enough to be a finding in the first place — which is the population rule in
+[the n=5 section above](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026) arriving from
+the other direction: there a figure moved because the machine was busy, here two figures differ by less
+than one machine's ordinary noise.
+
+**Where the rule went, and why not here.** Both halves are portable — a consumer running these gates
+meets this on day one — so neither stayed in this lens. The measurement discipline is a hard rule in
+Nolan's own manual (*"a gate figure names what it included and which machine produced it"*, the scope-and-machine
+sibling of the unit, sample, factor and copy rules), and the DEPLOY-section half is
+[`DEVELOPMENT-portable.md`](../../../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md)
+rule 8, because a figure written there folds into `CHANGELOG.md` and then into a release document. This
+section is the evidence they cite, which is this repo's convention for where a measurement lives.
+
+**The three figures themselves needed no repair.** They sit only in
+`contributing-davekjohn/development-fix-ship-pr-stale-ci-certificate.md`, in its CREATE and TEST
+sections; `fold-changelog-entry.ps1` folds **only** DEPLOY and removes the document, so none of them
+reaches the trunk, and a grep over `scripts/`, `plugins/` and `contributing-davekjohn/` finds them
+nowhere else. The convention gap was the whole issue.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup
