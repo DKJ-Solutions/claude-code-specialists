@@ -15,6 +15,12 @@
     outside a queue). Enabling one is a repo-settings change and Dave's. What is NOT his, and what this
     suite guards, is the two things that must already be true in the tree before that switch is flipped.
 
+    THE DECISION WAS SETTLED ON SEPTEMBER 3, 2026 AND THE ANSWER IS NO (#1355) -- AND THIS SUITE STAYS.
+    A no priced against a 12.3%/~5min problem is not a never, and the reopen condition is written into
+    Sylvester's lens beside the decision. Neither guard is dead code in the meantime: guard 2 is right
+    with no queue anywhere -- "merged" had been an inference from an exit code, on the one script that
+    writes to the trunk -- and guard 1 costs nothing while inert. Do not remove either as unused.
+
     BOTH FAIL SILENTLY AND BOTH FAIL BADLY, which is why they are pinned rather than commented:
 
       1. `.github/workflows/ci.yml` must carry the `merge_group` trigger. A required workflow without it
