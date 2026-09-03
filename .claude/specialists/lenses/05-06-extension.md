@@ -519,7 +519,14 @@ they land.
 `DKJ-Solutions` org carried `main-ci-gate` across intact and dropped its bypass list, and a required
 status check cannot be satisfied by a direct push — so for one day the cut could not run at all, and
 neither could a fold. Dave restored the list on September 3; the proof is the push itself, which now
-answers `Bypassed rule violations for refs/heads/main` where the day before it answered `GH013`. The
+answers `Bypassed rule violations for refs/heads/main` where the day before it answered `GH013`.
+**"Back" is not "back to what it was", and the difference decides who can cut**: the restored list is
+`OrganizationAdmin` + a repository role, with **no Write role** in it, so the bypass now follows org
+ownership rather than a repo permission. And that push proves it only for the account that made it —
+`Bypassed rule violations` from an owner says nothing about anyone else, which is the mis-reading that
+reopened #1244. The role table and the measurements are in
+[Sylvester's lens](05-15-extension.md); the reading that settles it for *your* account is
+`current_user_can_bypass` on the ruleset, taken from that account. The
 paragraph above described the route correctly throughout — it is the argument for why the cut is not a
 PR — and the blockage was never a reason to reopen the route question: the three objections at the top
 of this section are unchanged, and a release branch would still meet two gates it cannot satisfy by
