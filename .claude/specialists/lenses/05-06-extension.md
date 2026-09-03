@@ -509,14 +509,31 @@ changelog and bumps every plugin. The repair is coverage, not route: the cut run
 suites too, and CI runs on `main` pushes so the artefacts the cut itself generates are checked after
 they land.
 
-**That bypass is gone at the moment of writing, so the cut cannot run at all** (September 2, 2026,
+**That bypass was gone for a day, and it is back** (September 2–3, 2026,
 [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244)): the transfer into the
 `DKJ-Solutions` org carried `main-ci-gate` across intact and dropped its bypass list, and a required
-status check cannot be satisfied by a direct push. The paragraph above still describes the route
-correctly — it is the argument for why the cut is not a PR — but a release is blocked until Dave
-restores the list, and so is every fold. Do not read the blockage as a reason to reopen the route
-question: the three objections at the top of this section are unchanged, and a release branch would
-still meet two gates it cannot satisfy by construction.
+status check cannot be satisfied by a direct push — so for one day the cut could not run at all, and
+neither could a fold. Dave restored the list on September 3; the proof is the push itself, which now
+answers `Bypassed rule violations for refs/heads/main` where the day before it answered `GH013`. The
+paragraph above described the route correctly throughout — it is the argument for why the cut is not a
+PR — and the blockage was never a reason to reopen the route question: the three objections at the top
+of this section are unchanged, and a release branch would still meet two gates it cannot satisfy by
+construction.
+
+**What the day cost is the part worth keeping, because the blockage will recur and the trap is in the
+response to it.** The bypass list is repo settings, so a session that meets `GH013` cannot repair it
+and has to wait. **Waiting means leaving the trunk alone — it does not mean committing the fold
+locally and holding it.** A held fold looks like a neutral pause and is not one: it is a commit on
+`main` that only exists on one machine, and `main` is the branch every other machine syncs. Measured
+on September 3, 2026, on the working copy that produced this paragraph — a fold held on one machine
+sat there while the same fold landed from another, so `git pull` met a duplicate of an entry that was
+already upstream (identical text, identical `· 20260902-210200` timestamp) and left an unmerged
+`CHANGELOG.md` with no `MERGE_HEAD` to abort. Untangling it took a session, and the branch documents
+it was meant to clear had stayed on the trunk the whole time anyway, conflicting every open PR. So the
+answer to a blocked fold is to **stop before the commit**: the trunk keeps its branch document, the
+entry stays where the fold would have read it, and the fold runs unchanged the moment the bypass
+returns. Nothing is lost by waiting, and a duplicate commit is the one thing that cannot be undone
+cheaply.
 Since August 3, 2026 it is a **shared** script, mirrored into the plugin like the rest of the
 workflow ([#417](https://github.com/DaveKJohn/claude-code-specialists/issues/417)): everything
 that legitimately differs per repo — which root docs are permanent, how the notes are foldered,
