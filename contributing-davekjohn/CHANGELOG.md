@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/lint-gate-wall-clock` · 20260903-164154
+
+`Invoke-WorkflowGates` (`scripts/lib/gate-lib.ps1`) now times the real lint run and prints
+`lint gate: integrity check passed in Xs.` / `... FAILED in Xs.`, the direct parallel to the test
+half's `test gate: all N suites passed in Xs`. Timed around the child run only -- the evidence-cache
+fast path keeps its `already proved ... -- skipped.` line with no seconds. So a session recording
+"the full gate cost ~Ys" now has a lint figure to name beside the test figure, which is the half
+#1314 found missing when three conflicting "full gate" numbers were quoted for one test set. The
+figure is formatted invariant-culture (the `Format-GateSeconds` / #1159 concern), inlined because
+`gate-lib` does not dot-source `native-capture-lib`.
+
+Closes [#1319](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1319).
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer running the `contributing-davekjohn` workflow plugin picks up the mirrored `gate-lib.ps1`
+on the next plugin update: their `open-pr` / `-GatesOnly` run gains the same lint-gate seconds line,
+symmetric with the test-gate timing they already see. Console output only -- no behaviour, gate
+verdict or exit code changes.
+
+**Score:** 2
+
+#### Pull Request
+
+Lint gate prints its own wall-clock
+
+Plugins: contributing-davekjohn
+
+[PR #1324](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1324)
+
+---
+
 ### DEPLOY: `fix/git-identity-mismatch-unchecked` · 20260903-163646
 
 On a checkout where `gh` is authenticated as one GitHub account and `git config user.name` reads
