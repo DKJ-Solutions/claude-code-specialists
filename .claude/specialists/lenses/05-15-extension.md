@@ -234,32 +234,51 @@ infrastructure.
   ruleset reporting `active` reads as a clean bill of health while the one array the fold model runs on
   is gone. So check the field you actually rely on, not the object that contains it.
 
-  **AND ON SEPTEMBER 3, 2026 A DIFFERENT SUB-FIELD OF THAT RULESET MOVED — `strict`, TURNED ON
-  DELIBERATELY** ([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325),
-  Dave's call). The stale-CI certificate gate in `ship-pr.ps1` step 3b
+  **AND ON SEPTEMBER 3, 2026 A DIFFERENT SUB-FIELD OF THAT RULESET WAS MOVED AND MOVED BACK THE
+  SAME DAY — `strict`, ON FOR ABOUT 45 MINUTES**
+  ([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)). The stale-CI
+  certificate gate in `ship-pr.ps1` step 3b
   ([PR #1316](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1316)) detects a real
   race it cannot win on this trunk — `lint-en-tests` runs ~13m47s–16m09s while `main` gains a merge
-  every ~15–25 min, so re-running CI to refresh the certificate is a chase the operator keeps
-  losing. The verdict rejected every script-side change and turned three knobs across two objects
-  with `gh api`:
-  - ruleset `main-ci-gate` → `required_status_checks` rule: `strict_required_status_checks_policy`
-    `false` → `true`
-  - repo `DKJ-Solutions/claude-code-specialists`: `allow_auto_merge` and `allow_update_branch` both
-    `false` → `true`
+  every ~15–25 min, with ~44% of branches behind at the merge — so re-running CI to refresh the
+  certificate is a chase the operator keeps losing. The first verdict (~14:45 UTC) rejected every
+  script-side change and turned three knobs with `gh api`: ruleset `main-ci-gate` →
+  `required_status_checks` rule `strict_required_status_checks_policy` `false` → `true`, and repo
+  `DKJ-Solutions/claude-code-specialists` `allow_auto_merge` + `allow_update_branch` both `false` →
+  `true` (~15:10). #1325 was closed as "option 1 applied". Research on the thread (~15:29) showed
+  the option is measurably worse; #1325 was reopened on Dave's instruction (~15:34) and all three
+  fields reverted to `false` (~15:55). Readback confirms all three `false`.
 
-  With `strict` on, a PR must be up to date with `main` before it merges, and `allow_auto_merge` +
-  `allow_update_branch` let GitHub run that loop unattended — update the behind branch, re-run
-  `lint-en-tests` against the fresh tree, merge when green — so the operator arms auto-merge once and
-  stops being the thing between CI rounds (`allow_update_branch` supplies the "automatically update
-  branch" half a bare `strict` + auto-merge lacks, which the verdict flagged). It costs a full extra
-  `lint-en-tests` run for every branch that falls behind `main` while its own CI runs — on a busy
-  day, most of them — accepted with the
-  [#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292) fire-rate and #1325
-  convergence numbers both in view. `ship-pr.ps1` step 3b is unchanged: detection is correct and it
-  stays the portable net for consumers, whom a repo-settings change never reaches, with
-  `-SkipStaleCheck` the honest valve for a known-harmless window. This enacts option 1 of #1292
-  ("require branches to be up to date") for this repo; #1292 stays open as the broader merge-queue
-  question.
+  **Why it does not converge — the load-bearing fact.** GitHub performs **no server-side base-sync
+  of a PR branch** outside a merge queue. `allow_update_branch` ("Always suggest updating pull
+  request branches") only shows a UI button to a human with write access — it acts on nothing.
+  Auto-merge flips the merge switch only once *every* requirement, **including "up to date"**, is
+  already satisfied; it never syncs the base itself. So `strict` converts the ~44% behind-at-merge
+  rate into a hard, repeating, server-side block with **no automatic resolution and no valve** —
+  `-SkipStaleCheck` lives in `ship-pr.ps1` and cannot touch a refusal that is now GitHub's.
+  Confirmed live in the 45-minute window: PR #1316 itself had to be landed with
+  `gh pr merge --admin` while `strict` was on. Sources are cited on #1325.
+
+  **Strict-off with auto-merge on is not a fallback**, which is why `allow_auto_merge` was reverted
+  too and not only `strict`: without the "up to date" requirement, auto-merge would merge on a
+  stale-but-green certificate, unattended — reintroducing exactly
+  [#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292)'s defect, which
+  step 3b exists to catch. #1292 (the red-trunk mechanism issue) stays open and assigned in its own
+  right; the keep-`strict`-or-adopt-a-merge-queue decision is where #1325 now sits.
+
+  **The real fix is a GitHub merge queue**, which tests each PR against the projected merge
+  (target-branch tip + the PRs already queued), so staleness is gone by construction. It **is**
+  available to this repo (public + org-owned; the earlier "Enterprise only" reading was wrong).
+  Load-bearing prerequisite: `.github/workflows/ci.yml` triggers on `pull_request` and
+  `push: [main]` only, and a required workflow with no `merge_group` trigger never reports in the
+  queue — GitHub's own warning is that the merge then fails outright, a total merge outage on
+  `main` — so `merge_group` must land in `ci.yml` **before** any queue is enabled — and that
+  prerequisite is tracked on #1325. `ship-pr.ps1` step 3b is unchanged: its detection is correct
+  and it stays the mechanism and the portable net for consumers, whom a repo-settings change never
+  reaches, with `-SkipStaleCheck` the valve for a known-harmless window. **The generalisable half: a
+  repo-settings "fix" for the staleness race that is not a merge queue does not converge** —
+  `strict` + `allow_auto_merge` + `allow_update_branch` look like the unattended loop, but the base
+  never moves under the PR on its own, so all they add is the block.
 - **`.github/workflows/claude.yml` + `.github/workflows/claude-code-review.yml`** — the two Claude Code
   workflows, added August 14, 2026 via
   [PR #658](https://github.com/DaveKJohn/claude-code-specialists/pull/658). The first answers an

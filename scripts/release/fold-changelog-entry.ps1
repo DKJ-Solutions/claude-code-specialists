@@ -320,12 +320,21 @@ $branchDeploymentFilled = (Test-Path -LiteralPath $branchDeploymentPath) -and
 
 # WHICH BRANCH THE ENTRY BELONGS TO, read from the development document's own heading.
 #
-# This is the one thing the fixed filename genuinely costs, and the reason the branch line is in the
-# document rather than only in the scaffolder's head. In fold-all mode the branch is what the PR lookup
-# keys on, and it used to be recovered from the entry's file NAME (feat-x.md -> feat/x). A fixed name
-# carries no branch, so the filename would have been read as a branch called 'development', found no PR,
-# and folded the entry with neither number nor merge date -- silently, since a missing PR is a legitimate
-# outcome the script already prints and moves past.
+# THE FILENAME IS A WRITE CONVENTION AND A READ CANDIDATE, NEVER THE AUTHORITY -- and that is the reason
+# the branch line is in the document rather than only in the scaffolder's head. In fold-all mode the branch
+# is what the PR lookup keys on, and the heading is the one place that DECLARES it. Same answer
+# Resolve-BranchFilePath gives one level down, and it buys the same thing here: a branch renamed after
+# new-branch ran, or a document written by hand under a name that does not match, still folds against the
+# right PR.
+#
+# THIS USED TO BE FRAMED AS THE ONE THING THE FIXED FILENAME COST, and #1335 retired the framing rather
+# than the rule. From August 23 to September 3, 2026 the document was the single 'development.md', while
+# the branch used to be recovered from the entry's file NAME (feat-x.md -> feat/x). A fixed name carries no
+# branch, so the filename would have been read as a branch called 'development', found no PR, and folded
+# the entry with neither number nor merge date -- silently, since a missing PR is a legitimate outcome the
+# script already prints and moves past. The name carries the branch again now, so there is nothing left
+# being paid for and nothing to weigh the heading read against: it stands on the paragraph above on its
+# own merits, which is what #1339 kept it for.
 #
 # WHY THE FILENAME IS NOT TRUSTED FOR THIS, worth a line because the name has moved under the reasoning
 # more than once: while the file was 'development-cycle.md' the mis-parse produced 'development/cycle' -- a
@@ -347,7 +356,10 @@ if ($branchDeploymentFilled) {
 
 if ($Branch) {
     # Explicit target: the caller named the branch, so trust it. The legacy root file is named after that
-    # branch; the development document is not named after anything, so it qualifies on being filled.
+    # branch, so it qualifies on EXISTING. The development document qualifies on being FILLED instead --
+    # it is named after the branch too since #1335, but Resolve-BranchFilePath has already answered which
+    # path this branch's document sits at, and that answer is as often a legacy name as today's
+    # '<branch>.md', so the name is not what is being tested here.
     $entryFiles = @()
     if ($branchDeploymentFilled) { $entryFiles += $branchDeploymentRel }
     $legacyName = ($Branch -replace '/', '-') + ".md"
