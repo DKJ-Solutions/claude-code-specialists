@@ -147,8 +147,11 @@ while it did it, so it actively reassured.
 
 So the test is now the **name and the tip together**, and a name whose merged PR ended on a *different*
 commit is kept with a reason that says exactly that — *"a merged PR used this name, but not this
-commit — the name was recycled"*. "No merged PR" would describe a lookup that came up empty, when this
-one came up full and belonged to somebody else's work.
+commit — no proof for this tip (a recycled name, or a commit added after that PR merged)"*. "No merged
+PR" would describe a lookup that came up empty, when this one came up full — the name matched, this
+commit did not. The reason names that measurement rather than asserting a cause, because a recycled
+name, an unreadable tip and a branch that took a commit after its own PR merged all resolve here
+(issue #1296).
 
 **It matters most in the `-IncludeRemote` pass**, which hands over a `git push origin --delete` line. The
 local pass at worst discards commits `origin` still holds; a wrong line there reaches the copy of last

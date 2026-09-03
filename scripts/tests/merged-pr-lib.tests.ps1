@@ -175,8 +175,9 @@ Write-Host ''
 Write-Host 'Test-MergedPrNameKnown -- the sentence to print once the proof has said no' -ForegroundColor Cyan
 
 # IT IS NOT A PROOF, and the asserts say so in the one direction that matters: it answers TRUE for
-# exactly the case Test-RefMergedByPr answers FALSE for, which is what makes prune-merged's 'the name
-# was recycled' a different sentence from 'no merged PR' rather than a different verdict.
+# exactly the case Test-RefMergedByPr answers FALSE for, which is what makes prune-merged's
+# 'used this name, but not this commit' a different sentence from 'no merged PR' rather than a
+# different verdict.
 Assert-True (Test-MergedPrNameKnown -Name $reused -MergedTips $tips) `
     'known/recycled: a name a merged PR carried is known, whatever tip this ref is on'
 Assert-True (-not (Test-RefMergedByPr -Name $reused -Tip $tipStanding -MergedTips $tips)) `

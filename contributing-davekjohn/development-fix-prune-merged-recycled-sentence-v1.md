@@ -33,19 +33,47 @@
 
 ### PLAN
 
+Issue #1296. `prune-merged.ps1`'s `Get-MergedProof` returns `'recycled'` whenever the branch
+name is in the merged-PR map (`Test-MergedPrNameKnown`, a bare `ContainsKey`) while the tip is
+not one that map merged (`Test-RefMergedByPr` false). The two kept-branch sentences it prints
+(the local pass and the `-IncludeRemote` pass) then assert **the name was recycled** as the
+cause -- and the remote one additionally asserts **so this head is live work**. Both are false
+for a branch that simply took a commit after its own PR merged (and the local one is also false
+for an unreadable tip, which the docstring already admits). The fix is wording only: state what
+was measured, offer the causes without picking one. Token `'recycled'` stays (renaming it is a
+bigger change than the sentence, per the issue).
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/task/prune-merged.ps1`: reword the two kept sentences (local + remote pass) to
+      name the measurement, not a cause; align the `Get-MergedProof` docstring and the two inline
+      comments that carry the same "belonged to somebody else's work" overclaim.
+- [x] `plugins/workflows/contributing-davekjohn/skills/prune-merged/SKILL.md`: update the quoted
+      sentence to match.
+- [x] Regenerate the plugin mirror (`scripts/sync/build-shared-scripts.ps1`).
 
 ### TEST
 
+- [x] `scripts/tests/prune-merged.tests.ps1`: two assertions match `'the name was recycled'`
+      (cases o and q) -- repoint them at a stable substring of the new wording.
+- [x] `scripts/lint/check-plugin-integrity.ps1` + all suites green (via `open-pr.ps1`).
+
 ### DEPLOY: `fix/prune-merged-recycled-sentence-v1`
 
-**Score:**
+`prune-merged`'s kept-branch reason no longer claims a recycled name it never checked for. When a
+branch is kept because its name is in the merged set but its tip is not, the message now names
+what was measured -- "a merged PR used this name, but not this commit" -- and offers a recycled
+name or a post-merge commit as the possible causes, instead of asserting the first and (in the
+remote pass) calling the head "live work". Wording only; the refusal to delete is unchanged.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer running `prune-merged -IncludeRemote` gets a kept-head reason that is actionable
+instead of one that sends them hunting for a recycled name that may not exist.
+
+**Score:** 2
 
 #### Pull Request
 

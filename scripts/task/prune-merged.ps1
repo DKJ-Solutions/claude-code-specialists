@@ -447,9 +447,13 @@ function Get-MergedProof {
         reported. Three answers, and the middle one is the whole of inbound #1191:
 
           'merged PR'  -- this exact commit is the head of a merged PR under this name: proof (b);
-          'recycled'   -- the name HAS a merged PR, but not for this commit: no proof, and a different
-                          sentence, because "no merged PR" would read as a lookup coming up empty when
-                          what happened is that it came up FULL and belonged to somebody else's work;
+          'recycled'   -- the name HAS a merged PR, but this commit is not one it merged: no proof, and
+                          a different sentence, because "no merged PR" would read as a lookup coming up
+                          empty when it came up FULL -- the name matched, the commit did not. The token
+                          is 'recycled' (inbound #1191), but the state is wider than a reused name: a
+                          tip this run could not read resolves here too, and so does a branch that took
+                          a commit after its own PR merged. The printed sentence names that
+                          measurement rather than picking one of the causes (issue #1296);
           $null        -- no merged PR under this name at all.
 
         An empty $Tip resolves to 'recycled' where the name is known, which is the safe direction: a
@@ -495,12 +499,14 @@ foreach ($branch in $branches) {
         # parked branch, or a branch pushed from another machine -- and its reason is printed rather
         # than left to be inferred from the absence of a delete line.
         #
-        # A RECYCLED NAME GETS ITS OWN SENTENCE (inbound #1191). "No merged PR" would be a true
-        # statement that reads as a lookup coming up empty, when the lookup came up FULL and belonged
-        # to a previous branch of the same name -- and that is exactly the branch whose loss this
-        # script used to cause, so it is the one case worth naming in the output.
+        # THIS CASE GETS ITS OWN SENTENCE (inbound #1191). "No merged PR" would be a true statement
+        # that reads as a lookup coming up empty, when the lookup came up FULL -- the name matched, this
+        # commit did not. A recycled name whose predecessor merged is what #1191 was filed for and the
+        # loss this script used to cause; a tip that could not be read, or a commit added after the PR
+        # merged, lands here as well -- so the sentence states what was measured, not which cause it is
+        # (issue #1296).
         $why = if ($prProof -eq 'recycled') {
-            'a merged PR used this name, but not this commit -- the name was recycled, so this branch is unproven'
+            'a merged PR used this name, but not this commit -- no proof for this tip (a recycled name, or a commit added to this branch after that PR merged)'
         } elseif ($ghKnown) {
             'not an ancestor of the trunk and no merged PR'
         } else {
@@ -636,11 +642,14 @@ foreach ($h in $heads) {
         continue
     }
 
-    # THE HEAD THIS PASS EXISTS TO LABEL. Neither proof means live work -- unfinished, parked, or
-    # somebody else's open PR -- and naming it here is what replaces the hand-written
-    # don't-sweep-this-one warning that two of the three measured triages had to add by hand.
+    # THE HEAD THIS PASS EXISTS TO LABEL. No usable proof, so no delete line is handed over -- and
+    # naming the reason here is what replaces the hand-written don't-sweep-this-one warning that two of
+    # the three measured triages had to add by hand. Usually that means live work (unfinished, parked,
+    # somebody else's open PR); a recycled name or a commit added after the PR merged lands here too,
+    # which is why the recycled branch below states the measurement rather than calling the head live
+    # (issue #1296).
     $why = if ($prProof -eq 'recycled') {
-        'a merged PR used this name, but not this commit -- the name was recycled, so this head is live work'
+        'a merged PR used this name, but not this commit -- no proof for this tip (a recycled name, or a commit added to this head after that PR merged)'
     } elseif ($ghKnown) {
         'not an ancestor of the trunk and no merged PR -- live work (unfinished, parked, or another open PR)'
     } else {
