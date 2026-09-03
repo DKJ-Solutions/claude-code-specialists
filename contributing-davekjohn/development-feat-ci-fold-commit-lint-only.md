@@ -52,7 +52,7 @@ commit keeps its lint run and skips the suites.
 ### TEST
 
 - [x] `workflow-concurrency.tests.ps1` green (19 asserts).
-- [ ] `open-pr` gate green (lint + full suites) before the PR.
+- [x] Lint gate + full suites green locally (0 errors; 62 suites, 91s).
 
 ### DEPLOY: `feat/ci-fold-commit-lint-only`
 
