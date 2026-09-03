@@ -142,6 +142,38 @@ work.
   in the mirror the session actually imported, which was ten commits behind. **Resolve the load path
   before measuring it**, and where the two differ, report both and say which one the figure is: the gap
   is not an error to smooth away, it is queued cost that arrives at the next update.
+- **A GATE FIGURE NAMES WHAT IT INCLUDED AND WHICH MACHINE PRODUCED IT.** The four rules above fail on
+  the *unit*, the *sample*, the *factor* and the *copy*; this one fails on the **scope** and the
+  **machine**, and it outlives the other four because a wall-clock figure reads as self-describing when
+  it is not. *"The full gate: 471s"* states neither which checks ran inside it nor what kind of box ran
+  them, and each of those two moves the number further than the differences it gets quoted to settle.
+  Measured instance: one branch wrote three *"full gate"* figures for one test set — **608s** explicitly
+  bundling a lint gate together with the suites, then **471s** and **360s** whose own wording attached
+  the seconds to the test gate alone, with lint reported beside them as *"0 errors"* and no time folded
+  in. All three were then quoted as answering *"how long does the full gate take on this branch"*. On
+  that tree the parts were **75s** of lint and **401s** of suites at sixteen lanes — 476s together —
+  while the same two gates in that repo's CI job, on a four-core hosted runner, measured **30s** and
+  **906s**, median of twelve trunk runs: **936s** together, roughly **2x** the local reading and 1.5x–2.6x
+  the three figures individually. Not one of those measurements was wrong. What every one of them left
+  out were the two facts that make them comparable.
+  - **Say what was inside the measurement**, and where more than one gate ran, give them separately as
+    well as summed. A reader holding a different figure reconciles it against the parts, never against
+    the total — and the total is the one form in which two correct readings look like a disagreement
+    about the code.
+  - **Say which machine, and how many lanes.** For anything parallel the lane count is a property of the
+    *measurement*, not of the gate: a developer's box that deliberately holds two cores back and a hosted
+    runner with four cores in total are running different experiments over the same suites. Neither is
+    the truth about the gate; each is the truth about a run.
+  - **A local reading never stands in for the one that blocks the merge.** Where the question is what the
+    blocking gate costs, that job's own history is queryable — by the population rule above — so measure
+    it there rather than scaling a local number to it. Quoting the local figure for a different question
+    is fine, provided the figure says which question it answers.
+  - **And the environment's own spread is usually wider than the gap being explained**, which is why this
+    composes with the population rule instead of replacing it. Those twelve trunk runs span **676–983s**
+    end to end; the three local figures under reconciliation spanned 360–608s. The band being argued over
+    was narrower than one environment's ordinary noise — so scope and machine have to be settled before a
+    difference between two figures is a finding at all, rather than after somebody has built an
+    explanation on it.
 
 ## Nolan is lazy
 
