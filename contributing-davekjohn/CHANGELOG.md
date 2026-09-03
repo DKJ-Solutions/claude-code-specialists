@@ -32,6 +32,156 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/shared-ast-pass-and-plateau-facts · 20260903-234119
+
+The lint gate parses and walks this repo's script set **once** per run instead of twice. Two checks that
+always run -- the barred-skill check and the Shopify-CLI check -- each used to call the PowerShell parser
+over every script and then walk the whole tree looking for command calls. They now share one pass. Over 184
+script files that walk is 1.157s of a 1.413s pass, so the duplicate was the expensive half, and a second
+pass off the shared result costs 0.014s.
+
+Where it shows up is the test gate, because the four suites that exercise this lint run it 168 times and are
+almost nothing but those runs: **-12.6%** across them, 199.9s to 174.7s standalone, with every assert count
+unchanged at 108 / 95 / 78 / 59. On CI that takes the required check's floor down by roughly 30 seconds.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the rarer half of a performance report: the measurement said the proposed lever was worth a fifth
+rather than a half, and named a different duplicate nobody had looked for. Three figures written in the tree
+turned out to disagree with the tree -- a CI floor comment claiming ~51s where the measured floor is ~232s,
+a documented 50% saving that measures 2.0%, and a list of four scenarios that has nine and named two that no
+longer exist. And the report's own plateau shrank from five files to four once the reconstruction behind it
+was checked: a log timestamp from this gate is a finish time, so subtracting the shard start only gives a
+duration for a suite that started at `t0`, which two of the five did not.
+
+**Score:** N/A
+
+#### Pull Request
+
+Share one AST pass and correct the plateau's measured facts
+
+[PR #1362](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1362)
+
+---
+
+### DEPLOY: docs/changelog-merge-queue-settled · 20260903-233226
+
+Four pending entries under `## [Unreleased]` said the merge-queue decision for `main` was still open, and
+pointed at the closed [#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)
+rather than at [#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355), where Dave
+answered it on September 3, 2026: **no queue** on `main`, on price rather than feasibility. All four now
+carry the answer. Each was reworded rather than cut -- *"it could land while the decision was open"* is
+still the reason #1351's CI restructure needed no ruleset edit, and the two prerequisites in the tree are
+still there on purpose, so a future yes inherits them.
+
+[#1360](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1360) named two of the four and
+excluded a third on the reading that its *"and is Dave's call"* was about
+`strict_required_status_checks_policy`. It is not -- in context it attaches to the merge-queue decision
+itself -- which is why the repair swept the file instead of applying the two line numbers it was handed.
+The `strict` sentence that exclusion meant is a different one and is untouched, because that setting
+really is unflipped and really is Dave's.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+An entry under `## [Unreleased]` is not history yet -- it is **copy**, and the release cut publishes it
+verbatim. So a claim that was accurate the day it was written has a second correctness deadline the tree
+does not: the day the release goes out. Nothing gates that. #1355's own chain repaired both stale claims
+it made *in the tree* and left four in the file whose whole purpose is to be published, because the
+entries were already folded and the trunk copy is writable only under the bounded fold exception.
+
+The generalisable half: **a decision that closes an issue makes every pending entry citing that issue
+stale, and the branch that takes the decision is the one holding the list.** Grepping the changelog for
+the issue number it just closed is a step the deciding branch can run in seconds; a later reader has to
+reconstruct which claims were true when. And an issue reporting this class is an inventory rather than a
+specification -- three of the four here differed from what it named, one of them because it had reasoned
+past the right sentence.
+
+**Score:** 1
+
+Nothing a subscriber runs changes. What they get is a next release note that does not tell them a
+settled decision is pending -- and it prevents a failure that had not happened yet only because the cut
+had not happened yet.
+
+#### Pull Request
+
+Reword the four pending entries that still call the merge-queue decision open
+
+[PR #1361](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1361)
+
+---
+
+### DEPLOY: docs/merge-queue-decision · 20260903-230954
+
+The merge-queue question for `main` is answered and closed: **no queue**. #1351's CI sharding took the
+stale-certificate event from 31.9% at ~13 min to 12.3% at ~5 min -- an expected ~37 seconds per merge --
+and against that a queue buys a repo-settings change, a `ship-pr.ps1` step-3b rebuild that is dead code
+until the day of the flip, and a GitHub-side mechanism in the middle of a chain the repo's own scripts
+own end to end. The throughput objection had been discharged by the same change, so this is a no on
+price rather than on feasibility.
+
+The reasoning lives in the merge-queue block of Sylvester's lens, beside #1325's history: the decision
+and its price, the generalisable half (an option whose case rests on a measured cost has to be
+re-argued the day that cost is measured away), the **third prerequisite left deliberately unbuilt** with
+its three candidate shapes, two things a future flip should not learn the hard way (`--merge` may or may
+not be accepted against a queue-backed branch; `allow_auto_merge` is `false`, so a yes is plausibly two
+settings), and the condition that would reopen it -- fire rate back above ~25%, or CI past ~10 minutes.
+
+Two stale claims went with it: `ci.yml` no longer says the decision is open, and
+`merge-queue-prereq.tests.ps1` now says why its two guards stay despite the no.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a consumer of the plugins. The lens is repo-local, and the two other edits
+are a workflow comment and a test-suite header; no plugin payload changes and no released behaviour
+differs.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the merge-queue decision for main: no queue, and why
+
+[PR #1359](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1359)
+
+---
+
+### DEPLOY: fix/ship-pr-watch-before-registration · 20260903-225906
+
+`ship-pr` no longer mistakes a `gh pr checks --watch` that started before the CI checks registered
+for a CI failure. Where the watch comes back saying `no checks reported` and exits non-zero -- seen
+right after a push onto a busy Actions queue -- the run now falls back into the same registration
+wait step 3 already runs, instead of refusing with `Fix CI and re-run` about a check that had not
+failed because it did not yet exist. The 180s budget is shared across the probe and the fallback, so
+a race that never settles still ends in the existing `#1234` refusal. No behaviour changes on a
+healthy run or on a genuine red check.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `ship-pr` immediately after a push, on a busy Actions queue, could lose the ship
+attempt to this transient and read a misleading "Fix CI and re-run" telling them to go look at CI
+that was in fact fine. It is non-deterministic and the workaround was to re-run `ship-pr`, so the
+cost was a wasted CI window rather than a broken merge.
+
+**Score:** 2
+
+#### Pull Request
+
+ship-pr falls back to the registration wait when --watch starts before the checks exist
+
+Plugins: contributing-davekjohn
+
+[PR #1353](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1353)
+
+---
+
 ### DEPLOY: feat/shard-ci-suites · 20260903-223535
 
 The required `lint-en-tests` check spent 95% of its wall clock in one step, and that step was starved of
@@ -48,10 +198,12 @@ there it is contention-bound, which is the one regime where adding lanes is clos
 `lint-en-tests` summary. **The name is load-bearing** -- `main-ci-gate` requires a check called
 `lint-en-tests` and GitHub names a check after the job reporting it, so keeping a job by that exact name
 means this needs no ruleset edit and no repo-settings change. That is why it could land while the
-merge-queue decision on [#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325) is
-still open, and it is a prerequisite for that queue rather than an alternative to it: a queue at
-15-minute CI has a serial throughput of about four merges an hour against an observed trunk cadence of
-2.4-4.
+merge-queue decision was still open on
+[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325) -- and it is what settled
+that decision the same day, as **no queue**
+([#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355)): a queue at 15-minute CI
+had a serial throughput of about four merges an hour against an observed trunk cadence of 2.4-4, and
+sharding raised that to about twelve while shrinking the staleness cost the queue was sized against.
 
 The partition is a **stride, not a contiguous block**, and that is the design rather than a detail. The
 pool's expensive suites are expensive because they share a subject, suites that share a subject share a
@@ -135,7 +287,11 @@ Plugins: contributing-davekjohn
 
 Both prerequisites a GitHub merge queue needs are now in the tree, so the queue can be switched on
 without breaking the trunk on its first merge -- the switch itself stays a repo-settings change and
-therefore Dave's ([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)).
+therefore Dave's. He answered it the same day on
+[#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355), split out of
+[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325): **no queue** on `main`.
+So both prerequisites stay inert, and they stay in the tree deliberately -- a future yes inherits them
+rather than rediscovering them at the first merge.
 
 `.github/workflows/ci.yml` now triggers on `merge_group`. A required workflow without that trigger
 never runs for a queue entry, so `lint-en-tests` never reports, and GitHub's own warning is that the
@@ -346,8 +502,11 @@ would merge on a stale-but-green certificate, reintroducing exactly
 fix recorded there is a GitHub merge queue -- available to this repo, gated on a `merge_group`
 trigger landing in `.github/workflows/ci.yml` first (a required workflow without it never reports
 in the queue, and the merge then fails outright). #1292 (the red-trunk mechanism issue) stays open
-and assigned in its own right; the keep-`strict`-or-adopt-a-merge-queue decision now sits on #1325
-and is Dave's call. `ship-pr.ps1` step 3b is unchanged: its detection is correct and it stays the
+and assigned in its own right; the keep-`strict`-or-adopt-a-merge-queue decision moved to
+[#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355) and Dave answered it
+there the same day -- **no queue**, on price rather than feasibility, once #1351's CI sharding cut the
+staleness cost the queue was sized against.
+`ship-pr.ps1` step 3b is unchanged: its detection is correct and it stays the
 mechanism and the portable net for consumers.
 
 `.claude/rules/language-layers.md`'s closing verification-lesson paragraph is corrected in the same
@@ -547,7 +706,13 @@ red-trunk mechanism issue) stays open and assigned in its own right.
 
 The real fix is a GitHub merge queue, which tests each PR against the projected merge and is
 available to this repo (public, org-owned); its prerequisite is a `merge_group` trigger in
-`.github/workflows/ci.yml`. The keep-`strict`-or-adopt-a-merge-queue decision stays open on #1325.
+`.github/workflows/ci.yml`. The keep-`strict`-or-adopt-a-merge-queue decision was split out of #1325
+to [#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355) and settled there the
+same day: **no queue** on `main`, and the three settings stay `false`. That is a no on price rather
+than on feasibility -- the same day's CI sharding
+([#1351](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1351)) cut the expected
+stale-certificate cost from ~4.1 minutes per merge to ~0.6, and against ~37 seconds a yes buys a
+repo-settings change plus a step-3b rebuild that is dead code until the day of the flip.
 `ship-pr.ps1` step 3b is unchanged and stays the mechanism and the portable net for consumers. The
 reasoning is recorded in `.claude/specialists/lenses/05-15-extension.md` (the `main-ci-gate` /
 `ci.yml` bullet) and `.claude/rules/language-layers.md`.

@@ -656,23 +656,34 @@ function Invoke-TestSuiteGate {
         other caller passes neither parameter and gets the whole pool, unchanged, down to the wording of
         its summary line.
 
-        AND SHARDING HANDS THE GATE STRAIGHT BACK TO THE #714 REGIME -- measured, and the reason a caller
-        should not keep raising its shard count (issue #1354, September 3, 2026). The paragraph above is
+        AND SHARDING HANDS THE GATE STRAIGHT BACK TO THE #714 REGIME, WHICH IS WHY A CALLER SHOULD NOT
+        KEEP RAISING ITS SHARD COUNT (issues #1354 and #1358, September 3, 2026). The paragraph above is
         about the WHOLE pool, where 4 lanes against 2968 lane-seconds is contention. Inside one shard that
-        is no longer true: a quarter of the pool over the same 4 lanes is ~740 lane-seconds, which is the
-        same order as the slowest FILE, so each shard's wall clock collapses onto its own longest suite.
-        Measured on the first sharded runs -- a shard whose longest file was 183s took 183s, and one whose
-        longest was 206s took 207s, both read at t0 and so exact rather than inferred. Against a longest
-        file of 232s the max shard measured 283s and 286s, which bounds the prize for ANY partition change
-        at ~50s without needing a model; simulating over reconstructed durations agrees and adds that the
-        max shard is flat from six shards on, because 232s IS the longest file, and that a duration-aware
-        bin-pack reaches the same 232s and would buy persisted state for nothing.
+        is no longer true: a quarter of the pool over the same 4 lanes is ~740 lane-seconds, the same order
+        as the slowest FILE, so each shard's wall clock collapses onto its own longest suite. Measured on
+        the first sharded runs, and exact rather than reconstructed because the stride puts those files in
+        queue positions 3-4 where they start at t0: a shard whose longest file was 183s took 183s, and one
+        whose longest was 206s took 207s. So a sharded job is max(longest file) plus its provisioning, and
+        no partition of whole files can beat its own longest member -- which is the same wall a
+        duration-aware bin-pack would reach, so recording durations to feed one buys nothing here.
         SO THE TWO PARAGRAPHS DO NOT DISAGREE, AND WHICH ONE APPLIES IS A QUESTION OF SCALE. Adding lanes
         (more shards) pays while a shard's lane-seconds exceed its longest file, and stops dead at that
-        file. Past that point the only lever left is the one #714 named -- split the slowest FILE -- and
-        THAT is what a caller staring at a slow required check should reach for, rather than another
-        runner. Both are honest readings of the same function; the trap is quoting the first one after
-        the shard count has already crossed over into the second.
+        file. The trap is quoting the contention-bound paragraph after the shard count has already crossed
+        over into this one.
+        AND PAST THAT POINT THE LEVER IS INSIDE THE FILE, NOT AROUND IT -- so #714's "split the slowest
+        file" is one answer and not the only one. What a heavy suite here actually costs is its child
+        processes: the four check-plugin-integrity suites are ~100% their own lint invocations, and #1358
+        took ~12.6% off all four by removing a duplicated AST walk from the script they invoke, without
+        touching this function or any partition. A caller staring at a slow required check should price
+        that before buying another runner.
+        ONE WARNING FOR WHOEVER RE-MEASURES, because this function is what makes the mistake easy: it
+        records no per-suite duration and buffers a suite's output until that suite completes, so a log
+        timestamp is a FINISH time. Subtracting the shard's start yields a duration only for a suite that
+        started at t0 -- queue positions 1..MaxParallel. Do it further down the queue and you are reading
+        lane wait as runtime; that error put two files on a five-file "plateau" that has four, one of them
+        reconstructed at 189s against 17.0s standalone. Local figures also do not transfer: the same suites
+        run 3.6-4.0x faster on a workstation than on a four-core hosted runner, so a standalone reading is
+        corroboration only once the machine is stated.
         WHY THE FUNCTION PARTITIONS RATHER THAN THE CALLER -- and why a STRIDE: both at the partition
         itself, below the suite glob. WHY THIS DOES NOT PAY #714's BILL TWICE: the four
         check-plugin-integrity suites build a fixture EACH, in a per-process directory (that file's own

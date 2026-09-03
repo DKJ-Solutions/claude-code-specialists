@@ -1020,110 +1020,68 @@ sections; `fold-changelog-entry.ps1` folds **only** DEPLOY and removes the docum
 reaches the trunk, and a grep over `scripts/`, `plugins/` and `contributing-davekjohn/` finds them
 nowhere else. The convention gap was the whole issue.
 
-### The gate's wall clock is ONE suite again, now per shard — #1354 answered with a decline (September 3, 2026)
+### Inside the invocation — where a plateau suite's time actually goes (September 3, 2026)
 
-[#1354](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1354) reported the residual
-[#1351](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1351) left behind: the stride
-balances suite **count**, not **cost**, so the required check's wall clock is set by one shard --
-measured 5m01s against 2m42s on the first sharded run. The mechanism is exactly right and the issue
-said so. **Both repairs it proposed were nevertheless declined, because both are floored by something
-the issue mis-stated: the slowest FILE.** This is
-[the August 16 finding above](#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026)
-recurring one level down — there it was the pool's wall clock, here it is each shard's.
+[#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358) reported a plateau of five
+suite files at 189-232s and named two candidate levers: split the files further, or reduce the
+**per-invocation** cost of the 168 child `powershell` runs the four `check-plugin-integrity-*` suites make.
+It left the second unpriced in its own words -- *"it is not obvious without measuring which half of that
+~4.5s per invocation is the lint's own work."* Measured, on an idle 32-core workstation, over the fixture
+those suites build:
 
-**The floor, measured exactly rather than inferred.** The four `check-plugin-integrity-*` suites sit at
-queue positions 3 and 4 of their shards, so they start at `t0` and their durations are read straight off
-the log rather than reconstructed:
+| | per invocation | share |
+|---|---|---|
+| process spawn | 0.097s | 7% |
+| parse of the lint's 3419 lines | 0.115s | 8% |
+| dot-source its 11 libs | 0.071s | 5% |
+| **fixed overhead before any check runs** | **0.283s** | **21%** |
+| the 30 checks' own work | 1.079s | 79% |
+| **total** | **1.362s** | |
 
-| file | run A | run B | standalone, 18-core workstation |
-|---|---|---|---|
-| `check-plugin-integrity-links.tests.ps1` | **250.9s** | **212.5s** | **237.0s** |
-| `check-plugin-integrity-docs.tests.ps1` | 163.2s | 235.3s | 214.9s |
-| `check-plugin-integrity-entries.tests.ps1` | 182.8s | 206.0s | 390.0s (†) |
-| `check-plugin-integrity-commands.tests.ps1` | 104.1s | 106.8s | 222.5s (†) |
+**So it is a fifth, not a half** — and that answers the question in the direction that closes the lever
+rather than opening it. Removing all of the fixed overhead would need the suites to stop spawning a process
+per assert, and the lint calls `exit`, so in-process invocation is a rewrite of the fixture's contract for
+21%. Not proposed.
 
-(†) **Those two standalone readings are rejected, not reported as findings.** A file cannot cost more
-alone on 18 cores than it costs inside a 4-lane shard, so both are readings of the *workstation* rather
-than of the file — the local box was running this session's own work while it timed them, and these
-suites spend their time launching child processes and writing fixture trees, which is exactly what other
-load and a virus scanner perturb. They are kept in the table because omitting a measurement that came out
-inconvenient is the worse habit; the conclusions below rest on the runner columns, which are what sets
-the required check anyway.
+**The 4.5s in the report was a CI figure divided by an invocation count**, which folds four-lane contention
+on a four-core runner into what looks like a per-call cost. The two agree once the machine is stated: 52
+invocations x 1.12s is 58.7s, and that is what the heaviest suite measures standalone here. **Those suites
+are ~100% their lint invocations**, to within a second, which is the fact that makes per-invocation cost the
+whole lever for them.
 
-**The standalone figure agreeing with the in-gate figure is the whole finding.** 237s alone on 18 cores
-against 232s inside a 4-lane shard means the file is not contention-bound in any degree: its 52
-invocations of the real lint are a *serial* chain of child processes, so no lane count, no shard count
-and no faster machine reaches it. And the shards say the same thing directly — a shard whose longest
-file was 183s took **183s**; one whose longest was 206s took **207s**.
+**What was actually duplicated was the AST walk, not the parse either comment worried about.** Two
+non-skippable checks -- barred-skill and shopify-cli -- each called `ParseFile` and then
+`FindAll(CommandAst)` over the same file set. Over this repo's 184 script files one such pass is 1.413s, of
+which the **walk is 1.157s** and the parse only 0.256s; a second pass off a shared cache is 0.014s. Sharing
+it (`Get-PsScriptCommandAsts`) measured **-12.6%** across the four suites -- 58.7/55.7/51.0/34.5s to
+50.8/48.9/44.7/30.3s -- with every assert count unchanged at 108/95/78/59, and ~1.4s off the real lint gate.
+It retains 25,476 AST nodes for ~72MB of heap, which is the cost and is stated at the accessor.
 
-**Why both proposals stop at the same wall.** Per-suite durations were reconstructed from both runs by
-inverting the gate's own schedule (it refills a lane on each completion, taking the queue in
-`Sort-Object Name` order, so start times were taken from the completion timestamps). Simulated over that:
+#### The reconstruction trap — two of the five were never plateau members
 
-| shards | stride, max shard | LPT bin-pack, max shard | total runner-seconds |
-|---|---|---|---|
-| 4 (today) | 263s | 232s | 956s |
-| 5 | **270s** | 232s | 1,095s |
-| 6 | 232s | 232s | 1,301s |
-| 8 | 232s | 232s | 1,472s |
-| 12 | 232s | 232s | — |
+**The gate records no per-suite duration**, and it buffers each suite's output until that suite completes:
+`entry-scaffold`'s log lines all land within 2.7ms of each other. So a log timestamp gives a suite's
+**finish** time, and subtracting the shard's start is a duration only for a suite that started at `t0`.
 
-**READ THAT TABLE FOR ITS SHAPE AND NOT FOR ITS DIGITS, because the reconstruction behind it is only
-sound for the files that start at `t0`.** The inversion assumes a lane refills the instant a suite
-completes; it does not — the gate prints the finished suite's whole captured output first, so every
-inferred start time runs early and every inferred duration is inflated. Caught by measuring one of them
-standalone: `entry-scaffold.tests.ps1` reconstructs at **189s** and takes **32.2s** alone, a 6x error,
-and the error is worst exactly where the suite is cheap. **The aggregate agreement that first looked like
-validation is not one** — the pool totalled 2840s and 2982s of reconstructed lane-seconds against 2968s
-measured independently on run 33798952362, which is compensating error, not per-item accuracy. It is
-recorded here because it read as proof at the time and should not read that way again.
-**What survives is the decision, because the decision needs only the exact half:** the longest file is
-`check-plugin-integrity-links` at 212.5-250.9s measured at `t0`, no partition of whole files can beat its
-own longest file, and the max shard measured 283s and 286s. So the entire prize available to either
-proposal is ~50s of gate time at the very most, and the 232s the table converges on is the exact
-longest-file figure rather than a reconstructed one.
+With 4 lanes that means queue positions 1-4. Taken by stride over the 65-suite pool, the four
+`check-plugin-integrity-*` files sit at positions 3, 3, 3 and 4 of their shards -- so **#1358's figures for
+them are exact, exactly as it claimed**. But `entry-scaffold` is 5th of 16 in its shard and `new-branch` 9th
+of 16, so both reconstructions include lane wait. Standalone here `entry-scaffold` is **17.0s**, against the
+51-59s of the suites whose CI numbers are sound; at their measured 3.6-4.0x local-to-CI ratio it predicts
+~65s, not the 189s reported. `new-branch` at 52.8s predicts ~190-210s and is plausibly a real member.
 
-- **More shards** saturates at six and is **flat** thereafter, because 232s *is* the longest file.
-- **A duration-aware bin-pack** reaches the same 232s and not a second better — it would flatten the
-  cheap shards *upward*, which cuts runner-seconds and not wall clock. New persisted state, in a lib
-  mirrored into two plugins, for zero on the metric the issue is about.
-- **Five shards is worse than four.** That is not noise: the stride's max depends on which heavy files
-  co-locate, and the assignment reshuffles whenever a suite is added. So six shards' 232s is luck with
-  an expiry date, which is the argument against tuning this number at all.
+**So the plateau is four files, not five, and `entry-scaffold` should not be split.** This is
+[Chris's fifth intake pattern](01-01-extension.md#the-dave-rules) again -- the finding is real and its
+**size** is wrong -- on a report this team wrote itself, which is where it keeps happening. The lesson is
+narrower than "check the numbers": a reconstruction is only as good as its `t0` assumption, and the report
+stated that assumption correctly for the four files it verified and then silently extended the method to two
+it had not.
 
-**The whole prize from any partition change is at most ~50s of a ~298s required check, for +36%
-runner-seconds — so #1354 was closed on its own option 3, with the reason corrected.** (Bounded from the
-exact side: max shard measured 283s and 286s, longest file 232s. The ~31s the table suggests is the
-reconstruction's answer and the looser bound is the trustworthy one.) What it got wrong was not the
-mechanism but the price, and the price came from
-[`ci.yml`](../../../.github/workflows/ci.yml)'s own floor comment, which claimed `~51s for the heaviest of the check-plugin-integrity-* four`. That mis-read #714: **~51s was all four together across four
-lanes on a workstation**, in August 2026, and it went stale in both directions — those suites now run
-the lint **168** times where #714 measured 111, and the lint itself grew checks 28, 29 and 30. The
-comment is repaired on this branch; the same figure in
-[Tycho's lens](04-18-extension.md), [Sylvester's lens](05-15-extension.md),
-`native-capture-lib.ps1` and `check-plugin-integrity.ps1` is **correct as history** and was deliberately
-left alone — it records what the #714 split bought on the day, and only `ci.yml` was using it as a live
-floor for a decision.
-
-**Two figures corrected in passing.** Per-runner provisioning and checkout is **~20s**, not the ~35s
-`ci.yml` assumed (job duration minus the gate's own reported seconds, eight shard jobs across two runs).
-And the run-to-run noise on a *fixed* partition is ±40–50s — shard 1 read 283s then 243s, shard 3 237s
-then 286s — which is a second, independent reason a bin-pack fitted to recorded durations would be
-fitting to noise.
-
-**The lever that would actually pay, and why it is not this branch.** Splitting the top file alone only
-exposes whatever is behind it, so the change that moves the required check is splitting the *band* of
-heavy files — #714's lever applying a second time, to the files its own split created. **Three files are
-established as being in that band and the rest of the list is not**, which is the honest state: `links`
-(212.5-250.9s), `docs` (163.2-235.3s) and `entries` (182.8-206.0s) are exact at `t0`; every other
-candidate came from the reconstruction the paragraph above rejects, and the one of those checked
-standalone collapsed from 189s to 32.2s. So **the first task in
-[#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358) is to make the gate record
-per-suite durations**, because nothing in the tree does today and that absence is why this measurement
-had to be inverted out of a log at all. No end-to-end prediction is offered here: the earlier one
-(~195s) was computed from the rejected numbers and is withdrawn. What is certain is only the direction —
-the ceiling is a file, not a partition — and that any split must preserve every scenario across files of
-1049-2575 lines, which this repo has twice refused to shortcut by narrowing test scope.
+**What is left, and it is a decision rather than a measurement.** Splitting the four is still the only lever
+that reaches the report's ~195s target, and it is now a smaller job than filed: four files, not five, with
+the floor already ~30s lower. It redistributes rather than shrinks, and #714's pieces regrew, so it buys
+time once. Not built here -- the size of that change is Dave's call, and #1358 carries the corrected
+pricing.
 
 ### Boundaries with the other roles
 

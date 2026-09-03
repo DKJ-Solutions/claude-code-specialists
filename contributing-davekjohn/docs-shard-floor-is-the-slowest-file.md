@@ -36,137 +36,116 @@
 Answer [#1354](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1354) with measurement.
 It reports a real mechanism — the stride balances suite COUNT, not COST — and asks that the spread be
 read over several runs before either of its two repairs is built. Read: **both are floored by the
-slowest FILE, so neither can pay.** This branch therefore builds neither, corrects the stale figure that
-made them look affordable, and records the measurement.
+slowest FILE, so neither can pay.**
 
-#### What the measurement said
+#### Most of what this branch set out to do landed on the trunk while it was open
 
-The four `check-plugin-integrity-*` suites sit at queue positions 3-4 of their shards, so they start at
-`t0` and their durations are exact rather than reconstructed. The heaviest,
-`check-plugin-integrity-links.tests.ps1`, is **213-251s** on the runner and **237.0s standalone on an
-18-core workstation with the whole box to itself** — the two agreeing is the finding, because its 52
-invocations of the real lint are a serial chain of child processes that no lane count, shard count or
-faster machine reaches. Simulated over per-suite durations reconstructed from both runs, the max shard is
-263s at four shards and **232s at six, eight, ten and twelve — flat, because 232s IS the longest file**.
-A duration-aware bin-pack reaches the same 232s. Five shards is *worse* than four.
+`2bd31203` (#1358, September 3, 2026) reached the same conclusion independently and carried it further:
+it corrected `ci.yml`'s stale `~51s` floor to the measured CI figure, documented the reconstruction
+trap, corrected the plateau to four files, and took ~12.6% off the four heavy suites by removing a
+duplicated AST walk from the lint they invoke. **The branch was reduced to what that commit did not
+cover rather than rebased on top of it and re-asserted** — the whole `ci.yml` block and the whole lens
+section were resolved to the trunk's version, because theirs is better sourced than what was here.
 
-**The simulation is directional only** — the reconstruction behind it is sound just for the four suites
-that start at `t0`, and the branch withdraws the rest rather than shipping it (see TEST). The decision
-needs only that exact half: max shard measured 283s and 286s against a 232s longest file, so at most
-~50s is available to either proposal.
+What was left is the **portable** half. #1358's work is entirely repo-local (`ci.yml`, a lens, the lint
+script); `Invoke-TestSuiteGate`'s own SHARDING docstring is the shared source that ships to consumers
+through two plugin mirrors, and it still told them the gate is *contention-bound* and that *"adding
+lanes is close to linear"* — with nothing saying that reverses once the caller shards. That is the
+default destination for a lesson learned here, per `CLAUDE.md`, and nobody had written it.
+
+#### And one figure of this branch's own was wrong
+
+This branch first reported the heaviest suite at **237.0s standalone on an 18-core workstation**, and
+built its central claim on that figure agreeing with the ~232s CI reading — *"no faster machine touches
+it."* **Both are withdrawn.** The reading was contaminated: it was taken while this same session ran
+lint gates and git concurrently. #1358 measures that suite at **58.7s** on an idle box, and establishes
+a local-to-CI ratio of **3.6-4.0x** — which reproduces the CI figure exactly (58.7 x 4 ≈ 235s) and means
+the file *is* machine-sensitive. The decision is unaffected, because it only ever needed the exact CI
+side; but the reasoning offered for it was wrong, and a corroborating measurement taken on a busy
+machine is worse than none.
 
 ### CREATE
 
-- [x] Correct the floor claim in `.github/workflows/ci.yml`. It read `~51s for the heaviest of the
-      check-plugin-integrity-* four`, which mis-read #714 — ~51s was all four **together across four
-      lanes on a workstation** in August 2026 — and has since gone stale in both directions. Replaced
-      with the measured figure, the simulation that declines both of #1354's options, and the plateau.
-- [x] Correct the `~35s` per-runner provisioning assumption in the same block to the measured **~20s**
-      (job duration minus the gate's own reported seconds, eight shard jobs across two runs).
 - [x] Add the portable half to `Invoke-TestSuiteGate`'s SHARDING docstring in
-      `scripts/lib/native-capture-lib.ps1`: sharding hands the gate straight back to the #714
-      critical-path regime, so adding lanes pays only while a shard's lane-seconds exceed its longest
-      file and stops dead at that file. Written as a scale question so the two paragraphs do not read as
-      contradicting each other.
-- [x] Mirror it into the two plugins via `scripts/sync/build-shared-scripts.ps1`.
-- [x] Record the repo-specific measurement in `.claude/specialists/lenses/06-25-extension.md` — the
-      exact per-file table, the reconstruction and its validation, the shard-count simulation, and the
-      plateau — beside the August 16 finding it is the recurrence of.
-- [~] Do NOT sweep the same `~51s` in `04-18-extension.md`, `05-15-extension.md`,
-      `native-capture-lib.ps1` and `check-plugin-integrity.ps1`. Dropped deliberately: there the figure
-      is **correct as history**, recording what the #714 split bought on the day. Only `ci.yml` was using
-      it as a live floor for a decision.
-- [~] Do NOT raise the shard count and do NOT build the bin-pack. Dropped as the measured answer, not as
-      scope-trimming: six shards captures the entire available 31s of a ~298s check for +36% runner
-      seconds, the bin-pack buys the same 232s plus new persisted state in a lib mirrored into two
-      plugins, and the stride's max depends on which heavy files co-locate — it reshuffles whenever a
-      suite is added, so a tuned number is luck with an expiry date.
+      `scripts/lib/native-capture-lib.ps1`: sharding hands the gate back to the #714 critical-path
+      regime, so adding lanes pays only while a shard's lane-seconds exceed its longest file and stops
+      dead there. Written as a question of scale, so the two paragraphs are not read as contradicting
+      each other — the trap is quoting the contention-bound one after the shard count has crossed over.
+- [x] Name the lever that is NOT another runner, in the same place: the heavy suites are ~100% their own
+      lint invocations, and #1358 took ~12.6% off all four by fixing the script they invoke, touching
+      neither this function nor any partition. `#714`'s "split the slowest file" is one answer, not the
+      only one.
+- [x] Carry #1358's reconstruction warning into the docstring, because **this function is what makes the
+      mistake easy**: it records no per-suite duration and buffers output until a suite completes, so a
+      log timestamp is a finish time and subtracting the shard start is valid only for queue positions
+      1..MaxParallel. With the 3.6-4.0x local-to-CI ratio beside it, so a standalone reading is not
+      quoted as a CI figure again.
+- [x] Mirror all of it into the two plugins via `scripts/sync/build-shared-scripts.ps1`.
+- [x] Correct `~35s` to `~20s` in `ci.yml`'s floor block. Not a duplicate: the trunk's own rewrite says
+      `max(longest file) + ~20s` two paragraphs below a surviving `~35s of provisioning`, so the block
+      contradicted itself.
+- [~] Drop this branch's `ci.yml` rewrite and its Nolan lens section entirely. Resolved to the trunk's
+      version — see PLAN. Re-asserting the same correction in different words is how two documents start
+      disagreeing about one measurement.
+- [~] Drop the shard-count simulation (263s at four shards, 232s flat from six, LPT no better, five worse
+      than four). Its conclusion is already on the trunk in prose, and its inputs were the reconstruction
+      #1358 discredited — so it would land numbers this branch cannot stand behind for a claim that is
+      already made.
 
 ### TEST
 
-- [x] `check-plugin-integrity.ps1`: **0 errors**. Validates the new anchor cross-reference into the
-      August 16 section and the two mirrors (`[shared-script] checked 49`).
+- [x] `check-plugin-integrity.ps1`: 0 errors, including the shared-script mirror check over all three
+      copies of the lib.
 - [x] Full suite pool green under `open-pr`'s gate — see the PR body for the figure and its lane count.
-- [~] The reconstruction was NOT validated, and the branch says so rather than shipping the claim it
-      started with. Its aggregate agreement (2840s and 2982s of lane-seconds against the 2968s measured
-      independently on run 33798952362) is compensating error, not per-item accuracy: the inversion
-      assumes a lane refills the instant a suite completes, and the gate prints the finished suite's
-      captured output first. Measured counter-example, found by timing one standalone —
-      `entry-scaffold.tests.ps1` reconstructs at 189s and runs in **32.2s**. Only the four suites at
-      queue positions 3-4 are exact, because they start at `t0` and are not inferred at all; the
-      decision rests on those and holds without the rest.
-- [~] No new test. Dropped with the reason: every change here is comment, docstring and lens prose —
-      `ci-shard.tests.ps1` already asserts the matrix length and `-ShardCount` agree, and neither number
-      moved.
+- [~] No new test. Every change here is docstring and comment prose; `ci-shard.tests.ps1` already pins
+      the matrix length against `-ShardCount`, and neither number moved.
 
 ### DEPLOY: docs/shard-floor-is-the-slowest-file
 
 [#1354](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1354) reported that the shard
 stride balances suite **count** and not **cost**, so the required check's wall clock is set by one shard
-— 5m01s against 2m42s on the first sharded run. The mechanism is right. **Both repairs it proposed were
-declined, because both stop at the same wall: the slowest FILE.**
+— 5m01s against 2m42s on the first sharded run. The mechanism is right, and **both repairs it proposed
+stop at the same wall: the slowest FILE.** A shard whose longest file was 183s took 183s; one whose
+longest was 206s took 207s. Those are exact rather than reconstructed, because the stride puts the four
+`check-plugin-integrity-*` suites in queue positions 3-4 where they start at `t0`. So a sharded job is
+`max(longest file)` plus provisioning, no partition of whole files beats its own longest member, and a
+duration-aware bin-pack would reach that same wall — which is why neither was built.
 
-The floor was measured exactly rather than inferred. The four `check-plugin-integrity-*` suites sit at
-queue positions 3-4, so they start at `t0` and their durations are read straight off the log: the
-heaviest, `check-plugin-integrity-links.tests.ps1`, is **250.9s** and **212.5s** across the two runs —
-and **237.0s standalone on an 18-core workstation with the whole box to itself**. Those two agreeing is
-the finding: the file's 52 invocations of the real lint are a *serial* chain of child processes, so no
-lane count, shard count or faster machine touches it. The shards say it directly too — a shard whose
-longest file was 183s took **183s**, one whose longest was 206s took **207s**.
+**The repo-local half of this answer landed independently while this branch was open**
+([#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358), `2bd31203`): the stale
+`~51s` floor in `ci.yml` corrected to the measured CI figure, the reconstruction trap written down, the
+plateau corrected from five files to four, and ~12.6% taken off all four heavy suites by removing a
+duplicated AST walk from the lint they invoke. This branch was **reduced to the residual** rather than
+rebased on top and re-asserted; its own `ci.yml` rewrite and lens section were dropped in favour of the
+trunk's, which is better sourced.
 
-Per-suite durations were then reconstructed from both runs by inverting the gate's own schedule.
-Simulated over that, the max shard is 263s at four shards and **232s at six, eight, ten and twelve —
-flat, because 232s is the longest file**. A duration-aware bin-pack reaches the same 232s and not a
-second better; it flattens the cheap shards *upward*, which cuts runner-seconds and not wall clock, so
-it would buy new persisted state in a lib mirrored into two plugins for zero on the metric the issue is
-about. Five shards comes out *worse* than four, because the stride's max depends on which heavy files
-co-locate and the assignment reshuffles whenever a suite is added — so a tuned shard count is luck with
-an expiry date.
+What remained was the **portable** half, and it is the reason this PR exists. #1358's changes are all
+repo-local, while `Invoke-TestSuiteGate`'s SHARDING docstring travels to consumers through two plugin
+mirrors — and it still told them the gate is *contention-bound*, that *"adding lanes is close to
+linear,"* and nothing about that reversing the moment they shard. It now reads as a question of scale:
+adding lanes pays while a shard's lane-seconds exceed its longest file and stops dead at that file, and
+the trap is quoting the first paragraph after the shard count has crossed into the second. It also names
+the lever that is **not** another runner — those suites are ~100% their own lint invocations, and #1358
+bought its 12.6% inside the script they invoke without touching any partition — and it carries the
+reconstruction warning, because this function is precisely what makes that mistake easy: it records no
+per-suite duration and buffers output until a suite completes, so a log timestamp is a finish time.
 
-**That simulation is reported for its shape and not for its digits, and the branch says so rather than
-letting a later reader trust it.** The inversion assumes a lane refills the instant a suite completes;
-it does not — the gate prints the finished suite's whole captured output first, so every *inferred* start
-runs early and every inferred duration is inflated, worst where the suite is cheap. Caught by measuring
-one standalone: `entry-scaffold.tests.ps1` reconstructs at 189s and takes **32.2s** alone. The aggregate
-agreement that first looked like validation (2840s and 2982s of reconstructed lane-seconds against the
-2968s measured independently on run 33798952362) is compensating error, not per-item accuracy.
-**The decision survives because it needs only the exact half:** the longest file is 212.5-250.9s measured
-at `t0`, the max shard measured 283s and 286s, and no partition of whole files beats its own longest
-file — so the entire prize available to either proposal is **at most ~50s of a ~298s required check, for
-+36% runner-seconds**.
+**One figure of this branch's own was withdrawn rather than shipped.** It first reported the heaviest
+suite at 237.0s standalone on an 18-core workstation and argued from that agreeing with the CI reading
+that no faster machine could touch it. The reading was taken while this session ran gates concurrently;
+#1358's idle measurement is 58.7s, with a local-to-CI ratio of 3.6-4.0x that reproduces the CI figure
+exactly. The file is machine-sensitive, the conclusion never depended on it, and the argument offered
+for it was wrong. Also corrected: `~35s` of per-runner provisioning to the measured `~20s`, which the
+trunk's own block already stated two paragraphs lower.
 
-**What #1354 got wrong was not the mechanism but the price, and the price came from this repo's own
-comment.** `.github/workflows/ci.yml` claimed its floor was `~51s for the heaviest of the
-check-plugin-integrity-* four`. That mis-read
-[#714](https://github.com/DKJ-Solutions/claude-code-specialists/issues/714): **~51s was all four
-together, across four lanes, on a workstation** in August 2026 — and it has since gone stale in both
-directions, because those suites now run the lint **168** times where #714 measured 111 and the lint
-itself grew checks 28, 29 and 30. Corrected here, together with the `~35s` per-runner provisioning
-assumption in the same block, measured at **~20s**. The same figure elsewhere in the tree is
-**correct as history** and deliberately untouched: only `ci.yml` was using it as a live floor.
-
-`Invoke-TestSuiteGate`'s SHARDING docstring gains the portable half, mirrored into both plugins —
-sharding hands the gate straight back to the #714 critical-path regime, so adding lanes pays only while
-a shard's lane-seconds exceed its longest file and stops dead there. Written as a question of scale, so
-the two paragraphs are not read as disagreeing: the trap is quoting the contention-bound one after the
-shard count has already crossed over.
-
-**The lever that would actually pay is filed rather than folded in**
-([#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358))**.** Splitting the top
-file alone only exposes whatever is behind it, so what moves the required check is splitting the *band*
-of heavy files — #714's lever applying a second time to the files its own split created. **Three are
-established and the rest of the list is not**: `links`, `docs` and `entries` are exact at `t0`, every
-other candidate came from the rejected reconstruction, and the one checked standalone collapsed from
-189s to 32.2s. So the first task in #1358 is to make the gate **record per-suite durations** — nothing in
-the tree does today, which is why this measurement had to be inverted out of a log at all.
-
-**Score:** 3
+**Score:** 2
 
 #### What makes this deploy extra special
 
-A subscriber gets the corrected `Invoke-TestSuiteGate` docstring in the plugin mirror, which is the half
-that tells them *when adding a shard stops paying* — the question a consumer staring at a slow required
-check asks, and the one the old text answered in the wrong direction. Nothing they run changes.
+A subscriber gets the corrected `Invoke-TestSuiteGate` docstring in the plugin mirror — the half that
+tells them when adding a shard stops paying, what to reach for instead, and how not to mis-measure it.
+That is the question a consumer staring at a slow required check actually asks, and the old text
+answered it in the wrong direction. Nothing they run changes.
 
 **Score:** 2
 
