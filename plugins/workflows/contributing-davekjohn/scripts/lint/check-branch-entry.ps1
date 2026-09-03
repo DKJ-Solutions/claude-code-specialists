@@ -21,7 +21,7 @@
         Get-EntryScaffoldFindings      which fields is the scaffolder still waiting for?
 
     That second one is why no test on the score is needed. A freshly scaffolded entry already carries an
-    H2 and a title, so a heading test passes it -- the case the hand-written gates reached for the score
+    H3 and a title, so a heading test passes it -- the case the hand-written gates reached for the score
     to catch. Get-EntryScaffoldFindings answers it properly: it measures the fields the scaffolder left,
     names each one, and catches an untouched entry AND one whose prompt was deleted rather than answered.
     The gate that reuses it is therefore SIMPLER than the one written by hand, not more complex.

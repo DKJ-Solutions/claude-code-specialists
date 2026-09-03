@@ -98,7 +98,7 @@ foreach ($id in $ignored) { Assert-Match $id '^\d{2}-\d{2}$' "Get-RosterIgnoredI
 
 # THE RETIRED CHANGELOG SECTION SEAMS (August 5, 2026), asserted on ABSENCE. Get-ChangelogTierHeadings
 # mapped tier -> the '## ' heading its entries were folded under, and Get-ChangelogHeading (issue #178) was
-# the single-section answer before it. CHANGELOG.md has no section headings any more: an entry IS an H2 and
+# the single-section answer before it. CHANGELOG.md has no section headings any more: an entry IS an H3 and
 # the document is an intro plus a flat ranked list of them, so the fold and release-lib derive the
 # intro/list boundary structurally instead.
 #

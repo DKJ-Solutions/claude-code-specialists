@@ -32,6 +32,56 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/stale-heading-facts-in-scripts · 20260903-212305
+
+The August 26, 2026 level shift moved an entry to `###` and its sections to `####`, and left the prose
+in `scripts/**` describing the shape before it. The sweep that produced #1338 stayed in the `.md`
+layer, so these were left: **check 13's own header told a maintainer the gate enforces something
+the gate does not** -- *"an entry is an H2 with three named H3 sections"*, where the check derives H3,
+two, and H4 from the seams -- and `fold-changelog-entry.ps1`'s header contradicted its own body 500
+lines further down.
+
+Repaired at the six sites #1341 names and at every same-class site the sweep turned up beside them:
+sixty passages across sixteen files under `scripts/**` -- the lint gate, the fold,
+`entry-scaffold-lib`, `release-lib`, `pr-body-lib`, `script-contract-lib`, `repo-config`,
+`check-branch-entry`, `new-branch` and seven test suites, two of the claims being ones a suite **prints
+at runtime**. Seven of the nine non-test files are shared libs and were mirrored to the plugin with
+`build-shared-scripts.ps1`, so a consumer reads the same corrected text.
+
+Where the level was never the point it is now stated as a relation rather than a digit -- *"an entry
+carries named sections one level under its own heading"* -- which is what stops the next shift from
+recreating this entry. Deliberate history is left standing, including the layered blocks that name an
+old pair and then say it moved.
+
+**One change here is not prose.** The same shift had silently killed an assert: a fixture in
+`check-plugin-integrity-entries.tests.ps1` was rewritten by a typed `'^## #123 '` pattern that has
+matched nothing since the entry became an H3, so the manual-merge scenario re-tested the untouched good
+fixture and passed by asserting the assert two blocks above it. The pattern is composed from the seam
+now, and the restored assert was proved to bite before it was believed. **What the sweep found that is
+behaviour rather than prose is filed, not folded in**: #1344, where two copies of
+`Test-IsChangelogEntryFile` still range one level the wrong way.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer reads these comments to find out what the workflow's gates enforce, and seven of the nine
+repaired non-test files ship to them in the plugin mirror -- including the fold's own description of
+what it does to an entry as it lands, which had contradicted its own body since the shift. Nothing
+about their branches changes; what changes is that the files explaining the format agree with it.
+
+**Score:** 2
+
+#### Pull Request
+
+Correct the stale heading facts left in script comments and docstrings
+
+Plugins: contributing-davekjohn
+
+[PR #1347](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1347)
+
+---
+
 ### DEPLOY: docs/prose-phase-heading-levels · 20260903-205741
 
 The documents that teach the branch document's shape now show the shape the scaffolder actually writes.

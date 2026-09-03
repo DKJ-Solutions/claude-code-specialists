@@ -80,9 +80,9 @@ silent half-state this repo has measured, and cut-release.ps1 is the refusal poi
 table DOES stop the run -- it decides where the entry lands, and getting that wrong is a move on main.
 
 In fold-all mode (no -Branch) only files that are actually changelog entries are folded: an entry opens
-with its own heading -- an H2 since this change, an H3 before it -- so repo-root meta docs
-(CONTRIBUTING.md, SECURITY.md, ...) that open with an H1 are left untouched. -Branch mode targets exactly
-the named entry and is unaffected.
+with its own heading -- an H3 since the August 26, 2026 shift, an H2 in the flat window before it -- so
+repo-root meta docs (CONTRIBUTING.md, SECURITY.md, ...) that open with an H1 are left untouched. -Branch
+mode targets exactly the named entry and is unaffected.
 
 What the fold adds is exactly what does not exist until the merge, and since August 19, 2026 it is one
 fact per place: the closing line '[PR #NN](url)', and the landing moment stamped on the 'Pull Request'
@@ -99,12 +99,14 @@ The number, url and merge timestamp are fetched via one `gh pr list` (on -Branch
 derived from the file name) -- which can only happen after opening the PR. If no PR is found (e.g. a manual
 merge without a PR), no closing line is added and the heading is untouched either way.
 
-AN ENTRY FILE WRITTEN BEFORE THIS FORMAT IS PROMOTED, NOT PASSED THROUGH. Its H3 heading becomes an H2 as
-it lands, because the document it lands in is a flat list of H2s -- and an H3 in that list is not an entry
-boundary to any reader of it, so it would be swallowed into the block above it and inherit that block's
-PR link. The case is not hypothetical: a branch parked before this change carries exactly such a file and
-will be folded after it. Only the heading's LEVEL changes; its fields (the title, the type, and a date
-where one was scaffolded in) are left exactly as written.
+AN ENTRY FILE WRITTEN AT AN OLDER LEVEL IS RE-LEVELLED, NOT PASSED THROUGH. It arrives at the level
+CHANGELOG.md's entries carry -- an H3 since August 26, 2026 -- because a heading at any other level is not
+an entry boundary to a reader of that list: a shallower one splits the list above it, and a deeper one is
+swallowed into the block above and inherits that block's PR link. The case is not hypothetical: a branch
+parked before a shift carries exactly such a file and is folded after it. The WHOLE BLOCK moves, so an
+entry's own sections stay one level beneath its heading (see Set-EntryHeadingLevel at the loop below);
+only the LEVELS change, and the heading's fields (the title, the type, and a date where one was
+scaffolded in) are left exactly as written.
 
 THE DATE MOVED HERE FROM THE SCAFFOLD ON AUGUST 5, 2026 (Dave), and that half is unchanged: it is the
 FOLD's to write, because new-branch.ps1 runs when the branch is created and could only ever record the
@@ -267,9 +269,10 @@ function Test-IsChangelogEntryFile {
     # the entry at H2. Refusing to recognise it would silently leave that entry unfolded in the root --
     # the exact half-state this repo keeps rediscovering -- so the range runs DOWN from the current level,
     # not up: '#{entryLevel-1,entryLevel}'. This is the same direction Test-BranchChangelogIsFilled took on
-    # August 26 and for the same reason; 'entryLevel+1' (an H4 no entry has ever opened with) was the stale
-    # reading, issue #1344. The fold PROMOTES a below-level entry to the current level as it lands, whole
-    # block at once, via Set-EntryHeadingLevel (see the loop below).
+    # August 26 and for the same reason; 'entryLevel+1' (an H4 no entry has ever opened with, per the #953
+    # post-mortem further down this file) was the stale reading, issue #1344. The fold PROMOTES a
+    # below-level entry to the current level as it lands, whole block at once, via Set-EntryHeadingLevel
+    # (see the loop below).
     #
     # The bound is a RANGE, not a hardcoded '{2,3}': '^#{2,3}\s' looks like it also matches an H4 by
     # prefix, but it does not -- '^#{2,3}' consumes at most three '#' and then needs '\s', which fails on

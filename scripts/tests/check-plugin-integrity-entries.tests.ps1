@@ -31,11 +31,11 @@ try {
     #     warned about it and the warning did not stop it, which is the whole argument for a gate: the rule
     #     is exactly checkable.
     #
-    #     REWRITTEN FOR THE FLAT CHANGELOG (August 5, 2026). An entry is an H2 with three named H3 sections,
-    #     so the forbidden levels moved up by one AND a second, new rule joined them: a heading AT the
-    #     section level that is not one of the declared sections. Both halves are asserted here, and so is
-    #     the case that must stay silent -- the three real section headings, which the pre-flat version of
-    #     this check would have reported as three defects each.
+    #     REWRITTEN FOR THE FLAT CHANGELOG (August 5, 2026). An entry became an H2 with three named H3
+    #     sections, so the forbidden levels moved up by one AND a second, new rule joined them: a heading
+    #     AT the section level that is not one of the declared sections. Both halves are asserted here,
+    #     and so is the case that must stay silent -- the real section headings, which the pre-flat
+    #     version of this check would have reported as a defect each.
     #
     #     AND SHIFTED ONE LEVEL DEEPER AGAIN (August 26, 2026), when '## [Unreleased]' took H2 and both level
     #     pairs moved down. The levels below are COMPOSED from the lib rather than typed, which is the whole
@@ -142,24 +142,24 @@ try {
     Remove-Item -LiteralPath $fixCfg -Force
     Remove-Item -LiteralPath $bdPath -Force
 
-    Write-Host 'check 13 -- an entry is an H2 with three named H3 sections, and a body heading may be neither' -ForegroundColor Cyan
+    Write-Host 'check 13 -- an entry is an H3 with two named H4 sections, and a body heading may be neither' -ForegroundColor Cyan
     $s34Entry = Join-Path $Fixture 'fix-a-branch-name.md'
     $s34Good = @("$s34EntryH A fixture entry") + @('') + $s34Sections
     [System.IO.File]::WriteAllText($s34Entry, (($s34Good -join "`n") + "`n"), $Utf8NoBom)
     $r34a = Invoke-Integrity -FixtureRoot $Fixture
     # THE ASSERT THAT MATTERS MOST HERE, because the whole entry format would trip a level-only rule: the
-    # three declared section headings sit at the section level BY DESIGN and must be silent, while the
-    # '####' sub-heading inside one of them is the ordinary accepted case.
-    Assert-True (-not ($r34a.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: the three declared H3 sections plus a "####" sub-heading are accepted'
+    # declared section headings sit at the section level BY DESIGN and must be silent, while a sub-heading
+    # one level deeper inside one of them is the ordinary accepted case.
+    Assert-True (-not ($r34a.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: the declared sections plus a deeper sub-heading are accepted'
     Assert-True ($r34a.Out -match '\[entry-heading\] checked') 'scenario 34: and the entry file WAS examined -- the pass is not an empty scan'
-    Assert-True ($r34a.Out -match '\[entry-heading\].*1 unfolded entry\(ies\)') 'scenario 34: an H2 entry file is RECOGNISED as one -- the detector was H3-only until August 5, 2026, so this check silently judged nothing'
+    Assert-True ($r34a.Out -match '\[entry-heading\].*1 unfolded entry\(ies\)') 'scenario 34: an entry file at the current level is RECOGNISED as one -- the detector was pinned one level off until August 5, 2026, so this check silently judged nothing'
 
     # Defect one: a heading at the entry's own level inside the body. This is the old "$s34SectH Tested" defect,
     # one level up, and now the worse one -- it becomes a separate entry rather than a stray sub-heading.
     $s34Bad = @($s34Good) -replace ("^" + $s34SubH + " Tested$"), "$s34EntryH Tested"
     [System.IO.File]::WriteAllText($s34Entry, (($s34Bad -join "`n") + "`n"), $Utf8NoBom)
     $r34b = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($r34b.Out -match 'entry-heading.*fix-a-branch-name\.md:7') 'scenario 34: an H2 in an entry body is reported, with its line number'
+    Assert-True ($r34b.Out -match 'entry-heading.*fix-a-branch-name\.md:7') 'scenario 34: a heading at the entry level in a body is reported, with its line number'
     Assert-True ($r34b.Out -match 'SEPARATE entry') 'scenario 34: and the message says WHY, by naming the consequence at fold time'
     Assert-True ($r34b.Out -match 'undeclared tier 0') 'scenario 34: including what the phantom entry declares -- nothing'
 
@@ -207,9 +207,9 @@ try {
     # A PRE-FORMAT entry file, which is not history: an entry file lives only on a branch, so a branch
     # opened in the flat window (August 5-26, 2026) still carries the shape from then -- the entry one level
     # below the current heading -- and this repo had one parked on the remote the day the format landed. It
-    # must still be RECOGNISED (line 1 is skipped whatever its level, because the fold promotes it) while its
-    # body is judged by the same rules. The heading is composed as 'entryLevel - 1' rather than typed: the
-    # detector ranges DOWN from the current level since issue #1344, and a literal would pin yesterday's.
+    # must still be RECOGNISED (line 1 is skipped whatever its level, because the fold re-levels it) while
+    # its body is judged by the same rules. The heading is composed as 'entryLevel - 1' rather than typed:
+    # the detector ranges DOWN from the current level since issue #1344, and a literal would pin yesterday's.
     $s34Legacy = @(
         ('#' * ((Get-EntryHeadingLevel) - 1)) + " An older entry " + $s34Md + ' Fix ' + $s34Md + ' 2026-08-01'
         ''
@@ -221,7 +221,7 @@ try {
     $r34e = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($r34e.Out -match '\[entry-heading\].*1 unfolded entry\(ies\)') 'scenario 34: a pre-format flat-window entry file is still recognised as an entry file'
     Assert-True ($r34e.Out -match 'entry-heading.*fix-a-branch-name\.md:5') 'scenario 34: and its body is judged by the same rules'
-    Assert-True (-not ($r34e.Out -match 'fix-a-branch-name\.md:1')) 'scenario 34: while its own heading on line 1 is NOT reported -- that is the entry, and the fold promotes it'
+    Assert-True (-not ($r34e.Out -match 'fix-a-branch-name\.md:1')) 'scenario 34: while its own heading on line 1 is NOT reported -- that is the entry, and the fold re-levels it'
     Remove-Item -LiteralPath $s34Entry -Force
 
     # The CHANGELOG half, which is what cut-release actually parses -- and the half that catches damage
@@ -278,11 +278,16 @@ try {
     Assert-True ($r34g.Out -match 'has been SPLIT') 'scenario 34: and the message names what happened to the entry rather than only the rule'
     Assert-True ($r34g.Out -match "first named section is 'Significance'") 'scenario 34: quoting the section it starts at, which is the evidence'
 
-    # THE FALSE POSITIVE THIS AVOIDS, and it is the reason the rule is not simply "an H2 needs a #NN": the
-    # fold cannot reach gh on a manual merge, and then it writes a legitimate entry with no number and no PR
-    # footer, saying so on the console. Keying on the number would report the fold's own documented output as
-    # a defect.
-    $s34ClNoPr = @($s34ClGood) -replace ('^## #123 ' + [regex]::Escape($s34Md) + ' A real entry$'), "$s34EntryH A real entry with no PR number"
+    # THE FALSE POSITIVE THIS AVOIDS, and it is the reason the rule is not simply "an entry heading needs a
+    # #NN": the fold cannot reach gh on a manual merge, and then it writes a legitimate entry with no number
+    # and no PR footer, saying so on the console. Keying on the number would report the fold's own
+    # documented output as a defect.
+    #
+    # THE LEVEL IS COMPOSED HERE TOO, and it was a typed '^## ' until this line was swept: after the
+    # August 26, 2026 shift the pattern matched nothing, so this scenario re-tested the untouched good
+    # fixture and passed by asserting the assert two blocks up. The same lesson the block at the top of
+    # this scenario draws, in the one place it was not applied.
+    $s34ClNoPr = @($s34ClGood) -replace ('^' + $s34EntryH + ' #123 ' + [regex]::Escape($s34Md) + ' A real entry$'), "$s34EntryH A real entry with no PR number"
     [System.IO.File]::WriteAllText($s34Cl, (($s34ClNoPr -join "`n") + "`n"), $Utf8NoBom)
     $r34h = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($r34h.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: an entry with no PR number but with its sections is accepted -- the manual-merge fold'
