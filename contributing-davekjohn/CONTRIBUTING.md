@@ -348,7 +348,7 @@ escapable by not using the scripts. The repo's own lint and test gates are separ
 `scripts/tests/*.tests.ps1`, refusing to push on any error or failing suite.
 
 **And before any of them, one thing that is not a gate: `open-pr.ps1` COMMITS that document if it differs
-from `HEAD`** ([#1269](https://github.com/DaveKJohn/claude-code-specialists/issues/1269), September 3, 2026).
+from `HEAD`** ([#1269](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1269), September 3, 2026).
 Every reader above reads the working tree; the push ships `HEAD`; and the fold, the DEPLOY lock and the CI
 check in 3.2.5 all read the committed copy. Measured on PR #1267: the run passed every gate against a
 filled-in working copy, pushed the empty scaffold, published the filled-in body, and CI failed on arrival.

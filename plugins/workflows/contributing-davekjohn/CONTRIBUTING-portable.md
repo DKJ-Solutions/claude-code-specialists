@@ -194,13 +194,13 @@ add below it is the form's, and every heading there is a boundary the refresh wi
 reference — the measurement behind why nothing else survives in it, which is a method to re-run on your
 own history rather than an answer to inherit.
 
-**Before anything is pushed the script COMMITS your development document, if it differs from `HEAD`.** That
+**First, the script COMMITS your development document, if it differs from `HEAD`.** That
 one file and nothing else — never `git add -A`, so anything else you had staged stays staged. It has to,
 because every reader of that document inside the script reads your **working tree** while the push ships
 `HEAD`, and the fold, the merge-time gates and the CI gate below all read the **committed** copy. A document
 written but not committed therefore published a PR body describing a section the branch did not carry, and a
-CI check that had to fail on arrival. Measured in the source repo on September 3, 2026 (inbound
-[#1269](https://github.com/DaveKJohn/claude-code-specialists/issues/1269)); the
+CI check that had to fail on arrival. Measured in the source repo on September 3, 2026
+([#1269](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1269)); the
 [`open-pr` skill](skills/open-pr/SKILL.md) has why it commits rather than adding a fifth refusal.
 
 Then, before anything is pushed, the script runs two gates:

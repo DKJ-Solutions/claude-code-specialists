@@ -84,7 +84,7 @@ The script:
 powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -GatesOnly
 ```
 
-Runs step 4 above — the repo's lint gate, then every test suite — against the **working tree**, and stops
+Runs step 5 above — the repo's lint gate, then every test suite — against the **working tree**, and stops
 there. No branch check, no push, no PR. Exit 0 when both are green, 1 when either is not. It writes
 nothing to the working tree and nothing to GitHub -- the one thing it records is gate evidence, below.
 `-SkipLint` / `-SkipTests` still work and still mean what they mean everywhere else.
@@ -258,7 +258,7 @@ check, the fold, and `ship-pr`'s DEPLOY lock. So a document you had written but 
 a PR body describing a DEPLOY section that was not on the branch, and a CI check that had to fail on
 arrival.
 
-**Measured in the source repo on September 3, 2026 ([#1269](https://github.com/DaveKJohn/claude-code-specialists/issues/1269)),
+**Measured in the source repo on September 3, 2026 ([#1269](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1269)),
 from PR #1267.** The run printed `WARNING: the gates below run against a DIRTY tree`, passed every gate
 against the filled-in working copy, pushed the empty scaffold, and published the filled-in body.
 `branch-entry` failed immediately; recovering took a second commit and a re-push.
