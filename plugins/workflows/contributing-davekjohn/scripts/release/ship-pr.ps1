@@ -32,6 +32,14 @@
          over it (measured on PR #1068). Asked before step 1, the last moment at which refusing is free.
          It takes the trunk away from nobody -- it names the directory and the two commands that release
          it -- and an unreadable worktree list warns rather than refuses.
+     0b. CAN THIS ACCOUNT PUSH THE FOLD AT ALL? (issue #1278) Its sibling, and the same half-state by a
+         different route: step 0 asks whether step 5 can CHECK OUT the trunk, this asks whether it can
+         PUSH to it. A required status check on 'main' cannot be satisfied by a direct push -- the
+         pushed commit carries no checks -- and the fold IS a direct push, so an account without bypass
+         merges and then cannot fold. Measured on PR #1271: merged, folded, committed, GH013 on the
+         push. Two gh reads decide it (the trunk's rules, then this account's bypass on the ruleset
+         carrying them); it cannot be read off the merge, which the PR's own check satisfies. Asked in
+         the same place and for the same reason, and an unreadable ruleset warns rather than refuses.
       1. open-pr.ps1 [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
          pushes, and opens the PR. If a gate fails, nothing is pushed and this stops here.
 
@@ -333,6 +341,104 @@ If it is a checkout you still want, move it off the trunk yourself (git -C "$tru
     # BEST-EFFORT, never a refusal: an unreadable worktree list says something about git, not about the
     # trunk, and this script has to keep working in a clone that has never had a second worktree.
     Write-Warning "could not read 'git worktree list' -- shipping anyway; step 5 will report it if 'main' turns out to be held elsewhere."
+}
+
+# --- Step 0b: CAN THIS ACCOUNT PUSH THE FOLD AT ALL? (issue #1278) -------------------------------
+# THE SIBLING OF THE CHECK ABOVE, and the same half-state by a different route. Step 0a asks whether
+# step 5 can CHECK OUT the trunk; this asks whether step 5 can PUSH to it. Measured on PR #1271,
+# September 3, 2026: ship-pr merged, checked out main, folded, committed -- and the push was refused
+# with GH013 ("Required status check 'lint-en-tests' is expected"). The run ended merged-but-unfolded,
+# which is the one state nothing reports until a release trips over it.
+#
+# WHY IT CANNOT BE READ OFF THE MERGE. The merge satisfies a required status check (the PR's own check
+# ran); the fold cannot (a pushed commit has no checks). So an account can be fully entitled to merge
+# and not entitled to fold, and step 3's CI verdict says nothing at all about step 5. The two facts
+# that decide it are readable here for two gh calls: which rules apply to the trunk, and this account's
+# bypass on the ruleset carrying them.
+#
+# ASKED HERE FOR STEP 0a'S REASON, in the same words: this is the last moment at which refusing costs
+# nothing -- no gate has run, nothing is pushed, no PR exists and nothing is merged. Local first,
+# network second, so the free check still runs even when this one cannot.
+#
+# AND IT REFUSES ONLY ON A READ IT ACTUALLY MADE. An unreadable ruleset warns and ships, exactly as the
+# unreadable worktree list above does: the fold is redoable by hand or from an account with bypass,
+# while refusing on an unread ruleset would take ship-pr away from every consumer whose token cannot
+# read one. The verdict itself is Get-FoldPushVerdict's, and tested there.
+$foldRulesJson = ''
+$foldBypass = @{}
+$foldNames = @{}
+try {
+    # -DiscardStderr because this output is PARSED: a gh warning merged into it would break the
+    # ConvertFrom-Json and cost the check. Same reasoning as the run-facts read at step 3.
+    $rulesRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+        'api', "repos/$repo/rules/branches/main")
+    if ($rulesRead.ExitCode -eq 0) {
+        $foldRulesJson = $rulesRead.Output -join "`n"
+        # One detail read per ruleset that carries a blocking rule -- normally one, and none at all in a
+        # repo whose trunk has no such rule. `current_user_can_bypass` lives ONLY on the detail endpoint:
+        # the list endpoint returns it as null, so it cannot be had in a single call.
+        foreach ($rec in (Get-DirectPushBlockingRules -BranchRulesJson $foldRulesJson).Blocking) {
+            if (-not $rec.RulesetId) { continue }
+            # An ORGANIZATION ruleset is not under repos/<repo>/rulesets, and asking for it there 404s.
+            # Both endpoints answer with the same two fields, so only the path differs.
+            $rulesetPath = if ($rec.SourceType -eq 'Organization' -and $rec.Source) {
+                "orgs/$($rec.Source)/rulesets/$($rec.RulesetId)"
+            } else {
+                "repos/$repo/rulesets/$($rec.RulesetId)"
+            }
+            $detail = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @('api', $rulesetPath)
+            if ($detail.ExitCode -ne 0) { continue }
+            try {
+                $parsedDetail = ($detail.Output -join "`n") | ConvertFrom-Json
+                if ($parsedDetail.PSObject.Properties['current_user_can_bypass']) {
+                    $foldBypass[$rec.RulesetId] = [string]$parsedDetail.current_user_can_bypass
+                }
+                if ($parsedDetail.PSObject.Properties['name']) {
+                    $foldNames[$rec.RulesetId] = [string]$parsedDetail.name
+                }
+            } catch {
+                # Left out of the map on purpose: an unparseable detail is the UNKNOWN case for that
+                # ruleset alone, and the verdict warns on it rather than guessing either way.
+            }
+        }
+    }
+} catch {
+    $foldRulesJson = ''
+}
+
+$foldVerdict = Get-FoldPushVerdict -BranchRulesJson $foldRulesJson -BypassByRulesetId $foldBypass -NameByRulesetId $foldNames
+if ($foldVerdict.Blocked) {
+    # WHOSE ACCOUNT, said out loud. The verdict knows only "this account", and the whole repair is that
+    # a run from the wrong account stops here -- so naming it is what turns the refusal into an action.
+    # Best-effort, like every diagnostic on a refusal path: a read that fails costs the name, not the
+    # refusal.
+    $who = ''
+    try {
+        $me = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @('api', 'user', '--jq', '.login')
+        if ($me.ExitCode -eq 0) { $who = ($me.Output -join '').Trim() }
+    } catch { $who = '' }
+    $whoLine = if ($who) { " The account is '$who'." } else { '' }
+
+    Write-Error @"
+The FOLD could not be pushed to 'main' after the merge, so ship-pr stops BEFORE merging (issue #1278):
+
+  $($foldVerdict.Reason)$whoLine
+
+The fold is a direct push by design -- one of the three named exceptions to "never commit directly on
+main" -- and a rule like this one cannot be satisfied by a direct push: the pushed commit carries no
+checks, so GitHub refuses the ref update before any workflow could run. Merging first would leave the
+trunk merged-but-unfolded, which is the state nothing reports until a release trips over it.
+
+Nothing has been pushed, opened or merged -- this is the cheap place to stop.
+
+Two remedies, and this script takes neither:
+  - give this account bypass on that ruleset (repo settings, so it is the repo owner's call), or
+  - ship this branch from an account that already has it.
+"@
+    exit 1
+}
+if ($foldVerdict.Unknown) {
+    Write-Warning "could not decide whether the fold can be pushed to 'main' -- $($foldVerdict.Reason)"
 }
 
 # --- Step 1: open the PR (open-pr.ps1 runs the lint + test gate, pushes, opens) ------------------
