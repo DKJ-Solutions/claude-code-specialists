@@ -92,12 +92,21 @@ concurrency:
 # the merge-queue decision on #1325 is still open. Do not rename this job. Renaming it silently un-gates
 # `main`: the ruleset would wait forever for a check nobody reports, and every merge would block.
 #
-# `if: always()` PLUS AN EXPLICIT RESULT CHECK, AND BOTH HALVES ARE LOAD-BEARING. A job that `needs:` a
-# failed job is SKIPPED, not failed, and a skipped required check is not a reported failure -- so without
-# `always()` a red shard produces no verdict at all, and without the result check `always()` produces a
-# GREEN one. That combination is the single classic footgun of this pattern and it is the same silence
-# class as #1294's dropped runs: a check that reports success having measured nothing. It is asserted in
-# ci-shard.tests.ps1 in both directions rather than trusted to this comment.
+# `if: !cancelled()` PLUS AN EXPLICIT RESULT CHECK, AND BOTH HALVES ARE LOAD-BEARING. A job that
+# `needs:` a failed job is SKIPPED, not failed, and a skipped required check is not a reported failure --
+# so without an `if:` that outlives a failed dependency a red shard produces no verdict at all, and
+# without the result check that `if:` produces a GREEN one. That combination is the single classic
+# footgun of this pattern and it is the same silence class as #1294's dropped runs: a check that reports
+# success having measured nothing. It is asserted in ci-shard.tests.ps1 in both directions rather than
+# trusted to this comment.
+#
+# `!cancelled()` AND NOT `always()` -- issue #1356. `always()` is true even when the run was CANCELLED,
+# and `cancel-in-progress` cancels the four shards whenever a PR run is superseded by a newer push. The
+# summary job would then run anyway, read `cancelled != success`, and report the required check as
+# FAILURE where nothing failed -- a red run in the Actions list on a commit nothing merges, plus a
+# wasted runner per cancellation. `!cancelled()` keeps every property above: it is true when a
+# dependency failed or was skipped, so the fail-closed check still fires, and false only when the run
+# itself was cancelled, so a superseded run reports `cancelled` rather than `failure`.
 #
 # STRICT SUCCESS, NOT 'not failure'. `success` is required from every leg, so `skipped`, `cancelled` and
 # `neutral` all refuse. That is deliberate and it is why the fold-commit shortcut below stays on the STEP
@@ -192,10 +201,10 @@ jobs:
 
   # THE REQUIRED CHECK. Reports nothing of its own -- it exists so that `main-ci-gate`'s single required
   # context still names one job while the work happens in five. See the banner above jobs: for why the
-  # name must not change, and why `always()` and the strict result check are both required.
+  # name must not change, and why `!cancelled()` and the strict result check are both required.
   lint-en-tests:
     needs: [lint, suites]
-    if: always()
+    if: ${{ !cancelled() }}
     # ubuntu, deliberately: this job runs no PowerShell and never touches the repo, so the windows-latest
     # note at the top of this file does not apply to it -- and a linux runner starts in seconds where a
     # windows one costs a minute for the same two string comparisons.
