@@ -32,6 +32,59 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/fold-insert-by-landing-stamp-v1` · 20260903-134449
+
+`fold-changelog-entry.ps1` inserted every entry at the **top** of `CHANGELOG.md`'s pending list, on the
+premise that "the entry being folded is the most recently merged one". A **late** fold is exactly what
+breaks that premise, and this script is where late folds come from: its commit is a direct push to the
+trunk under one of this repo's named exceptions, so a push it cannot make holds the entry while later
+branches merge and fold ahead of it. The held entry then led a list it was no longer the newest member
+of -- while the stamp on its own heading, read off the PR's `mergedAt`, said otherwise. Two sources, no
+comparison, and nothing that errors: the only way to see it is to read two adjacent headings.
+
+The position is derived now. `Get-EntryInsertOffset` takes the same `$mergeStamp` the fold writes onto
+the heading and places the entry above the first one that landed earlier, so the two facts come from one
+source and cannot contradict each other. **Insert-only is untouched** -- it derives a position and sorts
+nothing, which is what keeps a bug in a commit that lands on `main` able to misplace at most the one
+entry being folded. A new `Get-EntryHeadingStamp` reads a stamp back, strictly: the heading tail pattern
+tolerates any text after the separator, so the template's `<timestamp of the moment this branch was
+merged>` placeholder had to be excluded from an ordering decision by name. Passing no stamp is the
+pre-change answer, which is both the no-PR fold and every consumer whose fold script is a release
+behind.
+
+Two out-of-order pairs the old behaviour had already left in the document are repaired here, on a
+branch, for the same reason the fold does not do it. The console line now names a late fold when one
+happens; a lint check on document order was measured and declined, because it would refuse an unrelated
+branch's PR over a misplacement already on `main`.
+
+Closes [#1280](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1280).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A repo that runs this workflow folds with the same script, so its own held folds were misplacing their
+entries too -- and the reason a consumer never noticed is the reason this matters to them: nothing errors,
+and the wrong order only surfaces in a **published** release document. The changelog is the cut's input,
+and one section inherits its document order rather than re-ranking: the development notes' **tier 0**
+section, whose own comment asks for "complete and chronological, which is what a record is for". The
+ranked documents were never affected -- `Build-ReleaseNotes` and `Build-ConsumerNotes` re-rank from the
+scores -- so the reach is narrow, and it is the kind of narrow that lands in a document nobody corrects
+afterwards. Arriving by plugin update, with no migration: a fold script one release behind keeps working
+because the new parameter's absence is the old behaviour.
+
+**Score:** 2
+
+#### Pull Request
+
+The fold places an entry by its landing stamp, not always at the top
+
+Plugins: contributing-davekjohn
+
+[PR #1298](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1298)
+
+---
+
 ### DEPLOY: `docs/language-layers-bypass-restored-v1` · 20260903-133806
 
 `.claude/rules/language-layers.md` said the `DKJ-Solutions` org transfer had "dropped the
