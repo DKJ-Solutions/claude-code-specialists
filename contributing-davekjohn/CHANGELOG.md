@@ -32,6 +32,31 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/matcher-fixture-drop-stale-oneline-comment` · 20260903-181113
+
+A stale regression comment in `source-repo-guard.tests.ps1`'s `New-MatcherFixture` is removed.
+It claimed the fixture path had to stay on one physical line because the test-suite gate scanned
+line by line; #1326 taught that gate to fold backtick continuations first, so the constraint it
+documented is gone. The one-line path form is kept as-is -- it is fine and matches `New-Tree`
+above it, which never carried the comment.
+
+**Score:** 1 -- cosmetic. The comment described a gate behaviour that no longer exists; leaving it
+would mislead the next reader of this helper into preserving a constraint that was already lifted.
+
+#### What makes this deploy extra special
+
+N/A -- a comment in a test file; no subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Drop the stale one-line constraint comment on New-MatcherFixture
+
+[PR #1332](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1332)
+
+---
+
 ### DEPLOY: `docs/record-strict-ci-gate` · 20260903-175320
 
 `main-ci-gate` now enforces `strict_required_status_checks_policy`, and
