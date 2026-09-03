@@ -32,6 +32,55 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/ship-pr-fold-push-bypass-preflight-v1` · 20260903-113806
+
+`ship-pr` now asks, before it opens anything, whether the account running it will be allowed to push
+the fold -- and refuses when it will not, instead of merging and leaving the trunk merged-but-unfolded.
+
+The fold is a direct push by design, one of the three named exceptions to "never commit directly on the
+trunk", and a required status check cannot be satisfied by a direct push: the pushed commit carries no
+checks, so the ref update is refused before any workflow could run. An account can therefore be fully
+entitled to *merge* -- the PR's own check ran and passed -- and not entitled to *fold*. Measured on
+PR #1271: merged, checked out the trunk, folded, committed, `GH013 ... Required status check
+"lint-en-tests" is expected`. Not once, but on every run from that account, because the cause sits in
+the ruleset rather than in the run.
+
+Step 0b answers it for two `gh` reads. `rules/branches/<trunk>` gives the rules and deliberately does
+**not** filter by bypass -- measured: it returns `required_status_checks` to an account whose
+`current_user_can_bypass` is `always` -- so the ruleset detail is read for the second half, from the org
+endpoint when the ruleset is the org's. Three rule types block a fold, each by its own definition:
+`required_status_checks`, `pull_request` (so `pull_requests_only` bypass is not bypass here) and
+`update`. `deletion`, `non_fast_forward`, `required_linear_history` and `required_signatures` do not.
+
+It sits where the worktree check sits, and for that check's reason: nothing is gated, pushed, opened or
+merged yet, so refusing is free. The local check still runs first, so a network read never costs the one
+that needs no network. An unreadable ruleset warns rather than refusing -- the opposite posture to the
+merge verdict at step 3, because there an unread required-check list could put red code on the trunk,
+while here the thing at risk is a fold that can be redone from an account with bypass. And it takes
+neither remedy: it names them (grant the account bypass, or ship from an account that has it) and stops.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+It closes the second route into the one state this workflow has no detector for. `ship-pr` already
+refused, at exactly this point, when step 5 would not be able to *check out* the trunk (#1069); it now
+refuses when step 5 would not be able to *push* to it. Same step, same reasoning, same sentence -- and
+the failure it prevents is not a risk that might occur but one that fired on every run from one of the
+two accounts that ship this repo.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr refuses before the merge when it cannot push the fold
+
+Plugins: contributing-davekjohn
+
+[PR #1285](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1285)
+
+---
+
 ### DEPLOY: `fix/park-write-error-terminates-eap-stop-v1` · 20260903-112308
 
 A failed `park` now reports its reason and lets the caller own the exit code, instead of throwing a
