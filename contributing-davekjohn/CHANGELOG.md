@@ -32,6 +32,59 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/record-strict-ci-gate` · 20260903-175320
+
+`main-ci-gate` now enforces `strict_required_status_checks_policy`, and
+`DKJ-Solutions/claude-code-specialists` now allows auto-merge and branch auto-update. The three
+fields were changed by `gh api` out-of-band on 2026-09-03 (Dave's call on
+[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)); this branch is the
+docs record of that change.
+
+- ruleset `main-ci-gate`, `required_status_checks` rule: `strict_required_status_checks_policy`
+  `false` to `true`
+- repo `DKJ-Solutions/claude-code-specialists`: `allow_auto_merge` and `allow_update_branch` both
+  `false` to `true`
+
+With `strict` on, a PR must be up to date with `main` before it can merge; `allow_auto_merge` and
+`allow_update_branch` let GitHub run the convergence loop unattended -- update the behind branch,
+re-run `lint-en-tests` against the fresh tree, merge when green -- so the operator arms auto-merge
+once instead of standing between CI rounds. The cost is a full extra `lint-en-tests` run for every
+branch that falls behind `main` while its own CI runs. `ship-pr.ps1`'s step-3b stale-CI certificate
+gate (PR #1316) is unchanged: its detection is correct and it remains the portable safety net for
+consumers, whom a repo-settings change does not reach; `-SkipStaleCheck` stays the valve for a
+known-harmless window. This enacts option 1 of
+[#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292) ("require branches to
+be up to date") for this repo; #1292 stays open as the broader merge-queue question. Recorded in
+`.claude/specialists/lenses/05-15-extension.md` (the `main-ci-gate` / `ci.yml` bullet) and in
+`.claude/rules/language-layers.md` (the closing verification-lesson paragraph, which now notes this
+as the third change to that ruleset in two days).
+
+This branch ships only documentation; the settings change was applied and verified out-of-band and
+is already in force, so a maintainer feels the new merge behaviour regardless of this entry. What
+the entry buys is that the next session reading the `main-ci-gate` / `ci.yml` bullet finds the
+convergence-race resolution -- and the reason step 3b was deliberately left alone -- recorded with
+its #1325 / #1292 / #1316 chain intact, rather than re-deriving it or re-proposing the script-side
+fix the #1325 verdict rejected.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A change to this repo's own GitHub ruleset and merge settings reaches no consumer: it ships no
+plugin change, no script change, and no page a consumer adopts. The portable consumer-side
+mechanism -- `ship-pr.ps1` step 3b -- is explicitly unchanged, and no earlier release note told
+consumers to adopt anything this retires.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record strict CI checks + auto-merge on main-ci-gate
+
+[PR #1333](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1333)
+
+---
+
 ### DEPLOY: `fix/ship-pr-stale-ci-certificate` · 20260903-174847
 
 A required check certifies GitHub's **merge ref** -- the branch already merged into the trunk -- as that
