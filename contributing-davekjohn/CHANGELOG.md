@@ -32,6 +32,98 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/suite-gate-fixture-assert-line-scoped` · 20260903-172201
+
+`test-suite-gate.tests.ps1`'s per-process fixture assert folded backtick continuations before judging
+a temp path, so a path whose `$PID`/GUID discriminator sat after a `-continuation is no longer
+reported as an offender. The guard no longer scans itself.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a test-suite internal assert; no subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+test-suite-gate fixture assert folds backtick continuations before judging a temp path
+
+[PR #1329](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1329)
+
+---
+
+### DEPLOY: `fix/guard-coverage-comment-counts` · 20260903-171521
+
+The coverage assert in `../scripts/tests/source-repo-guard.tests.ps1` -- the one holding every registered
+shared entry point to carrying the source-repo guard -- tested for the guard by matching the lib's **name**
+anywhere in the file. A comment naming the lib therefore counted as having the guard, including a comment
+explaining why the guard was deliberately left out. It now reads the file's **parsed syntax**: the lib named
+in a string literal, and an actual `Assert-OwnCopy` call, each reported separately so a guard that is loaded
+but never fired is caught as well. Two registered entry points had been passing that assert on prose alone --
+`scripts/lint/check-unfolded-entry.ps1` and `scripts/task/park-cycle.ps1`, both hook-invoked, both correct in
+their code -- and their exemptions are now declared with the hook that earns each one. The same helper closes
+a second gap in the same block: it already claimed an exemption for a script that has since gained the guard
+is a licence nobody is using, and never checked it.
+
+**Score:** 2
+
+Inside this repo the defect cost no breakage -- it cost the argument. The block's own comment says the
+exception list is named there "and nowhere else" because "a page can go stale in silence, a failing assert
+cannot", and for these two scripts the assert never fired, so nobody had to argue the exemption. The larger
+half is that the assert was weaker than it reads for *every* entry point, not only the two that tripped it:
+a script that genuinely should carry the guard passed as long as any comment mentioned the lib. Nothing
+changes for anyone until the next entry point is registered -- which is when it now gets held to the rule
+rather than to its comments. Above cosmetic because the guardrail's coverage was real and unmeasured;
+below tier 1 because nothing that shipped was ever wrong.
+
+#### What makes this deploy extra special
+
+`scripts/tests/` is source-only -- no test suite is mirrored into any plugin, so nothing here reaches a
+consumer through a release. The two scripts whose exemptions are declared *are* mirrored, but neither
+changed: only this repo's bookkeeping about them did.
+
+**Score:** N/A
+
+#### Pull Request
+
+The guard-coverage assert no longer counts a comment as the guard
+
+[PR #1328](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1328)
+
+---
+
+### DEPLOY: `fix/park-commit-fixture-pins-signing` · 20260903-170154
+
+`scripts/tests/park-commit.tests.ps1` no longer depends on the machine's `commit.gpgsign`: its
+fixture pins signing off, beside the `user.name`, `user.email` and `core.autocrlf` pins that were
+already there. With signing forced on and the agent not answering, the suite went `16 passed, 12
+failed` -- naming the park continuation clause, which decides nothing about signing -- and because the
+test gate is repo-wide it blocked `open-pr.ps1` on unrelated branches. It now passes 28/28 with
+signing still forced on. The lib is deliberately left signable: `Invoke-GitParkCommit` commits the
+user's real work under their own identity, so the pin belongs to the fixture, which is where #1287
+put it for the sibling suite. A sweep of the other 13 commit-making suites found no further instance.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Third instance of one class, and the first two were each found the same way -- by blocking a gate on
+a branch about something else entirely. What makes it worth more than its one line is the sweep that
+came with it: every commit-making suite is now pinned, measured rather than assumed, so this class
+has no fourth instance left to find.
+
+**Score:** N/A
+
+#### Pull Request
+
+Pin commit.gpgsign off in the park-commit suite fixture
+
+[PR #1327](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1327)
+
+---
+
 ### DEPLOY: `fix/lint-gate-wall-clock` · 20260903-164154
 
 `Invoke-WorkflowGates` (`scripts/lib/gate-lib.ps1`) now times the real lint run and prints

@@ -90,6 +90,29 @@ function Invoke-Gate {
     }
 }
 
+# Folds PowerShell backtick continuations into one logical statement, so a scan judges a statement
+# rather than a physical line. Issue #1326: a fixture path whose discriminator ($PID, a fresh GUID)
+# sits after a `-continuation is still per-process, but a physical-line scan reads only its first line
+# and reports a correct path as an offender. A line whose last non-whitespace character is a backtick
+# is glued to the next -- exactly how the parser treats it -- and the returned object keeps the
+# STARTING physical line number so an offender is still named at a place you can open.
+function Join-BacktickContinuation {
+    param([string[]]$Lines)
+    $out = New-Object System.Collections.Generic.List[pscustomobject]
+    $i = 0
+    while ($i -lt $Lines.Count) {
+        $start = $i + 1
+        $stmt  = $Lines[$i]
+        while ($stmt -match '`[ \t]*$' -and ($i + 1) -lt $Lines.Count) {
+            $i++
+            $stmt = ($stmt -replace '`[ \t]*$', ' ') + $Lines[$i].Trim()
+        }
+        $i++
+        $out.Add([pscustomobject]@{ Line = $start; Text = $stmt })
+    }
+    ,$out
+}
+
 try {
     Write-Host "== test-suite-gate.tests: the gate every PR and every release runs ==" -ForegroundColor Cyan
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
@@ -346,20 +369,29 @@ finally {
 # THE SUBJECT IS THE DISCRIMINATOR, NOT THE SPELLING. $PID, a fresh GUID and a per-case label built on top
 # of either all pass; a bare literal does not. Two suites legitimately use a GUID rather than $PID because
 # they create one file PER CHILD INVOCATION and $PID would be the same for all of them.
+#
+# And the spelling includes the LINE BREAKS. Backtick continuations are folded first, so the unit judged
+# is a statement rather than a physical line: a discriminator on the far side of a `-continuation is in
+# view, and a path split so that GetTempPath() and Join-Path land on different lines is still seen (#1326).
 Write-Host ''
 Write-Host 'every suite keeps its temp fixture per-process' -ForegroundColor Cyan
-$suiteFiles = @(Get-ChildItem -Path (Join-Path $RepoRoot 'scripts\tests') -Filter '*.ps1' -File)
+# This file is the guard, not a fixture-building suite -- it carries GetTempPath()/Join-Path in its
+# own prose and in the #1326 fold cases below, which are test DATA rather than paths a run creates.
+# Its one real fixture ($Fixture, at the top) is $PID-keyed. A guard scanning itself only re-checks
+# its own example strings, so it is left out.
+$self = 'test-suite-gate.tests.ps1'
+$suiteFiles = @(Get-ChildItem -Path (Join-Path $RepoRoot 'scripts\tests') -Filter '*.ps1' -File |
+    Where-Object { $_.Name -ne $self })
 Assert-True ($suiteFiles.Count -gt 20) "the scan found the suites (saw $($suiteFiles.Count) files)"
 
 $tempLines = New-Object System.Collections.Generic.List[pscustomobject]
 foreach ($sf in $suiteFiles) {
-    $n = 0
-    foreach ($line in [System.IO.File]::ReadAllLines($sf.FullName)) {
-        $n++
-        if ($line -notmatch 'GetTempPath\(\)') { continue }
-        # This file's own guard quotes the API in prose above; only lines that BUILD a path count.
-        if ($line -notmatch 'Join-Path') { continue }
-        $tempLines.Add([pscustomobject]@{ File = $sf.Name; Line = $n; Text = $line.Trim() })
+    $folded = Join-BacktickContinuation ([System.IO.File]::ReadAllLines($sf.FullName))
+    foreach ($stmt in $folded) {
+        if ($stmt.Text -notmatch 'GetTempPath\(\)') { continue }
+        # This file's own guard quotes the API in prose above; only statements that BUILD a path count.
+        if ($stmt.Text -notmatch 'Join-Path') { continue }
+        $tempLines.Add([pscustomobject]@{ File = $sf.Name; Line = $stmt.Line; Text = $stmt.Text.Trim() })
     }
 }
 Assert-True ($tempLines.Count -gt 40) "the scan really read the temp paths (found $($tempLines.Count))"
@@ -370,6 +402,33 @@ Assert-True ($tempLines.Count -gt 40) "the scan really read the temp paths (foun
 $unsafe = @($tempLines | Where-Object { $_.Text -notmatch '\$PID|\$tag|\$Guid|NewGuid' })
 Assert-Equal 0 $unsafe.Count ("every temp fixture path is per-process (offenders: " +
     (@($unsafe | ForEach-Object { "$($_.File):$($_.Line)" }) -join ', ') + ')')
+
+# --- The continuation fold, exercised directly (#1326) ---------------------------------------------
+#
+# The scan above trusted the discriminator to sit on the same physical line as the GetTempPath()/
+# Join-Path pair. A backtick continuation puts it on the next line, and the assert then reported a
+# path that is in fact per-process -- measured on fix/guard-coverage-comment-counts (#1321), where a
+# helper carrying both $PID and a fresh GUID was named as an offender. These two cases pin the fold:
+# a split SAFE path must fold to one statement with its discriminator visible, and a split BARE
+# literal must still be caught.
+Write-Host ''
+Write-Host 'a backtick continuation does not hide the discriminator' -ForegroundColor Cyan
+$splitSafe = Join-BacktickContinuation @(
+    '    $p = Join-Path ([System.IO.Path]::GetTempPath()) `',
+    '        ("srguard-$PID-$Label-" + [guid]::NewGuid().ToString(''N'').Substring(0, 6) + ''.ps1'')'
+)
+Assert-Equal 1 $splitSafe.Count 'a backtick continuation folds to a single statement'
+Assert-True (($splitSafe[0].Text -match 'GetTempPath\(\)') -and ($splitSafe[0].Text -match 'Join-Path')) `
+    'the folded statement still carries both path markers'
+Assert-True ($splitSafe[0].Text -match '\$PID|\$tag|\$Guid|NewGuid') `
+    'and the discriminator after the continuation is now in view'
+
+$splitBare = Join-BacktickContinuation @(
+    '    $p = Join-Path ([System.IO.Path]::GetTempPath()) `',
+    '        "fixed-fixture-name.ps1"'
+)
+Assert-True ($splitBare[0].Text -notmatch '\$PID|\$tag|\$Guid|NewGuid') `
+    'a bare literal split across a continuation is still reported'
 
 Write-Host ''
 Write-Host "Result: $script:pass pass, $script:fail fail." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
