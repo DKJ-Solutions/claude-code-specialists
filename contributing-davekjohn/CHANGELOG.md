@@ -32,6 +32,120 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/date-1244-passage-and-roles-v1` · 20260903-114307
+
+Two statements in the sysadmin lens's `#1244` passage had gone stale and are now dated against a
+measurement rather than swept: **`#1244` is open**, not closed -- it was reopened because its closing
+evidence read a commit's *author* as its *pusher*, and the residual runs on as `#1278` -- and
+**`davekokbwj` holds admin**, not write. The second matters beyond bookkeeping: the whole `#1244`
+thread turns on which account holds which role, so a fold that pushes cleanly from that account now
+proves the **admin** bypass works and says nothing about the Write role. That is the exact
+mis-attribution the thread had to retract, and this lens is the document the retraction cites as its
+baseline.
+
+The measured picture the lens now carries: all three accounts are **org owners** of `DKJ-Solutions`,
+and the restored bypass list is `OrganizationAdmin` + a repository role with **no Write role** in it.
+So the bypass follows org ownership rather than a repo permission -- a wider grant that no repo-level
+setting displays -- and the old "safe while there are no external collaborators" caveat no longer
+guards what it was written to guard. Four knock-on statements in the same file's August 14 App passage
+were re-tensed for the same reason, and Rendall's lens, which said the bypass "is back" without saying
+it came back as a *different* pair, now says which pair.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report proposed dating two sentences; verifying it first turned up that the report's own role
+table had gone stale between filing and pickup, and that repairing only the two named spots would have
+left four more statements in the same passage contradicting them. Both are the house rule working as
+intended -- a reported *reason* is verified before it is repaired, and an inconsistency the repair
+creates is part of the repair.
+
+**Score:** N/A
+
+#### Pull Request
+
+Date the sysadmin lens's #1244 passage against the measured repo state
+
+[PR #1286](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1286)
+
+---
+
+### DEPLOY: `fix/ship-pr-fold-push-bypass-preflight-v1` · 20260903-113806
+
+`ship-pr` now asks, before it opens anything, whether the account running it will be allowed to push
+the fold -- and refuses when it will not, instead of merging and leaving the trunk merged-but-unfolded.
+
+The fold is a direct push by design, one of the three named exceptions to "never commit directly on the
+trunk", and a required status check cannot be satisfied by a direct push: the pushed commit carries no
+checks, so the ref update is refused before any workflow could run. An account can therefore be fully
+entitled to *merge* -- the PR's own check ran and passed -- and not entitled to *fold*. Measured on
+PR #1271: merged, checked out the trunk, folded, committed, `GH013 ... Required status check
+"lint-en-tests" is expected`. Not once, but on every run from that account, because the cause sits in
+the ruleset rather than in the run.
+
+Step 0b answers it for two `gh` reads. `rules/branches/<trunk>` gives the rules and deliberately does
+**not** filter by bypass -- measured: it returns `required_status_checks` to an account whose
+`current_user_can_bypass` is `always` -- so the ruleset detail is read for the second half, from the org
+endpoint when the ruleset is the org's. Three rule types block a fold, each by its own definition:
+`required_status_checks`, `pull_request` (so `pull_requests_only` bypass is not bypass here) and
+`update`. `deletion`, `non_fast_forward`, `required_linear_history` and `required_signatures` do not.
+
+It sits where the worktree check sits, and for that check's reason: nothing is gated, pushed, opened or
+merged yet, so refusing is free. The local check still runs first, so a network read never costs the one
+that needs no network. An unreadable ruleset warns rather than refusing -- the opposite posture to the
+merge verdict at step 3, because there an unread required-check list could put red code on the trunk,
+while here the thing at risk is a fold that can be redone from an account with bypass. And it takes
+neither remedy: it names them (grant the account bypass, or ship from an account that has it) and stops.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+It closes the second route into the one state this workflow has no detector for. `ship-pr` already
+refused, at exactly this point, when step 5 would not be able to *check out* the trunk (#1069); it now
+refuses when step 5 would not be able to *push* to it. Same step, same reasoning, same sentence -- and
+the failure it prevents is not a risk that might occur but one that fired on every run from one of the
+two accounts that ship this repo.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr refuses before the merge when it cannot push the fold
+
+Plugins: contributing-davekjohn
+
+[PR #1285](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1285)
+
+---
+
+### DEPLOY: `fix/park-write-error-terminates-eap-stop-v1` · 20260903-112308
+
+A failed `park` now reports its reason and lets the caller own the exit code, instead of throwing a
+raw terminating error past the message `Get-GitPushFailureMessage` was written to produce. The
+`cycle-autopark` Stop hook keeps its "always exits 0" contract when a park's push is rejected.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- workflow tooling internal to the park scripts. A consumer on the workflow plugin inherits the
+fix on their next update, but only in the failure path of a park; nothing changes for anyone not
+debugging one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Invoke-GitPark reports a failed park instead of throwing under EAP=Stop
+
+Plugins: contributing-davekjohn
+
+[PR #1283](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1283)
+
+---
+
 ### DEPLOY: `fix/unfolded-entry-on-main-unguarded-v1` · 20260903-104728
 
 A merge that skips the fold -- a PR merged from the GitHub UI, or any path that bypasses `ship-pr.ps1`

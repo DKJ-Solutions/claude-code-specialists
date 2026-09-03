@@ -405,9 +405,20 @@ function Get-GitPushFailureMessage {
 function Invoke-GitPark {
     <#
         Parks $Branch: stages what $Scope says, commits it when there is something staged, and pushes with
-        `git push -u`. Returns $true on success, $false with a message written by the caller's own
-        Write-Error -- the caller owns the exit code, because the two entry points differ in what a
-        failure means (park-branch stops; new-branch has already created the branch and the files).
+        `git push -u`. Returns $true on success, $false with a message written to Write-Error first -- the
+        caller owns the exit code, because the three entry points differ in what a failure means
+        (park-branch stops; new-branch has already created the branch and the files; park-cycle runs on a
+        Stop hook and must exit 0 regardless).
+
+        -ErrorAction Continue ON ALL THREE FAILURE MESSAGES (staging, committing, push), and it is not
+        decoration -- same reasoning as Invoke-WorkflowGates in gate-lib.ps1 (issue #1275). All three
+        callers run under $ErrorActionPreference = 'Stop', where Write-Error TERMINATES. Left terminating,
+        `return $false` below each message is dead code, the caller's `if (-not $ok)` arm never runs, and a
+        test can only observe a failed park by catching an exception -- so park-cycle's Stop hook exits
+        non-zero on the ordinary divergence case, breaking its "ALWAYS EXITS 0" contract, and park-branch
+        wraps the Get-GitPushFailureMessage sentence in a raw terminating error record rather than letting
+        its own `if (-not $ok) { exit 1 }` report it. The message is emitted non-terminating and the
+        caller decides what a red costs.
 
         NOTHING TO COMMIT IS NOT A FAILURE. A branch whose files were already committed locally but never
         pushed is the real-world case park exists for (issue #175): the commit is skipped and the existing
@@ -451,7 +462,7 @@ function Invoke-GitPark {
     }
     if ($addRes) {
         $addRes.Output | ForEach-Object { Write-Host $_ }
-        if ($addRes.ExitCode -ne 0) { Write-Error "park: staging failed."; return $false }
+        if ($addRes.ExitCode -ne 0) { Write-Error "park: staging failed." -ErrorAction Continue; return $false }
     }
 
     # `git diff --cached --quiet` exits 0 when nothing is staged and 1 when there is -- so this asks
@@ -471,7 +482,7 @@ function Invoke-GitPark {
             if ($pathArgs.Count -gt 0) { $commitArgs += @('--') + $pathArgs }
             $commitRes = Invoke-NativeCapture -FilePath 'git' -Arguments $commitArgs
             $commitRes.Output | ForEach-Object { Write-Host $_ }
-            if ($commitRes.ExitCode -ne 0) { Write-Error "park: committing failed."; return $false }
+            if ($commitRes.ExitCode -ne 0) { Write-Error "park: committing failed." -ErrorAction Continue; return $false }
         } finally {
             Remove-Item -Path $msgFile -Force -ErrorAction SilentlyContinue
         }
@@ -487,7 +498,7 @@ function Invoke-GitPark {
         # Flattened before it is matched: with stderr merged in (2>&1) the captured output is an ARRAY that
         # can hold ErrorRecords as well as strings, and -match against an array returns the matching
         # elements rather than a boolean -- which an if() then reads as true for any non-empty result.
-        Write-Error (Get-GitPushFailureMessage -Output ($pushRes.Output | Out-String))
+        Write-Error (Get-GitPushFailureMessage -Output ($pushRes.Output | Out-String)) -ErrorAction Continue
         return $false
     }
 

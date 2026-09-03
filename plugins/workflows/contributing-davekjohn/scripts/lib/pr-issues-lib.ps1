@@ -1735,3 +1735,214 @@ function Get-MissingLabelNote {
     $note += " Not substituted and not dropped: a fallback label would classify this PR wrongly, and a repo whose own workflow gates on the label would then go green on a label that says nothing."
     return $note
 }
+
+function Get-DirectPushBlockingRules {
+    <#
+    .SYNOPSIS
+        Which rulesets applying to the trunk carry a rule that a DIRECT PUSH cannot satisfy -- read from
+        `gh api repos/<repo>/rules/branches/<trunk>`. Returns one record per such ruleset, for the caller
+        to look the bypass up with.
+
+    .DESCRIPTION
+        THE FOLD IS A DIRECT PUSH BY DESIGN -- one of the three named exceptions to "never commit
+        directly on main" (CLAUDE.md). A required status check cannot be satisfied by a direct push:
+        the pushed commit has no checks yet, and GitHub refuses the ref update before any workflow could
+        run. So on a trunk carrying such a rule the fold lands only for an account the ruleset lets
+        bypass it, and for every other account ship-pr merges and then CANNOT push (issue #1278).
+
+        THE PAYLOAD IS NOT FILTERED BY BYPASS, which is what makes this readable at all. Measured on
+        this repo, September 3, 2026: `rules/branches/main` returns `required_status_checks` to an
+        account whose `current_user_can_bypass` is `always`, so the rule list and the bypass are two
+        independent reads and the second cannot be inferred from the first. This function does the
+        first; Get-FoldPushVerdict makes the verdict from both.
+
+        THREE RULE TYPES, and they are not a guess about GitHub's behaviour but the definition of each
+        rule. `required_status_checks` is the measured one -- it produced the GH013 rejection in #1278,
+        naming `lint-en-tests`. `pull_request` requires the change to arrive through a PR, and a fold
+        commit does not. `update` restricts who may update the ref at all. Every other type either
+        cannot fire on a fold (`deletion`; `non_fast_forward` and `required_linear_history`, which a
+        commit on top of the trunk satisfies) or is satisfiable by the pusher rather than by bypass
+        (`required_signatures`, the message patterns) -- so none of them is grounds to refuse a ship.
+
+    .PARAMETER BranchRulesJson
+        `gh api repos/<repo>/rules/branches/<trunk>` output. An unreadable or unparseable payload
+        returns Readable = $false, and the caller warns rather than refusing -- see Get-FoldPushVerdict.
+
+    .OUTPUTS
+        [pscustomobject] Readable (bool) and Blocking (array of [pscustomobject] RulesetId / SourceType /
+        Source / Rules / Contexts). An empty Blocking with Readable = $true is the ordinary answer in a
+        repo whose trunk carries no such rule.
+    #>
+    param([string]$BranchRulesJson)
+
+    $unreadable = [pscustomobject]@{ Readable = $false; Blocking = @() }
+    if (-not $BranchRulesJson -or -not $BranchRulesJson.Trim()) { return $unreadable }
+    try { $parsed = $BranchRulesJson | ConvertFrom-Json } catch { return $unreadable }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object. An empty
+    # array parses to $null, which is the legitimate "this trunk has no rules" answer and NOT unreadable.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.PSObject.Properties['type'] })
+
+    $blockingTypes = @('required_status_checks', 'pull_request', 'update')
+    $byRuleset = [ordered]@{}
+    foreach ($r in $records) {
+        $type = ([string]$r.type).Trim().ToLowerInvariant()
+        if ($blockingTypes -notcontains $type) { continue }
+
+        # The id can be absent on a payload shape this function has not met; without it the caller has
+        # nothing to look a bypass up with, so it is grouped under the empty key and reported as unknown.
+        $id = ''
+        if ($r.PSObject.Properties['ruleset_id']) { $id = [string]$r.ruleset_id }
+        if (-not $byRuleset.Contains($id)) {
+            $sourceType = ''
+            if ($r.PSObject.Properties['ruleset_source_type']) { $sourceType = [string]$r.ruleset_source_type }
+            $source = ''
+            if ($r.PSObject.Properties['ruleset_source']) { $source = [string]$r.ruleset_source }
+            $byRuleset[$id] = [pscustomobject]@{
+                RulesetId  = $id
+                SourceType = $sourceType
+                Source     = $source
+                Rules      = @()
+                Contexts   = @()
+            }
+        }
+        $byRuleset[$id].Rules += $type
+
+        # The check CONTEXTS, so the refusal can name what the remote would have named. `lint-en-tests`
+        # in the GH013 text of #1278 is this field, and quoting it is what makes the two messages
+        # recognisably the same event.
+        if ($type -eq 'required_status_checks' -and $r.PSObject.Properties['parameters'] -and $r.parameters) {
+            $params = $r.parameters
+            if ($params.PSObject.Properties['required_status_checks']) {
+                foreach ($c in @($params.required_status_checks)) {
+                    if ($c -and $c.PSObject.Properties['context']) { $byRuleset[$id].Contexts += [string]$c.context }
+                }
+            }
+        }
+    }
+
+    $blocking = @()
+    foreach ($key in $byRuleset.Keys) {
+        $rec = $byRuleset[$key]
+        $rec.Rules = @($rec.Rules | Sort-Object -Unique)
+        $rec.Contexts = @($rec.Contexts | Sort-Object -Unique)
+        $blocking += $rec
+    }
+    return [pscustomobject]@{ Readable = $true; Blocking = @($blocking) }
+}
+
+function Get-FoldPushVerdict {
+    <#
+    .SYNOPSIS
+        Whether the fold commit will be pushable to the trunk by THIS account -- decided before the
+        merge, from the trunk's rules and this account's bypass on each ruleset that carries one.
+        Returns Blocked / Unknown / Reason / BlockedBy.
+
+    .DESCRIPTION
+        ISSUE #1278, AND IT IS STEP 0'S FAILURE MODE EXACTLY. ship-pr merged PR #1271, checked out main,
+        folded, committed -- and the push was refused with GH013 ("Required status check
+        'lint-en-tests' is expected"), leaving the trunk merged-but-unfolded: the changelog entry
+        unfolded, the branch document still on main, every gate green until a release trips over it.
+        That is the same half-state the worktree check at step 0 exists to prevent, reached by a
+        different route, so the answer is the same one: refuse at step 0, where refusing is free.
+
+        WHY IT CANNOT BE INFERRED FROM THE MERGE. A required status check gates the ref update, and the
+        merge satisfies it (the PR's own check ran) while the fold cannot (a pushed commit has no
+        checks). So a run can be fully entitled to merge and not entitled to fold, which is precisely
+        what happened -- and why reading the CI verdict at step 3 says nothing about step 5.
+
+        UNKNOWN IS A WARNING, NOT A REFUSAL -- the opposite posture to Get-MergeBlockVerdict above, and
+        deliberately. There, an unreadable required-check list could let RED CODE onto the trunk, so it
+        refuses. Here the thing at risk is a fold that can be redone by hand or by an account with
+        bypass, while refusing on an unread ruleset would take ship-pr away from every consumer whose
+        token cannot read one -- a blast radius far larger than the defect. Same reasoning, and the same
+        answer, as step 0's own worktree arm: "an unreadable worktree list warns rather than refuses".
+
+        `pull_requests_only` COUNTS AS NO BYPASS, because the fold is not a pull request. GitHub's three
+        values answer "may this actor bypass"; only `always` answers yes for a direct push.
+
+    .PARAMETER BranchRulesJson
+        `gh api repos/<repo>/rules/branches/<trunk>` output -- the same payload Get-DirectPushBlockingRules
+        reads, re-read here so the verdict is a pure function of what GitHub actually said.
+
+    .PARAMETER BypassByRulesetId
+        Ruleset id (as a string key) -> that ruleset's `current_user_can_bypass`. A ruleset missing from
+        the map, or carrying an empty value, is the unreadable case for that ruleset alone.
+
+    .PARAMETER NameByRulesetId
+        Optional ruleset id -> `name`, used only to name the ruleset in the reason. Absent, the id is
+        used instead and the verdict is identical.
+    #>
+    param(
+        [string]$BranchRulesJson,
+        [hashtable]$BypassByRulesetId = @{},
+        [hashtable]$NameByRulesetId = @{}
+    )
+
+    $rules = Get-DirectPushBlockingRules -BranchRulesJson $BranchRulesJson
+    if (-not $rules.Readable) {
+        return [pscustomobject]@{
+            Blocked   = $false
+            Unknown   = $true
+            Reason    = "the trunk's rules could not be read, so whether the fold can be pushed is unknown -- shipping anyway; step 5 will report it if the push turns out to be refused"
+            BlockedBy = @()
+        }
+    }
+
+    if ($rules.Blocking.Count -eq 0) {
+        return [pscustomobject]@{
+            Blocked   = $false
+            Unknown   = $false
+            Reason    = 'no rule on the trunk that a direct push cannot satisfy'
+            BlockedBy = @()
+        }
+    }
+
+    $blockedBy = @()
+    $unknownOn = @()
+    foreach ($rec in $rules.Blocking) {
+        $label = $rec.RulesetId
+        if ($NameByRulesetId -and $rec.RulesetId -and $NameByRulesetId.ContainsKey($rec.RulesetId)) {
+            $label = "$($NameByRulesetId[$rec.RulesetId]) (id $($rec.RulesetId))"
+        } elseif (-not $label) {
+            $label = 'an unnamed ruleset'
+        }
+
+        $bypass = ''
+        if ($BypassByRulesetId -and $rec.RulesetId -and $BypassByRulesetId.ContainsKey($rec.RulesetId)) {
+            $bypass = ([string]$BypassByRulesetId[$rec.RulesetId]).Trim().ToLowerInvariant()
+        }
+
+        if ($bypass -eq 'always') { continue }
+        if (-not $bypass) { $unknownOn += $label; continue }
+
+        $what = "'" + ($rec.Rules -join "', '") + "'"
+        if ($rec.Contexts.Count -gt 0) { $what += " ($($rec.Contexts -join ', '))" }
+        $blockedBy += "$label applies $what to the trunk, and this account cannot bypass it (current_user_can_bypass = $bypass)"
+    }
+
+    if ($blockedBy.Count -gt 0) {
+        return [pscustomobject]@{
+            Blocked   = $true
+            Unknown   = $false
+            Reason    = ($blockedBy -join '; ')
+            BlockedBy = @($blockedBy)
+        }
+    }
+
+    if ($unknownOn.Count -gt 0) {
+        return [pscustomobject]@{
+            Blocked   = $false
+            Unknown   = $true
+            Reason    = "this account's bypass on $(Format-CheckNameList -Names $unknownOn) could not be read, so whether the fold can be pushed is unknown -- shipping anyway; step 5 will report it if the push turns out to be refused"
+            BlockedBy = @()
+        }
+    }
+
+    return [pscustomobject]@{
+        Blocked   = $false
+        Unknown   = $false
+        Reason    = 'this account can bypass every trunk rule a direct push cannot satisfy'
+        BlockedBy = @()
+    }
+}

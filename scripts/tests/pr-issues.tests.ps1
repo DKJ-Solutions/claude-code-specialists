@@ -1387,6 +1387,123 @@ Assert-True ($openPrText.Contains("'number,state,headRefName,body'")) 'the PR-bo
 Assert-True ($openPrText.Contains("'--state', 'all'")) "the search is --state all, so a MERGED claimant counts -- that is the #1282 case"
 Assert-True ($openPrText -like '*-CurrentBranch $branch*') "the current branch is passed, so this branch's own PR is not read as a rival"
 
+# --- Get-DirectPushBlockingRules / Get-FoldPushVerdict (issue #1278) ------------------------------
+# WHY THIS BLOCK EXISTS. ship-pr merged PR #1271, checked out main, folded, committed -- and the push
+# was refused with GH013, "Required status check 'lint-en-tests' is expected". The run ended
+# merged-but-unfolded: the entry unfolded, the branch document still on the trunk, every gate green
+# until a release trips over it. That is step 0's own failure mode reached by a second route, so the
+# repair is step 0's answer -- refuse before the merge, where refusing costs nothing.
+#
+# THE TWO READS ARE INDEPENDENT, and that is the property the whole check rests on. Measured against
+# the live API on September 3, 2026: `rules/branches/main` returns `required_status_checks` to an
+# account whose `current_user_can_bypass` is `always`, so the rule list does NOT tell you whether this
+# account is bound by it. A verdict made from the rule list alone would refuse every ship in this repo.
+Write-Host "`nGet-DirectPushBlockingRules / Get-FoldPushVerdict (#1278)" -ForegroundColor Cyan
+
+# The live shape, transcribed from `gh api repos/DKJ-Solutions/claude-code-specialists/rules/branches/main`
+# on the day of the failure -- so the fixture is what GitHub actually sends, not what it might send.
+$rulesMain = @'
+[{"type":"deletion","ruleset_source_type":"Repository","ruleset_source":"DKJ-Solutions/claude-code-specialists","ruleset_id":19008062},
+ {"type":"non_fast_forward","ruleset_source_type":"Repository","ruleset_source":"DKJ-Solutions/claude-code-specialists","ruleset_id":19008062},
+ {"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"do_not_enforce_on_create":false,"required_status_checks":[{"context":"lint-en-tests","integration_id":15368}]},"ruleset_source_type":"Repository","ruleset_source":"DKJ-Solutions/claude-code-specialists","ruleset_id":19008062}]
+'@
+
+$blocking = Get-DirectPushBlockingRules -BranchRulesJson $rulesMain
+Assert-True $blocking.Readable 'the live rules payload reads'
+Assert-Equal 1 $blocking.Blocking.Count 'one ruleset carries a rule a direct push cannot satisfy'
+Assert-Equal '19008062' $blocking.Blocking[0].RulesetId 'and it is named by id, which is what the bypass is looked up with'
+Assert-Equal 'required_status_checks' ($blocking.Blocking[0].Rules -join ',') 'only the blocking rule is reported'
+Assert-Equal 'lint-en-tests' ($blocking.Blocking[0].Contexts -join ',') 'and the check context, so the refusal can name what the remote names'
+
+# THE THREE THAT DO NOT BLOCK, asserted by name. `deletion` and `non_fast_forward` sit in the SAME
+# ruleset as the one that does, so a function that reported per-ruleset instead of per-rule would look
+# identical on this repo and refuse a fold on a trunk that merely forbids force-pushes.
+$harmless = Get-DirectPushBlockingRules -BranchRulesJson '[{"type":"deletion","ruleset_id":7},{"type":"non_fast_forward","ruleset_id":7},{"type":"required_linear_history","ruleset_id":7},{"type":"required_signatures","ruleset_id":7}]'
+Assert-True $harmless.Readable 'a payload of only non-blocking rules still reads'
+Assert-Equal 0 $harmless.Blocking.Count 'deletion, non_fast_forward, required_linear_history and required_signatures do not block a fold'
+
+# The other two that DO, and they are the definition of each rule rather than a guess: `pull_request`
+# demands the change arrive through a PR (a fold does not), and `update` restricts the ref update itself.
+$pr = Get-DirectPushBlockingRules -BranchRulesJson '[{"type":"pull_request","ruleset_id":8}]'
+Assert-Equal 1 $pr.Blocking.Count 'a pull_request rule blocks a fold -- the fold is not a pull request'
+$upd = Get-DirectPushBlockingRules -BranchRulesJson '[{"type":"update","ruleset_id":9}]'
+Assert-Equal 1 $upd.Blocking.Count 'an update rule blocks a fold -- it restricts the ref update itself'
+
+# EMPTY IS NOT UNREADABLE, and 5.1 makes that worth an assert: '[]' parses to $null, which is exactly
+# what a failed parse leaves behind. Read as unreadable, every consumer with an unprotected trunk would
+# get a warning on every ship for a question that has a clean answer.
+$none = Get-DirectPushBlockingRules -BranchRulesJson '[]'
+Assert-True $none.Readable 'an empty rule list READS -- a trunk with no rules is an answer, not a failure'
+Assert-Equal 0 $none.Blocking.Count 'and nothing blocks'
+
+Assert-True (-not (Get-DirectPushBlockingRules -BranchRulesJson '').Readable) 'an empty payload is unreadable'
+Assert-True (-not (Get-DirectPushBlockingRules -BranchRulesJson 'not json').Readable) 'and so is an unparseable one'
+
+# THE VERDICT, and the case the issue is about. `maikel-bwj` is neither an OrganizationAdmin nor holder
+# of the repo admin role, the two bypass actors main-ci-gate carries, so its current_user_can_bypass is
+# 'never' -- and every ship-pr run from that account merged and then could not push the fold.
+$blocked = Get-FoldPushVerdict -BranchRulesJson $rulesMain -BypassByRulesetId @{ '19008062' = 'never' } -NameByRulesetId @{ '19008062' = 'main-ci-gate' }
+Assert-True $blocked.Blocked 'an account that cannot bypass the required status check is refused BEFORE the merge (#1278)'
+Assert-True (-not $blocked.Unknown) 'and that is a decision, not an unknown'
+Assert-True ($blocked.Reason -like '*main-ci-gate*') 'the reason names the ruleset, so the remedy has an address'
+Assert-True ($blocked.Reason -like '*lint-en-tests*') 'and the check, so it is recognisably the same event as the GH013 text'
+
+# THE OTHER HALF, and the one that must not regress: this repo's own owner ships many times a day
+# through exactly this ruleset. A verdict that refused here would be worse than the defect.
+$allowed = Get-FoldPushVerdict -BranchRulesJson $rulesMain -BypassByRulesetId @{ '19008062' = 'always' }
+Assert-True (-not $allowed.Blocked) 'an account with bypass ships as before'
+Assert-True (-not $allowed.Unknown) 'and says so rather than warning'
+
+# 'pull_requests_only' IS NOT BYPASS HERE. GitHub's three values answer "may this actor bypass"; only
+# 'always' answers yes for a DIRECT push, and the fold is a direct push by design. Asserted separately
+# because the word 'bypass' in that value is exactly what invites reading it as a yes.
+$prOnly = Get-FoldPushVerdict -BranchRulesJson $rulesMain -BypassByRulesetId @{ '19008062' = 'pull_requests_only' }
+Assert-True $prOnly.Blocked 'pull_requests_only is not bypass for a fold -- the fold is not a pull request'
+
+# UNKNOWN WARNS, IT DOES NOT REFUSE -- the opposite posture to Get-MergeBlockVerdict, and deliberately.
+# There an unread required-check list could let red code onto the trunk. Here the thing at risk is a
+# fold that can be redone by hand, while refusing on an unread ruleset would take ship-pr away from
+# every consumer whose token cannot read one. Same answer as step 0's own unreadable-worktree arm.
+$unknownBypass = Get-FoldPushVerdict -BranchRulesJson $rulesMain -BypassByRulesetId @{}
+Assert-True (-not $unknownBypass.Blocked) 'an unread bypass never refuses a ship'
+Assert-True $unknownBypass.Unknown 'but it does say the question was not answered'
+
+$unknownRules = Get-FoldPushVerdict -BranchRulesJson 'not json'
+Assert-True (-not $unknownRules.Blocked) 'an unread rule list never refuses a ship either'
+Assert-True $unknownRules.Unknown 'and is likewise reported rather than swallowed'
+
+$clean = Get-FoldPushVerdict -BranchRulesJson '[]'
+Assert-True (-not $clean.Blocked) 'a trunk with no rules ships'
+Assert-True (-not $clean.Unknown) 'silently -- there is nothing to warn about'
+
+# A ruleset whose blocking rule is bypassable while a SECOND one is not: the verdict is per ruleset, and
+# one bypassable ruleset must not clear another. Both live in the same payload, as they would on a repo
+# carrying an org ruleset on top of its own.
+$twoRulesets = '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"ci"}]},"ruleset_id":1,"ruleset_source_type":"Repository"},{"type":"pull_request","ruleset_id":2,"ruleset_source_type":"Organization","ruleset_source":"DKJ-Solutions"}]'
+$mixed = Get-FoldPushVerdict -BranchRulesJson $twoRulesets -BypassByRulesetId @{ '1' = 'always'; '2' = 'never' }
+Assert-True $mixed.Blocked 'bypass on one ruleset does not clear another that blocks'
+Assert-True ($mixed.Reason -notlike '*ruleset_id*1*applies*') 'and the bypassed one is not named as a blocker'
+$twoBlocking = Get-DirectPushBlockingRules -BranchRulesJson $twoRulesets
+$orgRec = @($twoBlocking.Blocking | Where-Object { $_.RulesetId -eq '2' })[0]
+Assert-Equal 'Organization' $orgRec.SourceType 'the source type travels, because an org ruleset is not under repos/<repo>/rulesets and asking for it there 404s'
+Assert-Equal 'DKJ-Solutions' $orgRec.Source 'and so does the org name the detail read needs'
+
+# AND ship-pr.ps1 ACTUALLY RUNS IT, BEFORE THE MERGE. Without this assert every check above stays green
+# while the orchestrator merges first and folds into a rejection again -- which IS the defect, not a
+# regression in the helper. Same reasoning as the open-pr ordering asserts above: this file is the one
+# caller no suite gets to run.
+$idxFoldGate = $shipText.IndexOf('Get-FoldPushVerdict -BranchRulesJson')
+$idxOpenPr   = $shipText.IndexOf("'-File', (Join-Path `$PSScriptRoot 'open-pr.ps1')")
+$idxMergeNow = $shipText.IndexOf("@('pr', 'merge'")
+Assert-True ($idxFoldGate -ge 0) 'ship-pr.ps1 asks whether it can push the fold (#1278)'
+Assert-True ($idxOpenPr -gt $idxFoldGate) 'and it asks BEFORE step 1, so nothing is pushed and no PR exists when it refuses'
+Assert-True ($idxMergeNow -gt $idxFoldGate) 'and long before the merge, which is the whole repair'
+$idxWorktree = $shipText.IndexOf("Get-WorktreeHoldingBranch -PorcelainLines")
+Assert-True ($idxWorktree -ge 0 -and $idxWorktree -lt $idxFoldGate) 'the free local check still runs first -- a network read must not cost the one that needs no network'
+Assert-True ($shipText -like '*rules/branches/main*') 'the trunk rules are read from the branch endpoint, which does NOT filter by bypass'
+Assert-True ($shipText -like '*current_user_can_bypass*') 'and the bypass from the ruleset detail, which is the only endpoint carrying it'
+Assert-True ($shipText -like '*orgs/$($rec.Source)/rulesets/*') 'an Organization ruleset is read from the org endpoint'
+Assert-True ($shipText -like '*this is the cheap place to stop*') 'the refusal says nothing was merged, which is the fact the reader needs first'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

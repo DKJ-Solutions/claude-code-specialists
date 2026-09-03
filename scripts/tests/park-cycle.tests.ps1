@@ -533,6 +533,35 @@ try {
     Assert-True ($msgN -match '1 of 2 step\(s\) resolved') 'half-done plan: the numbers are still there'
     Assert-True (-not ($msgN -match 'reads as FINISHED')) 'half-done plan: and the alarm stays silent, because one step is still open'
     Assert-True ($msgN -match 'nothing uncommitted') 'half-done plan: a clean working copy is stated rather than left blank'
+
+    # --- (o) A REJECTED PUSH STILL EXITS 0 -- the Stop-hook contract (#1275) ------------------------
+    # THE DEFECT: Invoke-GitPark wrote its push-failure summary with a bare Write-Error, and every caller
+    # -- this one included -- runs under $ErrorActionPreference = 'Stop', where Write-Error TERMINATES. So
+    # `return $false` was dead code, the `if (-not $ok)` arm below the call never ran, and a rejected push
+    # (the ordinary divergence case this script's own note names) took park-cycle out non-zero -- on a hook
+    # whose header promises "ALWAYS EXITS 0". Nothing here could see it: every other case reaches a push
+    # that SUCCEEDS or no push at all.
+    #
+    # The fixture diverges with `git commit --amend` rather than a reset -- it rewrites the local tip so it
+    # is no longer a descendant of what origin holds, the same rejection with none of the destructive
+    # shape. Same technique as park-branch.tests.ps1 (d3).
+    Write-Host "park-cycle.ps1 -- a rejected push is reported, not thrown, and the hook still exits 0" -ForegroundColor Cyan
+    $fixO = New-Fixture -Label 'o' -GhAnswer 'none'
+    Switch-ToBranch -Dir $fixO -Name 'fix/diverged-v1'
+    $relO = New-CycleDocument -Dir $fixO -Branch 'fix/diverged-v1'
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixO add -- $relO 2>$null | Out-Null
+        & git -C $fixO commit -q -m 'cycle by hand' 2>$null | Out-Null
+        & git -C $fixO push -q -u origin 'fix/diverged-v1' 2>$null | Out-Null
+        # Rewrite the tip origin already has: local and origin now share no descendant line.
+        & git -C $fixO commit -q --amend -m 'cycle by hand (rewritten)' 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+
+    $rO = Invoke-ParkCycle -Dir $fixO
+    Assert-Equal 0 $rO.Code 'rejected push: exit 0 -- the Stop-hook contract holds'
+    Assert-True ($rO.Out -match 'could NOT be pushed') 'rejected push: the caller-owned line is reached, not a raw terminating error'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
