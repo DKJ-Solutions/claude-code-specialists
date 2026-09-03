@@ -269,16 +269,42 @@ infrastructure.
   **The real fix is a GitHub merge queue**, which tests each PR against the projected merge
   (target-branch tip + the PRs already queued), so staleness is gone by construction. It **is**
   available to this repo (public + org-owned; the earlier "Enterprise only" reading was wrong).
-  Load-bearing prerequisite: `.github/workflows/ci.yml` triggers on `pull_request` and
-  `push: [main]` only, and a required workflow with no `merge_group` trigger never reports in the
-  queue — GitHub's own warning is that the merge then fails outright, a total merge outage on
-  `main` — so `merge_group` must land in `ci.yml` **before** any queue is enabled — and that
-  prerequisite is tracked on #1325. `ship-pr.ps1` step 3b is unchanged: its detection is correct
-  and it stays the mechanism and the portable net for consumers, whom a repo-settings change never
-  reaches, with `-SkipStaleCheck` the valve for a known-harmless window. **The generalisable half: a
-  repo-settings "fix" for the staleness race that is not a merge queue does not converge** —
-  `strict` + `allow_auto_merge` + `allow_update_branch` look like the unattended loop, but the base
-  never moves under the PR on its own, so all they add is the block.
+  `ship-pr.ps1` step 3b is unchanged: its detection is correct and it stays the mechanism and the
+  portable net for consumers, whom a repo-settings change never reaches, with `-SkipStaleCheck` the
+  valve for a known-harmless window. **The generalisable half: a repo-settings "fix" for the
+  staleness race that is not a merge queue does not converge** — `strict` + `allow_auto_merge` +
+  `allow_update_branch` look like the unattended loop, but the base never moves under the PR on its
+  own, so all they add is the block.
+
+  **BOTH PREREQUISITES ARE NOW IN THE TREE, AND THE SWITCH IS STILL DAVE'S** (September 3, 2026,
+  #1325). Enabling the queue is a repo-settings change; making the repo survive one is not, and the
+  two things that had to be true first are both the same shape — **inert today, catastrophic on the
+  day the queue is switched on, and silent in between**. Both are pinned by
+  [`scripts/tests/merge-queue-prereq.tests.ps1`](../../../scripts/tests/merge-queue-prereq.tests.ps1),
+  because nothing in this repo's behaviour today would notice either being removed:
+  1. **`.github/workflows/ci.yml` now triggers on `merge_group`.** A required workflow without it
+     never runs for a queue entry, so `lint-en-tests` never reports and GitHub's own warning is that
+     the merge fails — a **total merge outage on `main`**, not a degradation. The suites run in full
+     for a queue entry: the #1300 fold-commit shortcut is gated on the `push` event, so it does not
+     reach one, and it must not — a queue entry *is* the projected merge being certified. The
+     concurrency key needed no change: its `|| github.sha` arm already gives each entry its own group.
+  2. **`ship-pr.ps1` reads the PR's state after `gh pr merge` instead of trusting the exit code.**
+     `gh pr merge --help` states it outright — under a queue the PR is *"added to the merge queue"*,
+     and gh exits **0** having enqueued. Step 5 folds onto the trunk on the strength of that exit
+     code, so an ordinary ship would have written a fold commit for a PR that had not landed: the
+     changelog entry on `main` ahead of its own merge, with nothing in the run saying so. **This one
+     is also right with no queue anywhere** — "merged" had been an inference from an exit code, on
+     the one script that writes to the trunk. A state that cannot be *read* is deliberately **not** a
+     refusal (same shape as the DEPLOY lock): only a state positively read as non-`MERGED` refuses,
+     because turning a network blip into a refusal between the merge and the fold would manufacture
+     the trapped-entry state (#1270) the fold exists to prevent. The refusal hands the wait back
+     rather than guessing a timeout — waiting a queue out is a separate decision, not taken here.
+
+  **The generalisable half of the prerequisites, beside the one above: a settings switch that is
+  somebody else's to flip does not make the code it will break somebody else's problem.** The queue
+  decision sat on #1325 for a day as "Dave's", and both defects that would have fired on the first
+  merge after it were in the tree the whole time, reachable and fixable without touching a setting.
+
 - **`.github/workflows/claude.yml` + `.github/workflows/claude-code-review.yml`** — the two Claude Code
   workflows, added August 14, 2026 via
   [PR #658](https://github.com/DaveKJohn/claude-code-specialists/pull/658). The first answers an

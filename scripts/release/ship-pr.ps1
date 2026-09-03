@@ -1268,6 +1268,56 @@ $mergeSubject = "merge: $branch (#$pr)"
 $merge = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'merge', "$pr", "--$mergeMethod", '--subject', $mergeSubject, '--repo', $repo)
 $merge.Output | ForEach-Object { Write-Host $_ }
 if ($merge.ExitCode -ne 0) { Write-Error "Merge of PR #$pr failed."; exit 1 }
+
+# EXIT 0 FROM `gh pr merge` IS NOT PROOF THAT THE PR MERGED -- issue #1325, the second merge-queue
+# prerequisite and a correctness gap in its own right. `gh pr merge --help` says it in so many words:
+# "When targeting a branch that requires a merge queue ... If required checks have passed, the pull
+# request will be added to the merge queue." ADDED, not merged -- and the command returns 0 having
+# enqueued. Step 5 is a few lines below and folds the entry onto 'main' on the strength of that exit
+# code, so the moment a queue is switched on an ordinary ship would write a fold commit for a PR that
+# has not landed. Nothing in the run would say so: the merge arrives minutes later, out of order with
+# the fold that describes it.
+#
+# SO THE STATE IS READ RATHER THAN INFERRED. It costs one `gh pr view` on a path that already makes
+# several, and it is right TODAY as well as under a queue: 'merged' has until now been an inference from
+# an exit code, on the one script that writes to the trunk.
+#
+# A FAILED READ IS NOT A FINDING, deliberately, and this matches the DEPLOY lock a few lines up: only a
+# state that is positively read and is not MERGED refuses. A network blip, an expired token or an
+# unknown field leaves the run exactly as it was before this block existed -- turning a read failure
+# into a refusal between the merge and the fold would manufacture the trapped-entry state (#1270) that
+# the fold exists to prevent.
+#
+# THE RETRY IS FOR PROPAGATION, NOT FOR THE QUEUE. With no queue the merge is synchronous and the first
+# read says MERGED; the two further attempts absorb a lagging read rather than waiting a queue out,
+# which is why the budget is seconds and not minutes. Waiting a queue out is a different decision and it
+# is not taken here -- the refusal hands it back instead of guessing at a timeout.
+$mergedState = ''
+for ($mergeReadAttempt = 1; $mergeReadAttempt -le 3; $mergeReadAttempt++) {
+    try {
+        $stateRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+            'pr', 'view', "$pr", '--repo', $repo, '--json', 'state', '--jq', '.state')
+        if ($stateRead.ExitCode -eq 0) { $mergedState = ($stateRead.Output -join '').Trim() }
+    } catch {
+        $mergedState = ''
+    }
+    if ($mergedState -eq 'MERGED' -or $mergeReadAttempt -eq 3) { break }
+    Start-Sleep -Seconds 5
+}
+if (-not $mergedState) {
+    Write-Host "  Merge state: PR #$pr's state could not be read -- not checked (this is not a finding)." -ForegroundColor DarkGray
+} elseif ($mergedState -ne 'MERGED') {
+    Write-Error @"
+gh pr merge returned 0 but PR #$pr reads '$mergedState', not 'MERGED' -- NOT folded (issue #1325).
+
+The likeliest cause is a merge queue on 'main': gh enqueues the PR and exits 0, and the merge lands
+minutes later. Folding now would put the changelog entry on the trunk ahead of the merge it describes.
+
+Let the queue land the merge, then re-run ship-pr: step 2 finds the merged PR and step 5 folds against a
+trunk that actually carries it. Nothing here needs undoing -- the PR is queued, not lost.
+"@
+    exit 1
+}
 Write-Host "ship-pr: PR #$pr merged (--$mergeMethod)." -ForegroundColor Green
 
 # --- Step 5: main + fold + commit + push ---------------------------------------------------------

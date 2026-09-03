@@ -1,4 +1,5 @@
-# CI gate: runs the lint gate + all test suites on every PR and every push to main.
+# CI gate: runs the lint gate + all test suites on every PR, every push to main, and every merge-queue
+# entry (the last is inert until a queue is enabled -- see the `merge_group` note on the trigger block).
 # This is the same guard that open-pr.ps1 runs locally, but inescapable -- even a PR that
 # originates outside the scripts (GitHub UI, or a forgotten -SkipLint) passes through here.
 # The scripts target Windows PowerShell 5.1, so we run on windows-latest with
@@ -9,12 +10,34 @@ name: CI
 permissions:
   contents: read
 
+# THE `merge_group` TRIGGER IS A PREREQUISITE, NOT A FEATURE -- issue #1325. It is inert until a merge
+# queue is switched on for `main` (a repo-settings change, and Dave's), and it has to be here BEFORE
+# that happens rather than after: a required workflow with no `merge_group` trigger never runs for a
+# queue entry, so the required `lint-en-tests` check never reports and GitHub's own warning is that the
+# merge then fails. That is a total merge outage on `main`, not a degradation -- which is why the
+# trigger lands first, on its own, and is proven green on the trunk before anything is enabled.
+#
+# WHY A QUEUE IS THE ANSWER AT ALL: `lint-en-tests` runs ~14-16 min while `main` gains a merge every
+# ~15-25 min, so a certificate is routinely stale by the time it is spent (#1292, and the ship-pr step
+# 3b gate that catches it). Every repo-settings remedy that is NOT a queue was measured and rejected on
+# #1325 -- `strict_required_status_checks_policy` + `allow_auto_merge` + `allow_update_branch` were all
+# turned on and reverted the same day, because GitHub performs NO server-side base-sync of a PR branch
+# outside a queue. A queue tests each entry against the PROJECTED merge (trunk tip + the entries ahead
+# of it), so staleness is gone by construction rather than blocked harder.
 on:
   pull_request:
   push:
     branches: [main]
+  merge_group:
 
-# TWO GROUPING RULES IN ONE KEY: a PR is keyed on its REF, a push to `main` on its own COMMIT.
+# TWO GROUPING RULES IN ONE KEY: a PR is keyed on its REF, everything else on its own COMMIT.
+#
+# "EVERYTHING ELSE" IS TWO EVENTS SINCE #1325, and the key needed no change to take the second one. The
+# expression's `|| github.sha` arm was written for pushes to `main`; a `merge_group` run lands there too
+# and gets the queue entry's own temp commit, which is already unique per entry, and `cancel-in-progress`
+# is false off the PR arm -- so no queue entry can cancel another. That is the behaviour a queue requires
+# and it falls out of what #1294 already built, which is why this comment gains a paragraph rather than
+# the key gaining a branch.
 #
 # THE PR HALF IS THE CHEAP HALF and is unchanged. A PR run that a later push supersedes is measuring a
 # commit nobody will merge, so killing it is free: `synchronize` fires on every push, which is how PR
@@ -93,6 +116,11 @@ jobs:
       # kind exactly. A PR never matches (`github.event_name` is not 'push' there), so the `main`
       # ruleset's required `lint-en-tests` check is untouched; on a push a skipped step still reports the
       # job green.
+      #
+      # A MERGE-QUEUE RUN NEVER MATCHES EITHER, and must not: `github.event_name` is 'merge_group' there,
+      # so the suites run in full. A queue entry IS the gate -- it is the projected merge being certified
+      # before it lands -- so the fold-commit shortcut above, which skips the suites for a tree whose only
+      # untested delta is changelog prose, has nothing to say about it (#1325).
       - name: Test suites (scripts/tests/*.tests.ps1)
         if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'fold:')) }}
         shell: powershell
