@@ -24,8 +24,8 @@
 
       * the original bug this file was written for -- fold-all folding any root *.md that was not in a tiny
         denylist, so CONTRIBUTING.md and SECURITY.md got folded and removed. The fix keys off the entry
-        format itself, and since this change that means an H2 heading (an H3 for an entry file written
-        before it) against a meta doc's H1.
+        format itself: a heading at the entry level (or the second level the range accepts, for a file
+        written under an older one) against a meta doc's H1.
       * the pre-pass: a fold-all run writes one entry at a time, so a refusal has to happen before the
         first write or it leaves a half-state to unpick by hand on main.
 
@@ -167,9 +167,11 @@ function New-FoldFixture {
 
 function New-EntryFile {
     <#
-        An entry file as new-branch.ps1 writes one since August 5, 2026: an H2 for the change, then
-        the three named H3 sections. -Rows sets the impact table's data rows (the scaffold's own tier-0 row
-        by default), so a test can declare a reach and a significance without hand-building the file.
+        An entry file in the current shape: the change's own heading at the entry level, then its named
+        sections one level under it -- both composed from the seams rather than typed, so this fixture
+        cannot become a second definition of the format. -Rows sets the impact table's data rows (the
+        scaffold's own tier-0 row by default), so a test can declare a reach and a significance without
+        hand-building the file.
     #>
     param(
         [string]$Dir, [string]$Name, [string]$Title,
@@ -189,8 +191,10 @@ function New-EntryFile {
 
 function New-LegacyEntryFile {
     <#
-        An entry file in the shape written BEFORE this format: an H3 heading carrying the type (and a
-        scaffolded date) as middot fields, with a 'Tier: N' line under it instead of an impact table.
+        An entry file in the shape written BEFORE this format: a heading ONE LEVEL DEEPER than an entry,
+        carrying the type (and a scaffolded date) as middot fields, with a 'Tier: N' line under it
+        instead of an impact table. Why that level and not the digit it was written at is at the
+        composition below.
 
         NOT A HISTORICAL CURIOSITY. An entry file lives only on a branch, so any branch created before this
         change still carries one -- this repo had exactly such a branch parked on the remote when the change
@@ -350,7 +354,7 @@ Assert-True (Test-Path (Join-Path $dir 'CLAUDE.md'))                        'CLA
 Assert-True ($changelogText -notmatch 'Security Policy')                    'meta content did NOT leak into CHANGELOG'
 Assert-True ($changelogText -notmatch '(?m)^# Contributing')               'CONTRIBUTING body did NOT leak into CHANGELOG'
 # THE ENTRY'S OWN SECTIONS CAME THROUGH AT THEIR OWN LEVEL. A replace-all rather than a count-1 would have
-# flattened these three into H2s and turned one entry into four.
+# lifted these three to the entry level and turned one entry into four.
 Assert-Equal 1 @(Get-EntryOrder -Changelog $changelogText).Count 'the folded entry is exactly ONE entry heading, not four'
 foreach ($section in @('What does this change do?', 'Who is this for', 'Type of change')) {
     Assert-True ($changelogText -match ('(?m)^' + $foldSectH + ' ' + [regex]::Escape($section) + '\s*$')) "the '$section' section kept its own level"
@@ -603,11 +607,12 @@ Assert-True ($clU -match 'Repo internal')                        'unscored table
 Assert-True ($clU -match '(?m)^\|\s*Tier\s*\|\s*Significance\s*\|') 'unscored table: and its table is still there'
 Assert-True ($clU -match '(?m)^\|\s*0\s*\|\s*-\s*\|\s*-\s*\|')   'unscored table: scaffold row and all, so the reach is still declared'
 
-Write-Host "A pre-format entry keeps its Tier: line and is promoted to an H2" -ForegroundColor Cyan
+Write-Host "A pre-format entry keeps its Tier: line and is re-levelled to the entry level" -ForegroundColor Cyan
 #      Both halves matter, and both are inversions of the old behaviour. The line SURVIVES because nothing
 #      above the entry states the tier any more -- consuming it would make the entry read back as tier 0 and
-#      drop silently out of the release documents. And the H3 heading is PROMOTED, because an H3 is not an
-#      entry boundary in a flat list of H2s: it would be absorbed into the block above and inherit its PR link.
+#      drop silently out of the release documents. And the heading is RE-LEVELLED, because a heading deeper
+#      than the entry level is not an entry boundary in that list: it would be absorbed into the block above
+#      and inherit its PR link.
 $dirL = New-FoldFixture -Label 'impact-legacy'
 New-EntryFile       -Dir $dirL -Name 'feat-current.md' -Title 'Written in the new format' -Rows '| 1 | 3 | fine |'
 Invoke-Fold -Dir $dirL -Branch 'feat/current' | Out-Null

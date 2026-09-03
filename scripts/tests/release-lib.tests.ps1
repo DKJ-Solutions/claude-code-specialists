@@ -18,10 +18,12 @@
     would have left a suite whose fixtures nothing in the repo writes any more, which passes by looking
     at a document that cannot occur.
 
-    THE SHAPE UNDER TEST: CHANGELOG.md is an intro followed by ONE H2 PER CHANGE, each carrying three H3
-    sections of its own ('What does this change do?', 'Who is this for' -- the impact table -- and 'Type
-    of change'), with the 'Plugins:' line and the '[PR #NN](url) <middot> merged <date>' footer as plain
-    lines at the end. New-FlatEntry below builds exactly that, and its own shape is asserted before the
+    THE SHAPE UNDER TEST: CHANGELOG.md is an intro followed by ONE ENTRY PER CHANGE, each carrying named
+    sections one level under its own heading ('What does this change do?', 'Who is this for' -- the impact
+    table -- and 'Type of change'), with the 'Plugins:' line and the '[PR #NN](url) <middot> merged <date>'
+    footer as plain lines at the end. Both levels are composed from the seams rather than typed, for the
+    reason the shift of August 26, 2026 made expensive: a fixture that states the format is a second
+    definition of it. New-FlatEntry below builds exactly that, and its own shape is asserted before the
     suite uses it.
 
     THE PRE-FORMAT SHAPE IS STILL TESTED, deliberately and in one direction only: this repo's whole
@@ -99,8 +101,9 @@ $emDash = [char]0x2014
 
 function New-FlatEntry {
     <#
-        One folded entry exactly as CHANGELOG.md carries it: the H2 heading the fold produced
-        ('#22 <middot> A title'), the three named H3 sections, then the plain 'Plugins:' and PR lines.
+        One folded entry exactly as CHANGELOG.md carries it: the entry-level heading the fold produced
+        ('#22 <middot> A title'), its three named sections one level under it, then the plain 'Plugins:'
+        and PR lines.
 
         -Rows are the impact table's data rows; '' leaves the table out entirely, which is the
         pre-table entry (and, with -TierLine, the 'Tier: N' shape those entries carried).
@@ -217,8 +220,9 @@ $e20 = New-FlatEntry -Heading "#20 $midDot Repo housekeeping" -Body 'Body twenty
 $sample = New-FlatChangelog -Entries @($e22, $e21, $e20)
 
 Write-Host "Get-EntryHeadingPattern -- the exact level, not a range" -ForegroundColor Cyan
-# THE ONE DECISION IN THE PARSER THAT CANNOT BE LOOSENED. An entry carries H3 sections of its own, so a
-# pattern accepting H3 as well reads every entry as four -- in well-formed markdown, with no error.
+# THE ONE DECISION IN THE PARSER THAT CANNOT BE LOOSENED. An entry carries named sections one level under
+# its own heading, so a pattern accepting that level as well reads every entry as several -- in
+# well-formed markdown, with no error.
 $rx = Get-EntryHeadingPattern
 Assert-Equal $true  (($EntryH + ' #22 x') -match $rx) 'the entry level matches'
 Assert-Equal $false (($EntryS + ' What does this change do?') -match $rx) 'a section-level heading does NOT match -- otherwise one entry reads as four'
@@ -304,8 +308,9 @@ Assert-Match $s.Entries[0] '(?m)^Plugins: team-alpha$' 'and its Plugins line'
 # The '---' separators between entries are structure, not content.
 Assert-NoMatch $s.Entries[0] '(?m)^---\s*$' 'the separator between entries is not carried into an entry'
 
-# A PRE-FORMAT H3 ENTRY IS NOT A BOUNDARY, and that is exactly why the fold promotes one to H2 before
-# pasting it in: left at H3 it is absorbed into the entry above and inherits that entry's PR link.
+# A HEADING BELOW THE ENTRY LEVEL IS NOT A BOUNDARY, and that is exactly why the fold re-levels a
+# pre-format entry before pasting it in: left where it was written it is absorbed into the entry above
+# and inherits that entry's PR link.
 $withH3 = New-FlatChangelog -Entries @($e22 + "`n`n$EntryS #7 $midDot An older entry $midDot Fix $midDot 2026-01-01`n`nBody seven.")
 Assert-Equal 1 (Split-Changelog -Content $withH3).Entries.Count 'a heading deeper than the entry level is absorbed, not counted -- the reason the fold promotes it'
 
