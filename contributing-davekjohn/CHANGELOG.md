@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/traps-count-closing-line-v1` · 20260903-151947
+
+Sylvester's manual said "Nine PowerShell traps" in its heading and "All nine" in its opening line, then
+closed the same section with "The general shape behind **all seven**" -- the sentence that carries the
+lesson out of the section and into the next problem. The section grew from seven traps to nine and the
+closing line was not carried along. The bullets were recounted rather than the heading trusted, because
+the file has a neighbouring count that was mis-corrected once before; the count is nine, so the closing
+line is the only wrong number and the repair is one word.
+
+A wrong count misleads nobody about the traps themselves -- all nine are still there and still correct.
+What it costs is trust in the section's own bookkeeping, which is exactly what a reader leans on when a
+list is too long to check by eye.
+
+Closes [#1302](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1302).
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- a portable manual reaches consumers by plugin update, but the correction changes no behaviour, no
+rule and no instruction. A reader who never noticed the number loses nothing.
+
+**Score:** N/A
+
+#### Pull Request
+
+Sylvester's manual: correct the traps section's closing count
+
+Plugins: team-alpha
+
+[PR #1312](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1312)
+
+---
+
 ### DEPLOY: `fix/asana-mirror-split-group-races-on-one-issue` · 20260903-151904
 
 `asana-mirror.yml`'s concurrency comment now names what splitting the group COST, not only what it
