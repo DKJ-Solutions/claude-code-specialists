@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/changelog-1268-mechanism-corrected-v1` · 20260903-150501
+
+`CHANGELOG.md`'s account of the #1268 red trunk no longer states three mechanisms that do not hold.
+It said "the check runs on the branch head"; `ci.yml` runs on `pull_request`, whose checkout is the
+merge ref, so CI does test the merged tree. It credited the test block to `#1259`, which is an issue
+and not a PR -- `7b783516` arrived via PR #1267. And it said "the merge is not gated", where the
+merge commit's run was created and then cancelled 8 seconds later by the fold push behind it. The
+replacement states what actually happened: a merge-ref certificate fixed at run creation, never
+re-fired when the base moved, and spent 2h11m later. Every figure in it was re-measured here rather
+than copied from the report -- which caught one more, a 45s interval that is 49s.
+
+This is the repo's own history, in the more durable of the two places the incident is written down,
+and it was the account a later reader would have reached for when this recurs. The stale certificate
+stays open as #1292; the cancelled merge run was repaired as #1294.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches a consumer. `contributing-davekjohn/CHANGELOG.md` is this repo's own history and
+ships nowhere: no script, manual, persona or manifest changes, so a repo on either plugin sees no
+difference at all.
+
+**Score:** N/A
+
+#### Pull Request
+
+the changelog's account of the #1268 red trunk states the stale-certificate mechanism and the right PR number
+
+[PR #1309](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1309)
+
+---
+
 ### DEPLOY: `fix/prune-merged-recycled-sentence-v1` · 20260903-144031
 
 `prune-merged`'s kept-branch reason no longer claims a recycled name it never checked for. When a
