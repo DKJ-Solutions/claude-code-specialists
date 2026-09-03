@@ -116,10 +116,12 @@ there it is contention-bound, which is the one regime where adding lanes is clos
 `lint-en-tests` summary. **The name is load-bearing** -- `main-ci-gate` requires a check called
 `lint-en-tests` and GitHub names a check after the job reporting it, so keeping a job by that exact name
 means this needs no ruleset edit and no repo-settings change. That is why it could land while the
-merge-queue decision on [#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325) is
-still open, and it is a prerequisite for that queue rather than an alternative to it: a queue at
-15-minute CI has a serial throughput of about four merges an hour against an observed trunk cadence of
-2.4-4.
+merge-queue decision was still open on
+[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325) -- and it is what settled
+that decision the same day, as **no queue**
+([#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355)): a queue at 15-minute CI
+had a serial throughput of about four merges an hour against an observed trunk cadence of 2.4-4, and
+sharding raised that to about twelve while shrinking the staleness cost the queue was sized against.
 
 The partition is a **stride, not a contiguous block**, and that is the design rather than a detail. The
 pool's expensive suites are expensive because they share a subject, suites that share a subject share a
@@ -203,7 +205,11 @@ Plugins: contributing-davekjohn
 
 Both prerequisites a GitHub merge queue needs are now in the tree, so the queue can be switched on
 without breaking the trunk on its first merge -- the switch itself stays a repo-settings change and
-therefore Dave's ([#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325)).
+therefore Dave's. He answered it the same day on
+[#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355), split out of
+[#1325](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1325): **no queue** on `main`.
+So both prerequisites stay inert, and they stay in the tree deliberately -- a future yes inherits them
+rather than rediscovering them at the first merge.
 
 `.github/workflows/ci.yml` now triggers on `merge_group`. A required workflow without that trigger
 never runs for a queue entry, so `lint-en-tests` never reports, and GitHub's own warning is that the
@@ -414,8 +420,11 @@ would merge on a stale-but-green certificate, reintroducing exactly
 fix recorded there is a GitHub merge queue -- available to this repo, gated on a `merge_group`
 trigger landing in `.github/workflows/ci.yml` first (a required workflow without it never reports
 in the queue, and the merge then fails outright). #1292 (the red-trunk mechanism issue) stays open
-and assigned in its own right; the keep-`strict`-or-adopt-a-merge-queue decision now sits on #1325
-and is Dave's call. `ship-pr.ps1` step 3b is unchanged: its detection is correct and it stays the
+and assigned in its own right; the keep-`strict`-or-adopt-a-merge-queue decision moved to
+[#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355) and Dave answered it
+there the same day -- **no queue**, on price rather than feasibility, once #1351's CI sharding cut the
+staleness cost the queue was sized against.
+`ship-pr.ps1` step 3b is unchanged: its detection is correct and it stays the
 mechanism and the portable net for consumers.
 
 `.claude/rules/language-layers.md`'s closing verification-lesson paragraph is corrected in the same
@@ -615,7 +624,13 @@ red-trunk mechanism issue) stays open and assigned in its own right.
 
 The real fix is a GitHub merge queue, which tests each PR against the projected merge and is
 available to this repo (public, org-owned); its prerequisite is a `merge_group` trigger in
-`.github/workflows/ci.yml`. The keep-`strict`-or-adopt-a-merge-queue decision stays open on #1325.
+`.github/workflows/ci.yml`. The keep-`strict`-or-adopt-a-merge-queue decision was split out of #1325
+to [#1355](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1355) and settled there the
+same day: **no queue** on `main`, and the three settings stay `false`. That is a no on price rather
+than on feasibility -- the same day's CI sharding
+([#1351](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1351)) cut the expected
+stale-certificate cost from ~4.1 minutes per merge to ~0.6, and against ~37 seconds a yes buys a
+repo-settings change plus a step-3b rebuild that is dead code until the day of the flip.
 `ship-pr.ps1` step 3b is unchanged and stays the mechanism and the portable net for consumers. The
 reasoning is recorded in `.claude/specialists/lenses/05-15-extension.md` (the `main-ci-gate` /
 `ci.yml` bullet) and `.claude/rules/language-layers.md`.
