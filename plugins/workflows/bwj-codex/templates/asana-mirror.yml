@@ -25,8 +25,30 @@ permissions:
   # The close update names the pull request that closed the issue, which is a pull-requests read.
   pull-requests: read
 
+# TWO GROUPS PER ISSUE, SPLIT BY WHAT AN ARRIVAL CAN LOSE -- not one shared group, and
+# `cancel-in-progress` is not what protects either of them (issue #1301, the same shape as #1294).
+# A concurrency group holds at most one IN-PROGRESS run plus one PENDING one, and a third arrival
+# DROPS the waiting one without consulting that field at all -- measured on this system's own ci.yml,
+# where the dropped runs had ZERO jobs allocated, so they were never killed mid-flight but removed
+# from the queue. So `cancel-in-progress: false` never meant "every event on this issue is
+# processed"; it means "a running job is not killed", and nothing more.
+#
+# WHICH ARRIVALS ARE EXPENDABLE: `labeled` and `unlabeled`. They only move the card, and the target
+# is recomputed from LIVE state -- Get-IssueLinkState reads the issue's state, labels and project
+# status at run time rather than from the event payload. The last arrival of a burst always runs, so
+# it lands the card exactly where the whole burst put it, and the dropped middle ones cost nothing.
+# Coalescing them is the POINT rather than a compromise: triage fires them in bursts.
+#
+# WHICH ARE NOT: `closed` and `reopened`. Their comment half is keyed on the EVENT, not on live
+# state, so a dropped one is a comment nobody ever posts. A dropped `closed` is recovered within a
+# day by reconciliation sweeps (a)/(b), which de-duplicate. A DROPPED `reopened` IS NOT RECOVERED AT
+# ALL: no sweep comments on a reopen, and the reopen is also the only thing that sets AllowBackward
+# while every sweep moves a card forward only -- so it loses the 'hold off on testing' notice
+# permanently AND leaves the card stuck at its forward floor. Giving those two their own group means
+# a triage burst can no longer displace one, while two of them on one issue still serialise, which
+# is what keeps a close and a reopen in the order they actually happened.
 concurrency:
-  group: asana-mirror-${{ github.event.issue.number || 'reconcile' }}
+  group: asana-mirror-${{ github.event.issue.number || 'reconcile' }}-${{ (github.event.action == 'closed' || github.event.action == 'reopened') && 'state' || 'triage' }}
   cancel-in-progress: false
 
 jobs:

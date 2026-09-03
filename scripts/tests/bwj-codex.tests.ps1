@@ -157,6 +157,18 @@ Assert-True ($mirrorSrc -notmatch 'WorkspaceGid')        'the script declares no
 Assert-True ($mirrorYml -notmatch 'ASANA_WORKSPACE_GID') 'and the workflow hands neither step a workspace variable'
 Assert-True ($mirrorYml -match 'ASANA_PROJECT_GID')      'while the project variable it does read is still passed'
 
+# THE CONCURRENCY GROUP IS SPLIT BY WHAT AN ARRIVAL CAN LOSE (#1301). One group per issue put the
+# `closed`/`reopened` runs -- the only ones whose work is keyed on the event rather than recomputed
+# from live state -- in the same queue as a triage burst, and a group drops its PENDING run without
+# consulting `cancel-in-progress`. A dropped `reopened` is unrecoverable: no sweep comments on a
+# reopen, and it is the only thing that sets AllowBackward while every sweep moves forward only.
+# Asserted over the yml text because the defect is a group two kinds of event SHARE -- there is no
+# helper to call, and the collapse back to one key is a one-line edit that changes nothing visible.
+Assert-True ($mirrorYml -match "(?m)^\s*group:\s*asana-mirror-.*github\.event\.issue\.number") 'the concurrency group is still keyed per issue'
+Assert-True ($mirrorYml -match "(?m)^\s*group:.*github\.event\.action\s*==\s*'closed'")   "and the group key separates 'closed'"
+Assert-True ($mirrorYml -match "(?m)^\s*group:.*github\.event\.action\s*==\s*'reopened'") "and 'reopened' from the label events, so a triage burst cannot displace one"
+Assert-True ($mirrorYml -match "(?m)^\s*cancel-in-progress:\s*false") 'while a run already going is still never killed'
+
 # comment request -- the only write this script builds
 Assert-Throws { New-AsanaCommentRequest -Gid 'abc' -Text 'x' }             'New-AsanaCommentRequest throws on a non-numeric GID'
 Assert-Throws { New-AsanaCommentRequest -Gid '123; rm -rf /' -Text 'x' }   'and on a GID carrying a shell payload'
