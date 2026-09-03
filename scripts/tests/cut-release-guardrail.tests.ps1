@@ -171,6 +171,22 @@ Assert-True (Test-BranchChangelogIsFilled -Text $modernDoc -OpeningHeadingOnly) 
 $oldBranchFirst = "# ``feat/older-shape`` progress`n`nSomething.`n"
 Assert-True (Test-BranchChangelogIsFilled -Text $oldBranchFirst -OpeningHeadingOnly) `
     'and so does the branch-first heading every document carried before August 23, 2026'
+# TODAY'S SHAPE (#1335) HAS NO DELIMITER LEFT, which is why the bare form requires the heading to be one
+# token carrying a slash. That is the honest narrowing rather than a guess about branch names: without it
+# '## Overview' declares the branch 'Overview' and this scan is back to the #1099 defect it was repaired
+# for -- reachable again, because the backticks that used to be the anchor are gone.
+$bareDoc = "## fix/x-v1`n`n### PLAN`n`nSomething.`n"
+Assert-True (Test-BranchChangelogIsFilled -Text $bareDoc -OpeningHeadingOnly) `
+    'and so does the bare heading a document carries today'
+# ...while a one-word heading declares NOTHING. Asserted on Get-BranchFileDeclaredBranch rather than on
+# Test-BranchChangelogIsFilled, deliberately: that wrapper answers true for this document anyway, through
+# its OTHER arm -- the first non-blank line sits at an entry level -- which is behaviour that predates all
+# of this and is not what the bare form could break. The name test is the half #1335 touched, so the name
+# test is what this holds.
+Assert-True ('' -eq (Get-BranchFileDeclaredBranch -Text "## Overview`n`nSome body text that is not an entry.`n" -OpeningHeadingOnly)) `
+    'a one-word opening heading declares no branch -- the bare form requires a branch-shaped token, not any single word'
+Assert-True ('' -eq (Get-BranchFileDeclaredBranch -Text "# Notes`n`n## Maintenance`n`nBody.`n")) `
+    'and un-narrowed it is the same answer, so the guard is in the pattern rather than in the switch'
 # THE '**Branch:**' FALLBACK IS NOT NARROWED, and it is the one shape that sits BELOW the title -- a
 # pre-split root entry, which is precisely the file this scan exists to catch. Its label is read from the
 # wording rather than typed, for the same reason the predicate reads it that way.

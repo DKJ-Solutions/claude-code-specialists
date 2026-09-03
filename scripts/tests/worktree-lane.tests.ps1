@@ -197,11 +197,11 @@ try {
     # The name carries the branch since #1255, and the lane's branch is 'feat/lane-a'. Written out
     # rather than derived, deliberately: this suite is asserting that worktree-lane delegated -RepoRoot
     # correctly, and a path computed from the same lib the script used would agree with it either way.
-    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\development-feat-lane-a.md')) "open: the development document is written in the lane"
+    Assert-True (Test-Path -LiteralPath (Join-Path $laneA 'contributing-davekjohn\feat-lane-a.md')) "open: the development document is written in the lane"
     # THE NAME THIS COULD ACTUALLY GAIN, which is the per-branch one (#1255). Checking the pre-#1255
     # shared name here would pass whatever the script did, because nothing writes that name any more --
     # a negative assert against a path no writer can produce is not a measurement.
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\development-feat-lane-a.md'))) "open: the primary did NOT gain one"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fa 'contributing-davekjohn\feat-lane-a.md'))) "open: the primary did NOT gain one"
     # AND THE LANE IS ON ORIGIN THE MOMENT IT OPENS (#900). Asserted here rather than left to
     # new-branch's own suite, because a lane is the case that needs it most: opening one is by definition
     # work running beside something else, which is exactly when the other side cannot see a local branch.

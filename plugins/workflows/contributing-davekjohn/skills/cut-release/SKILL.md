@@ -244,7 +244,7 @@ a release for a missing timestamp would be ceremony rather than a guard.
      second heading being a question rather than a number:
 
      ```text
-     ## DEPLOY: `feat/short-name`
+     ## DEPLOY: feat/short-name
 
      The routine version bump stops needing a developer.
 
