@@ -113,6 +113,8 @@ function New-Fixture {
     Invoke-Git @('init', '-q', $dir)                                        | Out-Null
     Invoke-Git @('-C', $dir, 'config', 'user.email', 'tycho-tests@local.invalid') | Out-Null
     Invoke-Git @('-C', $dir, 'config', 'user.name',  'Tycho Tests')         | Out-Null
+    # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+    Invoke-Git @('-C', $dir, 'config', 'commit.gpgsign', 'false')           | Out-Null
     Invoke-Git @('-C', $dir, 'symbolic-ref', 'HEAD', 'refs/heads/main')     | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $dir 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
     Invoke-Git @('-C', $dir, 'add', '-A')                                   | Out-Null

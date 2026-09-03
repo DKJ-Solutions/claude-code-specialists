@@ -272,10 +272,12 @@ function Initialize-FoldGitRepo {
     <# Turn a fixture into a real git repo with the baseline committed, so -Commit has something to
        commit ONTO.
 
-       Identity and autocrlf are set LOCALLY. Identity, because a machine without a global user.email
-       would otherwise fail inside the script under test and read as a defect in it. autocrlf, because
-       git's "LF will be replaced by CRLF" warning goes to stderr, and on Windows PowerShell that is
-       enough to fail the suite for a reason that has nothing to do with folding.
+       Identity, autocrlf and commit.gpgsign are all set LOCALLY. Identity, because a machine without a
+       global user.email would otherwise fail inside the script under test and read as a defect in it.
+       autocrlf, because git's "LF will be replaced by CRLF" warning goes to stderr, and on Windows
+       PowerShell that is enough to fail the suite for a reason that has nothing to do with folding.
+       commit.gpgsign false, because a machine with global signing on and a locked signing agent
+       (op-ssh-sign, gpg) would otherwise fail the baseline commit for the same unrelated reason (#1287).
 
        NO '2>&1' ON A NATIVE COMMAND -- the #107 pitfall this repo documents and that its own shared-
        scripts guard exists to catch. Under ErrorActionPreference=Stop a single stderr line from git
@@ -289,6 +291,7 @@ function Initialize-FoldGitRepo {
         & git -C $Dir config user.name  'fold test'         | Out-Null
         & git -C $Dir config user.email 'fold@test.invalid' | Out-Null
         & git -C $Dir config core.autocrlf false            | Out-Null
+        & git -C $Dir config commit.gpgsign false           | Out-Null
         & git -C $Dir add -A                                | Out-Null
         & git -C $Dir commit -m 'baseline' --quiet          | Out-Null
     } finally { $ErrorActionPreference = $prevEap }

@@ -97,6 +97,8 @@ function New-Fixture {
         & git -C $dir init -q 2>$null | Out-Null
         & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
         & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
+        # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
         # symbolic-ref instead of checkout -b: works on a still-unborn HEAD regardless of git's own
         # init.defaultBranch setting, and gives no error if HEAD happens to already be named 'main'.
         & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null

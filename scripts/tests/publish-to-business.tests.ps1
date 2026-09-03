@@ -72,12 +72,15 @@ $scriptUnderTest = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\relea
 # --- fixture helpers -------------------------------------------------------------------------------
 
 function Invoke-FixtureGit {
-    <# git in the fixture, with a fixed identity so commits work on any machine. Throws on failure. #>
+    <# git in the fixture, with a fixed identity and signing off so commits work on any machine --
+       commit.gpgsign=false because a machine with signing on but a locked signing agent would
+       otherwise fail every fixture commit for a reason unrelated to the script under test (#1287).
+       Throws on failure. #>
     param([string]$Dir, [string[]]$GitArgs)
     $prev = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        $out = & git -C $Dir -c user.name=fixture -c user.email=fixture@localhost @GitArgs 2>&1
+        $out = & git -C $Dir -c user.name=fixture -c user.email=fixture@localhost -c commit.gpgsign=false @GitArgs 2>&1
         $code = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $prev

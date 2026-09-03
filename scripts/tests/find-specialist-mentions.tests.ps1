@@ -158,6 +158,8 @@ function New-Fixture {
         git init --quiet 2>$null | Out-Null
         git config user.email 'fixture@example.com' 2>$null | Out-Null
         git config user.name  'Fixture' 2>$null | Out-Null
+        # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+        git config commit.gpgsign false 2>$null | Out-Null
         git add -A 2>$null | Out-Null
         git commit --quiet -m 'fixture' 2>$null | Out-Null
     } finally {
