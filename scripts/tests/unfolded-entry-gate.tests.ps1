@@ -161,7 +161,7 @@ try {
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'an unfolded changelog entry is sitting on the trunk' -and $r.Out -match 'feat/alpha') `
         'leftover on the trunk -- a compact summary carrying the [ERROR] detail, still exit 0'
 
-    $r = Invoke-Hook -Dir (New-Tree -Label 'hook-nocheck') -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) 'no-such-check.ps1')
+    $r = Invoke-Hook -Dir (New-Tree -Label 'hook-nocheck') -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) "no-such-check-$PID.ps1")
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'check script not found -- check skipped') `
         'check script missing -- a notice, exit 0, never a strand'
 }
