@@ -455,8 +455,8 @@ it was coming.
 
 **The branch's own file moved out of your repo root.** A branch used to carry `<branch-name>.md` beside
 your `README.md`; it now carries one `contributing-davekjohn/<branch>.md`, which holds both jobs as
-sections — `## PLAN` / `## CREATE` / `## TEST` for what still has to happen, and
-`## DEPLOY: <branch>` for what the change does. It was a pair under `contributing-davekjohn/branch/`
+sections — `### PLAN` / `### CREATE` / `### TEST` for what still has to happen, and
+`### DEPLOY: <branch>` for what the change does. It was a pair under `contributing-davekjohn/branch/`
 between August 6 and August 23, 2026, with reference copies under `branch/templates/`; both are gone, and
 the guidance those copies held is inside the document.
 

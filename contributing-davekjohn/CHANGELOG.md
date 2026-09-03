@@ -32,6 +32,47 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/prose-phase-heading-levels · 20260903-205741
+
+The documents that teach the branch document's shape now show the shape the scaffolder actually writes.
+The August 26, 2026 level shift moved three things -- the document's own heading to `##`, the four phase
+headings to `###`, and the entry's inner sections to `####` -- and the prose describing all of it was left
+at the pre-shift levels for a week, in eleven files. Nothing caught it, because the gates hold real branch
+documents and real entries to their level and never prose about them.
+
+Both halves are corrected together, which is the part worth knowing: repairing only the phase headings
+would have left `### DEPLOY:` with a `###` section claimed as sitting *under* it -- the same level, so the
+sentence would have become false in a new way. Where the shift expired a passage's *reasoning* rather than
+its figure, the passage was rewritten; where it expired a script comment's, it was filed as #1341 instead.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer copies the shape from exactly these pages, and they ship through a release. `CONTRIBUTING-portable.md`,
+`DEVELOPMENT-portable.md`, `RELEASES-portable.md` and the four skill pages were telling them to write `##`
+where their own scaffolder writes `###` -- and the shipped PR template told them to paste from a
+`'## DEPLOY:'` line their document has not carried since August 26.
+
+That last one was the only half with teeth, and check 23 is what found it: the template is generated from
+`Get-PrTemplateReference` and its placeholder must match `Get-PrDescriptionPlaceholderDefaults` verbatim, so
+editing the file was refused. The corrected form is **appended** to that list rather than replacing the old
+one -- the append-only rule from #952, whose whole point is that a consumer's template is their own file and
+still carries the previous wording. So a consumer who has not migrated keeps getting a description, and a
+new template is written with the level their document actually has.
+
+**Score:** 3
+
+#### Pull Request
+
+Correct the phase heading levels in prose about the branch document
+
+Plugins: contributing-davekjohn
+
+[PR #1345](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1345)
+
+---
+
 ### DEPLOY: docs/fold-fixed-filename-cost-stale · 20260903-203524
 
 Two present-tense claims in `fold-changelog-entry.ps1` outlived the rename that made them false, and

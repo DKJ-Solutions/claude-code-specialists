@@ -751,7 +751,16 @@ function Get-PrDescriptionPlaceholderDefaults {
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
-        "<!-- Filled from the DEPLOY section of contributing-davekjohn/<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+        # THE LEVEL IN THE QUOTED HEADING WAS STALE, NOT THE PATH (#1338, September 3, 2026). Every form
+        # above quotes '## DEPLOY:', which is the level the DEPLOY heading carried until the August 26, 2026
+        # shift moved the branch document's phases to H3 -- so this family's own template told a reader
+        # opening a PR by hand to paste from a line their document does not have. Appended rather than
+        # rewritten, for exactly the reason #952 is written up above: a consumer's template is THEIR file and
+        # still carries the old wording, and dropping the form they hold is how twelve PRs got no
+        # description. The level here is the one Get-BranchCycleSectionLevel writes and is not derived --
+        # this list is matched verbatim, so a computed level would make the strings unrecognisable to it.
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '### DEPLOY:' line. -->"
     )
 }
 
@@ -783,7 +792,7 @@ function Get-PrTemplateReference {
         IT WAS TWO LINES UNTIL AUGUST 24, 2026, and the first was a heading -- 'What does the change on
         this branch deploy to main?', the question the entry's opening section used to carry. It went
         with issue #865: since August 23 the DEPLOY section names that answer with no heading of its
-        own (the text sits straight under '## DEPLOY: <branch>'), so a template still asking the
+        own (the text sits straight under '### DEPLOY: <branch>'), so a template still asking the
         question was the last place in the system doing so, and every PR body opened here led with a
         heading whose own document had dropped it.
 
