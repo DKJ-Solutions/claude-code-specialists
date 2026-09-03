@@ -47,8 +47,18 @@ The reported symptom holds exactly as filed -- verified before anything was chan
 **It names one instance where there are two.** `scripts/task/park-cycle.ps1` is the same case, on the
 same registry, for the same reason -- a hook invokes it from the plugin, so a refusal would fire every
 turn -- and its guard sentence also happens to name the lib, in its `.DESCRIPTION`. Measured across all
-24 registered entry points: 20 genuinely wired, 2 declared exempt, and **2 passing on prose alone**.
+25 registered entry points: 20 genuinely wired, 3 declared exempt, and **2 passing on prose alone**.
 That does not change the repair, only its scope: both exemptions are declared here.
+
+#### The control case, which landed on the trunk mid-branch
+
+PR #1322 (issue #1315) merged while this branch was open and added `scripts/lint/check-git-identity.ps1`
+to the same `$guardExempt` block -- the one conflict this branch had, resolved by keeping both. It is
+worth more than a merge note, because it is the **control** that makes #1321 legible: same class of
+script, same hook-invoked reason, and its exemption **was** argued here the way the block intends. The
+only difference is that its "no guard" comment does not happen to name the lib, so the old text match
+fired on it. Same reason, opposite outcome, decided by comment wording alone. Both are now declared, and
+under the new matcher neither could have slipped through in the first place.
 
 ### CREATE
 
@@ -71,7 +81,7 @@ That does not change the repair, only its scope: both exemptions are declared he
       while the loop only checked the file exists and is registered. `Get-GuardWiringGap` makes it one
       line, so the paragraph is now true rather than aspirational.
 - [x] `../scripts/README.md`: the bullet said "exactly two exceptions" and named them, which this branch
-      makes wrong at four. Replaced with the reason class (hook-invoked) plus a pointer to the list in
+      makes wrong at five. Replaced with the reason class (hook-invoked) plus a pointer to the list in
       the suite, rather than a fresh count of four -- the page's own opening says it "deliberately states
       no count", and the test block says the list is "named here and nowhere else", so re-enumerating was
       the staleness both had already warned about.
@@ -87,7 +97,7 @@ That does not change the repair, only its scope: both exemptions are declared he
       same copy was green. The scratch copy was removed; it was deliberately not named `*.tests.ps1`, so
       it could not have joined the gate had it been left behind.
 - [x] The matcher is held to catching #1321 by three asserts of its own, and it has to be: no real file
-      exercises the comment case any more, because all four scripts that would are skipped as exempt
+      exercises the comment case any more, because all five scripts that would are skipped as exempt
       before the matcher is reached. A regression back into a text match would otherwise leave the suite
       green and silent -- precisely how the defect survived the first time. They run *before* the
       coverage assert, since a broken matcher makes its verdict meaningless in either direction.

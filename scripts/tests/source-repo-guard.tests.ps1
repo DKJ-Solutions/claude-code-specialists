@@ -275,14 +275,24 @@ finally {
 # for a Stop hook, on every turn -- in the repo that maintains them. The reason is specific to being a
 # hook and does not extend to a script somebody runs.
 #
-# TWO OF THE FOUR WERE NEVER DECLARED (issue #1321), and that was not a lapse of judgement: the coverage
+# TWO OF THE FIVE WERE NEVER DECLARED (issue #1321), and that was not a lapse of judgement: the coverage
 # check below used to be a text match over the whole file, which both of them satisfied with a COMMENT
 # naming the lib -- in each case a comment explaining why the guard was deliberately left out. The assert
 # never fired, so nobody ever had to argue the exemption, which is exactly the outcome the paragraph above
 # calls impossible. Their code was right all along; only this bookkeeping was missing.
+#
+# check-git-identity.ps1 IS THE CONTROL CASE, and it is worth keeping the pairing on the record: it joined
+# this list on September 3, 2026 (issue #1315) on exactly the same reason -- git-identity-sessioncheck.ps1
+# runs it from '${CLAUDE_PLUGIN_ROOT}/scripts/lint/', the released copy, so Assert-OwnCopy would refuse it
+# and thereby the hook at every session start here. It has no second caller: no CI half, deliberately,
+# because a runner acts and commits as a bot and would report a mismatch on every push. What made it the
+# control is that its "no guard" comment does not happen to name the lib, so the old text match DID fire
+# on it and its exemption was argued here the way this block intends. Same reason, opposite outcome,
+# decided by comment wording alone -- which is how #1321 was found.
 $guardExempt = @(
     'scripts\sync\check-roster-sync.ps1',      # SessionStart: roster-sessioncheck
     'scripts\sync\check-script-contract.ps1',  # SessionStart: script-contract-sessioncheck
+    'scripts\lint\check-git-identity.ps1',     # SessionStart: git-identity-sessioncheck (#1315)
     'scripts\lint\check-unfolded-entry.ps1',   # SessionStart: unfolded-entry-sessioncheck (#1270)
     'scripts\task\park-cycle.ps1'              # Stop: cycle-autopark (#900)
 )
@@ -352,7 +362,7 @@ function New-MatcherFixture {
 }
 
 # THE MATCHER IS ITSELF HELD TO CATCHING #1321, and it has to be, because no real file exercises the
-# comment case any more: all four scripts that would are skipped as exempt before the matcher is reached.
+# comment case any more: all five scripts that would are skipped as exempt before the matcher is reached.
 # So a regression back into a text match would leave the suite green and silent -- which is precisely how
 # the defect survived the first time. These three run BEFORE the coverage assert on purpose: a broken
 # matcher makes that assert's verdict meaningless in either direction.

@@ -25,7 +25,7 @@ Three consequences worth knowing before you touch anything:
   **The exempt scripts are deliberately not listed here** — they are named in
   [`tests/source-repo-guard.tests.ps1`](tests/source-repo-guard.tests.ps1) and nowhere else, so adding one
   is a decision that has to be argued in a file that fails when it is wrong. This page named two of them
-  until September 3, 2026, and by then there were four.
+  until September 3, 2026, and by then there were five.
   **The rule itself is held by that test rather than by this sentence** — it derives the entry points from
   the registry and fails on any that lacks the guard, so a new one is caught on the day it is registered.
   That assert exists because this line previously carried a hand-typed ratio and was wrong: the suite had
