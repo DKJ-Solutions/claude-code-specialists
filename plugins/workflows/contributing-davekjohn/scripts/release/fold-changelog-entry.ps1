@@ -252,28 +252,32 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 }
 
 function Test-IsChangelogEntryFile {
-    # A changelog entry file (created by new-branch.ps1) always opens with its own heading, and
-    # since August 5, 2026 that heading is an H2 ('## <title>') rather than the H3 it was before. Repo-root
-    # meta docs (CONTRIBUTING.md, SECURITY.md, a future CODE_OF_CONDUCT.md, ...) open with an H1 ('# ...').
+    # A changelog entry file (created by new-branch.ps1) always opens with its own heading, an H3
+    # ('### <title>') since the August 26, 2026 level shift. Repo-root meta docs (CONTRIBUTING.md,
+    # SECURITY.md, a future CODE_OF_CONDUCT.md, ...) open with an H1 ('# ...').
     # Fold-all mode keys off this structural signature so it only ever folds a genuine entry, never
     # whatever other *.md happens to sit in the repo root. Deliberately independent of the branch-
     # prefix table: consumer-extended prefixes (Shopify's style/, liquid/, ...) still fold, since an
     # entry from any prefix is written in this same format. The denylist below stays as a cheap
     # first filter; this is the actual gate.
     #
-    # BOTH LEVELS ARE ACCEPTED, and the range is built from the lib rather than written out, so the two
-    # scripts cannot end up recognising different things. An entry file lives only on a branch, so the H3
-    # shape is not distant history: a branch created before this change still carries one, and refusing to
-    # recognise it would silently leave that entry unfolded in the root -- the exact half-state this repo
-    # keeps rediscovering. The fold PROMOTES it to an H2 as it lands (see the loop below).
+    # TWO LEVELS ARE ACCEPTED, and the range is built from the lib rather than written out, so this and
+    # check-plugin-integrity.ps1 cannot end up recognising different things. An entry file lives only on a
+    # branch, so a branch opened in the flat window (August 5-26, 2026) still carries the shape from then:
+    # the entry at H2. Refusing to recognise it would silently leave that entry unfolded in the root --
+    # the exact half-state this repo keeps rediscovering -- so the range runs DOWN from the current level,
+    # not up: '#{entryLevel-1,entryLevel}'. This is the same direction Test-BranchChangelogIsFilled took on
+    # August 26 and for the same reason; 'entryLevel+1' (an H4 no entry has ever opened with) was the stale
+    # reading, issue #1344. The fold PROMOTES a below-level entry to the current level as it lands, whole
+    # block at once, via Set-EntryHeadingLevel (see the loop below).
     #
-    # The bound is a RANGE from the current level, not a hardcoded '{2,3}': '^#{2,3}\s' looks like it also
-    # matches an H2 by prefix, but it does not -- '^##' followed by '\s' fails on '###', which is why the
-    # alternation has to be spelled as a quantifier over the whole run.
+    # The bound is a RANGE, not a hardcoded '{2,3}': '^#{2,3}\s' looks like it also matches an H4 by
+    # prefix, but it does not -- '^#{2,3}' consumes at most three '#' and then needs '\s', which fails on
+    # the fourth '#', which is why the alternation has to be spelled as a quantifier over the whole run.
     param([Parameter(Mandatory = $true)][string]$Path)
     $entryLevel  = Get-EntryHeadingLevel
-    $legacyLevel = $entryLevel + 1
-    $rx = '^#{' + $entryLevel + ',' + $legacyLevel + '}\s'
+    $legacyLevel = $entryLevel - 1
+    $rx = '^#{' + $legacyLevel + ',' + $entryLevel + '}\s'
     foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         return ($line -match $rx)
