@@ -92,16 +92,32 @@ function Assert-True {
     }
 }
 
-# THE THREE CHECKS THIS SUITE SKIPS BY DEFAULT, AND WHY THE DEFAULT IS THE FAST ONE. Profiled over this
-# suite's own fixture, agent-def, parse and branch-template were half of every run's work, and this suite
-# runs the gate 110 times to assert one thing at a time -- 98% of its 194s was inside those child
-# processes, and it was the whole test gate's wall clock, three times the next slowest suite. Almost no
-# scenario here is about those three, so almost every run was paying for them.
+# THE THREE CHECKS THIS SUITE SKIPS BY DEFAULT. Profiled when this was one file, agent-def, parse and
+# branch-template were reported as half of every run's work, and almost no scenario here is about those
+# three -- so the fast path became the default.
 #
-# FOUR SCENARIOS PASS -Full, and they are the complete list: the two branch-template scenarios (r13bGood,
-# r13bGone), the [COVERAGE] scenario (which asserts 'agent-def' reports its count), and the
-# frontmatter-bom scenario (which asserts the ABSENCE of an [agent-def] finding -- the one shape that
-# would pass VACUOUSLY under a skip, and therefore the one to be careful about).
+# THAT SAVING IS NOW 2.0%, RE-MEASURED September 3, 2026 (issue #1358), and the figure is corrected here
+# rather than the skip removed. Over this fixture a full invocation is 1.390s and the -SkipCheck one
+# 1.362s. The reason is the fixture rather than the checks: it carries 2 skills, no manuals and no
+# personas, so agent-def, parse and branch-template have almost nothing to walk in it -- the 'half of
+# every run' figure cannot have been this tree. What actually dominates an invocation here was measured at
+# the same time: ~283ms (21%) is fixed overhead the child process pays before any check runs -- spawn,
+# the 3419-line parse, the libs -- and the rest is the checks' own work, of which barred-skill and
+# shopify-cli were 216ms and 174ms until #1358 gave them one shared pass.
+#
+# SO DO NOT REACH FOR -SkipCheck FOR SPEED. It buys 2% and it is the one knob here that can make an
+# absence assert pass vacuously; it stays the default only because the scenarios do not need those three,
+# not because it is fast.
+#
+# NINE SCENARIOS PASS -Full, and this is the complete list: in the entries suite, the six check-13b
+# branch-template scenarios (r13bAbsent, r13bOnBranch, r13bLeftover, r13bNameless, r13bMaster,
+# r13bMainOnMaster) and the [COVERAGE] scenario (which asserts 'agent-def' reports its count); in the docs
+# suite, the frontmatter-bom scenario and the one that writes a hook which does not parse and asserts
+# check 5 reports it. That last one is the shape to be careful about -- an assert about a SKIPPED check
+# proves nothing either way under the default, which is why its own comment says so.
+#
+# It said FOUR until September 3, 2026 (issue #1358), naming two scenarios (r13bGood, r13bGone) that no
+# longer exist -- a count in a comment that the split and check 13b's growth had both moved past.
 #
 # If you add a scenario that asserts anything about those three checks, pass -Full. A presence assert
 # fails loudly without it; an absence assert does not, which is why this note is here rather than in a

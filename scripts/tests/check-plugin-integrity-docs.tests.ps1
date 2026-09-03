@@ -600,6 +600,16 @@ try {
     $sa5 = Invoke-Integrity -FixtureRoot $Fixture -Full
     Assert-True ($sa5.Out -match '\[parse\].*probe-sessioncheck\.ps1') `
         'parse: a plugin hook that does not parse is reported -- the set widened for check 27 fixed this too'
+    # AND THE TWO CHECKS THAT WALK THE SAME SET SURVIVE IT (issue #1358). Since barred-skill and
+    # shopify-cli started sharing one pass through Get-PsScriptCommandAsts, an unparseable file is an
+    # EMPTY CommandAst list rather than each check's own null-and-continue. Both still count the file as
+    # covered and neither aborts -- asserted here because this is the only scenario in the four suites
+    # that puts a file the parser refuses in front of them, and a shared accessor that returned $null
+    # would take both checks down together instead of one.
+    Assert-True ($sa5.Out -match '\[barred-skill\] checked \d+') `
+        'barred-skill: still reports its coverage with a file the parser refuses in the set'
+    Assert-True ($sa5.Out -match '\[shopify-cli\] checked \d+') `
+        'shopify-cli: still reports its coverage with a file the parser refuses in the set -- the shared pass degrades to an empty list, not a null'
     Remove-Item -LiteralPath $hookProbe -Force
     Assert-True ((Invoke-Integrity -FixtureRoot $Fixture).Out -notmatch '\[script-ascii\] \.') `
         'script-ascii: the fixture is clean again once both probes are gone'

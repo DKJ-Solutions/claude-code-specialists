@@ -211,16 +211,25 @@
     OWN TEST SUITES, and for nothing else: no gate -- open-pr, cut-release, CI -- passes it, and a guard
     test holds them to that.
 
-    WHY IT EXISTS, MEASURED. The four check-plugin-integrity-*.tests.ps1 suites run this script 110 times
-    over a fixture, each run a fresh process executing all 27 checks in order to assert one. As ONE suite
-    that was 194s, of which 98% was inside those child runs, and it was the test gate's whole wall clock
-    -- three times the next slowest suite, so the gate cost what this one suite cost. Profiled over the
-    fixture, three checks were half of every run: agent-def, parse and branch-template, none of which
-    most scenarios are about.
+    WHY IT EXISTS, MEASURED. The four check-plugin-integrity-*.tests.ps1 suites run this script 168 times
+    over a fixture -- 52 + 45 + 40 + 31 -- each run a fresh process executing all 30 checks in order to
+    assert one. As ONE suite that was 194s, of which 98% was inside those child runs, and it was the test
+    gate's whole wall clock -- three times the next slowest suite, so the gate cost what this one suite
+    cost. Profiled over the fixture at the time, three checks were reported as half of every run:
+    agent-def, parse and branch-template, none of which most scenarios are about.
 
     THE SKIP CAME FIRST AND THE SPLIT SECOND, and both were needed. Skipping took the suite from 194s to
-    ~160s; splitting it into four files (August 16, 2026, issue #714) took the same 110 runs from 160s in
-    one lane to ~51s across four, because the test gate parallelises per FILE. Neither removed a scenario.
+    ~160s; splitting it into four files (August 16, 2026, issue #714) took the runs from 160s in one lane
+    to ~51s across four ON A WORKSTATION, because the test gate parallelises per FILE. Neither removed a
+    scenario.
+
+    THE SKIP'S OWN SAVING IS NOW 2.0%, re-measured September 3, 2026 (issue #1358): 1.362s against 1.390s
+    over today's fixture. The three checks are not half of anything in it -- it carries 2 skills, no
+    manuals and no personas, so they have almost nothing to walk there. The counts above were 110 and 27
+    until the same re-measurement. Do not reach for this parameter for speed; it buys 2% and it is the one
+    knob here that can make an absence assert pass vacuously. The fixture's own header records what
+    actually dominates an invocation, and check-plugin-integrity-fixture.ps1 is where that measurement
+    lives.
 
     A SKIPPED CHECK IS NEVER REPORTED AS 'checked 0'. This gate deliberately makes an empty scan visible
     -- 'no agent def found' is a finding-shaped statement, because a check that examined nothing must not
@@ -955,6 +964,45 @@ function Get-PsScriptFiles {
         })
     $script:PsScriptFileCache = @($found | Sort-Object -Property FullName -Unique)
     return $script:PsScriptFileCache
+}
+
+# THE CommandAst SET PER SCRIPT FILE, PARSED AND WALKED ONCE -- issue #1358. Two non-skippable checks
+# want exactly this list over exactly the set above: check 30 (barred-skill) reads the strings printed by
+# a writer cmdlet, and shopify-cli looks for a command named 'shopify'. Each used to call ParseFile and
+# then FindAll(CommandAst) itself, so every run paid for the same parse and the same full-tree walk twice.
+#
+# MEASURED, September 3, 2026, over this repo's own 184-file script set: one parse+walk pass is 1.41s, of
+# which the WALK is 1.16s and the parse only 0.26s -- so the duplicate that mattered was the walk, not the
+# parse the two comments both talked about. A second pass off this cache is 0.014s. Inside the fixture the
+# gate's own suites build, the two checks were 216ms and 174ms of a 1315ms invocation; sharing the pass
+# removes ~174ms of it, and those suites run this script 168 times.
+#
+# IT RETAINS THE ASTs, WHICH IS THE COST AND IT IS STATED RATHER THAN DISCOVERED: 25,476 CommandAst nodes
+# over that set hold ~72MB of heap and ~100MB of working set. That is affordable on a hosted runner and
+# trivial in the fixture (12 files), but it is the reason this caches the CommandAst LIST rather than the
+# whole AST per file -- the nodes are reachable from it either way, and a narrower promise is easier to
+# keep. If it ever needs to be memory-bounded, the answer is to run both checks in ONE pass over the file
+# set rather than to cache: the two loops are independent per file and neither needs a second look.
+#
+# CHECK 5 ('parse') DELIBERATELY DOES NOT USE THIS, and the reason is the one its own comment gives from
+# the other direction: it is the only skippable one of the three, and it needs the PARSE ERRORS this
+# accessor throws away. So it keeps its own pass, which is what lets these two run when 'parse' is
+# skipped -- the property the barred-skill comment already relied on, now stated where the sharing is.
+#
+# An unparseable file yields an EMPTY list, not $null. Both callers counted such a file as covered and
+# then skipped it, so an empty list preserves their coverage numbers exactly.
+$script:PsScriptCommandAstCache = @{}
+function Get-PsScriptCommandAsts {
+    param([Parameter(Mandatory)][string]$Path)
+    if ($script:PsScriptCommandAstCache.ContainsKey($Path)) { return $script:PsScriptCommandAstCache[$Path] }
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$null)
+    $cmds = if ($null -eq $ast) {
+        @()
+    } else {
+        @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true))
+    }
+    $script:PsScriptCommandAstCache[$Path] = $cmds
+    return $cmds
 }
 
 $psScripts = @()
@@ -3246,8 +3294,10 @@ Write-Coverage -Category 'plugin-link' -Checked $pluginLinkChecked `
 # a variable name. Markdown is matched per line, where there is no such distinction to draw.
 #
 # NOT SKIPPABLE, deliberately: -SkipCheck's list is the three checks the gate's own suites need, and the
-# comment on $script:SkippableChecks says adding a fourth is a deliberate act. This one re-parses the
-# script set rather than reusing check 5's pass, which is what lets it run when 'parse' is skipped.
+# comment on $script:SkippableChecks says adding a fourth is a deliberate act. This one does not reuse
+# check 5's pass, which is what lets it run when 'parse' is skipped -- it takes its CommandAsts from
+# Get-PsScriptCommandAsts, shared with the equally non-skippable shopify-cli check below (issue #1358).
+# Both used to parse and walk the same file set separately; that accessor's comment holds the measurement.
 $barredSkills = New-Object System.Collections.Generic.HashSet[string]
 foreach ($skillsDir in (Get-PluginSubdirs -PluginRoots $publishedPlugins -Leaf 'skills')) {
     Get-ChildItem -Path $skillsDir -Recurse -Filter 'SKILL.md' -File |
@@ -3295,9 +3345,7 @@ if ($barredSkills.Count -gt 0) {
     foreach ($psFile in (Get-PsScriptFiles)) {
         $barredChecked++
         $bsRel = $psFile.FullName.Replace($RepoRoot, '.')
-        $bsAst = [System.Management.Automation.Language.Parser]::ParseFile($psFile.FullName, [ref]$null, [ref]$null)
-        if ($null -eq $bsAst) { continue }
-        foreach ($cmd in $bsAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        foreach ($cmd in (Get-PsScriptCommandAsts -Path $psFile.FullName)) {
             $cmdName = $cmd.GetCommandName()
             if (-not $cmdName -or $barredWriters -notcontains $cmdName) { continue }
             $bsStrings = $cmd.FindAll({ param($n)
@@ -3375,7 +3423,9 @@ Write-Coverage -Category 'barred-skill' -Checked $barredChecked `
 # THROUGH THE PARSER, NOT BY LINE MATCHING, for the reason check 30 gives: a comment explaining the rule
 # (this one included) mentions the command, and so does every printed hint that tells a reader to run
 # 'shopify theme list'. Only a CommandAst is a call. NOT SKIPPABLE, like every check added since the
-# -SkipCheck list was fixed at the three the gate's own suites need.
+# -SkipCheck list was fixed at the three the gate's own suites need -- and because both this check and
+# check 30 always run, the two share ONE parse and ONE walk of the script set through
+# Get-PsScriptCommandAsts (issue #1358) instead of each doing their own.
 # TWO EXEMPTIONS, BOTH BY FILE NAME AND BOTH ABOUT THE SAME ONE CALL. The wrapper holds the permitted
 # call, and shopify-cli.tests.ps1 holds the assert that gives the wrapper its meaning: it invokes the
 # stub BARE, on purpose, to read back that the shim inherits the caller's 'Stop' -- which is what makes
@@ -3389,9 +3439,7 @@ foreach ($psFile in (Get-PsScriptFiles)) {
     $shopifyChecked++
     if ($shopifyExempt -contains $psFile.Name) { continue }
     $shRel = $psFile.FullName.Replace($RepoRoot, '.')
-    $shAst = [System.Management.Automation.Language.Parser]::ParseFile($psFile.FullName, [ref]$null, [ref]$null)
-    if ($null -eq $shAst) { continue }
-    foreach ($cmd in $shAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+    foreach ($cmd in (Get-PsScriptCommandAsts -Path $psFile.FullName)) {
         if ($cmd.GetCommandName() -ne 'shopify') { continue }
         $shSample = ($cmd.Extent.Text -replace '\s+', ' ').Trim()
         if ($shSample.Length -gt 120) { $shSample = $shSample.Substring(0, 120) + '...' }
