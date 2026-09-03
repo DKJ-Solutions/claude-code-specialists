@@ -703,8 +703,9 @@ function Get-PrDescriptionPlaceholderDefaults {
         moved under the workflow's own folder on August 14, 2026, the file was renamed branch-deployment.md
         on August 19, on August 23 it became the DEPLOY section of development.md, on August 25 that
         section started travelling WITH its heading -- issue #884 -- on August 26 the folder itself was
-        renamed workflow-davekjohn -> contributing-davekjohn, issue #886, and on August 27 the document
-        was renamed development.md -> development.md, issues #963/#958); the older
+        renamed workflow-davekjohn -> contributing-davekjohn, issue #886, on August 27 the document was
+        renamed development-cycle.md -> development.md, issues #963/#958, and on September 3 that one
+        shared document became one per branch, development-<branch>.md, issue #1255); the older
         strings stay because a consumer's PR template is THEIR file, and this script must not silently
         stop filling it in because the template it ships beside moved on. An unrecognised placeholder is
         a PR body with no description at all -- the outcome this list exists to prevent.
@@ -743,6 +744,7 @@ function Get-PrDescriptionPlaceholderDefaults {
         "<!-- Filled from contributing-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
     )
 }

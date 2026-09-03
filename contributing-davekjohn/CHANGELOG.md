@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/fold-hold-divergence-lesson-v1` · 20260903-101748
+
+Three docs stated that `main-ci-gate`'s bypass list is empty, which stopped being true on September 3,
+2026 when Dave restored it. Each is dated rather than swept, per this repo's convention, and the two
+lenses gain what the day actually taught.
+
+The load-bearing addition is a rule that did not exist: **a fold whose push is blocked is waited out, not
+committed locally.** Holding it looks like a neutral pause and is not one -- it is a `main` commit living
+on a single machine, and `main` is what every other machine syncs. Measured the same day: a held fold met
+the same fold landing from elsewhere, and `git pull` produced a duplicate entry plus an unmerged
+`CHANGELOG.md` with no `MERGE_HEAD`. A session went into untangling it, and the trunk leftovers the hold
+was meant to prevent had accumulated anyway. Waiting costs a visible unfolded document; holding costs a
+duplicate commit on the shared trunk, and only one of those is cheap to undo.
+
+Sylvester's lens also gains the measurement that identifies the condition without admin rights: the push
+answers `GH013 ... Required status check "lint-en-tests" is expected` when the list is empty, and
+`Bypassed rule violations for refs/heads/main` when it is not. Nothing in the GitHub UI distinguishes
+them for an account that cannot read the ruleset.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is written from the wreckage rather than from a design discussion. Every claim in it was measured on
+the working copy that had to be repaired, including the one that matters most -- that the two folds the
+blockage stranded folded unchanged once the bypass returned, which is the whole argument for waiting.
+
+**Score:** N/A
+
+#### Pull Request
+
+The lens's bypass paragraph is dated, and a held fold is not a neutral wait
+
+[PR #1272](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1272)
+
+---
+
 ### DEPLOY: `fix/new-branch-writer-legacy-reach-matches-resolver-v1` · 20260903-095419
 
 `new-branch`'s writer now reaches the same legacy document names its reader does. It chose which file

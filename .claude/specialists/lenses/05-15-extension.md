@@ -97,13 +97,21 @@ infrastructure.
   the work account `davekokbwj` has write rights, not admin — and that Write bypass is safe as long
   as there are no external collaborators, to be revisited as soon as there are.
 
-  **THAT LIST IS EMPTY RIGHT NOW, AND THE TRANSFER IS WHY** (September 2, 2026,
+  **THAT LIST WAS EMPTY FOR ONE DAY, AND THE TRANSFER WAS WHY** (September 2–3, 2026,
   [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244)). Moving the repo into
   the `DKJ-Solutions` org carried the ruleset across **intact** — active, `~DEFAULT_BRANCH`,
   `deletion` + `non_fast_forward` + `required_status_checks` on `lint-en-tests` — and dropped only its
-  bypass list: `bypass_actors: null`, `current_user_can_bypass: never`, which means nobody can push to
-  `main` directly, `DaveKJohn` as repo admin included. All three direct-on-`main` exceptions are dead
-  until Dave restores it at Settings → Rules → `main-ci-gate` → Bypass list.
+  bypass list: `bypass_actors: null`, `current_user_can_bypass: never`, which meant nobody could push to
+  `main` directly, `DaveKJohn` as repo admin included. All three direct-on-`main` exceptions were dead
+  until Dave restored it on September 3 at Settings → Rules → `main-ci-gate` → Bypass list.
+
+  **The paragraph is kept rather than deleted, because the failure is a property of the ruleset and not
+  of that one move.** The bypass list is the only thing standing between a green `main-ci-gate` and three
+  exceptions that cannot satisfy it, and nothing in GitHub's UI says so — a transfer, an org policy, or
+  somebody tidying the list all produce the identical symptom. What identifies it is the push's own
+  answer: `GH013 ... Required status check "lint-en-tests" is expected` when the list is empty,
+  `Bypassed rule violations for refs/heads/main` when it is not. Read that line rather than the ruleset
+  page; it is the one measurement that distinguishes the two states without admin rights.
 
   **It does not stop at the three exceptions — it blocks MERGES too, by a chain reaction**, and that is
   the part worth reading before anybody concludes the damage is bounded. A PR still merges; its fold
@@ -120,7 +128,7 @@ infrastructure.
   ([#1255](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1255)). The document is named
   per branch now, so two branches never write the same path and a leftover on the trunk collides with
   nobody. **What this ruleset still costs is the leftover itself** — an unfolded entry sitting on `main`
-  with nothing saying so — which is the half #1244 owns and the per-branch rename did not repair.
+  with nothing saying so — which was the half #1244 owned and the per-branch rename did not repair.
 
   **That half is no longer silent as of September 3, 2026**
   ([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270)). `check-unfolded-entry.ps1`
@@ -136,6 +144,15 @@ infrastructure.
   ship window — `ship-pr` pushes the merge commit and then, seconds later, the fold commit — which the CI
   workflow's `cancel-in-progress: true` swallows and a session reads as a finding that resolves itself. The
   detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`, one definition for both callers.
+
+  **#1244 is closed, so the cost is now only paid while a bypass is missing — and the response to that is
+  the part to get right.** Both leftovers it stranded (#1253 and #1261) folded unchanged the moment the
+  list came back, which is the evidence for the rule: a blocked fold is **waited out, not committed
+  locally**. Committing it makes a `main` commit that exists on one machine, and `main` is what every
+  other machine syncs — measured September 3, 2026, where a held fold met the same fold landing from
+  elsewhere and produced a duplicate entry and an unmerged `CHANGELOG.md` with no `MERGE_HEAD` to abort.
+  The trunk leftover is visible and cheap; the duplicate commit is neither. Rendall's lens carries the
+  fold-side statement of this. `check-unfolded-entry.ps1` above is what makes "visible" literal.
 
   **The hazard that made it urgent is worth keeping, because it is what a reader would otherwise
   rediscover.** Resolving that conflict in favour of the incoming branch **destroys an unfolded DEPLOY
