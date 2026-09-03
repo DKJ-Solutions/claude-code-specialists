@@ -33,19 +33,40 @@
 
 ### PLAN
 
+Issue #1326: `test-suite-gate.tests.ps1`'s per-process fixture assert scans line by line, so a
+PowerShell backtick continuation puts the discriminator (`$PID`, a fresh GUID) on the next line and a
+safe path is reported as an offender. Direction taken: keep the line scan for its simplicity but fold
+backtick continuations before scanning, so the unit judged is a statement, not a physical line.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add `Join-BacktickContinuation` -- glues a line ending in a backtick to the next, keeps the
+      starting physical line number for the offender message.
+- [x] Route the scan through it; judge `$stmt.Text` instead of a raw line.
+- [x] Exclude the guard file itself from the scan -- it now carries `GetTempPath()`/`Join-Path` in its
+      own prose and in the fold test data, which are not paths a run creates.
 
 ### TEST
 
+- [x] Three new asserts exercise the fold directly: a split safe path folds to one statement with its
+      discriminator in view, and a split bare literal is still caught.
+- [x] `scripts/tests/test-suite-gate.tests.ps1` green (56 pass, 0 fail); the temp-path scan count rose
+      from ~52 to 93 as folding also surfaced statements split across `GetTempPath()`/`Join-Path`.
+- [ ] Lint + tests green, then PR + merge + fold.
+
 ### DEPLOY: `fix/suite-gate-fixture-assert-line-scoped`
 
-**Score:**
+`test-suite-gate.tests.ps1`'s per-process fixture assert folded backtick continuations before judging
+a temp path, so a path whose `$PID`/GUID discriminator sat after a `-continuation is no longer
+reported as an offender. The guard no longer scans itself.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- a test-suite internal assert; no subscriber of any service reaches it.
+
+**Score:** N/A
 
 #### Pull Request
 
