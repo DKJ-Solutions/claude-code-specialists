@@ -349,6 +349,16 @@ escapable by not using the scripts. The repo's own lint and test gates are separ
 `open-pr.ps1` runs [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) and then every
 `scripts/tests/*.tests.ps1`, refusing to push on any error or failing suite.
 
+**And before any of them, one thing that is not a gate: `open-pr.ps1` COMMITS that document if it differs
+from `HEAD`** ([#1269](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1269), September 3, 2026).
+Every reader above reads the working tree; the push ships `HEAD`; and the fold, the DEPLOY lock and the CI
+check in 3.2.5 all read the committed copy. Measured on PR #1267: the run passed every gate against a
+filled-in working copy, pushed the empty scaffold, published the filled-in body, and CI failed on arrival.
+It commits that one file and nothing else — never `git add -A`, and anything else you had staged stays
+staged. Why it commits rather than refusing, and why neither the dirty-tree warning nor the backing gate
+covered it, are on the
+[`open-pr` skill page](../plugins/workflows/contributing-davekjohn/skills/open-pr/SKILL.md#the-document-commit-what-the-pr-says-is-what-the-branch-carries).
+
 #### 3.2.1. the scaffold gate, on the changelog entry itself
 
 **August 3, 2026.** `open-pr.ps1` refuses to push a branch whose entry still carries the wording
