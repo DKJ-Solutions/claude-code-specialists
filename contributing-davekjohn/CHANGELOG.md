@@ -32,6 +32,68 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/suite-gate-fixture-assert-line-scoped` · 20260903-172201
+
+`test-suite-gate.tests.ps1`'s per-process fixture assert folded backtick continuations before judging
+a temp path, so a path whose `$PID`/GUID discriminator sat after a `-continuation is no longer
+reported as an offender. The guard no longer scans itself.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a test-suite internal assert; no subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+test-suite-gate fixture assert folds backtick continuations before judging a temp path
+
+[PR #1329](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1329)
+
+---
+
+### DEPLOY: `fix/guard-coverage-comment-counts` · 20260903-171521
+
+The coverage assert in `../scripts/tests/source-repo-guard.tests.ps1` -- the one holding every registered
+shared entry point to carrying the source-repo guard -- tested for the guard by matching the lib's **name**
+anywhere in the file. A comment naming the lib therefore counted as having the guard, including a comment
+explaining why the guard was deliberately left out. It now reads the file's **parsed syntax**: the lib named
+in a string literal, and an actual `Assert-OwnCopy` call, each reported separately so a guard that is loaded
+but never fired is caught as well. Two registered entry points had been passing that assert on prose alone --
+`scripts/lint/check-unfolded-entry.ps1` and `scripts/task/park-cycle.ps1`, both hook-invoked, both correct in
+their code -- and their exemptions are now declared with the hook that earns each one. The same helper closes
+a second gap in the same block: it already claimed an exemption for a script that has since gained the guard
+is a licence nobody is using, and never checked it.
+
+**Score:** 2
+
+Inside this repo the defect cost no breakage -- it cost the argument. The block's own comment says the
+exception list is named there "and nowhere else" because "a page can go stale in silence, a failing assert
+cannot", and for these two scripts the assert never fired, so nobody had to argue the exemption. The larger
+half is that the assert was weaker than it reads for *every* entry point, not only the two that tripped it:
+a script that genuinely should carry the guard passed as long as any comment mentioned the lib. Nothing
+changes for anyone until the next entry point is registered -- which is when it now gets held to the rule
+rather than to its comments. Above cosmetic because the guardrail's coverage was real and unmeasured;
+below tier 1 because nothing that shipped was ever wrong.
+
+#### What makes this deploy extra special
+
+`scripts/tests/` is source-only -- no test suite is mirrored into any plugin, so nothing here reaches a
+consumer through a release. The two scripts whose exemptions are declared *are* mirrored, but neither
+changed: only this repo's bookkeeping about them did.
+
+**Score:** N/A
+
+#### Pull Request
+
+The guard-coverage assert no longer counts a comment as the guard
+
+[PR #1328](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1328)
+
+---
+
 ### DEPLOY: `fix/park-commit-fixture-pins-signing` · 20260903-170154
 
 `scripts/tests/park-commit.tests.ps1` no longer depends on the machine's `commit.gpgsign`: its

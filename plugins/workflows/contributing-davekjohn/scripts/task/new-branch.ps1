@@ -292,9 +292,24 @@ $fresh   = $false
 if ($tracked.ExitCode -ne 0) {
     Write-Host "Base not compared: this repo has no $trackedTrunk (no origin, or never fetched)." -ForegroundColor DarkGray
 } else {
-    # -DiscardStderr ON THE FETCH, and not only for tidiness: a failing git fetch echoes the remote URL,
-    # which in a repo cloned over HTTPS with a credential in the URL is a secret. The message below says
-    # the fetch failed and that the gap may be larger, which is everything a reader can act on.
+    # -DiscardStderr ON THE FETCH. This comment used to give a security reason -- "a failing git fetch
+    # echoes the remote URL, which in a repo cloned over HTTPS with a credential in the URL is a secret"
+    # -- and that reason is WRONG, measured on git 2.55.0.windows.5 (issue #1313). git puts the URL in
+    # every "unable to access" / "Authentication failed" line through transport_anonymize_url, which
+    # strips userinfo, so `https://<user>:<token>@host/o/r.git` comes back as `https://host/o/r.git`.
+    # Three shapes were tried -- user:token@, token@, and an unresolvable host -- and none leaked.
+    #
+    # THE FLAG STAYS, on the first reason and only that one: nothing here reads git's progress, the
+    # message below is complete without it, and a fetch writes all of it to stderr. So this line costs
+    # nothing. WHAT IT MUST NOT BECOME IS A PRECEDENT: #1313 was filed because this comment reads as a
+    # rule, and three other call sites were about to drop stderr on the strength of it -- including
+    # ship-pr.ps1's fold-step fetch, where git's own reason is the only thing a reader has at the one
+    # step where the PR is already merged. Where git's diagnosis IS the message, keep it. The place a
+    # credential genuinely does reach the screen is where WE print a URL rather than git: see
+    # Format-UrlForDisplay in scripts/release/publish-to-business.ps1.
+    #
+    # The message below says the fetch failed and that the gap may be larger, which is everything a
+    # reader can act on.
     $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', 'origin', '--quiet') -DiscardStderr
     $fresh = ($fetch.ExitCode -eq 0)
 }

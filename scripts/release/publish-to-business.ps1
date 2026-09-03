@@ -205,6 +205,40 @@ function Resolve-TargetUrl {
     return $Value
 }
 
+function Format-UrlForDisplay {
+    <#
+        A remote URL with its userinfo masked, for anything this script PRINTS or THROWS.
+
+        WHY THIS EXISTS, AND WHY IT IS THIS SCRIPT'S ALONE (issue #1313). -TargetRepo takes either
+        `owner/repo` -- which Resolve-TargetUrl composes into a clean URL -- or a URL verbatim, and the
+        verbatim form is where an operator publishing without gh auth pastes
+        `https://<user>:<token>@github.com/o/r.git`. This script then printed that value on EVERY run
+        ("Target : ..."), again on a clone failure, and again on success, and embedded it in Invoke-Git's
+        throw message. That is not git leaking anything: it is OUR interpolation of a value we were
+        handed, so git's own redaction never gets a say.
+
+        THAT DISTINCTION IS THE WHOLE POINT, because #1313 was filed against the opposite case. It
+        proposed -DiscardStderr on the `git fetch` calls in ship-pr.ps1 and its siblings, on the reason
+        that a failing fetch quotes the remote URL. Measured on git 2.55.0.windows.5, it does not: git
+        puts every "unable to access" / "Authentication failed" URL through transport_anonymize_url,
+        which strips userinfo, so the credential never reaches the captured output. Three shapes were
+        tried -- `user:token@`, `token@`, and an unresolvable host -- and all three came back redacted.
+        Dropping stderr at those call sites would therefore have cost git's own diagnosis (at, in
+        ship-pr's case, the one step where the PR is already merged) and bought nothing. The place the
+        report's reasoning DID hold was here, where the printer is us.
+
+        USERINFO ONLY, deliberately. That is the part a URL is guaranteed to carry a secret in, and it
+        is the part git itself redacts. A token in a query string or a path segment is NOT masked --
+        git prints those verbatim too (measured, same run) -- because guessing at which path segment is
+        a secret produces a mask nobody can trust. An scp-style `git@host:o/r.git` has no `://` and is
+        left alone; `git@` is not a secret.
+    #>
+    param([string] $Value)
+
+    if (-not $Value) { return $Value }
+    return [regex]::Replace($Value, '(?<=^[A-Za-z][A-Za-z0-9+.\-]*://)[^/@]+@', '***@')
+}
+
 function Invoke-Git {
     <# Runs git via the shared native-capture guard and throws on a non-zero exit. #>
     param(
@@ -218,7 +252,13 @@ function Invoke-Git {
     # and callers substring the returned lines (the name-status grouping in the report).
     $output = @($r.Output | ForEach-Object { "$_" })
     if ($r.ExitCode -ne 0) {
-        throw "git $($Arguments -join ' ') failed:`n$($output -join [Environment]::NewLine)"
+        # THE ARGUMENTS ARE MASKED, NOT JUST THE OUTPUT (issue #1313). Two of this script's calls carry
+        # the target URL as an argument -- the clone and the `remote add` -- so echoing the command line
+        # verbatim publishes whatever credential the operator pasted into -TargetRepo. The clone's caller
+        # then prints the first three lines of this very message, which is where it surfaced. git's half
+        # of the output redacts itself (see Format-UrlForDisplay); this half is ours to redact.
+        $shown = @($Arguments | ForEach-Object { Format-UrlForDisplay -Value "$_" })
+        throw "git $($shown -join ' ') failed:`n$($output -join [Environment]::NewLine)"
     }
     if (-not $Quiet -and $output) { $output | ForEach-Object { Write-Verbose $_ } }
     return $output
@@ -529,9 +569,14 @@ $Plugins = @($Plugins |
     Where-Object { $_ })
 
 $url = Resolve-TargetUrl -Value $TargetRepo
+# WHAT GOES ON THE SCREEN IS THE MASKED FORM, EVERY TIME (issue #1313). $url is what git is handed;
+# $urlShown is what a human or a log is handed, and the two are only different when -TargetRepo was
+# given as a URL carrying a credential. Kept as its own variable rather than masked at each Write-Host,
+# so a print added later cannot be the one that forgets.
+$urlShown = Format-UrlForDisplay -Value $url
 
 Write-Host "Source     : $root"
-Write-Host "Target     : $url ($Branch)"
+Write-Host "Target     : $urlShown ($Branch)"
 
 foreach ($required in $RequiredPaths) {
     if (-not (Test-Path -LiteralPath (Join-Path $root $required))) {
@@ -589,7 +634,7 @@ try {
     foreach ($pattern in $authPatterns) {
         if ($reason -match $pattern) {
             Write-Host ''
-            Write-Host "Could not reach $url."
+            Write-Host "Could not reach $urlShown."
             Write-Host 'git said:'
             Write-Host "  $($reason -split "`n" | Select-Object -First 3)"
             Write-Host ''
@@ -726,7 +771,7 @@ try {
     }
 
     Write-Host ''
-    Write-Host "Published to $url ($Branch)."
+    Write-Host "Published to $urlShown ($Branch)."
     Write-Host "Commit message: $Message"
     Write-Host ''
     Write-Host 'Claude picks this up on the next organization sync. Colleagues see the new version'
