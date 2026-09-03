@@ -270,11 +270,21 @@ finally {
 # can go stale in silence, a failing assert cannot.
 . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
 
-# Both are invoked from the plugin by a SessionStart hook, so a refusal would fail every session start in
-# this repo. That reason is specific to being a hook -- it does not extend to a script somebody runs.
+# THE EXEMPTIONS ARE ALL HOOK-INVOKED, and that is the only reason ever accepted here: the harness runs
+# these from the plugin against the current repo, so a refusal would fire on every session start -- or,
+# for a Stop hook, on every turn -- in the repo that maintains them. The reason is specific to being a
+# hook and does not extend to a script somebody runs.
+#
+# TWO OF THE FOUR WERE NEVER DECLARED (issue #1321), and that was not a lapse of judgement: the coverage
+# check below used to be a text match over the whole file, which both of them satisfied with a COMMENT
+# naming the lib -- in each case a comment explaining why the guard was deliberately left out. The assert
+# never fired, so nobody ever had to argue the exemption, which is exactly the outcome the paragraph above
+# calls impossible. Their code was right all along; only this bookkeeping was missing.
 $guardExempt = @(
-    'scripts\sync\check-roster-sync.ps1',
-    'scripts\sync\check-script-contract.ps1'
+    'scripts\sync\check-roster-sync.ps1',      # SessionStart: roster-sessioncheck
+    'scripts\sync\check-script-contract.ps1',  # SessionStart: script-contract-sessioncheck
+    'scripts\lint\check-unfolded-entry.ps1',   # SessionStart: unfolded-entry-sessioncheck (#1270)
+    'scripts\task\park-cycle.ps1'              # Stop: cycle-autopark (#900)
 )
 
 $entryPoints = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
@@ -284,6 +294,104 @@ $entryPoints = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
 Assert-True ($entryPoints.Count -gt 0) `
     'coverage: the registry yields entry points at all -- an empty set would pass every assert below while checking nothing'
 
+function Get-GuardWiringGap {
+    <#
+        What a file is MISSING in order to be guarded, read from its PARSED SYNTAX rather than its text.
+        Returns an empty string when nothing is missing.
+
+        A TEXT MATCH CANNOT ANSWER THIS (issue #1321). The check here was a whole-file `-notmatch` on the
+        lib's name, so any COMMENT naming the lib counted as having the guard -- including a comment
+        explaining why the guard was deliberately left out. It could not tell "loads the guard" from
+        "talks about the guard", which made the assert weaker than it reads for EVERY entry point, not
+        only for the two that happened to pass on prose. The parser hands back commands and string
+        literals and never comments, so the same wording buys nothing here. It is also the preference the
+        lint gate already applies in check 18: for this class of mistake, parse rather than grep.
+
+        BOTH HALVES, BECAUSE EACH IS A REAL MISTAKE ON ITS OWN. A lib loaded and never called is a guard
+        that cannot fire -- the very "correct but not wired in" shape this whole coverage block was added
+        for (#897) -- and a call with no lib behind it is a crash on the first run. So the gap names which
+        half is absent instead of reporting a bare no.
+
+        THE LIB IS LOOKED FOR IN A STRING LITERAL, not in the dot-source's own extent, because every
+        guarded script loads it through a variable: a Join-Path onto '..\lib\source-repo-guard-lib.ps1'
+        assigned to $guardLib, then `. $guardLib`. Anchoring on the dot-source would report all twenty
+        guarded scripts as unguarded, and resolving the variable would be a data-flow analysis to prove
+        what the literal already says.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$null)
+
+    $namesLib = [bool](@($ast.FindAll({ param($n)
+                    ($n -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
+                     $n -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) -and
+                    $n.Extent.Text -match 'source-repo-guard-lib'
+                }, $true)).Count)
+
+    $callsGuard = [bool](@($ast.FindAll({ param($n)
+                    $n -is [System.Management.Automation.Language.CommandAst] -and
+                    $n.GetCommandName() -eq 'Assert-OwnCopy'
+                }, $true)).Count)
+
+    $missing = @()
+    if (-not $namesLib)   { $missing += 'never names the lib outside a comment' }
+    if (-not $callsGuard) { $missing += 'never calls Assert-OwnCopy' }
+    return ($missing -join ', and it ')
+}
+
+function New-MatcherFixture {
+    # A one-file scratch script for the asserts below. $PID for the same reason New-Tree carries it: the
+    # test gate runs suites in parallel, and two runs sharing a fixed path delete each other's file.
+    param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Body)
+    # ONE LINE, and the test-suite gate is why: it scans line by line for a GetTempPath+Join-Path pair
+    # carrying a per-process discriminator, so a backtick continuation puts the $PID out of its sight and
+    # reports a path that is in fact per-process. Same single-line shape New-Tree above uses.
+    $p = Join-Path ([System.IO.Path]::GetTempPath()) ("srguard-$PID-matcher-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.ps1')
+    Set-Content -LiteralPath $p -Value $Body -Encoding UTF8
+    return $p
+}
+
+# THE MATCHER IS ITSELF HELD TO CATCHING #1321, and it has to be, because no real file exercises the
+# comment case any more: all four scripts that would are skipped as exempt before the matcher is reached.
+# So a regression back into a text match would leave the suite green and silent -- which is precisely how
+# the defect survived the first time. These three run BEFORE the coverage assert on purpose: a broken
+# matcher makes that assert's verdict meaningless in either direction.
+Write-Host 'The wiring matcher tells loading the guard apart from talking about it (#1321)' -ForegroundColor Cyan
+$matcherFixtures = @()
+try {
+    # The measured shape: check-unfolded-entry.ps1's line 60, prose naming the lib.
+    $commentOnly = New-MatcherFixture -Label 'comment' -Body @'
+# NO SOURCE-REPO GUARD, deliberately, and for the reason source-repo-guard-lib.ps1's own header gives.
+Write-Host 'the work this script actually does'
+'@
+    $matcherFixtures += $commentOnly
+    Assert-True ((Get-GuardWiringGap -Path $commentOnly) -ne '') `
+        'the matcher: a COMMENT naming the lib is NOT the guard -- the whole-file text match said it was'
+
+    # The shape all twenty guarded entry points use. It must pass, or the repair reports the whole repo.
+    $wired = New-MatcherFixture -Label 'wired' -Body @'
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
+'@
+    $matcherFixtures += $wired
+    Assert-Equal '' (Get-GuardWiringGap -Path $wired) `
+        'the matcher: the real two-line shape passes, loaded through a variable as every guarded script loads it'
+
+    # Loaded and never fired -- the other thing the old check could not tell from being guarded.
+    $loadedNotFired = New-MatcherFixture -Label 'halfway' -Body @'
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib }
+'@
+    $matcherFixtures += $loadedNotFired
+    Assert-True ((Get-GuardWiringGap -Path $loadedNotFired) -match 'Assert-OwnCopy') `
+        'the matcher: a guard loaded but never called is reported, and the gap names that half'
+}
+finally {
+    foreach ($f in $matcherFixtures) {
+        if ($f -and (Test-Path -LiteralPath $f)) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 $missingGuard = @()
 foreach ($ep in $entryPoints) {
     if ($guardExempt -contains $ep) { continue }
@@ -292,22 +400,31 @@ foreach ($ep in $entryPoints) {
         $missingGuard += "$ep (registered but absent from the tree)"
         continue
     }
-    $epText = [System.IO.File]::ReadAllText($epPath, [System.Text.Encoding]::UTF8)
-    if ($epText -notmatch 'source-repo-guard-lib') { $missingGuard += $ep }
+    $gap = Get-GuardWiringGap -Path $epPath
+    if ($gap) { $missingGuard += "$ep ($gap)" }
 }
 Assert-True ($missingGuard.Count -eq 0) `
-    "coverage: every shared entry point dot-sources the guard, except the named SessionStart-hook scripts$(if ($missingGuard.Count) { ' -- WITHOUT IT: ' + ($missingGuard -join ', ') })"
+    "coverage: every shared entry point loads the guard AND calls it, except the named hook scripts$(if ($missingGuard.Count) { ' -- NOT WIRED IN: ' + ($missingGuard -join '; ') })"
 
 # AND THE EXEMPTIONS ARE HELD TO BEING REAL. An exemption for a script that no longer exists, or that has
 # since gained the guard, is a licence nobody is using -- and the next reader would take it as evidence
 # that the entry is still needed. Same reasoning as the checks in the lint gate that refuse to carry a
 # stale exclusion.
+#
+# THE SECOND HALF OF THAT SENTENCE WAS ASSERTED NOWHERE until #1321. The loop checked that an exempted
+# file exists and is registered, and never that it still lacks the guard -- so the one claim needing a
+# measurement was the one the block only stated. Get-GuardWiringGap makes it a single line, so the
+# paragraph above is now true rather than aspirational.
 foreach ($ex in $guardExempt) {
     $exPath = Join-Path $RepoRoot $ex
     Assert-True (Test-Path -LiteralPath $exPath -PathType Leaf) `
         "coverage: the exemption for $ex names a file that exists"
     Assert-True ($entryPoints -contains $ex) `
         "coverage: the exemption for $ex names a registered entry point, so it is exempting something real"
+    if (Test-Path -LiteralPath $exPath -PathType Leaf) {
+        Assert-True ((Get-GuardWiringGap -Path $exPath) -ne '') `
+            "coverage: the exemption for $ex is still needed -- a script that has since gained the guard needs no licence"
+    }
 }
 
 Write-Host ''
