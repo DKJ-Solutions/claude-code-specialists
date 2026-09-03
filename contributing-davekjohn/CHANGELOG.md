@@ -32,6 +32,76 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/legacy-name-test-hardcodes-v1-suffix` · 20260903-123526
+
+`new-branch.tests.ps1` no longer builds the expected document name from a `-v1` suffix that
+`new-branch.ps1` stopped appending. The `#1259` legacy-name block held a `$vBranch =
+"$($case.Branch)-v1"` alias, and #1268 removed the completion that made it true -- so the block looked
+for `development-feat-on-pre963-v1.md`, a file nothing writes, and threw a `FileNotFoundException`
+before its first assert. The alias is deleted rather than corrected: named after a version suffix, it
+could only mislead the next reader, and `$case.Branch` says exactly what it is.
+
+**This was a green PR that landed a red trunk**, which is worth stating plainly because no gate
+reported it. #1268's branch was cut before `7b783516` (#1259) added this block, so its required check
+passed on a tree that did not contain the test its own change breaks. The merge commit is the first
+thing that holds both, and the merge is not gated -- the check runs on the branch head, and a branch
+is not required to be current with `main` before it merges. Every suite is green again on the merge
+result; 187 asserts in this suite, 61 suites in the gate.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches a consumer. The repaired file is a test suite that ships nowhere: `new-branch.ps1`
+itself is unchanged, so a repo on the workflow plugin sees no difference. What it buys is that the
+trunk is green again, which every open branch needs before its own gate can pass.
+
+**Score:** N/A
+
+#### Pull Request
+
+the legacy-name test stops hardcoding the -v1 suffix new-branch no longer appends
+
+[PR #1291](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1291)
+
+---
+
+### DEPLOY: `fix/open-pr-warn-issue-already-resolved-v1` · 20260903-121409
+
+`open-pr` now warns, before the push, when an issue the branch targets is already **CLOSED** or is
+already resolved by another **open or merged** PR -- the duplicate-work #1282 carried to a
+gate-green PR and found only at the merge conflict. The resolves gate was blind to it: it blocks
+only on a mentioned issue that is still open.
+
+A new pure helper `Get-TargetIssueWarnings` (`scripts/lib/pr-issues-lib.ps1`) takes the target
+numbers, the open-issue list open-pr already fetches, and one extra `gh pr list --search
+"<n> OR ... in:body" --state all` query, and returns one record per issue worth a word. It reads a
+rival PR body with the same `Get-ClosedIssueNumbers` the gate uses, so a bare mention does not
+count; a CLOSED rival PR (an abandoned attempt -- in #1282, the duplicate itself) and this branch's
+own PR are never reported. `open-pr.ps1` calls it in the resolves-gate block and emits one
+`Write-Warning` per record. Advisory only: a shared number or a reopened issue never blocks a PR.
+
+`new-branch.ps1` is unchanged -- it has no issue reference to check at creation, and already warns
+about a stale base "including an issue somebody else has just closed".
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an advisory line in a workflow script; no subscriber of any service notices it.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr warns when the target issue is already closed or resolved by another PR
+
+Plugins: contributing-davekjohn
+
+[PR #1288](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1288)
+
+---
+
 ### DEPLOY: `fix/drop-v1-suffix-completion-v1` · 20260903-120612
 
 `new-branch.ps1` no longer appends `-v1` to a branch name that carries no version suffix; the name is used

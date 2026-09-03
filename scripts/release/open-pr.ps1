@@ -654,6 +654,38 @@ Both are honest answers; the gate only refuses to guess.
             Write-Warning ("-Resolves names issue(s) that are not open right now: " + (($notOpen | ForEach-Object { "#$_" }) -join ', ') + " -- check for a typo. The closing keyword is written anyway (harmless on an already-closed issue).")
         }
     }
+
+    # --- Already-done check (issue #1282): advisory, never blocks ---------------------------------
+    # The gate above answers "does this PR declare what it closes" and blocks only on a mentioned
+    # issue that is still OPEN. It is silent on the two states that mean the BRANCH may be a
+    # duplicate: the target issue CLOSED while the branch was in flight, or another open/merged PR
+    # that already carries `Closes #<n>` for it. #1282 carried exactly that -- a branch cut to fix
+    # #1270, which PR #1276 closed thirty-seven minutes later -- to a gate-green PR, found only at
+    # the merge conflict. WARN and move on: a shared number or a reopened issue must not wedge a
+    # real PR, which is why #1282 asked for a warning rather than a refusal.
+    #
+    # ONE EXTRA `gh` CALL, and only when the branch targets an issue at all. It rides the open-issue
+    # list already fetched above for the OpenIssues half; the ClaimingPrs half needs a PR-body
+    # search that the other queries here do not cover. A failed query is said out loud and skipped,
+    # never fatal -- same rule as every other lookup in this script.
+    $targetIssues = @(@($mentions) + @($resolveList) | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+    if ($targetIssues.Count -gt 0) {
+        $otherPrsJson = ''
+        $prSearchTerms = (($targetIssues | ForEach-Object { "$_" }) -join ' OR ') + ' in:body'
+        $prSearch = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'list', '--repo', $repo, '--state', 'all', '--search', $prSearchTerms, '--json', 'number,state,headRefName,body', '--limit', '60') -DiscardStderr
+        if ($prSearch.ExitCode -eq 0) {
+            $otherPrsJson = ($prSearch.Output -join "`n")
+        } else {
+            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " (exit $($prSearch.ExitCode)) -- the already-done check is skipped.")
+        }
+
+        foreach ($w in @(Get-TargetIssueWarnings -TargetIssues $targetIssues -OpenIssues $openAll -OtherPrsJson $otherPrsJson -CurrentBranch $branch)) {
+            $says = @()
+            if ($w.IsClosed) { $says += 'is already CLOSED' }
+            foreach ($p in $w.ClaimingPrs) { $says += "is already resolved by PR #$($p.Number) ($($p.State.ToLowerInvariant()))" }
+            Write-Warning ("already-done check: issue #$($w.Issue) " + ($says -join ', and it ') + " -- this branch may repeat work that is already merged. If that is deliberate (a shared number, the issue reopened, cited only as context), nothing to do.")
+        }
+    }
 }
 
 # Scaffold gate: an entry that still carries its scaffold wording must not become a PR.

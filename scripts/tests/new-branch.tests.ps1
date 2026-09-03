@@ -1081,15 +1081,20 @@ Write-Output `$t.Type
     foreach ($case in $legacyNameCases) {
         Write-Host "new-branch.ps1 -- the writer keeps writing to the $($case.Label), as the reader does (#1259)" -ForegroundColor Cyan
         $fx = New-Fixture -Label ("n3-" + ($case.Branch -replace '[^a-z0-9]', ''))
-        $vBranch = "$($case.Branch)-v1"
+        # THE NAME AS GIVEN. This block once held a `$vBranch = "$($case.Branch)-v1"` alias, because
+        # new-branch completed a bare name with '-v1'. #1268 removed that completion and left the alias
+        # building a document name from a suffix nothing appends any more, so the block looked for a file
+        # that is never written. It went green on #1268's own branch, cut before this block existed
+        # (#1259), and only turned red once the two met on the trunk. The alias is gone rather than
+        # corrected: named after a version suffix, it can only mislead the next reader.
 
         $mk1 = Invoke-NewBranch -Dir $fx -Name $case.Branch -Title 'On a legacy name'
         Assert-Equal 0 $mk1.Code "$($case.Label): the branch is created"
-        $perBranchRel  = (Get-BranchFilePaths -Branch $vBranch).File
+        $perBranchRel  = (Get-BranchFilePaths -Branch $case.Branch).File
         $perBranchPath = Join-Path $fx ($perBranchRel -replace '/', '\')
         $legacyPath    = Join-Path $fx ($case.LegacyRel -replace '/', '\')
 
-        # Move the branch's document onto the legacy name. Its heading already declares $vBranch, which is
+        # Move the branch's document onto the legacy name. Its heading already declares the branch, which is
         # what the declare-test keys on -- the path is all that changes. Remove-Item rather than `git rm`:
         # a no-origin fixture never commits the document (new-branch only commits on the push path), so it
         # is untracked here and `git rm` would no-op.
@@ -1103,7 +1108,7 @@ Write-Output `$t.Type
             & git -C $fx add -A 2>$null | Out-Null
             & git -C $fx commit -q -m 'move document onto the legacy name' 2>$null | Out-Null
         } finally { $ErrorActionPreference = $prevEap }
-        Assert-Equal $vBranch (Get-BranchFileDeclaredBranch -Text $docText) "$($case.Label): the moved document still declares its branch"
+        Assert-Equal $case.Branch (Get-BranchFileDeclaredBranch -Text $docText) "$($case.Label): the moved document still declares its branch"
 
         $mk2 = Invoke-NewBranch -Dir $fx -Name $case.Branch -Title 'On a legacy name'
         Assert-Equal 0 $mk2.Code "$($case.Label): the rerun exits 0"

@@ -308,6 +308,84 @@ $unknownUndeclared = Get-ResolvesDecision -Resolves @(332) -OpenMentions $null
 Assert-Set  @()     $unknownUndeclared.Undeclared 'an undeterminable state reports no undeclared issues'
 
 Write-Host ""
+Write-Host "Get-TargetIssueWarnings -- the already-done check (issue #1282)" -ForegroundColor Cyan
+# The gap #1282 measured: the resolves gate blocks only on a mentioned issue that is still OPEN, so a
+# branch targeting an issue that has since been CLOSED, or one another open/merged PR already resolves,
+# reaches a gate-green PR and is found at the merge conflict. This helper is the facts behind the
+# warning; it never blocks.
+
+Assert-Equal 0 (@(Get-TargetIssueWarnings -TargetIssues @()).Count) 'no target issues -> nothing to say'
+
+# Target still open, no rival PR -> nothing to say.
+$stillOpen = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(1270, 42))
+Assert-Equal 0 $stillOpen.Count 'an open target with no rival PR produces no warning'
+
+# Target CLOSED (the open list is known and does not contain it).
+$closed = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(42, 99))
+Assert-Equal 1     $closed.Count       'a closed target produces one record'
+Assert-Equal 1270  $closed[0].Issue    'the record names the issue'
+Assert-True  $closed[0].IsClosed       'and marks it closed'
+Assert-Equal 0     @($closed[0].ClaimingPrs).Count 'with no claiming PR when none was supplied'
+
+# Open list undeterminable -> IsClosed is never asserted (the not-blocking treatment).
+$noList = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues $null)
+Assert-Equal 0 $noList.Count 'an undeterminable open-issue state claims nothing'
+
+# A rival OPEN PR whose body closes the number.
+$rivalJson = '[{"number":1276,"state":"OPEN","headRefName":"fix/other-v1","body":"Closes #1270"}]'
+$rival = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(1270) -OtherPrsJson $rivalJson -CurrentBranch 'fix/mine-v1')
+Assert-Equal 1     $rival.Count                  'a rival PR that closes the number produces a record'
+Assert-Equal $false $rival[0].IsClosed           'the issue itself is still open here'
+Assert-Equal 1276  @($rival[0].ClaimingPrs)[0].Number 'the claiming PR number comes through'
+Assert-Equal 'OPEN' @($rival[0].ClaimingPrs)[0].State 'and its state'
+
+# A MERGED rival counts too -- that is the exact #1282 case.
+$mergedJson = '[{"number":1276,"state":"MERGED","headRefName":"fix/other-v1","body":"Closes #1270"}]'
+$merged = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(1270) -OtherPrsJson $mergedJson -CurrentBranch 'fix/mine-v1')
+Assert-Equal 'MERGED' @($merged[0].ClaimingPrs)[0].State 'a merged rival is reported'
+
+# A CLOSED rival PR is an abandoned attempt (in #1282, the duplicate itself) -- NOT evidence the work is done.
+$closedRivalJson = '[{"number":1281,"state":"CLOSED","headRefName":"fix/other-v1","body":"Closes #1270"}]'
+$closedRival = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(1270) -OtherPrsJson $closedRivalJson -CurrentBranch 'fix/mine-v1')
+Assert-Equal 0 $closedRival.Count 'a CLOSED rival PR is not reported'
+
+# This branch's OWN open PR carries the keyword by design on a resumed run -- not a rival.
+$ownJson = '[{"number":500,"state":"OPEN","headRefName":"fix/mine-v1","body":"Closes #1270"}]'
+$own = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(1270) -OtherPrsJson $ownJson -CurrentBranch 'fix/mine-v1')
+Assert-Equal 0 $own.Count "this branch's own PR is never reported as a rival claimant"
+
+# A rival PR that only MENTIONS the number (no closing keyword) does not count -- same reader as the gate.
+$mentionOnlyJson = '[{"number":1276,"state":"MERGED","headRefName":"fix/other-v1","body":"context from #1270, unrelated"}]'
+$mentionOnly = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(1270) -OtherPrsJson $mentionOnlyJson -CurrentBranch 'fix/mine-v1')
+Assert-Equal 0 $mentionOnly.Count 'a bare mention in a rival PR body is not a claim'
+
+# Unparseable PR JSON -> no claiming PRs, and IsClosed is still evaluated from the open list.
+$badJson = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(42) -OtherPrsJson 'not json' -CurrentBranch 'fix/mine-v1')
+Assert-Equal 1 $badJson.Count            'unparseable PR JSON does not throw'
+Assert-True  $badJson[0].IsClosed        'and the closed-target signal still fires'
+Assert-Equal 0 @($badJson[0].ClaimingPrs).Count 'with no claiming PR from JSON that would not parse'
+
+# The whole #1282 scenario in one call: target #1270, closed; PR #1276 merged resolving it; PR #1281
+# closed on this branch also carrying the keyword. One record: closed, claimed by #1276 alone.
+$scenarioJson = '[{"number":1276,"state":"MERGED","headRefName":"fix/unfolded-entry-on-main-unguarded-v1","body":"Closes #1270"},{"number":1281,"state":"CLOSED","headRefName":"fix/unfolded-entry-on-main-sessioncheck-v1","body":"Closes #1270"}]'
+$scenario = @(Get-TargetIssueWarnings -TargetIssues @(1270) -OpenIssues @(42, 99) -OtherPrsJson $scenarioJson -CurrentBranch 'fix/unfolded-entry-on-main-sessioncheck-v1')
+Assert-Equal 1     $scenario.Count       'the #1282 scenario produces exactly one record'
+Assert-True  $scenario[0].IsClosed       'the target is reported closed'
+Assert-Equal 1     @($scenario[0].ClaimingPrs).Count 'and exactly one claiming PR (the merged one, not the abandoned duplicate)'
+Assert-Equal 1276  @($scenario[0].ClaimingPrs)[0].Number 'which is #1276'
+
+# Two target issues, one closed and one open+claimed -> a record for each, with the right signal.
+$twoJson = '[{"number":90,"state":"OPEN","headRefName":"fix/other-v1","body":"Closes #401"}]'
+$two = @(Get-TargetIssueWarnings -TargetIssues @(400, 401) -OpenIssues @(401) -OtherPrsJson $twoJson -CurrentBranch 'fix/mine-v1')
+Assert-Equal 2 $two.Count 'both targets that have something to say are reported'
+$rec400 = $two | Where-Object { $_.Issue -eq 400 }
+$rec401 = $two | Where-Object { $_.Issue -eq 401 }
+Assert-True  $rec400.IsClosed                       '#400 is closed'
+Assert-Equal 0 @($rec400.ClaimingPrs).Count         'and has no claiming PR'
+Assert-Equal $false $rec401.IsClosed                '#401 is still open'
+Assert-Equal 90 @($rec401.ClaimingPrs)[0].Number    'but is claimed by PR #90'
+
+Write-Host ""
 Write-Host "Get-ExistingPrRecord" -ForegroundColor Cyan
 
 # What open-pr.ps1 does with the answer: an existing PR means the gates and the push still run but
@@ -1296,6 +1374,18 @@ $idxResolve = $openPrText.IndexOf('$label = $info.Label')
 Assert-True ($idxResolve -ge 0 -and $idxResolve -lt $idxPush) 'the label is RESOLVED before the push too -- a check on a label resolved later would be checking nothing'
 Assert-True (([regex]::Matches($openPrText, '\$label = \$info\.Label')).Count -eq 1) 'and resolved in exactly one place, so the checked label and the sent label cannot differ'
 Assert-True ($openPrText -like '*if (-not $existingPr) {*') 'the gate is on the create path only -- an existing PR keeps its own labels and is never sent one'
+
+Write-Host ""
+Write-Host "open-pr.ps1 wires in the already-done check (issue #1282)" -ForegroundColor Cyan
+# The helper is proven pure above; this proves the script actually calls it, and BEFORE the push --
+# a warning that arrives after forty test suites and a push is the failure #1282 describes, not a fix.
+$idxAlreadyDone = $openPrText.IndexOf('Get-TargetIssueWarnings -TargetIssues')
+Assert-True ($idxAlreadyDone -ge 0) 'open-pr.ps1 calls Get-TargetIssueWarnings'
+Assert-True ($idxAlreadyDone -lt $idxPush) 'and it runs before the push, so the author hears it in seconds'
+Assert-True ($idxAlreadyDone -lt $idxGates) 'and before the lint and test gates'
+Assert-True ($openPrText.Contains("'number,state,headRefName,body'")) 'the PR-body search asks for the four fields the helper reads'
+Assert-True ($openPrText.Contains("'--state', 'all'")) "the search is --state all, so a MERGED claimant counts -- that is the #1282 case"
+Assert-True ($openPrText -like '*-CurrentBranch $branch*') "the current branch is passed, so this branch's own PR is not read as a rival"
 
 # --- Get-DirectPushBlockingRules / Get-FoldPushVerdict (issue #1278) ------------------------------
 # WHY THIS BLOCK EXISTS. ship-pr merged PR #1271, checked out main, folded, committed -- and the push
