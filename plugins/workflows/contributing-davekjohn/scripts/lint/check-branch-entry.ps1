@@ -31,7 +31,7 @@
     will say, so the author learns it here rather than at the cut, and merges anyway.
 
     THE DEPLOY LOCK, AND IT IS WHY THIS SCRIPT NOW READS A PR BODY AT ALL (Dave, issue #884,
-    August 25, 2026). The DEPLOY section travels four times -- development.md, the PR body,
+    August 25, 2026). The DEPLOY section travels four times -- the branch's development document, the PR body,
     CHANGELOG.md, the release notes -- and is fixed at the moment the PR opens, because that is what the
     review approved and what the fold takes. ship-pr refuses the merge on divergence, and ship-pr is
     local, which is this gate's whole reason for existing. It ADDS NO RULE HERE EITHER: the comparison is
@@ -203,7 +203,7 @@ if (-not (Test-Path -LiteralPath $entryPath)) {
     exit 1
 }
 
-# THE DEPLOY SECTION, NOT THE WHOLE DOCUMENT. The entry is a section of development.md since
+# THE DEPLOY SECTION, NOT THE WHOLE DOCUMENT. The entry is a section of the branch's development document since
 # August 23, 2026, and every reader below is entry-shaped -- handed the plan as well, the scaffold check
 # would accuse the step list of being an unfinished entry. Get-DevelopmentEntryText hands back the
 # whole text for a legacy file that IS an entry, so a branch created before the merge is read as it was.

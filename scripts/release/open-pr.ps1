@@ -19,7 +19,7 @@
 
     THE TITLE IS NOT TYPED HERE -- IT IS DERIVED (Dave, #506 + #505, August 7, 2026). A fresh PR is called
     '<branch type>: <the entry's Branch title>': the type off the branch prefix, the words out of
-    the DEPLOY section of development.md. So the sentence is written once, at `new-branch -Title`, and the PR, the
+    the DEPLOY section of the branch's development document. So the sentence is written once, at `new-branch -Title`, and the PR, the
     changelog and the release documents cannot disagree about what the change is called -- nor can the title
     lose its type prefix, which the last five PRs before this change all had (#499-#503). Get-PrTitle
     composes it; -Title is still accepted and ignored, see that parameter.
@@ -49,7 +49,7 @@
     Auto-fill (if you do NOT supply -Body): the script fills in the template itself as much as
     possible, so the PR never lands on github.com as an empty form:
       1. The template's description placeholder is replaced by the changelog entry
-         (the DEPLOY section of development.md, an older branch/ pair, or the pre-split
+         (the DEPLOY section of the branch's development document, an older branch/ pair, or the pre-split
          <SafeName>.md in the repo root), which always
          exists on the branch. So you never have to type anything twice. What goes in is the entry from
          its 'What does the change...' section onwards -- see Get-PrDescription for why the three
@@ -711,8 +711,8 @@ if (Test-Path -LiteralPath $entryPath) {
     $entryText = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
     $scaffoldFindings = @(Get-EntryScaffoldFindings -EntryText $entryText -Wording (Get-EntryScaffoldWording))
     if ($scaffoldFindings.Count -gt 0) {
-        # Repo-relative, not the bare leaf. Every branch's document is called development.md, so a
-        # leaf-only name in the refusal tells the reader nothing about which file to open.
+        # Repo-relative, not the bare leaf: the document sits under contributing-davekjohn/, so a
+        # leaf-only name in the refusal makes the reader hunt for the file it means.
         $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
         $detail = ($scaffoldFindings | ForEach-Object { "  - $($_.Label): '$($_.Marker)'" }) -join "`n"
         if ($Force) {

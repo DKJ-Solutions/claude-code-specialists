@@ -1152,7 +1152,7 @@ function Get-EntryTierSectionLabel {
 # deploy it describes, and the heading followed the reader.
 # REVERSED ON AUGUST 25, 2026 (Dave, issue #884), AFTER ONE DAY, AND THIS TIME THE REASON IS THE SECTION'S
 # WHOLE JOURNEY RATHER THAN ITS FIRST STOP. #865 optimised for the reader of the document the section opens.
-# But the section travels four times -- development.md -> the PR body -> CHANGELOG.md -> the developer
+# But the section travels four times -- the branch's development document -> the PR body -> CHANGELOG.md -> the developer
 # release notes -- and #865's own comment named that tension itself, one word wide, and shipped anyway. Two
 # of those four readers are not looking at a PR, and the two that come last are the ones a release is read
 # from. #884 asks for one thing in all four places, so the wording follows the SECTION rather than any one
@@ -4581,7 +4581,7 @@ function Test-EntryDeclaresShape {
 # --- The entry's links, held against the destination its text lands at ---------------------------
 #
 # WHY THIS IS A QUESTION AT ALL. The entry is written as the DEPLOY section of
-# contributing-davekjohn/development.md, and the fold moves its text VERBATIM into the changelog. So a
+# contributing-davekjohn/<branch>.md, and the fold moves its text VERBATIM into the changelog. So a
 # relative link in it has to resolve from the CHANGELOG's OWN directory rather than from the one the author
 # is typing in -- and where those two differ it looks wrong in front of them and only becomes right after it
 # moves. The natural instinct produces the broken form, and nothing said so: reported from a consumer as
@@ -5207,7 +5207,7 @@ function Get-BranchFilePaths {
         object.
 
         ONE FILE SINCE AUGUST 23, 2026 (Dave), WHERE THERE WERE TWO. 'workflow-davekjohn/branch/' held a
-        step list and an entry side by side; both are sections of 'contributing-davekjohn/development.md'
+        step list and an entry side by side; both are sections of the branch's development document
         now -- PLAN, CREATE and TEST carry the steps, and the fourth phase, '## `<branch>` DEPLOY', IS the
         entry that folds into CHANGELOG.md at the merge. The split had been correct about one thing and wrong
         about another: the two jobs genuinely are different, and putting them in two documents meant the

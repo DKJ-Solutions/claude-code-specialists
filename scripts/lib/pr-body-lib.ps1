@@ -217,7 +217,7 @@ function Get-PrDescription {
     # are answered together here rather than as two independent flags.
     #
     # ON TODAY'S SHAPE the start line IS '## DEPLOY: `<branch>`', and it is included. #884's requirement is
-    # that the section is ONE THING in all four places it lands -- development.md, the PR body,
+    # that the section is ONE THING in all four places it lands -- the branch's development document, the PR body,
     # CHANGELOG.md, the release notes -- and is locked once the PR opens. A copy that drops its own heading
     # and shifts every remaining one is not that thing: it is a rendering of it, and two renderings cannot
     # be compared without agreeing on the transform first. Carried verbatim, the PR body IS the section, so
@@ -597,7 +597,7 @@ function Test-DeployLock {
 
     .DESCRIPTION
         THE LOCK (Dave, issue #884, August 25, 2026). The DEPLOY section travels four times --
-        development.md -> the PR body -> CHANGELOG.md -> the developer release notes -- and it has to
+        the branch's development document -> the PR body -> CHANGELOG.md -> the developer release notes -- and it has to
         be the same thing at every stop. So it is fixed at the moment the PR opens: after that the document
         may not diverge from what the PR published, because the PR is what reviewers approved and
         CHANGELOG.md is what the fold will take.
