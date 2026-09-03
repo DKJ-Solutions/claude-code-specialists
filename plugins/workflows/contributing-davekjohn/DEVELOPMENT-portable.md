@@ -368,7 +368,7 @@ answer may well be *"this reaches nobody here"*, and you say so:
 | block | who notices | answer it with |
 |---|---|---|
 | the DEPLOY section's own opening text | this repo's own developers — **tier 0** | a score, always |
-| `### What makes this deploy extra special` | a subscriber of the service — **this repo's audience, tier 2** | a score, or `N/A` if no subscriber would notice |
+| `#### What makes this deploy extra special` | a subscriber of the service — **this repo's audience, tier 2** | a score, or `N/A` if no subscriber would notice |
 
 **Tier 0 has no heading of its own**, and the DEPLOY heading is its section (Dave, August 23, 2026). It was
 `#### Tier 0`, then a `###` question of its own; the question went away when the entry became a section of
@@ -379,7 +379,7 @@ level in the same change — it is the entry's first inner heading now, at the s
 is answering a question rather than classifying a reader, and the second heading **resolves** to whichever
 audience tier the repo has stated, so the form stops naming a number that is only right for repos answering
 2. The tiers still exist exactly as before; they live in the parser instead of in the prose. **A repo that
-has stated no audience tier keeps the older shape**, a `#### Tier N` sub-section per tier the model has with
+has stated no audience tier keeps the older shape**, a `##### Tier N` sub-section per tier the model has with
 tier 0 among them, because a heading with no tier to resolve to would read as tier 0 and empty its release
 documents.
 
@@ -431,7 +431,7 @@ about is answered before a PR opens.
 
 ### Four things about this shape, each of which someone has got wrong before
 
-- **The PR line is not yours to write.** The fold fills `### Pull Request` from the merge itself.
+- **The PR line is not yours to write.** The fold fills `#### Pull Request` from the merge itself.
 - **Nothing may use `###` inside the section, and `####` only for its named headings.** A `###` becomes a
   *separate change* the moment the fold pastes this into `CHANGELOG.md` — one that declares no impact, so it
   reads as tier 0. A `####` collides with the named headings, truncating whichever one it lands in. Use
@@ -686,7 +686,7 @@ run on `main` right after the merge:
 1. **splits the document at the DEPLOY heading** and takes that section — the plan above it never travels;
 2. **strips any HTML comments** — the guidance is the form rather than the answer;
 3. inserts the entry at the **top** of `CHANGELOG.md`'s list — that document is newest-first — with the
-   PR link written into `### Pull Request` and the merge moment stamped on the DEPLOY heading;
+   PR link written into `#### Pull Request` and the merge moment stamped on the DEPLOY heading;
 4. **removes the document** — one deletion, which clears the plan along
    with the entry because they are sections of the same file, and leaves the trunk without a copy;
 5. commits exactly those two paths.

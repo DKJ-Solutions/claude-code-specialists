@@ -244,13 +244,13 @@ a release for a missing timestamp would be ceremony rather than a guard.
      second heading being a question rather than a number:
 
      ```text
-     ## DEPLOY: feat/short-name
+     ### DEPLOY: feat/short-name
 
      The routine version bump stops needing a developer.
 
      **Score:** 4
 
-     ### What makes this deploy extra special
+     #### What makes this deploy extra special
 
      Consumers must re-add the marketplace under its new name.
 

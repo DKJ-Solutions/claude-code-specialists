@@ -53,24 +53,24 @@ second attempt. Without `-Branch` the fold recovers the branch from the file nam
 PR lookup.
 
 **The entry body carries the description; the fold adds what only exists after the PR.** An entry is one
-`##` heading naming the branch, with two named `###` sections under it — the same block in the entry file
+`###` heading naming the branch, with two named `####` sections under it — the same block in the entry file
 and in `CHANGELOG.md`, so what a contributor writes is exactly what lands. The fold **strips the guidance
-comments** on the way and writes the PR line into `### Pull Request`:
+comments** on the way and writes the PR line into `#### Pull Request`:
 
 ```markdown
-## DEPLOY: feat/short-name · 20260806-114230
+### DEPLOY: feat/short-name · 20260806-114230
 
 …why it matters at this reach…
 
 **Score:** 2
 
-### What makes this deploy extra special
+#### What makes this deploy extra special
 
 …or one line saying why it reaches nobody there…
 
 **Score:** N/A
 
-### Pull Request
+#### Pull Request
 
 Short strong title
 
@@ -79,11 +79,11 @@ Short strong title
 
 **The entry opens with the change's two audiences, lowest first, and neither names a tier number.**
 Tier 0 answers directly under the DEPLOY heading; the audience tier answers under
-`### What makes this deploy extra special`, which means whichever single tier the repo has stated
+`#### What makes this deploy extra special`, which means whichever single tier the repo has stated
 (`Get-ReleaseAudienceTier`). **Not every change reaches that audience** — that is why these are blocks rather
 than the table they replaced, where a missing row read as an omission, and why the second one can answer
 `N/A` with a line saying why. Where a repo has stated no audience tier, each tier the model has gets a
-`#### Tier N` sub-section instead, tier 0 among them, exactly as before.
+`##### Tier N` sub-section instead, tier 0 among them, exactly as before.
 
 **It was six sections until August 16, 2026 and is two since** (Dave). The heading absorbed the branch ID
 and, through the branch it names, the type; the PR title moved into the section that already held the PR's
@@ -92,7 +92,7 @@ other facts; and `Significance` lost a heading that only asked again what the se
 in flight — folds unchanged.
 
 The scaffolder fills in the heading and the PR title. The fold adds what does not exist until the merge,
-one fact per place: the **`PR #NN` link** as the last line of the entry's own `### Pull Request` section,
+one fact per place: the **`PR #NN` link** as the last line of the entry's own `#### Pull Request` section,
 and the **moment it landed** stamped on that section's heading. The separator is a middot in both.
 **The ENTRY heading is left exactly as its author wrote it**, and so is everything else — the fold
 rewrites nothing but the comments it strips.
@@ -105,9 +105,12 @@ keep the branch heading.
 **An entry file written before this format still folds.** It carries an `###` heading with the type as a
 middot field and, where the repo had adopted tiers, an impact table or a `Tier: N` line. An entry file
 lives only on a branch, so that shape is not distant history — any branch opened before the format
-changed still has one. The fold **promotes the heading to `##`** as it lands, and says so on the console:
-an `###` in a flat list of `##`s is not an entry boundary to any reader of it, so it would otherwise be
-absorbed into the entry above and inherit that entry's PR link.
+changed still has one. The fold **re-levels the whole block to `###`** as it lands, and says so on the
+console: it measures the level the entry was actually written at and shifts every heading in it by that one
+delta, so the entry's own sections move down with it. A heading at the wrong level in that list is not an
+entry boundary to any reader of it, so the entry would otherwise be absorbed into the one above and inherit
+its PR link — and lifting the heading *alone* would put it level with its own sections, which is the same
+defect from the other side: one entry read as several.
 
 **The date is the fold's** (Dave, August 5, 2026). The scaffolder runs when
 the *branch* is created, so any date it wrote was the branch's birth date — a branch opened on Monday and
@@ -116,7 +119,7 @@ So the entry carries what the author knows and the fold adds what only the merge
 from the PR's own merge timestamp rather than from the clock, because a fold does not always run in the
 same minute as its merge.
 
-**And since August 23, 2026 it stands on the `## DEPLOY:` heading** (Dave), where it stood on the
+**And since August 23, 2026 it stands on the `### DEPLOY:` heading** (Dave), where it stood on the
 `Pull Request` heading for four days and on the closing line before that. It is the date the change
 *landed*, and that is the line saying *what* landed. It is the only stamp left: the document's own heading
 carried a creation stamp until September 3, 2026, and nothing read it back. Both shapes of this one are
@@ -124,19 +127,19 @@ read back: an entry carrying the stamp on `Pull Request` still parses. The closi
 `[PR #N](url)` and nothing else: one fact, one place. An entry folded without a PR gets neither, because
 there is nothing to read either off.
 
-## The one formatting rule: a body sub-heading is `####`, never `##` or `###`
+## The one formatting rule: a body sub-heading is `#####`, never `###` or `####`
 
-**`##` makes it a separate change.** Every `##` in `CHANGELOG.md` is read as one entry, so a body
+**`###` makes it a separate change.** Every `###` in `CHANGELOG.md` is read as one entry, so a body
 sub-heading at that level becomes a phantom entry — one that declares no impact, therefore reads as an
 undeclared tier 0, and gets its own block in the release record.
 
-**`###` makes it a seventh section, and can cost the entry a declaration.** The named sections sit at
-that level, and a section ends at the next heading of that level or above — so a stray `###` truncates
+**`####` makes it a seventh section, and can cost the entry a declaration.** The named sections sit at
+that level, and a section ends at the next heading of that level or above — so a stray `####` truncates
 whichever section it lands in. The dangerous version is a *misspelled* section heading (`Branch Type`):
 the parser looks for the exact text, so the entry silently loses the declaration the tier and significance
 gates read.
 
-Use `####`, or bold. The lint gate checks both halves in the entry file and in `CHANGELOG.md`.
+Use `#####`, or bold. The lint gate checks both halves in the entry file and in `CHANGELOG.md`.
 
 **What makes this worth a rule is *when* it bites.** The entry file looks perfectly fine on its own, and
 fine in the changelog after folding. The damage only appears once the release cut lifts the body into the
@@ -171,9 +174,9 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
    clears the plan along with the entry since they are sections of one file. A pre-split root entry file is
    removed as it always was, and an older `branch/` step list is removed beside it.
 
-**Where it lands is the top of the list.** `CHANGELOG.md` is an intro followed by a flat list of `##`
+**Where it lands is the top of the list.** `CHANGELOG.md` is an intro followed by a flat list of `###`
 entries, **newest first**: the entry being folded is the most recently merged one, so it leads. Everything
-above the first `##` is the intro and is never written into; a document with no entries yet simply gets the
+above the first `###` is the intro and is never written into; a document with no entries yet simply gets the
 first one.
 
 **It ranked on the Significance sections until August 16, 2026**, and the argument for that was that the
