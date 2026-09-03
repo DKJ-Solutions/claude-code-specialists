@@ -123,7 +123,7 @@ jobs:
     strategy:
       # FOUR, AND THE FLOOR IS WHY IT IS NOT MORE. The gate's cost within a shard is its slowest FILE
       # (#714), so no partition of whole files can go below the longest one and more shards cannot help --
-      # each extra runner just pays its own ~35s of provisioning and checkout. Four gives 16 suites per
+      # each extra runner just pays its own ~20s of provisioning and checkout. Four gives 16 suites per
       # shard over 4 lanes, which is enough for the pool's ~2968 lane-seconds to stop being the binding
       # constraint; past that the longest file is all that is left.
       #

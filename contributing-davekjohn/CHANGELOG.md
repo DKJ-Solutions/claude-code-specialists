@@ -32,6 +32,65 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/shard-floor-is-the-slowest-file · 20260904-001420
+
+[#1354](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1354) reported that the shard
+stride balances suite **count** and not **cost**, so the required check's wall clock is set by one shard
+— 5m01s against 2m42s on the first sharded run. The mechanism is right, and **both repairs it proposed
+stop at the same wall: the slowest FILE.** A shard whose longest file was 183s took 183s; one whose
+longest was 206s took 207s. Those are exact rather than reconstructed, because the stride puts the four
+`check-plugin-integrity-*` suites in queue positions 3-4 where they start at `t0`. So a sharded job is
+`max(longest file)` plus provisioning, no partition of whole files beats its own longest member, and a
+duration-aware bin-pack would reach that same wall — which is why neither was built.
+
+**The repo-local half of this answer landed independently while this branch was open**
+([#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358), `2bd31203`): the stale
+`~51s` floor in `ci.yml` corrected to the measured CI figure, the reconstruction trap written down, the
+plateau corrected from five files to four, and ~12.6% taken off all four heavy suites by removing a
+duplicated AST walk from the lint they invoke. This branch was **reduced to the residual** rather than
+rebased on top and re-asserted; its own `ci.yml` rewrite and lens section were dropped in favour of the
+trunk's, which is better sourced.
+
+What remained was the **portable** half, and it is the reason this PR exists. #1358's changes are all
+repo-local, while `Invoke-TestSuiteGate`'s SHARDING docstring travels to consumers through two plugin
+mirrors — and it still told them the gate is *contention-bound*, that *"adding lanes is close to
+linear,"* and nothing about that reversing the moment they shard. It now reads as a question of scale:
+adding lanes pays while a shard's lane-seconds exceed its longest file and stops dead at that file, and
+the trap is quoting the first paragraph after the shard count has crossed into the second. It also names
+the lever that is **not** another runner — those suites are ~100% their own lint invocations, and #1358
+bought its 12.6% inside the script they invoke without touching any partition — and it carries the
+reconstruction warning, because this function is precisely what makes that mistake easy: it records no
+per-suite duration and buffers output until a suite completes, so a log timestamp is a finish time.
+
+**One figure of this branch's own was withdrawn rather than shipped.** It first reported the heaviest
+suite at 237.0s standalone on an 18-core workstation and argued from that agreeing with the CI reading
+that no faster machine could touch it. The reading was taken while this session ran gates concurrently;
+#1358's idle measurement is 58.7s, with a local-to-CI ratio of 3.6-4.0x that reproduces the CI figure
+exactly. The file is machine-sensitive, the conclusion never depended on it, and the argument offered
+for it was wrong. Also corrected: `~35s` of per-runner provisioning to the measured `~20s`, which the
+trunk's own block already stated two paragraphs lower.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A subscriber gets the corrected `Invoke-TestSuiteGate` docstring in the plugin mirror — the half that
+tells them when adding a shard stops paying, what to reach for instead, and how not to mis-measure it.
+That is the question a consumer staring at a slow required check actually asks, and the old text
+answered it in the wrong direction. Nothing they run changes.
+
+**Score:** 2
+
+#### Pull Request
+
+Correct the shard floor: the required check is pinned to the slowest FILE, not to the partition
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1363](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1363)
+
+---
+
 ### DEPLOY: feat/gate-records-per-suite-durations · 20260904-000118
 
 The test gate now reports **how long each suite took**, not just the pool total. After the suites finish it
