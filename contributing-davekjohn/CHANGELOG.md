@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/shared-ast-pass-and-plateau-facts · 20260903-234119
+
+The lint gate parses and walks this repo's script set **once** per run instead of twice. Two checks that
+always run -- the barred-skill check and the Shopify-CLI check -- each used to call the PowerShell parser
+over every script and then walk the whole tree looking for command calls. They now share one pass. Over 184
+script files that walk is 1.157s of a 1.413s pass, so the duplicate was the expensive half, and a second
+pass off the shared result costs 0.014s.
+
+Where it shows up is the test gate, because the four suites that exercise this lint run it 168 times and are
+almost nothing but those runs: **-12.6%** across them, 199.9s to 174.7s standalone, with every assert count
+unchanged at 108 / 95 / 78 / 59. On CI that takes the required check's floor down by roughly 30 seconds.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the rarer half of a performance report: the measurement said the proposed lever was worth a fifth
+rather than a half, and named a different duplicate nobody had looked for. Three figures written in the tree
+turned out to disagree with the tree -- a CI floor comment claiming ~51s where the measured floor is ~232s,
+a documented 50% saving that measures 2.0%, and a list of four scenarios that has nine and named two that no
+longer exist. And the report's own plateau shrank from five files to four once the reconstruction behind it
+was checked: a log timestamp from this gate is a finish time, so subtracting the shard start only gives a
+duration for a suite that started at `t0`, which two of the five did not.
+
+**Score:** N/A
+
+#### Pull Request
+
+Share one AST pass and correct the plateau's measured facts
+
+[PR #1362](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1362)
+
+---
+
 ### DEPLOY: docs/changelog-merge-queue-settled · 20260903-233226
 
 Four pending entries under `## [Unreleased]` said the merge-queue decision for `main` was still open, and
