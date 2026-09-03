@@ -266,13 +266,64 @@ integrity.ps1`: 0 errors. `Invoke-TestSuiteGate` over all 61 suites, once as ask
 
 ### DEPLOY: `fix/ship-pr-stale-ci-certificate`
 
-**Score:**
+A required check certifies GitHub's **merge ref** -- the branch already merged into the trunk -- as that
+ref stood when the run was **created**. `pull_request` does not re-fire when the base moves, and
+`main-ci-gate` carries `strict_required_status_checks_policy: false`, so a check that went green before
+`main` advanced still satisfies the gate hours later. `ship-pr.ps1` step 3b now refuses that merge: after
+the required check goes green and before step 4 merges, it reads the certifying run's `created_at`, asks
+whether `main` has gained a first-parent commit since, and stops -- with `-SkipStaleCheck` as the valve.
+
+Measured on PR #1268, the merge that produced [#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292):
+its CI run started `07:39:34Z`, the test block its own change breaks reached `main` at `07:54:19Z` -- 45
+seconds before that run finished, and 14m45s after it started -- and it merged at `10:06:12Z` on that same
+green check, 2h11m stale.
+
+**The predicate is not the one the report proposed, and that is the substance of the change.** #1292 asked
+for a refusal when the branch is *behind* `origin/main`. Behind-ness is the ordinary case here -- 20 of the
+last 45 merged PRs, 44.4% -- and it is harmless whenever `main` advanced *before* the certifying run, which
+most of it did. What actually voids a certificate is narrower, and strictly implied by behind-ness: **did
+`main` move since the run that went green?** That fires on 14 of the same 45 (31.1%), median staleness 16.1
+minutes, max 146.6.
+
+**The anchor is the run's `created_at` and not a check's `startedAt`, and the difference is the whole safety
+property.** The first build used `startedAt`, reasoning that queueing only pushes it later so the error
+would be conservative. It is the opposite: a later anchor makes `git log --since` **miss** commits that
+landed in the gap, so a stale certificate passes as sound -- the exact failure this step exists to catch.
+Two things make that gap large rather than sub-second: `windows-latest` provisioning, and a re-run, which
+resets the timestamp without GitHub recomputing the merge ref. Verified on run `33652133970` -- top-level
+`created_at` held at `15:59:52Z` across a re-run whose `run_started_at` moved to `21:15:50Z`, five hours
+later, while the `/attempts/2` sub-resource reports its *own* `created_at` matching that late start, which
+is precisely the value that would have reintroduced the identical bias.
+
+Once a required check is named, every subsequent read fails closed -- no resolvable run id, an unreadable
+`created_at`, a failed fetch, a failed log -- naming `-SkipStaleCheck` in each refusal. Where the ruleset
+requires nothing at all it warns and ships, deliberately: this file is plugin payload, and refusing forever
+in a consumer that has no ruleset is the worse failure.
+
+Two defects were found in review and repaired here rather than filed. The new `git fetch origin main`
+lacked `-DiscardStderr` and echoed its captured output on failure, which on an HTTPS clone with a
+credential in the remote URL prints a secret -- the lesson [`../scripts/task/new-branch.ps1`](../scripts/task/new-branch.ps1)
+already carries. And the parsed `git log` read lacked the same flag, where a stray line becomes a fake SHA
+and the refusal's `Substring(0, 8)` turns a careful message into a .NET trace. The pre-existing sibling of
+the first, at this same file's fold-step fetch, is
+[#1313](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1313).
+
+What this change deliberately does **not** do is touch `main-ci-gate`. Enabling
+`strict_required_status_checks_policy` is #1292's own option 1 and GitHub's built-in answer to this, but it
+is a repo-settings change and therefore Dave's -- and it is not an alternative to this step so much as a
+complement, since it would protect this repo only.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+Nothing a subscriber sees. `ship-pr.ps1` is plugin payload, so what reaches a consumer is one new refusal
+-- the trunk moved while their PR sat green -- and one new flag to override it. For them the gate is what a
+ruleset cannot be: a consuming repo has no `main-ci-gate` to make strict, so this step is the only place
+the staleness is caught on their side at all.
+
+**Score:** N/A
 
 #### Pull Request
 
 ship-pr refuses to merge on a CI certificate main has outrun
-
