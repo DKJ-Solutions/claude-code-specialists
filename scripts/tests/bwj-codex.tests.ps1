@@ -169,6 +169,40 @@ Assert-True ($mirrorYml -match "(?m)^\s*group:.*github\.event\.action\s*==\s*'cl
 Assert-True ($mirrorYml -match "(?m)^\s*group:.*github\.event\.action\s*==\s*'reopened'") "and 'reopened' from the label events, so a triage burst cannot displace one"
 Assert-True ($mirrorYml -match "(?m)^\s*cancel-in-progress:\s*false") 'while a run already going is still never killed'
 
+# AND THE BLOCK STATES WHAT THE SPLIT COSTS (#1306). Two groups mean a `state` run and a `triage` run
+# on ONE issue can overlap, where one group serialised them -- and Sync-AsanaTaskStage has no
+# compare-and-set, so the later write wins whichever event was later. The split is still the better
+# side of the trade, so the first three asserts pin that the comment SAYS SO: it is a property no
+# reader can see in the key itself, and the previous comment was convincing while naming only the
+# half that improved.
+Assert-True ($mirrorYml -like '*#1306*')          'the block cites the issue for the cost the split carries'
+Assert-True ($mirrorYml -like '*CONCURRENTLY*')   'and states that a state run and a triage run can overlap on one issue'
+Assert-True ($mirrorYml -like '*sweep (d)*')      'and names the sweep that recovers the one case where that loses'
+
+# The three above are claims about the COMMENT; the two below are the mechanism the comment PROMISES.
+# Sweep (d) only re-derives a needs-info hold because it passes -Labels into Resolve-TargetStage, and
+# dropping that argument would leave the block above describing a backstop that no longer exists --
+# silently, since a card left at its forward floor looks exactly like a card that belongs there.
+#
+# READ THROUGH THE PARSER, NOT AS TEXT, and that is the whole reason this is not a regex. A pattern
+# over the call's span is satisfied by any nearby MENTION of -Labels: a comment reading
+# '# TODO: consider -Labels here' passes it while the argument itself is gone, which is exactly the
+# silence these asserts exist to break. Only a CommandParameterAst is an argument -- the same rule
+# check-plugin-integrity states for the Shopify CLI, where a comment naming the CLI is not a subject.
+# It is also why neither assert is coupled to the call-site FORMATTING: reordering the arguments or
+# switching either site to splatting changes the count rather than sneaking past a text anchor.
+$mirrorAst = [System.Management.Automation.Language.Parser]::ParseFile(
+    (Join-Path $PluginRoot 'templates\asana-mirror.ps1'), [ref]$null, [ref]$null)
+$stageCalls = @($mirrorAst.FindAll({ param($n)
+    $n -is [System.Management.Automation.Language.CommandAst] -and
+    $n.GetCommandName() -eq 'Resolve-TargetStage' }, $true))
+$stageWithLabels = @($stageCalls | Where-Object {
+    @($_.CommandElements | Where-Object {
+        $_ -is [System.Management.Automation.Language.CommandParameterAst] -and
+        $_.ParameterName -eq 'Labels' }).Count -gt 0 })
+Assert-Equal 2 $stageCalls.Count      'Resolve-TargetStage is still called at exactly two sites (event mode and sweep (d))'
+Assert-Equal 2 $stageWithLabels.Count 'and BOTH pass -Labels as a real argument, so sweep (d) can still re-derive the needs-info hold'
+
 # comment request -- the only write this script builds
 Assert-Throws { New-AsanaCommentRequest -Gid 'abc' -Text 'x' }             'New-AsanaCommentRequest throws on a non-numeric GID'
 Assert-Throws { New-AsanaCommentRequest -Gid '123; rm -rf /' -Text 'x' }   'and on a GID carrying a shell payload'

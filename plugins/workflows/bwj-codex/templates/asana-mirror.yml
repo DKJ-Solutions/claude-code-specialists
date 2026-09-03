@@ -47,6 +47,24 @@ permissions:
 # permanently AND leaves the card stuck at its forward floor. Giving those two their own group means
 # a triage burst can no longer displace one, while two of them on one issue still serialise, which
 # is what keeps a close and a reopen in the order they actually happened.
+#
+# WHAT THE SPLIT COSTS, because it is not free: a `state` run and a `triage` run on ONE issue can now
+# run CONCURRENTLY, where the single group serialised them. Sync-AsanaTaskStage has no
+# compare-and-set -- it reads the card's membership and moves -- so the later WRITE wins regardless of
+# which EVENT was later. That only matters for `needs-info`, one of the two answers allowed to move a
+# card BACKWARD: triage resolves it to the hold and moves the card back, and a `state` run still
+# holding the reading it took before that label landed resolves a forward floor. A forward move needs
+# no permission, so nothing blocks it and the card leaves the hold. Reconciliation sweep (d) is the
+# backstop -- it passes -Labels into Resolve-TargetStage, so it re-derives the hold WITH
+# AllowBackward and puts the card back within a day. That is the difference from the defect above,
+# whose reopen path had no backstop at all.
+#
+# AND NEITHER HALF IS REPAIRED, for two DIFFERENT reasons -- kept apart here because the first one
+# reads as though it covered both. THE KEY STAYS SPLIT: the queue holds one pending run, so
+# serialise-and-drop versus run-everything is a real trade with no third option, and a dropped
+# `reopened` is the more expensive side of it. THE WRITE PATH IS LEFT ALONE on its own grounds: a
+# compare-and-set in Sync-AsanaTaskStage would close the window properly, but it is a change to the
+# write path for a failure sweep (d) already heals within a day (issue #1306).
 concurrency:
   group: asana-mirror-${{ github.event.issue.number || 'reconcile' }}-${{ (github.event.action == 'closed' || github.event.action == 'reopened') && 'state' || 'triage' }}
   cancel-in-progress: false
