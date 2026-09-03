@@ -32,6 +32,112 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/development-doc-per-branch-path-v1` · 20260903-014524
+
+The branch's development document is named after its branch -- `contributing-davekjohn/development-<branch>.md`
+-- so two branches never write the same path. It was one shared `development.md`, on the argument that git
+tracks the file per branch and a checkout swaps them; that is true of checkout and says nothing about merge.
+Every merge to `main` put the merged branch's copy on the trunk and left every other open PR conflicting on
+it, and a conflicting PR has no merge ref, so the forge creates no check suite at all -- `lint-en-tests` could
+never go green and the PR could never merge, which conflicted it again at the next merge. Measured on
+September 2, 2026: all four open PRs conflicting, this document the only conflicting path in three of them.
+
+**The fold was measured and is not the fix.** Simulating a completed fold against those same four PRs cleared
+the two `add/add` cases and left the two `modify/delete` cases conflicting -- deleting the trunk copy changes
+the conflict's shape, not its existence, which is why resolving a lap by merging `main` in never converged.
+A `.gitattributes` merge strategy, which `DEVELOPMENT-portable.md` used to recommend as the cheap repair, was
+declined for two reasons stated there: a forge computes mergeability with its own machinery, and a `union`
+merge would produce a document declaring two branches.
+
+**The trap the pre-August-2026 per-branch form set is not rebuilt.** That form made the fold guess the branch
+from the filename, which is why a `-v2` suffix was once forbidden. Here the filename is a write convention and
+a read candidate, never the authority: the resolver still identifies a document by the branch it DECLARES and
+discovers candidates by pattern, so a renamed branch still resolves and `-v2` costs nothing. The half of the
+old reasoning that was right is preserved too -- the documents stay in the workflow's folder beside
+`CHANGELOG.md`, so the repo root is untouched and a relative link in a DEPLOY section still resolves.
+
+Eight names were read before this change and ten are now: this branch's own, every other per-branch document
+in the folder, then the shared name and the seven that came before it. `-Branch` is authoritative where a
+caller names one, which is what stops a trunk carrying several documents from handing the fold somebody
+else's entry -- the stranding hazard reported on the issue. Two silent gaps the naming would otherwise have
+opened are closed with it: the scaffold gate read one fixed path and would have reported `absent` while a
+stale document sat at a per-branch name, and two lint checks held literal LISTS of branch-document names that
+a pattern cannot be added to. Fold-all sweeps every per-branch document rather than one, because a shared
+path could only ever hold one and a trunk can now carry several.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer's branch documents change name, and every branch they have open on the day of the update keeps
+working: the shared name is read and never written, so a document already holding work stays where it is and
+is still found, folded and cleared. Nothing has to be migrated by hand and no branch is stranded. What a
+consumer gains is the defect itself -- with more than one PR open, merges stop silently costing the others
+their CI.
+
+**Score:** 4
+
+#### Pull Request
+
+Name each branch's development document after its branch, so merges stop conflicting every other open PR
+
+Plugins: contributing-davekjohn
+
+[PR #1261](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1261)
+
+---
+
+### DEPLOY: `fix/claude-review-presdk-failure-silent-v1` · 20260903-015507
+
+`claude-review` no longer goes red in silence when it fails **before** the Claude SDK is reached. That
+class — a bad credential, missing action inputs, or the GitHub App not being installed — leaves
+`execution_file` empty, which skipped the **Why the review failed** step entirely, so the workflow wrote
+no titled annotation and `ship-pr`'s relay had nothing to print. The operator got a red tick and a blank
+reason line, indistinguishable from a workflow with nothing to say.
+
+**The workflow now has the complementary gate**, and the tests pin that both halves of `failure()` are
+covered so a class cannot fall between them again. The repair went into the workflow rather than into
+`Get-AuthoredFailureNote`, for the reason #1112 settled: teaching the relay to read *untitled*
+annotations would relay "Process completed with exit code 1" in every consuming repo. A workflow that
+wants to be heard writes a title.
+
+**What the new sentence may claim is the constraint, not its wording.** It states only what an empty
+output proves — the SDK produced no result, so this is the setup and not the diff, and no
+`api_error_status` exists to read. It does not name the cause, because the step cannot read it: the cause
+is in the runner's untitled annotation and the step log. The app installation is cited in the job summary
+as the *measured instance*, never as the diagnosis, which is #966's mistake with the sign flipped.
+
+**The failure that produced this is still live and is not repairable here.** The Claude Code GitHub App
+did not follow the transfer into `DKJ-Solutions`, so both `claude.yml` and `claude-code-review.yml` are
+inert on a 401 — an account-level install, like the spend limit #1164 needed. The transferable lesson,
+now in the system-administration lens beside its sibling #1244: **after a transfer, verify the
+capability, not the artefact that represents it.** #1239's checklist confirmed the Actions secret
+survived, and it had — while both workflows depending on it were dead anyway, one layer further out than
+the check reached.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing here reaches that reader. `.github/workflows/claude-code-review.yml` is this repo's own CI
+and ships to nobody, and `pr-issues-lib.ps1` was deliberately not touched, so no plugin mirror moved.
+
+The half a consumer *does* inherit is split out rather than folded in: `ship-pr` relays only a **titled**
+annotation, and no shipped page says so — `annotation` appears in three shipped `.ps1` files and zero
+shipped `.md`, so a consumer's own advisory check can go red with a blank reason and no way to learn that
+`echo "::error title=X::Y"` is the whole price of admission. That is
+[#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251).
+
+**Score:** N/A
+
+#### Pull Request
+
+claude-review names a pre-SDK failure instead of going red in silence
+
+[PR #1253](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1253)
+
+---
+
 ### DEPLOY: `docs/ship-pr-titled-annotation-page-v1` · 20260903-012152
 
 `ship-pr` merges past a failing *not-required* check and relays the sentence that check wrote about
