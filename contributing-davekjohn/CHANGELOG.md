@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/branch-file-paths-docstring-covers-1255-v1` · 20260903-103107
+
+`Get-BranchFilePaths`'s docstring narrative stopped at #963 and never explained the two rows #1255
+added. `SharedFile` and `Pattern` are both load-bearing -- one is a legacy candidate
+`Resolve-BranchFilePath` reads, the other drives its per-branch discovery sweep and
+`Test-IsPerBranchDocumentPath` -- so a reader following the narrative to understand the returned table
+found no reason for either. Three paragraphs now cover the sixth rename, `Pattern` as the one row that
+is not a name, and why the read set is no longer counted in prose at all: the number had been `four`,
+then `seven`, then `eight`, and #1255 added a name without touching it. Since #1259 there is one
+ordered source -- `Get-BranchFileLegacyNames` -- so the docstring points at it instead of carrying a
+count that goes stale on the next rename. No behaviour changed; the plugin mirror moved with it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a docstring inside a shared script lib. No subscriber of a service reads it, and nothing about
+what the scripts do changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+Get-BranchFilePaths's docstring reaches the per-branch rename
+
+Plugins: contributing-davekjohn
+
+[PR #1274](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1274)
+
+---
+
 ### DEPLOY: `docs/fold-hold-divergence-lesson-v1` · 20260903-101748
 
 Three docs stated that `main-ci-gate`'s bypass list is empty, which stopped being true on September 3,
