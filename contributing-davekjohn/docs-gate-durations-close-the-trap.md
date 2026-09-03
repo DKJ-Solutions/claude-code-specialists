@@ -33,23 +33,84 @@
 
 ### PLAN
 
-PR #1364 made the gate record per-suite durations, which falsified two statements written hours earlier on #1358: ci.yml's floor comment and Nolan's lens both say the gate records no per-suite duration. Both are now wrong in the direction that matters -- they tell the next reader to reconstruct.
+PR #1364 made the test gate record per-suite durations. That falsified two statements written earlier the
+same day on [#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358), both by this
+chain:
+
+- `../.github/workflows/ci.yml` -- *"the gate records no per-suite duration"*, inside a paragraph headed
+  BEWARE THE RECONSTRUCTION TRAP.
+- `../.claude/specialists/lenses/06-25-extension.md` -- the same claim opening its reconstruction-trap
+  section.
+
+**Wrong in the direction that matters:** both tell the next reader to reconstruct a duration from log
+timestamps, which is the exact method that produced the bad figures on #1358, and they now say it of a gate
+that prints the answer.
+
+#### And a second, less obvious staleness in the same lens section
+
+That section closes by concluding *"the plateau is four files, not five"* and proposing a decision on it.
+That conclusion was itself re-derived from the same reconstructions it was correcting -- it fixed the two
+bad members and then trusted the method for the membership list. The first recorded run shows a band of
+about a dozen suites and a different makespan-setter. Corrected rather than deleted: the parts that hold
+(entry-scaffold is genuinely not a member; the four `check-plugin-integrity-*` figures were genuinely
+exact) are kept, and the overreach is named as the same error one level up.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `../.github/workflows/ci.yml`: the paragraph now opens **DO NOT RECONSTRUCT DURATIONS FROM LOG
+      TIMESTAMPS -- THE GATE PRINTS THEM**, points at the per-shard table, and keeps the warning with its
+      reason restated -- the buffered output still makes every log timestamp a finish time, so the trap is
+      live for anyone who ignores the table.
+- [x] `../.claude/specialists/lenses/06-25-extension.md`: the trap section's opening claim is now past
+      tense with a forward link, and the trap itself is kept because the misleading timestamps are still
+      in every log.
+- [x] Same file: the *"four files, not five"* close is corrected, and a new section records the instrument,
+      the first recorded run, and the two facts it changed (`new-branch` sets the makespan; seven suites in
+      the band appear in none of the five).
+- [x] That new section carries the generalisable lesson rather than only the numbers: **build the
+      instrument before the argument**, and print a derivation's assumption beside the figure -- which is
+      why the table carries the lane offset and not just the duration.
+- [x] Every figure in the new section states **30 lanes on a 32-core workstation**, because #1351 measured
+      3.7x between that and the 4-lane CI shape, and this document's own standing rule is that a gate
+      figure without its lane count says nothing.
 
 ### TEST
 
+- [x] Full local gate (lint + all 65 suites) via `open-pr.ps1`, then the same gate as CI. No script
+      changed on this branch, so the gates are here to catch the link-scan and doc-shape checks that do
+      read these two files -- check 4 resolves the new relative links and the new intra-document anchor.
+- [x] `grep` for the falsified phrasing across the tree: no remaining occurrence of the claim that the
+      gate records no per-suite duration.
+
 ### DEPLOY: docs/gate-durations-close-the-trap
 
-**Score:**
+Two documents were telling readers to do the thing that had just been fixed. `ci.yml`'s floor comment and
+the performance lens both said *"the gate records no per-suite duration"* and instructed the next reader to
+reconstruct one from log timestamps -- written hours before PR #1364 made the gate print those durations
+directly, and left standing by it.
+
+That is the wrong way round to be stale: the sentence does not merely go out of date, it actively
+recommends the method that produced the bad numbers on #1358 in the first place. Both now point at the
+per-shard table the gate prints, and both keep the warning with its reason intact, because the buffered
+output still makes a log timestamp a finish time for anyone who reads the log instead of the table.
+
+The lens also closed with *"the plateau is four files, not five"*, a conclusion re-derived from the same
+reconstructions it was correcting. The recorded run puts about a dozen suites in the band and a different
+suite at the top, so that section now records the instrument and what it changed -- and keeps the parts of
+the earlier correction that survived.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+It is a branch whose entire subject is prose this chain wrote a few hours earlier and then invalidated by
+succeeding. Worth doing rather than filing, because a stale sentence that names a *method* is worse than
+one that names a number: the number is checkable, the method just gets followed. The lesson kept in the
+lens is the one that generalises past this issue -- build the instrument before the argument, and print a
+derivation's assumption next to the figure it produced.
+
+**Score:** N/A
 
 #### Pull Request
 
 Close the reconstruction trap in the docs that still describe it as open
-
