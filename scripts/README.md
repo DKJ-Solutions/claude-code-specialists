@@ -19,15 +19,23 @@ Three consequences worth knowing before you touch anything:
   The cache holds the last *released* mirror, so it lags this directory by however many merges have landed
   since. Two silent failures measured on one day; see below. **Every shared entry point refuses outright**
   ([`lib/source-repo-guard-lib.ps1`](lib/source-repo-guard-lib.ps1)) and names the local path to run
-  instead — with exactly two exceptions, `sync/check-roster-sync.ps1` and `sync/check-script-contract.ps1`:
-  both are invoked from the plugin by a SessionStart hook, so a refusal there would fail every session
-  start in this repo. That reason is specific to being a hook and extends to nothing else.
-  **The rule is held by a test rather than by this sentence** —
-  [`tests/source-repo-guard.tests.ps1`](tests/source-repo-guard.tests.ps1) derives the entry points from
+  instead — except the handful that the **harness** invokes from the plugin, a SessionStart or Stop hook,
+  where a refusal would fire on every session start or every turn in this repo. That reason is specific to
+  being a hook and extends to nothing else.
+  **The exempt scripts are deliberately not listed here** — they are named in
+  [`tests/source-repo-guard.tests.ps1`](tests/source-repo-guard.tests.ps1) and nowhere else, so adding one
+  is a decision that has to be argued in a file that fails when it is wrong. This page named two of them
+  until September 3, 2026, and by then there were five.
+  **The rule itself is held by that test rather than by this sentence** — it derives the entry points from
   the registry and fails on any that lacks the guard, so a new one is caught on the day it is registered.
   That assert exists because this line previously carried a hand-typed ratio and was wrong: the suite had
   always tested whether the guard *decides* correctly and never whether it is *called*, and
-  `maintenance/measure-always-on.ps1` had gone into the registry without it (#897).
+  `maintenance/measure-always-on.ps1` had gone into the registry without it (#897). It reads the parsed
+  syntax rather than the file's text, which is the second repair of the same class
+  ([#1321](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1321)): a whole-file match on
+  the lib's *name* could not tell loading the guard from talking about it, so a comment explaining why a
+  script deliberately has no guard counted as having one — and two entry points passed that assert for
+  months without meeting it.
 - **Never edit a file under `plugins/*/scripts/`.** Change the source here and run
   [`sync/build-shared-scripts.ps1`](sync/build-shared-scripts.ps1). Lint check 8 reports a hand-edited
   mirror as drift.
