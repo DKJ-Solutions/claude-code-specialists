@@ -33,19 +33,56 @@
 
 ### PLAN
 
+#### Where this came from
+
+Issue #1262 asked which of two implementations of #1255 is wanted. Answering it meant reading both,
+and the read turned up something neither PR body mentions: the merged one, #1261, **replaced** a
+string in `Get-PrDescriptionPlaceholderDefaults` where that list is documented append-only. That is
+the same defect #952 was filed about, committed a second time, and it shipped green.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Restore `contributing-davekjohn/development.md` to the recognised list, above the per-branch
+      form so the written one stays last
+- [x] Correct the docstring's rename narrative -- it read `development.md -> development.md` since
+      August 27 -- and add the September 3 per-branch rename to it
+- [x] Mirror both into `plugins/workflows/contributing-davekjohn/scripts/lib/pr-body-lib.ps1`
 
 ### TEST
 
+- [x] `pr-body.tests.ps1`: pin every published form as a superset assert, plus a named assert for the
+      dropped one, so a REMOVAL fails while an append needs no edit here
+- [x] Proved the guard fires: with the string removed again, 2 failed / 195 passed
+- [x] Full suite green with it restored: 197 asserts
+
 ### DEPLOY: `fix/pr-placeholder-list-append-only-v1`
 
-**Score:**
+`Get-PrDescriptionPlaceholderDefaults` recognises the pre-#1255 placeholder again. That string --
+`contributing-davekjohn/development.md` -- was the WRITTEN one from August 27 to September 3, 2026, so
+it is what every PR template scaffolded in that week carries right now, here and in every consumer
+that adopted a release in it. #1255 replaced it rather than appending, and an unrecognised placeholder
+is not a warning: open-pr leaves it in place and the PR body ships with no description at all. That is
+the exact outcome measured in #952, at 0 matches in smartwatchbanden, and the exact list that exists to
+prevent it.
+
+Nothing asserted the removal, and the reason is worth naming: the append-only guard added after #952
+derives the migrated string from the pre-`workflow-davekjohn` one, so it can only speak for forms that
+have a partner under the old folder name. Document renames have none -- the asymmetry is deliberate and
+correct -- so every rename of the document itself walked through the gap. The guard here is keyed on
+history instead: every form this family has ever published is pinned as a set, and the list must be a
+superset of it. Appending needs no edit; removing is the only thing that fails.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+This reaches consumers, and it reaches the ones who did nothing wrong. A repo that adopted a release
+between August 27 and September 3 has the affected string checked into its own
+`.github/pull_request_template.md`, where an update does not rewrite it -- so without this the list
+tolerates only the templates that need no tolerance, which is the inversion #952 named. No migration to
+perform: the string is recognised again on the next update.
+
+**Score:** 3
 
 #### Pull Request
 
