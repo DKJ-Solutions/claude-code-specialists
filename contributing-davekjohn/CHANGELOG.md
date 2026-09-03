@@ -32,6 +32,28 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/fixture-git-inherits-gpgsign-v1` · 20260903-115852
+
+A locked commit-signing agent no longer fails test suites for a reason unrelated to their subject:
+every git fixture that commits now pins `commit.gpgsign=false` locally, the way it already pins
+`core.autocrlf`, so a fixture's throwaway commits never depend on the developer's signing setup.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- test-fixture hygiene; no subscriber of any consuming service notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+Fixture git repos pin commit.gpgsign=false so a locked signing agent no longer fails unrelated suites
+
+[PR #1289](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1289)
+
+---
+
 ### DEPLOY: `docs/date-1244-passage-and-roles-v1` · 20260903-114307
 
 Two statements in the sysadmin lens's `#1244` passage had gone stale and are now dated against a
