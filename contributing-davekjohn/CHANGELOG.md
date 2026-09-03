@@ -32,6 +32,31 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `feat/ci-fold-commit-lint-only` · 20260903-155604
+
+The `fold:` commit's CI run drops from the full ~15-minute suite to a lint-only run of about a
+minute. That is roughly half of every ship's trunk runner time on `windows-latest` (billed at 2x),
+recovered without giving back anything #1294 bought: every trunk commit still carries a green
+`lint-en-tests`, and the folded `CHANGELOG.md` is still link-scanned by that lint run. The skip is
+keyed on the commit message (`fold:`), not a path filter, so no merge commit can fall through it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a CI-internal change to this repo's own `.github/workflows/`; no subscriber of any consuming
+service sees it.
+
+**Score:** N/A
+
+#### Pull Request
+
+CI on the fold commit runs lint only, not the full suites
+
+[PR #1310](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1310)
+
+---
+
 ### DEPLOY: `docs/traps-count-closing-line-v1` · 20260903-151947
 
 Sylvester's manual said "Nine PowerShell traps" in its heading and "All nine" in its opening line, then
