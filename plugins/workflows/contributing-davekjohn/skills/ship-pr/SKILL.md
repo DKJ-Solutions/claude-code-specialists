@@ -289,6 +289,47 @@ than adopting, and #985 stays open as their home.
 log and an idle `gh` child are not evidence of a stall. Judge progress from `git log` and `gh pr view`, never
 from the log file.
 
+
+### And it will not merge what it cannot fold ([#1278](https://github.com/DaveKJohn/claude-code-specialists/issues/1278))
+
+The section above asks whether step 5 can **check out** the trunk. This one asks whether it can **push**
+to it, and it is the same half-state by a second route.
+
+The fold is a **direct push** — one of the three named exceptions to *"never commit directly on the
+trunk"*. A required status check cannot be satisfied by a direct push: the pushed commit carries no
+checks, so the ref update is refused before any workflow could run. Which means an account can be fully
+entitled to **merge** — the PR's own check ran and passed — and not entitled to **fold**. Measured on
+PR #1271, September 3, 2026: `ship-pr` merged, checked out the trunk, folded, committed, and the push
+came back
+
+```
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: - Required status check "lint-en-tests" is expected.
+```
+
+leaving the trunk merged-but-unfolded. Not once — **every** run from that account, because the cause is
+the ruleset rather than the run.
+
+So step 0 now asks the question before step 1, for two `gh` reads:
+
+| read | what it answers |
+|---|---|
+| `repos/<repo>/rules/branches/<trunk>` | which rules apply to the trunk. It does **not** filter by bypass — measured: it returns `required_status_checks` to an account whose `current_user_can_bypass` is `always` — which is exactly why a second read is needed |
+| `repos/<repo>/rulesets/<id>` (or `orgs/<org>/rulesets/<id>`) | this account's `current_user_can_bypass` on the ruleset carrying it. The list endpoint returns that field as `null`, so it cannot be had in one call |
+
+**Three rule types block a fold**, and each by its own definition rather than by guesswork:
+`required_status_checks`, `pull_request` (the fold is not a pull request — so `pull_requests_only`
+bypass is *not* bypass here), and `update`. `deletion`, `non_fast_forward`, `required_linear_history`
+and `required_signatures` do not, and a trunk carrying only those ships exactly as before.
+
+**An unreadable ruleset warns; it never refuses.** The opposite posture to the merge verdict at step 3,
+and deliberately: there an unread required-check list could put red code on the trunk, while here the
+thing at risk is a fold that can be redone by hand or from an account with bypass. Refusing on an unread
+ruleset would take `ship-pr` away from every consumer whose token cannot read one — a far larger blast
+radius than the defect. Same answer as step 0's own unreadable-worktree arm.
+
+**It takes neither remedy**, and says both: give the account bypass on that ruleset (repo settings, so
+it is the repo owner's call), or ship the branch from an account that already has it.
 ## Why step 3 polls before it watches
 
 `gh pr checks` prints `no checks reported` **and exits 0** while no check has registered yet — which is

@@ -62,10 +62,12 @@ function Assert-Equal {
 }
 
 function New-GitTree {
-    <# A fresh repo with a local identity and autocrlf off -- identity so a machine with no global
-       user.email does not fail here for a reason unrelated to the code under test, autocrlf so git's own
-       CRLF warning never reaches stderr and trips the EAP guard. Same reasoning as every other git
-       fixture in this directory. #>
+    <# A fresh repo with a local identity, autocrlf off and commit signing off -- identity so a machine
+       with no global user.email does not fail here for a reason unrelated to the code under test,
+       autocrlf so git's own CRLF warning never reaches stderr and trips the EAP guard, and
+       commit.gpgsign false so a machine with signing on but a locked signing agent does not fail the
+       fixture commit for the same unrelated reason (#1287). Same reasoning as every other git fixture
+       in this directory. #>
     param([Parameter(Mandatory = $true)][string]$Label)
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("syncrules-$PID-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
@@ -77,6 +79,7 @@ function New-GitTree {
         & git -C $dir config user.name  'sync-rules test' | Out-Null
         & git -C $dir config user.email 'sync@test.invalid' | Out-Null
         & git -C $dir config core.autocrlf false          | Out-Null
+        & git -C $dir config commit.gpgsign false         | Out-Null
     } finally { $ErrorActionPreference = $prevEap }
     return $dir
 }

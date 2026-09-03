@@ -198,10 +198,9 @@ if (Test-Path -LiteralPath $configPath) {
 }
 
 
-# Validation via the shared SSOT helper -- no inline repetition of the hard-reject rules. It runs on the name
-# AS GIVEN, before the version suffix below is completed, and that order is a measured requirement rather
-# than tidiness: completing first turns '-Name main' into 'main-v1', which every hard reject then waves
-# through. Caught by this script's own suite on the first run.
+# Validation via the shared SSOT helper -- no inline repetition of the hard-reject rules. It runs on the
+# name AS GIVEN: this script does not complete or rewrite the name (see the version-suffix note below), so
+# what Test-BranchName sees is exactly what the branch will be called.
 $check = Test-BranchName -Branch $Name
 if (-not $check.IsValid) {
     Write-Error "new-branch cannot run -- invalid branch name '$Name': $($check.Reason)"
@@ -222,31 +221,25 @@ if ($Name -eq $trunk) {
     exit 1
 }
 
-# --- THE VERSION SUFFIX, COMPLETED HERE RATHER THAN DEMANDED (Dave, August 23, 2026) ---------------
+# --- THE VERSION SUFFIX IS NOT COMPLETED HERE, AND THAT IS DELIBERATE (Dave, September 3, 2026) -----
 #
-# A branch name ends in '-v<N>', and a second development cycle on the same subject keeps the name and bumps
-# the number. The rule was already half-written in branch-info.ps1: 'final' is refused there BECAUSE a
-# version suffix is the honest way to say "another round of this", and Dave's answer when asked for the
-# remedy was '-v2'. This makes it the starting point instead of the way out.
+# From August 23, 2026 this script appended '-v1' to any name carrying no '-v<N>' suffix, so a second
+# development cycle on the same subject would keep the name and bump the number. In 209 branches that
+# reached a merge with the suffix, not one was ever bumped to '-v2': the completion served a case that
+# had not occurred while charging every caller for it. It was also the direct cause of inbound #1224 --
+# a consumer wrapping this script for a branch whose name it does NOT own (a Dependabot PR branch) had a
+# SECOND branch, '<their-name>-v1', created, committed to and pushed, leaving the entry on a branch the
+# pull request does not point at.
 #
-# IT APPENDS '-v1' AND NOTHING ELSE -- it does NOT look for the lowest free number, and that restraint is
-# the whole design. new-branch is documented idempotent: running it again on the same subject RESUMES that
-# branch, which is what the new-branch skill relies on and what the -Park flow needs. A version scan would
-# turn every rerun into a new branch -- measured on this script's own suite, where the second run landed on
-# '-v2' and the assert that HEAD had not moved failed. So a bump is a DECISION somebody states by typing
-# '-v2', which is also exactly how Dave's own sentence reads.
+# So the name is used exactly as given. A '-v<N>' suffix is still valid and still the honest way to say
+# "another round of this" -- it is what the 'final' refusal in branch-info.ps1 points the caller at -- it
+# is simply TYPED now, never added for you. Nothing scans for the lowest free number; nothing rejects
+# '-v2'. new-branch stays idempotent: a rerun on the same name RESUMES that branch, which is what the
+# new-branch skill and the -Park flow rely on.
 #
-# AN EXPLICIT '-vN' IS LEFT EXACTLY AS GIVEN, for the same reason: a number somebody typed is a statement.
-#
-# WHY IT IS NOT A REFUSAL IN Test-BranchName, which is where a rule like this usually goes. Two reasons:
-# branch-info.ps1 is REPO-OWNED and does not travel, so enforcing there states the rule to this repo alone
-# while this script is the shared one; and a hard refusal breaks every branch in flight, here and in three
-# consumers, which meet this convention through a plugin update rather than by choosing to.
-if ($Name -notmatch '-v\d+$') {
-    $completed = "$Name-v1"
-    Write-Host "Branch name completed: '$Name' -> '$completed' (a development cycle carries its version; a second cycle on the same subject is '-v2', typed deliberately)." -ForegroundColor Cyan
-    $Name = $completed
-}
+# DO NOT RESTORE THE COMPLETION. The mirror-image rule -- a written ban on the '-v2' suffix -- was retired
+# on August 6, 2026 for its own reasons; this one is retired now for the reasons above. A scaffolder that
+# rewrites the name it was handed is exactly the shape that broke #1224.
 
 # --- THE BASE THIS BRANCH IS CUT FROM, MEASURED AND REPORTED (inbound #1046) -----------------------
 #

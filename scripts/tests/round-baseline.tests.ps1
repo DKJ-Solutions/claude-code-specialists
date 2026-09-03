@@ -87,6 +87,8 @@ function New-BaselineRepo {
     Invoke-Native -FilePath 'git' -Arguments @('-C', $dir, 'config', 'user.email', 'test@example.com') | Out-Null
     Invoke-Native -FilePath 'git' -Arguments @('-C', $dir, 'config', 'user.name', 'Baseline Test')     | Out-Null
     Invoke-Native -FilePath 'git' -Arguments @('-C', $dir, 'config', 'core.autocrlf', $Autocrlf)       | Out-Null
+    # gpgsign off: a locked signing agent must not fail the baseline commit for a reason unrelated to the test (#1287).
+    Invoke-Native -FilePath 'git' -Arguments @('-C', $dir, 'config', 'commit.gpgsign', 'false')        | Out-Null
 
     Add-BaselineFile -Dir $dir -FileName $FileName -Text $Text -Crlf:$Crlf
     Invoke-Native -FilePath 'git' -Arguments @('-C', $dir, 'add', '-A')                      | Out-Null

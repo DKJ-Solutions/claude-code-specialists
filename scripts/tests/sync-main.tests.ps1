@@ -108,6 +108,8 @@ function New-Consumer {
     Invoke-Git -C $work config user.name  'sync-main test'
     Invoke-Git -C $work config user.email 'sync@test.invalid'
     Invoke-Git -C $work config core.autocrlf false
+    # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+    Invoke-Git -C $work config commit.gpgsign false
     Invoke-Git -C $work checkout -q -b main
 
     $seams = @('# fixture repo-config')

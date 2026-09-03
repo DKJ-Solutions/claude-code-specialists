@@ -32,6 +32,301 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/open-pr-commits-branch-doc-v1` · 20260903-125359
+
+`open-pr.ps1` read the branch's development document from the **working tree** -- the scaffold,
+step-list, backing, impact and link gates, and the PR body it composes -- and then pushed **HEAD**. On
+a dirty document those are two different files, and every downstream reader takes the committed one:
+the `branch-entry` CI check, the fold, and ship-pr's DEPLOY lock. So the run published a PR body
+describing a DEPLOY section the branch did not carry, and CI failed on arrival. It now commits that
+document first, through the new `Invoke-GitParkCommit` in `park-lib.ps1` -- the stage-and-commit half
+of a park, without the push, bounded to the resolved document path(s) exactly as `park-cycle`'s bound 1
+is.
+
+Measured on PR #1267: `branch-entry` run 100563684253 failed on `7b783516`, and run 100564770379
+passed on `f1c02ea7` once the document had been committed by hand. The `DIRTY tree` warning (#1026)
+covered it only as a soft risk, and the backing gate could not see it at all --
+`Get-BranchBackingFinding` requires `Committed -eq 0`, so a dirty document *alongside* committed code
+raised nothing.
+
+Committing rather than refusing was the choice, because this script is the documented owner of the
+step that publishes that document, `park-cycle` already commits exactly this path automatically for
+the life of the branch, and a refusal would have charged the author a full lint + test gate re-run:
+committing moves HEAD, which invalidates the gate-evidence fingerprint the next run would otherwise
+reuse. Placing it above `Invoke-WorkflowGates` also makes that function's dirty-tree warning honest --
+a remaining dirty count is now real unpublished work.
+
+It is deliberately **not** called a gate. Its normal outcome is an act rather than a verdict -- it errors
+only if git itself fails -- so naming it one would make the four-plus-one gate count in
+[`CLAUDE.md`](../CLAUDE.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md) wrong on the day it landed. It is
+written up where a consumer reads it: open-pr's own `.DESCRIPTION`, a new section on the `open-pr` skill
+page, `CONTRIBUTING-portable.md`'s PR step, and step 3.2 here.
+
+One latent defect was found during the extraction: `Write-Error` inside the commit arm terminates under
+`$ErrorActionPreference = 'Stop'`, which every caller sets. Inline in a function returning a bare bool
+that only ever fed an `exit`, that was harmless; in a function whose return value a caller reads, it
+makes the return dead code -- and it broke `park-cycle.ps1`'s documented "ALWAYS EXITS 0" contract,
+since it runs on a Stop hook. **That repair is not this branch's to claim**: PR #1283 landed it on
+`main` for all three of `Invoke-GitPark`'s messages while this branch was parked. What this branch does
+is carry it across the split -- two of the three messages now sit in `Invoke-GitParkCommit`, the push
+message stays with the pusher, and each half records the reasoning where its own caller reads it. The
+merge of `main` is where the two met, and resolving it by hand was the only way to keep both the split
+and all three repairs.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing a subscriber sees. The fix is entirely inside the workflow tooling: a consumer running
+`open-pr` stops meeting a guaranteed red CI check on a branch whose document was written but not
+committed, which they notice the first time it does not happen.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr commits the branch document it derives the PR body from, so what CI reads is what was gated
+
+Plugins: contributing-davekjohn
+
+[PR #1293](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1293)
+
+---
+
+### DEPLOY: `fix/legacy-name-test-hardcodes-v1-suffix` · 20260903-123526
+
+`new-branch.tests.ps1` no longer builds the expected document name from a `-v1` suffix that
+`new-branch.ps1` stopped appending. The `#1259` legacy-name block held a `$vBranch =
+"$($case.Branch)-v1"` alias, and #1268 removed the completion that made it true -- so the block looked
+for `development-feat-on-pre963-v1.md`, a file nothing writes, and threw a `FileNotFoundException`
+before its first assert. The alias is deleted rather than corrected: named after a version suffix, it
+could only mislead the next reader, and `$case.Branch` says exactly what it is.
+
+**This was a green PR that landed a red trunk**, which is worth stating plainly because no gate
+reported it. #1268's branch was cut before `7b783516` (#1259) added this block, so its required check
+passed on a tree that did not contain the test its own change breaks. The merge commit is the first
+thing that holds both, and the merge is not gated -- the check runs on the branch head, and a branch
+is not required to be current with `main` before it merges. Every suite is green again on the merge
+result; 187 asserts in this suite, 61 suites in the gate.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches a consumer. The repaired file is a test suite that ships nowhere: `new-branch.ps1`
+itself is unchanged, so a repo on the workflow plugin sees no difference. What it buys is that the
+trunk is green again, which every open branch needs before its own gate can pass.
+
+**Score:** N/A
+
+#### Pull Request
+
+the legacy-name test stops hardcoding the -v1 suffix new-branch no longer appends
+
+[PR #1291](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1291)
+
+---
+
+### DEPLOY: `fix/open-pr-warn-issue-already-resolved-v1` · 20260903-121409
+
+`open-pr` now warns, before the push, when an issue the branch targets is already **CLOSED** or is
+already resolved by another **open or merged** PR -- the duplicate-work #1282 carried to a
+gate-green PR and found only at the merge conflict. The resolves gate was blind to it: it blocks
+only on a mentioned issue that is still open.
+
+A new pure helper `Get-TargetIssueWarnings` (`scripts/lib/pr-issues-lib.ps1`) takes the target
+numbers, the open-issue list open-pr already fetches, and one extra `gh pr list --search
+"<n> OR ... in:body" --state all` query, and returns one record per issue worth a word. It reads a
+rival PR body with the same `Get-ClosedIssueNumbers` the gate uses, so a bare mention does not
+count; a CLOSED rival PR (an abandoned attempt -- in #1282, the duplicate itself) and this branch's
+own PR are never reported. `open-pr.ps1` calls it in the resolves-gate block and emits one
+`Write-Warning` per record. Advisory only: a shared number or a reopened issue never blocks a PR.
+
+`new-branch.ps1` is unchanged -- it has no issue reference to check at creation, and already warns
+about a stale base "including an issue somebody else has just closed".
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an advisory line in a workflow script; no subscriber of any service notices it.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr warns when the target issue is already closed or resolved by another PR
+
+Plugins: contributing-davekjohn
+
+[PR #1288](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1288)
+
+---
+
+### DEPLOY: `fix/drop-v1-suffix-completion-v1` · 20260903-120612
+
+`new-branch.ps1` no longer appends `-v1` to a branch name that carries no version suffix; the name is used
+exactly as given. A `-v<N>` suffix stays valid and is typed by hand for a second cycle on a subject.
+Resolves inbound #1224 -- a consumer wrapping `new-branch` for a branch whose name it does not own
+(Dependabot) no longer gets a second branch created. Behaviour change for everyone who runs `new-branch`
+here and in the three consuming repos, reached through a plugin update.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+For a repo consuming the workflow plugin: `new-branch` stops rewriting the branch name it is handed, which
+is what inbound #1224 needed. A consumer not wrapping it for foreign branches still sees the change --
+their branches stop gaining `-v1` -- noticed the next time they branch.
+
+**Score:** 3
+
+#### Pull Request
+
+new-branch no longer auto-completes the -v1 suffix
+
+Plugins: contributing-davekjohn
+
+[PR #1268](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1268)
+
+---
+
+### DEPLOY: `fix/fixture-git-inherits-gpgsign-v1` · 20260903-115852
+
+A locked commit-signing agent no longer fails test suites for a reason unrelated to their subject:
+every git fixture that commits now pins `commit.gpgsign=false` locally, the way it already pins
+`core.autocrlf`, so a fixture's throwaway commits never depend on the developer's signing setup.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- test-fixture hygiene; no subscriber of any consuming service notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+Fixture git repos pin commit.gpgsign=false so a locked signing agent no longer fails unrelated suites
+
+[PR #1289](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1289)
+
+---
+
+### DEPLOY: `docs/date-1244-passage-and-roles-v1` · 20260903-114307
+
+Two statements in the sysadmin lens's `#1244` passage had gone stale and are now dated against a
+measurement rather than swept: **`#1244` is open**, not closed -- it was reopened because its closing
+evidence read a commit's *author* as its *pusher*, and the residual runs on as `#1278` -- and
+**`davekokbwj` holds admin**, not write. The second matters beyond bookkeeping: the whole `#1244`
+thread turns on which account holds which role, so a fold that pushes cleanly from that account now
+proves the **admin** bypass works and says nothing about the Write role. That is the exact
+mis-attribution the thread had to retract, and this lens is the document the retraction cites as its
+baseline.
+
+The measured picture the lens now carries: all three accounts are **org owners** of `DKJ-Solutions`,
+and the restored bypass list is `OrganizationAdmin` + a repository role with **no Write role** in it.
+So the bypass follows org ownership rather than a repo permission -- a wider grant that no repo-level
+setting displays -- and the old "safe while there are no external collaborators" caveat no longer
+guards what it was written to guard. Four knock-on statements in the same file's August 14 App passage
+were re-tensed for the same reason, and Rendall's lens, which said the bypass "is back" without saying
+it came back as a *different* pair, now says which pair.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report proposed dating two sentences; verifying it first turned up that the report's own role
+table had gone stale between filing and pickup, and that repairing only the two named spots would have
+left four more statements in the same passage contradicting them. Both are the house rule working as
+intended -- a reported *reason* is verified before it is repaired, and an inconsistency the repair
+creates is part of the repair.
+
+**Score:** N/A
+
+#### Pull Request
+
+Date the sysadmin lens's #1244 passage against the measured repo state
+
+[PR #1286](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1286)
+
+---
+
+### DEPLOY: `fix/ship-pr-fold-push-bypass-preflight-v1` · 20260903-113806
+
+`ship-pr` now asks, before it opens anything, whether the account running it will be allowed to push
+the fold -- and refuses when it will not, instead of merging and leaving the trunk merged-but-unfolded.
+
+The fold is a direct push by design, one of the three named exceptions to "never commit directly on the
+trunk", and a required status check cannot be satisfied by a direct push: the pushed commit carries no
+checks, so the ref update is refused before any workflow could run. An account can therefore be fully
+entitled to *merge* -- the PR's own check ran and passed -- and not entitled to *fold*. Measured on
+PR #1271: merged, checked out the trunk, folded, committed, `GH013 ... Required status check
+"lint-en-tests" is expected`. Not once, but on every run from that account, because the cause sits in
+the ruleset rather than in the run.
+
+Step 0b answers it for two `gh` reads. `rules/branches/<trunk>` gives the rules and deliberately does
+**not** filter by bypass -- measured: it returns `required_status_checks` to an account whose
+`current_user_can_bypass` is `always` -- so the ruleset detail is read for the second half, from the org
+endpoint when the ruleset is the org's. Three rule types block a fold, each by its own definition:
+`required_status_checks`, `pull_request` (so `pull_requests_only` bypass is not bypass here) and
+`update`. `deletion`, `non_fast_forward`, `required_linear_history` and `required_signatures` do not.
+
+It sits where the worktree check sits, and for that check's reason: nothing is gated, pushed, opened or
+merged yet, so refusing is free. The local check still runs first, so a network read never costs the one
+that needs no network. An unreadable ruleset warns rather than refusing -- the opposite posture to the
+merge verdict at step 3, because there an unread required-check list could put red code on the trunk,
+while here the thing at risk is a fold that can be redone from an account with bypass. And it takes
+neither remedy: it names them (grant the account bypass, or ship from an account that has it) and stops.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+It closes the second route into the one state this workflow has no detector for. `ship-pr` already
+refused, at exactly this point, when step 5 would not be able to *check out* the trunk (#1069); it now
+refuses when step 5 would not be able to *push* to it. Same step, same reasoning, same sentence -- and
+the failure it prevents is not a risk that might occur but one that fired on every run from one of the
+two accounts that ship this repo.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr refuses before the merge when it cannot push the fold
+
+Plugins: contributing-davekjohn
+
+[PR #1285](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1285)
+
+---
+
+### DEPLOY: `fix/park-write-error-terminates-eap-stop-v1` · 20260903-112308
+
+A failed `park` now reports its reason and lets the caller own the exit code, instead of throwing a
+raw terminating error past the message `Get-GitPushFailureMessage` was written to produce. The
+`cycle-autopark` Stop hook keeps its "always exits 0" contract when a park's push is rejected.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- workflow tooling internal to the park scripts. A consumer on the workflow plugin inherits the
+fix on their next update, but only in the failure path of a park; nothing changes for anyone not
+debugging one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Invoke-GitPark reports a failed park instead of throwing under EAP=Stop
+
+Plugins: contributing-davekjohn
+
+[PR #1283](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1283)
+
+---
+
 ### DEPLOY: `fix/unfolded-entry-on-main-unguarded-v1` · 20260903-104728
 
 A merge that skips the fold -- a PR merged from the GitHub UI, or any path that bypasses `ship-pr.ps1`

@@ -38,6 +38,14 @@
     append is a hard stop (exit 1), because the branch is pushed by then and merging it would publish
     the loss.
 
+    IT COMMITS ONE FILE ON YOUR BEHALF -- the branch's development document, and nothing else (issue
+    #1269). Every reader of that document in this script reads the WORKING TREE, and the push ships
+    HEAD; the branch-entry CI check, the fold and ship-pr's DEPLOY lock all take the COMMITTED copy. So
+    a document written but not committed produced a PR body describing a section the branch did not
+    carry, and a CI check that had to fail. The commit happens just above the lint + test gate, is
+    bounded to the resolved document path(s), and leaves anything else you had staged staged. See the
+    document-commit block at that point for the measurement and for why it commits rather than refusing.
+
     Auto-fill (if you do NOT supply -Body): the script fills in the template itself as much as
     possible, so the PR never lands on github.com as an empty form:
       1. The template's description placeholder is replaced by the changelog entry
@@ -528,7 +536,7 @@ if (-not $existingPr) {
         $mergedPr = Get-ExistingPrRecord -Json ($mergedLookup.Output -join "`n")
         if ($mergedPr) {
             Write-Host "PR #$($mergedPr.number) for '$branch' is already merged -- nothing to open. $($mergedPr.url)" -ForegroundColor Green
-            Write-Host "A follow-up cycle on the same subject gets its own branch: new-branch completes the name with -v2." -ForegroundColor DarkGray
+            Write-Host "A follow-up cycle on the same subject gets its own branch -- name it with a -v2 suffix by hand." -ForegroundColor DarkGray
             exit 0
         }
     }
@@ -644,6 +652,38 @@ Both are honest answers; the gate only refuses to guess.
         $notOpen = @($resolveIssues | Where-Object { $openAll -notcontains $_ })
         if ($notOpen.Count -gt 0) {
             Write-Warning ("-Resolves names issue(s) that are not open right now: " + (($notOpen | ForEach-Object { "#$_" }) -join ', ') + " -- check for a typo. The closing keyword is written anyway (harmless on an already-closed issue).")
+        }
+    }
+
+    # --- Already-done check (issue #1282): advisory, never blocks ---------------------------------
+    # The gate above answers "does this PR declare what it closes" and blocks only on a mentioned
+    # issue that is still OPEN. It is silent on the two states that mean the BRANCH may be a
+    # duplicate: the target issue CLOSED while the branch was in flight, or another open/merged PR
+    # that already carries `Closes #<n>` for it. #1282 carried exactly that -- a branch cut to fix
+    # #1270, which PR #1276 closed thirty-seven minutes later -- to a gate-green PR, found only at
+    # the merge conflict. WARN and move on: a shared number or a reopened issue must not wedge a
+    # real PR, which is why #1282 asked for a warning rather than a refusal.
+    #
+    # ONE EXTRA `gh` CALL, and only when the branch targets an issue at all. It rides the open-issue
+    # list already fetched above for the OpenIssues half; the ClaimingPrs half needs a PR-body
+    # search that the other queries here do not cover. A failed query is said out loud and skipped,
+    # never fatal -- same rule as every other lookup in this script.
+    $targetIssues = @(@($mentions) + @($resolveList) | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+    if ($targetIssues.Count -gt 0) {
+        $otherPrsJson = ''
+        $prSearchTerms = (($targetIssues | ForEach-Object { "$_" }) -join ' OR ') + ' in:body'
+        $prSearch = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'list', '--repo', $repo, '--state', 'all', '--search', $prSearchTerms, '--json', 'number,state,headRefName,body', '--limit', '60') -DiscardStderr
+        if ($prSearch.ExitCode -eq 0) {
+            $otherPrsJson = ($prSearch.Output -join "`n")
+        } else {
+            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " (exit $($prSearch.ExitCode)) -- the already-done check is skipped.")
+        }
+
+        foreach ($w in @(Get-TargetIssueWarnings -TargetIssues $targetIssues -OpenIssues $openAll -OtherPrsJson $otherPrsJson -CurrentBranch $branch)) {
+            $says = @()
+            if ($w.IsClosed) { $says += 'is already CLOSED' }
+            foreach ($p in $w.ClaimingPrs) { $says += "is already resolved by PR #$($p.Number) ($($p.State.ToLowerInvariant()))" }
+            Write-Warning ("already-done check: issue #$($w.Issue) " + ($says -join ', and it ') + " -- this branch may repeat work that is already merged. If that is deliberate (a shared number, the issue reopened, cited only as context), nothing to do.")
         }
     }
 }
@@ -1078,6 +1118,95 @@ if (-not $existingPr) {
             exit 1
         }
         Write-Host "label gate: label '$label' exists in $repo." -ForegroundColor DarkGray
+    }
+}
+
+# --- The document commit: the branch carries the document this PR describes (issue #1269) ---------
+#
+# THE DEFECT, MEASURED ON PR #1267 (September 3, 2026). Every reader of the branch's development
+# document in this script reads the WORKING TREE -- the scaffold, step-list, backing, impact and link
+# gates above, and the PR body composed below. The push two blocks down ships HEAD. On a dirty document
+# those are two different files, and all three downstream readers take the committed one: the
+# `branch-entry` CI check, the fold, and ship-pr's DEPLOY lock. So the run pushed an empty scaffold,
+# published a PR body describing a DEPLOY section that was not on the branch, and the CI check failed
+# on the first attempt (run 100563684253 on 7b783516; 100564770379 passed on f1c02ea7 once the document
+# was committed by hand).
+#
+# WHY THE EXISTING SIGNALS DO NOT COVER IT. Invoke-WorkflowGates below WARNS that the gates ran against
+# a dirty tree (#1026) and proceeds, which is right for a tree that is merely mid-flight. And the
+# backing gate above refuses only when this document is the work -- Get-BranchBackingFinding requires
+# `Committed -eq 0` -- so a dirty document ALONGSIDE committed code raises nothing at all. That was
+# #1267 exactly.
+#
+# WHY IT COMMITS RATHER THAN REFUSING, which was the other candidate in the issue. This script is the
+# documented owner of the step that publishes this document, and park-cycle.ps1 already commits exactly
+# this one path automatically for the life of the branch (its bound 1) -- so committing it here is an
+# act the system already performs, at the one moment it has to be true. A refusal would also charge the
+# author a full lint + test gate re-run for it: committing moves HEAD, which changes the gate-evidence
+# fingerprint, so the run after the refusal cannot reuse what this one proved.
+#
+# AND IT IS BOUNDED EXACTLY AS park-cycle's BOUND 1 IS: the resolved document path(s) and nothing else,
+# never `git add -A`. `git commit -- <paths>` commits those paths only, so anything else the author had
+# staged for their own next commit stays staged.
+#
+# ABOVE Invoke-WorkflowGates, DELIBERATELY. Committing first is what makes that function's dirty-tree
+# warning honest: after this block a remaining dirty count is real unpublished work, not the document
+# the gates just read. The cheap gates all sit above here, so a run this script was going to refuse
+# anyway makes no commit.
+$docRels = @()
+foreach ($cand in @((Resolve-BranchFilePath -Kind Cycle -RepoRoot $repoRoot),
+                    $entryPath.Substring($repoRoot.Length).TrimStart('\', '/'))) {
+    # Forward slashes, because these go to git; and only what exists, because Invoke-GitParkCommit's
+    # own pathspec filter is the second half of the same rule. $entryPath may still be a legacy root
+    # <SafeName>.md on a branch cut before the split, which is why it is asked for by variable rather
+    # than resolved a second time here.
+    $rel = ($cand -replace '\\', '/')
+    if ($rel -and $docRels -notcontains $rel -and (Test-Path -LiteralPath (Join-Path $repoRoot $rel))) {
+        $docRels += $rel
+    }
+}
+
+# ASKED BEFORE IT IS ACTED ON, and the reason is the OUTPUT rather than the git calls it saves. The
+# shared helper announces 'park: nothing new to commit.' when there is nothing to do, which is right in
+# park-branch and park-cycle and confusing here: this script says nothing else about parking, and the
+# line would print on every run whose document was already committed -- i.e. almost all of them. Asking
+# first means the block is silent unless it acted, and drops two of its three git calls on that path.
+#
+# --untracked-files=all, because a branch made by hand rather than by new-branch has this document
+# untracked rather than modified, and `git diff` cannot see it. core.quotePath is forced for the habit
+# .claude/rules/language-layers.md states rather than for this call's own sake -- the answer here is
+# emptiness and nothing is compared -- so a later reader who starts comparing these paths inherits the
+# safe form instead of the one that decodes with the console code page.
+#
+# A GIT THAT CANNOT ANSWER IS TREATED AS DIRTY, deliberately the opposite of park-cycle's fail-safe. It
+# refuses to PUSH when the answer is unknown; the unknown answer here would let this script publish a PR
+# body it cannot vouch for, so it attempts the commit and lets the refusal below carry the reason.
+$docDirty = $false
+if ($docRels.Count -gt 0) {
+    $docStatus = Invoke-NativeCapture -FilePath 'git' -Arguments (@('-c', 'core.quotePath=true', '-C', $repoRoot,
+                                                                   'status', '--porcelain', '--untracked-files=all', '--') + $docRels)
+    $docDirty = if ($docStatus.ExitCode -ne 0) { $true } else { [bool]((($docStatus.Output | Out-String)).Trim()) }
+}
+
+if ($docDirty) {
+    $docCommit = Invoke-GitParkCommit -RepoRoot $repoRoot -Branch $branch -Scope 'BranchFiles' -Paths $docRels
+    if (-not $docCommit.Ok) {
+        Write-Error @"
+document commit: could not commit $($docRels -join ', ') - nothing pushed, no PR opened.
+
+git's own reason is above. This PR's body is composed from that file and the CI check reads the
+committed copy of it, so opening the PR while the two disagree is a guaranteed red check on a body
+that describes a section the branch does not carry (issue #1269).
+
+Commit it yourself and run again:
+
+  git add -- $($docRels -join ' ')
+  git commit
+"@
+        exit 1
+    }
+    if ($docCommit.Committed) {
+        Write-Host "document commit: committed $($docRels -join ', ') - the PR body, the branch and the CI check now read the same file." -ForegroundColor Green
     }
 }
 

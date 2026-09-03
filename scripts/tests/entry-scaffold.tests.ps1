@@ -192,6 +192,8 @@ try {
     & git -C $fixture init -q 2>$null | Out-Null
     & git -C $fixture config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
     & git -C $fixture config user.name 'Tycho Tests' 2>$null | Out-Null
+    # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+    & git -C $fixture config commit.gpgsign false 2>$null | Out-Null
     & git -C $fixture symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $fixture 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
     & git -C $fixture add -A 2>$null | Out-Null

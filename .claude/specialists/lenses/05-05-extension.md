@@ -58,12 +58,13 @@ Edge cases — classify by **what actually changes**, not which files happen to 
   capability (even when docs come with it — the docs follow the capability).
 - Unknown prefix → label `question` (to be classified later).
 
-**Every branch name ends in `-v<N>`** (Dave, August 23, 2026), and `new-branch` completes one that does
-not: `feat/thing` becomes `feat/thing-v1`. A second development cycle on the same subject keeps the name
-and bumps the number — typed deliberately as `-v2`, never guessed, because a scan for the lowest free
-version would turn every rerun of `new-branch` into a new branch and that script is documented idempotent.
-**Never "final" in a branch name** — that is the same rule from the other end: `Test-BranchName` refuses it
-because a name claiming to be the last word is a prediction, and the version number is the honest form.
+**A `-v<N>` suffix is optional, and `new-branch` no longer adds one** (Dave, September 3, 2026 — it
+completed `-v1` unconditionally from August 23, 2026 until then). In 209 branches that reached a merge
+carrying the suffix, none was ever bumped to `-v2`, and the completion was the direct cause of inbound
+#1224. So a branch is named verbatim; a second development cycle on the same subject is a `-v2` **typed by
+hand**, which nothing rejects. **Never "final" in a branch name** — `Test-BranchName` refuses it because a
+name claiming to be the last word is a prediction, and a hand-typed version number is the honest form it
+points you at.
 
 **Step 3 — create the branch (its changelog entry comes along in the same move):**
 ```sh
@@ -77,8 +78,8 @@ Creating the branch and creating its changelog entry file are no longer two sepa
 **a branch is never entry-less.** `new-branch.ps1` checks out the branch (idempotently — running it
 again on an existing branch simply resumes it) and writes `contributing-davekjohn/development-<branch>.md` in the
 same run — one document holding both jobs: the step phases, and the `### DEPLOY:` section that is the entry.
-It also **completes the version suffix**, appending `-v1` to a name that carries none, so a second cycle on
-the same subject is a deliberately typed `-v2`. **One script since August 7, 2026** —
+It uses the name **exactly as given** — it does not complete a `-v<N>` suffix (see above), so a caller
+wrapping it for a branch whose name it does not own gets that name. **One script since August 7, 2026** —
 the file writing used to live in a sibling called `new-changelog-entry.ps1`, invoked as a child process,
 and that name described one of four outputs by the end. Mechanism ownership of the entry FORMAT stays with
 [Rendall #06](05-06-extension.md#changelog); Derek's `new-branch` is what writes it at the moment the
@@ -288,9 +289,9 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   [the safety rules](../../../CLAUDE.md#never-directly-on-the-main-branch--via-branch--pr) — a
   visible result, or irreversible/outward-facing work — stop and wait for Dave's word first. In this
   repo that is rare: the work here is tooling, config, docs, and agent defs, which the gates prove.
-- **Every name ends in `-v<N>`**, completed by `new-branch` when absent. A second cycle on the same subject
-  is `-v2`, typed by hand.
-- **Never "final" in a branch name.** The version suffix is what to use instead — see above.
+- **A `-v<N>` suffix is optional and typed by hand**, never completed by `new-branch` (it did, until
+  September 3, 2026). A second cycle on the same subject is a hand-typed `-v2`.
+- **Never "final" in a branch name.** A hand-typed version suffix is what to use instead — see above.
 - After a merge the remote branch is removed by the repo's **`deleteBranchOnMerge` setting**,
   switched on July 27, 2026. Until then it was **off** while this lens claimed the cleanup came from
   `gh pr merge --delete-branch` and Derek's persona claimed it came from the setting — two different

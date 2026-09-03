@@ -228,11 +228,13 @@ is a capability that is new or larger than it was, even when documentation comes
 stays a recognised changelog **type** — every entry already written under it must still validate, and it is
 what an unknown prefix falls back to. Recognise both, write one.
 
-**Every branch name carries a version, and `new-branch` completes it.** `docs/thing` becomes `docs/thing-v1`;
-a second cycle on the same subject is `docs/thing-v2`, typed deliberately rather than guessed — a rerun of
-`new-branch` resumes the branch it named rather than opening the next one. The refusal on `final` in
+**A `-v<N>` suffix is optional and typed by hand — `new-branch` no longer completes it** (it did, from
+August 23 to September 3, 2026; dropped because in 209 branches carrying it none was ever bumped to `-v2`,
+and it broke a consumer wrapping the script for a branch whose name it does not own — inbound #1224). A
+second cycle on the same subject is `docs/thing-v2`, typed deliberately; a rerun of `new-branch` on the same
+name resumes that branch rather than opening the next one. The refusal on `final` in
 [`branch-info.ps1`](../scripts/lib/branch-info.ps1) is the same rule from the other end: a name claiming to be
-the last word is a prediction, and the number is the honest form.
+the last word is a prediction, and a hand-typed number is the honest form.
 
 **Re-read the file after `new-branch` has written it.** It is the only file here written out of band, and an
 editor tracking what it last read refuses the next write until it has read again — one read fixes it and
@@ -346,6 +348,16 @@ locally, before the push and before the merge; the fifth runs in CI, and it exis
 escapable by not using the scripts. The repo's own lint and test gates are separate and stated in the [root `CLAUDE.md`](../CLAUDE.md):
 `open-pr.ps1` runs [`check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) and then every
 `scripts/tests/*.tests.ps1`, refusing to push on any error or failing suite.
+
+**And before any of them, one thing that is not a gate: `open-pr.ps1` COMMITS that document if it differs
+from `HEAD`** ([#1269](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1269), September 3, 2026).
+Every reader above reads the working tree; the push ships `HEAD`; and the fold, the DEPLOY lock and the CI
+check in 3.2.5 all read the committed copy. Measured on PR #1267: the run passed every gate against a
+filled-in working copy, pushed the empty scaffold, published the filled-in body, and CI failed on arrival.
+It commits that one file and nothing else — never `git add -A`, and anything else you had staged stays
+staged. Why it commits rather than refusing, and why neither the dirty-tree warning nor the backing gate
+covered it, are on the
+[`open-pr` skill page](../plugins/workflows/contributing-davekjohn/skills/open-pr/SKILL.md#the-document-commit-what-the-pr-says-is-what-the-branch-carries).
 
 #### 3.2.1. the scaffold gate, on the changelog entry itself
 
