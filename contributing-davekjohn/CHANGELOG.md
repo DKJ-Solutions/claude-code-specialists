@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/pr-placeholder-list-append-only-v1` · 20260903-102422
+
+`Get-PrDescriptionPlaceholderDefaults` recognises the pre-#1255 placeholder again. That string --
+`contributing-davekjohn/development.md` -- was the WRITTEN one from August 27 to September 3, 2026, so
+it is what every PR template scaffolded in that week carries right now, here and in every consumer
+that adopted a release in it. #1255 replaced it rather than appending, and an unrecognised placeholder
+is not a warning: open-pr leaves it in place and the PR body ships with no description at all. That is
+the exact outcome measured in #952, at 0 matches in smartwatchbanden, and the exact list that exists to
+prevent it.
+
+Nothing asserted the removal, and the reason is worth naming: the append-only guard added after #952
+derives the migrated string from the pre-`workflow-davekjohn` one, so it can only speak for forms that
+have a partner under the old folder name. Document renames have none -- the asymmetry is deliberate and
+correct -- so every rename of the document itself walked through the gap. The guard here is keyed on
+history instead: every form this family has ever published is pinned as a set, and the list must be a
+superset of it. Appending needs no edit; removing is the only thing that fails.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This reaches consumers, and it reaches the ones who did nothing wrong. A repo that adopted a release
+between August 27 and September 3 has the affected string checked into its own
+`.github/pull_request_template.md`, where an update does not rewrite it -- so without this the list
+tolerates only the templates that need no tolerance, which is the inversion #952 named. No migration to
+perform: the string is recognised again on the next update.
+
+**Score:** 3
+
+#### Pull Request
+
+the PR placeholder list is append-only again
+
+Plugins: contributing-davekjohn
+
+[PR #1271](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1271)
+
+---
+
 ### DEPLOY: `fix/branch-file-paths-docstring-covers-1255-v1` · 20260903-103107
 
 `Get-BranchFilePaths`'s docstring narrative stopped at #963 and never explained the two rows #1255
