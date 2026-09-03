@@ -478,10 +478,13 @@ $branchDirPath  = Join-Path $repoRoot $branchFiles.Directory
 # readers' question, and answering the writer's question with it would keep an old name alive on every
 # branch a consumer creates.
 #
-# THE STEP LIST AND THE ENTRY WERE TWO FILES, so there are two old names to recognise rather than one. A
-# branch created before the merge has both, each declaring it; whichever is found first is where this run
-# keeps writing, because a rerun that moved half of somebody's work to the new file would be the split it is
-# trying to avoid.
+# THE LEGACY NAMES ARE THE READER'S, VERBATIM (#1259). This list must reach exactly as far back as
+# Resolve-BranchFilePath does, or a branch working in an old name the reader still finds gets a second
+# document written beside its work here. The two lists were maintained separately and drifted -- #886
+# (the workflow-davekjohn/ folder rename) and #963 (development-cycle.md -> development.md) grew the
+# reader and left this at three names -- so it now comes from Get-BranchFileLegacyNames, the one ordered
+# source both sides read. The declared-branch test below is still this writer's own and stricter than
+# the reader's fallback: it adopts an old name ONLY where that file declares THIS branch.
 function Get-BranchFileTargetRel {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -499,12 +502,13 @@ function Get-BranchFileTargetRel {
     return $Current
 }
 
-# THE SHARED NAME LEADS THE LEGACY LIST (#1255), and it is the entry that matters most on the day of the
-# change: every branch open right now is working in it. Without it a rerun of this script on such a branch
-# would create the per-branch document beside the one holding the work and split it in half -- the exact
-# failure this list exists to prevent, one rename further on.
+# -Legacy IS Resolve-BranchFilePath's OWN LEGACY LIST (#1259): the pre-#1255 shared name, the pre-#963
+# filename, the branch/ pair, and the pre-#886 workflow-davekjohn/ set -- in the reader's order. The
+# shared name leads because on the day of #1255 every branch in flight is working in it, and a rerun
+# that did not see it would split that work across two documents; the names behind it are the earlier
+# renames, each protecting a branch that never moved off its old name.
 $cycleRel  = Get-BranchFileTargetRel -RepoRoot $repoRoot -Current $branchFiles.File `
-    -Legacy @($branchFiles.SharedFile, $branchFiles.LegacyCycle, $branchFiles.OlderCycle) -Branch $branch
+    -Legacy (Get-BranchFileLegacyNames -Kind 'Cycle') -Branch $branch
 $cyclePath = Join-Path $repoRoot ($cycleRel -replace '/', '\')
 
 if (-not (Test-Path -LiteralPath $branchDirPath)) {

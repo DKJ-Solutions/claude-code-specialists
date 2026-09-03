@@ -5224,6 +5224,44 @@ function Test-IsPerBranchDocumentPath {
     return ($norm -like "$dir/$([string]$paths.Pattern)")
 }
 
+function Get-BranchFileLegacyNames {
+    <#
+        The ordered legacy candidate names for the branch's working document -- the names that are READ
+        wherever a branch in flight still carries one, and never written again.
+
+        ONE SOURCE, TWO CALLERS (#1259). Resolve-BranchFilePath sweeps this list, and new-branch.ps1's
+        writer feeds the same list to its own Get-BranchFileTargetRel so a rerun on an old name keeps
+        writing there instead of splitting the branch's work across two documents. Those two lists were
+        maintained by hand in two files, and #886 (the workflow-davekjohn/ -> contributing-davekjohn/
+        folder rename) and #963 (development-cycle.md -> development.md) grew the reader's copy and left
+        the writer's at three names. This function is the single ordered source so the next rename cannot
+        do that again.
+
+        THE ORDER IS NEWEST-PREDECESSOR FIRST. SharedFile is the pre-#1255 shared name every branch open
+        on September 3, 2026 carries; PriorNameFile is the pre-#963 filename; then the current folder's
+        branch/ pair; then the whole pre-#886 workflow-davekjohn/ set, last and never written. It matches
+        the slice Resolve-BranchFilePath used to inline, so the resolver's behaviour is unchanged.
+
+        $legacyKind FOLLOWS THE RESOLVER: 'File' and 'Cycle' both read the Cycle-named legacy files (the
+        step list's history), 'Deployment' reads the Deployment-named ones (the entry's). Every name here
+        is a branch-independent constant, so this calls Get-BranchFilePaths with no -Branch.
+    #>
+    param(
+        [Parameter(Mandatory)][ValidateSet('File', 'Cycle', 'Deployment')][string]$Kind
+    )
+    $paths = Get-BranchFilePaths
+    $legacyKind = if ($Kind -eq 'File') { 'Cycle' } else { $Kind }
+    return @(
+        [string]$paths.SharedFile,
+        [string]$paths.PriorNameFile,
+        [string]$paths."Legacy$legacyKind",
+        [string]$paths."Older$legacyKind",
+        [string]$paths.PriorFolderFile,
+        [string]$paths."PriorFolderLegacy$legacyKind",
+        [string]$paths."PriorFolderOlder$legacyKind"
+    )
+}
+
 function Resolve-BranchFilePath {
     <#
         The repo-relative path of the branch's working document AS IT EXISTS in $RepoRoot: today's single
@@ -5276,7 +5314,7 @@ function Resolve-BranchFilePath {
         CI may find the checkout moved by the time it looks.
 
         READING THE TEXT FROM A COMMIT IS NOT ENOUGH ON ITS OWN, which is why this is a parameter here rather
-        than a detail of the caller. The choice between the seven candidate names is made by READING each of
+        than a detail of the caller. The choice between the candidate names is made by READING each of
         them, so a caller that resolves against the working tree and then reads the answer out of a commit
         gets the mismatch this parameter exists to remove -- and it fails in the dangerous direction: the
         resolver names a path that tree does not carry, the read comes back empty, and a gate reads that as
@@ -5329,7 +5367,6 @@ function Resolve-BranchFilePath {
     # 'File' is the name a caller uses when it means the document rather than one of its two jobs; Cycle and
     # Deployment resolve to the same path and are kept so a gate can still say WHICH half it was reading.
     $current = if ($Kind -eq 'File') { [string]$paths.File } else { [string]$paths.$Kind }
-    $legacyKind = if ($Kind -eq 'File') { 'Cycle' } else { $Kind }
     # EVERY OTHER PER-BRANCH DOCUMENT IN THE FOLDER, so this resolver never trusts a filename to be right
     # (#1255). $current is the name this branch's document SHOULD have; these are the names one could
     # actually have -- a branch renamed after new-branch ran, a document written by hand, or a leftover from
@@ -5353,28 +5390,17 @@ function Resolve-BranchFilePath {
             )
         }
     }
-    $candidates = @(
-        $current,
-        $discovered,
-        # THE PRE-#1255 SHARED NAME, after this branch's own and before the branch/ pair -- the same slot,
-        # and for the same reason, that PriorNameFile occupies below: it is the nearest predecessor, and
-        # every branch open on September 3, 2026 carries it.
-        [string]$paths.SharedFile,
-        # THE PRE-#963 FILENAME, immediately after today's and before the branch/ pair, because it is the
-        # nearest predecessor: every branch open on August 27, 2026 carries it. It answers every Kind for
-        # the same reason PriorFolderFile does -- it was one document too, not a half.
-        [string]$paths.PriorNameFile,
-        [string]$paths."Legacy$legacyKind",
-        [string]$paths."Older$legacyKind",
-        # THE PRE-#886 FOLDER, LAST AND NEVER WRITTEN. Same three names one directory over, in the same
-        # order, so a branch left open inside 'workflow-davekjohn/' is still found, folded and cleared.
-        # It comes after the current folder's set for the reason the order paragraph gives: a repo that has
-        # both prefers the one a writer would create. PriorFolderFile answers every Kind, because the old
-        # folder's current document is one file just as the new one is.
-        [string]$paths.PriorFolderFile,
-        [string]$paths."PriorFolderLegacy$legacyKind",
-        [string]$paths."PriorFolderOlder$legacyKind"
-    )
+    # $current is this branch's own name; $discovered is every OTHER per-branch document in the folder
+    # (tree arm only). Then the legacy names -- SharedFile, PriorNameFile, the branch/ pair, and the
+    # whole pre-#886 workflow-davekjohn/ set -- from Get-BranchFileLegacyNames, the ONE ordered source
+    # new-branch.ps1's writer reads too (#1259). The declare-test below admits or rejects each candidate;
+    # a name being in the list only means it is looked at.
+    #
+    # BUILT WITH + RATHER THAN A COMMA LITERAL: @($a, $b, (Get-...)) leaves $discovered and the returned
+    # list as nested Object[] elements -- an array subexpression does not flatten a sub-array reached
+    # through a variable or a call -- and the foreach below would then hand a whole array to the reader as
+    # one $rel. Concatenation flattens each operand one level, which is exactly the depth here.
+    $candidates = @($current) + @($discovered) + @(Get-BranchFileLegacyNames -Kind $Kind)
 
     # Read once per candidate and remember it: the second loop asks the same question again, and on the
     # -Reader arm one question is a child process rather than a Test-Path.
