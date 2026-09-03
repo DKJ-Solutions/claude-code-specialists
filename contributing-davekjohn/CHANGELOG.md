@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/date-1244-passage-and-roles-v1` · 20260903-114307
+
+Two statements in the sysadmin lens's `#1244` passage had gone stale and are now dated against a
+measurement rather than swept: **`#1244` is open**, not closed -- it was reopened because its closing
+evidence read a commit's *author* as its *pusher*, and the residual runs on as `#1278` -- and
+**`davekokbwj` holds admin**, not write. The second matters beyond bookkeeping: the whole `#1244`
+thread turns on which account holds which role, so a fold that pushes cleanly from that account now
+proves the **admin** bypass works and says nothing about the Write role. That is the exact
+mis-attribution the thread had to retract, and this lens is the document the retraction cites as its
+baseline.
+
+The measured picture the lens now carries: all three accounts are **org owners** of `DKJ-Solutions`,
+and the restored bypass list is `OrganizationAdmin` + a repository role with **no Write role** in it.
+So the bypass follows org ownership rather than a repo permission -- a wider grant that no repo-level
+setting displays -- and the old "safe while there are no external collaborators" caveat no longer
+guards what it was written to guard. Four knock-on statements in the same file's August 14 App passage
+were re-tensed for the same reason, and Rendall's lens, which said the bypass "is back" without saying
+it came back as a *different* pair, now says which pair.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report proposed dating two sentences; verifying it first turned up that the report's own role
+table had gone stale between filing and pickup, and that repairing only the two named spots would have
+left four more statements in the same passage contradicting them. Both are the house rule working as
+intended -- a reported *reason* is verified before it is repaired, and an inconsistency the repair
+creates is part of the repair.
+
+**Score:** N/A
+
+#### Pull Request
+
+Date the sysadmin lens's #1244 passage against the measured repo state
+
+[PR #1286](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1286)
+
+---
+
 ### DEPLOY: `fix/ship-pr-fold-push-bypass-preflight-v1` · 20260903-113806
 
 `ship-pr` now asks, before it opens anything, whether the account running it will be allowed to push
