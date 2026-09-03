@@ -32,6 +32,60 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `fix/git-identity-mismatch-unchecked` · 20260903-163646
+
+On a checkout where `gh` is authenticated as one GitHub account and `git config user.name` reads
+another, nothing said so. Two things broke from that, both silently. The claim rule -- `gh issue edit
+<n> --add-assignee @me`, stated in Chris's persona body and in this folder's contributing page --
+resolves `@me` through the GitHub API, so it wrote the account `gh` held while every commit on the
+branch read the other one: measured on DAVE-KOK-BWJ, where claiming #1314 with the documented idiom put
+`DaveKJohn` on work whose commits all said `davekokbwj`, and it had to be corrected by hand. And Derek's
+cross-device tell -- a branch whose commits name a different account than the checkout, which the lens
+teaches as the signature of work built on another device -- fires on such a machine **by construction**,
+so a later session reads "built elsewhere" off a branch that never left the room.
+
+`scripts/lint/check-git-identity.ps1` now reports the split, from a SessionStart hook in every repo that
+has this plugin, at the one moment it matters: just before a session claims an issue and starts
+committing. It prints both accounts, both ways out, and the by-name claim to use in the meantime; it
+repairs nothing itself, because which of the two accounts is right is not a script's call. The claim rule
+in both places that state it now names what `@me` actually binds to -- the defect was its definition,
+which said "the account the session is logged in as" where the claim's own job needs the account the
+commits will name -- and the tell in the lens has gained the precondition it always depended on.
+
+Two things it deliberately does not do. It compares names rather than emails, although GitHub attributes
+a commit by email: `gh api user` returns a null email for an account with no public one and
+`gh api user/emails` needs the `user` token scope, and widening a scope to print an advisory line is the
+wrong trade. And it fires only when `user.name` is a valid GitHub username by GitHub's own rule --
+because that free-text field usually holds a person's name, and an unconditional comparison would fire
+forever in every repo that spells its name normally, which is the shape of the stale-path check this repo
+declined at 124 findings all false.
+
+Closes [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Both halves travel. The check and its hook ship in the workflow plugin, so a consumer with a split
+identity is told at session start instead of discovering it from a tracker that disagrees with its own
+branches -- and one with a single account never sees a line, which is what the login-shape guard buys. The
+claim rule's corrected definition ships in Chris's persona body, which every consumer loads on every turn,
+so the instruction they read is the one that matches what the tracker will actually record. Most consumers
+run one account and will notice nothing; for the ones that do not, this is the difference between a claim
+that means something and a claim that names the wrong person.
+
+**Score:** 2
+
+#### Pull Request
+
+Report when gh and git commit as different accounts
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1322](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1322)
+
+---
+
 ### DEPLOY: `fix/test-gate-summary-omits-lanes` · 20260903-162227
 
 `Invoke-TestSuiteGate` printed the parallel lane count only on the opening line nobody quotes and left
