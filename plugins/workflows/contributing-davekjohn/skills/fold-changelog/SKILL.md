@@ -4,7 +4,7 @@ description: >-
   Fold a branch's changelog entry into CHANGELOG.md via the shared, centralized fold script from the
   plugin (single source of truth, issue #81) -- so a consumer does not have to duplicate this script
   locally. Use this on main, immediately after merging a branch, to fold the entry
-  (the DEPLOY section of contributing-davekjohn/development-<branch>.md, or an older branch/ pair, or a pre-split
+  (the DEPLOY section of contributing-davekjohn/<branch>.md, or an older branch/ pair, or a pre-split
   <branch-name>.md in the repo root) into CHANGELOG.md --
   a flat ranked list with no section headings, where each entry lands at the position its own
   Significance sections rank it at (furthest reach first, highest significance first within a tier) -- and then
@@ -26,7 +26,7 @@ where a conflict is pure noise, because the two entries never actually disagree.
 writes its **own** entry file, and this skill folds it in after the merge, when the conflict window is
 already closed.
 
-**The entry is the DEPLOY section of `contributing-davekjohn/development-<branch>.md`** — one document per
+**The entry is the DEPLOY section of `contributing-davekjohn/<branch>.md`** — one document per
 branch, named after it, so two branches never write the same path and a merge cannot conflict them. (It was
 a single shared `development.md` until September 3, 2026, on the argument that git tracks it per branch;
 that is true of checkout and not of merge, and the cost is written up in `DEVELOPMENT-portable.md`.) The
@@ -58,7 +58,7 @@ and in `CHANGELOG.md`, so what a contributor writes is exactly what lands. The f
 comments** on the way and writes the PR line into `### Pull Request`:
 
 ```markdown
-## DEPLOY: `feat/short-name` · 20260806-114230
+## DEPLOY: feat/short-name · 20260806-114230
 
 …why it matters at this reach…
 
@@ -118,8 +118,8 @@ same minute as its merge.
 
 **And since August 23, 2026 it stands on the `## DEPLOY:` heading** (Dave), where it stood on the
 `Pull Request` heading for four days and on the closing line before that. It is the date the change
-*landed*, and that is the line saying *what* landed — the counterpart of the creation stamp on the
-document's own `#` heading, so the two ends of a branch's life are stamped where they belong. Both are
+*landed*, and that is the line saying *what* landed. It is the only stamp left: the document's own heading
+carried a creation stamp until September 3, 2026, and nothing read it back. Both shapes of this one are
 read back: an entry carrying the stamp on `Pull Request` still parses. The closing line keeps the clickable
 `[PR #N](url)` and nothing else: one fact, one place. An entry folded without a PR gets neither, because
 there is nothing to read either off.
@@ -157,7 +157,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/fold-changelo
 lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
 for them the line above is the correct one.
 
-Without `-Branch` it folds everything it finds: `contributing-davekjohn/development-<branch>.md` if it holds an entry, plus
+Without `-Branch` it folds everything it finds: `contributing-davekjohn/<branch>.md` if it holds an entry, plus
 any pre-split entry file in the root. An optional `-RepoRoot <path>`
 overrides which repo root the script writes to — for a consumer that runs the fold from a
 temporary/detached worktree (e.g. a `ship-pr.ps1` that checks out main elsewhere) and wants the fold
@@ -167,7 +167,7 @@ to land there instead of wherever `CLAUDE_PROJECT_DIR`/git-root would otherwise 
 1. Folds each entry into `CHANGELOG.md`, with the PR number + link included (retrieved via
    `gh pr list` — keyed on `-Branch`, or on the name in the document's heading, or for a pre-split entry
    on its file name).
-2. Clears it afterwards: **`contributing-davekjohn/development-<branch>.md` is removed** — one deletion, which
+2. Clears it afterwards: **`contributing-davekjohn/<branch>.md` is removed** — one deletion, which
    clears the plan along with the entry since they are sections of one file. A pre-split root entry file is
    removed as it always was, and an older `branch/` step list is removed beside it.
 

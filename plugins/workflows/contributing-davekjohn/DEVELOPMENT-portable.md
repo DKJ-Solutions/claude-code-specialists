@@ -1,7 +1,7 @@
-# `development-<branch>.md` — the portable half
+# `<branch>.md` — the portable half
 
 Everything a branch needs to carry lives in **one file**:
-`contributing-davekjohn/development-<branch>.md` — one document per branch, named after it, inside the
+`contributing-davekjohn/<branch>.md` — one document per branch, named after it, inside the
 workflow's own root folder where everything portable gathers. (It was the single shared
 `development.md` until September 3, 2026; [see below](#why-the-name-carries-the-branch) for what that
 cost and why it changed.) It has two halves with two
@@ -10,7 +10,7 @@ different readers, and they are sections of one document rather than two files:
 | half | subject | who reads it | lifetime |
 |---|---|---|---|
 | `### PLAN` · `### CREATE` · `### TEST` | what still **must happen** | whoever is working on the branch | removed at the merge; never folded |
-| ``### DEPLOY: `<branch>` `` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then removed with the rest |
+| `### DEPLOY: <branch>` | what the change **does** | whoever reads `CHANGELOG.md` later | folded at the merge, then removed with the rest |
 
 It is written by the shared
 [`scripts/task/new-branch.ps1`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/scripts/task/new-branch.ps1)
@@ -62,17 +62,20 @@ adopt it; this page reaches you with every plugin update.
 ## The heading
 
 ```markdown
-# Development: `feat/thing` · 20260823-101500
+## feat/thing
 ```
 
-The **title comes first, then a colon, then the branch** (Dave, August 23, 2026). Both this heading and the
-DEPLOY heading below follow that shape; they read `` # `feat/thing` cycle `` until then, branch first and
-title trailing. What the flip buys is the scanned line: both are met at a glance in a diff, a search result
-or `CHANGELOG.md`, and leading with the title means the two announce themselves in the same place every
-time while the branch reads as the subject rather than as a label.
+**The heading is the branch and nothing else** (Dave, September 3, 2026). It carried a title word, the
+branch in backticks and the branch's creation stamp — `` # Development: `feat/thing` · 20260823-101500 ``
+— and every part of that had a reason that has since run out. The title said what the file is, which the
+filename now says; the backticks delimited the branch name for the readers below, which they no longer
+need; and the stamp recorded when the branch began, which nothing ever read back. What the changelog
+orders by is the **merge** stamp, and that one still stands on the DEPLOY section's `#### Pull Request`
+heading, written by the fold from the pull request's own merge moment.
 
-The suffix is the **creation stamp** — the moment this branch began, in the document that begins and ends
-with it.
+The **DEPLOY heading keeps its title word** — `### DEPLOY: feat/thing` — and that asymmetry is deliberate
+rather than an oversight. That heading travels into your changelog, where it stands beside other entries
+and has to say which of the four phases it is; this one opens a file whose name already says so.
 
 **The branch name in the heading is machine-read.** It is how the fold finds the PR to look up, and how
 `new-branch` decides whether this document is already somebody's: any name other than the trunk's is a
@@ -257,7 +260,7 @@ something Claude's own output demonstrates, and for a branch that is the gate ou
 depend on:
 
 ```text
-/goal every step above the DEPLOY heading in contributing-davekjohn/development-<branch>.md is resolved
+/goal every step above the DEPLOY heading in contributing-davekjohn/<branch>.md is resolved
 and open-pr reports the lint and test gates green, or stop after 20 turns
 ```
 
@@ -293,7 +296,7 @@ nobody has to prompt the cycle forward turn by turn — a strong default, not a 
 ## The DEPLOY section — the changelog entry
 
 ```markdown
-## DEPLOY: `feat/thing-v1` · <the merge stamp the fold writes>
+### DEPLOY: feat/thing-v1 · <the merge stamp the fold writes>
 ```
 
 `new-branch` already writes this shape, so on a fresh branch you are filling in a form rather than starting
@@ -321,7 +324,7 @@ See [the lib](../scripts/lib/release-lib.ps1).    <- correct where it sits BESID
 ```
 
 **You do not have to work out which one you are.** The guidance block at the top of your own
-`contributing-davekjohn/development-<branch>.md` states your repo's answer in one sentence, composed by
+`contributing-davekjohn/<branch>.md` states your repo's answer in one sentence, composed by
 `new-branch` from the same seam `open-pr`'s link gate resolves against — so the file you are typing in and
 the gate that refuses cannot disagree about the base.
 
@@ -479,9 +482,16 @@ parking note — and the gate goes quiet.
 
 ## Why the name carries the branch
 
-**One document per branch: `contributing-davekjohn/development-<branch>.md`**, where `<branch>` is the
-branch name with its slashes flattened — `fix/thing-v1` becomes `development-fix-thing-v1.md`. Two
+**One document per branch: `contributing-davekjohn/<branch>.md`**, where `<branch>` is the
+branch name with its slashes flattened — `fix/thing-v1` becomes `fix-thing-v1.md`. Two
 branches therefore never write the same path.
+
+**The name is the branch and nothing else** (Dave, September 3, 2026). It was `development-<branch>.md`
+for a few hours on the day the per-branch form arrived, and the prefix bought a reader nothing the folder
+did not already say. It bought the *tooling* one thing, which is worth knowing if you fork any of this: it
+made `development-*.md` a glob that could not reach this folder's own permanent pages. With the prefix gone
+the shared scripts exclude those pages by name instead — your changelog above all, since every folded entry
+in it declares a branch and would otherwise read as a document waiting to be folded.
 
 **This reversed a decision, and the reversal was measured** (September 3, 2026). The name used to be the
 fixed `development.md`, on the argument that it could not collide because *git already tracks this file per

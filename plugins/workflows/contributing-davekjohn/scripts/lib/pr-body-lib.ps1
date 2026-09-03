@@ -705,7 +705,8 @@ function Get-PrDescriptionPlaceholderDefaults {
         section started travelling WITH its heading -- issue #884 -- on August 26 the folder itself was
         renamed workflow-davekjohn -> contributing-davekjohn, issue #886, on August 27 the document was
         renamed development-cycle.md -> development.md, issues #963/#958, and on September 3 that one
-        shared document became one per branch, development-<branch>.md, issue #1255); the older
+        shared document became one per branch, development-<branch>.md, issue #1255, and later that same
+        day the 'development-' prefix went, leaving <branch>.md, issue #1335); the older
         strings stay because a consumer's PR template is THEIR file, and this script must not silently
         stop filling it in because the template it ships beside moved on. An unrecognised placeholder is
         a PR body with no description at all -- the outcome this list exists to prevent.
@@ -745,7 +746,8 @@ function Get-PrDescriptionPlaceholderDefaults {
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
         "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
-        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+        "<!-- Filled from the DEPLOY section of contributing-davekjohn/<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
     )
 }
 

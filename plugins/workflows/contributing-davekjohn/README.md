@@ -58,7 +58,7 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`DEVELOPMENT-portable.md`](DEVELOPMENT-portable.md) | the document a branch works in: its two halves, the dossier form, the three step marks, the version suffix, its branch-long lifetime, and what the fold does at the merge |
 | [`skills/`](skills/) | the skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
-| [`hooks/`](hooks/) | two read-only SessionStart checks that never block, both belonging to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck` — plus one **Stop** hook that acts rather than reports: `cycle-autopark` pushes the branch's `development-<branch>.md` to `origin` after every turn, until a PR publishes it (#900) |
+| [`hooks/`](hooks/) | two read-only SessionStart checks that never block, both belonging to running this across several repos: `connector-sessioncheck` and `script-contract-sessioncheck` — plus one **Stop** hook that acts rather than reports: `cycle-autopark` pushes the branch's `<branch>.md` to `origin` after every turn, until a PR publishes it (#900) |
 | [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-config` skill |
 | [`templates/`](templates/) | the one file in this cycle that has to be **copied** rather than imported: `pull_request_template.md`. GitHub reads a PR template only from `.github/` in your own repo, so what ships here is the reference to copy and to diff against — see the [`open-pr` skill](skills/open-pr/SKILL.md) for the one promise it makes: the placeholder line |
 
@@ -114,7 +114,7 @@ below changes for you, and nothing here asks you to run anything.
 |---|---|
 | [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `contributing-davekjohn/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
 | [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
-| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `contributing-davekjohn/development-<branch>.md` in one move |
+| [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `contributing-davekjohn/<branch>.md` in one move |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`worktree-lane`](skills/worktree-lane/SKILL.md) | one branch has to be built while another one ships — opens a branch in its own worktree, and hands it back when it is ready to ship |
 | [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |

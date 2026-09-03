@@ -72,7 +72,7 @@ intact, entirely superseded — and nothing anywhere reported it. It was found t
 remote heads while cleaning up an unrelated merge.
 
 So before executing a line of a parked plan, **measure it against the main branch**, however detailed and
-current `contributing-davekjohn/development-<branch>.md` reads. A plan that reads as current is not evidence that it is. The cheap checks
+current `contributing-davekjohn/<branch>.md` reads. A plan that reads as current is not evidence that it is. The cheap checks
 first:
 
 ```powershell
@@ -120,7 +120,7 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/park-cycle.ps1"
 
 **A Stop hook invokes it after every turn**, which is the point of it -- so this line is for reading, and
 for the rare occasion you want to see why nothing was pushed. It commits and pushes
-**`contributing-davekjohn/development-<branch>.md` and nothing else**, because what another device needs from
+**`contributing-davekjohn/<branch>.md` and nothing else**, because what another device needs from
 a branch in flight is the plan, which phase is running, and where the last session stopped.
 
 **Why a hook and not a habit.** `park` and `new-branch -Park` between them produced **six** commits in the
