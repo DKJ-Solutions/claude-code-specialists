@@ -818,6 +818,13 @@ Write-Host "A changelog with no trailing newline does not swallow the entry appe
 #      the list newest-first, every entry lands at the top and the only fold that still reaches the end is
 #      the one into a list with NO entries yet. So the damage is applied before the FIRST fold instead of
 #      between two, and the guard it pins is unchanged.
+#
+#      AND #1280 GAVE THE END A SECOND WAY TO BE REACHED (September 3, 2026), which is why the guard matters
+#      more now rather than less: an entry placed by its landing stamp that is OLDER than everything pending
+#      lands at the list's end. That is a held fold, the exact case #1280 exists for. This scenario still
+#      reproduces through the empty list, deliberately -- these fixtures have no gh and therefore no PR, so
+#      the fold writes no stamp and every entry here still lands at the top. Placing by the stamp is
+#      asserted where it is a pure function, in entry-scaffold.tests.ps1.
 $dirN = New-FoldFixture -Label 'tail-noeol'
 # The editor's damage, reproduced exactly: every trailing line break gone, so the file ends on its intro
 # with nothing after it -- and the first entry folded in has to land against that.

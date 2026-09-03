@@ -535,7 +535,18 @@ Assert-True ($foldText -match 'entry-scaffold-lib\.ps1') 'the fold dot-sources t
 # and the significance in ONE pass, and that resolver falls back to the older 'Tier: N' line itself -- so
 # asserting the old name here would demand the fold reach past its own abstraction.
 Assert-True ($foldText -match 'Resolve-EntryImpact') 'the fold reads the reach and the significance in one pass'
-Assert-True ($foldText -match 'Get-EntryInsertOffset') 'and places the entry by that rank, so CHANGELOG.md stays ordered'
+Assert-True ($foldText -match 'Get-EntryInsertOffset') 'and places the entry through the shared offset reader, so CHANGELOG.md stays ordered'
+# AND IT PASSES THE LANDING STAMP (#1280). Matched on the CALL rather than the parameter name alone, for the
+# reason the strip asserts below give: a docstring paragraph explaining #1280 must not be able to satisfy
+# this. Without the stamp the callee falls back to "the top, always" and a LATE fold silently misplaces its
+# entry -- which errors nowhere and is only visible by reading two headings in the finished document.
+Assert-True ($foldText -match 'Get-EntryInsertOffset[^\r\n]*-Stamp \$mergeStamp') 'and passes the entry''s own landing stamp, so a LATE fold is placed by when it landed'
+# THE STAMP IS RESET PER ITERATION, asserted because the leak it prevents is silent and cross-entry: in
+# fold-all mode an entry whose PR lookup found nothing would be placed by the PREVIOUS entry's landing
+# moment. The assignment sits above the PR block, so this pins the order rather than merely the presence.
+$stampInit = $foldText.IndexOf('$mergeStamp = ''''')
+Assert-True ($stampInit -gt 0) 'the fold clears $mergeStamp per iteration, so no entry inherits the previous one''s landing moment'
+Assert-True ($stampInit -lt $foldText.IndexOf('Format-EntryMergeStamp -MergedAt')) 'and it does so BEFORE the PR lookup that may not fill it'
 # THE FOLD STRIPS NOTHING FROM THE ENTRY ANY MORE, and this is asserted as an ABSENCE because it is a
 # reversal rather than a gap. While the changelog had one section per tier, the heading above an entry stated
 # its reach -- so the entry's own 'Tier: N' line was the same fact twice, and an unscored table was a question
@@ -997,6 +1008,90 @@ Assert-Equal 2 $blockImpact.Tier 'insert/fenced: the entry reads as tier 2 from 
 $crlfList = $fencedList -replace "`n", "`r`n"
 $crlfOff = Get-EntryInsertOffset -SectionText $crlfList -Score 3 -Tier 1
 Assert-Equal "$entryH #20 Real, tier 2, and it documents the format" ((($crlfList.Substring($crlfOff)) -split "`r?`n")[0]).Trim() 'insert/fenced: a CRLF document lands in the same place -- the offsets keep step with the lines'
+
+# --- The stamp reader, and the insert offset placed by it (issue #1280) ---------------------------
+# WHAT THIS PROTECTS. Between August 16 and September 3, 2026 the offset was the literal TOP for every
+# input, on the premise that "the entry being folded is the most recently merged one". A LATE fold breaks
+# that premise, and the fold is where late folds come from: its commit is a direct push to the trunk, so a
+# push it cannot make holds the entry while later branches merge and fold ahead of it. Measured in this
+# repo's own CHANGELOG.md, where '20260903-102422' landed above '20260903-103107' -- and the stamp is
+# written by the fold from the PR's mergedAt, so the document contradicted itself in two adjacent headings.
+# Nothing errors in that state, which is exactly why it needs a suite rather than a gate.
+#
+# THE READER FIRST, because the ordering below is only as good as it is. Round-tripped through the
+# formatter, which is how the function is called in anger -- so a drift between the writer and the reader
+# fails here rather than at the next held fold.
+$stampSep = Get-EntryIdSeparator
+Assert-Equal '20260903-104728' (Get-EntryHeadingStamp -HeadingLine "$entryH DEPLOY: ``x`` $stampSep 20260903-104728") 'stamp: a stamped heading reads back its stamp'
+Assert-Equal '20260819-171500' (Get-EntryHeadingStamp -HeadingLine ('# T' + (Format-EntrySectionHeadingSuffix -Stamp '20260819-171500'))) 'stamp: and the writer''s own output round-trips through it'
+Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine "$entryH DEPLOY: ``x``") 'stamp: an unstamped heading answers empty rather than guessing'
+# THE PLACEHOLDER IS THE CASE THAT MUST NOT SORT. Get-EntrySectionHeadingTail deliberately tolerates any
+# non-blank text after the separator, so a heading copied from the trunk's reset state arrives here saying
+# '<timestamp of the moment this branch was merged>'. Compared as if it were a moment, that is a silent
+# wrong answer in the one document whose subject is when things landed.
+Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine ("$entryH DEPLOY: ``x`` $stampSep " + (Get-EntryMergeStampTemplatePlaceholder))) 'stamp: the template''s placeholder is not a stamp'
+Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine ("$entryH DEPLOY: ``x`` $stampSep " + (Get-EntryIdTemplatePlaceholder))) 'stamp: nor is the creation placeholder'
+Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine "$entryH DEPLOY: ``x`` $stampSep 2026-09-03 10:47") 'stamp: nor a date in any other shape -- only what Format-EntryMergeStamp writes'
+Assert-Equal '' (Get-EntryHeadingStamp -HeadingLine '') 'stamp: an empty line is not a heading and answers empty'
+# COMPOSED FROM THE SAME PARTS AS THE DOCUMENT, for the reason the fixture two screens up has now paid for
+# twice: a fixture that states the format is a second definition of it.
+$stampedList = @(
+    "$entryH DEPLOY: ``a`` $stampSep 20260903-104728", '', 'body a', '', '---', '',
+    "$entryH DEPLOY: ``b`` $stampSep 20260903-103107", '', 'body b', '', '---', '',
+    "$entryH DEPLOY: ``c`` $stampSep 20260903-101748", '', 'body c', '', '---', ''
+) -join "`n"
+function Get-StampedInsertLabel {
+    param([AllowEmptyString()][string]$Stamp)
+    $off = Get-EntryInsertOffset -SectionText $stampedList -Stamp $Stamp
+    if ($off -ge $stampedList.Length) { return '<end>' }
+    return (($stampedList.Substring($off) -split "`r?`n")[0]).Trim()
+}
+Assert-Equal "$entryH DEPLOY: ``a`` $stampSep 20260903-104728" (Get-StampedInsertLabel -Stamp '20260903-110000') 'insert/stamp: the newest entry still leads -- now as the answer rather than the assumption'
+# THE MEASURED CASE, with the real stamps from the misplacement in this repo's CHANGELOG.md: #1271 merged
+# at 102422 and folded after #1274's 103107, so it belongs BETWEEN b and c and not above either.
+Assert-Equal "$entryH DEPLOY: ``c`` $stampSep 20260903-101748" (Get-StampedInsertLabel -Stamp '20260903-102422') 'insert/stamp: a LATE fold lands where it landed, not at the top'
+Assert-Equal '<end>' (Get-StampedInsertLabel -Stamp '20260903-090000') 'insert/stamp: older than everything pending lands at the list''s end'
+# A TIE CONTINUES PAST, so the entry folded first stays on top. Two changes landing in the same second have
+# no order to get right; what this pins is that the choice is stable rather than arbitrary.
+Assert-Equal "$entryH DEPLOY: ``c`` $stampSep 20260903-101748" (Get-StampedInsertLabel -Stamp '20260903-103107') 'insert/stamp: an equal stamp keeps the entry folded first on top'
+# THE PRE-#1280 BEHAVIOUR IS WHAT NO STAMP MEANS, and it is a supported answer rather than a caller's
+# oversight: a fold with no PR writes no stamp on the heading either, so there is nothing to place by. It is
+# also what a consumer's fold script one plugin release behind does -- it calls without the parameter at all.
+Assert-Equal "$entryH DEPLOY: ``a`` $stampSep 20260903-104728" (Get-StampedInsertLabel -Stamp '') 'insert/stamp: no stamp is the top, which is the no-PR fold and every older caller'
+Assert-Equal "$entryH DEPLOY: ``a`` $stampSep 20260903-104728" ((($stampedList.Substring((Get-EntryInsertOffset -SectionText $stampedList))) -split "`r?`n")[0]).Trim() 'insert/stamp: and omitting the parameter entirely is the same answer'
+Assert-Equal "$entryH DEPLOY: ``a`` $stampSep 20260903-104728" (Get-StampedInsertLabel -Stamp 'not-a-stamp') 'insert/stamp: an unreadable stamp degrades to the top rather than sorting on nonsense'
+# AN UNREADABLE STAMP IN THE LIST STOPS THE WALK, which is the safe direction rather than a gap: it can only
+# place the entry HIGHER than the pre-#1280 answer would have, never lower. Asserted on a list whose middle
+# entry is legacy -- the fold has stamped every heading since August 19, 2026, so an unstamped one is older
+# than anything stamped, and 'above it' is right.
+$mixedList = @(
+    "$entryH DEPLOY: ``a`` $stampSep 20260903-104728", '', 'body a', '', '---', '',
+    "$entryH An entry from before the stamp", '', 'body legacy', '', '---', '',
+    "$entryH DEPLOY: ``c`` $stampSep 20260903-101748", '', 'body c', '', '---', ''
+) -join "`n"
+$mixedOff = Get-EntryInsertOffset -SectionText $mixedList -Stamp '20260903-090000'
+Assert-Equal "$entryH An entry from before the stamp" ((($mixedList.Substring($mixedOff)) -split "`r?`n")[0]).Trim() 'insert/stamp: an unstamped entry stops the walk -- never sunk past a list that cannot be ordered'
+# CRLF, for the same reason the fenced fixture asserts it: the offsets are rebuilt from the split the fence
+# flags come from, and the root CHANGELOG is CRLF. The heading LINES are read from that same split now, so a
+# stray "`r" on the end of one would defeat the '\s*$' anchor in the stamp reader and silently answer ''.
+$crlfStamped = $stampedList -replace "`n", "`r`n"
+$crlfStampedOff = Get-EntryInsertOffset -SectionText $crlfStamped -Stamp '20260903-102422'
+Assert-Equal "$entryH DEPLOY: ``c`` $stampSep 20260903-101748" ((($crlfStamped.Substring($crlfStampedOff)) -split "`r?`n")[0]).Trim() 'insert/stamp: a CRLF document places the late fold in the same spot'
+# FENCE-AWARE STILL, and this is the combination the two mechanisms could break each other on: the stamps are
+# read off the heading LINES collected by the fence walk, so a heading quoted inside a fence must be invisible
+# to the ordering as well as to the boundary. A fence-blind read would compare a quoted stamp, and a quoted
+# stamp can say anything at all.
+$fencedStamped = @(
+    "$entryH DEPLOY: ``a`` $stampSep 20260903-104728", '',
+    'The shape is:', '',
+    '```text',
+    "$entryH DEPLOY: ``quoted`` $stampSep 19990101-000000",
+    '```', '',
+    '---', '',
+    "$entryH DEPLOY: ``c`` $stampSep 20260903-101748", '', 'body c', '', '---', ''
+) -join "`n"
+$fencedStampedOff = Get-EntryInsertOffset -SectionText $fencedStamped -Stamp '20260903-102422'
+Assert-Equal "$entryH DEPLOY: ``c`` $stampSep 20260903-101748" ((($fencedStamped.Substring($fencedStampedOff)) -split "`r?`n")[0]).Trim() 'insert/stamp: a stamp quoted inside a fence orders nothing -- the walk skips it as a boundary and as a moment'
 
 # --- The rubric -----------------------------------------------------------------------------------
 $rubric = @(Get-EntrySignificanceRubric)

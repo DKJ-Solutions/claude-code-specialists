@@ -32,6 +32,367 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: `docs/traps-count-closing-line-v1` · 20260903-151947
+
+Sylvester's manual said "Nine PowerShell traps" in its heading and "All nine" in its opening line, then
+closed the same section with "The general shape behind **all seven**" -- the sentence that carries the
+lesson out of the section and into the next problem. The section grew from seven traps to nine and the
+closing line was not carried along. The bullets were recounted rather than the heading trusted, because
+the file has a neighbouring count that was mis-corrected once before; the count is nine, so the closing
+line is the only wrong number and the repair is one word.
+
+A wrong count misleads nobody about the traps themselves -- all nine are still there and still correct.
+What it costs is trust in the section's own bookkeeping, which is exactly what a reader leans on when a
+list is too long to check by eye.
+
+Closes [#1302](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1302).
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- a portable manual reaches consumers by plugin update, but the correction changes no behaviour, no
+rule and no instruction. A reader who never noticed the number loses nothing.
+
+**Score:** N/A
+
+#### Pull Request
+
+Sylvester's manual: correct the traps section's closing count
+
+Plugins: team-alpha
+
+[PR #1312](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1312)
+
+---
+
+### DEPLOY: `fix/asana-mirror-split-group-races-on-one-issue` · 20260903-151904
+
+`asana-mirror.yml`'s concurrency comment now names what splitting the group COST, not only what it
+bought. Splitting `closed`/`reopened` away from `labeled`/`unlabeled` (#1301) stopped a triage burst
+displacing a pending close or reopen -- but it also means those two classes can now run CONCURRENTLY on
+one issue, where the single group serialised them. `Sync-AsanaTaskStage` has no compare-and-set, so the
+later WRITE wins regardless of which EVENT was later, and the one answer that loses is `needs-info`: a
+`state` run holding a pre-label reading resolves a forward floor, forward moves need no permission, and
+the card leaves the hold somebody just put it in. Reconciliation sweep (d) puts it back within a day,
+because it passes `-Labels` into `Resolve-TargetStage` and so re-derives the hold with `AllowBackward`.
+
+The block is unchanged otherwise and the key is untouched: the queue holds one pending run, so
+serialise-and-drop versus run-everything is a real trade with no third option, and the split takes the
+better side of it. What was missing was the half that is not visible in the key.
+
+Five asserts keep it that way: three that the comment states the property, and two -- read through the
+PowerShell parser rather than as text -- that `Resolve-TargetStage` is still called at exactly two
+sites and that BOTH of them still pass `-Labels` as a real argument. The parser is the point rather
+than a flourish: a regex over the call's span is satisfied by any nearby mention of `-Labels`, so it
+would pass while the argument was gone, which is the exact silence the assert exists to break.
+
+The comment also keeps the two declines apart. The queue holding one pending run is why the KEY stays
+split; it says nothing about the write path. `Sync-AsanaTaskStage` is left alone on separate grounds --
+a compare-and-set would close the window properly, but it is a change to the write path for a failure
+sweep (d) already heals within a day.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The template travels into a consumer's `.github/`, so a consumer reading their own `asana-mirror.yml`
+now gets the whole trade rather than the half that improved. Nothing they run changes. The failure it
+prevents is a maintainer collapsing the key back to one group -- reading a comment that only lists the
+split's benefits and concluding the split was free -- which would silently restore the unrecoverable
+dropped `reopened` that #1301 was filed for.
+
+**Score:** 1
+
+#### Pull Request
+
+asana-mirror's concurrency comment names the overlap its split introduces
+
+Plugins: bwj-codex
+
+[PR #1311](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1311)
+
+---
+
+### DEPLOY: `docs/changelog-1268-mechanism-corrected-v1` · 20260903-150501
+
+`CHANGELOG.md`'s account of the #1268 red trunk no longer states three mechanisms that do not hold.
+It said "the check runs on the branch head"; `ci.yml` runs on `pull_request`, whose checkout is the
+merge ref, so CI does test the merged tree. It credited the test block to `#1259`, which is an issue
+and not a PR -- `7b783516` arrived via PR #1267. And it said "the merge is not gated", where the
+merge commit's run was created and then cancelled 8 seconds later by the fold push behind it. The
+replacement states what actually happened: a merge-ref certificate fixed at run creation, never
+re-fired when the base moved, and spent 2h11m later. Every figure in it was re-measured here rather
+than copied from the report -- which caught one more, a 45s interval that is 49s.
+
+This is the repo's own history, in the more durable of the two places the incident is written down,
+and it was the account a later reader would have reached for when this recurs. The stale certificate
+stays open as #1292; the cancelled merge run was repaired as #1294.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches a consumer. `contributing-davekjohn/CHANGELOG.md` is this repo's own history and
+ships nowhere: no script, manual, persona or manifest changes, so a repo on either plugin sees no
+difference at all.
+
+**Score:** N/A
+
+#### Pull Request
+
+the changelog's account of the #1268 red trunk states the stale-certificate mechanism and the right PR number
+
+[PR #1309](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1309)
+
+---
+
+### DEPLOY: `fix/prune-merged-recycled-sentence-v1` · 20260903-144031
+
+`prune-merged`'s kept-branch reason no longer claims a recycled name it never checked for. When a
+branch is kept because its name is in the merged set but its tip is not, the message now names
+what was measured -- "a merged PR used this name, but not this commit" -- and offers a recycled
+name or a post-merge commit as the possible causes, instead of asserting the first and (in the
+remote pass) calling the head "live work". Wording only; the refusal to delete is unchanged.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `prune-merged -IncludeRemote` gets a kept-head reason that is actionable
+instead of one that sends them hunting for a recycled name that may not exist.
+
+**Score:** 2
+
+#### Pull Request
+
+prune-merged names what it measured instead of asserting a recycled name
+
+Plugins: contributing-davekjohn
+
+[PR #1308](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1308)
+
+---
+
+### DEPLOY: `fix/asana-mirror-concurrency-drops-state-event` · 20260903-142021
+
+`asana-mirror.yml`'s concurrency key is now split into two groups per issue instead of one, so a burst
+of label events on an issue can no longer drop a pending `closed` or `reopened` run. `cancel-in-progress`
+was never what protected them: a group holds one in-progress run plus one *pending* one, and a third
+arrival drops the waiting one without consulting that field -- the mechanism measured on this repo's own
+`ci.yml` in #1294. `labeled`/`unlabeled` keep the shared per-issue group and coalesce, which is correct
+for them: their card move is recomputed from live state, so the last arrival of a burst lands the card
+where the whole burst put it. `closed`/`reopened` get a group of their own, because their comment is
+keyed on the event and a dropped one is a comment nobody ever posts -- and a dropped `reopened` is
+unrecoverable, since no sweep comments on a reopen and the reopen is the only thing that grants a
+backward move. The comment above the block now names which arrivals are expendable, and the bwj-codex
+suite pins the split.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running the Asana mirror keeps a reopen notice that could previously vanish without trace:
+no red run, no failed check, just a `cancelled` run nobody investigates and a card left in the wrong
+column. The daily reconciliation sweep never covered this one -- it comments only on closed issues and
+only ever moves a card forward.
+
+**Score:** 3
+
+#### Pull Request
+
+asana-mirror's concurrency group is split, so a triage burst can no longer drop a pending close or reopen
+
+Plugins: bwj-codex
+
+[PR #1305](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1305)
+
+---
+
+### DEPLOY: `fix/ci-trunk-pending-run-displaced` · 20260903-140852
+
+`.github/workflows/ci.yml` now keys each push to `main` on its own commit (`github.sha`), so no trunk
+commit's CI run shares a concurrency group with any other push. Pull requests are untouched -- still
+keyed on `github.ref`, still cancelling superseded runs, so the ~7m40s reruns PR #933 measured stay
+saved.
+
+**What was wrong.** The block keyed one group on the ref, i.e. one group for the whole trunk, and relied
+on a conditional `cancel-in-progress` to stop the fold commit cancelling the merge commit's run. That
+field governs only the **in-progress** run. A concurrency group also drops a **pending** one when a third
+arrival queues into it, and that path does not consult the field at all -- so the guard could not cover
+the way the cancellation actually happened. Measured over the 28 most recent `merge:` commits on the
+trunk: **14 `success`, 14 `cancelled`**. Half the trunk's merge commits had never been gated. The
+cancelled runs had **zero jobs allocated**, which is the proof they never left the queue: run
+`33742497546` (merge `371af75b`, PR #1268) was created `10:06:15Z` and cancelled `10:06:23Z`.
+
+**And it was never only folds displacing merges**, which is what the reading beyond #1294's report added:
+`0ab47d2d`, `2c54de74` and `e0175372` went down in one chain, so on a busy day only the **last push of
+each ~15-minute window** ran. The tip was always gated; nothing between it and the previous tip ever was
+-- which is why that day's two `failure` runs on `main` named no commit.
+
+`.github/workflows/unfolded-entry.yml` keeps the opposite arrangement on purpose (a shared trunk group,
+`cancel-in-progress: true`): it is required by nothing and superseding its run is how the ~6s ship window
+stops reading as a stale red. Its comment, and the `Get-UnfoldedTrunkEntry` docstring in
+`entry-scaffold-lib.ps1`, both credited *ci.yml's* field for that swallowing; both now name the workflow
+that actually does it.
+
+New suite `scripts/tests/workflow-concurrency.tests.ps1` pins the grouping key in both workflows and in
+both directions -- 12 asserts, mutation-checked. The subject is deliberately the **key** and not the
+field: an assert on `cancel-in-progress` would have been green for the entire life of the defect.
+
+**The cost is deliberate.** Every push to `main` now runs, where roughly half were dropped: 27 runs where
+13 ran, on September 3. Whether the fold commit needs a full run of its own is left open as
+[#1300](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1300).
+
+The lesson is split per CLAUDE.md's source-is-the-default rule: the portable fact (`cancel-in-progress`
+governs the in-progress run only) is a hard rule in Sylvester's manual, the repo-specific half (this
+trunk's rhythm is what made it bite) is on the `ci.yml` bullet of his lens.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- CI plumbing for this repo's own trunk. No subscriber of any service reaches it. The portable half
+does travel to consumers, as a hard rule in the system-administration manual, but it is a rule for
+whoever maintains a workflow rather than anything a subscriber sees.
+
+**Score:** N/A
+
+#### Pull Request
+
+Trunk pushes each get their own CI concurrency group, so no merge commit's run is displaced while pending
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1304](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1304)
+
+---
+
+### DEPLOY: `fix/publish-commit-inherits-gpgsign-v1` · 20260903-140140
+
+The commit `publish-to-business.ps1` makes in its temp clone now pins `commit.gpgsign=false`, beside
+the synthetic identity it already pinned. It used to inherit the machine's global signing config, so
+with signing on and the signing agent locked git could not write the commit object: the publish
+exited non-zero and five asserts went red naming the **subset filter**, which blocked a push on a
+branch touching neither this script nor its suite. It presents as a flake and is not one -- CI
+configures no signing at all, so it was green there and red only where somebody would act on it.
+
+Off rather than on, because the author is deliberately synthetic: a signature by the operator's own
+key could never verify against `marketplace-publisher <publisher@localhost>`. Measured rather than
+assumed -- the target repo carries no rulesets and every commit it already holds is unsigned.
+
+The residual of #1287, which pinned the commits the *fixture* makes and not the one the script makes
+itself. The four sibling commit paths keep inheriting the setting on purpose: they commit under the
+operator's own identity, where a locked agent *should* fail rather than quietly land it unsigned.
+
+**Score:** 2
+
+Small, and the trigger is a machine state the source repo does not currently hold -- but it is a
+failure that has already happened rather than one being guarded against in advance, and the cost was
+disproportionate to the fix: an unrelated branch could not be pushed, and the red asserts pointed at
+the wrong subject entirely.
+
+#### What makes this deploy extra special
+
+N/A. `scripts/` does not travel to the published marketplace and this script has no plugin mirror, so
+no consumer runs it or can observe the change.
+
+**Score:** N/A
+
+#### Pull Request
+
+The publish commit no longer inherits the machine's signing config
+
+[PR #1303](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1303)
+
+---
+
+### DEPLOY: `fix/fold-insert-by-landing-stamp-v1` · 20260903-134449
+
+`fold-changelog-entry.ps1` inserted every entry at the **top** of `CHANGELOG.md`'s pending list, on the
+premise that "the entry being folded is the most recently merged one". A **late** fold is exactly what
+breaks that premise, and this script is where late folds come from: its commit is a direct push to the
+trunk under one of this repo's named exceptions, so a push it cannot make holds the entry while later
+branches merge and fold ahead of it. The held entry then led a list it was no longer the newest member
+of -- while the stamp on its own heading, read off the PR's `mergedAt`, said otherwise. Two sources, no
+comparison, and nothing that errors: the only way to see it is to read two adjacent headings.
+
+The position is derived now. `Get-EntryInsertOffset` takes the same `$mergeStamp` the fold writes onto
+the heading and places the entry above the first one that landed earlier, so the two facts come from one
+source and cannot contradict each other. **Insert-only is untouched** -- it derives a position and sorts
+nothing, which is what keeps a bug in a commit that lands on `main` able to misplace at most the one
+entry being folded. A new `Get-EntryHeadingStamp` reads a stamp back, strictly: the heading tail pattern
+tolerates any text after the separator, so the template's `<timestamp of the moment this branch was
+merged>` placeholder had to be excluded from an ordering decision by name. Passing no stamp is the
+pre-change answer, which is both the no-PR fold and every consumer whose fold script is a release
+behind.
+
+Two out-of-order pairs the old behaviour had already left in the document are repaired here, on a
+branch, for the same reason the fold does not do it. The console line now names a late fold when one
+happens; a lint check on document order was measured and declined, because it would refuse an unrelated
+branch's PR over a misplacement already on `main`.
+
+Closes [#1280](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1280).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A repo that runs this workflow folds with the same script, so its own held folds were misplacing their
+entries too -- and the reason a consumer never noticed is the reason this matters to them: nothing errors,
+and the wrong order only surfaces in a **published** release document. The changelog is the cut's input,
+and one section inherits its document order rather than re-ranking: the development notes' **tier 0**
+section, whose own comment asks for "complete and chronological, which is what a record is for". The
+ranked documents were never affected -- `Build-ReleaseNotes` and `Build-ConsumerNotes` re-rank from the
+scores -- so the reach is narrow, and it is the kind of narrow that lands in a document nobody corrects
+afterwards. Arriving by plugin update, with no migration: a fold script one release behind keeps working
+because the new parameter's absence is the old behaviour.
+
+**Score:** 2
+
+#### Pull Request
+
+The fold places an entry by its landing stamp, not always at the top
+
+Plugins: contributing-davekjohn
+
+[PR #1298](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1298)
+
+---
+
+### DEPLOY: `docs/language-layers-bypass-restored-v1` · 20260903-133806
+
+`.claude/rules/language-layers.md` said the `DKJ-Solutions` org transfer had "dropped the
+bypass actors to empty" as the current state. Dave refilled `main-ci-gate`'s bypass list on
+September 3, 2026, with a shape the July field-by-field re-check had not seen --
+`OrganizationAdmin` plus a repository admin role, where it once held repository admin plus the
+Write role. The paragraph now states the restore beside the emptying, names the new list
+shape, and points at the system-administration lens for the mechanics. Its language point --
+`lint-en-tests` is an external name this repo may cite but not rename -- is unchanged; the
+"a re-check is a snapshot" observation is now backed by two stale readings instead of one.
+
+The two other passages #1290 named were already repaired by #1286.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal governance-rule document. No subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+record the main-ci-gate bypass restore in the language-layers rule
+
+#### Pull Request
+
+record the main-ci-gate bypass restore in the language-layers rule
+
+[PR #1295](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1295)
+
+---
+
 ### DEPLOY: `fix/open-pr-commits-branch-doc-v1` · 20260903-125359
 
 `open-pr.ps1` read the branch's development document from the **working tree** -- the scaffold,
@@ -103,10 +464,17 @@ before its first assert. The alias is deleted rather than corrected: named after
 could only mislead the next reader, and `$case.Branch` says exactly what it is.
 
 **This was a green PR that landed a red trunk**, which is worth stating plainly because no gate
-reported it. #1268's branch was cut before `7b783516` (#1259) added this block, so its required check
-passed on a tree that did not contain the test its own change breaks. The merge commit is the first
-thing that holds both, and the merge is not gated -- the check runs on the branch head, and a branch
-is not required to be current with `main` before it merges. Every suite is green again on the merge
+reported it. #1268's branch was cut before `7b783516` added this block -- that commit reached `main`
+via PR #1267, for issue #1259 -- so nothing its branch held ever ran the test its change breaks. CI
+does test the merged tree: `ci.yml` runs on `pull_request`, whose checkout is GitHub's *merge ref*,
+the branch already merged into the base tip. What fails is that the ref is fixed when the run is
+**created** and `pull_request` does not re-fire when the base moves, so a green check goes **stale**.
+This run started `07:39:34Z` and went green `07:55:08Z`; the block reached `main` at `07:54:19Z` --
+14m45s into the run, under a minute before it ended -- and #1268 merged `10:06:12Z` on that
+2h11m-old certificate, which `strict_required_status_checks_policy: false` accepts. Nor was the merge
+commit ungated: its own `push` run was created `10:06:15Z` and **cancelled 8 seconds later** by the
+fold push behind it, a separate defect that cost half the trunk's merge commits their gate and is
+repaired in #1294. The stale certificate itself is #1292. Every suite is green again on the merge
 result; 187 asserts in this suite, 61 suites in the gate.
 
 **Score:** 3
@@ -399,6 +767,37 @@ Plugins: contributing-davekjohn
 
 ---
 
+### DEPLOY: `fix/branch-file-paths-docstring-covers-1255-v1` · 20260903-103107
+
+`Get-BranchFilePaths`'s docstring narrative stopped at #963 and never explained the two rows #1255
+added. `SharedFile` and `Pattern` are both load-bearing -- one is a legacy candidate
+`Resolve-BranchFilePath` reads, the other drives its per-branch discovery sweep and
+`Test-IsPerBranchDocumentPath` -- so a reader following the narrative to understand the returned table
+found no reason for either. Three paragraphs now cover the sixth rename, `Pattern` as the one row that
+is not a name, and why the read set is no longer counted in prose at all: the number had been `four`,
+then `seven`, then `eight`, and #1255 added a name without touching it. Since #1259 there is one
+ordered source -- `Get-BranchFileLegacyNames` -- so the docstring points at it instead of carrying a
+count that goes stale on the next rename. No behaviour changed; the plugin mirror moved with it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a docstring inside a shared script lib. No subscriber of a service reads it, and nothing about
+what the scripts do changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+Get-BranchFilePaths's docstring reaches the per-branch rename
+
+Plugins: contributing-davekjohn
+
+[PR #1274](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1274)
+
+---
+
 ### DEPLOY: `fix/pr-placeholder-list-append-only-v1` · 20260903-102422
 
 `Get-PrDescriptionPlaceholderDefaults` recognises the pre-#1255 placeholder again. That string --
@@ -435,37 +834,6 @@ the PR placeholder list is append-only again
 Plugins: contributing-davekjohn
 
 [PR #1271](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1271)
-
----
-
-### DEPLOY: `fix/branch-file-paths-docstring-covers-1255-v1` · 20260903-103107
-
-`Get-BranchFilePaths`'s docstring narrative stopped at #963 and never explained the two rows #1255
-added. `SharedFile` and `Pattern` are both load-bearing -- one is a legacy candidate
-`Resolve-BranchFilePath` reads, the other drives its per-branch discovery sweep and
-`Test-IsPerBranchDocumentPath` -- so a reader following the narrative to understand the returned table
-found no reason for either. Three paragraphs now cover the sixth rename, `Pattern` as the one row that
-is not a name, and why the read set is no longer counted in prose at all: the number had been `four`,
-then `seven`, then `eight`, and #1255 added a name without touching it. Since #1259 there is one
-ordered source -- `Get-BranchFileLegacyNames` -- so the docstring points at it instead of carrying a
-count that goes stale on the next rename. No behaviour changed; the plugin mirror moved with it.
-
-**Score:** 2
-
-#### What makes this deploy extra special
-
-N/A -- a docstring inside a shared script lib. No subscriber of a service reads it, and nothing about
-what the scripts do changed.
-
-**Score:** N/A
-
-#### Pull Request
-
-Get-BranchFilePaths's docstring reaches the per-branch rename
-
-Plugins: contributing-davekjohn
-
-[PR #1274](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1274)
 
 ---
 
@@ -538,6 +906,57 @@ Plugins: contributing-davekjohn
 
 ---
 
+### DEPLOY: `fix/claude-review-presdk-failure-silent-v1` · 20260903-015507
+
+`claude-review` no longer goes red in silence when it fails **before** the Claude SDK is reached. That
+class — a bad credential, missing action inputs, or the GitHub App not being installed — leaves
+`execution_file` empty, which skipped the **Why the review failed** step entirely, so the workflow wrote
+no titled annotation and `ship-pr`'s relay had nothing to print. The operator got a red tick and a blank
+reason line, indistinguishable from a workflow with nothing to say.
+
+**The workflow now has the complementary gate**, and the tests pin that both halves of `failure()` are
+covered so a class cannot fall between them again. The repair went into the workflow rather than into
+`Get-AuthoredFailureNote`, for the reason #1112 settled: teaching the relay to read *untitled*
+annotations would relay "Process completed with exit code 1" in every consuming repo. A workflow that
+wants to be heard writes a title.
+
+**What the new sentence may claim is the constraint, not its wording.** It states only what an empty
+output proves — the SDK produced no result, so this is the setup and not the diff, and no
+`api_error_status` exists to read. It does not name the cause, because the step cannot read it: the cause
+is in the runner's untitled annotation and the step log. The app installation is cited in the job summary
+as the *measured instance*, never as the diagnosis, which is #966's mistake with the sign flipped.
+
+**The failure that produced this is still live and is not repairable here.** The Claude Code GitHub App
+did not follow the transfer into `DKJ-Solutions`, so both `claude.yml` and `claude-code-review.yml` are
+inert on a 401 — an account-level install, like the spend limit #1164 needed. The transferable lesson,
+now in the system-administration lens beside its sibling #1244: **after a transfer, verify the
+capability, not the artefact that represents it.** #1239's checklist confirmed the Actions secret
+survived, and it had — while both workflows depending on it were dead anyway, one layer further out than
+the check reached.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing here reaches that reader. `.github/workflows/claude-code-review.yml` is this repo's own CI
+and ships to nobody, and `pr-issues-lib.ps1` was deliberately not touched, so no plugin mirror moved.
+
+The half a consumer *does* inherit is split out rather than folded in: `ship-pr` relays only a **titled**
+annotation, and no shipped page says so — `annotation` appears in three shipped `.ps1` files and zero
+shipped `.md`, so a consumer's own advisory check can go red with a blank reason and no way to learn that
+`echo "::error title=X::Y"` is the whole price of admission. That is
+[#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251).
+
+**Score:** N/A
+
+#### Pull Request
+
+claude-review names a pre-SDK failure instead of going red in silence
+
+[PR #1253](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1253)
+
+---
+
 ### DEPLOY: `fix/development-doc-per-branch-path-v1` · 20260903-014524
 
 The branch's development document is named after its branch -- `contributing-davekjohn/development-<branch>.md`
@@ -590,57 +1009,6 @@ Name each branch's development document after its branch, so merges stop conflic
 Plugins: contributing-davekjohn
 
 [PR #1261](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1261)
-
----
-
-### DEPLOY: `fix/claude-review-presdk-failure-silent-v1` · 20260903-015507
-
-`claude-review` no longer goes red in silence when it fails **before** the Claude SDK is reached. That
-class — a bad credential, missing action inputs, or the GitHub App not being installed — leaves
-`execution_file` empty, which skipped the **Why the review failed** step entirely, so the workflow wrote
-no titled annotation and `ship-pr`'s relay had nothing to print. The operator got a red tick and a blank
-reason line, indistinguishable from a workflow with nothing to say.
-
-**The workflow now has the complementary gate**, and the tests pin that both halves of `failure()` are
-covered so a class cannot fall between them again. The repair went into the workflow rather than into
-`Get-AuthoredFailureNote`, for the reason #1112 settled: teaching the relay to read *untitled*
-annotations would relay "Process completed with exit code 1" in every consuming repo. A workflow that
-wants to be heard writes a title.
-
-**What the new sentence may claim is the constraint, not its wording.** It states only what an empty
-output proves — the SDK produced no result, so this is the setup and not the diff, and no
-`api_error_status` exists to read. It does not name the cause, because the step cannot read it: the cause
-is in the runner's untitled annotation and the step log. The app installation is cited in the job summary
-as the *measured instance*, never as the diagnosis, which is #966's mistake with the sign flipped.
-
-**The failure that produced this is still live and is not repairable here.** The Claude Code GitHub App
-did not follow the transfer into `DKJ-Solutions`, so both `claude.yml` and `claude-code-review.yml` are
-inert on a 401 — an account-level install, like the spend limit #1164 needed. The transferable lesson,
-now in the system-administration lens beside its sibling #1244: **after a transfer, verify the
-capability, not the artefact that represents it.** #1239's checklist confirmed the Actions secret
-survived, and it had — while both workflows depending on it were dead anyway, one layer further out than
-the check reached.
-
-**Score:** 3
-
-#### What makes this deploy extra special
-
-N/A — nothing here reaches that reader. `.github/workflows/claude-code-review.yml` is this repo's own CI
-and ships to nobody, and `pr-issues-lib.ps1` was deliberately not touched, so no plugin mirror moved.
-
-The half a consumer *does* inherit is split out rather than folded in: `ship-pr` relays only a **titled**
-annotation, and no shipped page says so — `annotation` appears in three shipped `.ps1` files and zero
-shipped `.md`, so a consumer's own advisory check can go red with a blank reason and no way to learn that
-`echo "::error title=X::Y"` is the whole price of admission. That is
-[#1251](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1251).
-
-**Score:** N/A
-
-#### Pull Request
-
-claude-review names a pre-SDK failure instead of going red in silence
-
-[PR #1253](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1253)
 
 ---
 

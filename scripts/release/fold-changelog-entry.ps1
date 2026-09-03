@@ -31,11 +31,19 @@ legacy single-section Get-ChangelogHeading (issue #178) and the '## Pull Request
 There is no heading left to name, so there is no heading left to get wrong: the whole class of failure
 the old "could not find the heading -- stopping" path existed for cannot occur.
 
-WHERE IN that list is the TOP, always (Dave, August 16, 2026). CHANGELOG.md is newest-first: the entry
-being folded is the most recently merged one, so it leads, and the document reads as the chronological
-record it is.
+WHERE IN that list is NEWEST FIRST (Dave, August 16, 2026), and since September 3, 2026 that is measured
+rather than assumed (issue #1280). CHANGELOG.md is a chronological record and reads as one; the entry being
+folded leads when it actually landed last, which is the ordinary case and no longer the only one this
+script can express. It used to insert at the TOP for every entry, on the premise that "the entry being
+folded is the most recently merged one" -- and a LATE fold is exactly what breaks that premise. This script
+is where late folds come from: the commit is a direct push to the trunk, so a push it cannot make holds the
+entry while later branches merge and fold ahead of it, and the held entry then led a list it was no longer
+the newest member of. The stamp on the heading and the position in the list came from two sources and
+nothing compared them. They come from one now -- Get-EntryInsertOffset takes the same $mergeStamp that is
+written onto the heading -- so the document cannot contradict itself. Measured in this repo's own
+CHANGELOG.md, where '20260903-102422' sat above '20260903-103107'.
 
-IT RANKED ON (TIER, SIGNIFICANCE) UNTIL THAT DAY (issue #467), and the argument for it was that the cut
+IT RANKED ON (TIER, SIGNIFICANCE) UNTIL AUGUST 16, 2026 (issue #467), and the argument for it was that the cut
 EMPTIES the pending list, so document order at cut time IS the order the release documents inherit. That
 turned out to hold for exactly one section. Build-ReleaseNotes passes -RankByTier for every tier from 1
 up, and Build-ConsumerNotes always ranks at tier 2 -- both re-rank from the scores themselves and inherit
@@ -43,8 +51,11 @@ nothing. The one place that does inherit is the development notes' TIER 0 sectio
 for "complete and chronological, which is what a record is for" and was quietly getting score-descending
 order instead. So this made that comment true rather than breaking anything.
 
-INSERT-ONLY, NEVER A RE-SORT, deliberately and unchanged: this commit lands directly on main, so a bug
-must be able to misplace at most the one entry being folded rather than scramble a list it did not write.
+INSERT-ONLY, NEVER A RE-SORT, deliberately and unchanged -- #1280 included, which is why it derives a
+POSITION and does not sort: this commit lands directly on main, so a bug must be able to misplace at most
+the one entry being folded rather than scramble a list it did not write. So an out-of-order pair an earlier
+always-top fold already left in the document stays exactly where it is; repairing that is a branch's job,
+not this commit's.
 
 The TIER and SIGNIFICANCE are still read here, from the entry's own sections -- they are printed on the
 console line and they decide the version bump at the cut. They just no longer decide this position. An
@@ -728,6 +739,11 @@ foreach ($file in $entryFiles) {
     # filter and returns the repo's most recent PR, whichever branch that came from -- so an entry whose
     # branch could not be determined would be stamped with a stranger's PR number, url and merge date. A
     # wrong reference in the changelog is worse than none, and none is a state this script already handles.
+    # RESET PER ITERATION, DELIBERATELY. This is assigned inside the PR block below and read at the insert,
+    # so in fold-all mode an entry whose PR lookup found nothing would otherwise be placed by the PREVIOUS
+    # entry's landing moment -- the same leak the $folded record two screens down had to guard $num against,
+    # and the same consequence: a wrong fact about one entry, silently, in a commit that lands on the trunk.
+    $mergeStamp = ''
     if ($branchForPr) {
         $prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branchForPr, '--state', 'all', '--json', 'number,url,files,mergedAt', '--limit', '1', '--repo', $repo) -DiscardStderr
         $ghCode = $prList.ExitCode
@@ -810,11 +826,10 @@ foreach ($file in $entryFiles) {
         $listStart = $changelogContent.Length
     }
 
-    # WHERE IN the list, decided by the tier and then the significance score (issue #467). The fold is the
-    # only moment at which CHANGELOG.md's pending list can be ordered, because the cut empties it: whatever
-    # order is left here IS the order the release documents inherit, since they read the list in document
-    # order and sort nothing. That is what makes the ordering reproducible across the fold and the cut
-    # without either re-estimating a score.
+    # WHERE IN the list. The fold is the only moment at which CHANGELOG.md's pending list can be ordered,
+    # because the cut empties it: whatever order is left here IS the order the development notes' tier 0
+    # section inherits, since it reads the list in document order and sorts nothing. That is what makes the
+    # ordering reproducible across the fold and the cut.
     #
     # THE SLICE, AND WHY THE OFFSET IS RELATIVE TO IT: Get-EntryInsertOffset only ever returns an entry
     # boundary or the slice's end, so adding $listStart back cannot land mid-entry. The insert itself is
@@ -822,12 +837,23 @@ foreach ($file in $entryFiles) {
     # because every folded entry is followed by its own separator AND the tail normalisation above has
     # guaranteed the content ends on a line break. Landing at the end is where that guarantee is load-bearing.
     #
-    # THE OFFSET IS THE TOP OF THE LIST SINCE AUGUST 16, 2026 (Dave): CHANGELOG.md is newest-first, so the
-    # entry being folded leads. The rank is still PASSED and is now ignored by the callee -- see its
-    # parameter block for why the signature kept it -- because $filed.RankScore and .Tier are still read
-    # here for the console line and by the cut for the version bump.
+    # NEWEST FIRST SINCE AUGUST 16, 2026 (Dave), AND PLACED BY THE STAMP SINCE #1280: CHANGELOG.md is
+    # newest-first, and the entry being folded leads only when it actually landed last. Which is what
+    # $mergeStamp answers -- the same moment this script has just written onto the entry's own heading, read
+    # off the PR's mergedAt. It used to be assumed instead, and this script is where that assumption fails:
+    # the fold is a direct push to the trunk, so a push it cannot make holds the entry while later branches
+    # merge and fold ahead of it. The stamp and the position now come from one source, so they cannot
+    # contradict each other in the document.
+    #
+    # AN EMPTY STAMP MEANS THE TOP, and that is the no-PR case rather than a gap: with no PR there is
+    # nothing to read a landing moment off, this script deliberately writes no stamp on the heading either,
+    # and both facts stay absent together.
+    #
+    # The rank is still PASSED and is still ignored by the callee -- see its parameter block for why the
+    # signature kept it -- because $filed.RankScore and .Tier are read here for the console line and by the
+    # cut for the version bump.
     $listText = $changelogContent.Substring($listStart)
-    $insertPos = $listStart + (Get-EntryInsertOffset -SectionText $listText -Score $filed.RankScore -Tier $filed.Tier)
+    $insertPos = $listStart + (Get-EntryInsertOffset -SectionText $listText -Score $filed.RankScore -Tier $filed.Tier -Stamp $mergeStamp)
 
     $entryBlock = "$entryContent$nl$nl---$nl$nl"
     $changelogContent = $changelogContent.Substring(0, $insertPos) + $entryBlock + $changelogContent.Substring($insertPos)
@@ -851,8 +877,21 @@ foreach ($file in $entryFiles) {
     # WHERE it landed, not just that it landed. With the sections gone there is no heading name to report,
     # and "folded" alone would say nothing about the one thing this script decides -- so the position in the
     # list is printed instead, which is also what makes a misplacement visible without opening the file.
-    $aheadOf = @([regex]::Matches($changelogContent.Substring($insertPos + $entryBlock.Length), '(?m)^' + $entryHashes + ' ')).Count
-    Write-Host "Folded and removed: $file (tier $($filed.Tier)$rankNote -- placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' }))" -ForegroundColor Green
+    #
+    # BOTH SIDES OF THE POSITION SINCE #1280, and the second half is what the first half could not say. Only
+    # "above N" was printed while every entry landed at the top, where the count below is always 0 by
+    # construction. A stamp-placed entry can land mid-list, and there "above 46 entries" reads exactly like
+    # the old always-top line -- so the number that tells a reader a LATE fold happened is the one that was
+    # missing. Printed only when it is not zero, so the ordinary fold's line is unchanged.
+    $tailFromEntry = $changelogContent.Substring($insertPos + $entryBlock.Length)
+    $entryRx = [regex]('(?m)^' + $entryHashes + ' ')
+    $aheadOf = @($entryRx.Matches($tailFromEntry)).Count
+    $behind = @($entryRx.Matches($changelogContent.Substring($listStart, $insertPos - $listStart))).Count
+    $placedNote = "placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' })"
+    if ($behind -gt 0) {
+        $placedNote += " and below $behind that landed later -- a LATE fold, placed by its own stamp rather than at the top"
+    }
+    Write-Host "Folded and removed: $file (tier $($filed.Tier)$rankNote -- $placedNote)" -ForegroundColor Green
     # Captured per iteration rather than read back afterwards. $num in particular survives from one loop
     # pass to the next, so an entry whose PR lookup found nothing would otherwise inherit the previous
     # entry's number -- into a commit message, where a wrong PR reference is worse than none.

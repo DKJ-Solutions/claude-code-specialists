@@ -2883,11 +2883,46 @@ function Get-EntryInsertOffset {
         Pure: where in CHANGELOG.md's list a newly folded entry belongs -- a character offset into
         $SectionText, always at an entry boundary ('## ' at line start) or at its very end.
 
-        NEWEST FIRST, FULL STOP (Dave, August 16, 2026). The answer is the TOP of the list: the entry being
-        folded is the most recently merged one, so it leads. The list is a chronological record and reads
-        like one.
+        NEWEST FIRST, FULL STOP (Dave, August 16, 2026), AND SINCE SEPTEMBER 3, 2026 THAT IS MEASURED
+        RATHER THAN ASSUMED (issue #1280). The rule is unchanged -- the list is a chronological record and
+        reads like one -- but the answer used to be the literal TOP for every input, on the premise that
+        "the entry being folded is the most recently merged one". A LATE fold is exactly what breaks that
+        premise, and a late fold is not exotic: the fold is a direct push to the trunk under one of this
+        repo's named exceptions, so a push it cannot make leaves the entry held while later branches merge
+        and fold ahead of it. Both halves of the premise came from different sources and nothing compared
+        them -- the POSITION was assumed here, while the STAMP on the entry's own heading is read off the
+        PR's mergedAt by Format-EntryMergeStamp -- so a held fold wrote a stamp that contradicted the place
+        it wrote it in. Measured in this repo's own CHANGELOG.md, where '20260903-102422' sat above
+        '20260903-103107' because #1274 merged after #1271 and folded first -- twice over, in fact: an
+        older pair had gone unnoticed. Both were repaired on the branch that made this change.
 
-        IT RANKED ON (TIER, SIGNIFICANCE) UNTIL THAT DAY, and the reason that went is worth keeping, because
+        SO THE POSITION IS NOW DERIVED FROM THAT SAME STAMP: the first entry in the list whose own stamp is
+        OLDER than $Stamp. The list stays newest-first, and for the ordinary fold-seconds-after-the-merge
+        case the answer is still the top -- it is simply the answer rather than the assumption. Passing no
+        $Stamp restores the old behaviour exactly, which is what a fold with no PR to read a moment off
+        gets: there is nothing to place by, so it leads.
+
+        WHY IT IS NOT COSMETIC. The changelog is the cut's input. Build-ReleaseNotes and Build-ConsumerNotes
+        re-rank from the scores and inherit nothing, so the ranked documents were never affected -- but the
+        development notes' TIER 0 section inherits document order deliberately ("complete and
+        chronological, which is what a record is for", the comment #467 was written to make true). A late
+        fold put a wrong order into precisely the section that had been fixed to be chronological.
+
+        AN ENTRY WHOSE HEADING CARRIES NO READABLE STAMP STOPS THE WALK, which is the safe direction rather
+        than a gap. Such an entry is either legacy -- the fold has stamped every heading since August 19,
+        2026, so anything without one is older than anything with one -- or it was folded with no PR to
+        read a moment off, in which case there is nothing to compare and the pre-#1280 answer was the top
+        anyway. Stopping there is the HIGHEST position consistent with what can actually be read, so an
+        unreadable stamp degrades to "the top of what I can order" rather than sinking a new entry past a
+        boundary it could not compare against. Note which claim that is and which it is not: the walk
+        deliberately places an entry lower than the old always-top answer -- that is the fix -- and what it
+        will not do is go one step further down on a comparison it never made.
+
+        EQUAL STAMPS KEEP THE ENTRY THAT WAS FOLDED FIRST ON TOP: the walk stops on strictly older, so a tie
+        continues past. Two changes landing in the same second have no chronological order to get right, and
+        this makes the choice stable rather than arbitrary.
+
+        IT RANKED ON (TIER, SIGNIFICANCE) UNTIL AUGUST 16, 2026, and the reason that went is worth keeping, because
         the ranking looked load-bearing and was not. The argument for it was that the cut EMPTIES this list,
         so document order at cut time IS the order the release documents inherit -- which turned out to be
         true of exactly one section. Build-ReleaseNotes passes -RankByTier for every tier from 1 up and
@@ -2899,10 +2934,13 @@ function Get-EntryInsertOffset {
         bump; they simply stopped deciding this one.
 
         INSERT-ONLY, NEVER A RE-SORT, and that is unchanged and still a safety property rather than an
-        optimisation. This function serves a commit that lands DIRECTLY ON THE MAIN BRANCH under one of this
-        repo's two named exceptions. A re-sort would have the fold rewrite the position of entries it did
+        optimisation -- including under #1280, which is why that change derives a POSITION and does not
+        sort. This function serves a commit that lands DIRECTLY ON THE MAIN BRANCH under one of this
+        repo's named exceptions. A re-sort would have the fold rewrite the position of entries it did
         not write, so a bug could scramble the list; an insert can only ever misplace the one entry being
-        folded, which is visible in the diff and one edit to repair.
+        folded, which is visible in the diff and one edit to repair. So the stamps of the entries already in
+        the list are READ and never rewritten: the walk below moves nothing, and an out-of-order pair a
+        pre-#1280 fold already left behind stays exactly where it is until somebody repairs it on a branch.
 
         $Score and $Tier are still accepted and deliberately ignored. The fold computes both for the console
         line and for the bump, and dropping them from this signature would only move that call's edit into
@@ -2911,6 +2949,9 @@ function Get-EntryInsertOffset {
         $EntryPattern is the heading shape an entry starts with -- '(?m)^## ' for the current format. It is a
         parameter rather than a constant because a document mid-migration still holds pre-format '### '
         entries, and the caller knows which it is looking at.
+
+        $Stamp is the moment the entry being folded LANDED, in Format-EntryMergeStamp's shape. Optional, and
+        omitting it is a supported answer rather than a caller's oversight -- see above.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$SectionText,
@@ -2927,7 +2968,13 @@ function Get-EntryInsertOffset {
         # default saw a document with no entries in it. The fold then ranked a new entry against an empty
         # list and appended it, which reverses the ranked order without erroring: three entries folded
         # low-then-high came out exactly backwards, and the only thing that noticed was this suite.
-        [string]$EntryPattern = ''
+        [string]$EntryPattern = '',
+        # OPTIONAL, AND ITS ABSENCE IS THE PRE-#1280 BEHAVIOUR RATHER THAN AN ERROR (September 3, 2026).
+        # Same reasoning as $Score and $Tier above, in the other direction: this lib reaches every consumer
+        # through a plugin update, and a fold script one release behind calls this function without the
+        # parameter. That call has to keep working -- it runs on the trunk, straight after a merge -- so a
+        # missing stamp means "place it at the top", which is exactly what that older fold expected.
+        [string]$Stamp = ''
     )
     # The default, resolved where a function call is legal. An explicit pattern from a caller still wins --
     # a document mid-migration is read by passing its own level in.
@@ -2961,9 +3008,16 @@ function Get-EntryInsertOffset {
     $srcLines = @($SectionText -split "`r?`n")
     $fenced = Get-FencedLineFlags -Lines $srcLines
     $entryStarts = @()
+    # The heading LINE beside its offset, because #1280 needs what the heading SAYS and not only where it
+    # is. Collected in the same pass and from the same fence walk, so the two arrays cannot disagree about
+    # which boundaries are real -- a second walk is how a fence-blind reader gets re-introduced.
+    $entryHeadings = @()
     $offset = 0
     for ($i = 0; $i -lt $srcLines.Count; $i++) {
-        if ((-not $fenced[$i]) -and $rxLine.IsMatch($srcLines[$i])) { $entryStarts += $offset }
+        if ((-not $fenced[$i]) -and $rxLine.IsMatch($srcLines[$i])) {
+            $entryStarts += $offset
+            $entryHeadings += $srcLines[$i]
+        }
         $offset += $srcLines[$i].Length
         # The separator this line ended with, taken from the source rather than assumed.
         if ($offset -lt $SectionText.Length) {
@@ -2974,11 +3028,37 @@ function Get-EntryInsertOffset {
     # as its own case anyway, because a list with a head note and no entries yet is not empty text.
     if ($entryStarts.Count -eq 0) { return $SectionText.Length }
 
-    # THE FIRST ENTRY BOUNDARY, which is what "newest first" means as an offset. The fence walk above is
-    # what makes it correct rather than trivially `IndexOf('## ')`: an entry may QUOTE a heading inside a
-    # fence -- the entry introducing this very format does -- and inserting at a quoted heading would split
-    # somebody else's fenced block in two. Measured on the fold of PR #477, back when this function ranked.
-    return $entryStarts[0]
+    # THE ENTRY'S OWN STAMP, ROUND-TRIPPED THROUGH THE FORMATTER rather than shape-tested a second time
+    # here. Format-EntrySectionHeadingSuffix builds exactly what a stamped heading ends with and
+    # Get-EntryHeadingStamp reads exactly that back, so this one line validates $Stamp, rejects the
+    # template's placeholder, and proves the writer and the reader agree -- with no copy of the pattern in
+    # this function to go stale. Empty in, empty out, which is the no-stamp case below.
+    $mine = Get-EntryHeadingStamp -HeadingLine (Format-EntrySectionHeadingSuffix -Stamp $Stamp)
+
+    # NOTHING TO PLACE BY -> THE FIRST ENTRY BOUNDARY, which is what "newest first" meant as an offset for
+    # every input between August 16, 2026 and #1280, and still means for a fold with no PR to read a moment
+    # off. The fence walk above is what makes it correct rather than trivially `IndexOf('## ')`: an entry
+    # may QUOTE a heading inside a fence -- the entry introducing this very format does -- and inserting at
+    # a quoted heading would split somebody else's fenced block in two. Measured on the fold of PR #477,
+    # back when this function ranked.
+    if (-not $mine) { return $entryStarts[0] }
+
+    # WHERE IT LANDED, AGAINST WHERE THE OTHERS LANDED (#1280). The first entry that is strictly OLDER is
+    # the one this entry goes above; equal stamps continue, so a tie leaves the entry folded first on top.
+    # CompareOrdinal rather than -lt because these are fixed-width big-endian stamps and the comparison has
+    # to be by code point -- PowerShell's -lt on strings is CULTURE-aware, which is a different question
+    # asked of the same two values.
+    for ($k = 0; $k -lt $entryStarts.Count; $k++) {
+        $theirs = Get-EntryHeadingStamp -HeadingLine $entryHeadings[$k]
+        # No readable stamp stops the walk, and the docstring carries why that is the safe direction: it can
+        # only ever place this entry HIGHER than the pre-#1280 answer would have, never lower.
+        if (-not $theirs) { return $entryStarts[$k] }
+        if ([string]::CompareOrdinal($theirs, $mine) -lt 0) { return $entryStarts[$k] }
+    }
+    # Older than everything already in the list -- the oldest held fold there is. The slice's end, which the
+    # caller's tail normalisation has guaranteed sits after a line break; see the fold's note on why that
+    # guarantee is load-bearing exactly here.
+    return $SectionText.Length
 }
 # --- The entry's own shape: one H2 per change, with named sections ---------------------------------
 #
@@ -3202,6 +3282,33 @@ function Format-EntrySectionHeadingSuffix {
     param([AllowEmptyString()][string]$Stamp = '')
     if (-not $Stamp) { return '' }
     return ' ' + $script:EntryIdSeparator + ' ' + $Stamp
+}
+
+function Get-EntryHeadingStamp {
+    <#
+        Pure: the stamp a heading line carries -- '20260903-103107' -- or '' when it carries none. The
+        inverse of Format-EntrySectionHeadingSuffix, and placed beside it so the writer and the reader
+        cannot drift apart about the spacing or the separator.
+
+        STRICT ABOUT THE SHAPE, WHERE THE TAIL PATTERN IS DELIBERATELY LOOSE, and the difference is the
+        reason this function exists rather than a capture group being added to Get-EntrySectionHeadingTail.
+        That tail is a TOLERANCE -- '(?:\s<sep>\s\S.*?)?\s*$', anything non-blank -- and its own docstring
+        says why: nothing read the stamp back, so a heading was allowed to say whatever it said. Something
+        reads it back now, so this accepts only what Format-EntryMergeStamp writes. Anything else answers
+        '' rather than being compared as if it were a moment, which is what keeps the template's own
+        placeholder ('<timestamp of the moment this branch was merged>') out of an ordering decision: a
+        placeholder that sorted as a date would be a silent wrong answer in the one document whose subject
+        is when things landed.
+
+        AND THE SHAPE IS WHY THE CALLER NEEDS NO [datetime]. 'yyyyMMdd-HHmmss' is fixed-width and
+        big-endian, so an ORDINAL string comparison of two of these IS the chronological one. No parse
+        means no unparseable-date path to handle -- the shape test above is the whole validation, and it
+        happens once, here.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$HeadingLine)
+    $m = [regex]::Match($HeadingLine, '\s' + [regex]::Escape($script:EntryIdSeparator) + '\s+(\d{8}-\d{6})\s*$')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
 }
 
 function Get-EntryIdSeparator {
@@ -6386,9 +6493,10 @@ function Get-UnfoldedTrunkEntry {
         THE ONE FALSE POSITIVE IT CAN RAISE is the ship window. ship-pr.ps1 pushes the merge commit and
         then, seconds later, the fold commit that clears the document. Between the two the just-merged
         document is on the trunk and this reports it -- correctly, because the trunk genuinely carries
-        an unfolded entry at that instant. The CI workflow's cancel-in-progress swallows the merge
-        commit's run; a session that starts in that window gets an accurate finding that the next
-        commit resolves.
+        an unfolded entry at that instant. unfolded-entry.yml's own cancel-in-progress swallows the
+        merge commit's run there -- ci.yml's does not, and since #1294 cannot: each push to the trunk
+        runs in a group of its own. A session that starts in that window gets an accurate finding
+        that the next commit resolves.
 
         WIDE READING OF THE DECLARED BRANCH, deliberately. Every file considered here sits at the fixed
         development-*.md path and is a known-shape branch document, so the -OpeningHeadingOnly narrowing

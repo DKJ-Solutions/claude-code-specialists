@@ -14,20 +14,37 @@ on:
   push:
     branches: [main]
 
-# ONE RUN PER REF, AND `cancel-in-progress` IS CONDITIONAL RATHER THAN `true` -- the fold is why.
-# A PR run that a later push supersedes is measuring a commit nobody will merge, so killing it is
-# free: `synchronize` fires on every push, which is how PR #933 came to carry three consecutive full
-# runs of one branch at ~7m40s each, on a runner whose minutes bill double.
+# TWO GROUPING RULES IN ONE KEY: a PR is keyed on its REF, a push to `main` on its own COMMIT.
 #
-# A push to `main` shares its group with the NEXT push to `main`, never with a PR -- github.ref is
-# refs/pull/N/merge there and refs/heads/main here, so the two can never collide and the condition is
-# not what separates them. What it protects against is this repo's own trunk rhythm: ship-pr pushes to
-# `main` TWICE per branch, the merge commit and then the fold commit that clears the branch document.
-# Measured August 26, 2026: 6s apart on #932 and 7m on #933. Under a plain `true` the fold would cancel
-# the merge commit's own run -- at a 6s gap, always -- and a cancelled check is not a passing one, so the
-# commit the `main` ruleset gates on would sit there having never been gated.
+# THE PR HALF IS THE CHEAP HALF and is unchanged. A PR run that a later push supersedes is measuring a
+# commit nobody will merge, so killing it is free: `synchronize` fires on every push, which is how PR
+# #933 came to carry three consecutive full runs of one branch at ~7m40s each, on a runner whose
+# minutes bill double. So PR runs share a group per `github.ref` and cancel each other.
+#
+# THE PUSH HALF IS KEYED PER COMMIT, AND `cancel-in-progress` IS NOT WHAT PROTECTS IT -- issue #1294.
+# Every push to `main` used to share one `refs/heads/main` group, with the conditional below relied on
+# to stop the fold commit cancelling the merge commit's run. That could not work: a concurrency group
+# holds at most one IN-PROGRESS run plus one PENDING one, and a third arrival DROPS the pending one
+# without consulting `cancel-in-progress` at all. ship-pr pushes to `main` twice per branch -- the
+# merge commit, then the fold commit that clears the branch document, measured 6s apart on #932 -- so
+# on a ~15-minute run the merge commit's run was still queued when the fold displaced it.
+#
+# MEASURED September 3, 2026 over the 28 most recent `merge:` commits on the trunk's first-parent line:
+# 14 `success`, 14 `cancelled`. Half the trunk had never been gated. Run 33742497546 (merge commit
+# 371af75b, #1268) was created 10:06:15Z and cancelled 10:06:23Z having allocated ZERO jobs, which is
+# the proof it never left the queue rather than being killed mid-run. And it was never only folds
+# displacing merges: 0ab47d2d, 2c54de74 and e0175372 went down in one chain, so on a busy trunk only
+# the LAST push of each ~15-minute window ran at all. The tip was always gated; nothing between it and
+# the previous tip ever was, which is why that day's two `failure` runs named no commit.
+#
+# THE EXTRA RUNNER MINUTES ARE THE POINT, NOT AN OVERSIGHT: every push to `main` now runs, where before
+# roughly half were dropped -- 27 runs instead of 13 on September 3. The PR saving above is untouched,
+# because the push half never shared a group with a PR in the first place (`github.ref` is
+# refs/pull/N/merge there and refs/heads/main here), so none of what #932 measured is reopened. Whether
+# the FOLD commit needs a full run of its own is a separate question with its own trade-off, and it is
+# deliberately not answered here.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
