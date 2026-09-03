@@ -89,7 +89,8 @@ concurrency:
 # THE NAME IS THE POINT: `main-ci-gate` requires a check called `lint-en-tests`, and GitHub names a check
 # after the job that reports it. Keeping a job by that exact name means this restructure needs NO ruleset
 # edit, no repo-settings change and nobody's permission -- which is the whole reason it could be done while
-# the merge-queue decision on #1325 is still open. Do not rename this job. Renaming it silently un-gates
+# the merge-queue decision on #1325 was still open. It has since been settled -- NO queue (#1355,
+# September 3, 2026) -- which changes nothing here. Do not rename this job. Renaming it silently un-gates
 # `main`: the ruleset would wait forever for a check nobody reports, and every merge would block.
 #
 # `if: always()` PLUS AN EXPLICIT RESULT CHECK, AND BOTH HALVES ARE LOAD-BEARING. A job that `needs:` a
