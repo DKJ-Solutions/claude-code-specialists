@@ -86,6 +86,11 @@ The six steps, stopping on the first failure:
    that cannot go home stays where it is and says why. See
    [And stopping now leaves the checkout on the trunk](#and-stopping-now-leaves-the-checkout-on-the-trunk-1073).
 3. **Wait for CI.** See [Why step 3 polls before it watches](#why-step-3-polls-before-it-watches).
+
+   **Then, has `main` moved since the run that certified this PR (step 3b)?** A required check tests
+   GitHub's merge ref as it stood when its run started and is never refreshed if `main` moves
+   afterward, so a green check can go stale before the merge. See
+   [Has `main` moved since the certifying run?](#has-main-moved-since-the-certifying-run-1292).
 4. **Merge** (`gh pr merge`), but first the **step-list gate again**: the phases above the DEPLOY heading in
    `contributing-davekjohn/development-<branch>.md` must
    have nothing unresolved left in them, or the merge does not happen. Not belt-and-braces — the rule is
@@ -112,6 +117,7 @@ The six steps, stopping on the first failure:
 | `-NoResolves` | Passed through to `open-pr`: declare that this PR closes no issue. |
 | `-SkipLint` | Passed through to `open-pr`: skip the lint gate. An escape valve. |
 | `-SkipTests` | Passed through to `open-pr`: skip the test gate. An escape valve. |
+| `-SkipStaleCheck` | Skip step 3b's certificate-staleness check (issue #1292): merge even though `main` gained a commit after the run that certified this PR started. Use it only when that window is known-harmless — e.g. the commits `main` gained are docs-only. |
 | `-Force` | Passed through to `open-pr`: ship an entry that still carries its scaffold wording. Deliberately separate from the two above — those skip a tool, this overrules a judgement about content. |
 | `-RefreshBody` | Passed through to `open-pr`: on a branch whose PR is **already open**, rewrite that PR's description from the current changelog entry. Opt-in, so a body edited on github.com is never overwritten unasked. No effect when the PR is created in this run. |
 | `-PollSeconds` | Poll interval in seconds for the CI wait. Default 15. |
@@ -425,6 +431,45 @@ line beside the red mark means the job left no sentence behind — not that the 
 advisory workflow has something useful to say about a failure, give it a titled `::error::` line and
 `ship-pr` carries it to the operator's console; the first titled failure in the job wins, and warnings
 are not read.
+
+## Has `main` moved since the certifying run? ([#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292))
+
+**The filed reason did not hold, and step 3b follows the corrected one.** #1292 reported "the required
+check runs on the branch head" — it does not: `ci.yml`-style CI on `pull_request` tests GitHub's
+**merge ref**, the branch already merged into the base tip, so the merge result genuinely is tested.
+What verification found instead is a green check going **stale**: GitHub fixes the merge ref at the
+moment the run is **created** and never refreshes it if the base moves afterward (`pull_request` does
+not re-fire on that), and a ruleset without `strict_required_status_checks_policy: true` lets a stale
+green check satisfy the gate regardless. Measured on the instance: a test block that PR #1268's branch
+predated reached `main` 45 seconds before #1268's own CI run finished and 14m45s after that run
+started, and #1268 merged on that same certificate 2h11m later.
+
+**Why this is "has `main` moved since the run", not "is the branch behind `main`"** — the report's own
+filed option. Behind-ness at merge is the ordinary case and is harmless whenever `main` advanced
+*before* the certifying run started: the run then tested a merge ref that already held everything it
+needed to. Measured on the source repo's last 45 merged PRs: 20 (44.4%) were behind-at-merge, but only
+14 (31.1%) actually had `main` gain a first-parent commit *after* their certifying run began — the
+narrower predicate step 3b uses. Median staleness among those 14 was 16.1 minutes, max 146.6 (PR #1268
+itself). Of the 14, 2 carried a `scripts/**`/`scripts/tests/**` change in the window — the subset that
+can actually turn a trunk red — but step 3b does not filter on that: predicting which file a future
+test depends on is not this script's to do, and the predicate is already cheap enough (one fetch, one
+first-parent log) that narrowing it further would trade a real safety margin for a rarer refusal on no
+measured benefit.
+
+**The timestamp is the earliest required check's own `startedAt`**, not the run's creation time: using
+the check's own start is the conservative direction, since queueing only pushes it *later* than the
+moment the merge ref was actually fixed. Read from data step 3 already holds in memory — no new `gh`
+call for the timestamp itself, only one `git fetch origin main` so this check reads a current `main`.
+
+**Fails closed on the predicate, not on the network.** If the required check's timestamp cannot be
+read, or the fetch/log fails, step 3b warns and ships rather than inventing a verdict — the same
+posture the unreadable-body case at the DEPLOY lock and the unreadable-worktree-list case at step 0
+already take. The read that has to fail closed is `Get-MergeBlockVerdict`'s own, on the required-check
+list, and it has already run by this point.
+
+**Repo-settings option 1 from the same issue** (`strict_required_status_checks_policy: true`) remains
+available and closes the gap completely by forcing a re-run on every base move; it is the repo owner's
+call, not this script's, and step 3b does not touch it.
 
 ## The merge method is repo policy
 

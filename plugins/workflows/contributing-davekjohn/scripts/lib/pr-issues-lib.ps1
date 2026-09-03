@@ -19,6 +19,12 @@
     for the wait to SAY which check governed it. The query cannot be tested and the selection can, so
     the selection lives here -- see that function's own header for the measurement behind it.
 
+    The third group (Get-CertifyingRunTimestamp and Get-StaleCertificateVerdict) is issue #1292's
+    corrected mechanism: a required check tests GitHub's merge ref as it stood when the run started,
+    and that ref is never refreshed if 'main' moves afterward -- so a green check can go STALE between
+    the run and the merge. Selecting the certifying timestamp out of a checks payload, and deciding
+    whether 'main' has since moved, are both pure; only the git/gh reads that feed them are not.
+
     Everything here is a PURE function of its input -- no git, no gh, no filesystem -- so the suite
     (scripts/tests/pr-issues.tests.ps1) can assert the whole decision table without a live remote.
     The parts that cannot be pure (asking GitHub which issues are still open, and asking it for the
@@ -1031,6 +1037,118 @@ function Get-MergeBlockVerdict {
         FailedRequired = @()
         FailedOther    = $failedOther
     }
+}
+
+function Get-CertifyingRunTimestamp {
+    <#
+    .SYNOPSIS
+        The earliest startedAt among a PR's REQUIRED checks -- the moment closest to when GitHub fixed
+        the merge ref the certifying run tested. $null when it cannot be read.
+
+    .DESCRIPTION
+        Issue #1292's corrected mechanism, read out of data ship-pr.ps1 already has in memory. A
+        `pull_request` workflow tests GitHub's MERGE REF (branch already merged into the base tip), and
+        that ref is fixed at the moment the run is CREATED -- 'pull_request' does not re-fire when the
+        base moves afterward. So a required check's own startedAt is the closest available answer to
+        "when was this merge ref fixed", and USING THE CHECK'S OWN START RATHER THAN THE RUN'S CREATION
+        TIME IS THE CONSERVATIVE DIRECTION: queueing only pushes startedAt LATER than the true ref-fix
+        moment, so a commit landing in that (typically sub-minute) gap is rarely missed, rather than a
+        sound certificate being wrongly voided.
+
+        MULTIPLE REQUIRED CHECKS TAKE THE EARLIEST, because a ruleset can require more than one and each
+        is free to start at a different time within the same triggering run -- the earliest is closest
+        to when the ref was actually fixed. Where a ruleset requires exactly one (this repo's own), this
+        is simply that check's startedAt.
+
+        MATCHED BY NAME AGAINST $ChecksJson, because that is the only payload carrying timestamps at all:
+        `gh pr checks --required` (RequiredChecksJson elsewhere in this file) never has to carry more
+        than name/bucket/state for Get-MergeBlockVerdict, so a caller that already fetched the wider
+        payload for Get-CheckWaitReport is not sent back for a second one -- it already holds the
+        timestamps this needs, just filtered to a different set of names.
+
+        PURE, like every other selector in this file: the caller reads gh and 'main' for itself; this
+        only reduces a payload it is handed. Uses ConvertTo-CheckTimestamp for the same reasons that
+        function's own header gives (the PS5.1 datetime auto-conversion, and the zero-time '0001-01-01'
+        shape a check that has not started yet serialises as).
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,bucket,state,startedAt,completedAt,link` output -- the same
+        payload step 3 already reads for Get-CheckWaitReport and the failure diagnostics.
+
+    .PARAMETER RequiredNames
+        The required check names (not required-checks JSON -- just the names; the caller already has
+        them from whichever read named the required checks in the first place).
+    #>
+    param(
+        [string]$ChecksJson,
+        [string[]]$RequiredNames = @()
+    )
+
+    $names = @($RequiredNames | Where-Object { $_ -and ([string]$_).Trim() })
+    if ($names.Count -eq 0) { return $null }
+    if (-not $ChecksJson -or -not $ChecksJson.Trim()) { return $null }
+
+    try { $parsed = $ChecksJson | ConvertFrom-Json } catch { return $null }
+    # Assign first, wrap second -- the 5.1 pitfall every parse in this file already avoids.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.name })
+    if ($records.Count -eq 0) { return $null }
+
+    $started = @()
+    foreach ($r in $records) {
+        if ($names -notcontains [string]$r.name) { continue }
+        $ts = ConvertTo-CheckTimestamp -Value $r.startedAt
+        if ($null -ne $ts) { $started += $ts }
+    }
+    if ($started.Count -eq 0) { return $null }
+    return (@($started | Sort-Object)[0])
+}
+
+function Get-StaleCertificateVerdict {
+    <#
+    .SYNOPSIS
+        Whether commits found on 'main' since the certifying run void this PR's CI certificate --
+        issue #1292's corrected predicate, replacing "the branch is behind" with "did 'main' move
+        since the run that certified it".
+
+    .DESCRIPTION
+        MEASURED, NOT GUESSED (issue #1292, September 3, 2026). The filed report proposed refusing a
+        branch that is BEHIND 'main' at merge time; verification found that predicate over-fires --
+        behind-ness at merge is the ordinary case in this repo (20 of the last 45 merged PRs, 44.4%)
+        and is harmless whenever 'main' advanced BEFORE the certifying run started, which most of it
+        did. The predicate that actually voids a certificate is narrower and strictly implied by
+        behind-ness:
+
+            has 'main' moved SINCE the run that went green?
+
+        Measured on the same 45 merged PRs: 14 (31.1%) had 'main' gain a first-parent commit after
+        their certifying run began -- the true fire rate of this gate -- with a median staleness of
+        16.1 minutes and a max of 146.6 (PR #1268 itself: the test block its own branch predated
+        reached 'main' 45s before #1268's run finished and 14m45s after that run started, and #1268
+        then merged on that same certificate 2h11m later). Of the 14, only 2 carried a
+        scripts/**/scripts/tests/** change in the commits 'main' gained -- the subset that could
+        actually turn the trunk red -- but this verdict does NOT filter on that: predicting which file
+        a future test depends on is not this script's to do, and the corrected predicate is already
+        cheap enough (one fetch, one first-parent log) that narrowing it further would trade a real
+        safety margin for a rarer refusal on no measured benefit.
+
+        PURE: the caller does the reading (`git fetch origin main`, then `git log origin/main
+        --first-parent --since=<Get-CertifyingRunTimestamp's answer>`) and hands the resulting SHA list
+        here. Nothing here touches git or gh, so the verdict is asserted without a live remote -- the
+        same split Get-MergeBlockVerdict and Get-CheckWaitReport already follow in this file.
+
+    .PARAMETER NewMainCommits
+        The SHAs of first-parent commits on 'main' at or after the certifying run's own earliest
+        required-check startedAt, newest first (the order `git log` already produces). Empty (not
+        $null) means "main has not moved" -- the caller's own read decides that; this only counts what
+        it is handed.
+    #>
+    param([string[]]$NewMainCommits = @())
+
+    $commits = @($NewMainCommits | Where-Object { $_ -and ([string]$_).Trim() } | Select-Object -Unique)
+    if ($commits.Count -eq 0) {
+        return [pscustomobject]@{ Stale = $false; Count = 0; Commits = @() }
+    }
+    return [pscustomobject]@{ Stale = $true; Count = $commits.Count; Commits = $commits }
 }
 
 function Get-FailedCheckRunRefs {

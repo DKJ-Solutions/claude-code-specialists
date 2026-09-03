@@ -112,6 +112,15 @@
          The lane is printed with it, and it is advice rather than the condition it once was: step 2b has
          already moved this tree to the trunk, so the next branch belongs in a lane because that is where
          you build, not because staying here would cost you your checkout.
+     3b. HAS 'main' MOVED SINCE THE RUN THAT CERTIFIED THIS PR? (issue #1292) A required check tests
+         GitHub's merge ref as it stood when the run was CREATED and is never refreshed if 'main' moves
+         afterward, so a green check can go STALE between the run and the merge -- measured at 31.1% of
+         recent merges (14/45), median staleness 16.1 minutes, max 146.6 (PR #1268 itself). Refuses (with
+         -SkipStaleCheck as the valve) when 'main' gained a first-parent commit since the earliest
+         required check's own startedAt; a network read that fails here WARNS rather than refuses, since
+         this is not the read that has to fail closed -- the required-check-list read at step 3 already
+         did. See the comment at the step for the full corrected mechanism and why "the branch is behind"
+         (#1292's own filed predicate) is the wrong, wider question.
       4. TWO GATES, THEN MERGE. The step-list gate refuses while development.md has an unresolved
          step above DEPLOY, and the DEPLOY LOCK (issue #884) refuses when that section no longer matches
          what PR #NN published -- the section is fixed at the moment the PR opens, because it is what the
@@ -193,6 +202,12 @@
 .PARAMETER NoMerge
     Open the PR and stop (do not wait for CI, merge, or fold).
 
+.PARAMETER SkipStaleCheck
+    Escape valve for the step-3b certificate-staleness check (issue #1292): merge even though 'main'
+    has gained a commit since the run that certified this PR started. Use it only when that window is
+    known-harmless (e.g. the gained commits are docs-only) -- the check exists because the ordinary
+    remedy (bring the branch up to date and let CI re-run) is cheap and this valve skips it.
+
 .PARAMETER PollSeconds
     Poll interval (seconds) for the CI watch. Default 15.
 
@@ -224,6 +239,7 @@ param(
     [switch]$SkipTests,
     [switch]$Force,
     [switch]$NoMerge,
+    [switch]$SkipStaleCheck,
     [int]$PollSeconds = 15,
     [string]$Resolves = '',
     [switch]$NoResolves,
@@ -858,6 +874,112 @@ if ($waitReport) {
     # read") reads as a fault on a fresh repo whose owner has no prior for which parts of this toolchain
     # to trust -- and the reporter of #1083 read it as the no-ruleset case, which it is not.
     Write-Host "  waited $(Format-CheckDuration -Seconds $waitedSec) -- no readable check facts, so nothing to report about the wait" -ForegroundColor DarkGray
+}
+
+# --- Step 3b: has 'main' moved since the run that certified this PR? (issue #1292) ----------------
+# THE FILED REASON DID NOT HOLD, AND THIS FOLLOWS THE CORRECTED ONE, NOT THE ORIGINAL. #1292 reported
+# "the required check runs on the branch head", which is wrong: ci.yml triggers on 'pull_request', so
+# the check tests GitHub's MERGE REF -- the branch already merged into the base tip -- and the merge
+# result genuinely is tested. What #1292's own verification comment found instead is a green check
+# going STALE: GitHub fixes the merge ref at the moment the run is CREATED and never refreshes it when
+# the base moves afterward ('pull_request' does not re-fire on that), and this repo's ruleset has
+# `strict_required_status_checks_policy: false`, so a stale green check still satisfies the gate.
+# Measured on PR #1268 (the instance): the test block PR #1268's own branch predated reached 'main' 45s
+# before #1268's own CI run finished and 14m45s after that run started, and #1268 then merged on that
+# same certificate 2h11m later.
+#
+# WHY THIS IS "HAS main MOVED SINCE THE RUN", NOT "IS THE BRANCH BEHIND main" -- #1292's own filed
+# option 2. Behind-ness at merge is the ordinary case and is harmless whenever 'main' advanced BEFORE
+# the certifying run started: the run then tested a merge ref that already held everything it needed
+# to, and refusing on it is pure friction. Measured on the last 45 merged PRs into this repo's 'main':
+# 20 (44.4%) were behind-at-merge, but only 14 (31.1%) actually had 'main' gain a first-parent commit
+# AFTER their certifying run began -- the narrower predicate that voids a certificate, and the one this
+# gate uses. Median staleness among those 14 was 16.1 minutes, max 146.6 (PR #1268 itself). Of the 14,
+# 2 carried a scripts/**/scripts/tests/** change in the window -- the subset that can actually turn the
+# trunk red -- but this gate does NOT filter on that: predicting which file a future test depends on is
+# not this script's to do, and the predicate below is already cheap enough (one fetch, one first-parent
+# log) that narrowing it further would trade a real safety margin for a rarer refusal on no measured
+# benefit. Repo-settings option 1 from the same issue (`strict_required_status_checks_policy: true`)
+# remains available and closes the gap completely -- it is Dave's call, not this script's, and is not
+# made here.
+#
+# THE TIMESTAMP IS THE EARLIEST REQUIRED CHECK'S OWN startedAt (Get-CertifyingRunTimestamp), not the
+# run's creation time: using the check's own start is the CONSERVATIVE direction, because queueing only
+# pushes startedAt LATER than the moment the merge ref was actually fixed -- a commit landing in that
+# (typically sub-minute) queueing gap is rarely missed, rather than a sound certificate being wrongly
+# voided. Read from $checkFactsJson and $requiredFactsJson, ALREADY IN MEMORY from the wait above -- no
+# new gh call for the timestamp itself, only a re-parse of $requiredFactsJson for the names
+# Get-MergeBlockVerdict does not expose.
+#
+# THE ONE NEW NETWORK CALL is a `git fetch origin main`, so this local clone's view of 'main' is
+# current at the moment this check actually runs (this script's own clone can otherwise be arbitrarily
+# stale, which would silently under-refuse). First-parent, because a merge commit's own author/commit
+# date is not when its contents landed relative to the certifying run -- first-parent walks 'main's own
+# history the same way every fold and release commit on it already does.
+#
+# FAILS CLOSED ON THE PREDICATE, NOT ON THE NETWORK. If the required check's timestamp cannot be read,
+# or the fetch/log fails, this WARNS AND SHIPS rather than inventing a verdict -- the same posture the
+# unreadable-body case at the DEPLOY lock and the unreadable-worktree-list case at step 0 already take
+# for a read that is not itself the safety-critical one. Get-MergeBlockVerdict's OWN read is the one
+# that fails closed on an unreadable required-check list, above, and has already run by this point.
+if ($SkipStaleCheck) {
+    Write-Host "ship-pr: -SkipStaleCheck set -- not checking whether 'main' moved since the certifying run." -ForegroundColor DarkYellow
+} else {
+    $staleCheckNames = @()
+    if ($requiredFactsJson -and $requiredFactsJson.Trim()) {
+        try {
+            # Assign first, wrap second -- the 5.1 pitfall every parse in this file already avoids.
+            $parsedStaleNames = $requiredFactsJson | ConvertFrom-Json
+            $staleCheckNames = @(@($parsedStaleNames) | Where-Object { $_ -and $_.name } | ForEach-Object { [string]$_.name })
+        } catch {
+            $staleCheckNames = @()
+        }
+    }
+    $certifiedSince = $null
+    if ($staleCheckNames.Count -gt 0 -and $checkFactsJson) {
+        $certifiedSince = Get-CertifyingRunTimestamp -ChecksJson $checkFactsJson -RequiredNames $staleCheckNames
+    }
+    if ($null -eq $certifiedSince) {
+        Write-Host "  stale-CI check: could not read a required check's start time -- not checked (this is not a finding)." -ForegroundColor DarkGray
+    } else {
+        $fetchMain = Invoke-NativeCapture -FilePath 'git' -Arguments @('fetch', 'origin', 'main', '--quiet')
+        if ($fetchMain.ExitCode -ne 0) {
+            $fetchMain.Output | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
+            Write-Host "  stale-CI check: 'git fetch origin main' failed -- not checked (this is not a finding)." -ForegroundColor DarkYellow
+        } else {
+            $sinceStr = $certifiedSince.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            $mainLog = Invoke-NativeCapture -FilePath 'git' -Arguments @('log', 'origin/main', '--first-parent', '--since', $sinceStr, '--pretty=format:%H')
+            if ($mainLog.ExitCode -ne 0) {
+                Write-Host "  stale-CI check: could not read the history of 'origin/main' -- not checked (this is not a finding)." -ForegroundColor DarkYellow
+            } else {
+                $newMainCommits = @($mainLog.Output | Where-Object { $_ -and "$_".Trim() })
+                $staleVerdict = Get-StaleCertificateVerdict -NewMainCommits $newMainCommits
+                if ($staleVerdict.Stale) {
+                    $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object { $_.Substring(0, 8) }) -join ', '
+                    Write-Error @"
+stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
+started (issue #1292) -- NOT merged.
+
+The required check(s) ($(Format-CheckNameList -Names $staleCheckNames)) tested GitHub's merge ref as it
+stood when that run began; anything landed on 'main' since is untested against this branch. Newest
+first: $shownShas
+
+Bring the branch up to date so CI re-runs against the current 'main', then re-run ship-pr:
+
+  git fetch origin main
+  git merge origin/main
+  <push, wait for CI to go green again, re-run ship-pr>
+
+-SkipStaleCheck ships on the old certificate anyway -- use it only when the window is known-harmless
+(e.g. the gained commits are docs-only). There is no re-run of the wait for this gate: fixing it means
+bringing the branch forward, not retrying the same read.
+"@
+                    exit 1
+                }
+                Write-Host "  stale-CI check: 'main' has not moved since the certifying run -- certificate still holds." -ForegroundColor DarkGray
+            }
+        }
+    }
 }
 
 # --- Step 4: merge (no --admin: never bypass the CI gate) ----------------------------------------
