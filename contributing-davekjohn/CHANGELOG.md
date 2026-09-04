@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1420-private-consumer-quote-bound · 20260905-001543
+
+A measurement taken in a private consumer now quotes only the fragment the finding reads. The repo, file
+and line are published as before and carry the provenance; the sentence around the match stays in the
+consumer's tree. `CLAUDE.md`'s `public` bullet states it, and the three sites that had gone further --
+the #15 lens, `entry-scaffold-lib.ps1` with its plugin mirror, and the supremacy-declaration fixtures --
+are brought back to that bound. The verbatim-citation convention itself is untouched and said so
+explicitly: a bounded quote plus `file:line` is still re-verifiable, which is the property a paraphrase
+loses. Test fixtures are named as in scope, because a matcher reads structure and the consumer's
+remaining words buy no coverage while a public repository keeps them forever.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes plugins, not a subscribed service, and nothing here reaches a subscriber. The
+reader is a maintainer of this tree or of a consuming one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Bound a verbatim quote from a private consumer to the fragment the finding needs
+
+Plugins: contributing-davekjohn
+
+[PR #1427](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1427)
+
+---
+
 ### DEPLOY: fix/1419-prose-echo-sanitize · 20260905-001011
 
 Both consumer-prose session checks echo a line out of a consumer's own markdown so the reader can
