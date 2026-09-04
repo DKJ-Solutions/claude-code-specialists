@@ -33,21 +33,81 @@
 
 ### PLAN
 
+#### What #1424 reports, and what was verified before anything was written
+
+Three entries sit under `## [Unreleased]` in `CHANGELOG.md` and will ship in the same release. Two of
+them say `new-branch.ps1` only warns on a stale base; the third is the branch that made it refuse. Read
+as history all three are accurate. Read as a release note -- which is what `cut-release.ps1` builds out
+of this block -- the release tells a consumer both things, and offers no way to tell which sentence
+describes the version they installed.
+
+Verified against the tree on September 5, 2026 rather than taken from the report: all three entries are
+still pending, no release has been cut against the block, and both warn-statements read exactly as the
+issue quotes them.
+
+#### The shape chosen, of the three the issue lists
+
+Shape 2 -- **the superseding entry names what it overtakes** -- and written as a convention rather than
+one edit, which is the part the issue asked to have settled.
+
+It is the same principle `RELEASES-portable.md` already states one stage later for published notes: a
+line that was **true when written** goes stale and is left untouched, and the correction travels with the
+newer document. The superseded entries were true on their own day, and an entry is the only durable
+record of why a branch held back -- so rewriting them destroys history to repair a rendering. Shape 1
+leaves the contradiction in the release note; shape 3 needs the fold to learn a concept it does not have,
+for a shape measured once.
+
+The convention goes in the **portable** layer: every consumer's changelog has this shape, this repo is
+the source, and the lens is for what a consumer would have to differ on -- here nothing differs.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `CHANGELOG.md`: one paragraph inside the `fix/1417-new-branch-refuse-stale-base` entry naming the
+      two pending entries it overtakes, and saying which sentence is the current one
+- [x] `DEVELOPMENT-portable.md`: state the convention under the DEPLOY section, citing the
+      published-record rule it derives from
+- [x] Leave both superseded entries byte-identical -- that is the decision, not an omission
 
 ### TEST
 
+- [x] Lint + tests green via `open-pr.ps1`
+
 ### DEPLOY: fix/1424-superseded-entry-note
 
-**Score:**
+The release note stops contradicting itself. Three entries pending in one `## [Unreleased]` block will
+ship together, and two of them tell the reader that `new-branch.ps1` warns on a stale base while the third
+is the branch that made it refuse. The `fix/1417-new-branch-refuse-stale-base` entry now names the two it
+overtakes, quotes the claim it supersedes, and says which sentence describes the version you installed.
+
+**The two superseded entries are byte-identical, and that is the decision rather than an omission.** They
+were true on the day each branch merged, and an entry is the only durable record of *why* a branch held
+back -- #1416 declined to settle the warn-versus-refuse asymmetry and filed #1417 for it, which is exactly
+the reasoning the next reader needs. Amending them would write a decision into history that was never
+taken there. This is the published-record rule stated one stage earlier: a line true when written goes
+stale rather than false, and the correction travels with the newer document.
+
+So the general half ships too, in `DEVELOPMENT-portable.md` beside the rest of the DEPLOY form -- because
+the shape recurs by construction. A question filed out of one branch and answered in another lands in the
+same block whenever both merge between two cuts, the changelog has no notion of one entry superseding
+another, and nothing detects it. The rule is a habit at the moment DEPLOY is written, not a gate: before
+writing that a behaviour changed, grep `[Unreleased]` for what it used to be. A gate would have to read
+prose for contradiction, which this repo declined at 12.5% precision.
+
+Reason: the contradiction is invisible to every gate the block passes through, and it only becomes
+legible at the cut -- when the note is generated and nobody is reading the three entries side by side any
+more.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer reads the generated release note and nothing else; this repo's own maintainers can always fall
+back to the issue numbers. So the entry that gets repaired here is the one that reaches them, and the
+convention that keeps it repaired arrives at their next plugin update as one more paragraph in the DEPLOY
+form -- the page an author of theirs is already reading when the mistake is available to make.
+
+**Score:** 2
 
 #### Pull Request
 
 The superseding changelog entry names the pending entries it overtakes
-
