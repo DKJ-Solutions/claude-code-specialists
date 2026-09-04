@@ -1075,6 +1075,188 @@ New-EntryFile -Dir $dirN -Name 'feat-other-thing-v1.md' -Title 'A different bran
 $rN = Invoke-Fold -Dir $dirN
 Assert-True ($rN.ExitCode -eq 0)                                        'not a duplicate: a branch with no entry of its own folds normally'
 Assert-True ((Get-Changelog -Dir $dirN) -match 'A different branch')    'not a duplicate: and lands in the list'
+
+# ---------------------------------------------------------------------------------------------------
+# THE TRUNK IS READ ACROSS DEVICES, NOT JUST LOCALLY (inbound #1405)
+#
+# Dave works one repo from more than one device at the same time, deliberately and permanently, so two
+# checkouts holding the same trunk is the normal case rather than an accident. The duplicate gate above
+# reads the WORKING COPY of CHANGELOG.md and nothing else, which on a second device is a snapshot of
+# whatever that checkout last pulled. Two halves are covered here, and they fail independently:
+#
+#   * the pre-pass, which refuses to fold onto a trunk that is already behind its upstream; and
+#   * the push-rejection diagnosis, which is the half that matters, because the measured failure was a
+#     RACE -- the trunk was current when the gate read it, and the other device folded the same branch
+#     inside the window between that read and the push. No check at the top of a run can close a window
+#     that opens after it.
+#
+# EVERY FIXTURE HERE NEEDS A REAL REMOTE, which is why these cases build a bare repo and clone it rather
+# than using the plain fold fixture. That is also the assert underneath the first case below: a fixture
+# WITHOUT an origin must be unaffected, or this gate would refuse every other fold in this suite.
+function New-RemoteFoldFixture {
+    <#
+        A fold fixture wired to its own bare remote, on main, with the baseline pushed -- and the bare
+        repo registered for cleanup. Returns the bare repo's path so a second clone can be made from it.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Dir)
+    Initialize-FoldGitRepo -Dir $Dir
+    # -M main regardless of the machine's init.defaultBranch, for the same reason the worktree case above
+    # gives: every assertion here names main, and a fixture that happened to init as 'master' would fail
+    # on the branch name rather than on the behaviour.
+    Invoke-Git -Dir $Dir -GitArgs @('branch', '-M', 'main')                    | Out-Null
+    $bare = "$Dir.git"
+    if (Test-Path -LiteralPath $bare) { Remove-Item -Recurse -Force -LiteralPath $bare }
+    $script:fixtures += $bare
+    Invoke-Git -Dir $Dir -GitArgs @('init', '--bare', '--quiet', $bare)        | Out-Null
+    Invoke-Git -Dir $Dir -GitArgs @('remote', 'add', 'origin', $bare)          | Out-Null
+    Invoke-Git -Dir $Dir -GitArgs @('push', '--quiet', '-u', 'origin', 'main') | Out-Null
+    # AND THE BARE REPO'S HEAD IS POINTED AT THAT BRANCH, which a push does NOT do. `git init --bare` sets
+    # HEAD from the machine's init.defaultBranch, so on a machine still defaulting to 'master' the bare is
+    # left with HEAD on a ref that does not exist -- and `git clone` of it checks out NOTHING, silently,
+    # with only a warning. Every assertion that needs the second device then fails on an empty directory
+    # rather than on the behaviour under test. A real remote has its default branch set; this is that.
+    Invoke-Git -Dir $bare -GitArgs @('symbolic-ref', 'HEAD', 'refs/heads/main') | Out-Null
+    return $bare
+}
+
+function Initialize-SecondDevice {
+    <# The other device: a real clone of the same bare remote, with the identity and autocrlf settings
+       Initialize-FoldGitRepo explains, since a clone inherits none of them. #>
+    param([Parameter(Mandatory = $true)][string]$Bare, [Parameter(Mandatory = $true)][string]$Dir)
+    if (Test-Path -LiteralPath $Dir) { Remove-Item -Recurse -Force -LiteralPath $Dir }
+    $script:fixtures += $Dir
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git clone --quiet $Bare $Dir                       | Out-Null
+        & git -C $Dir config user.name  'fold test 2'        | Out-Null
+        & git -C $Dir config user.email 'fold2@test.invalid' | Out-Null
+        & git -C $Dir config core.autocrlf false             | Out-Null
+        & git -C $Dir config commit.gpgsign false            | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+    # LOUD RATHER THAN EMPTY. A clone that checks nothing out leaves a directory with no fold script in it,
+    # and every fold invoked against it then dies in the PowerShell launcher -- an exit code that names no
+    # cause, on assertions about behaviour that never ran. This is a fixture precondition, so it throws.
+    if (-not (Test-Path -LiteralPath (Join-Path $Dir 'scripts\release\fold-changelog-entry.ps1'))) {
+        throw "second device: the clone of '$Bare' checked out an empty tree -- its HEAD does not name a branch that exists."
+    }
+}
+
+Write-Host "A trunk behind its upstream is refused before the gate reads it (#1405)" -ForegroundColor Cyan
+$dirS = New-FoldFixture -Label 'staletrunk'
+New-EntryFile -Dir $dirS -Name 'feat-stale-thing-v1.md' -Title 'Folded on a stale trunk'
+$bareS = New-RemoteFoldFixture -Dir $dirS
+
+# The other device moves the trunk on. This checkout's refs/remotes/origin/main still points at the old
+# commit, so the gap only becomes visible once the fold FETCHES -- which is the first of the three things
+# the report asked for, and it is under test here rather than assumed.
+$devS = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-staletrunk-dev2"
+Initialize-SecondDevice -Bare $bareS -Dir $devS
+[System.IO.File]::WriteAllText((Join-Path $devS 'OTHER.md'), "the other device moved main on`n", $Utf8NoBom)
+Invoke-Git -Dir $devS -GitArgs @('add', 'OTHER.md')                       | Out-Null
+Invoke-Git -Dir $devS -GitArgs @('commit', '--quiet', '-m', 'other work') | Out-Null
+Invoke-Git -Dir $devS -GitArgs @('push', '--quiet')                       | Out-Null
+
+$rS = Invoke-Fold -Dir $dirS -Branch 'feat/stale-thing-v1' -ExtraArgs @('-Push')
+Assert-Equal 1 $rS.ExitCode                                             'stale trunk: the run ends non-zero'
+Assert-True ($rS.Output -match 'Refused')                               'stale trunk: and says it refused rather than half-folding'
+Assert-True ($rS.Output -match '1 behind origin/main')                  'stale trunk: naming HOW FAR behind, as a number'
+Assert-True (Test-Path (Join-Path $dirS 'feat-stale-thing-v1.md'))      'stale trunk: the entry file is left exactly where it was'
+Assert-True ((Get-Changelog -Dir $dirS) -notmatch 'Folded on a stale trunk') `
+    'stale trunk: and nothing was written to CHANGELOG.md'
+$headS = ((Invoke-Git -Dir $dirS -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
+Assert-True ($headS -notmatch '^fold:')                                 'stale trunk: no fold commit was made on the trunk'
+
+# THE ESCAPE VALVE, asserted for the reason -Force is: a gate whose way past is untested is a gate nobody
+# can get past on the day it is wrong. It is a SEPARATE flag from -Force deliberately -- this one waves
+# through a measurement of the checkout, -Force waves through a judgement about content.
+$rSF = Invoke-Fold -Dir $dirS -Branch 'feat/stale-thing-v1' -ExtraArgs @('-SkipTrunkCheck')
+Assert-Equal 0 $rSF.ExitCode                                            'stale trunk: -SkipTrunkCheck folds anyway'
+Assert-True ((Get-Changelog -Dir $dirS) -match 'Folded on a stale trunk') `
+    'stale trunk: -SkipTrunkCheck writes the entry'
+
+# A REPO WITH NO ORIGIN CANNOT BE BEHIND ONE, and this is the assert that keeps the gate from refusing
+# every other fold in this suite: Get-TrunkGap reports "could not measure", which a caller must never
+# read as "behind".
+Write-Host "A repo with no origin is not refused -- unmeasurable is not behind (#1405)" -ForegroundColor Cyan
+$dirNo = New-FoldFixture -Label 'noorigin'
+New-EntryFile -Dir $dirNo -Name 'feat-no-origin-v1.md' -Title 'Folded without a remote'
+Initialize-FoldGitRepo -Dir $dirNo
+$rNo = Invoke-Fold -Dir $dirNo -Branch 'feat/no-origin-v1'
+Assert-Equal 0 $rNo.ExitCode                                            'no origin: the fold is not refused'
+Assert-True ($rNo.Output -notmatch 'behind origin')                     'no origin: and claims no gap it could not measure'
+Assert-True ((Get-Changelog -Dir $dirNo) -match 'Folded without a remote') `
+    'no origin: the entry lands as it always did'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "A rejected push is diagnosed against the fetched remote (#1405)" -ForegroundColor Cyan
+#
+# THE RACE, REPRODUCED FROM ITS FAR SIDE. The measured sequence had a trunk that was CURRENT when the
+# duplicate gate read it -- checkout, pull --ff-only, gate read, all correct -- and the other device
+# folded the same branch inside the window before the push. -SkipTrunkCheck is what stands in for that
+# window here: it puts this run exactly where the real one was, past a gate that answered honestly on the
+# state it could see. That it ALSO proves the two guards are independent is deliberate -- skipping the
+# pre-pass must not switch off the diagnosis, which is the guard that catches what the pre-pass cannot.
+$dirR = New-FoldFixture -Label 'racedfold'
+# THE HEADING NAMES THE BRANCH, which is what makes this a real test rather than a trivially
+# passing one. Get-FoldedEntryForBranch keys on the branch name in the DEPLOY heading and says so in its
+# own header: an entry whose heading names no branch cannot be matched. A fixture titled only 'Raced by
+# two devices' would therefore report `not upstream` no matter what the other device had done -- the
+# diverged case below would still pass, and it would be proving nothing.
+New-EntryFile -Dir $dirR -Name 'feat-raced-thing-v1.md' -Title 'DEPLOY: `feat/raced-thing-v1`'
+$bareR = New-RemoteFoldFixture -Dir $dirR
+
+# The other device folds the SAME branch first and gets its push in.
+$devR = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-racedfold-dev2"
+Initialize-SecondDevice -Bare $bareR -Dir $devR
+$rOther = Invoke-Fold -Dir $devR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Push')
+Assert-Equal 0 $rOther.ExitCode                                         'raced fold: (fixture) the other device folds and pushes cleanly'
+
+$rR = Invoke-Fold -Dir $dirR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Push', '-SkipTrunkCheck')
+Assert-Equal 1 $rR.ExitCode                                             'raced fold: the run ends non-zero'
+# The five facts that had to be established BY HAND in the measured incident -- a fetch, a log of
+# HEAD..origin/main, a grep of the remote changelog, a count, and a body diff -- are each asserted here,
+# because each one is separately derivable and each was separately missing.
+Assert-True ($rR.Output -match 'moved 1 commit')                        'raced fold: it names how far origin/main moved'
+Assert-True ($rR.Output -match 'fold: feat/raced-thing-v1')             'raced fold: and shows WHICH commit moved it'
+Assert-True ($rR.Output -match 'ALREADY folded on')                     'raced fold: it establishes the entry is already upstream'
+Assert-True ($rR.Output -match 'present once')                          'raced fold: counted, so a duplicate upstream would read differently'
+Assert-True ($rR.Output -match 'body is identical')                     'raced fold: and the bodies are compared, not merely the headings'
+Assert-True ($rR.Output -match 'Do NOT push this commit by hand')       'raced fold: the advice is inverted -- pushing would duplicate the entry'
+Assert-True ($rR.Output -notmatch 'the state this flag exists to avoid') `
+    'raced fold: and the old generic "push by hand" verdict is NOT what it ends on'
+
+# IT DIAGNOSES AND STOPS. Every route off a trunk is a history operation the consumer's own safety rules
+# reserve to the operator, so the one thing this script must never do here is tidy up after itself.
+$headR = ((Invoke-Git -Dir $dirR -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
+Assert-True ($headR -match '^fold: feat/raced-thing-v1')                'raced fold: the local fold commit is left exactly where it is'
+
+# THE FALSE POSITIVE THAT WOULD BE WORSE THAN THE DEFECT. A push refused by an ORDINARY divergence must
+# still get the ordinary advice: that commit is real work, and telling its author not to push it would
+# strand the entry for good.
+Write-Host "An ordinary divergence is NOT reported as a duplicate (#1405)" -ForegroundColor Cyan
+$dirV = New-FoldFixture -Label 'divergedfold'
+# Same branch-naming heading as the raced case, deliberately: the ONLY difference between the two cases
+# is what the other device pushed, so 'has NO entry' here is a measurement rather than a shape that could
+# never have matched.
+New-EntryFile -Dir $dirV -Name 'feat-diverged-thing-v1.md' -Title 'DEPLOY: `feat/diverged-thing-v1`'
+$bareV = New-RemoteFoldFixture -Dir $dirV
+$devV = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-divergedfold-dev2"
+Initialize-SecondDevice -Bare $bareV -Dir $devV
+[System.IO.File]::WriteAllText((Join-Path $devV 'UNRELATED.md'), "nothing to do with the fold`n", $Utf8NoBom)
+Invoke-Git -Dir $devV -GitArgs @('add', 'UNRELATED.md')                       | Out-Null
+Invoke-Git -Dir $devV -GitArgs @('commit', '--quiet', '-m', 'unrelated work') | Out-Null
+Invoke-Git -Dir $devV -GitArgs @('push', '--quiet')                           | Out-Null
+
+$rV = Invoke-Fold -Dir $dirV -Branch 'feat/diverged-thing-v1' -ExtraArgs @('-Push', '-SkipTrunkCheck')
+Assert-Equal 1 $rV.ExitCode                                             'diverged: the run still ends non-zero'
+Assert-True ($rV.Output -match 'has NO entry on')                       'diverged: it says the entry is NOT upstream'
+Assert-True ($rV.Output -match 'the state this flag exists to avoid')   'diverged: so the ordinary "push by hand" advice stands'
+Assert-True ($rV.Output -notmatch 'Do NOT push this commit by hand')    'diverged: and it is NOT called a duplicate'
+
+# The teardown above runs mid-file, so everything registered after it -- the duplicate cases and the
+# remote-backed fixtures here -- is swept once more on the way out.
+foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
 Write-Host ""
 Write-Host "Result: $($script:pass) pass, $($script:fail) fail." -ForegroundColor $(if ($script:fail -gt 0) { 'Red' } else { 'Green' })
 if ($script:fail -gt 0) { exit 1 }

@@ -224,6 +224,44 @@ score leaves merged work with no record at all, while a duplicate that is refuse
 already standing. There is nothing to lose by stopping, which is what makes this the one place a refusal
 costs nothing.
 
+**And that gate reads a trunk it has actually checked, because one repo is worked from more than one
+device.** Until inbound #1405 it read `CHANGELOG.md` from the **working copy** and nothing else, which on
+a second checkout is a snapshot of whatever that tree last pulled — so a branch the other device had
+already folded read as "no entry yet", with complete confidence. Two guards close that, and they fail
+independently:
+
+- **Before the gate reads**, the fold fetches `origin/<trunk>` and **refuses a trunk that is behind it**,
+  naming how far. `-SkipTrunkCheck` folds anyway. This is deliberately a *different* flag from `-Force`:
+  that one waves through a judgement about **content** (the changelog already names this branch), this one
+  waves through a **measurement of the checkout** — the same split `open-pr` draws with
+  `-SkipLint`/`-SkipTests`. A repo with no `origin/<trunk>` ref at all — no remote, or a clone that has
+  never fetched — is *unmeasurable* rather than behind, and folds exactly as it always did.
+- **After a rejected push**, the fold says *why* it was rejected. This is the half a pre-pass structurally
+  cannot cover, because the measured failure was a **race** rather than a stale checkout: the trunk was
+  current when the gate read it, and the other device folded the same branch inside the window before the
+  push. No check at the top of a run can close a window that opens after it.
+
+**Why the second one matters more than it looks.** The step used to report `git push exited 1` plus git's
+own "the remote contains work that you do not have locally" — the same sentence a plain divergence gives,
+at the one moment the two need **opposite** actions. If the remote merely moved, the fold commit is real
+work and has to be integrated and pushed. If the other device already folded this branch, the commit is a
+duplicate, and pushing it by hand — which is what this step used to advise — produces exactly the
+two-entries-one-branch state the gate above exists to prevent. So the run now names how far the trunk
+moved and which commits did it, reads the remote's changelog straight out of the fetched ref, and reports
+per branch whether its entry is already upstream, **how many times**, and whether the **body** matches the
+one this run just wrote. Bodies rather than whole blocks, because both devices stamp the heading at their
+own fold time and no two stamps can match.
+
+Where every entry the commit carries is already upstream, the closing advice inverts to **"Do NOT push
+this commit by hand"**. Where any of them is not, the ordinary "push by hand" verdict stands — a genuine
+divergence must never be reported as a duplicate, or its author would strand the entry for good.
+
+**It diagnoses and stops, repairing nothing, deliberately.** The fold commit is on the trunk by then, and
+every route off a trunk — a reset, a rebase, a merge commit — is a history operation a repo's safety rules
+reserve to the operator. Being exact about the state is the whole job here. That boundary is the point:
+in the incident this came from, the tooling put a correct-looking commit on the trunk and then left the
+operator in a state their own constitution forbade every route out of.
+
 **Two refusals disappeared with the sections, and both are structural rather than relaxed:** "could not find
 the heading — stopping" (issue #178) has no heading name left to mismatch, and "this repo declares no section
 for tier N" has no mapping left to miss — a tier the repo does not use is now a position in the list rather
