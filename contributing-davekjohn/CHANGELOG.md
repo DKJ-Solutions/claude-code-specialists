@@ -32,6 +32,163 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/bwj-github-type-field-convention · 20260904-213855
+
+`bwj-codex` now carries the board's `Github Type` field the same way it carries `Github Issue`: an
+optional `Get-AsanaTypeFieldGid` seam in `adopt-bwj-asana`, and a `report-issue` step 2 that sets the
+field **from the issue type step 1 already chose** rather than deciding it a second time. Because the
+value is carried forward rather than re-derived, a ticket this workflow files cannot end up with a
+board type its own GitHub issue contradicts.
+
+The field's **option** GIDs are deliberately not part of the seam -- they are resolvable at run time
+from the project `report-issue` is already reading for the section, so pinning three more GIDs per
+repo would only add three more values that go stale in silence. What that buys is stated where a
+maintainer will meet it: rebuild an option and nothing breaks; rename one away from `Bug`, `Feature`
+or `Task` and the write is skipped with a note rather than guessing.
+
+Two things measured on the way in are written down with it. Asana's `opt_fields` takes **no
+wildcard**, so the enum options are not free on the call already being made and the exact string is
+spelled out; and of the 23 cards on the BWJ board, whose `Github Type` had only ever been filled by
+hand, **5 disagreed with the GitHub issue** in both directions -- which is what a hand-fill costs
+rather than a drift rate for a step that had never run.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo whose board carries the field gets it filled at creation instead of by hand, and
+`adopt-bwj-asana` now proposes the seam that turns it on. A consumer whose board carries no such
+field sets nothing and sees no change -- `$null` stays the default and the write is skipped silently.
+The `bwj-codex` seam register in the plugin README lists both GitHub field seams for the first time,
+so the set of values a consumer is expected to answer is readable in one place again.
+
+**Score:** 3
+
+#### Pull Request
+
+set the board's Github Type field from the issue type report-issue already chose
+
+Plugins: bwj-codex
+
+[PR #1390](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1390)
+
+---
+
+### DEPLOY: docs/fix-1386-step5-per-project-not-workspace · 20260904-213204
+
+`WORKFLOW-portable.md` step 5 blamed a self-filed ticket's missing `Prio-Score` on a workspace
+boundary; measured against the real BWJ boards the two boards sit in the SAME workspace and still
+differ, because a custom field also has to be added to the project (`custom_field_settings`), not
+merely defined in a reachable workspace. Step 5 and its echo in step 7 now name that per-project test
+instead, with the `GitHub - WH` / `GitHub - SWB` measurement as evidence -- a refinement of #1213 rather
+than a duplicate.
+
+**Score:** 3 -- corrects a step that reads as safe when it silently is not: a maintainer following the
+old text would conclude a same-workspace project is fine, exactly where `GitHub - WH` shows it is not.
+
+#### What makes this deploy extra special
+
+A BWJ store repo troubleshooting why its self-filed tickets never gain a prio label now gets the test
+that actually explains it (is the field added to this project?) instead of one that predicts nothing
+useful once workspaces already agree.
+
+**Score:** 2
+
+#### Pull Request
+
+Fix step 5 workspace framing: per-project custom_field_settings gates Prio-Score, not the workspace boundary
+
+Plugins: bwj-codex
+
+[PR #1387](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1387)
+
+---
+
+### DEPLOY: docs/bwj-github-issue-field-convention · 20260904-211725
+
+Documents and closes the write-side of #1377: `bwj-codex` now states the `Github Issue` Asana
+custom-field convention -- the full issue URL, never a bare number, because Asana only renders a
+text field as a clickable link when its value is a complete URL. `adopt-bwj-asana`'s step 2
+proposes an optional `Get-AsanaIssueFieldGid` seam (defaults to `$null`; addressed by GID rather
+than by name, unlike `Prio-Score`, because writing a field at creation needs its GID where reading
+one back can go by name), and `report-issue`'s step 2 sets that field on task creation when a repo
+has configured it. The read-side fallback discussed in the issue is deliberately left out.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A BWJ store repo running `adopt-bwj-asana` (or re-reading `report-issue`) now finds a documented,
+optional convention for the board's `Github Issue` field instead of a silent gap filled in by
+hand. Nothing changes automatically -- the seam defaults to `$null` and stays silent until a
+maintainer sets it -- so no existing repo is affected unless it opts in.
+
+**Score:** 2
+
+#### Pull Request
+
+Document and write the bwj-codex Github Issue Asana field convention
+
+Plugins: bwj-codex
+
+[PR #1384](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1384)
+
+---
+
+### DEPLOY: fix/cut-release-live-stage-order · 20260904-210554
+
+The `cut-release` skill stated **cut-then-push** as a rule for a repo with a live stage — *"Block 1 always
+runs first; Block 2 only follows it"* — and this repo's `CONTRIBUTING.md` restated it at 4.7. It is a
+default now, and the repo picks the order from one property of its live target.
+
+**The condition, stated where the block is walked:** a push that cannot meaningfully fail — it either runs
+or errors loudly, nobody else writes to the target — cuts first, which is what most repos with a deploy
+step want, because the audience document then exists before anything reaches a customer. A push that can
+**fail or be partial** — no locking on the target, third parties editing it through a web UI while you
+work, a drift check that legitimately refuses, a per-file rather than wholesale push — pushes first and
+makes the cut the documented closing act of the push.
+
+**What the default gives up, now named rather than left to be discovered.** Cutting first in front of a
+fallible push produces a **stranded release**: the tag, the GitHub Release and the audience document all
+exist, permanently, describing a state no customer ever saw. Nothing detects it — every artefact is
+well-formed — and the only witness is whoever watched the push refuse. The `← LIVE` marker makes it
+visible: its own reasoning is that *only the person who did the push knows it succeeded*, which under
+cut-then-push makes the marker wrong by construction from the moment the cut lands until a human moves it.
+In the repo that reported this, that marker sat two releases behind.
+
+**No seam, deliberately.** `Get-LiveStageCutOrder` was the obvious shape and would have cost a script
+contract record, a blueprint entry and asserts to carry a value no script reads — the order is a sentence
+a person walks past in a checklist, where `Get-LiveStage` gates whether the block prints at all. It stays
+available if a second live-stage consumer ever wants the checklist rendered in its order rather than told
+which orders exist.
+
+**This was already the tree contradicting itself, which is what settled it against declaring the old rule
+universal.** `team-shopify`'s webshop-manager manual has documented push-then-cut for exactly this case
+all along — *"only when the user decides to push; the release is then cut by the release manager"* — so
+two pages shipped from one repo disagreed, and inbound
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378) found it from the outside.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A checklist that imposes itself is only as good as its right to impose. This page had one rule it could
+not justify, and the tell was that the repo shipping it already ran the other way somewhere else — the
+kind of contradiction that is invisible from inside, because each page reads as correct on its own. It
+took a consumer walking the checklist against a target that can refuse to surface it.
+
+**Score:** 2
+
+#### Pull Request
+
+Block 2's cut-then-push is a default a live stage can answer differently
+
+Plugins: contributing-davekjohn
+
+[PR #1383](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1383)
+
+---
+
 ### DEPLOY: docs/contributing-layering-third-rank · 20260904-205254
 
 `CONTRIBUTING-portable.md`'s layering section ranked only the two consumer documents (the floor and

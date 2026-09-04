@@ -150,8 +150,9 @@ Both chapters answer themselves out of your repo-owned `scripts/repo-config.ps1`
   what asks it to run. `adopt-shopify-floor` lists it among the optional Shopify seams it writes into
   that file as commented guidance.
 
-**Chapter one needs the Asana answers.** The `report-issue` skill needs to know which workspace and
-project a mirrored task lands in, and the CI mechanism needs the project:
+**Chapter one needs the Asana answers**, a set of functions in that same file. The `report-issue`
+skill needs to know which workspace and project a mirrored task lands in, and the CI mechanism needs
+the project:
 
 - `Get-AsanaWorkspaceGid` -- the Asana workspace GID.
 - `Get-AsanaStageMap` -- which numbered section of the board each stage of the cycle is, plus the
@@ -174,6 +175,12 @@ project a mirrored task lands in, and the CI mechanism needs the project:
   live on
   that board's sections, so a task filed anywhere else is on no pipeline and never moves a column.
   Neither failure says anything in a log.
+- `Get-AsanaIssueFieldGid` and `Get-AsanaTypeFieldGid` -- the GIDs of the board's `Github Issue` and
+  `Github Type` custom fields, so a mirrored task carries the issue URL and the issue type from the
+  moment it is created rather than waiting for somebody to type them in. **Both optional**, and
+  `$null` -- the default -- is the common answer: most boards carry neither, and `report-issue`
+  skips whichever is unset without saying anything. Where a board does carry one, leaving it unset is
+  the state that costs something, because the field is then filled by hand or not at all.
 
 `adopt-bwj-asana` **proposes** these, it never places them: they state what your repo *is*, and the
 project may differ per brand. The CI half reads the project from the repo variable
