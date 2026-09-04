@@ -35,19 +35,86 @@
 
 Extract the dual-context repo-root resolution and the always-on prose walk into scripts/lib/consumer-check-lib.ps1; point the two prose checks' marketplace skip at the existing Test-IsWorkflowSourceRepo.
 
+#### What the pickup measured, before anything was written
+
+The five files and the shared block are as #1422 reports them. Two things the report could not see
+from the outside, both found by reading the tree:
+
+- **The resolution had already drifted.** Four checks resolve the root on one line;
+  `check-git-identity.ps1` carries a `try`/`catch` variant. So outside a checkout one of the five
+  answers and four die on `.Trim()` against `$null` under `Set-StrictMode` -- and nothing said which
+  reading was intended, because both were written as though obviously right. The tolerant one wins:
+  three of the five run from a SessionStart hook, where an advisory check must not strand the session.
+- **The marketplace skip already has a name, and the two copies were asking the wrong question.**
+  `Test-IsWorkflowSourceRepo` (seam-lib) exists precisely because *"does this repo publish plugins"*
+  and *"is this repo the source of THIS workflow"* come apart under the one-product-one-repository
+  rule -- that is issue #998. Its docstring carries a census of the sites that legitimately use the
+  broad test; both prose checks were written in September, after that census, and neither is in it.
+
+#### Where the extraction deliberately stops
+
+`#1422` guessed that a single `Initialize-ConsumerCheck` taking five switches would not be an
+improvement. It would not, and the measured subset is smaller than even the issue's fallback:
+
+- the **repo-config load cannot be extracted at all**, and the reason is PowerShell scope rather than
+  judgement -- `. $file` inside a function defines into the *function's* scope, so a helper would load
+  a consumer's seams and discard them on return;
+- the **marketplace skip needs no new definition**, it needs the existing one;
+- the **lib dot-sources** differ per check and have nothing shared to name.
+
+So the new lib holds exactly two things, and the boundary is the interesting half: it returns the
+**fact** and never the **verdict**. `''` means *"could not tell"*, and the four session checks exit 0
+on it while the CI gate exits 1 -- same input, opposite correct answer, which is why folding either
+into the lib would impose it on the other.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/consumer-check-lib.ps1` -- `Resolve-CheckRepoRoot` (the tolerant reading) and
+      `Get-CheckProseCorpus` (the guarded `measure-context-lib` load plus the `Get-AlwaysOnDocuments`
+      walk). Dependency-free for the first, as it is dot-sourced before anything is resolved.
+- [x] All five checks call it, dot-sourced **guarded**, each keeping its own `''` verdict.
+- [x] The two prose checks' skip calls `Test-IsWorkflowSourceRepo` instead of re-testing the manifest
+      file inline -- #998's repair applied to the two sites written after it.
+- [x] `Test-IsWorkflowSourceRepo`'s census updated: it was one short in each direction, and it is the
+      docstring that arbitrates exactly the choice both authors got wrong.
+- [x] Registered in `shared-scripts-lib.ps1` as a `LibOnly` pair and the mirrors regenerated -- all
+      five callers are mirrored, so a lib that stayed behind would break every consumer's copy.
 
 ### TEST
 
+- [x] New suite `scripts/tests/consumer-check-lib.tests.ps1` -- 9 asserts. The precedence *order* is
+      pinned because nothing else in the tree states it, and the outside-a-checkout case is pinned
+      because a happy-path-only test is what let two readings of one line coexist.
+- [x] Both skip fixtures now assert **both directions**: a manifest publishing somebody else's product
+      is judged, one publishing `contributing-davekjohn` is skipped. The negative case is the assert
+      that catches a reversion to the broad file test -- under it, that fixture passed as `[OK]`.
+- [x] Lint gate green; the eight directly affected suites green, then the full gate via `open-pr`.
+
 ### DEPLOY: feat/1422-shared-check-preamble
 
-**Score:**
+Five consumer-facing lint checks opened with the same ~30-line preamble, and it had already drifted:
+four resolved the repo root on one line and crashed outside a git checkout, while the fifth carried a
+tolerant variant nobody had reconciled. The dual-context root resolution and the always-on prose walk
+now have one definition in `scripts/lib/consumer-check-lib.ps1`, and each check keeps its own verdict
+on what that definition cannot decide -- a session check has nothing to judge outside a checkout, a
+CI gate must refuse there.
+
+The same pass closed a hole the duplication was hiding. Both prose checks skipped *"a repo that
+publishes plugins"* by testing `marketplace.json` inline, where the question they mean is *"is this
+repo the source of this workflow"* -- the distinction #998 already exists for. A repo publishing
+another product while consuming this workflow was silently exempted from both checks; it is now
+judged, with an assert in each suite pinning it.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- the subject is this repo's own lint layer and the shared scripts a consumer runs. No
+subscriber of a service notices a preamble having one definition instead of five. The behaviour that
+did change reaches a consuming repo that also publishes a marketplace of its own, which no current
+consumer is.
+
+**Score:** N/A
 
 #### Pull Request
 
