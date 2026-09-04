@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/readme-keys-install-claim · 20260904-105119
+
+`README.md` no longer claims the two settings keys produce no install at all. That absolute was retired
+in `INSTALL.md` after inbound #327 and survived here in two places, so the repo's own front page
+contradicted its install manual -- and the contradiction was load-bearing enough to generate a false
+report (#1371) whose author read the README, measured the register, and concluded the documents were
+wrong rather than one of them stale. Both statements now say the keys leave you without a *working*
+install, name what they do produce -- a full project-scoped record written after the load phase, by a
+session that loads nothing, sometimes pointing at a payload that does not exist -- and send the reader to
+`INSTALL.md`'s install step for the mechanics.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The state this repairs is the one a consumer cannot diagnose: a record that says *installed, project
+scope, correct sha* while the session is completely inert, with every check that reads the record
+agreeing. `README.md` is the first page an adopter opens, and it was the one page that said that state
+could not arise -- so an adopter who hit it had been told to look for an absent record instead of an
+inert session. The corrected block names the surface to verify instead (is the bootstrap skill in the
+slash list, did the session hooks print, does Chris open the turn), which is the check that works when
+the administration lies.
+
+**Score:** 3
+
+#### Pull Request
+
+README stops claiming the settings keys produce no install at all
+
+[PR #1375](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1375)
+
+---
+
 ### DEPLOY: fix/retire-build-consumernotes · 20260904-104312
 
 `Build-ConsumerNotes` is gone from `scripts/lib/release-lib.ps1`, and with it the second answer to a
