@@ -449,6 +449,37 @@ placeholder anywhere, so `open-pr` measures instead of matching: it names the de
 any tier whose reason is still blank. That catches the untouched entry the placeholders used to catch
 *and* the one whose placeholder was deleted rather than answered.
 
+### When your entry contradicts one already pending, name it — and leave that one alone
+
+`[Unreleased]` holds every entry merged since the last release, and they ship as **one** release note.
+So two entries in that block can disagree: a question filed out of one branch and answered in another,
+both landing between the same two cuts. Each is accurate as history — it says what its own branch decided
+on the day — and together they tell the reader both that the tool warns and that it refuses, with nothing
+saying which sentence describes the version they installed.
+
+**The correction travels with the newer entry, never backwards.** Your DEPLOY section gains a short
+paragraph naming the pending entries it overtakes, quoting the claim it supersedes, and stating that this
+one is current. The superseded entries are not edited.
+
+This is the [published-record rule](RELEASES-portable.md#once-it-has-landed-it-is-a-published-record--and-that-protects-only-what-was-true)
+one stage earlier, and for the same reason. A line that was **true when it was written** and has since
+been overtaken is stale, not false, and going stale is the record working; amending it to say something
+its branch did not do writes a decision into history that was never taken there. An entry is also the
+only durable record of **why a branch held back** — the asymmetry it declined to settle, the follow-up it
+filed — and that reasoning is what the next reader needs when the question comes round again. Rewriting it
+destroys that to repair a rendering.
+
+**Nothing detects this, and nothing is built to.** The fold has no notion of one entry superseding
+another; it pastes a section into a list. The author of the later branch is the only person who knows the
+earlier claim exists, and normally knows it well — the superseding branch is usually the one the earlier
+entry filed the issue for. So this is a habit at the moment you write DEPLOY, not a gate: **before you
+write that a behaviour changed, grep `[Unreleased]` for what it used to be.**
+
+The measured instance is
+[#1424](https://github.com/DaveKJohn/claude-code-specialists/issues/1424) in the source repo — three
+entries in one block, two of them stating that the branch scaffolder only warns on a stale base and the
+third being the branch that made it refuse.
+
 ## Why one file and not two
 
 Two files used to do these two jobs, and before them one file did both badly. The one-file version was

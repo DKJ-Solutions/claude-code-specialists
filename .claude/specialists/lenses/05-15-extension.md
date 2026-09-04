@@ -1392,8 +1392,9 @@ construction a *flagged* finding is a section carrying no citation, so cites-the
 appear among flagged findings; it can only appear among **suppressed** ones, and the full census there
 is 4 sections: 1 cites-then-contradicts, 3 cites-and-correctly-defers. The one is
 `smartwatchbanden`'s own preamble: it names `CONTRIBUTING-portable.md` as a pointer into the plugin and,
-four lines later, overrides it — *"Dit bestand blijft de grondwet. Bij tegenspraak wint `CLAUDE.md` en
-is de contributor-pagina de bug."* Every candidate suppresses that finding, because the portable page's
+four lines later, overrides it — the clause reads `wint` directly beside `` `CLAUDE.md` `` and names the
+contributing page by a Dutch prose noun, `de contributor-pagina` (`smartwatchbanden/CLAUDE.md:22`).
+Every candidate suppresses that finding, because the portable page's
 filename sits right there. It is the cleanest real instance in the corpus and the detector is
 structurally blind to it — a pointer test built on "is the source mentioned nearby" cannot distinguish
 correct deference from restatement-with-citation-and-override, and 1 suppressed contradiction against 3
@@ -1448,10 +1449,11 @@ test scores **0 raw findings and 0 recall** — on the single defect it was name
 paragraph it finds **1**, and that one is a false positive.
 
 **The reason is exact and is the useful part.** The instance is
-`smartwatchbanden`'s *"Bij tegenspraak wint `CLAUDE.md` en is de contributor-pagina de bug"* — it names
-the contributing page by a Dutch **prose noun**, not by its filename, so the third term is precisely the
-one absent. The filename sits two lines up, in a different sentence. Nothing about the sentence is
-unusual; what was wrong was inferring a term list from a defect that had been read rather than grepped.
+`smartwatchbanden/CLAUDE.md:22`, whose clause carries `wint` beside `` `CLAUDE.md` `` and names the
+contributing page by a Dutch **prose noun**, `de contributor-pagina`, not by its filename — so the third
+term is precisely the one absent. The filename sits two lines up, in a different sentence. Nothing about
+the sentence is unusual; what was wrong was inferring a term list from a defect that had been read
+rather than grepped.
 
 **What ships instead is ADJACENCY, and it is the same literalness arriving at a different rule.**
 `CLAUDE.md` and `wins`/`wint` must sit next to each other, either order, nothing between them but

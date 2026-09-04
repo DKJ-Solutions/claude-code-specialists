@@ -47,6 +47,15 @@
     NO gh, NO NETWORK. Every input is a file in the working copy, which is what lets the SessionStart
     hook run this in a consumer with no token.
 
+    WHAT IT PRINTS OUT OF A CONSUMER'S FILES IS SANITIZED (#1419), and this check is one of the two that
+    issue was filed about. The finding names a path, quotes the matched phrase and echoes the whole LINE,
+    and the hook forwards this report into session context while deciding what to surface by matching
+    '[ERROR]' over it -- so a raw echo lets untrusted text choose how loudly it is reported, and repaint
+    a terminal on the way past. Rel goes through check-report-lib.ps1's Format-SafePathToken; Match and
+    Text are prose, so they go through Format-SafeProseToken. Nothing else here comes from the consumer.
+    The prose form substitutes square brackets rather than deleting them -- argued in full in that
+    function's docstring, and disclosed to the reader in the footer this check prints.
+
     ONE CALLER, and it is automatic: the SessionStart hook supremacy-declaration-sessioncheck.ps1 in the
     workflow plugin. NO CI leg, deliberately, for the reason its sibling gives -- a consumer's CI is not
     this repo's to add, and here the check skips by design.
@@ -124,6 +133,11 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 
+# THE SANITIZERS, for the three values below that come out of a CONSUMER'S OWN FILES (#1419). Loaded for
+# the same reason its sibling check-retired-doc-name.ps1 loads it, and deliberately at the same point:
+# two checks of one shape reporting untrusted prose is exactly the pair that must not drift apart.
+. (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+
 # THE WALK IS NOT REIMPLEMENTED HERE, and neither is the corpus nor -- since #1422 -- its LOADING.
 # Get-CheckProseCorpus owns the guarded measure-context-lib load and the Get-AlwaysOnDocuments call, which
 # this check and check-retired-doc-name both carried verbatim; Get-AlwaysOnDocuments owns the '@'-import
@@ -143,8 +157,11 @@ if ($findings.Count -eq 0) {
 
 Write-Host "[ERROR] $($findings.Count) line(s) declare this repo's CLAUDE.md the winner over the workflow's contributing page:" -ForegroundColor Red
 foreach ($f in $findings) {
-    Write-Host "          $($f.Rel):$($f.Line)  matched '$($f.Match)'" -ForegroundColor Red
-    Write-Host "            $($f.Text)" -ForegroundColor DarkYellow
+    # All three are the consumer's: Rel is a path, Match and Text are prose. Nothing on these lines is
+    # the plugin's own text, which is what makes this check's block untrusted end to end -- unlike its
+    # sibling, where the retired name and its "since" sentence come from the plugin and stay raw.
+    Write-Host "          $(Format-SafePathToken -Value $f.Rel):$($f.Line)  matched '$(Format-SafeProseToken -Value $f.Match)'" -ForegroundColor Red
+    Write-Host "            $(Format-SafeProseToken -Value $f.Text)" -ForegroundColor DarkYellow
 }
 Write-Host '        THE ORDER RUNS THE OTHER WAY. The plugin''s portable pages and skills outrank' -ForegroundColor Red
 Write-Host '        contributing-davekjohn/CONTRIBUTING.md, which outranks this repo''s own CLAUDE.md --' -ForegroundColor Red
@@ -153,4 +170,6 @@ Write-Host '        so a session reading that page and a session reading CLAUDE.
 Write-Host '        and neither is wrong on the page it read.' -ForegroundColor Red
 Write-Host '        A repo that genuinely wants its own constitution to lead states that as a SEAM answer,' -ForegroundColor Red
 Write-Host '        not by overriding the page in prose. Otherwise replace each line above with a pointer.' -ForegroundColor Red
+Write-Host '        The phrase and the line are a PREVIEW: square brackets are shown as round ones, so' -ForegroundColor DarkGray
+Write-Host '        nothing in them reads as a marker of ours. Open the file and line above for the text.' -ForegroundColor DarkGray
 exit 1
