@@ -825,6 +825,39 @@ try {
         'oid: and asks the two-part question with it'
     Assert-True ($src -notmatch [regex]::Escape('$mergedHeads -contains')) `
         'oid: the bare-name match that let a merged name vouch for a re-created branch is gone'
+
+    # --- The sync log (inbound #1382) ----------------------------------------------------------------
+    # THE ORDERING ASSERT IS THE ONE THAT MATTERS. The commit is path-bounded ('git commit -- @paths'),
+    # so an entry written after the add would sit untracked in the working copy while the run reported a
+    # clean success -- a sync that says it left a record and did not. Nothing on screen would differ.
+    Write-Host ''
+    Write-Host 'the sync log'
+
+    Assert-True ($src -match [regex]::Escape('Get-ShopifySyncLogPath')) `
+        'log: the seam is read at all'
+    # DEFAULT SILENCE. The machinery reaches every Shopify consumer through a plugin update; the policy
+    # of keeping a log belongs to the repo. An unanswered seam must leave no file behind.
+    Assert-True ($src -match [regex]::Escape("SyncLogPath = ''")) `
+        'log: and its default is empty, so a repo that never asked for a log does not get one'
+    Assert-True ($src -match '(?s)function Write-SyncLogEntry.{0,1200}if \(-not \$rel\) \{ return '''' \}') `
+        'log: an unanswered seam returns early and writes nothing'
+    Assert-True ($src -match '(?s)function Write-SyncLogEntry.{0,1600}VUL-IN') `
+        'log: and a scaffold marker left standing counts as unanswered, like the theme id'
+
+    $addIdx   = $src.IndexOf("Invoke-SyncGitQuiet @(@('add', '--') + `$paths)")
+    $writeIdx = $src.IndexOf('$logRel = Write-SyncLogEntry')
+    Assert-True ($writeIdx -gt 0 -and $addIdx -gt 0 -and $writeIdx -lt $addIdx) `
+        'log: the entry is written BEFORE the path-bounded add, or it would be left untracked by a run that reports success'
+    Assert-True ($src -match [regex]::Escape('if ($logRel) { $paths = @($paths) + $logRel }')) `
+        'log: and its path joins the set the add and the commit are bounded to'
+
+    # A FAULT COSTS THE LOG, NEVER THE SYNC. At this point the branch holds a third party's in-flight
+    # edits and the only copy is local; a badly answered seam must not take that down.
+    Assert-True ($src -match '(?s)function Write-SyncLogEntry.{0,3000}\} catch \{(?s).{0,400}return ''''') `
+        'log: a write that throws is reported and the run continues, rather than losing the sync with it'
+    # The prepend itself lives in the lib, where the suite can walk it without running a sync.
+    Assert-True ($src -match [regex]::Escape('Add-SyncLogEntry -Existing $existing -Entry $entry')) `
+        'log: where the entry goes is the lib''s decision, not a second copy of it here'
 }
 finally {
     foreach ($d in $script:trees) {

@@ -152,6 +152,11 @@
                                       checkboxes or its own wording around it. Default: what
                                       New-SyncPrBody composes, which names both halves and every path
                                       with its kind.
+      Get-ShopifySyncLogPath          where this repo keeps its durable sync record, repo-root-relative
+                                      (e.g. 'bwj-codex/SYNC-LOG.md'). Answered: every sync prepends an
+                                      entry there and it rides in the branch's own commit. Default:
+                                      unanswered, and then nothing is written -- keeping a log is the
+                                      repo's policy, not a Shopify fact (inbound #1382).
       Get-ShopifySyncPrLabels         the label(s) the sync PR carries. Returns a string or an array of
                                       them; empty and absent both mean no label, which is the default
                                       and was the only behaviour before inbound #1023.
@@ -330,7 +335,7 @@ $seam = & {
     Set-StrictMode -Off
     $answers = @{
         LiveThemeId = ''; StoreDomain = ''; Pattern = ''; BranchPrefix = ''
-        Merges = $false; Trunk = ''; MergeMethod = ''; Labels = @()
+        Merges = $false; Trunk = ''; MergeMethod = ''; Labels = @(); SyncLogPath = ''
     }
     $configPath = Join-Path $args[0] 'scripts\repo-config.ps1'
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return $answers }
@@ -342,6 +347,11 @@ $seam = & {
     if (Get-Command Get-ShopifySyncMerges           -ErrorAction SilentlyContinue) { $answers.Merges       = [bool](Get-ShopifySyncMerges) }
     if (Get-Command Get-TrunkBranchName             -ErrorAction SilentlyContinue) { $answers.Trunk        = [string](Get-TrunkBranchName) }
     if (Get-Command Get-PrMergeMethod               -ErrorAction SilentlyContinue) { $answers.MergeMethod  = [string](Get-PrMergeMethod) }
+    # UNANSWERED MEANS NO LOG, and that is why this seam is not required (inbound #1382). Keeping a sync
+    # log is a repo's POLICY -- bwj-codex's, for the two BWJ store repos -- while the machinery here is
+    # generic and reaches every Shopify consumer through a plugin update. A repo that never asked for the
+    # record must not find a new file in its tree because it updated a plugin, so the default is silence.
+    if (Get-Command Get-ShopifySyncLogPath          -ErrorAction SilentlyContinue) { $answers.SyncLogPath  = [string](Get-ShopifySyncLogPath) }
     # THE ONE ANSWER IN THIS BLOCK WHOSE FAULT IS REPORTED, and it is the body seam's reason below applied
     # to the PR route (inbound #1023). Every other default here is a CORRECT answer, so falling back to one
     # is silent by design. No label is different: in a repo whose guardrail requires one, the fallback
@@ -419,6 +429,75 @@ function Get-SyncPrBodySeamAnswer {
         }
         return $answer
     } $RepoRoot $Take $Keep $Default
+}
+
+# --- The sync log, written on the branch ------------------------------------------------------------
+# WHY A RECORD IN THE TREE AND NOT JUST THE PR (inbound #1382). The PR body says everything this entry
+# says, once, on GitHub. It is not a record: nothing in the repo indexes it, nothing greps it, and a repo
+# whose standing rule is that a sync PR does NOT wait for review has spent its whole review moment on a
+# page nobody re-reads. So a sync branch, which owes no changelog entry by design, owes this instead --
+# and the symmetry is the point rather than the file.
+#
+# THE MASTHEAD IS EVERYTHING ABOVE THE FIRST '## ' LINE, and the new entry goes immediately before it.
+# That rule is deterministic and survives a hand-edited masthead: the log is newest-first, so a repo can
+# put whatever title and pointer it likes at the top without this function needing to recognise them.
+# A file with no '## ' line yet is a fresh one, and the entry is appended after whatever is there.
+function Write-SyncLogEntry {
+    <#
+    .SYNOPSIS
+        Prepend this run's entry to the repo's sync log. Returns the repo-relative path it wrote, or ''
+        when there is nothing to write.
+
+    .DESCRIPTION
+        UNANSWERED SEAM RETURNS '' AND WRITES NOTHING -- that is the default and the common case. Only a
+        repo that has stated where its log lives gets one.
+
+        A FAULT COSTS THE LOG, NEVER THE SYNC. By the time this runs, the branch holds a third party's
+        in-flight edits to a live theme and the only copy is local. A path the consumer's seam answered
+        badly must not take that down, so the failure is reported and the run continues -- the same
+        bargain the PR-body seam strikes one screen up, and for the same reason.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$RelativePath = '',
+        [Parameter(Mandatory = $true)][string]$Branch,
+        [Parameter(Mandatory = $true)][string]$Date,
+        [object[]]$Take = @(),
+        [object[]]$Keep = @()
+    )
+
+    $rel = ([string]$RelativePath).Trim()
+    if (-not $rel) { return '' }
+    # A 'VUL-IN' left standing in the seam block reads as answered to anything testing for emptiness --
+    # the same rule the theme-id check applies above, for the same reason.
+    if ($rel -match 'VUL-IN') {
+        Write-Host "Get-ShopifySyncLogPath still answers with a scaffold marker ('$rel'), so no sync-log entry was written." -ForegroundColor Yellow
+        return ''
+    }
+
+    try {
+        $rel      = $rel -replace '\\', '/'
+        $full     = Join-Path $RepoRoot ($rel -replace '/', '\')
+        $entry    = New-SyncLogEntry -Branch $Branch -Date $Date -Take $Take -Keep $Keep
+        $existing = if (Test-Path -LiteralPath $full -PathType Leaf) {
+            [System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8)
+        } else {
+            $dir = Split-Path -Parent $full
+            if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+            ''
+        }
+
+        # WHERE the entry goes is Add-SyncLogEntry's, in the lib, because that decision is pure and fails
+        # silently; what is left here is the disk.
+        $text = Add-SyncLogEntry -Existing $existing -Entry $entry
+
+        [System.IO.File]::WriteAllText($full, $text, (New-Object System.Text.UTF8Encoding($false)))
+        Write-Host "Sync log: entry for $Branch written to $rel." -ForegroundColor DarkGray
+        return $rel
+    } catch {
+        Write-Host "Could not write the sync-log entry to '$rel', so this sync leaves no record in the tree: $($_.Exception.Message)" -ForegroundColor Yellow
+        return ''
+    }
 }
 
 function Write-SyncPredecessorVerdict {
@@ -971,6 +1050,16 @@ try {
     }
 
     $paths = @($take | ForEach-Object { $_.Path })
+
+    # THE SYNC LOG RIDES IN THIS COMMIT, and that is the whole reason it needs no gate (inbound #1382).
+    # The script that creates the branch writes the record in the same breath -- the shape new-branch.ps1
+    # uses for a changelog entry -- so a sync branch cannot be record-less and there is nothing left for a
+    # check to catch after the fact. Written here, BEFORE the add, because the add is path-bounded: a file
+    # produced after it would sit untracked in the working copy and the run would report a clean success.
+    $logRel = Write-SyncLogEntry -RepoRoot $repoRoot -RelativePath $seam.SyncLogPath `
+                                 -Branch $branch -Date $stamp -Take $take -Keep $keep
+    if ($logRel) { $paths = @($paths) + $logRel }
+
     Invoke-SyncGitQuiet @(@('add', '--') + $paths) | Out-Null
 
     $msg = "sync: mirror in-flight third-party edits from live ($($take.Count) file(s))"
