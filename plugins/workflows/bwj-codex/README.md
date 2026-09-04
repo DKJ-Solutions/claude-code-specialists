@@ -121,7 +121,9 @@ and the CI mechanism needs the project. That is answered by a set of functions i
   column claims a handover that never happened -- but it is silent, so it is worth stating deliberately.
 - `Get-AsanaProjectGid` -- the project a mirrored task is created in, and it has exactly one correct
   value: **the board the team reads**. Two independent constraints land on the same answer. An Asana
-  custom field does not cross workspaces, so a project outside the board's workspace makes the prio
+  custom field only becomes usable once it has been added to a project's own `custom_field_settings`
+  -- workspace membership alone does not establish that -- so a project the field was never added to
+  makes the prio
   labels of
   [step 5](WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label) reach only the
   tickets imported from the board; and the stages of

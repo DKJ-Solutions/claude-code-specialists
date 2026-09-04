@@ -1492,10 +1492,12 @@ function Get-PrioScoreFromTask {
         match on name rather than a position.
 
         A field is defined in ONE workspace and does not cross into another, which is what makes the
-        name -- not a GID -- the only portable handle. The consequence is on the caller, not here: a
-        task living in a project of some other workspace carries no field by this name at all, so a
-        ticket this workflow filed itself scores only when ASANA_PROJECT_GID names a project in the
-        board's own workspace. Issue #1213.
+        name -- not a GID -- the only portable handle. But workspace membership is not the operative
+        test: a field only becomes readable on a task once it has separately been added to that
+        task's project, via the project's own custom_field_settings. The consequence is on the
+        caller, not here: a task living in a project the field was never added to carries no field by
+        this name at all, so a ticket this workflow filed itself scores only when ASANA_PROJECT_GID
+        names a project that actually carries the field. Issues #1213, #1386.
     #>
     param(
         [AllowNull()]$Task,

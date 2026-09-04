@@ -98,11 +98,14 @@ reads.** That used to be an open BWJ decision -- one shared project or one per s
 any more (Dave, September 2, 2026): there is exactly one board, and two independent constraints both
 land on it.
 
-- **The prio labels.** An Asana custom field does not cross workspaces, so a task created in a project
-  of some *other* workspace can never carry a `Prio-Score`, and the sweep of
+- **The prio labels.** An Asana custom field only becomes usable once it has been added to a
+  project's own `custom_field_settings` -- workspace membership alone does not establish that -- so a
+  task created in a project the field was never added to can never carry a `Prio-Score`, and the
+  sweep of
   [step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
   then reaches only the tickets *imported from* the board
-  ([#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213)).
+  ([#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213),
+  [#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386)).
 - **The stages.** They live on that board's own sections, so a task filed anywhere else sits on no
   pipeline and never moves a column -- see step 5 below.
 
@@ -116,11 +119,12 @@ looks that field up by *name*, because it is **reading** a task back and the Asa
 custom field's name alongside its value -- no GID needed. Creating a task and setting one of its
 custom fields in the same call is the opposite direction: the `create task` call addresses a custom
 field by its GID, which Asana Field settings shows on the field's own page, in the URL. **The same
-one-workspace constraint
+per-project constraint
 [step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
-already states for `Prio-Score` applies here too** -- an Asana custom field is defined in a
-workspace and does not cross into another, so this GID has to come from the same workspace
-`Get-AsanaWorkspaceGid` names. And it is **plainly optional**: `$null`, the default, means the board
+already states for `Prio-Score` applies here too** -- an Asana custom field only becomes usable once
+it has been added to a project's own `custom_field_settings`, and being defined in the same workspace
+does not establish that, so this GID has to come from a field that actually sits on the project
+`Get-AsanaProjectGid` names. And it is **plainly optional**: `$null`, the default, means the board
 carries no `Github Issue` field, and `report-issue` skips the write silently -- a repo without the
 field loses nothing by leaving it unset.
 
