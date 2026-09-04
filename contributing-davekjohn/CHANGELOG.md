@@ -31,3 +31,33 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: fix/duplicate-entry-section-heading · 20260904-094044
+
+`check-plugin-integrity.ps1`'s entry-heading check (check 13) now refuses a changelog entry whose
+declared section heading appears more than once -- `#### Pull Request` written twice, say. Both copies
+are valid names, so nothing errored before: the entry validated, every gate passed, and the split only
+showed in a published GitHub Release body, because the fold stamps and links the last `Pull Request`
+heading while the PR body and the release notes read the first. `v4.29.0`'s Release body shipped a
+bullet with no PR link that way (issue #1367). The check catches it in both places it already
+walks -- the branch's development document (on the PR, and in CI) and `CHANGELOG.md` below its intro
+(after a fold, the one write that lands directly on `main`) -- and a heading quoted inside a code fence
+is a mention, not a finding.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal lint gate. No subscriber of any service reaches it; the entry files and `CHANGELOG.md`
+it guards are developer-facing.
+
+**Score:** N/A
+
+#### Pull Request
+
+refuse an entry whose section heading appears more than once
+
+[PR #1368](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1368)
+
+---
+
