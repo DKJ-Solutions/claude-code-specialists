@@ -32,6 +32,33 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/sync-main-3b-offline-dryrun · 20260904-113834
+
+The documented offline `-MirrorPath` rehearsal of the pre-task sync works again:
+`[3b]` no longer hard-exits a dry run when `origin` cannot be reached. A real
+(pushing) run still refuses there, exactly as inbound #1181 built it.
+
+**Score:** 2 -- restores a rehearsal path the plugin's own docstring promises but
+`[3b]` had closed; noticed by a maintainer who runs the sync offline against a
+mirror, and prevents a consumer working around it in their own test fixture.
+
+#### What makes this deploy extra special
+
+N/A -- team-shopify tooling internals. No subscriber of any consuming service
+notices whether the offline dry run stops at `[3b]` or prints its verdict.
+
+**Score:** N/A
+
+#### Pull Request
+
+the sync's [3b] step lets a dry run continue when origin cannot be reached
+
+Plugins: team-shopify
+
+[PR #1376](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1376)
+
+---
+
 ### DEPLOY: fix/readme-keys-install-claim · 20260904-105119
 
 `README.md` no longer claims the two settings keys produce no install at all. That absolute was retired
