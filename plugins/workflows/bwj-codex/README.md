@@ -105,7 +105,7 @@ The hooks and blueprint a workflow carries "only where it needs them" -- this on
 ## What it expects from your repo -- the seam
 
 The `report-issue` skill needs to know which Asana workspace and project a mirrored task lands in,
-and the CI mechanism needs the project. That is answered by two functions in your repo-owned
+and the CI mechanism needs the project. That is answered by a set of functions in your repo-owned
 `scripts/repo-config.ps1` -- the same file `contributing-davekjohn` already dot-sources:
 
 - `Get-AsanaWorkspaceGid` -- the Asana workspace GID.
@@ -129,6 +129,12 @@ and the CI mechanism needs the project. That is answered by two functions in you
   live on
   that board's sections, so a task filed anywhere else is on no pipeline and never moves a column.
   Neither failure says anything in a log.
+- `Get-AsanaIssueFieldGid` and `Get-AsanaTypeFieldGid` -- the GIDs of the board's `Github Issue` and
+  `Github Type` custom fields, so a mirrored task carries the issue URL and the issue type from the
+  moment it is created rather than waiting for somebody to type them in. **Both optional**, and
+  `$null` -- the default -- is the common answer: most boards carry neither, and `report-issue`
+  skips whichever is unset without saying anything. Where a board does carry one, leaving it unset is
+  the state that costs something, because the field is then filled by hand or not at all.
 
 `adopt-bwj-asana` **proposes** these, it never places them: they state what your repo *is*, and the
 project may differ per brand. The CI half reads the project from the repo variable
