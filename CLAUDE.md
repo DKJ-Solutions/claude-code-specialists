@@ -346,6 +346,26 @@ The constitution above, concretely implemented here:
   information, credentials, or secrets. The core team's (`team-alpha`) agent defs are therefore
   deliberately repo-neutral; repo-specific context lives in the consuming (private) repo's
   `.claude/specialists/lenses/` lens.
+
+  **And a measurement taken in a *private* consumer quotes only what the finding needs — the matched
+  fragment, never the surrounding sentence** (Dave, September 5, 2026, on
+  [#1420](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1420)). The convention that a
+  measurement cites its instance verbatim is not weakened by this and must not be: a citation is
+  auditable and a paraphrase is not, and this tree has scar tissue from measurements rewritten until
+  nothing in them was checkable. What is bounded is the *excerpt*. The **repo name, the file and the
+  line** are published as before — they are already in `connectors/` and in the `bwj-codex` skill — and
+  they are what carries the provenance, so the quote itself shrinks to the characters the check, the
+  count or the argument actually turns on. Everything the finding does not read is the consumer's own
+  wording and stays in the consumer's own tree.
+
+  **The test is mechanical: could the finding be re-verified without this character?** In the
+  supremacy-declaration case the check reads an adjacency — `` `CLAUDE.md` `` beside `wins`/`wint` —
+  which is the check's own pattern rather than anybody's prose, so that clause is cited and the
+  governance sentence around it is not. **A test fixture is held to the same bound and is not an
+  exception**, because a matcher reads structure: a fixture needs the shape the finding turns on, and
+  the consumer's remaining words are decoration that a public repository then keeps forever. The reason
+  the bound is worth having at all is asymmetry — a public quote cannot be withdrawn, and the next
+  measurement reaches for as long an excerpt as the last one was allowed.
 - **Changes to shared agent defs land here first**, are committed here, and only then picked up by
   the consuming repos — never the other way around.
 - **And because this repo *is* the source, the shared source is the default destination for a lesson
