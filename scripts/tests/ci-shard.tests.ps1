@@ -11,9 +11,12 @@
       * -ShardCount disagreeing with the matrix length runs a FRACTION of the pool and reports every
         shard green. A matrix of [1,2,3,4] against -ShardCount 5 runs 4/5 of the suites, for ever, with
         nothing in any log saying which fifth never ran.
-      * The summary job losing `if: always()` turns a red shard into NO verdict: a job that needs a
-        failed job is skipped, and a skipped check is not a reported failure.
-      * The summary job losing its result comparison turns `always()` into a permanent GREEN.
+      * The summary job losing `if: !cancelled()` turns a red shard into NO verdict: a job that needs a
+        failed job is skipped, and a skipped check is not a reported failure. Regaining a bare
+        `if: always()` in its place is the #1356 regression -- `always()` also fires on a CANCELLED run,
+        so a PR run superseded by `cancel-in-progress` reports the required check as failure, not
+        cancelled.
+      * The summary job losing its result comparison turns that `if:` into a permanent GREEN.
       * The summary job being RENAMED un-gates `main` outright -- `main-ci-gate` requires the context
         `lint-en-tests`, so the ruleset would wait for a check nobody reports.
 
@@ -185,8 +188,8 @@ Assert-True ($summaryJob.Success) 'the summary job block is readable'
 $summary = if ($summaryJob.Success) { $summaryJob.Groups['body'].Value } else { '' }
 
 Assert-True ($summary -match '(?m)^\s*needs:\s*\[\s*lint\s*,\s*suites\s*\]') 'it needs both legs'
-Assert-True ($summary -match '(?m)^\s*if:\s*always\(\)') `
-    'and runs with if: always() -- without it a red shard reports NO verdict rather than a red one'
+Assert-True (($summary -match '(?m)^\s*if:\s*\$\{\{\s*!cancelled\(\)\s*\}\}') -and ($summary -notmatch '(?m)^\s*if:\s*always\(\)')) `
+    'runs with if: !cancelled(), not always() -- true on a failed/skipped leg so a red shard still reports red, false only on a cancelled run where always() would report a superseded PR run as failure (#1356)'
 Assert-True ($summary -match 'needs\.lint\.result') 'it reads the lint result'
 Assert-True ($summary -match 'needs\.suites\.result') 'and the suites result'
 Assert-True ($summary -match 'exit 1') 'and exits non-zero on a leg that did not succeed'
