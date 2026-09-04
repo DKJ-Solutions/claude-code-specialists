@@ -239,11 +239,22 @@ try {
 
     # THE SKIP, and it is measured on a real marketplace file rather than asserted about this repo:
     # the same tree answers [ERROR] without one and [OK] with one.
+    #
+    # BOTH DIRECTIONS SINCE #1422, because the skip narrowed from "publishes plugins" to
+    # Test-IsWorkflowSourceRepo's "publishes THIS workflow". A manifest publishing somebody else's
+    # product is now a CONSUMER and is judged; only one publishing 'contributing-davekjohn' is skipped.
+    # The negative case is asserted first: under the old broad file test it passed as [OK], so it is
+    # the assert that would catch a reversion to it.
     New-Item -ItemType Directory -Path (Join-Path $inRoot '.claude-plugin') -Force | Out-Null
-    Set-Text -Dir $inRoot -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [] }'
+    Set-Text -Dir $inRoot -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "some-other-product" } ] }'
     $r = Invoke-Script -Dir $inRoot
-    Assert-True ($r.Code -eq 0 -and $r.Out -match 'publishes the plugin') `
-        'a repo that publishes plugins is skipped -- its own pages are the source of the convention'
+    Assert-True ($r.Code -eq 1 -and $r.Out -match '\[ERROR\]') `
+        'a repo publishing ANOTHER product is a consumer of this workflow -- still judged, not skipped'
+
+    Set-Text -Dir $inRoot -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "contributing-davekjohn" } ] }'
+    $r = Invoke-Script -Dir $inRoot
+    Assert-True ($r.Code -eq 0 -and $r.Out -match 'publishes the workflow') `
+        'a repo that publishes THIS workflow is skipped -- its own pages are the source of the convention'
 
     # --- retired-doc-name-sessioncheck.ps1, the hook (always exit 0) ------------------------------
     Write-Host ''

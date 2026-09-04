@@ -63,9 +63,22 @@ $ErrorActionPreference = 'Stop'
 # and thereby the hook -- at every session start in the source repo. The CI half runs the in-repo copy
 # (via actions/checkout), which the guard would not have fired on anyway.
 
-# Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
-# source root copy falls back to the git root. Same resolution as every other mirrored script.
-$repoRoot = if ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+# THE ROOT COMES FROM ONE DEFINITION (#1422). Dot-sourced guarded, so a mirror built before this lib
+# existed degrades to the old inline form rather than throwing.
+$checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
+if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
+
+$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+    Resolve-CheckRepoRoot -RootOverride $RootOverride
+} elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+
+# '' MEANS "COULD NOT TELL". This runs from a SessionStart hook as well as from CI, and the hook's case
+# is a tree that is not a checkout -- where there is no trunk to carry a leftover, so there is nothing to
+# judge rather than a failure. The CI half always has a checkout (actions/checkout), so it never lands here.
+if (-not $repoRoot) {
+    Write-Host '[OK] no git checkout here -- no trunk to carry an unfolded entry.'
+    exit 0
+}
 
 # repo-config.ps1 first and optional, exactly as check-branch-entry loads it. Get-BranchFileDeclaredBranch
 # reads the branch-line label from the wording rather than a hardcoded literal, and Get-BranchTrunkName

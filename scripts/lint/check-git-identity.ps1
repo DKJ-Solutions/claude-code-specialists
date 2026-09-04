@@ -89,12 +89,18 @@ $ErrorActionPreference = 'Stop'
 # so Assert-OwnCopy would refuse it -- and thereby the hook -- at every session start in the source
 # repo.
 
-# Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
-# source root copy falls back to the git root. Same resolution as every other mirrored script. Wrapped
-# because this also runs in a tree that is not a checkout (a fixture, or a session started outside a
-# repo), where `git rev-parse` exits non-zero and must not strand the hook.
+# THE ROOT COMES FROM ONE DEFINITION (#1422), and this script's wrapped variant is the one that BECAME
+# it: four siblings resolved the root on one line and died on `.Trim()` against $null in a tree that is
+# not a checkout, which this one had already handled. The tolerant reading won because a SessionStart
+# hook must not fail over an advisory check. Dot-sourced guarded, so a mirror built before this lib
+# existed degrades to the wrapped inline form this line replaces rather than throwing.
+$checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
+if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
+
 $repoRoot = ''
-if ($RootOverride) {
+if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+    $repoRoot = Resolve-CheckRepoRoot -RootOverride $RootOverride
+} elseif ($RootOverride) {
     $repoRoot = $RootOverride
 } elseif ($env:CLAUDE_PROJECT_DIR) {
     $repoRoot = $env:CLAUDE_PROJECT_DIR
