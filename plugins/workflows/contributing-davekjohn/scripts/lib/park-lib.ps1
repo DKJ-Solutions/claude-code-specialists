@@ -145,6 +145,24 @@ function Get-GitParkBacking {
         back for 'this checkout has no ref by that name' would raise the alarm on a repo that is merely
         configured differently.
 
+        THE REMOTE-TRACKING REF IS PREFERRED OVER THE BARE LOCAL NAME, when one exists (#1399). $Trunk
+        arrives as a bare local branch name ('main'), and the normal flow lets local main sit behind
+        origin/main for the length of a branch -- new-branch's own base warning allows exactly that, and
+        the documented way to catch up mid-branch is 'git merge origin/main' rather than a rebase, which
+        the safety rules block as a force-push. That merge fast-forwards the branch's merge-base with
+        LOCAL main to include every commit it just pulled in from origin, because local main itself never
+        moved -- so '$Trunk...HEAD' now counts those already-upstream commits as this branch's own
+        committed work. A branch with zero real commits of its own then reports Committed > 0, and the
+        backing gate that exists to catch an unbacked park goes silent on exactly the case it was built
+        for. refs/remotes/origin/$Trunk does not have this problem: a fetch (which 'git merge origin/main'
+        requires as its first step) keeps it current with the remote, so it is preferred whenever this
+        checkout has one. Checking for it is a local, offline read of what the last fetch already
+        recorded -- no network call, matching the docstring's existing offline-friendly claim -- and where
+        it does not exist (no origin configured, or origin/main never fetched) this falls back to the bare
+        $Trunk name exactly as before. The OBJECT'S Trunk FIELD KEEPS THE ORIGINAL NAME either way: it is
+        what Format-GitParkBacking prints in the 'not measured' sentence, and a reader expects that
+        sentence to name the trunk ('main'), not the ref this function resolved it to internally.
+
         core.quotePath IS FORCED ON, and it is the language rule about reading a native command's output
         rather than a preference: the paths here are COMPARED against $Paths, and PowerShell 5.1 decodes
         a child's stdout with whatever console code page the run inherited. Quoting holds the wire to
@@ -164,12 +182,26 @@ function Get-GitParkBacking {
 
     $committed = 0
     $committedKnown = $false
-    $refRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', $Trunk) -DiscardStderr
+    # PREFER THE REMOTE-TRACKING REF (#1399): resolve refs/remotes/origin/$Trunk first, and only fall back
+    # to the bare local name when this checkout has no such ref. See the docstring's "THE REMOTE-TRACKING
+    # REF IS PREFERRED" section for why the bare name silently over-counts a branch's committed work.
+    # THE VERIFY RESULT IS REUSED RATHER THAN ASKED TWICE: a successful check against
+    # refs/remotes/origin/$Trunk already proves that ref resolves, so re-verifying it a line later would
+    # be a second native `git` process spawned for a question already answered -- and the common case,
+    # once this ships, is exactly the one where origin exists and is current.
+    $trunkRef = $Trunk
+    $remoteRefRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', "refs/remotes/origin/$Trunk") -DiscardStderr
+    $refRes = if ($remoteRefRes.ExitCode -eq 0) {
+        $trunkRef = "refs/remotes/origin/$Trunk"
+        $remoteRefRes
+    } else {
+        Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', $trunkRef) -DiscardStderr
+    }
     if ($refRes.ExitCode -eq 0) {
         # THREE DOTS: the branch against its MERGE BASE with the trunk, not against the trunk's tip -- so
         # a trunk that has moved on since the branch was cut does not report its own commits as this
         # branch's work.
-        $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-c', 'core.quotePath=true', '-C', $RepoRoot, 'diff', '--name-only', "$Trunk...HEAD")
+        $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-c', 'core.quotePath=true', '-C', $RepoRoot, 'diff', '--name-only', "$trunkRef...HEAD")
         if ($diffRes.ExitCode -eq 0) {
             $committedKnown = $true
             $committed = @(($diffRes.Output | Out-String) -split '\r?\n' |
