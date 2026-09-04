@@ -35,8 +35,8 @@
 
 Issue #1416: `new-branch.ps1` carries a second inline copy of the trunk-gap measurement that #1405 moved
 into `Get-TrunkGap`. Put the scaffolder on the shared function so the measurement has one definition, and
-leave the policy question -- whether `new-branch` should refuse rather than warn -- exactly where the issue
-left it, because that is not this branch's to settle.
+file the policy question -- whether `new-branch` should refuse rather than warn -- as its own issue,
+because it is a decision rather than a repair and it is not this branch's to settle.
 
 #### The one thing that is not a straight swap
 
@@ -96,7 +96,8 @@ the scope is the caller's to state, and the suite's parked-branch fixture is wha
 that as a separate question and it is not this branch's: the fold refuses because its next act is a commit
 directly on the trunk, while a stale base under a branch is recoverable with an ordinary pull, and the
 scaffolder is mirrored into every consumer's plugin cache and arrives by plugin update rather than by
-choice. That asymmetry may well be correct and permanent; #1416 stays open for it.
+choice. That asymmetry may well be correct and permanent, and it is nobody's to settle inside a dedup:
+it is filed as #1417, with the three shapes it could take and the reason each one costs something.
 
 Every sentence the script prints is byte-identical, which is what the wording asserts in
 `new-branch.tests.ps1` hold. One measurement did move: the gap is now taken on a resume too, since the
