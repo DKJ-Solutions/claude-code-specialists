@@ -625,6 +625,59 @@ infrastructure.
   a consumer fixture that has findings; through the hook that is **365 ms**, against **544 ms** for
   `unfolded-entry-sessioncheck` beside it. So it is the *cheapest* of the session hooks rather than a
   sixth tax, and the skip is why: in this repo it exits before the `@`-import walk runs.
+- **`scripts/lint/check-supremacy-declaration.ps1`** — the supremacy-declaration check (issue
+  [#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415), September 4, 2026):
+  does a consumer's own always-on prose declare *its* `CLAUDE.md` the winner over
+  `contributing-davekjohn/CONTRIBUTING.md`, inverting `LAW-THIRD-RANK-ORDER`? The **second** of the two
+  narrow literal greps the declined framework recorded, and the one that entry measures every candidate
+  as **structurally blind** to: a pointer test flags only sections that cite nothing, so
+  cites-then-contradicts can live nowhere but among the findings it suppresses.
+
+  **It shares its corpus with the first**, and that is the point of `Get-ConsumerProseDocuments` in
+  `entry-scaffold-lib.ps1`: which documents a consumer-prose check may read is one question with one
+  answer, and each of its exclusions (the changelog, `releases/`, plugin-shipped payload, a per-branch
+  document) is load-bearing for a measured reason. Two copies would drift on the day a third exclusion is
+  found, and the copy that missed it would report what the other correctly ignores.
+
+  **The detector is ADJACENCY, not co-occurrence, and that departs from the sentence this page
+  recorded** — measured, with the numbers, [further down](#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026).
+  Short version: the recorded three-term test scores 0 findings and 0 recall on its own target, because
+  the real sentence names the contributing page by a Dutch prose noun rather than by its filename;
+  requiring `CLAUDE.md` and `wins`/`wint` to sit *beside* each other scores 3 raw / 2 reported / 2 true /
+  100%, and reads **direction**, which is the whole defect — *"this page wins"* is the rank order stated
+  correctly and a term list cannot tell the two apart.
+
+  **Its one suppression rests on one instance, and is written down as such** rather than presented as a
+  principle: a hit wholly inside a `"…"` span is skipped, the instance being a consumer quoting the
+  closing line of a page it retired. Kept because precision is 67% without it and 100% with it; the
+  suite pins it from both sides, including that an unrelated quotation elsewhere on the line does *not*
+  suppress a real finding.
+
+  **ONE CALLER, no CI half, and the publishing-repo skip** — the same three answers its sibling gives,
+  for the same reasons. With one honest difference: for the retired-name check the skip is a **repair**
+  (this repo narrates the rename history and would read as drift), while here it is only a **guard** —
+  measured at zero hits in this repo without it, because every supremacy sentence here names the
+  plugin's page as the winner.
+
+  **What the seventh session hook costs** (5 runs each, median, this machine, September 4, 2026,
+  **measured after the paragraph repair rather than before it**): **728 ms** through the hook in this
+  repo, against **798 ms** for `retired-doc-name-sessioncheck` measured in the same run. The check alone
+  is **387 ms** here where it skips, and **1,484 ms** against a consumer that has findings — against
+  **1,312 ms** for the sibling on that same consumer in that same run, so the paragraph joining costs
+  roughly **13%** over a detector that still reads physical lines. That is the price of the false
+  negative being closed, and it is worth it.
+
+  **The re-measurement is itself the lesson.** The first figures here were taken before review found the
+  wrapping defect, and the repair makes the check do strictly more work per document — so the paragraph
+  above would have shipped as a current, dated fact about code that no longer existed. Caught by the copy
+  edit, not by any gate: **a measurement taken before the last repair is stale, and nothing goes red when
+  it is.**
+
+  **Compare the pair, never the figure.** These absolutes run roughly double what the sibling's own entry
+  records for itself, on the same machine, with nothing about that hook changed — the box was simply
+  busy. Same load sensitivity [#1401](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1401)
+  closed by making a duration assert compare against its queue instead of a fixed ceiling, and the reason
+  the sibling is re-measured beside it here rather than quoted.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
@@ -1382,9 +1435,47 @@ September 4, 2026): `check-retired-doc-name.ps1`, driven by a SessionStart hook 
 [described above on this page](#what-sylvester-owns-here). It kept the three constraints this entry
 imposes — literal names, derived rather than listed; the corpus as an inclusion list with the changelog
 out; and the publishing-repo skip — and it carries one stated gap, the shape `development-<branch>.md`,
-which has no literal form. **The second is still only recorded**, and deliberately: the supremacy
-declaration is the finding this entry measures every candidate as structurally blind to, so it wants
-its own pass rather than riding along on the first one's branch.
+which has no literal form.
+
+**The second was built later that same day** ([#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415),
+September 4, 2026): `check-supremacy-declaration.ps1`, its own SessionStart hook, and
+`Get-ConsumerProseDocuments` — the corpus enumeration lifted out of the first check so both read one
+definition of which documents a consumer-prose check may look in. **And the sentence above it, the one
+this entry recorded as the alternative, did not survive its own measurement.** That is worth stating in
+the entry that wrote it rather than quietly correcting: it had never been run as a check, #1415 asked for
+it to be measured before it shipped, and over the same 8-document corpus the three-term same-sentence
+test scores **0 raw findings and 0 recall** — on the single defect it was named to catch. Loosened to a
+paragraph it finds **1**, and that one is a false positive.
+
+**The reason is exact and is the useful part.** The instance is
+`smartwatchbanden`'s *"Bij tegenspraak wint `CLAUDE.md` en is de contributor-pagina de bug"* — it names
+the contributing page by a Dutch **prose noun**, not by its filename, so the third term is precisely the
+one absent. The filename sits two lines up, in a different sentence. Nothing about the sentence is
+unusual; what was wrong was inferring a term list from a defect that had been read rather than grepped.
+
+**What ships instead is ADJACENCY, and it is the same literalness arriving at a different rule.**
+`CLAUDE.md` and `wins`/`wint` must sit next to each other, either order, nothing between them but
+markdown — which answers the question co-occurrence cannot: *which page is being declared the winner*.
+Direction is the entire defect. *"this page wins"* over `CLAUDE.md` is `LAW-THIRD-RANK-ORDER` stated
+**correctly** and a term list scores it identically to the inversion. Measured on the same corpus:
+**3 raw / 2 reported / 2 true / 100%**, one hit suppressed for sitting inside a `"…"` quotation (a page
+narrating a rule it retired). Against this page's own bar — the accepted dead-link check at 17/17, the
+declined stale-path check at 124/0 — it lands on the accepted side, where the recorded shape landed
+below the declined one.
+
+**And it found one more standing defect than this entry's census knew about.** The census above counts
+the suppressed sections as 4: 1 contradiction, 3 correct deferrals. The contradiction is
+`smartwatchbanden`'s `CLAUDE.md` preamble — but the same inversion is stated a second time, from the
+other side, in that repo's own `contributing-davekjohn/CONTRIBUTING.md`, and no candidate measured here
+ever counted it. Two standing instances, one repo.
+
+**One inheritance was asked for and turns out to be a guard rather than a repair, which is worth saying
+plainly.** #1415 required the publishing-repo skip on the ground that this repo's pages *"discuss
+supremacy declarations at length, so without it the source reads as consumer drift"*. Measured: this
+repo's own always-on pages produce **zero** hits without the skip, because every supremacy sentence here
+names the plugin's page as the winner and adjacency reads that correctly. The skip is kept — this is
+where sentences about a consumer's rank order get written, and one future line would fire — but it is
+sibling consistency and cheap insurance, not the repair it is in `check-retired-doc-name.ps1`.
 
 **The manifest survives the decline** — a later revisit should not have to re-derive 11 laws from
 scratch:
