@@ -655,6 +655,33 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # The retired-name check (issue #1389). A renamed convention reached a consumer through
+            # nothing: no gate reads a consumer's CLAUDE.md, and check-script-contract covers FUNCTIONS,
+            # so a renamed file convention was outside it by construction. Measured -- both BWJ consumers
+            # still restated the retired single 'development.md' in their always-on documents, one day
+            # and six days after the rename, while the tooling around it had been made rename-proof on
+            # purpose.
+            #
+            # ITS ONLY CALLER IS THE HOOK, and there is no CI leg on purpose: a consumer's CI is not this
+            # repo's to add, and in the publishing repo the check skips itself (its own pages narrate the
+            # rename history correctly). So unlike check-unfolded-entry, which has a CI half, the
+            # SessionStart hook retired-doc-name-sessioncheck.ps1 IS the route rather than a convenience
+            # on top of one.
+            #
+            # NO SKILL, on the same reasoning check-unfolded-entry and check-git-identity give: the
+            # caller is automatic and nobody invokes it as a procedure. One command in its .SYNOPSIS
+            # answers it early.
+            Name   = 'check-retired-doc-name'
+            Source = 'scripts\lint\check-retired-doc-name.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = ''
+            # A fixture root, plus an always-on root the suite can point at a scratch document tree.
+            # A consumer never types either.
+            SkillParamsExempt = @('RootOverride', 'RootDocument')
+            # Timeable with no arguments: reads the always-on closure and reports, no write of any kind.
+            MeasureArgs = @()
+        },
+        @{
             # The split-identity check (issue #1315). `@me` in the claim rule resolves through the
             # GitHub API, so it writes whichever account gh holds -- and nothing compared that against
             # the identity git commits as. Measured: gh authenticated as DaveKJohn while

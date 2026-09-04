@@ -68,13 +68,19 @@ routes; every specialist executes according to the shared safety rules and their
 
 
 
-**Where this actually runs.** This roster is a set of Claude Code subagents plus three informational
+**Where this actually runs.** This roster is a set of Claude Code subagents plus the informational
 
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`) and
+SessionStart hooks the enabled plugins ship -- `roster-sessioncheck` in the core team and the rest in
 
-one Stop hook that acts rather than reports (`cycle-autopark`, #900 -- it pushes the branch's development
+`contributing-davekjohn`, all read-only and none of them blocking -- and one Stop hook that acts rather
 
-cycle to origin until a PR publishes it);
+than reports (`cycle-autopark`, #900 -- it pushes the branch's development cycle to origin until a PR
+
+publishes it). **The set is NOT listed here**: it was named as three, went stale twice inside two days
+
+as hooks were added, and each plugin's own `hooks/hooks.json` is the one place that cannot -- so read it
+
+there;
 
 they run in Claude Code and in Cowork, but not in a plain Claude.ai Chat session (there they show up
 

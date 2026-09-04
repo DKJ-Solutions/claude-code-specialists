@@ -294,6 +294,12 @@ $guardExempt = @(
     'scripts\sync\check-script-contract.ps1',  # SessionStart: script-contract-sessioncheck
     'scripts\lint\check-git-identity.ps1',     # SessionStart: git-identity-sessioncheck (#1315)
     'scripts\lint\check-unfolded-entry.ps1',   # SessionStart: unfolded-entry-sessioncheck (#1270)
+    # SessionStart: retired-doc-name-sessioncheck (#1389). Same reason as the four above, and it carries
+    # the answer the guard could not give it: what this repo needs here is not a REFUSAL but a SKIP, and
+    # the check makes that decision itself on the guard's own condition 2 (a .claude-plugin/
+    # marketplace.json exists). Refusing would take the hook down at every session start here; skipping
+    # states the right thing -- this repo's pages are the source of the convention, not a copy of it.
+    'scripts\lint\check-retired-doc-name.ps1',
     'scripts\task\park-cycle.ps1'              # Stop: cycle-autopark (#900)
 )
 

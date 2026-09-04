@@ -6838,3 +6838,198 @@ function Get-UnfoldedTrunkEntry {
     }
     return $findings.ToArray()
 }
+
+function Get-RetiredBranchDocNames {
+    <#
+        The RETIRED names of the branch's working document, as literal strings a prose page can carry --
+        one row per name this layout has abandoned, plus the folder it abandoned. Issue #1389.
+
+        WHY A CONSUMER'S PROSE NEEDS THIS AT ALL. The document has been renamed seven times, twice on
+        September 3, 2026 alone, and the tooling was deliberately made rename-proof for it: every reader
+        goes through Resolve-BranchFilePath, and the fold's bound in the source repo's constitution is
+        named by that resolver rather than spelled out. THE PROSE DESCRIBING IT TO CONSUMERS WAS NOT.
+        Nothing reads a consumer's CLAUDE.md, check-script-contract.ps1 covers functions rather than
+        conventions, and #1273 caught the plugin's own pages while nobody was positioned to notice that
+        both live consumers had the same defect. Measured: both BWJ consumers still restated the retired
+        single 'development.md' in their always-on documents, one day and six days after the rename.
+
+        IT IS DERIVED, NOT A LIST. The names come from Get-BranchFileLegacyNames, which is already the one
+        ordered source the resolver and new-branch's writer share -- so the next rename adds this token by
+        the same row it always adds, and there is no second list to leave at seven names. Both Kinds are
+        unioned because the split-file era named the two halves differently and a prose page may carry
+        either.
+
+        LITERAL, AND THAT IS THE WHOLE LICENCE THIS CHECK HAS. The prose-contract framework (#1380) was
+        measured at 12.5% precision and DECLINED (Dave, September 4, 2026); the decline recorded this as
+        the alternative that is proportionate, in the source repo's system-administration lens: "one
+        [grep] for the literal string 'development.md' outside the changelog and history paths". A
+        filename is an exact string with a mechanical answer, which is the same distinction that
+        separates this repo's accepted dead-link check (17 findings, 17 real) from its declined
+        stale-path check (124 findings, none real). Anything fuzzier than a filename does not belong
+        here.
+
+        SO THE PER-BRANCH PREDECESSOR IS DELIBERATELY ABSENT, and it is a stated gap rather than an
+        oversight. 'development-<slug>.md' (pre-#1335) has no literal form: a prose page names the SHAPE,
+        'development-<branch>.md', and matching that needs a wildcard -- the exact step toward fuzzy that
+        the decline above rules out. What survives of that era is 'development-cycle.md', a real literal
+        and present below. A consumer restating only the shape is missed, and that is the price of the
+        precision.
+
+        THE FOLDER IS A NAME TOO (#886, 'workflow-davekjohn/' -> 'contributing-davekjohn/'). It is taken
+        from the first segment of the pre-rename paths rather than written out, for the reason above.
+
+        Each row carries the literal Name and a Since line naming what replaced it, because a finding
+        whose remedy the reader has to derive is a finding they will work around.
+
+        LONGEST FIRST, and the order is behaviour rather than presentation: Get-RetiredDocNameMention
+        claims a span per line, so 'development-cycle.md' has to be tried before 'development.md' could
+        be looked for inside it.
+    #>
+    $paths = Get-BranchFilePaths
+    $current = $paths.Directory
+
+    $names = New-Object System.Collections.Generic.List[object]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+
+    # The retired FOLDER, read off the first segment of the pre-#886 paths rather than written out.
+    foreach ($rel in @([string]$paths.PriorFolderFile)) {
+        if (-not $rel) { continue }
+        $folder = ($rel -split '/')[0]
+        if ($folder -and $folder -ne $current -and $seen.Add($folder)) {
+            $names.Add([pscustomobject]@{
+                Name  = $folder
+                Kind  = 'folder'
+                Since = "the folder is '$current/' since August 26, 2026 (#886)"
+            }) | Out-Null
+        }
+    }
+
+    # The retired FILENAMES, both Kinds unioned. Basenames only: a prose page names the file far more
+    # often than the whole path, and every path form contains the basename anyway.
+    $currentFile = [System.IO.Path]::GetFileName(((Get-BranchFilePaths -Branch 'x').File -replace '/', '\'))
+    foreach ($rel in (@(Get-BranchFileLegacyNames -Kind File) + @(Get-BranchFileLegacyNames -Kind Deployment))) {
+        if (-not $rel) { continue }
+        $leaf = [System.IO.Path]::GetFileName(($rel -replace '/', '\'))
+        if (-not $leaf) { continue }
+        # A belt-and-braces guard, not a live case: today's name is '<slug>.md' and no legacy row can
+        # produce it. It costs one comparison, and it is what stops a future rename from shipping a check
+        # that reports the name it has just introduced.
+        if ($leaf -ieq $currentFile) { continue }
+        if (-not $seen.Add($leaf)) { continue }
+        $names.Add([pscustomobject]@{
+            Name  = $leaf
+            Kind  = 'file'
+            Since = "the document is named after its branch, '$current/<branch>.md', since September 3, 2026 (#1255, #1335)"
+        }) | Out-Null
+    }
+
+    return @($names | Sort-Object -Property @{ Expression = { $_.Name.Length }; Descending = $true }, Name)
+}
+
+function Get-RetiredDocNameMention {
+    <#
+        Every line in a CONSUMER's own law-bearing prose that carries a retired name from
+        Get-RetiredBranchDocNames -- i.e. a document restating a convention the plugin has moved on
+        from. Issue #1389.
+
+        THE DOCUMENT SET IS THE #1380 CORPUS, and stating it as an INCLUSION list is the load-bearing
+        half. Two kinds of page:
+
+          1. the always-on closure -- CLAUDE.md and everything it '@'-imports -- passed in as
+             -Documents, because that walk belongs to measure-context-lib.ps1 and a second walk here
+             would be a second definition of the always-on path;
+          2. the workflow folder's own permanent pages, MINUS its changelog.
+
+        THE CHANGELOG EXCLUSION IS NOT OPTIONAL. A folded entry correctly names the file that was current
+        on the day it landed, so a check that read the changelog would be born red on its own past --
+        which this repo already names as a smell in itself, and which is the recorded reason #1380's
+        declaration-based candidate was set aside at 88/88. releases/ is out by the same logic and needs
+        no rule of its own: it is neither always-on nor a reserved page, so it never enters the set.
+        Excluded by NAME out of ReservedNames rather than through Get-ChangelogPath, on that property's
+        own reasoning -- a seam may point anywhere, and a lib that went looking for a repo root to
+        resolve it is a lib that can find the wrong tree.
+
+        PLUGIN-SHIPPED PAYLOAD IS EXCLUDED (Source -ne 'tree'). The orchestrator's persona is
+        '@'-imported from the marketplace clone by every repo, so it is one file rather than one finding
+        per consumer -- and it is the plugin's own text, which is the thing a consumer is supposed to be
+        pointing AT. Without this exclusion #1380's own corpus counted it three times.
+
+        A PER-BRANCH DOCUMENT IS NOT IN THE SET EITHER, and it falls out for free: it is transient
+        working prose, it is not always-on, and it is not a reserved page. A branch whose own plan
+        discusses the rename would otherwise report itself.
+
+        WHAT IT DOES NOT DO is decide whether the restatement AGREES with the plugin. It cannot, and that
+        is the whole finding of #1380: a test that reads nearby text for the source and calls that
+        deference is structurally blind to cites-then-contradicts, measured there at 1 in 4. Here the
+        question never arises -- a retired filename is wrong whether the sentence around it agrees or not.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # The always-on rows from Get-AlwaysOnDocuments. Optional: a caller with no walk available still
+        # gets the folder's own pages judged, which is where one of the two measured instances sat.
+        [object[]]$Documents = @()
+    )
+
+    $paths = Get-BranchFilePaths
+    $retired = @(Get-RetiredBranchDocNames)
+    if ($retired.Count -eq 0) { return @() }
+
+    $rels = New-Object System.Collections.Generic.List[string]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($doc in $Documents) {
+        if (-not $doc) { continue }
+        if (-not $doc.Exists) { continue }
+        if ($doc.Source -ne 'tree') { continue }
+        $rel = [string]$doc.Display
+        if ($rel -and $seen.Add($rel)) { $rels.Add($rel) | Out-Null }
+    }
+
+    foreach ($reserved in @($paths.ReservedNames)) {
+        if (-not $reserved) { continue }
+        if ($reserved -ieq 'CHANGELOG.md') { continue }
+        $rel = "$($paths.Directory)/$reserved"
+        if ($seen.Add($rel)) { $rels.Add($rel) | Out-Null }
+    }
+
+    $findings = New-Object System.Collections.Generic.List[object]
+    foreach ($rel in $rels) {
+        $full = Join-Path $RepoRoot ($rel -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
+        $text = [System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8)
+        $lines = $text -split "(?:\r\n|\n|\r)"
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = [string]$lines[$i]
+            if (-not $line) { continue }
+            # SPANS, NOT TOKENS, and this one is anticipatory rather than measured: NO pair in today's
+            # set overlaps, so nothing here double-reports right now. It is kept because the set is
+            # DERIVED and gains a row on every rename -- the day a new name contains an older one, a
+            # single line of prose would be reported twice for one thing to repair, and the claim above
+            # is what stops it. Cheap, and the alternative is discovering it from a doubled finding.
+            $claimed = New-Object System.Collections.Generic.List[object]
+            foreach ($name in $retired) {
+                $at = $line.IndexOf($name.Name, [System.StringComparison]::OrdinalIgnoreCase)
+                while ($at -ge 0) {
+                    $end = $at + $name.Name.Length
+                    $overlaps = $false
+                    foreach ($c in $claimed) { if ($at -lt $c.End -and $c.Start -lt $end) { $overlaps = $true; break } }
+                    if (-not $overlaps) {
+                        $claimed.Add([pscustomobject]@{ Start = $at; End = $end }) | Out-Null
+                        $findings.Add([pscustomobject]@{
+                            Rel   = $rel
+                            Line  = $i + 1
+                            Name  = $name.Name
+                            Kind  = $name.Kind
+                            Since = $name.Since
+                            Text  = $line.Trim()
+                        }) | Out-Null
+                    }
+                    if ($end -ge $line.Length) { break }
+                    $at = $line.IndexOf($name.Name, $end, [System.StringComparison]::OrdinalIgnoreCase)
+                }
+            }
+        }
+    }
+
+    return @($findings | Sort-Object -Property Rel, Line, Name)
+}
