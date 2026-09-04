@@ -46,6 +46,12 @@
                                                           session context. Display only; the slug
                                                           guards below remain what decides whether a
                                                           value may become a PATH.
+      - Format-SafePathToken / Format-SafeProseToken  -- the same job for the two values an id charset
+                                                          would mangle: a file path (inbound #414) and
+                                                          an echoed line of the consumer's own prose
+                                                          (#1419). Same two classes, one shared answer
+                                                          for control characters and a per-shape one
+                                                          for square brackets.
       - Test-PluginNameSlug / Test-PluginMarketplaceSlug -- the plugin-id / '@marketplace' slug
                                                           guards (values from settings.json /
                                                           manifests become filesystem paths, so
@@ -122,6 +128,33 @@
 # the error/info counts or the exit code.
 $script:CheckScopeLabel = ''
 
+# --- What must never survive into a report line (inbound #309, #414, #1419) ----------------------
+# Two classes, named here because the sanitizers below have to AGREE about them and differ only in what
+# they do with the second:
+#   - CONTROL CHARACTERS ('\p{C}' -- Cc, Cf and the surrogates): newlines, ANSI escape sequences and
+#     bidi overrides. The SessionStart hooks forward this output into session context, where "the hook
+#     labels its output 'data, not instructions'" does not cover a value that fabricates a line of its
+#     own, repaints a terminal, or reverses the reading order of the text around it.
+#   - SQUARE BRACKETS. The hooks decide what to surface, and how loudly, by matching markers like
+#     '[ERROR]' over a check's WHOLE output -- so a bracket out of an untrusted value is not merely odd,
+#     it is COUNTED.
+# Named rather than repeated per function so the shared half stays one decision: what each sanitizer
+# DOES with a class is its own argument, but which class it is arguing about is not.
+$script:CheckReportControlPattern = '\p{C}'
+$script:CheckReportMarkerPattern  = '[\[\]]'
+
+# AND "DID SANITIZING CHANGE ANYTHING" IS ASKED ORDINALLY, NEVER WITH '-ne'. PowerShell's string '-eq'
+# and '-ne' compare culture-sensitively, and an invariant-culture comparison treats format characters
+# (Cf) as IGNORABLE -- so "start<U+202E>end" -ne 'startend' is FALSE. The two functions below that say
+# out loud when the display differs from the raw value would therefore have stayed silent for exactly
+# the class most worth announcing: a bidi override, a zero-width joiner, a soft hyphen. Measured by this
+# branch's own bidi assert, on the new function, in the same shape Format-SuspectToken had carried
+# unnoticed since #309.
+function Test-TokenChanged {
+    param([AllowEmptyString()][string]$Before = '', [AllowEmptyString()][string]$After = '')
+    return (-not [string]::Equals($Before, $After, [System.StringComparison]::Ordinal))
+}
+
 function Format-SafeToken {
     <# Make a value from a consumer-owned JSON file safe to PRINT into a report line.
 
@@ -175,11 +208,54 @@ function Format-SafePathToken {
            '[ERROR]' over a check's whole output -- so a path containing one would not merely look odd,
            it would be COUNTED. A bracket in a real path is vanishingly rare; a bracket that changes a
            hook's verdict is not something to leave to chance.
-       Everything else is kept, because everything else is what makes a path a path. #>
+       Everything else is kept, because everything else is what makes a path a path. Both classes come
+       from the shared patterns above, so the prose sibling below argues about the same two things. #>
     param([AllowEmptyString()][string]$Value = '', [int]$MaxLength = 200)
-    $clean = ($Value -replace '[\p{C}\[\]]', '') -replace '\s+', ' '
+    $clean = (($Value -replace $script:CheckReportControlPattern, '') -replace $script:CheckReportMarkerPattern, '') -replace '\s+', ' '
     $clean = $clean.Trim()
     if ($clean.Length -gt $MaxLength) { $clean = $clean.Substring(0, $MaxLength - 3) + '...' }
+    return $clean
+}
+
+function Format-SafeProseToken {
+    <# The prose-shaped sibling, for a finding that ECHOES A LINE OF THE CONSUMER'S OWN TEXT (#1419).
+
+       WHY A THIRD FUNCTION RATHER THAN EITHER EXISTING ONE. check-retired-doc-name.ps1 prints the
+       offending line out of a consumer's markdown so the reader recognises what to repair, and neither
+       sibling can carry it: Format-SafeToken's id charset deletes most of a sentence (every ':', '(',
+       ',' and quote in it), and Format-SafePathToken -- exactly right for a path -- deletes the square
+       brackets that in prose are a markdown link. The value here is not a token at all, it is a
+       sentence, and the only property that has to hold is that it cannot be mistaken for output of ours.
+
+       CONTROL CHARACTERS ARE REMOVED, AND THE LINE SAYS SO. Same class and same reasoning as the
+       sibling, with Format-SuspectToken's doctrine attached rather than assumed: this line is echoed
+       BECAUSE somebody is about to edit it, so a reader shown a silently altered preview would go
+       hunting for text that is not in the file. A newline cannot actually reach here -- the caller has
+       already split the document into lines -- and that is a property of today's one caller, not of
+       this function.
+
+       SQUARE BRACKETS ARE SUBSTITUTED, NOT DELETED, and this is the one place the three siblings
+       deliberately differ. The property that matters is only that no marker can FORM, and '(ERROR)'
+       cannot be counted by any hook. In an id or a path a bracket is vanishingly rare, so deleting it
+       costs nothing; in prose it is ordinary and load-bearing, and deleting it turns '[the guide](x.md)'
+       into something the reader has to reconstruct. So the substitution is uniform and carries NO note:
+       it is a display convention like the whitespace collapsing beside it, not a claim about this line.
+
+       WHAT MAKES THE REMAINING LOSS AFFORDABLE is that the preview is not the locator. The caller
+       prints '<file>:<line>' immediately above it, so the echo is there for recognition -- which is
+       also why a cap and an ellipsis are enough for an over-long line. #>
+    param([AllowEmptyString()][string]$Value = '', [int]$MaxLength = 200)
+    # Whitespace first and separately: a tab is both '\s' and a control character, and collapsing it to
+    # a space is cosmetic, so it must not trip the "held characters that cannot be printed" note below.
+    $normalized = $Value -replace '\s+', ' '
+    $stripped = $normalized -replace $script:CheckReportControlPattern, ''
+    $hadControl = Test-TokenChanged -Before $normalized -After $stripped
+    $clean = (($stripped -replace '\[', '(') -replace '\]', ')').Trim()
+    if ($clean.Length -gt $MaxLength) { $clean = $clean.Substring(0, $MaxLength - 3) + '...' }
+    if ($hadControl) {
+        if (-not $clean) { return "<unprintable> (the raw line held nothing displayable; $($Value.Length) character(s))" }
+        return "$clean (shown sanitized -- the raw line held characters that cannot be printed)"
+    }
     return $clean
 }
 
@@ -193,7 +269,7 @@ function Format-SuspectToken {
        and then show a different, plausible one. #>
     param([AllowEmptyString()][string]$Value = '', [int]$MaxLength = 120)
     $clean = Format-SafeToken -Value $Value -MaxLength $MaxLength
-    if ($clean -ne $Value) {
+    if (Test-TokenChanged -Before $Value -After $clean) {
         if (-not $clean) { return "<unprintable> (the raw value held nothing displayable; $($Value.Length) character(s))" }
         return "$clean (shown sanitized -- the raw value held characters that cannot be printed)"
     }
