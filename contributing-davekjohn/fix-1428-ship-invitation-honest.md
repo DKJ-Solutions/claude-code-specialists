@@ -33,7 +33,17 @@
 
 ### PLAN
 
-Issue #1428: shapes 1+2 -- ship-pr's printed line becomes 'nothing here needs YOU' and names the two commits still held; Chris's body separates clearing the context from quitting the harness. Shape 3 (detached watcher) stays Dave's.
+Issue #1428, **as corrected on September 5, 2026**. The original filing read Dave's quote backwards: the
+close-out did not offer a clearance it could not keep, it **withheld** one he was entitled to. His workflow
+is three moves -- background the ship, `/clear`, start the next issue -- so the repair has to say
+*positively* that a `/clear` is safe, not merely stop promising anything.
+
+**That is blocked on a measurement nobody has taken**: whether a `/clear` leaves the backgrounded run
+alive. The ancestry rules out quitting the harness and says nothing about `/clear`. The probe is set up and
+needs one deliberate `/clear` from Dave; the protocol is in the issue.
+
+**What is on this branch is the half that stands regardless** -- the false line, the measured ancestry, and
+the bound on the parking rule. The positive half waits for the measurement rather than guessing at it.
 
 ### CREATE
 
@@ -46,8 +56,14 @@ Issue #1428: shapes 1+2 -- ship-pr's printed line becomes 'nothing here needs YO
 - [x] Chris's persona body: bound the parking justification to a PARKED branch, and say "cleared"
       precisely and never conditionally.
 - [x] `ship-pr` skill page: *"stop" is not "quit"*, with the ancestry and the fold named.
-- [~] Shape 3 from the issue — revisiting the detached watcher declined in #985 — dropped: it is
-      repo-settings-adjacent and the issue names it as Dave's, not a proposal.
+- [ ] BLOCKED ON THE MEASUREMENT: say it positively. Once the probe answers, the printed line and
+      Chris's close-out rule state that a `/clear` is safe during a ship and that quitting Claude Code
+      or closing the terminal is not. Naming only what is unsafe is what the corrected issue rejects.
+- [ ] BLOCKED ON DAVE: the vanished notification. Even if the process survives, the completion lands
+      in a conversation that no longer exists, so the outcome reaches nobody. Four options are in the
+      issue and the choice is his.
+- [~] Shape 4 -- revisiting the detached watcher declined in #985 -- dropped here: repo-settings-
+      adjacent, and the issue names it as Dave's.
 
 ### TEST
 
