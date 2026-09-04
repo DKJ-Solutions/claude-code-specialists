@@ -851,6 +851,29 @@ prose contract check could close is real, and is left as a follow-up rather than
 because it needs its own design (what counts as an agreeing restatement, how the manifest is authored)
 rather than a paragraph.
 
+**A fourth move exists, and nothing named it until inbound
+[#1388](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1388): a law this plugin
+deliberately DELEGATES, with no seam and no page of its own answering it either.**
+`cut-release/SKILL.md`'s "Which comes first, the cut or the push" block is the measured instance: it
+declines to build a `Get-LiveStageCutOrder` seam on purpose — the order is a sentence a person walks
+past in a checklist, not a value any script reads — and tells a repo running the non-default order to
+state that order **in its own `CLAUDE.md`**, because the standing rule authorising it has to live there
+anyway. Read against the three moves above, that instruction looks like the forbidden one: it is not
+pointing at the law, there is no seam to hold this repo's answer to, and staying silent would leave the
+order genuinely undocumented anywhere a reader could find it. It is none of the three because the
+premise behind the three does not hold here — there is no shared prose *for* a consumer's page to
+duplicate. The corollary polices copies of a law the plugin states somewhere; here the plugin has
+decided not to state an answer at all, and asked the consumer to.
+
+**The two are told apart by asking whether a plugin page states the law's answer anywhere.** Where one
+does — this page, a sibling portable page, a skill's own reasoning — a consumer restating that answer
+is the forbidden copy, exactly as before. Where a plugin page explicitly declines to answer and says so
+(`cut-release` Block 2's "No seam, deliberately"), a consumer's prose is not a copy of anything: it is
+the only place that repo's answer is ever written down, and the corollary has nothing to say against
+it. **This fourth move is scoped to that explicit decline** — a plugin page has to name the delegation,
+the way `cut-release` does, or the gap reads as an oversight rather than a deliberate fourth door, and
+a consumer cannot tell the two apart on its own.
+
 **Read this section end to end before writing a repo's own layering answer.** "Which file carries the
 floor is yours" and "the workflow's page wins" above are still both true and both local to the two
 consumer layers; this third rank does not change either, it completes the sentence neither of them ever

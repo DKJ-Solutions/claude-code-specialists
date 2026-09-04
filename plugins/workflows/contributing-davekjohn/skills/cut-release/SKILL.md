@@ -596,6 +596,12 @@ running the non-default order states it in its own `CLAUDE.md`, where the standi
 live push authorises its own closing cut has to live anyway. Revisit if a second live-stage consumer
 ever wants the checklist to render in its order rather than say which orders exist.
 
+**This instruction is the measured instance of `CONTRIBUTING-portable.md`'s fourth move, not an
+exception to its corollary against restating shared law.** That page's ranking section polices copies
+of a law the plugin states somewhere; this block deliberately states none, and asks the consumer's own
+`CLAUDE.md` to carry the only answer that will ever exist. See that page's "A fourth move exists"
+paragraph (inbound #1388) if the two ever read as disagreeing again.
+
 **This is not new to the tree, which is what settled it.** `team-shopify`'s webshop-manager manual
 already documented push-then-cut for exactly this case — *"only when the user decides to push; the
 release is then cut by the release manager"* — so the two pages shipped from one repo contradicting each
