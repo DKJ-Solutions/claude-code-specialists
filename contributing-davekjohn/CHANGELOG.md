@@ -32,6 +32,70 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/duration-aware-shard-packing · 20260904-085157
+
+`Invoke-TestSuiteGate` now packs its shards and orders each shard's queue from recorded per-suite CI
+durations, instead of striding over a list sorted by filename. On the measured 65-suite pool that is
+**305s -> 237s**, and it touches no test, no assert and no scenario.
+
+**It closes a claim this repo made three times and never tested where it mattered.** `ci.yml`, the
+gate's own docstring and the entry directly above this one all said a sharded job is
+`max(longest file) + provisioning`, and drew from it that a duration-aware bin-pack "would reach that
+same wall -- which is why neither was built." Read off the first real per-suite tables (#1364), **three
+of four shards finished 41-95s above their longest file**: shard 3 ran 317s with a 221.8s heaviest
+file. The bound is `max(longest file, lane-seconds / lanes)` and only the first term had ever been
+checked, because the only durations anybody could read off a log came from queue positions 3-4 -- the
+shards where the file genuinely is binding.
+
+**Both halves were needed, and that is the result worth keeping.** Simulated over the pool: stride +
+name order 305s, stride + longest-first 266s, **LPT pack + name order 307s -- worse than doing
+nothing** -- and LPT pack + longest-first 237s. A balanced shard whose heaviest file is dequeued last
+still ends on that file's tail, so packing alone hands each shard a heavier heaviest file for no gain.
+Measured instance of the cost of the old order: `new-branch.tests.ps1` is alphabetically late, drew a
+lane at +40.9s, ran 249.2s, and set its shard's 290s makespan single-handedly.
+
+**The durations are a HINT and never a contract**, which is the whole safety argument for persisting
+anything at all. Every `*.tests.ps1` in the directory runs exactly once across the shards whether or
+not it appears in the file; a listed suite that no longer exists is ignored; an untimed suite is
+charged the maximum, so it opens in the first lanes rather than trailing sixteen others; and a missing,
+unparseable or empty file falls back to the stride. Stale data can cost wall clock, never coverage.
+
+**And the file is committed rather than written by the gate**, because the only durations worth packing
+a hosted runner from are a hosted runner's -- these suites run 3.6-4.0x faster on a workstation and the
+ratio is *not* uniform (`entry-scaffold` is ~11x). A gate that refreshed the file from whatever machine
+last ran it would pack CI off workstation figures and land worse than no data at all.
+`scripts/maintenance/record-suite-durations.ps1` regenerates it from a CI run's own tables and names
+those runs in the file.
+
+**#1358's headline is declined on the strength of this, not deferred.** At 237s the pool is finally at
+its longest file, so splitting that file buys the ~15s gap to the 16-lane work bound -- for the price
+of preserving 340 asserts across ~2,950 lines, which is the trade #714 refused. The arithmetic is now
+in `ci.yml` and in the gate docstring rather than in an issue thread, including why the shard count
+still does not go up: another runner lowers only the second term.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A subscriber gets the packing itself through the two plugin mirrors of `native-capture-lib.ps1`, and
+gets it **inert**: with no `suite-durations.json` beside their suites the gate strides exactly as
+before, same files, same order, same coverage. What they gain is the option -- drop a durations file in
+and their own sharded gate packs and orders itself -- plus a docstring that no longer tells them a
+duration-aware assignment cannot help, and now carries the arithmetic for when another shard stops
+paying.
+
+**Score:** 3
+
+#### Pull Request
+
+Pack and order the test shards by recorded duration
+
+Plugins: contributing-davekjohn, team-shopify
+
+[PR #1366](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1366)
+
+---
+
 ### DEPLOY: fix/lint-en-tests-cancelled-run · 20260904-075826
 
 The `lint-en-tests` summary job -- the single required check, added in #1351 -- ran with `if: always()`,
