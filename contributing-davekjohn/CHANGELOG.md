@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1395-empty-label-on-create · 20260904-221518
+
+`open-pr.ps1` sends no `--label` at all when the branch-prefix seam answers no label for a prefix it
+knows. It used to append `--label` unconditionally, so a repo that has abolished PR labels -- the issue
+**type** carries the classification there now -- had every gate pass, its branch pushed, and then the
+whole `gh pr create` refused over a label named `''`. The empty answer is now recognised before the
+`gh label list` call, so there is no lookup whose answer cannot matter and no success line announcing
+that `''` exists in the repository; the resolved label is normalised first, because `$null` in a native
+argument list is an empty argument rather than an absent one. Inbound #1395, measured in
+`BWJ-ecommerce/smartwatchbanden` on September 4, 2026, which had been opening its PRs by hand in the
+meantime.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's own prefix table names a label for all three of its prefixes, so nothing here
+changes. The consumer that reported it gets its scripted PR route back.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr sends no --label at all when the seam answers none
+
+Plugins: contributing-davekjohn
+
+[PR #1404](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1404)
+
+---
+
 ### DEPLOY: feat/bwj-codex-sync-log · 20260904-220935
 
 `bwj-codex` is now the shared **extra layer** for BWJ's two Shopify store repos rather than only their
