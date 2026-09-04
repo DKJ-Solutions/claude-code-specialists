@@ -846,10 +846,12 @@ may not restate the law in its own words.** A restatement is a copy, and a copy 
 it is written — only on the day the plugin's answer moves under it and the copy does not move with it.
 This is the same rule this workflow already applies one layer down, to code: a returned local copy of a
 shared function is not a bug on day one, it is a bug the day the two diverge (`check-script-contract.ps1`
-exists for exactly that shape). Nothing yet enforces the prose version of it — the gap a manifest-driven
-prose contract check could close is real, and is left as a follow-up rather than built into this section,
-because it needs its own design (what counts as an agreeing restatement, how the manifest is authored)
-rather than a paragraph.
+exists for exactly that shape). A manifest-driven check for the prose version of it was measured in the
+source repo and declined ([#1380](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1380)):
+a section that restates a law almost always also names the mechanism it is talking about, so a pointer
+test cannot tell correct deference from restatement-with-citation-and-override — the same distinction,
+one layer up, that `check-script-contract.ps1` gets to skip because a function call is unambiguous where
+a sentence is not. The numbers are in that repo's own system-administration lens, not shipped here.
 
 **Read this section end to end before writing a repo's own layering answer.** "Which file carries the
 floor is yours" and "the workflow's page wins" above are still both true and both local to the two
