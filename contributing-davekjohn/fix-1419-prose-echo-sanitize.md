@@ -126,5 +126,5 @@ shaping the report about itself.
 
 #### Pull Request
 
-The retired-name check sanitizes the consumer prose it echoes into session context
+Both consumer-prose session checks sanitize the line they echo into session context
 
