@@ -399,7 +399,16 @@ if (-not (Test-Path -LiteralPath $newBranch -PathType Leaf)) {
 $delegateOk = $false
 try {
     Write-Host ""
-    & $newBranch -Name $Name -Title $Title -Intent $Intent -RepoRoot $lanePath
+    # -SkipStaleBase (issue #1417) KEEPS THIS SCRIPT'S CONTRACT EXACTLY AS IT WAS. new-branch refuses a
+    # base behind origin/<trunk> since #1417, and that refusal is about an operator cutting from whatever
+    # HEAD they were standing on. There is no such choice here: step 3 above added this worktree DETACHED
+    # AT origin/$trunk, moments after a fetch this script refuses to proceed without. So the base was
+    # chosen by this script, deliberately and freshly, and the only thing new-branch's own fetch can
+    # discover is that origin moved in the seconds since -- which would refuse a lane, roll it straight
+    # back at step 5, and print `git pull --ff-only` as the remedy for a DETACHED worktree, where it is
+    # not the remedy. The warning still prints, which is the honest half; the refusal is the half that
+    # would be answering a question nobody asked here.
+    & $newBranch -Name $Name -Title $Title -Intent $Intent -RepoRoot $lanePath -SkipStaleBase
     $delegateOk = ($LASTEXITCODE -eq 0 -or $null -eq $LASTEXITCODE)
 } catch {
     Write-Host $_.Exception.Message -ForegroundColor Red
