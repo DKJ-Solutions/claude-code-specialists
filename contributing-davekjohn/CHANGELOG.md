@@ -32,6 +32,35 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/fix-1388-corollary-delegated-law-exception · 20260904-214401
+
+`CONTRIBUTING-portable.md`'s restatement corollary named three permitted moves for a consumer document
+(point, state a seam's answer, say nothing) and forbade a fourth (restate the law). `cut-release/SKILL.md`
+Block 2 instructs exactly that fourth move for the release-order law, which it deliberately answers with
+no seam. The corollary now names a fourth permitted move -- prose for a law the plugin explicitly declines
+to answer at all -- scoped to a plugin page that says so in as many words, and `cut-release` Block 2 now
+cross-references it. Neither page's underlying reasoning changed; only the corollary's coverage did.
+Fixes #1388.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer repo that reads both pages while deciding whether to keep a non-default release order note in
+its own `CLAUDE.md` no longer meets a contradiction between the two.
+
+**Score:** 2
+
+#### Pull Request
+
+Add the fourth move (deliberately delegated law, no seam) to CONTRIBUTING-portable.md's restatement corollary
+
+Plugins: contributing-davekjohn
+
+[PR #1393](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1393)
+
+---
+
 ### DEPLOY: docs/bwj-github-type-field-convention · 20260904-213855
 
 `bwj-codex` now carries the board's `Github Type` field the same way it carries `Github Issue`: an
