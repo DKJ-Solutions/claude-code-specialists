@@ -121,6 +121,13 @@ resume on a trunk two commits behind, no valve, exit 0.
 based the worktree at `origin/<trunk>` seconds earlier, so there is no operator choice to gate, and the
 refusal's own remedy (`git pull --ff-only`) is not the remedy for a detached worktree.
 
+**It overtakes two entries pending in this same block, and they are left as written.**
+`fix/1416-trunk-gap-one-definition` states that the scaffolder *"still warns and does not refuse"*, and
+`fix/fold-cross-device-duplicate-gate` that it *"deliberately only warns"*. Each was true on the day its
+branch merged, and an entry is the only durable record of why a branch held back -- so correcting them
+would destroy that record to repair a rendering. **This entry is the current one:** from this release
+`new-branch.ps1` refuses, and `-SkipStaleBase` is how you cut from a stale base anyway.
+
 Reason: it closes the hazard #1046 measured -- a complete duplicate of already-merged work, branch, commit,
 PR and every gate green on both, from a base 17 commits behind. Anyone who cuts a branch this way notices
 the day it first refuses.
