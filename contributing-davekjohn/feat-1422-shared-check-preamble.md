@@ -44,7 +44,8 @@ from the outside, both found by reading the tree:
   `check-git-identity.ps1` carries a `try`/`catch` variant. So outside a checkout one of the five
   answers and four die on `.Trim()` against `$null` under `Set-StrictMode` -- and nothing said which
   reading was intended, because both were written as though obviously right. The tolerant one wins:
-  three of the five run from a SessionStart hook, where an advisory check must not strand the session.
+  **four** of the five run from a SessionStart hook (`hooks.json` wires all but `check-branch-entry`,
+  which is the CI gate), and an advisory check must not strand the session it starts.
 - **The marketplace skip already has a name, and the two copies were asking the wrong question.**
   `Test-IsWorkflowSourceRepo` (seam-lib) exists precisely because *"does this repo publish plugins"*
   and *"is this repo the source of THIS workflow"* come apart under the one-product-one-repository
@@ -63,9 +64,12 @@ improvement. It would not, and the measured subset is smaller than even the issu
 - the **lib dot-sources** differ per check and have nothing shared to name.
 
 So the new lib holds exactly two things, and the boundary is the interesting half: it returns the
-**fact** and never the **verdict**. `''` means *"could not tell"*, and the four session checks exit 0
-on it while the CI gate exits 1 -- same input, opposite correct answer, which is why folding either
-into the lib would impose it on the other.
+**fact** and never the **verdict**. `''` means *"could not tell"*, and the five callers give **three
+different** answers to it -- the CI gate refuses, three session checks exit 0 because there is
+genuinely no prose and no trunk to judge, and `check-git-identity` needs no test at all, because `''`
+reaches `Get-GitUserName`, which drops the `-C` and reads the **global** git config, and comparing
+that against the active `gh` account is still a meaningful answer. Three verdicts from one
+resolution is the argument for the split: folding any of them into the lib imposes it on the other two.
 
 ### CREATE
 

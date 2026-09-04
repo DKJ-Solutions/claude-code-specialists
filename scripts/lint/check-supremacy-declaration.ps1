@@ -85,14 +85,32 @@ $ErrorActionPreference = 'Stop'
 # thereby the hook -- at every session start in the publishing repo. What the publishing repo needs here is
 # not a refusal but a SKIP, which is the marketplace test below and a different question.
 
-# Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the source
-# root copy falls back to the git root. Same resolution as every other mirrored script.
-$repoRoot = if ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+# THE ROOT COMES FROM ONE DEFINITION (#1422), the same call its sibling makes -- see the reasoning in
+# check-retired-doc-name.ps1 and in consumer-check-lib.ps1 itself. Dot-sourced guarded, so a mirror built
+# before this lib existed degrades to the old inline form rather than throwing.
+$checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
+if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
+
+$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+    Resolve-CheckRepoRoot -RootOverride $RootOverride
+} elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+
+# '' MEANS "COULD NOT TELL", and this is a SessionStart check, so that is nothing to judge rather than a
+# failure. The resolution is shared; the verdict is this script's own.
+if (-not $repoRoot) {
+    Write-Host '[OK] no git checkout here -- no always-on prose to judge.'
+    exit 0
+}
 
 # THE SKIP. See the docstring: a guard rather than a repair, measured at zero hits here on the day it was
 # written, kept because this is the repo where sentences about a consumer's supremacy rule get written.
-if (Test-Path -LiteralPath (Join-Path $repoRoot '.claude-plugin\marketplace.json') -PathType Leaf) {
-    Write-Host '[OK] this repo publishes the plugin -- its own pages are the source of the rank order, not a copy of it.'
+# SINCE #1422 IT ASKS Test-IsWorkflowSourceRepo rather than re-testing the manifest file inline, which is
+# both the sibling's call and #998's repair applied here: a repo that publishes some OTHER product's
+# marketplace while consuming this workflow is a consumer, and its inverted rank order is real drift that
+# the broad file test skipped in silence.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+if (Test-IsWorkflowSourceRepo -RepoRoot $repoRoot) {
+    Write-Host '[OK] this repo publishes the workflow -- its own pages are the source of the rank order, not a copy of it.'
     exit 0
 }
 
@@ -106,19 +124,15 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 
-# THE WALK IS NOT REIMPLEMENTED HERE, and neither is the corpus. Get-AlwaysOnDocuments owns the '@'-import
+# THE WALK IS NOT REIMPLEMENTED HERE, and neither is the corpus nor -- since #1422 -- its LOADING.
+# Get-CheckProseCorpus owns the guarded measure-context-lib load and the Get-AlwaysOnDocuments call, which
+# this check and check-retired-doc-name both carried verbatim; Get-AlwaysOnDocuments owns the '@'-import
 # closure; Get-ConsumerProseDocuments owns which of those documents a consumer-prose check may look in.
-# Loaded guarded rather than required: a tree that does not carry measure-context-lib.ps1 still gets the
-# workflow folder's own pages judged, which is where one of the two measured instances sat.
-$documents = @()
-$measureLib = Join-Path $PSScriptRoot '..\lib\measure-context-lib.ps1'
-if (Test-Path -LiteralPath $measureLib -PathType Leaf) {
-    . $measureLib
-    $root = if ($RootDocument) { $RootDocument } else { Join-Path $repoRoot 'CLAUDE.md' }
-    if (Test-Path -LiteralPath $root -PathType Leaf) {
-        $documents = @(Get-AlwaysOnDocuments -RootDocument $root -RepoRoot $repoRoot)
-    }
-}
+# Still guarded rather than required: a tree that carries neither lib gets @() and still has the workflow
+# folder's own pages judged, which is where one of the two measured instances sat.
+$documents = if (Get-Command Get-CheckProseCorpus -ErrorAction SilentlyContinue) {
+    @(Get-CheckProseCorpus -RepoRoot $repoRoot -RootDocument $RootDocument)
+} else { @() }
 
 $findings = @(Get-SupremacyDeclaration -RepoRoot $repoRoot -Documents $documents)
 

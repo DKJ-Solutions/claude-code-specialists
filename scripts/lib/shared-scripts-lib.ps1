@@ -269,6 +269,24 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The preamble every consumer-facing lint check opens with (issue #1422): the dual-context
+            # root resolution and the always-on prose corpus, in one definition where five entry points
+            # carried near-copies. IT HAS TO TRAVEL for the ordinary lib reason -- all five callers are
+            # mirrored, so a lib that stayed behind would leave every consumer's copy dot-sourcing a file
+            # they do not have.
+            #
+            # DEPENDENCY-FREE for Resolve-CheckRepoRoot, like plugin-tree-lib and source-repo-guard-lib:
+            # it is dot-sourced on the first line that resolves anything. Get-CheckProseCorpus loads
+            # measure-context-lib itself, guarded, from its own directory -- already mirrored here.
+            #
+            # NO CONTRACT ROW FOLLOWS: nothing in it is repo-owned. It reads an env var and asks git
+            # where it is, so there is no seam a consumer has to answer.
+            Name    = 'consumer-check-lib'
+            Source  = 'scripts\lib\consumer-check-lib.ps1'
+            Plugin  = 'contributing-davekjohn'
+            LibOnly = $true
+        },
+        @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
             Plugin  = 'team-alpha'

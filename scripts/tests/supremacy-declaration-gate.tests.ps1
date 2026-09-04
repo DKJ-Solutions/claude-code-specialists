@@ -334,11 +334,21 @@ try {
 
     # THE SKIP, measured on a real marketplace file rather than asserted about this repo: the same tree
     # answers [ERROR] without one and [OK] with one.
+    #
+    # BOTH DIRECTIONS SINCE #1422, for the reason its sibling suite states: the skip narrowed from
+    # "publishes plugins" to Test-IsWorkflowSourceRepo's "publishes THIS workflow", so a manifest
+    # publishing somebody else's product is a consumer and is judged. The negative case is asserted
+    # first, being the one the old broad file test would have passed as [OK].
     New-Item -ItemType Directory -Path (Join-Path $dutch '.claude-plugin') -Force | Out-Null
-    Set-Text -Dir $dutch -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [] }'
+    Set-Text -Dir $dutch -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "some-other-product" } ] }'
     $r = Invoke-Script -Dir $dutch
-    Assert-True ($r.Code -eq 0 -and $r.Out -match 'publishes the plugin') `
-        'a repo that publishes plugins is skipped -- its own pages are the source of the rank order'
+    Assert-True ($r.Code -eq 1 -and $r.Out -match '\[ERROR\]') `
+        'a repo publishing ANOTHER product is a consumer of this workflow -- still judged, not skipped'
+
+    Set-Text -Dir $dutch -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "contributing-davekjohn" } ] }'
+    $r = Invoke-Script -Dir $dutch
+    Assert-True ($r.Code -eq 0 -and $r.Out -match 'publishes the workflow') `
+        'a repo that publishes THIS workflow is skipped -- its own pages are the source of the rank order'
 
     # --- supremacy-declaration-sessioncheck.ps1, the hook (always exit 0) --------------------------
     Write-Host ''
