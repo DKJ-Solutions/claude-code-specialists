@@ -869,6 +869,27 @@ describing it to you was not, and nothing reads your `CLAUDE.md`. Measured: both
 workflow were still stating a retired name as current, one day and six days after the rename, and no
 mechanism existed by which either of them could have found out.
 
+**A second narrow slice is enforced the same way, and it is aimed at THIS section — the rank order
+itself.** `supremacy-declaration-sessioncheck` greps the same documents for a line declaring your own
+`CLAUDE.md` the winner over this page's layer: the two tokens `CLAUDE.md` and `wins`/`wint` sitting
+directly beside each other, with nothing between them but markdown. Adjacency is the whole rule, and it
+is what makes the check safe to run against prose — *"this page wins"* over `CLAUDE.md` is this ranking
+stated **correctly**, and a check that merely looked for both words nearby would report it as loudly as
+the inversion. A hit inside a `"…"` quotation is skipped: a page quoting a rule it has retired is
+narrating, not declaring.
+
+**It is the one contradiction the decline above proved nobody could see**
+([#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415)). A pointer test only ever
+flags a section that cites nothing, so a section that names this page and then overrides it four lines
+later sits among the findings such a test *suppresses* — invisible by construction, and invisible from
+both ends in practice, since you read your own page and follow it while the source repo never reads your
+page at all. Measured when the check was built: one live consumer carried two standing inversions, in
+its `CLAUDE.md` preamble and in its own `contributing-davekjohn/CONTRIBUTING.md`.
+
+**If you genuinely want your own constitution to lead, that is a seam answer, not a sentence.** The
+check reports rather than adjudicates, but the repair it names is the honest one: say so where the
+plugin asks to be told, instead of overriding this page in prose that only your own readers ever see.
+
 **A fourth move exists, and nothing named it until inbound
 [#1388](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1388): a law this plugin
 deliberately DELEGATES, with no seam and no page of its own answering it either.**

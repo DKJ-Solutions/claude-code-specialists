@@ -34,8 +34,8 @@
 ### PLAN
 
 Issue [#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415): the **second** of
-the two narrow literal greps the prose-contract decline (#1380) recorded as proportionate. The first
-landed earlier the same day as `check-retired-doc-name.ps1` (#1389, PR #1414); the second had no tracker
+the two narrow literal greps the prose-contract decline (#1380) recorded as proportionate. The first,
+`check-retired-doc-name.ps1` (#1389, PR #1414), landed earlier the same day; the second had no tracker
 entry at all until #1415, only a sentence in a lens.
 
 #### What the issue asked for, and the precondition it set
@@ -133,7 +133,8 @@ and `hooks/hooks.json` stays the one authority that cannot go stale.
 
 ### TEST
 
-- [x] `scripts/tests/supremacy-declaration-gate.tests.ps1` -- 27 asserts: the shared corpus on its own,
+- [x] `scripts/tests/supremacy-declaration-gate.tests.ps1` -- 27 asserts as first written (42 by the end,
+      once the review findings below had each been pinned): the shared corpus on its own,
       both measured instances as fixtures, the suppressed quotation, and the **direction** case (the rank
       order stated correctly must not fire), which is the assert that fails first if anybody loosens the
       pattern back toward co-occurrence.
@@ -143,13 +144,20 @@ and `hooks/hooks.json` stays the one authority that cannot go stale.
 - [x] `check-plugin-integrity.ps1`: 0 errors.
 - [x] Run the check against both live consumers and against this repo: 2 findings in `smartwatchbanden`,
       clean in `xoxowildhearts` (the quoted historical line correctly suppressed), skip here.
-- [x] Measure the seventh session hook's cost, and re-measure the sibling in the same run rather than
-      quoting its recorded figure -- 781 ms against 799 ms.
 - [x] Review chain: Victor (code), Edith (copy), Sebastian (security), Nolan (cost), in parallel on the
-      diff. Two findings repaired here -- the wrapping false negative and a date contradiction across
-      three passages; two filed (#1419, #1420); two more filed as deferred design (#1421, #1422).
-- [x] Re-run everything after the repair: new suite 37/37, `retired-doc-name-gate` 25/25,
-      `source-repo-guard` 46/46, lint gate 0 errors, and the live-consumer run re-measured.
+      diff, then Victor and Edith again on the repairs. **Four findings repaired here** -- the wrapping
+      false negative, the list-item regression the wrap repair itself introduced, a date contradiction
+      across three passages, and a stale cost figure; **four filed** (#1419, #1420, #1421, #1422).
+- [x] Measure the seventh session hook's cost, re-measuring the sibling in the same run rather than
+      quoting its recorded figure -- 728 ms against 798 ms, and 1,484 ms against the sibling's 1,312 ms
+      on a consumer that has findings, so the paragraph joining costs about 13%.
+- [x] Re-take that measurement **after** the repair rather than before it. The first figures were taken
+      before the wrapping defect was found, and the repair makes the check do strictly more work per
+      document -- so they would have shipped as a current, dated fact about code that no longer existed.
+      Caught by the copy edit; no gate reads a measurement's age.
+- [x] Re-run everything after the repairs: new suite 42/42, `retired-doc-name-gate` 25/25,
+      `source-repo-guard` 46/46, `entry-scaffold` 691/691, `shared-scripts` 508/508, lint gate 0 errors,
+      and the live-consumer run re-measured -- still 2 findings, both true, `xoxowildhearts` still clean.
 
 #### The one significant defect review found, and it was nearly invisible
 
@@ -177,6 +185,22 @@ into a single "quoted" span and suppress every real finding after it. The same r
 true; `xoxowildhearts` still clean, which is now a stronger result than before -- at paragraph scope its
 retired-page quotation is a live false-positive risk that the quote-span suppression has to catch, and
 does. The source repo still measures zero without the skip, so the "guard, not repair" note above stands.
+
+**And the repair introduced a defect of its own, which the second review pass caught.** A tight list has
+no blank line between its items, and `*` is *both* a bullet marker and the bold decoration the gap class
+has to allow -- so joining a paragraph ran two unrelated bullets together:
+
+```text
+* Read the constitution in `CLAUDE.md`
+* wins arguments only when they cite the correct rank order.
+```
+
+reported `` `CLAUDE.md` * wins `` -- a declaration present in neither line. **The per-line detector could
+not have this defect**, because it never attempted cross-line adjacency at all: widening the match is
+what created it, which is the honest shape of most precision work. A list item now starts its own unit
+and its marker is dropped, exactly as a blockquote marker is. All three marker shapes are pinned in the
+suite, not only `*` -- `-` and `1.` cannot bridge today because they are outside the gap class, and the
+asserts are what keep that true if anyone widens it.
 
 #### One defect the suite caught in itself, kept because it is a real trap
 

@@ -6926,6 +6926,75 @@ function Get-RetiredBranchDocNames {
     return @($names | Sort-Object -Property @{ Expression = { $_.Name.Length }; Descending = $true }, Name)
 }
 
+function Get-ConsumerProseDocuments {
+    <#
+        The repo-relative paths of a CONSUMER's own law-bearing prose -- the #1380 corpus, as an
+        INCLUSION list. One definition, shared by every check that asks "does this repo's own prose
+        contradict the plugin": Get-RetiredDocNameMention (#1389) and Get-SupremacyDeclaration (#1415).
+
+        IT IS SHARED BECAUSE THE CORPUS IS THE HALF THAT IS EASY TO GET SUBTLY WRONG. The detectors
+        differ -- one looks for a filename, the other for a direction -- but which documents they are
+        allowed to look in is one question with one answer, and the exclusions below are each load-bearing
+        for a measured reason. Two copies of this would drift on the day a third exclusion is found, and
+        the copy that missed it would report a document the other correctly ignores.
+
+        Two kinds of page:
+
+          1. the always-on closure -- CLAUDE.md and everything it '@'-imports -- passed in as -Documents,
+             because that walk belongs to measure-context-lib.ps1 and a second walk here would be a second
+             definition of the always-on path;
+          2. the workflow folder's own permanent pages, MINUS its changelog.
+
+        THE CHANGELOG EXCLUSION IS NOT OPTIONAL. A folded entry correctly names the file, and states the
+        rule, that was current on the day it landed, so a check that read the changelog would be born red
+        on its own past -- which this repo already names as a smell in itself, and which is the recorded
+        reason #1380's declaration-based candidate was set aside at 88/88. releases/ is out by the same
+        logic and needs no rule of its own: it is neither always-on nor a reserved page, so it never
+        enters the set. Excluded by NAME out of ReservedNames rather than through Get-ChangelogPath, on
+        that property's own reasoning -- a seam may point anywhere, and a lib that went looking for a repo
+        root to resolve it is a lib that can find the wrong tree.
+
+        PLUGIN-SHIPPED PAYLOAD IS EXCLUDED (Source -ne 'tree'). The orchestrator's persona is '@'-imported
+        from the marketplace clone by every repo, so it is one file rather than one finding per consumer --
+        and it is the plugin's own text, which is the thing a consumer is supposed to be pointing AT.
+        Without this exclusion #1380's own corpus counted it three times.
+
+        A PER-BRANCH DOCUMENT IS NOT IN THE SET EITHER, and it falls out for free: it is transient working
+        prose, it is not always-on, and it is not a reserved page. A branch whose own plan discusses a
+        rename or a supremacy rule would otherwise report itself.
+
+        IT RETURNS PATHS, NOT CONTENT, and it does not check that they exist. The caller joins them to its
+        own RepoRoot and skips what is missing -- which is what lets the same list describe a consumer that
+        carries the workflow folder and one that does not.
+    #>
+    param(
+        # The always-on rows from Get-AlwaysOnDocuments. Optional: a caller with no walk available still
+        # gets the folder's own pages judged, which is where one of #1389's two measured instances sat.
+        [object[]]$Documents = @()
+    )
+
+    $paths = Get-BranchFilePaths
+    $rels = New-Object System.Collections.Generic.List[string]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($doc in $Documents) {
+        if (-not $doc) { continue }
+        if (-not $doc.Exists) { continue }
+        if ($doc.Source -ne 'tree') { continue }
+        $rel = [string]$doc.Display
+        if ($rel -and $seen.Add($rel)) { $rels.Add($rel) | Out-Null }
+    }
+
+    foreach ($reserved in @($paths.ReservedNames)) {
+        if (-not $reserved) { continue }
+        if ($reserved -ieq 'CHANGELOG.md') { continue }
+        $rel = "$($paths.Directory)/$reserved"
+        if ($seen.Add($rel)) { $rels.Add($rel) | Out-Null }
+    }
+
+    return $rels.ToArray()
+}
+
 function Get-RetiredDocNameMention {
     <#
         Every line in a CONSUMER's own law-bearing prose that carries a retired name from
@@ -6970,27 +7039,10 @@ function Get-RetiredDocNameMention {
         [object[]]$Documents = @()
     )
 
-    $paths = Get-BranchFilePaths
     $retired = @(Get-RetiredBranchDocNames)
     if ($retired.Count -eq 0) { return @() }
 
-    $rels = New-Object System.Collections.Generic.List[string]
-    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-
-    foreach ($doc in $Documents) {
-        if (-not $doc) { continue }
-        if (-not $doc.Exists) { continue }
-        if ($doc.Source -ne 'tree') { continue }
-        $rel = [string]$doc.Display
-        if ($rel -and $seen.Add($rel)) { $rels.Add($rel) | Out-Null }
-    }
-
-    foreach ($reserved in @($paths.ReservedNames)) {
-        if (-not $reserved) { continue }
-        if ($reserved -ieq 'CHANGELOG.md') { continue }
-        $rel = "$($paths.Directory)/$reserved"
-        if ($seen.Add($rel)) { $rels.Add($rel) | Out-Null }
-    }
+    $rels = @(Get-ConsumerProseDocuments -Documents $Documents)
 
     $findings = New-Object System.Collections.Generic.List[object]
     foreach ($rel in $rels) {
@@ -7032,4 +7084,240 @@ function Get-RetiredDocNameMention {
     }
 
     return @($findings | Sort-Object -Property Rel, Line, Name)
+}
+
+function Get-ProseParagraphUnits {
+    <#
+        A document's lines regrouped into the units a READER sees: one entry per blank-line-separated
+        paragraph, blockquote markers stripped, hard-wrapped continuation lines joined with a single
+        space -- each carrying a map back to the source line every piece came from. Issue #1415.
+
+        WHY THIS EXISTS, AND IT IS A MEASURED DEFECT RATHER THAN A REFINEMENT. Get-SupremacyDeclaration
+        first matched per PHYSICAL line, and this repo's prose convention hard-wraps paragraphs at about
+        100 columns -- so an ordinary sentence puts 'CLAUDE.md' at the end of one line and 'wins' at the
+        start of the next, and an adjacency test that never sees the two together reports nothing. Found
+        by review and reproduced before it was repaired, in both forms:
+
+            On any real conflict between the two, `CLAUDE.md`
+            wins, and the contributing page is simply wrong.        -> 0 findings
+
+            > Bij tegenspraak wint
+            > `CLAUDE.md` en is de contributor-pagina de bug.       -> 0 findings
+
+        THE BLOCKQUOTE HALF IS THE ONE THAT MATTERS MOST, because the single real instance this whole
+        check exists for lives in a blockquote. It happens to sit on one physical line today, so the
+        check found it -- one editor re-wrapping that paragraph would have silently emptied the gate
+        while every test still passed.
+
+        THE SAME SHAPE IS ALREADY SETTLED ONE FILE UP. Get-EntryCodeSpans runs '(?s)' over the whole
+        joined text, with the reason written beside it -- "because a span may legitimately wrap a line in
+        prose". This is that reasoning applied to the same file's newest reader.
+
+        NOT A WHOLE-DOCUMENT JOIN, DELIBERATELY. Matching over the entire text would let a bounded gap
+        bridge two unrelated paragraphs, and -- worse -- would let one unbalanced quotation mark swallow
+        the rest of the document into a single "quoted" span and suppress every real finding after it.
+        The paragraph is the largest unit where both a sentence and its quotation marks reliably close.
+
+        The map is kept as one row per appended segment (its offset in the joined text, and the source
+        line it came from) rather than per character: a caller resolves a match to its line by taking the
+        last row at or before the match offset, which is what lets a finding still name a real line
+        number in the file somebody has to go and edit.
+    #>
+    # AllowEmptyString/AllowEmptyCollection are load-bearing, not defensive: the blank lines that
+    # SEPARATE the paragraphs are the input, and a Mandatory [string[]] validates every element -- so
+    # without these the function refuses exactly the documents it exists to read.
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [AllowEmptyCollection()]
+        [string[]]$Lines
+    )
+
+    $units = New-Object System.Collections.Generic.List[object]
+    $buffer = New-Object System.Text.StringBuilder
+    $segments = New-Object System.Collections.Generic.List[object]
+
+    function Add-Unit {
+        if ($buffer.Length -gt 0) {
+            $units.Add([pscustomobject]@{ Text = $buffer.ToString(); Segments = $segments.ToArray() }) | Out-Null
+        }
+        $buffer.Clear() | Out-Null
+        $segments.Clear()
+    }
+
+    for ($i = 0; $i -le $Lines.Count; $i++) {
+        # One pass past the end, so a document whose last paragraph runs to EOF is still emitted.
+        $raw = if ($i -lt $Lines.Count) { [string]$Lines[$i] } else { '' }
+
+        # Blockquote markers are stripped, not treated as text: '>' is punctuation the reader does not
+        # see, and leaving it in would break the adjacency it sits between on a wrapped quote.
+        $stripped = ($raw -replace '^\s*>+\s?', '')
+
+        if ($stripped.Trim() -eq '') { Add-Unit; continue }
+
+        # A LIST ITEM STARTS A NEW UNIT, and this is a measured regression rather than a nicety. Tight
+        # lists are written with no blank line between the items, so without this the join runs two
+        # unrelated bullets together -- and '*' is BOTH a bullet marker and the bold/italic decoration
+        # the gap class has to allow, so a '*'-bulleted pair bridges into a match that exists in neither
+        # item:
+        #
+        #     * Read the constitution in `CLAUDE.md`
+        #     * wins arguments only when they cite the correct rank order.
+        #
+        # matched '`CLAUDE.md` * wins' -- a declaration in no line of the document. Found by review of
+        # the wrap repair itself, which is what introduced it: the per-line detector never attempted
+        # cross-line adjacency, so it could not have this defect.
+        #
+        # EVERY marker shape breaks the unit, not only '*'. Today '-', '+' and '1.' cannot bridge anyway
+        # because they are outside the gap class -- which is exactly why they are included here: the day
+        # somebody widens that class for a new decoration, the bound should already hold rather than
+        # produce this same defect a second time in a shape nobody is looking for.
+        $isListItem = $stripped -match '^\s*(?:[\*\-\+]|\d+[\.\)])\s+\S'
+        if ($isListItem) {
+            Add-Unit
+            # The marker itself is dropped for the reason the blockquote marker is: it is punctuation
+            # structuring the page, not a word in the sentence the reader is judging.
+            $stripped = $stripped -replace '^\s*(?:[\*\-\+]|\d+[\.\)])\s+', ''
+        }
+
+        if ($buffer.Length -gt 0) { $buffer.Append(' ') | Out-Null }
+        $segments.Add([pscustomobject]@{ Start = $buffer.Length; Line = $i + 1 }) | Out-Null
+        $buffer.Append($stripped) | Out-Null
+    }
+
+    return $units.ToArray()
+}
+
+function Resolve-ProseUnitLine {
+    <#
+        The source line a match at $Offset inside one Get-ProseParagraphUnits unit came from: the last
+        segment starting at or before that offset. Issue #1415.
+
+        THE MATCH ITSELF MAY SPAN TWO LINES -- that is the entire point of joining them -- so this
+        answers with the line the match BEGINS on, which is the line a reader opens to repair it.
+    #>
+    param(
+        [Parameter(Mandatory)][object]$Unit,
+        [Parameter(Mandatory)][int]$Offset
+    )
+
+    $line = 1
+    foreach ($seg in @($Unit.Segments)) {
+        if ($seg.Start -le $Offset) { $line = $seg.Line } else { break }
+    }
+    return $line
+}
+
+function Get-SupremacyDeclaration {
+    <#
+        Every line in a CONSUMER's own law-bearing prose that declares its OWN 'CLAUDE.md' the winner
+        over the workflow's contributing page -- i.e. a repo inverting LAW-THIRD-RANK-ORDER, which puts
+        the plugin's portable pages above 'contributing-davekjohn/CONTRIBUTING.md' and that above the
+        floor. Issue #1415.
+
+        THE HOLE THIS CLOSES. #1380's whole finding was that a pointer test is STRUCTURALLY blind to
+        cites-then-contradicts: a flagged finding is by construction a section carrying no citation, so a
+        section that names its source and then overrides it can only ever appear among the SUPPRESSED
+        findings. The census there was 4 suppressed sections -- 1 contradiction, 3 correct deferrals --
+        and the one is the defect below. Nothing in the tree could see it, which is why the decline
+        recorded a narrow literal grep for it instead of reviving the framework.
+
+        WHAT THE RECORDED GREP SAID, AND WHY THIS IS NOT IT. The decline recorded the alternative as
+        "'wins'/'wint' plus 'CLAUDE.md' plus the contributing page's own filename, all three in the same
+        sentence". #1415 asked for that shape to be MEASURED before it shipped, because it had never been
+        run, and the measurement overturned it. Over the same 8-document corpus:
+
+            scope         raw   true   precision   recall (of the standing instances)
+            line            0      0      --           0 of 2
+            sentence        0      0      --           0 of 2      <- the recorded shape
+            paragraph       1      0      0%           0 of 2
+
+        Zero, at the scope the decline actually named, on the one defect it was named to catch. The
+        reason is exact and worth keeping: the real sentence is
+        "Bij tegenspraak wint `CLAUDE.md` en is de contributor-pagina de bug" -- it names the contributing
+        page by a Dutch PROSE NOUN, 'de contributor-pagina', not by its filename. The third term is
+        precisely the term that is absent. Loosening the scope to a paragraph does find something, and
+        what it finds is a false positive; loosening the third term to catch prose nouns is the step into
+        fuzzy matching that #1380 already declined.
+
+        WHAT IS SHIPPED INSTEAD: ADJACENCY, WHICH ENCODES DIRECTION. 'CLAUDE.md' and 'wins'/'wint' must
+        sit NEXT TO each other, in either order, with nothing between them but whitespace and markdown
+        markup. That is still a purely literal character test -- it never reads what a sentence means --
+        but it answers the one question co-occurrence cannot: WHICH page is being declared the winner.
+        Direction is the whole defect. 'this page wins' over CLAUDE.md is the law stated CORRECTLY, and a
+        term list holding both words scores it identically to the inversion; adjacency separates them,
+        because the subject of the verb is the token beside it. Measured on the same corpus:
+        3 raw / 2 reported / 2 true / 100% precision, and it finds BOTH standing instances -- one more
+        than #1380's census knew about.
+
+        THE ONE SUPPRESSION, AND ITS ONE INSTANCE. A hit sitting wholly inside a '"..."' span is skipped.
+        The instance is xoxowildhearts quoting the closing line of a page it RETIRED, in order to explain
+        why it removed it -- somebody else's words, reported, not this document's own claim. That is the
+        same class as the changelog exclusion in Get-ConsumerProseDocuments and it is literal in the same
+        way: a character-span test, not a reading. STATED PLAINLY, IT RESTS ON A SINGLE INSTANCE -- one
+        false positive is a thin basis for a rule, and it is kept because without it precision is 67% and
+        with it 100%, against a bar this repo sets by its accepted dead-link check (17 findings, 17 real)
+        and its declined stale-path check (124 findings, none real).
+
+        WHAT IT DOES NOT DO is decide whether a repo is ALLOWED to invert the order. It is not: the third
+        rank is the plugin's, and a consumer that wants its own constitution to lead states that as a seam
+        answer rather than by overriding the page in prose. But the check reports rather than adjudicates,
+        and its message says which line to repair rather than what the repo should have meant.
+
+        THE TWO STANDING INSTANCES, both in BWJ-ecommerce/smartwatchbanden, measured September 4, 2026:
+        'CLAUDE.md:22' (the preamble inversion, the one #1380 could not see) and
+        'contributing-davekjohn/CONTRIBUTING.md:306' (the SAME inversion stated from the other side, which
+        the #1380 census never counted at all).
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # The always-on rows from Get-AlwaysOnDocuments -- passed straight through to the shared corpus.
+        [object[]]$Documents = @()
+    )
+
+    $rels = @(Get-ConsumerProseDocuments -Documents $Documents)
+
+    # ADJACENT, EITHER ORDER. The gap class holds whitespace and the markdown that decorates a term --
+    # backticks, bold/italic markers, link brackets -- and nothing else. A comma or a word in between
+    # ends the adjacency, which is the point: 'CLAUDE.md, which the contributing page wins over' is a
+    # different claim and must not match. The cap keeps a long decorated run from bridging two clauses.
+    # Dutch 'wint' sits beside English 'wins' because a consumer's constitution may be in either -- the
+    # two live consumers are one of each, which is how the Dutch instance was found.
+    $gap = '[\s`\*_\[\]\(\)]{0,12}'
+    $pattern = "(?i)(?:``?CLAUDE\.md``?$gap\b(?:wins|wint)\b|\b(?:wins|wint)\b$gap``?CLAUDE\.md``?)"
+
+    $findings = New-Object System.Collections.Generic.List[object]
+    foreach ($rel in $rels) {
+        $full = Join-Path $RepoRoot ($rel -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
+        $text = [System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8)
+        $lines = $text -split "(?:\r\n|\n|\r)"
+
+        # PARAGRAPHS, NOT PHYSICAL LINES -- see Get-ProseParagraphUnits for the two reproduced false
+        # negatives that forced this. Both the adjacency match and the quotation suppression run on the
+        # joined unit, because a wrapped sentence and a wrapped quotation are the same problem.
+        foreach ($unit in @(Get-ProseParagraphUnits -Lines $lines)) {
+            $quotes = @([regex]::Matches($unit.Text, '"[^"]*"'))
+            foreach ($m in ([regex]::Matches($unit.Text, $pattern))) {
+                $quoted = $false
+                foreach ($q in $quotes) {
+                    if ($m.Index -ge $q.Index -and ($m.Index + $m.Length) -le ($q.Index + $q.Length)) { $quoted = $true; break }
+                }
+                if ($quoted) { continue }
+
+                $lineNo = Resolve-ProseUnitLine -Unit $unit -Offset $m.Index
+                $findings.Add([pscustomobject]@{
+                    Rel   = $rel
+                    Line  = $lineNo
+                    # The match is reported from the JOINED text, so a declaration that wrapped reads as
+                    # one phrase here even though the file breaks it in two -- which is the thing the
+                    # reader needs to recognise. Text stays the physical line they will open.
+                    Match = ($m.Value -replace '\s+', ' ').Trim()
+                    Text  = ([string]$lines[$lineNo - 1]).Trim()
+                }) | Out-Null
+            }
+        }
+    }
+
+    return @($findings | Sort-Object -Property Rel, Line)
 }
