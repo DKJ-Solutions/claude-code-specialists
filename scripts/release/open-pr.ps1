@@ -144,7 +144,10 @@
     impact gates are not, and a query that fails or returns nothing readable leaves the old behaviour
     rather than blocking. The refusal names the label, the prefix that produced it, the seam file that
     maps them and the labels that do exist -- see Get-MissingLabelNote for why neither substituting nor
-    dropping the label is the kindness it looks like.
+    dropping the label is the kindness it looks like. A seam that answers NO label for a prefix it knows
+    is the one case that is not a finding (inbound #1395, September 4, 2026, measured in a consumer that
+    abolished PR labels outright): there is nothing to look up, and the create sends no --label at all
+    rather than `--label ''`, which gh reads as a label that does not exist and refuses the create over.
 
     Lint gate (guardrail for main): before the push, scripts/lint/check-plugin-integrity.ps1 runs.
     If that finds errors (invalid marketplace/plugin manifests, missing agent-def frontmatter,
@@ -1090,34 +1093,63 @@ if (-not $existingPr) {
         $label = 'question'
         Write-Warning "Unknown branch prefix '$($info.Prefix)' - label 'question' set; classify the PR manually."
     }
+    # NORMALISED TO A STRING BEFORE ANYTHING READS IT, because the seam is free to answer $null (see
+    # directly below) and $null is not '' to a native argument list -- it becomes an EMPTY ARGUMENT,
+    # which is the defect this block now handles. Trimmed for the same reason: ' ' is not a label name
+    # either, and neither case should have to be recognised twice further down.
+    $label = "$label".Trim()
 
-    # -Utf8 because a label name is DATA and routinely carries an emoji or an accent (#907), and
-    # -DiscardStderr because gh's own progress is not the answer -- the exit code and the payload are.
-    # --limit is load-bearing: `gh label list` defaults to 30, and a truncated list would refuse a PR
-    # over a label that exists but did not fit.
-    $labelLookup = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('label', 'list', '--json', 'name', '--limit', '500', '--repo', $repo) -DiscardStderr
-    # A FAILED OR UNREADABLE QUERY IS NOT AN ANSWER, and it deliberately does not block -- the same
-    # reasoning the existing-PR lookup gives. An old gh with no --json, a network hiccup or a repo with
-    # no labels at all leaves the behaviour this script always had: gh judges the label at the create.
-    $repoLabels = @()
-    if ($labelLookup.ExitCode -ne 0) {
-        Write-Warning "label gate: could not ask gh which labels $repo has (exit $($labelLookup.ExitCode)) - continuing, so 'gh pr create' is again the one that judges '$label', after the push."
+    # NO LABEL AT ALL IS A LEGITIMATE SEAM ANSWER, AND NOT THIS GATE'S SUBJECT (inbound #1395).
+    #
+    # THE DEFECT. Measured in BWJ-ecommerce/smartwatchbanden on September 4, 2026, which abolished PR
+    # labels outright -- the issue TYPE now carries that classification -- so its prefix table answers
+    # Label = $null for every prefix it knows. Get-MissingLabelNote already reads an empty label as
+    # "nothing to check"; nothing after it did. The lookup asked gh for a list whose answer could not
+    # matter, the success line announced that '' exists in the repository, and the create appended
+    # `--label ''` -- which gh reads as a label that does not exist, and it refuses the WHOLE create,
+    # after the push, with every gate including this one green. That is exactly the failure the label
+    # gate was built to end, reached by the one path the gate anticipated and did not carry through.
+    #
+    # THE QUERY IS SKIPPED, not merely the compare: a gh call whose answer cannot change the outcome is
+    # the cheapest thing in this script to leave out, and both of its failure warnings would otherwise
+    # go on to name a label there is none of.
+    #
+    # THIS IS NOT THE FALLBACK Get-MissingLabelNote REFUSES TO TAKE. That refusal is about a label the
+    # seam NAMED and the repository does not have, where dropping it would sail a PR past a workflow
+    # that gates on the label. Here the repo has SAID there is no label: sending none is the answer it
+    # gave, not a silent kindness taken on its behalf.
+    if (-not $label) {
+        Write-Host "label gate: scripts\lib\branch-info.ps1 gives the '$($info.Prefix)/' prefix no label - nothing to check, and the create sends no --label at all." -ForegroundColor DarkGray
     } else {
-        $repoLabels = @(Get-LabelNames -Json ($labelLookup.Output -join "`n"))
-        if ($repoLabels.Count -eq 0) {
-            Write-Warning "label gate: gh returned no readable label for $repo - continuing, so 'gh pr create' is again the one that judges '$label', after the push."
-        }
-    }
 
-    if ($repoLabels.Count -gt 0) {
-        $labelNote = Get-MissingLabelNote -Labels $repoLabels -Label $label `
-                                          -Prefix $(if ($info.IsKnown) { $info.Prefix } else { '' }) `
-                                          -SeamPath 'scripts\lib\branch-info.ps1' -Repo $repo
-        if ($labelNote) {
-            Write-Error "label gate: $labelNote`n`nNothing pushed, no PR opened."
-            exit 1
+        # -Utf8 because a label name is DATA and routinely carries an emoji or an accent (#907), and
+        # -DiscardStderr because gh's own progress is not the answer -- the exit code and the payload are.
+        # --limit is load-bearing: `gh label list` defaults to 30, and a truncated list would refuse a PR
+        # over a label that exists but did not fit.
+        $labelLookup = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('label', 'list', '--json', 'name', '--limit', '500', '--repo', $repo) -DiscardStderr
+        # A FAILED OR UNREADABLE QUERY IS NOT AN ANSWER, and it deliberately does not block -- the same
+        # reasoning the existing-PR lookup gives. An old gh with no --json, a network hiccup or a repo with
+        # no labels at all leaves the behaviour this script always had: gh judges the label at the create.
+        $repoLabels = @()
+        if ($labelLookup.ExitCode -ne 0) {
+            Write-Warning "label gate: could not ask gh which labels $repo has (exit $($labelLookup.ExitCode)) - continuing, so 'gh pr create' is again the one that judges '$label', after the push."
+        } else {
+            $repoLabels = @(Get-LabelNames -Json ($labelLookup.Output -join "`n"))
+            if ($repoLabels.Count -eq 0) {
+                Write-Warning "label gate: gh returned no readable label for $repo - continuing, so 'gh pr create' is again the one that judges '$label', after the push."
+            }
         }
-        Write-Host "label gate: label '$label' exists in $repo." -ForegroundColor DarkGray
+
+        if ($repoLabels.Count -gt 0) {
+            $labelNote = Get-MissingLabelNote -Labels $repoLabels -Label $label `
+                                              -Prefix $(if ($info.IsKnown) { $info.Prefix } else { '' }) `
+                                              -SeamPath 'scripts\lib\branch-info.ps1' -Repo $repo
+            if ($labelNote) {
+                Write-Error "label gate: $labelNote`n`nNothing pushed, no PR opened."
+                exit 1
+            }
+            Write-Host "label gate: label '$label' exists in $repo." -ForegroundColor DarkGray
+        }
     }
 }
 
@@ -1630,12 +1662,19 @@ $extraGhArgs = @()
 if ($assignee) { $extraGhArgs += @('--assignee', $assignee) }
 if ($milestone) { $extraGhArgs += @('--milestone', $milestone) }
 
+# THE LABEL IS AN ARG LIST FOR THE SAME REASON THOSE TWO ARE (inbound #1395): a flag whose value may
+# legitimately be absent is composed, never interpolated into the fixed list. `--label ''` is not "no
+# label" to gh -- it is a label named '' that the repository does not have, and gh refuses the whole
+# create over it. The label gate above has already said which of the two cases this is, so nothing is
+# decided here; this only stops the empty answer from becoming an empty argument.
+$labelArgs = if ($label) { @('--label', $label) } else { @() }
+
 try {
     # gh writes some of its progress/URL to stderr; Invoke-NativeCapture runs it under EAP=Continue
     # so a stderr line cannot become a terminating error before the exit-code check (#107, the same
-    # pitfall as the push above). The optional assignee/milestone args are appended to the fixed
+    # pitfall as the push above). The optional label/assignee/milestone args are appended to the fixed
     # argument list. The temp body file is cleaned up in finally, whether or not gh succeeds.
-    $create = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('pr', 'create', '--base', 'main', '--head', $branch, '--title', $prTitle, '--body-file', $bodyFile, '--label', $label, '--repo', $repo) + $extraGhArgs)
+    $create = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('pr', 'create', '--base', 'main', '--head', $branch, '--title', $prTitle, '--body-file', $bodyFile, '--repo', $repo) + $labelArgs + $extraGhArgs)
     $create.Output | ForEach-Object { Write-Host $_ }
     if ($create.ExitCode -ne 0) {
         # GH'S OWN MESSAGE IS THE REASON; THE LOGIN HINT IS A SUFFIX (inbound #1077). This line used to

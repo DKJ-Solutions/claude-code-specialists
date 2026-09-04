@@ -1362,7 +1362,7 @@ Assert-Equal '' (Get-MissingLabelNote -Labels @('Bug') -Label 'bug' -Prefix 'fix
 # no labels at all. A diagnostic must never be the reason a PR cannot be opened.
 Assert-Equal '' (Get-MissingLabelNote -Labels @() -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'an empty label list is "unknowable" and not "absent"'
 Assert-Equal '' (Get-MissingLabelNote -Labels $null -Label 'bug' -Prefix 'fix' -Repo 'x/y') 'and so is no list at all'
-Assert-Equal '' (Get-MissingLabelNote -Labels $labelNames -Label '' -Prefix 'fix' -Repo 'x/y') 'and so is an empty label -- that is the nameless-PR guard subject, not this gate'
+Assert-Equal '' (Get-MissingLabelNote -Labels $labelNames -Label '' -Prefix 'fix' -Repo 'x/y') 'and so is an empty label -- a repo that attaches none has nothing for this gate to judge (inbound #1395)'
 
 # THE FALLBACK HAS THE SAME HOLE ONE LAYER DOWN, which the report named: open-pr substitutes 'question'
 # for an unknown prefix, and that is a GitHub DEFAULT label a repo may equally have deleted. The check
@@ -1399,6 +1399,38 @@ $idxResolve = $openPrText.IndexOf('$label = $info.Label')
 Assert-True ($idxResolve -ge 0 -and $idxResolve -lt $idxPush) 'the label is RESOLVED before the push too -- a check on a label resolved later would be checking nothing'
 Assert-True (([regex]::Matches($openPrText, '\$label = \$info\.Label')).Count -eq 1) 'and resolved in exactly one place, so the checked label and the sent label cannot differ'
 Assert-True ($openPrText -like '*if (-not $existingPr) {*') 'the gate is on the create path only -- an existing PR keeps its own labels and is never sent one'
+
+Write-Host ""
+Write-Host "open-pr.ps1 sends NO --label when the seam answers none (inbound #1395)" -ForegroundColor Cyan
+# THE MEASURED CASE. BWJ-ecommerce/smartwatchbanden abolished PR labels outright on September 4, 2026 --
+# the issue TYPE carries the classification now -- so its prefix table answers Label = $null for every
+# prefix it knows. Get-MissingLabelNote reads that as "nothing to check" (asserted above) and the create
+# appended `--label ''` anyway, which gh reads as a label that does not exist: it refuses the WHOLE
+# create, after the push, with every gate including the label gate green.
+#
+# TEXT ASSERTS, for the same reason the block above gives: the script is the one caller no suite gets to
+# run, and the helper being right is exactly what was already true when this failed.
+$idxCreateLine = $openPrText.IndexOf("@('pr', 'create'")
+$createLine    = if ($idxCreateLine -ge 0) { ($openPrText.Substring($idxCreateLine) -split "`n")[0] } else { '' }
+Assert-True ($createLine -notlike '*--label'', $label*') 'the create no longer interpolates the label into its fixed argument list -- an empty answer became `--label ''''`, a label gh cannot find'
+Assert-True ($createLine -like '*+ $labelArgs*') 'it appends a composed $labelArgs instead, the way it already appends the optional assignee and milestone'
+Assert-True (([regex]::Matches($openPrText, '\$labelArgs = if \(\$label\)')).Count -eq 1) 'and $labelArgs is composed in exactly one place, so the checked label and the sent label still cannot differ'
+Assert-True ($openPrText -like '*$labelArgs = if ($label) { @(''--label'', $label) } else { @() }*') 'the flag travels only when there is a label to put behind it'
+
+# THE NORMALISATION IS PART OF THE REPAIR, not tidiness: the seam is free to answer $null, and $null in a
+# native argument list is an EMPTY ARGUMENT rather than an absent one. Trimmed too -- ' ' is not a label.
+$idxTrim = $openPrText.IndexOf('$label = "$label".Trim()')
+Assert-True ($idxTrim -ge 0) 'the resolved label is normalised to a trimmed string, so a $null or blank seam answer cannot reach gh as an argument'
+Assert-True ($idxTrim -gt $idxResolve -and $idxTrim -lt $idxLabelGate) 'and it happens between the resolve and the gate, so both read the same value'
+
+# THE QUERY IS SKIPPED, not merely the compare: a `gh label list` whose answer cannot change the outcome
+# is the cheapest call in this script to leave out, and both of its failure warnings would otherwise name
+# a label there is none of.
+$idxEmptyBranch = $openPrText.IndexOf('if (-not $label) {')
+$idxLabelList   = $openPrText.IndexOf("@('label', 'list', '--json'")
+Assert-True ($idxEmptyBranch -ge 0) 'open-pr.ps1 recognises "this repo attaches no label" as an answer rather than a gap'
+Assert-True ($idxEmptyBranch -lt $idxLabelList) 'and it recognises it BEFORE asking gh for a label list whose answer cannot matter'
+Assert-True ($idxEmptyBranch -lt $idxLabelGate) 'and before the compare, so the success line can never announce that '''' exists in the repository'
 
 Write-Host ""
 Write-Host "open-pr.ps1 wires in the already-done check (issue #1282)" -ForegroundColor Cyan

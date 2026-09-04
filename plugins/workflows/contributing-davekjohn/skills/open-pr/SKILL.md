@@ -449,6 +449,18 @@ same way, and the first sign of it was a failed create after a push.
 - **A query it cannot read is not an answer.** An old `gh` without `--json`, a network hiccup, or a repo
   with no labels at all leaves you with the behaviour this script always had: a warning, and `gh`
   judging the label at the create. The gate never becomes the reason a PR cannot be opened.
+- **A seam that names NO label is an answer, and the one case this gate has nothing to do.** If your
+  prefix table answers `Label = $null` -- a repo that has abolished PR labels entirely, because the issue
+  **type** carries the classification now -- there is no lookup, no compare, and the create sends **no
+  `--label` at all**. Read it against the first bullet rather than as an exception to it: that one is
+  about a label your seam *named* and your repo does not have, where dropping it would sail a PR past a
+  workflow gating on the label. This one is your repo saying there is no label, so sending none is the
+  answer you gave. Inbound
+  [#1395](https://github.com/DaveKJohn/claude-code-specialists/issues/1395), measured in a consumer on
+  September 4, 2026: `--label` was appended unconditionally, so an empty answer went out as
+  `--label ''` -- a label named `''`, which `gh` cannot find and refuses the whole create over, after
+  the push, with this gate green. The gate had always read an empty label as "nothing to check"; it was
+  the create that had not.
 
 ## The impact gate: how far does this change reach, and how much does it weigh?
 
