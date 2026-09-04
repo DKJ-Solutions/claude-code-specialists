@@ -90,6 +90,15 @@ is ~4.9 s.
 The rename the issue deferred over cost nothing: neither hook had ever been released, so
 `consumer-prose-sessioncheck` is the first name a consumer ever sees.
 
+**It overtakes two entries pending in this same block, and they are left exactly as they are.**
+`feat/1389-retired-doc-name-check` announces *"`check-retired-doc-name.ps1` closes it, driven by a new
+`retired-doc-name-sessioncheck` SessionStart hook"*, and `feat/1415-supremacy-declaration-check`
+announces its own sibling beside it. Both were true on the day each branch merged, and both name files
+this branch removed a day later. **The current statement is this one**: one script,
+`check-consumer-prose.ps1`, and one hook, `consumer-prose-sessioncheck`, carrying both detectors. Nothing
+either of those entries says about *what* is detected has changed -- only the count of scripts, hooks and
+suites doing it.
+
 **Score:** 3
 
 #### What makes this deploy extra special
