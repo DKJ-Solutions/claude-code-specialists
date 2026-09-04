@@ -589,6 +589,42 @@ infrastructure.
   at 124 findings all false. The three accounts in this family are all login-shaped, so the measured case
   is still caught. `git-identity-gate.tests.ps1` walks both edges of that rule, and passes both identities
   in explicitly — a suite that read the machine's own would assert something different on every checkout.
+- **`scripts/lint/check-retired-doc-name.ps1`** — the retired-name check (issue
+  [#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389), September 4, 2026):
+  does a consumer's own always-on prose still name a *retired* name of the branch's development
+  document? It is the first of the two narrow literal greps that the declined prose-contract
+  framework recorded as the proportionate alternative
+  ([below on this page](#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026)),
+  and its whole licence is that sentence — the detector is `Get-RetiredDocNameMention` in
+  `entry-scaffold-lib.ps1`, the names come from `Get-BranchFileLegacyNames`, and nothing here reads what
+  a sentence *means*.
+
+  **Three things separate it from the framework that was declined**, and all three are asserted rather
+  than described. The names are **derived**, so the next rename adds this token by the same row it always
+  adds and there is no second list to leave at seven names. The corpus is stated as an **inclusion**
+  list — the always-on closure plus the workflow folder's own permanent pages, minus its changelog,
+  because a folded entry correctly names the file of its day and a check that read it would be born red
+  on its own past. And it **skips the publishing repo**, on the source-repo guard's own condition 2, for
+  the reason #1380's first pass measured the hard way: this repo's pages narrate the rename history on
+  purpose, so without the skip the source reads as consumer drift.
+
+  **Its stated gap, so nobody rediscovers it as a bug.** `development-<slug>.md` (pre-#1335) is *not* a
+  token: a prose page names the shape, and matching a shape needs a wildcard, which is the step toward
+  fuzzy the decline rules out. `development-cycle.md` is a real literal and is covered, so the
+  `development-` era is not wholly absent — but a consumer restating only the shape is missed, and that
+  is what the precision costs.
+
+  **ONE CALLER, and no CI half — the strongest case of it on this page.** Where
+  `check-git-identity` has no CI half because a runner is a bot by design, this one has none because
+  there is nothing for a CI leg to check: in the only repo whose CI this repo controls, the check
+  skips. So `retired-doc-name-sessioncheck.ps1` (workflow plugin) is not a convenience on top of
+  another route — it *is* the route, which is the whole point of #1389.
+
+  **What the sixth session hook costs, measured rather than assumed** (5 runs each, median, this
+  machine, September 4, 2026): the check alone is **194 ms** here where it skips and **328 ms** against
+  a consumer fixture that has findings; through the hook that is **365 ms**, against **544 ms** for
+  `unfolded-entry-sessioncheck` beside it. So it is the *cheapest* of the session hooks rather than a
+  sixth tax, and the skip is why: in this repo it exits before the `@`-import walk runs.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
@@ -1340,6 +1376,15 @@ same proposal again.** Two narrow, literal, high-precision one-off greps, each a
 of one framework carrying eleven at 12%: one for the literal string `development.md` outside the
 changelog and history paths, one for a supremacy declaration — `wins`/`wint` plus `CLAUDE.md` plus the
 contributing page's own filename, all three in the same sentence.
+
+**The first of the two was built the same day** ([#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389),
+September 4, 2026): `check-retired-doc-name.ps1`, driven by a SessionStart hook in every consumer and
+[described above on this page](#what-sylvester-owns-here). It kept the three constraints this entry
+imposes — literal names, derived rather than listed; the corpus as an inclusion list with the changelog
+out; and the publishing-repo skip — and it carries one stated gap, the shape `development-<branch>.md`,
+which has no literal form. **The second is still only recorded**, and deliberately: the supremacy
+declaration is the finding this entry measures every candidate as structurally blind to, so it wants
+its own pass rather than riding along on the first one's branch.
 
 **The manifest survives the decline** — a later revisit should not have to re-derive 11 laws from
 scratch:

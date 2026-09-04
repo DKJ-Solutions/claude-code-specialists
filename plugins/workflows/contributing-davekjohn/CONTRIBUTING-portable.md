@@ -853,6 +853,22 @@ test cannot tell correct deference from restatement-with-citation-and-override �
 one layer up, that `check-script-contract.ps1` gets to skip because a function call is unambiguous where
 a sentence is not. The numbers are in that repo's own system-administration lens, not shipped here.
 
+**One narrow slice of it IS enforced, and you will meet it at a session start rather than in a review.**
+The decline above is about reading what a *sentence* means; a **filename** needs no reading, so the
+`retired-doc-name-sessioncheck` SessionStart hook greps your own always-on documents — your `CLAUDE.md`
+and everything it `@`-imports — plus your `contributing-davekjohn/README.md` and `CONTRIBUTING.md`, for
+every name this workflow's branch document has been *renamed away from*. Your changelog and your
+`releases/` are never read: a folded entry correctly names the file of its own day. When it fires it
+names the document, the line and the retired name, and the repair is always the same — replace the
+sentence with a pointer at the page that owns the answer.
+
+**It exists because this corollary had no delivery at all**
+([#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389)). That document has been
+renamed seven times, twice inside one day, and the *tooling* was built rename-proof for it; the prose
+describing it to you was not, and nothing reads your `CLAUDE.md`. Measured: both live consumers of this
+workflow were still stating a retired name as current, one day and six days after the rename, and no
+mechanism existed by which either of them could have found out.
+
 **A fourth move exists, and nothing named it until inbound
 [#1388](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1388): a law this plugin
 deliberately DELEGATES, with no seam and no page of its own answering it either.**

@@ -236,19 +236,23 @@ Rendall), and the **repo-neutral bootstrap skill** `specialists-init`.
 **Doesn't:** governance (`CLAUDE.md`, the workflow rules), safety hooks, or MCP config. Those stay
 at repo level deliberately, because they differ per repo (or are safety-critical). The plugins
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
-repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), and three
+repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), and a set of
 informational, read-only SessionStart hooks that never block — `roster-sessioncheck` (roster-drift
-signaling) in the **core team**, and `connector-sessioncheck` (sync signaling) plus
-`script-contract-sessioncheck` (signals when a repo's own workflow libs no longer expose a function the
-shared scripts call) in **`contributing-davekjohn`**; see the
-[connectors README](connectors/README.md).
+signaling) in the **core team**, and in **`contributing-davekjohn`** the rest, among them
+`connector-sessioncheck` (sync signaling), `script-contract-sessioncheck` (signals when a repo's own
+workflow libs no longer expose a function the shared scripts call) and `retired-doc-name-sessioncheck`
+(signals when a repo's own always-on prose still names a convention the plugin has renamed,
+[#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389)); see the
+[connectors README](connectors/README.md). **The set is not enumerated in prose anywhere** — it was, as
+three, and went stale twice inside two days as hooks were added; each plugin's `hooks/hooks.json` is the
+one place that cannot.
 
 **And since August 26, 2026 one hook that acts rather than reports**, which is a real widening of that list
 and named as such: `cycle-autopark` (a **Stop** hook, in `contributing-davekjohn`) commits and pushes the
 branch's `<branch>.md` to `origin` after every turn, until a PR publishes it
 ([#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900)). It writes to git, so it is not
 read-only — but it is still not a *guardrail*: it blocks nothing, refuses nothing, and exits 0 on every
-outcome. What earns it a place beside the three above is that it is repo-neutral and touches exactly one
+outcome. What earns it a place beside the read-only set above is that it is repo-neutral and touches exactly one
 document, whose path the shared resolver decides; the four bounds that keep it that narrow are in the
 `park` skill.
 The add-on teams `team-lifehub` and `team-shopify` may carry domain skills that a repo shares.
@@ -619,9 +623,10 @@ matters operationally for the skills/subagents/hooks split described under
 bundled in a plugin works across all three surfaces, but a **subagent** or a **hook** runs only in
 Cowork and in Claude Code — in a plain Claude.ai Chat session they show up grayed out (see
 [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)).
-Concretely for claude-code-specialists: the specialists roster (the subagents under Chris), the three
-SessionStart hooks (`connector-sessioncheck`, `roster-sessioncheck`, `script-contract-sessioncheck`) and
-the Stop hook `cycle-autopark`
+Concretely for claude-code-specialists: the specialists roster (the subagents under Chris), the
+SessionStart hooks the enabled plugins ship (read them in each plugin's `hooks/hooks.json` — a
+hand-written list here was named as three and went stale twice inside two days) and the Stop hook
+`cycle-autopark`
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
