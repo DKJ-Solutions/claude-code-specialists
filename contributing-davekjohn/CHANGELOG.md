@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/closeout-receipt-length-bound · 20260904-222307
+
+Chris's close-out had three permitted shapes and a receipt-not-report rule, and still grew back into a
+report. Two seams are tightened in his persona body. The instruction to "name what it filed, with
+numbers" is now bounded by length — the number and at most a short clause, never a sentence of finding —
+because that instruction was the one doing the expanding: a close-out that obeys the filing rule and then
+writes a paragraph per issue asks the reader to read everything twice. And "the test is duplication, not
+length" now has a cruder rule beside it, since a session can always find something non-duplicative to
+add.
+
+The second seam was a missing home rather than a missing bound. A finding that cannot be filed from the
+current checkout — one belonging on another repo, where filing needs the owner's word — had no shape, so
+it arrived as a fourth one, the *"this waits on you"* the page explicitly forbids. It is now filed
+inward, into the nearest issue this session can already file, and cited like any other number.
+
+Line-count neutral: the two clauses are paid for by cutting restatement, because this text loads on
+every turn in every consuming repo.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer's orchestrator gets the same bound, which matters because the failure it fixes is one a
+consumer cannot see: a close-out that reads as thorough is exactly the one that costs its reader the
+session. A repo adopting the specialists inherits the tightened rule rather than the wording that kept
+giving way.
+
+**Score:** 2
+
+#### Pull Request
+
+Chris's close-out receipt gets a length bound and a home for an unfileable finding
+
+Plugins: team-alpha
+
+[PR #1406](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1406)
+
+---
+
 ### DEPLOY: fix/1395-empty-label-on-create · 20260904-221518
 
 `open-pr.ps1` sends no `--label` at all when the branch-prefix seam answers no label for a prefix it
