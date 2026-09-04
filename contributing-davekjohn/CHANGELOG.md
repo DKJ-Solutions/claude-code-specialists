@@ -32,6 +32,67 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1389-retired-doc-name-check · 20260904-230550
+
+A renamed convention now reaches a consumer through something. This workflow's branch document has been
+renamed seven times, twice inside one day, and the tooling around it was deliberately built rename-proof
+-- every reader goes through `Resolve-BranchFilePath`, and the fold's bound is named by that resolver
+rather than spelled out. The prose describing the convention to consumers was not: no gate reads a
+consumer's `CLAUDE.md`, and `check-script-contract.ps1` covers *functions*, so a renamed file convention
+sat outside it by construction. Measured -- both live consumers were still stating the retired single
+`development.md` as current, one day and six days after the rename, and no mechanism existed by which
+either could have found out.
+
+`check-retired-doc-name.ps1` closes it, driven by a new `retired-doc-name-sessioncheck` SessionStart
+hook, which is the whole delivery -- there is no CI half, because in the one repo whose CI this repo
+controls the check skips itself. It greps the always-on document closure plus the workflow folder's own
+permanent pages for every name the branch document has been renamed *away from*, and names the document,
+the line and the retired name.
+
+**The design question was not open, and staying inside its bounds is the point.** The prose-contract
+framework was measured at 12.5% precision and declined the same day; that decline recorded two narrow
+literal greps as the proportionate alternative, and this is the first of them, held to the three
+constraints the decline imposed. The names are **derived** from `Get-BranchFileLegacyNames`, so the next
+rename adds this token by the same row it always adds. The corpus is an **inclusion** list with the
+changelog and `releases/` out, because a folded entry correctly names the file of its own day and a check
+that read it would be born red on its own past. And it **skips the publishing repo**, on the source-repo
+guard's own condition 2, for the reason that measurement found the hard way: this repo narrates the
+rename history on purpose, so without the skip the source reads as consumer drift. One gap is stated
+rather than left to be rediscovered -- `development-<branch>.md` is a shape, not a literal, and matching
+a shape is the step toward fuzzy the decline rules out.
+
+Along the way the hook enumerations were retired instead of extended. Four documents named the
+SessionStart set by hand as "two" or "three"; each had already gone stale twice inside two days, and this
+change would have made all four wronger. They now point at each plugin's `hooks/hooks.json`, the one
+place that cannot go stale.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This is the only thing that will ever tell a consuming repo that a shared convention moved under its own
+documentation. The failure it ends is silent by construction: a restatement is correct on the day it is
+written and becomes a lie on the day the plugin's answer changes, and until now the plugin had no way of
+saying so -- noticing required reading a repo the source never reads. Measured at 365 ms through the
+hook, which makes it the cheapest of the session checks rather than a sixth tax, and it never blocks
+anything.
+
+`CONTRIBUTING-portable.md` gains the paragraph that tells you what the hook means when it fires and what
+the repair is, beside the corollary it enforces: a consumer document may point at a shared law, answer a
+seam the law names, or say nothing.
+
+**Score:** 3
+
+#### Pull Request
+
+A consumer-side check for retired branch-document names
+
+Plugins: contributing-davekjohn
+
+[PR #1414](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1414)
+
+---
+
 ### DEPLOY: fix/fold-cross-device-duplicate-gate · 20260904-225721
 
 The fold's duplicate gate now reads a trunk it has actually checked, and a refused push says what
