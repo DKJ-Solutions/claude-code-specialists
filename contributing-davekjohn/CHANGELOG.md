@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1419-prose-echo-sanitize · 20260905-001011
+
+Both consumer-prose session checks echo a line out of a consumer's own markdown so the reader can
+recognise what to repair, and both printed it raw -- into a report the SessionStart hook forwards into
+session context and filters by matching `[ERROR]` over it. Untrusted text therefore chose how loudly it
+was reported, and could repaint a terminal or reverse the reading order of the text around it on the way
+past. In `check-retired-doc-name.ps1` the path and the line now go through `check-report-lib.ps1` while
+the plugin's own strings stay raw; in `check-supremacy-declaration.ps1` all three reported values are the
+consumer's, so none of them stays raw. A third sanitizer, `Format-SafeProseToken`, was needed because a
+sentence is not a token: the id form eats its punctuation and the path form eats the brackets that in
+prose are a markdown link. So brackets are substituted rather than deleted, and each check's footer says
+so. Building it surfaced a real defect in the neighbouring `Format-SuspectToken`: its "say when the
+display differs" check used PowerShell's culture-sensitive `-ne`, which treats Unicode format characters
+as ignorable, so a suspect id carrying a zero-width or bidi character had been reported as clean since
+#309. Both now compare ordinally.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Every repo with the workflow plugin runs these two checks at session start, which is where a consumer's
+own prose enters a session's context. Nothing is known to have gone wrong, and the named failure is
+concrete: a line in a consumer's own documentation -- and a repo whose pages discuss check output is
+exactly the kind that has such a line -- carrying a bracketed marker or an ANSI escape, and thereby
+shaping the report about itself.
+
+**Score:** 2
+
+#### Pull Request
+
+Both consumer-prose session checks sanitize the line they echo into session context
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1426](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1426)
+
+---
+
 ### DEPLOY: fix/1417-new-branch-refuse-stale-base · 20260905-000004
 
 `new-branch.ps1` now **refuses** to cut a branch from a base behind `origin/<trunk>`, where it previously
