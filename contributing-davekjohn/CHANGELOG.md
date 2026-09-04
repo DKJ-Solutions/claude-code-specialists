@@ -32,6 +32,76 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/closeout-receipt-length-bound · 20260904-222307
+
+Chris's close-out had three permitted shapes and a receipt-not-report rule, and still grew back into a
+report. Two seams are tightened in his persona body. The instruction to "name what it filed, with
+numbers" is now bounded by length — the number and at most a short clause, never a sentence of finding —
+because that instruction was the one doing the expanding: a close-out that obeys the filing rule and then
+writes a paragraph per issue asks the reader to read everything twice. And "the test is duplication, not
+length" now has a cruder rule beside it, since a session can always find something non-duplicative to
+add.
+
+The second seam was a missing home rather than a missing bound. A finding that cannot be filed from the
+current checkout — one belonging on another repo, where filing needs the owner's word — had no shape, so
+it arrived as a fourth one, the *"this waits on you"* the page explicitly forbids. It is now filed
+inward, into the nearest issue this session can already file, and cited like any other number.
+
+Line-count neutral: the two clauses are paid for by cutting restatement, because this text loads on
+every turn in every consuming repo.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer's orchestrator gets the same bound, which matters because the failure it fixes is one a
+consumer cannot see: a close-out that reads as thorough is exactly the one that costs its reader the
+session. A repo adopting the specialists inherits the tightened rule rather than the wording that kept
+giving way.
+
+**Score:** 2
+
+#### Pull Request
+
+Chris's close-out receipt gets a length bound and a home for an unfileable finding
+
+Plugins: team-alpha
+
+[PR #1406](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1406)
+
+---
+
+### DEPLOY: fix/1395-empty-label-on-create · 20260904-221518
+
+`open-pr.ps1` sends no `--label` at all when the branch-prefix seam answers no label for a prefix it
+knows. It used to append `--label` unconditionally, so a repo that has abolished PR labels -- the issue
+**type** carries the classification there now -- had every gate pass, its branch pushed, and then the
+whole `gh pr create` refused over a label named `''`. The empty answer is now recognised before the
+`gh label list` call, so there is no lookup whose answer cannot matter and no success line announcing
+that `''` exists in the repository; the resolved label is normalised first, because `$null` in a native
+argument list is an empty argument rather than an absent one. Inbound #1395, measured in
+`BWJ-ecommerce/smartwatchbanden` on September 4, 2026, which had been opening its PRs by hand in the
+meantime.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's own prefix table names a label for all three of its prefixes, so nothing here
+changes. The consumer that reported it gets its scripted PR route back.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr sends no --label at all when the seam answers none
+
+Plugins: contributing-davekjohn
+
+[PR #1404](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1404)
+
+---
+
 ### DEPLOY: feat/bwj-codex-sync-log · 20260904-220935
 
 `bwj-codex` is now the shared **extra layer** for BWJ's two Shopify store repos rather than only their
