@@ -32,6 +32,38 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/fix-1394-per-project-test-in-adopt-bwj-asana · 20260904-222833
+
+Fixed [#1394](https://github.com/DaveKJohn/claude-code-specialists/issues/1394): `adopt-bwj-asana/SKILL.md`
+still stated the one-workspace test for whether `Prio-Score` reaches a task, in a paragraph that cited
+step 5 of `WORKFLOW-portable.md` as its authority -- a test that step 5 stopped making once
+[#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386) replaced it with the
+per-project test (`custom_field_settings`), so the citation pointed a reader at the opposite claim. The
+same superseded workspace-only reasoning was also present, unflagged by the issue but found via its own
+suggested `grep -rn "one-workspace|does not cross" plugins/`, in the "propose one value" paragraph
+earlier in the same file, in `README.md`'s `Get-AsanaProjectGid` entry, and in `asana-mirror.ps1`'s
+`Get-PrioScoreFromTask` docstring -- all three corrected the same way, to the per-project test.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+Corrects a citation that pointed maintainers preparing a board for `Prio-Score`/`Github Issue`/`Github
+Type` at the wrong test, but only in reference material read before configuring the seam -- nothing in
+the shipped script behaviour changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+correct adopt-bwj-asana's stale one-workspace citation to match step 5's per-project test
+
+Plugins: bwj-codex
+
+[PR #1400](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1400)
+
+---
+
 ### DEPLOY: docs/closeout-receipt-length-bound · 20260904-222307
 
 Chris's close-out had three permitted shapes and a receipt-not-report rule, and still grew back into a
