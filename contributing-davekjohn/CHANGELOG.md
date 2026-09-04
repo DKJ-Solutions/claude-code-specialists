@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1422-shared-check-preamble · 20260905-011053
+
+Five consumer-facing lint checks opened with the same ~30-line preamble, and it had already drifted:
+four resolved the repo root on one line and crashed outside a git checkout, while the fifth carried a
+tolerant variant nobody had reconciled. The dual-context root resolution and the always-on prose walk
+now have one definition in `scripts/lib/consumer-check-lib.ps1`, and each check keeps its own verdict
+on what that definition cannot decide -- a session check has nothing to judge outside a checkout, a
+CI gate must refuse there.
+
+The same pass closed a hole the duplication was hiding. Both prose checks skipped *"a repo that
+publishes plugins"* by testing `marketplace.json` inline, where the question they mean is *"is this
+repo the source of this workflow"* -- the distinction #998 already exists for. A repo publishing
+another product while consuming this workflow was silently exempted from both checks; it is now
+judged, with an assert in each suite pinning it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the subject is this repo's own lint layer and the shared scripts a consumer runs. No
+subscriber of a service notices a preamble having one definition instead of five. The behaviour that
+did change reaches a consuming repo that also publishes a marketplace of its own, which no current
+consumer is.
+
+**Score:** N/A
+
+#### Pull Request
+
+One definition for the lint checks' shared preamble
+
+Plugins: contributing-davekjohn
+
+[PR #1431](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1431)
+
+---
+
 ### DEPLOY: fix/1424-superseded-entry-note · 20260905-003549
 
 The release note stops contradicting itself. Three entries pending in one `## [Unreleased]` block will
