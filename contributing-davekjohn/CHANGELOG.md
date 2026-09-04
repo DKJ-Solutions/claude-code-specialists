@@ -32,6 +32,49 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/retire-build-consumernotes · 20260904-104312
+
+`Build-ConsumerNotes` is gone from `scripts/lib/release-lib.ps1`, and with it the second answer to a
+question the library should only answer once. It rendered `releases/consumer/<dir>/<X.Y.Z>.md` for the
+two-document release flow that became one document on August 11, 2026; that commit dropped the call and
+left the function, and nothing has called it since. It was still passing a hard-coded `-EntryLevel 2` --
+the literal [#1369](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1369) had just
+repaired out of both live renderers -- and its own test pinned that stale answer, which is why the repair
+could not reach it.
+
+It is **retired rather than levelled** because levelling needed a container heading invented for a
+document nothing generates. In its place is a record in the file's own convention, saying what it built,
+why it went, why deletion was the honest repair, and why a pinned consumer cannot be reached by it: the
+lib and `cut-release.ps1` ship together from one plugin version.
+
+**The tests were triaged, not deleted with it.** Around forty asserts only ever ran through this
+renderer, and every property still true of a document that travels outward moved onto
+`Build-ReleaseNoteDraft`, which passes the identical switch set. Two of them now assert something they
+could not before: the legacy impact table and the older `Tier: N` line run against a fixture that
+actually carries them. And the no-HTML scan came out stronger than it went in -- it covers both generated
+documents now, excluding html comments by name, because the draft carries its guidance as comments
+deliberately and the scan had been written against a document that had none.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. Nothing a consumer runs changes: the function had no caller, the document it built is not generated
+anywhere, and every archived `releases/consumer/` document a consumer may still hold is read by
+`check-plugin-integrity.ps1` from disk rather than through this code.
+
+**Score:** N/A
+
+#### Pull Request
+
+Build-ConsumerNotes is retired rather than levelled
+
+Plugins: contributing-davekjohn
+
+[PR #1374](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1374)
+
+---
+
 ### DEPLOY: fix/release-note-entry-heading-level-v1 · 20260904-101415
 
 A generated release note keeps a `DEPLOY:` heading at the H3 it was written at, under a
