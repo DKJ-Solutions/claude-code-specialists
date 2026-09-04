@@ -594,8 +594,8 @@ first.** The document is a record of what landed, so it reads in the order thing
 **The ranking looked load-bearing and was not, which is the part worth keeping.** Its whole argument was
 that the cut *empties* this list, so document order at cut time is the order the release documents
 inherit — and that held for exactly one section. `Build-ReleaseNotes` passes `-RankByTier` for every tier
-from 1 up and `Build-ConsumerNotes` always ranks at tier 2, so both re-rank from the scores themselves and
-inherit nothing. The one section that does inherit is the development notes' **tier 0**, whose own comment
+from 1 up and `Build-ReleaseNoteDraft` ranks at the repo's own audience tier, so both re-rank from the
+scores themselves and inherit nothing. The one section that does inherit is the development notes' **tier 0**, whose own comment
 asks for *"complete and chronological, which is what a record is for"* — and which was quietly receiving
 score-descending order instead. So the change made that comment true rather than breaking a guarantee.
 **Before removing a mechanism, check which of its stated consumers actually consume it**; here four of

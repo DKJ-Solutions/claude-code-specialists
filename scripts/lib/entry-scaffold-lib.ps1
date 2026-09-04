@@ -2902,7 +2902,7 @@ function Get-EntryInsertOffset {
         $Stamp restores the old behaviour exactly, which is what a fold with no PR to read a moment off
         gets: there is nothing to place by, so it leads.
 
-        WHY IT IS NOT COSMETIC. The changelog is the cut's input. Build-ReleaseNotes and Build-ConsumerNotes
+        WHY IT IS NOT COSMETIC. The changelog is the cut's input. Build-ReleaseNotes and Build-ReleaseNoteDraft
         re-rank from the scores and inherit nothing, so the ranked documents were never affected -- but the
         development notes' TIER 0 section inherits document order deliberately ("complete and
         chronological, which is what a record is for", the comment #467 was written to make true). A late
@@ -2926,7 +2926,7 @@ function Get-EntryInsertOffset {
         the ranking looked load-bearing and was not. The argument for it was that the cut EMPTIES this list,
         so document order at cut time IS the order the release documents inherit -- which turned out to be
         true of exactly one section. Build-ReleaseNotes passes -RankByTier for every tier from 1 up and
-        Build-ConsumerNotes always ranks at tier 2, so both re-rank from the scores themselves and inherit
+        Build-ReleaseNoteDraft ranks at the repo's own audience tier, so both re-rank from the scores and inherit
         nothing. The one place that does inherit is the development notes' TIER 0 section, whose own comment
         asks for "complete and chronological, which is what a record is for" -- and which was getting
         score-descending order instead. So this change makes that comment true rather than breaking it.
