@@ -71,34 +71,30 @@ naming an owner is exactly the failure this rule exists to prevent.
    issue, not a question at the end of the turn*. That is the input half and this is the output half,
    and they only work together: obey the filing rule and still close with three paragraphs of open
    points, and the requester is asked to answer everything twice. So the close-out gives the **numbers
-   and nothing else**: *"Filed #1388, #1389, #1399."* is a complete receipt, and the reader clicks.
-   **Naming what you filed is not licence to describe it** — a paragraph per ticket retells, where
-   nobody can search it, what the issue already says, and the line meant to bound the close-out becomes
-   the one that expands it (Dave, September 4, 2026, after four tickets each got two lines of finding).
+   and nothing else** — *"Filed #1388, #1389, #1399."* is a complete receipt, the reader clicks, and a
+   paragraph per ticket only retells, where nobody can search it, what the issue already says.
 
    **So no *"what is still open"*, no *"what now waits on you"*, no *"what I deliberately left
    alone"*.** Each is either an issue that should have been filed, or option B's single decision, or
    nothing at all. A lesson learned is still recorded in the relevant docs rather than in a memory note
-   — that is writing, not a question, and it belongs inside the assignment.
-
-   **And a finding you cannot file from this checkout is not a fourth shape either.** Where the tracker
-   that should hold it is out of reach — another repo, or one where opening an issue needs the
-   requester's word — record it inside the nearest issue you *can* file here and cite that number.
-   Shape A then carries it, exactly like any other finding that left with a number.
+   — that is writing, not a question, and it belongs inside the assignment. **And where the tracker
+   that should hold a finding is out of reach** — another repo, or one where opening an issue needs the
+   requester's word — it goes inside the nearest issue you *can* file here and is cited by that number.
+   An unreachable tracker is not a fourth shape either.
 
    **THE CLOSE-OUT IS A RECEIPT, NOT THE REPORT** (Dave, August 27, 2026, after a close-out he could
    not read in the time he had, and again on September 4). By the time a chain ends, the reasoning
    already has a durable home a terminal does not: the branch document and the changelog entry it folds
-   into, the PR body, the issues filed. Retelling it writes it a second time where nobody can search,
-   and charges the requester for reading it. So a receipt is three things —
+   into, the PR body, and the issues filed. Retelling it writes it a second time where nobody can
+   search, and charges the requester for reading it. So a receipt is three things —
    **what happened**, **where to read it** (the PR or issue number), and **that the session can be
    cleared**, which is the one fact no PR carries and what lets them close the context without
-   re-reading the turn to check — **in two or three lines plus the numbers**, never a per-item table, a
+   re-reading the turn to check — at shape A's size, plus the numbers, and never a per-item table, a
    rundown of what each specialist did, or a walk through the reasoning. Where the detail is not yet
    anywhere durable, that is the finding: put it in the branch document, the PR or an issue, and point
    at it.
 
-   **Duplication decides what earns a line; those two or three lines decide how many.** A sentence the
+   **Duplication decides what earns a line; that size decides how many.** A sentence the
    requester can only get from you — a decision you took on their behalf, something that turned out
    differently than asked — belongs in the reply, and one already sitting in the PR body does not,
    however short. **But the ceiling holds even where that test says yes**, because a session can always

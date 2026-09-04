@@ -66,13 +66,25 @@ change promotes a described consequence to a stated rule rather than inventing a
       measurement, so "name what you filed" can no longer be read as "describe each one".
 - [x] Same file: a finding that cannot be filed from this checkout is recorded inside the nearest issue
       that **can** be filed here and cited by number -- shape A carries it, and no fourth shape is added.
-- [x] Same file: the ceiling. Shape A now says *two or three lines* where it said only `SHORT`, the
-      receipt paragraph carries the figure, and the duplication test is restated as subordinate to it --
-      naming, in the text, that *"the test is duplication, not length"* was itself being quoted in
-      defence of length.
+- [x] Same file: the ceiling. Shape A now says *two or three lines* where it said only `SHORT`, and the
+      duplication test is restated as subordinate to it -- naming, in the text, that *"the test is
+      duplication, not length"* was itself being quoted in defence of length.
 - [x] Compressed the receipt paragraph's lead to hold the always-on growth down, and folded the
-      September 4 repetition into its existing August 27 attribution rather than adding a fourth
-      restatement of the rule.
+      September 4 repetition into its existing August 27 attribution rather than restating it.
+- [x] **Acted on the review, which caught the trap this branch had set out to avoid.** The first draft
+      stated the figure *three* times inside forty lines -- on the one page whose subject is brevity --
+      and the un-filable-finding rule arrived as a paragraph of its own. Nolan measured +1,429 B
+      (~458 tokens every turn, in every consuming repo, 100% of it inside step 6) with ~250-350 B of it
+      restating the page; Edith reached the same finding independently. So the figure is now stated
+      **once**, in shape A, and the other two places back-reference it; the un-filable-finding rule is
+      one sentence inside the paragraph that already enumerates the forbidden fourth things, which is
+      where it belongs -- it is another instance of that ban, not a new rule. Final delta **+1,112 B**
+      (~356 tokens), and Edith's dropped conjunction in the durable-homes list is restored.
+- [~] Did **not** move the un-filable-finding rule to the on-demand manual, which was Nolan's third
+      proposal (-366 B). The manual's test is right -- one situation, not every turn -- but the trigger
+      here is invisible: a session with a finding it cannot file does not know it is in a special case,
+      so it reaches for a fourth shape instead of reaching for the manual. Compressed to one sentence in
+      the persona instead, which takes most of the saving and keeps the rule where the failure happens.
 - [~] No change to `plugins/teams/agent-shared/findings-become-issues.md`. The un-filable-tracker case
       would generalise to every specialist, but the shared block is stamped into 15 agent defs and the
       close-out shapes live only in the persona -- promoting a rule that currently has one home would
@@ -86,8 +98,8 @@ change promotes a described consequence to a stated rule rather than inventing a
 - [x] Grepped the tree for every restatement of the close-out shapes and of *"duplication, not
       length"*: the shapes exist only in the persona, and the one other hit is the archived 4.21.0
       release note, which is history and is answered in the new text rather than swept.
-- [x] Edith (copy edit), and Nolan (always-on cost, +1,429 B on a page every session pays) reviewed the
-      diff in parallel; findings acted on before the PR.
+- [x] Edith (copy edit) and Nolan (always-on cost) reviewed the diff in parallel, and both independently
+      returned the same primary finding; acted on above, before the PR.
 - [x] `check-plugin-integrity.ps1` + the full suite, via `open-pr.ps1`'s own gate.
 
 ### DEPLOY: docs/closeout-receipt-ceiling
