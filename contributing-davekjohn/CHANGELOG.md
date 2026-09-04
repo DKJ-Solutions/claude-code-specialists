@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1408-closeout-ceiling-order · 20260904-224649
+
+Fixed [#1408](https://github.com/DaveKJohn/claude-code-specialists/issues/1408): the length ceiling
+[#1406](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1406) put into Chris's close-out
+stood beside the archived August 27, 2026 reasoning that had **refused a word budget**, with nothing on
+either page saying how the two fit -- so the next session to read the archive found a recorded argument
+against the guardrail it was standing under. The paragraph said *"the ceiling holds regardless"*, which is
+the one reading under which the objection lands.
+
+The repair is the order, because the objection was aimed at a ceiling applied *instead of* the duplication
+test and not *after* it. The persona now states both in sequence -- duplication filters first, so the
+sentence only the session can give is never what the ceiling meets; the ceiling then caps what survives,
+because *"not a duplicate"* is always satisfiable -- and says why that is not a budget: over the ceiling a
+surplus is **rehoused** into the branch document or an issue the receipt cites, not cut. And the figure the
+archive recorded as the observed consequence, *"two or three lines"*, becomes the stated rule in place of
+*"a handful of lines"*, which is the cruder form #1402 asked for.
+
+The archive is deliberately left as written. It is the record of a decision, its argument is true of the
+budget it was aimed at, and the live rule is where a rule is repaired.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Every consumer's orchestrator gets a number where it had *"a handful"*, and stops carrying a rule its own
+shipped history argues against -- a contradiction a consumer can only ever find at the moment it costs
+them, mid-close-out, with the archive quotable in defence of the length the ceiling exists to stop.
+Line-count neutral but one: the ordering and the figure are paid for by dropping the restatement of what
+the receipt contains, which the paragraph above it already names.
+
+**Score:** 2
+
+#### Pull Request
+
+state the order between the close-out's duplication test and its length ceiling
+
+Plugins: team-alpha
+
+[PR #1412](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1412)
+
+---
+
 ### DEPLOY: fix/1401-duration-ceiling-load-sensitive · 20260904-223712
 
 The test gate's own suite no longer refuses a push because the machine was busy. Scenario 4b in
