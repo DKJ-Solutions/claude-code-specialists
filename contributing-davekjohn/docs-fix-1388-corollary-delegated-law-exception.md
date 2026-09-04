@@ -54,7 +54,7 @@ leave the "no seam" reasoning there untouched.
 - [x] Re-read both passages after editing -- the corollary's three moves plus the new fourth move
   now cover `cut-release` Block 2's instruction without a gap: it is scoped to a law the plugin
   explicitly declines to answer, which is the one thing the original three did not have room for.
-- [ ] Lint + tests green, then PR + merge + fold.
+- [x] Lint + tests green, then PR + merge + fold.
 
 ### DEPLOY: docs/fix-1388-corollary-delegated-law-exception
 
