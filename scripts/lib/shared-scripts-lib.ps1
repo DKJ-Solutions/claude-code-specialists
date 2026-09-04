@@ -682,6 +682,34 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # The supremacy-declaration check (issue #1415). The SECOND of the two narrow greps the
+            # prose-contract decline (#1380) recorded as proportionate; the first is check-retired-doc-name
+            # above, and this one had no tracker entry at all until #1415 -- only a sentence in a lens,
+            # which is how a recorded alternative quietly becomes a recorded alternative nobody builds.
+            #
+            # IT IS THE ONE DEFECT #1380 CALLED STRUCTURALLY INVISIBLE. A pointer test flags sections
+            # carrying no citation, so cites-then-contradicts can only appear among the SUPPRESSED
+            # findings -- correct deference and restatement-with-override look identical to it. Measured
+            # in smartwatchbanden: two standing inversions of LAW-THIRD-RANK-ORDER, one of which #1380's
+            # own census never counted.
+            #
+            # THE RECORDED SHAPE WAS MEASURED AND REPLACED. Three terms in one sentence scored 0 findings
+            # and 0 recall on its own target; adjacency of 'CLAUDE.md' and 'wins'/'wint' scores
+            # 3 raw / 2 reported / 2 true / 100%. The full table is in Get-SupremacyDeclaration.
+            #
+            # ITS ONLY CALLER IS THE HOOK, no CI leg, no skill -- the same three answers, for the same
+            # three reasons, that check-retired-doc-name gives directly above.
+            Name   = 'check-supremacy-declaration'
+            Source = 'scripts\lint\check-supremacy-declaration.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = ''
+            # A fixture root, plus an always-on root the suite can point at a scratch document tree.
+            # A consumer never types either.
+            SkillParamsExempt = @('RootOverride', 'RootDocument')
+            # Timeable with no arguments: reads the always-on closure and reports, no write of any kind.
+            MeasureArgs = @()
+        },
+        @{
             # The split-identity check (issue #1315). `@me` in the claim rule resolves through the
             # GitHub API, so it writes whichever account gh holds -- and nothing compared that against
             # the identity git commits as. Measured: gh authenticated as DaveKJohn while

@@ -107,15 +107,22 @@ What it does, in order:
 2. Fetches `origin` and bases the lane on `origin/main`, not on the local trunk. The "fresh pull before
    every new branch" rule applies to a lane exactly as it does to a branch, and reading origin directly
    also means the lane does not care what the primary currently has checked out.
-   **And it is no longer the only script that looks** (inbound #1046, August 28, 2026): `new-branch`
-   used to cut from whatever `HEAD` held, so the safe base was reachable only by already knowing to
-   take the lane route. It now measures `HEAD..origin/<trunk>` and warns with the count. The lane still
-   goes further -- it *takes* the right base rather than reporting the wrong one -- which is why the
-   warning `new-branch` prints names this script as the way out.
+   **And it is no longer the only script that looks** (inbound #1046, August 28, 2026; #1417,
+   September 4, 2026): `new-branch` used to cut from whatever `HEAD` held, so the safe base was
+   reachable only by already knowing to take the lane route. It now measures `HEAD..origin/<trunk>` and
+   **refuses** a base behind it. The lane still does something different rather than something weaker --
+   it *takes* the right base instead of judging the one it was handed -- which is why `new-branch` names
+   this script as a way out, and why step 4 below hands it `-SkipStaleBase`.
 3. Adds the worktree **detached** at that commit.
 4. Delegates to `new-branch.ps1` with the lane as its `-RepoRoot`, so the branch and both branch files
    come into being **inside** the lane. Every rule `new-branch` enforces therefore holds in a lane
    without being restated.
+   **With one deliberate exception, `-SkipStaleBase`** (#1417). That refusal is about an operator cutting
+   from whatever `HEAD` they were standing on, and there is no such choice here: step 2 fetched and step 3
+   based this worktree at `origin/<trunk>` seconds ago. All `new-branch`'s own fetch can find is that
+   origin moved in between -- which would refuse the lane, roll it straight back at step 5, and offer
+   `git pull --ff-only` as the remedy for a *detached* worktree, where it is not the remedy. The warning
+   still prints; only the refusal is waived.
 5. If that delegation fails, **removes the worktree again** and exits non-zero. That rollback is what
    lets step 3 run before the branch name has ever been validated.
 

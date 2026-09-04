@@ -300,6 +300,16 @@ $guardExempt = @(
     # marketplace.json exists). Refusing would take the hook down at every session start here; skipping
     # states the right thing -- this repo's pages are the source of the convention, not a copy of it.
     'scripts\lint\check-retired-doc-name.ps1',
+    # SessionStart: supremacy-declaration-sessioncheck (#1415). The second of the two greps #1380's
+    # decline recorded, and the exemption is the same one its sibling directly above argues, for the same
+    # mechanism: the hook runs it from '${CLAUDE_PLUGIN_ROOT}/scripts/lint/', so Assert-OwnCopy would
+    # refuse it -- and the hook with it -- at every session start in this repo. It makes the SKIP
+    # decision itself on the guard's own condition 2. One difference worth stating rather than inheriting:
+    # for the retired-name check the skip is a REPAIR (this repo's pages narrate the rename history and
+    # would read as drift), while here it is only a GUARD -- measured on the day it was written, this
+    # repo's own always-on pages produce zero hits, because every supremacy sentence they carry names the
+    # plugin's page as the winner and the detector reads direction.
+    'scripts\lint\check-supremacy-declaration.ps1',
     'scripts\task\park-cycle.ps1'              # Stop: cycle-autopark (#900)
 )
 

@@ -43,10 +43,11 @@ The script:
 3. **Asks whether this is a resume or a cut**, reading *both* ref namespaces -- `refs/heads/<name>` and
    `refs/remotes/origin/<name>`. That question comes first because the answer decides whether step 4 has
    a base to talk about at all.
-4. **Measures the base it is about to cut from** and warns if it is behind `origin/<trunk>`, naming the
-   count. It does not refuse and it does not move `HEAD` for you -- see below. Skipped on a resume: the
-   count is `HEAD..origin/<trunk>` and on a resume `HEAD` is whatever you were standing on, so the
-   warning would hand you the trunk's gap under the resumed branch's name.
+4. **Measures the base it is about to cut from** and **refuses** if it is behind `origin/<trunk>`, naming
+   the count and `-SkipStaleBase` -- see below. It does not move `HEAD` for you either way; refusing is
+   how it avoids having to. Skipped on a resume: the count is `HEAD..origin/<trunk>` and on a resume
+   `HEAD` is whatever you were standing on, so it would hand you the trunk's gap under the resumed
+   branch's name -- which is also why a resume is never refused.
 5. Creates or resumes the branch -- **idempotent**, in three shapes:
    - it exists locally -> `git checkout <name>`;
    - it exists **only on `origin`** -> `git checkout -b <name> --track origin/<name>`, i.e. created **at
@@ -58,12 +59,10 @@ The script:
    branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
    unless it holds uncommitted work, which is kept and reported instead.
 
-## The base a branch is cut from (inbound #1046)
+## The base a branch is cut from (inbound #1046, decided in #1417)
 
-`worktree-lane.ps1` refuses a stale trunk in so many words -- *"a lane must not be based on a stale
-trunk"* -- and bases its worktree on `origin/<trunk>`. `new-branch` used to cut from whatever `HEAD`
-held and never look, in a run that reaches `origin` moments later to push. Two scripts, one hazard, two
-answers.
+`new-branch` used to cut from whatever `HEAD` held and never look, in a run that reaches `origin`
+moments later to push.
 
 **What that cost, measured in a consumer with two sessions on one board:** a branch cut from a trunk 17
 commits behind `origin/main`, to fix an issue the other session had closed by a merged PR four minutes
@@ -72,21 +71,41 @@ gate green on both -- found only when the PR sat without a CI check. The claim s
 and it looks like it should: `gh issue edit <n> --add-assignee @me` **succeeds silently on a closed
 issue**.
 
-So `new-branch` now measures `HEAD..origin/<trunk>` and says what it found:
+So `new-branch` measures `HEAD..origin/<trunk>` and acts on what it found:
 
-| what it reads | what it prints |
+| what it reads | what it does |
 |---|---|
-| the base is behind by N | a warning naming N, the local remedy (`git pull --ff-only`) and the lane route -- **twice**, once before the checkout and once as the last line of the run |
+| the base is behind by N | **refuses**, naming N, the local remedy (`git pull --ff-only`), the lane route, and `-SkipStaleBase` |
+| the base is behind by N, and `-SkipStaleBase` was given | cuts anyway, warning with N -- **twice**, once before the checkout and once as the last line of the run |
 | the base is current | one dim line saying so, so silence is never ambiguous |
 | no `refs/remotes/origin/<trunk>` in the repo | one dim line saying the question could not be asked -- no fetch is attempted and no gap is claimed |
 
-**It warns; it does not refuse.** Refusing matches the lane script and stays open as a stronger
-follow-up, but this script is mirrored into every consumer's plugin cache and arrives by plugin
-**update** rather than by choice.
+**It refuses, and the refusal costs nothing**, which is the argument for it. The check sits *before* the
+checkout, so a refused run leaves the tree exactly as it found it: no branch, no document, no commit, no
+push, nothing to unpick -- and one `git pull --ff-only` resumes the same command. That is the same
+property `fold-changelog-entry.ps1` cites for its own refusal (#1405).
 
-**Why it is said twice.** Everything this script prints after the check -- the scaffold, the tier rubric,
-the commit, the push -- sits between the first copy and the end of the run, so a single line at that
-depth is off-screen by the time you read anything. The bottom copy is the one that gets read.
+**It cannot reach a resume, and that is structural rather than a promise.** #1046 warned instead of
+refusing, because this script is mirrored into every consumer's plugin cache and arrives by plugin
+**update** rather than by choice -- landing a refusal nobody asked for on the script you are told to
+re-run to resume a parked branch. #1417 held that against the code: the whole base block is gated on
+*"not resuming"*, so a resume never reaches the question. What is refused is only a **new** cut from the
+base you happened to be standing on, which is the case #1046 measured. The mirroring argument survives
+as the **valve** -- one flag, not a hand-typed `git checkout -b`.
+
+**And the lane was never the precedent it read as.** `worktree-lane.ps1` does not refuse a stale base;
+it refuses a failed **fetch** and then bases its worktree at `origin/<trunk>` outright, so it has no
+stale base to refuse. Its answer is to remove the choice, which this script cannot copy -- it does not
+move `HEAD` for you. The lane therefore passes `-SkipStaleBase` when it delegates here: it chose the
+base itself, seconds earlier, and there is no operator decision left to gate.
+
+**No threshold.** Refusing only above N commits was considered and declined: the duplicate #1046 measured
+was of a PR merged *four minutes* earlier, so the dangerous gap can be a single commit.
+
+**Why the warning is said twice under the valve.** Everything this script prints after the check -- the
+scaffold, the tier rubric, the commit, the push -- sits between the first copy and the end of the run, so
+a single line at that depth is off-screen by the time you read anything. The bottom copy is the one that
+gets read, and under the valve it is the whole record that the valve was used.
 
 **`HEAD..origin/<trunk>`, not a trunk-versus-origin comparison**, deliberately: it answers *"what is my
 base missing"*, so a branch intentionally stacked on another branch gets the gap it actually carries
