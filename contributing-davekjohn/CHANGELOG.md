@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1415-supremacy-declaration-check · 20260904-235353
+
+A consumer is now told, at session start, when its own always-on prose declares its `CLAUDE.md` the
+winner over the workflow's contributing page -- inverting the rank order the plugin legislates. This is
+the one contradiction the declined prose-contract framework (#1380) proved was *structurally* invisible:
+a pointer test only ever flags sections that cite nothing, so a page that names its source and then
+overrides it four lines later can live nowhere but among the findings such a test suppresses.
+
+The recorded design for it did not survive being measured, which is the more useful half of this change.
+The three-term same-sentence grep the decline wrote down scored **0 findings and 0 recall** on the single
+defect it was named to catch -- the real sentence names the contributing page by a prose noun rather than
+by its filename. What ships instead is **adjacency**: `CLAUDE.md` and `wins`/`wint` beside each other,
+which is just as literal but reads *direction*, and direction is the whole defect -- *"this page wins"*
+is the same rank order stated correctly. On the same 8-document corpus: 3 raw / 2 reported / 2 true /
+**100% precision**, against a bar this repo sets with an accepted check at 17/17 and a declined one at
+124/0. It also found one standing inversion more than the original census knew about.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own maintainers and the repos consuming the plugin. The change reaches
+a consuming repo at its next plugin update, as one more read-only session-start line that stays silent
+unless that repo has the defect; it reaches no subscriber of a service, because there is none.
+
+**Score:** N/A
+
+#### Pull Request
+
+A consumer-side check for an inverted supremacy declaration
+
+Plugins: contributing-davekjohn
+
+[PR #1423](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1423)
+
+---
+
 ### DEPLOY: fix/1416-trunk-gap-one-definition · 20260904-232313
 
 `new-branch.ps1` no longer measures the trunk gap itself. The ref probe, the fetch, the

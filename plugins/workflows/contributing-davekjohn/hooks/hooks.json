@@ -26,6 +26,11 @@
           },
           {
             "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/supremacy-declaration-sessioncheck.ps1\"",
+            "timeout": 120
+          },
+          {
+            "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/git-identity-sessioncheck.ps1\"",
             "timeout": 120
           }
