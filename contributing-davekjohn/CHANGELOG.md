@@ -32,6 +32,52 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1424-superseded-entry-note · 20260905-003549
+
+The release note stops contradicting itself. Three entries pending in one `## [Unreleased]` block will
+ship together, and two of them tell the reader that `new-branch.ps1` warns on a stale base while the third
+is the branch that made it refuse. The `fix/1417-new-branch-refuse-stale-base` entry now names the two it
+overtakes, quotes the claim it supersedes, and says which sentence describes the version you installed.
+
+**The two superseded entries are byte-identical, and that is the decision rather than an omission.** They
+were true on the day each branch merged, and an entry is the only durable record of *why* a branch held
+back -- #1416 declined to settle the warn-versus-refuse asymmetry and filed #1417 for it, which is exactly
+the reasoning the next reader needs. Amending them would write a decision into history that was never
+taken there. This is the published-record rule stated one stage earlier: a line true when written goes
+stale rather than false, and the correction travels with the newer document.
+
+So the general half ships too, in `DEVELOPMENT-portable.md` beside the rest of the DEPLOY form -- because
+the shape recurs by construction. A question filed out of one branch and answered in another lands in the
+same block whenever both merge between two cuts, the changelog has no notion of one entry superseding
+another, and nothing detects it. The rule is a habit at the moment DEPLOY is written, not a gate: before
+writing that a behaviour changed, grep `[Unreleased]` for what it used to be. A gate would have to read
+prose for contradiction, which this repo declined at 12.5% precision.
+
+Reason: the contradiction is invisible to every gate the block passes through, and it only becomes
+legible at the cut -- when the note is generated and nobody is reading the three entries side by side any
+more.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer reads the generated release note and nothing else; this repo's own maintainers can always fall
+back to the issue numbers. So the entry that gets repaired here is the one that reaches them, and the
+convention that keeps it repaired arrives at their next plugin update as one more paragraph in the DEPLOY
+form -- the page an author of theirs is already reading when the mistake is available to make.
+
+**Score:** 2
+
+#### Pull Request
+
+The superseding changelog entry names the pending entries it overtakes
+
+Plugins: contributing-davekjohn
+
+[PR #1429](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1429)
+
+---
+
 ### DEPLOY: docs/1420-private-consumer-quote-bound · 20260905-001543
 
 A measurement taken in a private consumer now quotes only the fragment the finding reads. The repo, file
@@ -120,6 +166,13 @@ resume on a trunk two commits behind, no valve, exit 0.
 `worktree-lane.ps1` passes the valve when it delegates, so lanes behave exactly as before: it fetched and
 based the worktree at `origin/<trunk>` seconds earlier, so there is no operator choice to gate, and the
 refusal's own remedy (`git pull --ff-only`) is not the remedy for a detached worktree.
+
+**It overtakes two entries pending in this same block, and they are left as written.**
+`fix/1416-trunk-gap-one-definition` states that the scaffolder *"still warns and does not refuse"*, and
+`fix/fold-cross-device-duplicate-gate` that it *"deliberately only warns"*. Each was true on the day its
+branch merged, and an entry is the only durable record of why a branch held back -- so correcting them
+would destroy that record to repair a rendering. **This entry is the current one:** from this release
+`new-branch.ps1` refuses, and `-SkipStaleBase` is how you cut from a stale base anyway.
 
 Reason: it closes the hazard #1046 measured -- a complete duplicate of already-merged work, branch, commit,
 PR and every gate green on both, from a base 17 commits behind. Anyone who cuts a branch this way notices
