@@ -587,8 +587,9 @@ Remove-Item -Recurse -Force -LiteralPath $cur -ErrorAction SilentlyContinue
 # THE FLAT SHAPE (#881, August 25, 2026): no tier heading, so the ENTRY's declaration is the filter
 # ===================================================================================================
 Write-Host "The flat shape: no tier heading, the entry's own declaration decides" -ForegroundColor Cyan
-# This is what release-lib writes NOW -- entries at '##' and their sections at '###', exactly
-# CHANGELOG.md's levels, with no '## Tier <n>' wrapper above them. The container heading this script used
+# What release-lib wrote from #881 (August 25, 2026) until #1369 -- entries at '##' and their sections at
+# '###', with no '## Tier <n>' wrapper above them. Those were CHANGELOG.md's levels on the day, and both
+# moved one deeper the next day; the block after this one is the shape written today. The container heading this script used
 # to filter on is gone, and the fallback it had ("no tier headings, take everything") would have carried
 # the tier-0 entry into a document written for colleagues. Silent, plausible, and wrong in the direction
 # that publishes repo-internal work: the same failure shape as the fabricated bullet above.
@@ -661,6 +662,105 @@ Assert-True ($flatDoc -notmatch 'Repo-internal housekeeping') `
     'flat shape: the tier-0 entry is filtered out on ITS OWN declaration, with no heading to read it from'
 Assert-Equal 2 (@([regex]::Matches($flatDoc, '(?m)^- \[')).Count) 'flat shape: exactly two bullets'
 Remove-Item -Recurse -Force -LiteralPath $flat -ErrorAction SilentlyContinue
+
+# ===================================================================================================
+# THE SHAPE WRITTEN TODAY (#1369, September 4, 2026): a constant H1, a version H2, entries at H3
+# ===================================================================================================
+Write-Host "Today's shape: entries at H3 under a version heading" -ForegroundColor Cyan
+# WHY THIS BLOCK EXISTS, and it is the same gap the 'current shape' block above was written to close: every
+# fixture before it described a note release-lib no longer writes, so nothing here would have noticed the
+# recogniser going blind. The levels moved twice -- once on August 26, 2026 when CHANGELOG.md gained
+# '## [Unreleased]' and an entry became an H3, and once here when the release note stopped promoting it
+# back to H2 -- and the note now carries a '## Version <X.Y.Z> (<Mon DD, YYYY>)' heading that did not exist
+# in any earlier shape. Two things have to hold: the entries are still FOUND one level deeper, and that new
+# H2 is NOT read as an entry. The second is the one that fails quietly -- an unrecognised container heading
+# used to become a bullet with a fabricated type, which is the failure this suite already carries a standing
+# check for.
+#
+# THE H1 NO LONGER NAMES THE VERSION EITHER, so this also proves nothing here was reading it: the metadata
+# pair below it is what the script parses, and that pair is exactly why it stayed in the document.
+$todayNotes = @"
+# Changelog Releases
+
+**Date:** 2026-09-04\
+**Type:** Minor
+
+A one-line release title
+
+## Version 4.30.0 (Sep 04, 2026)
+
+### A consumer-facing feature
+
+#### What does this change do?
+
+Body text.
+
+#### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 2 | 4 | consumers notice |
+| 1 | 3 | colleagues too |
+
+#### Type of change
+
+Feat
+
+---
+
+### Something for colleagues
+
+#### What does this change do?
+
+Body text.
+
+#### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 1 | 3 | useful |
+
+#### Type of change
+
+Docs
+
+---
+
+### Repo-internal housekeeping
+
+#### What does this change do?
+
+Body text.
+
+#### Who is this for
+
+| Tier | Significance | Why |
+|---|---|---|
+| 0 | - | - |
+
+#### Type of change
+
+Chore
+"@
+$today = New-Fixture -Label 'today-shape' -NotesContent $todayNotes -Version '4.30.0' -NotesDir '4.x'
+$rt = Invoke-Script -Dir $today -Version '4.30.0'
+Assert-Equal 0 $rt.Code "today's shape: exit 0"
+$todayDoc = [System.IO.File]::ReadAllText((Join-Path $today 'contributing-davekjohn\releases\internal\4.x\4.30.0.md'))
+Assert-True ($todayDoc -match '- \[Feat\] A consumer-facing feature') "today's shape: an H3 entry is still found -- the walk is level-agnostic"
+Assert-True ($todayDoc -match '- \[Docs\] Something for colleagues')  "today's shape: and so is the tier-1 one"
+Assert-True ($todayDoc -notmatch 'Repo-internal housekeeping') `
+    "today's shape: the tier-0 entry is still filtered out on its own declaration"
+# THE NEW CONTAINER HEADING IS NOT AN ENTRY. It has no named section directly beneath it (its children are
+# the entries themselves) and no middot metadata, so both recognisers reject it -- but a bullet reading
+# 'Version 4.30.0 (Sep 04, 2026)' in a document written for colleagues is exactly the shape that got
+# through last time, so it is asserted rather than reasoned about.
+Assert-True ($todayDoc -notmatch "(?m)^- (\[[^\]]+\] )?Version 4\.30\.0") "today's shape: the version heading is not carried over as a bullet"
+Assert-True ($todayDoc -notmatch 'Changelog Releases') "today's shape: nor is the constant H1"
+Assert-Equal 2 (@([regex]::Matches($todayDoc, '(?m)^- \[')).Count) "today's shape: exactly two bullets"
+# The metadata pair is still read out of the document, which is why it survived the header change.
+Assert-True ($todayDoc -match '2026-09-04') "today's shape: the date is carried over from the '**Date:**' line"
+Assert-True ($todayDoc -match 'Minor')      "today's shape: and the type from the '**Type:**' line"
+Remove-Item -Recurse -Force -LiteralPath $today -ErrorAction SilentlyContinue
 
 # And the all-tier-0 case in the flat shape: the warning still names the reason rather than reporting a
 # parse failure, which is the one thing the container heading used to be needed for.
