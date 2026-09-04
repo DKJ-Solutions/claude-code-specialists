@@ -46,6 +46,10 @@
                                                           session context. Display only; the slug
                                                           guards below remain what decides whether a
                                                           value may become a PATH.
+      - Test-TokenChanged                             -- the ORDINAL "did sanitizing change anything"
+                                                          test the two announcing forms share (#1419).
+                                                          Never '-ne': that comparison is culture-aware
+                                                          and treats format characters as ignorable.
       - Format-SafePathToken / Format-SafeProseToken  -- the same job for the two values an id charset
                                                           would mangle: a file path (inbound #414) and
                                                           an echoed line of the consumer's own prose
@@ -128,7 +132,8 @@
 # the error/info counts or the exit code.
 $script:CheckScopeLabel = ''
 
-# --- What must never survive into a report line (inbound #309, #414, #1419) ----------------------
+# --- What must never survive into a report line (inbound #309, inbound #414, #1419) --------------
+# (#1419 is a same-repo issue, not an inbound one -- the label is per issue, not per list.)
 # Two classes, named here because the sanitizers below have to AGREE about them and differ only in what
 # they do with the second:
 #   - CONTROL CHARACTERS ('\p{C}' -- Cc, Cf and the surrogates): newlines, ANSI escape sequences and
@@ -140,6 +145,15 @@ $script:CheckScopeLabel = ''
 #     it is COUNTED.
 # Named rather than repeated per function so the shared half stays one decision: what each sanitizer
 # DOES with a class is its own argument, but which class it is arguing about is not.
+#
+# A THIRD CLASS IS CLOSED BY THE WHITESPACE COLLAPSE, NOT BY EITHER PATTERN, and it is written down here
+# because nothing about the code says so. U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are
+# category Zl/Zp -- '\p{C}' does not match them, and entry-scaffold-lib.ps1's line splitter does not split
+# on them either, so a consumer line can genuinely carry one. What neutralizes them is the
+# "-replace '\s+', ' '" pass every sanitizer below runs, because .NET's '\s' DOES match both. That makes
+# the protection real but incidental: reorder or drop that pass "because stripping controls first reads
+# more naturally" and a line-forging channel reopens silently. The asserts in check-report-lib.tests.ps1
+# are what stop that, and this comment is what tells the next editor which pass they belong to.
 $script:CheckReportControlPattern = '\p{C}'
 $script:CheckReportMarkerPattern  = '[\[\]]'
 
@@ -236,7 +250,12 @@ function Format-SafeProseToken {
 
        SQUARE BRACKETS ARE SUBSTITUTED, NOT DELETED, and this is the one place the three siblings
        deliberately differ. The property that matters is only that no marker can FORM, and '(ERROR)'
-       cannot be counted by any hook. In an id or a path a bracket is vanishingly rare, so deleting it
+       cannot be counted by any hook. Bounded honestly: this closes what a hook COUNTS, not what an eye
+       mistakes -- every hook regex here matches literal ASCII brackets, so a fullwidth U+FF3B passes
+       through and could still LOOK like a marker to somebody scanning the terminal. That is a display
+       resemblance with no mechanical effect, and widening the pattern to chase homoglyphs would start
+       deleting ordinary punctuation out of prose to prevent nothing measurable.
+       In an id or a path a bracket is vanishingly rare, so deleting it
        costs nothing; in prose it is ordinary and load-bearing, and deleting it turns '[the guide](x.md)'
        into something the reader has to reconstruct. So the substitution is uniform and carries NO note:
        it is a display convention like the whitespace collapsing beside it, not a claim about this line.

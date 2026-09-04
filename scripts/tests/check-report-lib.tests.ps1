@@ -199,6 +199,17 @@ try {
     Assert-Equal 'a b' (Format-SafeProseToken -Value "a`tb") 'a tab collapses to a space'
     Assert-True (-not ((Format-SafeProseToken -Value "a`tb") -match 'shown sanitized')) 'and collapsing it is not reported as sanitizing'
 
+    # U+2028 / U+2029 are the one line-breaking class NEITHER pattern covers: they are Zl/Zp, so '\p{C}'
+    # does not match them, and entry-scaffold-lib.ps1's line splitter does not split on them either -- a
+    # consumer line really can carry one. What closes them is the '\s+' collapse, because .NET's '\s'
+    # DOES match both. That makes the protection incidental, so it is pinned here: reorder or drop that
+    # pass and these two asserts are what fail instead of a forged line reaching somebody's session.
+    foreach ($sep in @(0x2028, 0x2029)) {
+        $ls = Format-SafeProseToken -Value "before$([char]$sep)after"
+        Assert-Equal 'before after' $ls "U+$('{0:X4}' -f $sep) is folded to a space, so it cannot break the line"
+        Assert-Equal 'before after' (Format-SafePathToken -Value "before$([char]$sep)after") "U+$('{0:X4}' -f $sep) is folded by the path form too"
+    }
+
     Assert-Equal 200 (Format-SafeProseToken -Value ('z' * 500)).Length 'an over-long line is capped at 200 -- the locator is the file:line above it, not this preview'
     Assert-True ((Format-SafeProseToken -Value ('z' * 500)) -match '\.\.\.$') 'and a capped line ends in an ellipsis rather than looking complete'
     Assert-Equal '' (Format-SafeProseToken -Value '') 'empty in, empty out -- no throw'
