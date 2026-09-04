@@ -1020,6 +1020,121 @@ sections; `fold-changelog-entry.ps1` folds **only** DEPLOY and removes the docum
 reaches the trunk, and a grep over `scripts/`, `plugins/` and `contributing-davekjohn/` finds them
 nowhere else. The convention gap was the whole issue.
 
+### Inside the invocation — where a plateau suite's time actually goes (September 3, 2026)
+
+[#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358) reported a plateau of five
+suite files at 189-232s and named two candidate levers: split the files further, or reduce the
+**per-invocation** cost of the 168 child `powershell` runs the four `check-plugin-integrity-*` suites make.
+It left the second unpriced in its own words -- *"it is not obvious without measuring which half of that
+~4.5s per invocation is the lint's own work."* Measured, on an idle 32-core workstation, over the fixture
+those suites build:
+
+| | per invocation | share |
+|---|---|---|
+| process spawn | 0.097s | 7% |
+| parse of the lint's 3419 lines | 0.115s | 8% |
+| dot-source its 11 libs | 0.071s | 5% |
+| **fixed overhead before any check runs** | **0.283s** | **21%** |
+| the 30 checks' own work | 1.079s | 79% |
+| **total** | **1.362s** | |
+
+**So it is a fifth, not a half** — and that answers the question in the direction that closes the lever
+rather than opening it. Removing all of the fixed overhead would need the suites to stop spawning a process
+per assert, and the lint calls `exit`, so in-process invocation is a rewrite of the fixture's contract for
+21%. Not proposed.
+
+**The 4.5s in the report was a CI figure divided by an invocation count**, which folds four-lane contention
+on a four-core runner into what looks like a per-call cost. The two agree once the machine is stated: 52
+invocations x 1.12s is 58.7s, and that is what the heaviest suite measures standalone here. **Those suites
+are ~100% their lint invocations**, to within a second, which is the fact that makes per-invocation cost the
+whole lever for them.
+
+**What was actually duplicated was the AST walk, not the parse either comment worried about.** Two
+non-skippable checks -- barred-skill and shopify-cli -- each called `ParseFile` and then
+`FindAll(CommandAst)` over the same file set. Over this repo's 184 script files one such pass is 1.413s, of
+which the **walk is 1.157s** and the parse only 0.256s; a second pass off a shared cache is 0.014s. Sharing
+it (`Get-PsScriptCommandAsts`) measured **-12.6%** across the four suites -- 58.7/55.7/51.0/34.5s to
+50.8/48.9/44.7/30.3s -- with every assert count unchanged at 108/95/78/59, and ~1.4s off the real lint gate.
+It retains 25,476 AST nodes for ~72MB of heap, which is the cost and is stated at the accessor.
+
+#### The reconstruction trap — two of the five were never plateau members
+
+**The gate recorded no per-suite duration** — it does now, and closing that is what
+[PR #1364](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1364) was for; read
+[the section below](#the-instrument-and-what-it-immediately-changed-september-3-2026) for what the first
+recording showed. The trap itself is unchanged and still worth knowing, because the misleading timestamps
+are still in every log: the gate buffers each suite's output until that suite completes, so
+`entry-scaffold`'s log lines all land within 2.7ms of each other. A log timestamp gives a suite's
+**finish** time, and subtracting the shard's start is a duration only for a suite that started at `t0`.
+
+With 4 lanes that means queue positions 1-4. Taken by stride over the 65-suite pool, the four
+`check-plugin-integrity-*` files sit at positions 3, 3, 3 and 4 of their shards -- so **#1358's figures for
+them are exact, exactly as it claimed**. But `entry-scaffold` is 5th of 16 in its shard and `new-branch` 9th
+of 16, so both reconstructions include lane wait. Standalone here `entry-scaffold` is **17.0s**, against the
+51-59s of the suites whose CI numbers are sound; at their measured 3.6-4.0x local-to-CI ratio it predicts
+~65s, not the 189s reported. `new-branch` at 52.8s predicts ~190-210s and is plausibly a real member.
+
+**So the plateau is four files, not five, and `entry-scaffold` should not be split.** This is
+[Chris's fifth intake pattern](01-01-extension.md#the-dave-rules) again -- the finding is real and its
+**size** is wrong -- on a report this team wrote itself, which is where it keeps happening. The lesson is
+narrower than "check the numbers": a reconstruction is only as good as its `t0` assumption, and the report
+stated that assumption correctly for the four files it verified and then silently extended the method to two
+it had not.
+
+**And "four, not five" is itself only as good as the reconstruction it corrected** — see the section below,
+where the recorded numbers make the band about a dozen suites. The correction above stands as far as it
+goes: `entry-scaffold` really is not a member, and the four `check-plugin-integrity-*` figures really were
+exact. What it got wrong is the same thing it was correcting for, one level up — it re-derived a *membership
+list* from the same reconstructions instead of waiting for the instrument.
+
+### The instrument, and what it immediately changed (September 3, 2026)
+
+The section above ends by proposing a decision off reconstructions. **@maikel-bwj retitled
+[#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358) instead** — from a
+five-file plateau at named seconds to *"the band of heavy suite files ... **first make the gate record
+per-suite durations**"* — and that ordering was right. PR #1364 built it: `Invoke-TestSuiteGate` records
+each suite's duration **and the offset at which its lane opened**, prints them slowest first, and marks the
+one that set the makespan.
+
+**The first recorded run reordered the top of the list.** All 65 suites, **30 lanes on a 32-core
+workstation**, 91s total (reproduced at 92s):
+
+| suite | duration | lane opened |
+|---|---|---|
+| `new-branch.tests.ps1` | **89.7s** | +1.1s **← set the makespan** |
+| `check-plugin-integrity-links.tests.ps1` | 83.8s | +0.2s |
+| `check-plugin-integrity-docs.tests.ps1` | 82.8s | +0.2s |
+| `fold-changelog.tests.ps1` | 78.2s | +0.3s |
+| `check-plugin-integrity-entries.tests.ps1` | 78.1s | +0.2s |
+| `sync-main.tests.ps1` | 69.4s | +13.8s |
+| `prune-merged.tests.ps1` | 65.1s | +2.8s |
+| `check-plugin-integrity-commands.tests.ps1` | 61.1s | +0.2s |
+| `bootstrap-drift.tests.ps1` | 58.8s | +0.1s |
+| `roster-sync.tests.ps1` | 57.7s | +6.4s |
+| `shared-scripts.tests.ps1` | 54.3s | +12.5s |
+| `script-contract.tests.ps1` | 53.7s | +8.9s |
+
+Two facts nothing could see before: **`new-branch` sets the makespan**, where #1358 had it second behind
+`check-plugin-integrity-links`; and **seven suites in that band appear in none of the five** —
+`fold-changelog`, `sync-main`, `prune-merged`, `bootstrap-drift`, `roster-sync`, `shared-scripts`,
+`script-contract`. The retitle's wording is the accurate one.
+
+**State the lane count with any figure from this table.** It is a 30-lane workstation reading, not the
+4-lane shape the required check runs, and #1351 measured 3.7x between those regimes. CI prints its own
+table per shard now, so the comparison is a log read.
+
+**The lesson, which is Nolan's and not a one-off.** Two rounds of this issue were spent arguing about which
+files are expensive while the instrument that answers it did not exist and was cheap to build. A
+measurement whose method carries an unstated assumption does not merely risk being wrong — it *reads as
+data*, so the argument moves to what to do about it rather than to whether it is true. **Build the
+instrument before the argument**, and where a figure has to be derived, print the derivation's assumption
+next to it: the reason the table carries the lane offset at all is that a duration alone cannot be checked
+against the pool's makespan by a reader who does not know when the suite began.
+
+**Still open on #1358:** the split, now genuinely unpriced again. It is not four files and not five, the
+makespan-setter is a different suite than the report named, and nothing about it should be decided off this
+workstation table rather than a 4-lane CI one.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup

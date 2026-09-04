@@ -110,8 +110,16 @@ function Format-GateSeconds {
         depend on the machine that printed it. Repo content is English (CLAUDE.md, Language), and a
         number whose meaning depends on regional settings is the same defect as an untranslated string.
     #>
-    param([Parameter(Mandatory = $true)][double]$Seconds)
-    return [string]::Format($script:NativeCaptureInvariant, '{0:N0}', $Seconds)
+    param(
+        [Parameter(Mandatory = $true)][double]$Seconds,
+        # WHOLE SECONDS BY DEFAULT, and the default is what every caller before #1358 gets -- a test
+        # asserts that 0.4 renders as '0'. The per-suite table added by that issue is the one caller that
+        # needs a decimal: most suites in this pool finish under a second, and a column of '0s' rows
+        # records nothing. Still routed through the invariant culture, because that is the whole point of
+        # this function and a second format string is a second chance to lose it.
+        [int]$Decimals = 0
+    )
+    return [string]::Format($script:NativeCaptureInvariant, ('{0:N' + $Decimals + '}'), $Seconds)
 }
 
 function ConvertTo-NativeArgumentToken {
@@ -655,6 +663,41 @@ function Invoke-TestSuiteGate {
         So the caller may now ask for a quarter of the pool and run four of itself. ci.yml does; every
         other caller passes neither parameter and gets the whole pool, unchanged, down to the wording of
         its summary line.
+
+        AND SHARDING HANDS THE GATE STRAIGHT BACK TO THE #714 REGIME, WHICH IS WHY A CALLER SHOULD NOT
+        KEEP RAISING ITS SHARD COUNT (issues #1354 and #1358, September 3, 2026). The paragraph above is
+        about the WHOLE pool, where 4 lanes against 2968 lane-seconds is contention. Inside one shard that
+        is no longer true: a quarter of the pool over the same 4 lanes is ~740 lane-seconds, the same order
+        as the slowest FILE, so each shard's wall clock collapses onto its own longest suite. Measured on
+        the first sharded runs, and exact rather than reconstructed because the stride puts those files in
+        queue positions 3-4 where they start at t0: a shard whose longest file was 183s took 183s, and one
+        whose longest was 206s took 207s. So a sharded job is max(longest file) plus its provisioning, and
+        no partition of whole files can beat its own longest member -- which is the same wall a
+        duration-aware bin-pack would reach, so recording durations to FEED ONE buys nothing here.
+        RECORDING THEM FOR A DIFFERENT REASON DOES, and this function now does it (see below). A partition
+        cannot beat its longest file, but that only helps once you know WHICH file that is -- and #1358's
+        answer to that was wrong in both directions until the gate began reporting it: it named the wrong
+        suite as the heaviest, and it put seven others outside a band they are in.
+        SO THE TWO PARAGRAPHS DO NOT DISAGREE, AND WHICH ONE APPLIES IS A QUESTION OF SCALE. Adding lanes
+        (more shards) pays while a shard's lane-seconds exceed its longest file, and stops dead at that
+        file. The trap is quoting the contention-bound paragraph after the shard count has already crossed
+        over into this one.
+        AND PAST THAT POINT THE LEVER IS INSIDE THE FILE, NOT AROUND IT -- so #714's "split the slowest
+        file" is one answer and not the only one. What a heavy suite here actually costs is its child
+        processes: the four check-plugin-integrity suites are ~100% their own lint invocations, and #1358
+        took ~12.6% off all four by removing a duplicated AST walk from the script they invoke, without
+        touching this function or any partition. A caller staring at a slow required check should price
+        that before buying another runner.
+        ONE WARNING FOR WHOEVER RE-MEASURES: READ THE TABLE THIS FUNCTION PRINTS, NOT THE LOG TIMESTAMPS.
+        Every suite's duration and the offset at which its lane opened are reported after the pool (#1364,
+        stated again below). THE WARNING OUTLIVED THE FIX because the misleading timestamps did: this
+        function buffers a suite's output until that suite completes, so a log
+        timestamp is a FINISH time. Subtracting the shard's start yields a duration only for a suite that
+        started at t0 -- queue positions 1..MaxParallel. Do it further down the queue and you are reading
+        lane wait as runtime; that error put two files on a five-file "plateau" that has four, one of them
+        reconstructed at 189s against 17.0s standalone. Local figures also do not transfer: the same suites
+        run 3.6-4.0x faster on a workstation than on a four-core hosted runner, so a standalone reading is
+        corroboration only once the machine is stated.
         WHY THE FUNCTION PARTITIONS RATHER THAN THE CALLER -- and why a STRIDE: both at the partition
         itself, below the suite glob. WHY THIS DOES NOT PAY #714's BILL TWICE: the four
         check-plugin-integrity suites build a fixture EACH, in a per-process directory (that file's own
@@ -668,6 +711,17 @@ function Invoke-TestSuiteGate {
         refuses when one of them did not report -- a workflow-level concern, so it lives in ci.yml's own
         banner rather than here, and it is the reason this function throws on a nonsensical (Shard,
         ShardCount) instead of quietly selecting nothing.
+
+        PER-SUITE DURATIONS ARE RECORDED, NOT RECONSTRUCTED (issue #1358). Before that this function timed
+        only the pool, and because it buffers a suite's output until that suite exits, the only per-suite
+        signal a log carried was a FINISH time. Subtracting the pool's start from it is a duration only for
+        a suite that started at t0 -- one of the first -MaxParallel dequeued -- and nothing in the
+        arithmetic says so. It cost a five-file plateau that had four members: the method was applied
+        correctly to the four suites in the opening lanes and then extended to two sitting 5th and 9th in a
+        4-lane queue, reading their lane wait as runtime. The table printed after the pool now carries each
+        suite's duration AND the offset at which its lane opened, slowest first, and marks the one that set
+        the makespan -- the only suite whose shortening moves the total, which is #714's finding and the
+        thing every wall-clock question about this pool starts from.
 
         Returns $true when every suite exited 0, $false when any did not, and $true with a warning when
         there is nothing to run -- an empty or missing directory is a repo without suites, not a failure,
@@ -781,6 +835,19 @@ function Invoke-TestSuiteGate {
     $launchDir  = (Get-Location).Path
     $sw         = [System.Diagnostics.Stopwatch]::StartNew()
     $failedNames = New-Object System.Collections.ArrayList
+    # PER-SUITE DURATIONS, RECORDED RATHER THAN RECONSTRUCTED -- issue #1358. This function used to time
+    # only the whole pool, and it buffers each suite's output until that suite exits, so the ONLY per-suite
+    # signal in a log was the timestamp of a completed suite's first line: a FINISH time. Subtracting the
+    # pool's start from it gives a duration only for a suite that started at t0, i.e. one of the first
+    # $MaxParallel to be dequeued -- and that assumption is invisible in the arithmetic. Measured cost of
+    # leaving it implicit: a five-file plateau reported off this pool had four members, because the method
+    # was applied correctly to the suites in the opening lanes and then extended to two that were 5th and
+    # 9th in a 4-lane queue, reading their lane wait as runtime.
+    #
+    # BOTH NUMBERS ARE KEPT, and the start offset is the one that was missing. A duration alone still
+    # cannot be checked against the pool's makespan by a reader who does not know when the suite began, and
+    # the offset is what makes 'this suite waited for a lane' visible instead of inferable.
+    $suiteTimings = New-Object System.Collections.ArrayList
 
     if ($suites.Count -gt 0) {
         if ($MaxParallel -le 0) {
@@ -833,6 +900,9 @@ function Invoke-TestSuiteGate {
                     $null = $proc.Handle
                     $running.Add([pscustomobject]@{
                         Name = $suite.Name; Process = $proc; OutFile = $outFile; ErrFile = $errFile
+                        # WHEN THIS LANE OPENED, off the gate's own stopwatch -- see $suiteTimings for why
+                        # the offset is recorded and not just the duration (issue #1358).
+                        StartOffset = $sw.Elapsed.TotalSeconds
                     }) | Out-Null
                 }
 
@@ -845,6 +915,14 @@ function Invoke-TestSuiteGate {
                 foreach ($d in $done) {
                     $d.Process.WaitForExit()          # settles ExitCode before it is read
                     $code = $d.Process.ExitCode
+                    # RECORDED HERE, WHERE BOTH ENDS ARE KNOWN. Reaping is the only moment this loop holds
+                    # a suite's start and its finish at once; after $running.Remove the start offset is gone.
+                    $suiteTimings.Add([pscustomobject]@{
+                        Name        = $d.Name
+                        StartOffset = $d.StartOffset
+                        Duration    = ($sw.Elapsed.TotalSeconds - $d.StartOffset)
+                        Failed      = ($code -ne 0)
+                    }) | Out-Null
                     if ($code -eq 0) {
                         Write-Host "== $($d.Name) ==" -ForegroundColor Cyan
                     } else {
@@ -910,6 +988,36 @@ function Invoke-TestSuiteGate {
 
     $sw.Stop()
     $total = $suites.Count + $extraCommands.Count
+
+    # THE PER-SUITE TABLE, slowest first -- issue #1358. Printed before the verdict so the verdict stays
+    # the last line a session copies, and only when there is a pool to describe.
+    #
+    # WHY SLOWEST FIRST RATHER THAN COMPLETION ORDER: the whole reason to have this is to find the file
+    # that sets the shard's wall clock, and #714's finding is that a shard costs its slowest FILE. The
+    # blocks above are already in completion order, so ordering by cost adds the view the log did not have.
+    #
+    # THE MAKESPAN MARKER IS THE ACTIONABLE BIT. A suite is marked '<-- set the makespan' when it finished
+    # last, because that is the only suite whose shortening moves this pool's total -- everything else has
+    # slack behind it. That is the claim #714 proved and #1354 re-proved, and printing it stops the next
+    # reader deriving it from timestamps.
+    if ($suiteTimings.Count -gt 0) {
+        $lastFinish = ($suiteTimings | ForEach-Object { $_.StartOffset + $_.Duration } | Measure-Object -Maximum).Maximum
+        $nameWidth = ($suiteTimings | ForEach-Object { $_.Name.Length } | Measure-Object -Maximum).Maximum
+        Write-Host ''
+        Write-Host "test gate: per-suite durations, slowest first (recorded, not reconstructed -- #1358)" -ForegroundColor Cyan
+        Write-Host "  'started' is when a LANE OPENED, not when the suite was queued: a late start is lane wait, not runtime." -ForegroundColor DarkGray
+        foreach ($t in ($suiteTimings | Sort-Object -Property Duration -Descending)) {
+            $finish = $t.StartOffset + $t.Duration
+            # Within a tick of the pool's end, so a rounding difference does not hide the marker.
+            $marker = if ([Math]::Abs($finish - $lastFinish) -lt 0.05) { '  <-- set the makespan' } else { '' }
+            $flag   = if ($t.Failed) { ' FAILED' } else { '' }
+            Write-Host ("  {0,8}s  {1,-$nameWidth}  started +{2}s{3}{4}" -f `
+                (Format-GateSeconds $t.Duration -Decimals 1), $t.Name,
+                (Format-GateSeconds $t.StartOffset -Decimals 1), $flag, $marker) `
+                -ForegroundColor $(if ($t.Failed) { 'Red' } else { 'Gray' })
+        }
+        Write-Host ''
+    }
 
     # The verdict is printed here rather than left to the caller, because completion-order blocks bury it:
     # in a 27-suite weave the one red header is 2000 lines up. Sorted, so two runs name the same failures

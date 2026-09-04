@@ -89,7 +89,8 @@ concurrency:
 # THE NAME IS THE POINT: `main-ci-gate` requires a check called `lint-en-tests`, and GitHub names a check
 # after the job that reports it. Keeping a job by that exact name means this restructure needs NO ruleset
 # edit, no repo-settings change and nobody's permission -- which is the whole reason it could be done while
-# the merge-queue decision on #1325 is still open. Do not rename this job. Renaming it silently un-gates
+# the merge-queue decision on #1325 was still open. It has since been settled -- NO queue (#1355,
+# September 3, 2026) -- which changes nothing here. Do not rename this job. Renaming it silently un-gates
 # `main`: the ruleset would wait forever for a check nobody reports, and every merge would block.
 #
 # `if: !cancelled()` PLUS AN EXPLICIT RESULT CHECK, AND BOTH HALVES ARE LOAD-BEARING. A job that
@@ -129,11 +130,39 @@ jobs:
   suites:
     runs-on: windows-latest
     strategy:
-      # FOUR, AND THE FLOOR IS WHY IT IS NOT MORE. The gate's cost within a shard is still its slowest
-      # FILE (#714), which is ~51s for the heaviest of the check-plugin-integrity-* four, so past roughly
-      # four shards the returns stop and each extra runner still pays its own ~35s of provisioning and
-      # checkout. Four gives 16 suites per shard over 4 lanes -- the pool's 2968 lane-seconds spread over
-      # 16 lanes, or ~190s plus setup, which is the ~200s the same pool already reaches on a workstation.
+      # FOUR, AND THE FLOOR IS WHY IT IS NOT MORE. The gate's cost within a shard is its slowest FILE
+      # (#714), so no partition of whole files can go below the longest one and more shards cannot help --
+      # each extra runner just pays its own ~20s of provisioning and checkout. Four gives 16 suites per
+      # shard over 4 lanes, which is enough for the pool's ~2968 lane-seconds to stop being the binding
+      # constraint; past that the longest file is all that is left.
+      #
+      # THE FLOOR IS ~200s, NOT THE ~51s THIS COMMENT USED TO CLAIM -- issue #1358, corrected September 3,
+      # 2026. The 51s figure predated the shard matrix and was never a CI measurement. Measured on runs
+      # 33802607836 and 33803180318, the four check-plugin-integrity-* suites draw queue positions 3-4 of
+      # their shards, so with 4 lanes they start at t0 and their duration is exact rather than
+      # reconstructed: the heaviest ran 250.9s and 212.5s. That is the whole regime -- a shard whose
+      # longest file was 183s took 183s, one whose longest was 206s took 207s -- so this job is
+      # max(longest file) + ~20s, and the four shard makespans on those runs were 183/137/283/237s and
+      # 243/179/286/207s.
+      #
+      # ~30s CAME OFF THAT FLOOR in #1358 by making the lint parse and walk the script set once instead of
+      # twice (see Get-PsScriptCommandAsts in check-plugin-integrity.ps1): those four suites are ~100% lint
+      # invocations -- 52 of them in the heaviest, at ~1.12s each on a workstation -- and they measured
+      # 58.7/55.7/51.0/34.5s before and 50.8/48.9/44.7/30.3s after, with every assert count unchanged.
+      # DO NOT RECONSTRUCT DURATIONS FROM LOG TIMESTAMPS -- THE GATE PRINTS THEM (#1358, PR #1364). Each
+      # shard's log carries a 'per-suite durations, slowest first' table holding every suite's duration,
+      # the offset at which its lane opened, and a marker on the one that set the makespan. Read that.
+      # WHY THE WARNING IS STILL HERE now that the table exists: the gate buffers each suite's output
+      # until that suite completes, so a log timestamp is a FINISH time and always was. Subtracting the
+      # shard start from it is a duration only for a suite in queue positions 1-4 -- and that is how the
+      # figures on #1358 came to name a five-file plateau, by extending the method to two suites sitting
+      # 5th and 9th in a 4-lane queue and reading their lane wait as runtime. The table is the answer to
+      # that; the timestamps are still there and still misleading.
+      #
+      # AND THE CORRECTED COUNT IS NOT 'FOUR' EITHER -- do not quote one from this comment's own history.
+      # The first RECORDED run named a different heaviest suite than #1358 did and put roughly a dozen
+      # files in the expensive band, seven of which appear in none of the five. Anything about which files
+      # are heavy comes from the table on a 4-lane run, not from a workstation and not from prose.
       #
       # fail-fast IS FALSE, DELIBERATELY. The default would cancel the surviving shards the moment one goes
       # red, which costs exactly the information this repo needs most from a red gate: these suites have a

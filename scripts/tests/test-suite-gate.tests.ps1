@@ -133,6 +133,14 @@ try {
         Assert-Equal '2,182' (Format-GateSeconds 2182.4) 'Format-GateSeconds: 2182s is 2,182 even under nl-NL (not 2.182)'
         Assert-Equal '249'   (Format-GateSeconds 249)    'Format-GateSeconds: a sub-1000 figure carries no separator'
         Assert-Equal '0'     (Format-GateSeconds 0.4)    'Format-GateSeconds: rounds to whole seconds'
+        # -Decimals arrived with the per-suite table (#1358), where most suites finish under a second and
+        # a column of '0s' rows records nothing. Asserted under nl-NL for the same reason as the rows
+        # above: there the decimal separator is a COMMA, so a culture leak would print '1,2' and an
+        # English reader gets a thousands separator instead of a decimal point -- #1159's defect one digit
+        # further down. The default must stay 0, because every pre-#1358 caller relies on it.
+        Assert-Equal '1.2'   (Format-GateSeconds 1.24 -Decimals 1) 'Format-GateSeconds: -Decimals 1 keeps the invariant DOT under nl-NL'
+        Assert-Equal '2,182.4' (Format-GateSeconds 2182.44 -Decimals 1) 'Format-GateSeconds: and still groups thousands invariantly'
+        Assert-Equal '0'     (Format-GateSeconds 0.4)    'Format-GateSeconds: the default is unchanged -- whole seconds'
     } finally {
         [System.Threading.Thread]::CurrentThread.CurrentCulture = $prevCulture
     }
@@ -281,6 +289,49 @@ Write-Host "GATE-RESULT: `$r"
     # The one timing assert that is safe, because it is a floor the sleeps guarantee: six 1.2s suites in
     # sequence cannot come in under 7.2s of sleeping, however fast the machine is.
     Assert-True ($ser.Seconds -ge 6) "and it costs their sum (took $([math]::Round($ser.Seconds,1))s)"
+
+    # --- 4b. The per-suite table records a DURATION, not a finish time (issue #1358) ----------------
+    #
+    # THIS IS THE ASSERT THAT WOULD HAVE CAUGHT THE DEFECT. The gate used to time only the pool, and it
+    # buffers a suite's output until that suite exits -- so the only per-suite figure derivable from a log
+    # was a FINISH time, and subtracting the pool's start from it is a duration only for a suite that
+    # started at t0. A five-file plateau reported off the real pool turned out to have four members
+    # because the method was extended to two suites sitting 5th and 9th in a 4-lane queue.
+    #
+    # THE SERIAL RUN IS THE PERFECT DISCRIMINATOR and it is why this rides scenario 4's fixture rather
+    # than building its own: with -MaxParallel 1, suite six starts around +6s and runs for ~1.2s. A
+    # duration column holding finish times would read ~7.2s for it. So the two readings differ by 6x
+    # here, which no timing noise can bridge -- and the assert is a CEILING on every row plus a FLOOR on
+    # the largest offset, which together say "these are runtimes and the queueing really happened".
+    Write-Host "per-suite durations are recorded, and a queued suite is not charged for its wait" -ForegroundColor Cyan
+    $rows = @($ser.Lines | ForEach-Object {
+        if ($_ -match '^\s+([\d.,]+)s\s+(\S+\.tests\.ps1)\s+started \+([\d.,]+)s') {
+            [pscustomobject]@{
+                Duration = [double](($matches[1] -replace ',', ''))
+                Name     = $matches[2]
+                Offset   = [double](($matches[3] -replace ',', ''))
+                Makespan = ($_ -match 'set the makespan')
+            }
+        }
+    })
+    Assert-Equal 6 $rows.Count 'the table carries one row per suite'
+    Assert-True ($ser.Flat -match 'per-suite durations, slowest first') 'and says what it is and how it is ordered'
+    Assert-True ($ser.Flat -match 'recorded, not reconstructed') 'and that it is recorded rather than derived from timestamps'
+
+    $maxOffset = ($rows | Measure-Object -Property Offset -Maximum).Maximum
+    Assert-True ($maxOffset -ge 5) "serially the last lane really opened late (largest offset +$([math]::Round($maxOffset,1))s)"
+    $maxDuration = ($rows | Measure-Object -Property Duration -Maximum).Maximum
+    Assert-True ($maxDuration -lt 4) "yet NO row is charged for that wait -- every duration is a runtime (largest $([math]::Round($maxDuration,1))s, not ~7s)"
+
+    # Sorted slowest first, which is the whole reason to print it: the makespan-setter is findable.
+    $sortedDesc = $true
+    for ($i = 1; $i -lt $rows.Count; $i++) { if ($rows[$i].Duration -gt $rows[$i - 1].Duration + 0.001) { $sortedDesc = $false } }
+    Assert-True $sortedDesc 'the rows are ordered slowest first'
+
+    # Exactly one, because it is the claim '#714 proved: only the last-finishing suite's cost moves the
+    # pool's total. Two markers would mean the comparison is against the wrong end.
+    Assert-Equal 1 (@($rows | Where-Object { $_.Makespan }).Count) 'exactly one row is marked as having set the makespan'
+    Assert-True ($ser.Flat -match 'a late start is lane wait, not runtime') 'the header warns the reader what the offset is, since that is the trap'
 
     # --- 5. The working directory the child is handed ----------------------------------------------
     Write-Host "-WorkingDirectory -- the child inherits PowerShell's location, not the process's" -ForegroundColor Cyan
