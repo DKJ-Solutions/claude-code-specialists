@@ -120,9 +120,10 @@ and the CI mechanism needs the project. That is answered by a set of functions i
   for a person. That is the fail-safe default rather than a fault -- a card pushed into the submitter's
   column claims a handover that never happened -- but it is silent, so it is worth stating deliberately.
 - `Get-AsanaProjectGid` -- the project a mirrored task is created in, and it has exactly one correct
-  value: **the board the team reads**. Two independent constraints land on the same answer. An Asana
-  custom field does not cross workspaces, so a project outside the board's workspace makes the prio
-  labels of
+  value: **the board the team reads**. Two independent constraints land on the same answer. `Prio-Score`
+  only reaches a task once it has been added to that task's project via the project's own
+  `custom_field_settings` -- sitting in the board's workspace is not enough to guarantee that -- so a
+  project that does not carry the field makes the prio labels of
   [step 5](WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label) reach only the
   tickets imported from the board; and the stages of
   [step 6](WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
