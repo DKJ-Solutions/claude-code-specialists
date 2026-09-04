@@ -192,7 +192,7 @@ and an unclassifiable name switches the check off for itself.
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
 | [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
-| [`bwj-codex/`](plugins/workflows/bwj-codex/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under; today one rule, for handling Asana tickets: a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and the Asana task resolves itself when the GitHub issue closes (a CI workflow the plugin ships as a template). Two skills (`report-issue`, `adopt-bwj-asana`), no specialists, no hooks. Extends only the ticket-work step of `contributing-davekjohn` and contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `contributing-davekjohn`. |
+| [`bwj-codex/`](plugins/workflows/bwj-codex/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under; today one rule, for handling Asana tickets: a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself. Two skills (`report-issue`, `adopt-bwj-asana`), no specialists, no hooks. Extends only the ticket-work step of `contributing-davekjohn` and contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `contributing-davekjohn`. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -333,9 +333,10 @@ A consuming repo adds this marketplace via `extraKnownMarketplaces` in `.claude/
 enables the desired plugins via `enabledPlugins` — and then, because an install is **project-scoped**,
 runs `claude plugin marketplace update <marketplace>` followed by
 `claude plugin install <plugin>@<marketplace> --scope project` from that repo's root for each of
-them; the settings keys alone install nothing, without the flag the command defaults to a
-machine-wide `user` install instead, and without the refresh it can serve an *older* version and
-still report success (see [Versioning](#versioning)). The canonical enable-a-plugin walkthrough (the
+them; the settings keys alone leave you without a working install, without the flag the command
+defaults to a machine-wide `user` install instead, and without the refresh it can serve an *older*
+version and still report success (see [Versioning](#versioning)). The canonical enable-a-plugin
+walkthrough (the
 settings snippet, the cache refresh, the per-plugin install, the restart, the install-record
 self-check, running the bootstrap skill) is in
 [INSTALL.md](INSTALL.md#adoption--how-to-connect-your-repo) — five steps, for those who
@@ -926,10 +927,24 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > **The install is not a formality, and leaving it out fails silently** (inbound
   > [#274](https://github.com/DaveKJohn/claude-code-specialists/issues/274), measured in a consumer during
   > the 3.0.0 adoption round). An install is **project-scoped** — `installed_plugins.json` keys every
-  > record by `projectPath` — so the two settings keys plus a restart produce *no* install and no error.
-  > What the reader gets instead is a session with neither the skill nor the session-start hooks, which
-  > is indistinguishable from a healthy one: "no hooks because the plugin is not loaded" and "no hooks
-  > because all is well" print the same nothing.
+  > record by `projectPath` — so the two settings keys plus a restart give you no *working* install and
+  > no error. What the reader gets instead is a session with neither the skill nor the session-start
+  > hooks, which is indistinguishable from a healthy one: "no hooks because the plugin is not loaded" and
+  > "no hooks because all is well" print the same nothing.
+  >
+  > **They do not, however, produce *nothing* — and that is the sharper trap** (inbound
+  > [#327](https://github.com/DaveKJohn/claude-code-specialists/issues/327),
+  > [#355](https://github.com/DaveKJohn/claude-code-specialists/issues/355)). This block read *"produce
+  > no install and no error"* until September 4, 2026, and `INSTALL.md` had already retired that absolute
+  > — *"this page no longer claims they do nothing"* — while this one kept it. Measured on a virgin
+  > profile with the marketplace registered and the cache present, a **single session start** wrote a
+  > full project-scoped record, with the correct `projectPath`, `version` and `gitCommitSha`, while that
+  > same session loaded nothing at all: the record is written *after* the load phase, so only the next
+  > session gets the plugin. Measured again after three session starts, its `installPath` named a
+  > directory that **did not exist**. So a record is a claim, not evidence — run the install, and verify
+  > by the **surface** (is the bootstrap skill in your slash list, did the session hooks print, does
+  > Chris open the turn) rather than by the administration. Mechanics:
+  > [Connecting — the install step](INSTALL.md#connecting--the-install-step).
   >
   > **`--scope project` carries that same weight, and the later update is the same pair of commands:**
   > `claude plugin marketplace update <marketplace>` and then

@@ -518,6 +518,73 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
 
     Assert-True ((New-SyncPrBody -Take $rowsTake -Keep $rowsKeep -Intro 'Custom intro.') -match '^Custom intro\.') 'body/intro: the opening line is the caller''s to set'
 
+    # --- The sync-log entry (inbound #1382) ----------------------------------------------------------
+    # THE HEADLINE ASSERT HERE IS 'log/shared', and it is not a shape check. The entry and the PR body
+    # are two renderings of ONE set of rows, and the failure they are built to prevent is silent: the day
+    # a verdict class is added, one composer learns about it and the other keeps producing a
+    # complete-looking record with that class missing. Asserting that the same rows produce the same
+    # bullets is the only assert that fails when the two drift apart -- every other property below is
+    # true of a forked composer too.
+    Write-Host ''
+    Write-Host 'New-SyncLogEntry'
+
+    $entry = New-SyncLogEntry -Branch 'sync/live-2026-09-04' -Date '2026-09-04' -Take $rowsTake -Keep $rowsKeep
+
+    Assert-True ($entry -match '(?m)^## 2026-09-04 -- .sync/live-2026-09-04.') 'log/heading: the entry opens with its date and the branch it came from'
+    Assert-True ($entry -match 'sections/header\.liquid' -and $entry -match 'snippets/promo\.liquid') 'log/take: the taken paths are named at all'
+    Assert-True ($entry -match 'gone from live -- .templates/page\.back-to-school\.json.') 'log/keep: the held-back half is in the entry, and it is the half nothing else records'
+    Assert-True ($entry -match '\*\*Taken from live \(2\)\*\*' -and $entry -match '\*\*Held back, the trunk wins \(2\)\*\*') 'log/counts: both halves carry their own count'
+
+    # ONE DEFINITION, TWO OUTPUTS. Every bullet the body draws from these rows is in the entry, verbatim.
+    $bodyBullets  = @([regex]::Matches($body,  '(?m)^- .+$')  | ForEach-Object { $_.Value })
+    $entryBullets = @([regex]::Matches($entry, '(?m)^- .+$') | ForEach-Object { $_.Value })
+    Assert-Equal ($bodyBullets -join '|') ($entryBullets -join '|') 'log/shared: the same rows render identically in the PR body and the log entry'
+
+    # NO PR FIELD, and it is a decision rather than an omission: the entry is committed on the sync
+    # branch before any PR exists, and the default seam answer never opens one at all.
+    Assert-True ($entry -notmatch '(?i)pull request|/pull/') 'log/pr: the entry carries no PR field, because there is no PR yet when it is written'
+
+    # The trailing blank line is what makes prepending two entries need no separator logic at the caller.
+    Assert-True ($entry.EndsWith("`n`n")) 'log/tail: an entry ends with a blank line, so two of them concatenate cleanly'
+    Assert-True ($entry -notmatch "`r") 'log/eol: LF only -- this runs on Windows and the file is read on GitHub'
+
+    $logEmpty = New-SyncLogEntry -Branch 'sync/live-2026-09-04' -Date '2026-09-04' -Take @() -Keep @()
+    Assert-True ($logEmpty -match 'Nothing was taken from live\.') 'log/empty: an empty half says so in words here too, rather than leaving a silent gap'
+
+    # --- Where the entry goes in the file ------------------------------------------------------------
+    # 'prepend/nomasthead' IS THE ONE THAT EARNS THIS BLOCK. '$lines[0..($anchor - 1)]' with an anchor of
+    # 0 is '$lines[0..-1]', which PowerShell reads as "0 through the LAST index" -- so the arm that looks
+    # like it yields an empty head yields the WHOLE FILE, and the log is duplicated rather than prepended
+    # to. Well-formed markdown, no error, and only on a log whose first line is already an entry.
+    Write-Host ''
+    Write-Host 'Add-SyncLogEntry'
+
+    $second = "## 2026-09-05 -- ``sync/live-2026-09-05``" + "`n`n- new on live -- ``a.liquid```n`n"
+
+    Assert-Equal $second (Add-SyncLogEntry -Existing '' -Entry $second) 'prepend/fresh: an empty file becomes the entry and nothing else'
+
+    $masthead = "# Sync log`n`nWhat third parties did on live. Newest first.`n`n"
+    $withOne  = Add-SyncLogEntry -Existing ($masthead + $entry) -Entry $second
+    Assert-True ($withOne.StartsWith($masthead)) 'prepend/masthead: whatever sits above the first entry is left exactly where it is'
+    Assert-True ($withOne.IndexOf('2026-09-05') -lt $withOne.IndexOf('2026-09-04')) 'prepend/order: and the new entry lands above the old one, newest first'
+    Assert-True ($withOne -match [regex]::Escape($entry)) 'prepend/intact: the entry already there survives byte for byte'
+    Assert-Equal 2 ([regex]::Matches($withOne, '(?m)^## ').Count) 'prepend/count: two entries in, two entries out'
+
+    # The trap: a log that is entries only, with no masthead at all.
+    $bare = Add-SyncLogEntry -Existing $entry -Entry $second
+    Assert-Equal 2 ([regex]::Matches($bare, '(?m)^## ').Count) 'prepend/nomasthead: a log whose first line IS an entry gets two entries, not its whole self back'
+    Assert-True ($bare.StartsWith('## 2026-09-05')) 'prepend/nomasthead: and the new one is still on top'
+
+    # A masthead and no entries yet: the file was hand-started, and the entry goes after it.
+    $mastheadOnly = Add-SyncLogEntry -Existing $masthead -Entry $second
+    Assert-True ($mastheadOnly.StartsWith('# Sync log')) 'prepend/mastheadonly: a file with a title and no entries keeps its title'
+    Assert-True ($mastheadOnly -match [regex]::Escape($second)) 'prepend/mastheadonly: and gains the entry below it'
+
+    # CRLF in, LF out: this runs on Windows, and a file that gains CRLF halfway diffs whole on GitHub.
+    $crlf = Add-SyncLogEntry -Existing (($masthead + $entry) -replace "`n", "`r`n") -Entry $second
+    Assert-True ($crlf -notmatch "`r") 'prepend/eol: an existing CRLF file is normalised to LF rather than mixed'
+    Assert-Equal 2 ([regex]::Matches($crlf, '(?m)^## ').Count) 'prepend/eol: and the anchor is still found through the old line endings'
+
     # ===============================================================================================
     # THE STANDING-PREDECESSOR PAIR (inbound #1021)
     #

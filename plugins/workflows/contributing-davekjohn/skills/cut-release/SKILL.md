@@ -44,8 +44,9 @@ words: *"not automation, but a checklist that imposes itself."*
 **Two scripts ARE mirrored now** (this line said the opposite until August 3, 2026): `cut-release.ps1`
 does the cut itself, and `new-internal-note.ps1` lays down the internal summary's skeleton. What this
 page adds is the part no script performs — the GitHub Release, the live push, the branch cleanup, and
-the order. Once a release has been cut, walk through the two blocks below **in order** and print/paste
-each command as you go — do not skip a step or reorder them from memory.
+the order. Once a release has been cut, walk through the blocks below **in order** and print/paste
+each command as you go — do not skip a step or reorder them from memory. The one thing a repo answers
+for itself is whether Block 2 runs before or after Block 1; the checklist does not decide that.
 
 ### Block 1 — cutting (always)
 
@@ -558,6 +559,54 @@ tagging) fills in `Get-LiveStage` with a short description of that target. Where
    again, which is where it started: the marker is the one release artefact whose correctness a script cannot
    confirm, because only the person who did the push knows it succeeded.
 
+#### Which comes first, the cut or the push — the repo answers this, not the checklist
+
+**Block 1 before Block 2 is the DEFAULT, not a rule** (inbound
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378), September 4, 2026, from
+`BWJ-ecommerce/smartwatchbanden`). This page stated it as one for as long as it had a live stage to
+describe, and a repo that ran the reverse read as drift. It was not drift, and the question turns on a
+single property of the target:
+
+- **A push that cannot meaningfully fail** — it either runs or errors loudly, and nobody else writes to
+  the target → **cut, then push.** The audience document exists before anything reaches a customer, so it
+  can be reviewed first, and the checklist reads top to bottom.
+- **A push that can fail or be partial** — a target with no locking, third parties editing it while you
+  work, a drift check that legitimately refuses, a per-file rather than wholesale push → **push, then
+  cut**, and the cut becomes the documented closing act of the push.
+
+**What the second order buys is an invariant, and it is worth naming because the first order gives it
+up silently.** Cut first and a failed push leaves a **stranded release**: the tag, the GitHub Release
+and the audience document all exist, permanently, describing a state no customer ever saw. Nothing
+detects that — every artefact is well-formed, and the only witness is the person who watched the push
+refuse. Cut afterwards and it cannot arise, because the release records what shipped rather than what
+was intended to.
+
+**The `← LIVE` marker in step 2 is the sharpest way to see the difference**, and its own reasoning is
+the argument: *only the person who did the push knows it succeeded.* Under push-then-cut that person is
+the one cutting, so the marker is correct at the moment it is written. Under cut-then-push the marker is
+**wrong by construction** from the moment the cut lands until a human moves it — which is a hand step
+this page can ask for but not enforce. Measured in the repo that filed #1378: its marker sat two
+releases behind, on a version cut four weeks earlier.
+
+**No seam, deliberately.** `Get-LiveStageCutOrder` was the obvious shape and would have cost a script
+contract record, a blueprint entry and asserts to carry a value **no script reads** — the order is a
+sentence a person walks past in a checklist, where `Get-LiveStage` gates whether the block prints at
+all. The condition above is answerable from the description already in `Get-LiveStage`, and a repo
+running the non-default order states it in its own `CLAUDE.md`, where the standing rule that a
+live push authorises its own closing cut has to live anyway. Revisit if a second live-stage consumer
+ever wants the checklist to render in its order rather than say which orders exist.
+
+**This instruction is the measured instance of `CONTRIBUTING-portable.md`'s fourth move, not an
+exception to its corollary against restating shared law.** That page's ranking section polices copies
+of a law the plugin states somewhere; this block deliberately states none, and asks the consumer's own
+`CLAUDE.md` to carry the only answer that will ever exist. See that page's "A fourth move exists"
+paragraph (inbound #1388) if the two ever read as disagreeing again.
+
+**This is not new to the tree, which is what settled it.** `team-shopify`'s webshop-manager manual
+already documented push-then-cut for exactly this case — *"only when the user decides to push; the
+release is then cut by the release manager"* — so the two pages shipped from one repo contradicting each
+other, and #1378 found it from the outside.
+
 ### Block 3 — publishing the marketplace to the business organisation (only where this repo is a marketplace source)
 
 This block is driven by two facts rather than a preference: the repo carries
@@ -749,9 +798,13 @@ owes this text. Write it there, and the cut carries it outward for you.
   and what differs per repo is read from optional getters in the consumer's `scripts\repo-config.ps1`.
   This page remains the *procedure* around the script — the parts no script performs: the GitHub
   Release, the live push, the branch cleanup.
-- **Order matters.** Block 1 always runs first; Block 2 only follows it, and only where
-  `Get-LiveStage` says there is one to run. Block 3 likewise comes after Block 1, only where the repo
-  is a marketplace source — and only when its publication is itself asked for.
+- **Order matters INSIDE a block, and between blocks it is nearly fixed.** Block 1's steps are walked
+  top to bottom. Block 3 comes after Block 1, only where the repo is a marketplace source — and only
+  when its publication is itself asked for. **Block 2 is the one exception**: it normally follows
+  Block 1, but a live stage whose push can fail or be partial runs it *first* and makes the cut the
+  closing act of the push — see
+  [Which comes first, the cut or the push](#which-comes-first-the-cut-or-the-push--the-repo-answers-this-not-the-checklist)
+  for the condition and the stranded-release failure mode the default gives up.
 - **And inside Block 1 the GitHub Release is last, which was a correction and has now outlived its
   original reason** (August 4, 2026; revisited August 10, 2026). It used to be step 2, directly after the
   tag, because its body was a file `cut-release.ps1` had already generated. When the body became the

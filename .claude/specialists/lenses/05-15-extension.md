@@ -1252,6 +1252,118 @@ to resolve at the consumer's `.claude/extensions/`, where check 4 already valida
 forms are passed over: a `${...}` target is the plugin-relative form, a `~/` one points at the
 marketplace clone deliberately, and an absolute URL is the repair being asked for.
 
+**A prose contract check — the pointer-test analogue of `check-script-contract.ps1`, applied to law
+instead of code — was measured and declined** (Dave, September 4, 2026;
+[#1380](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1380)). Inbound
+[#1379](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1379) asked for the two-sided
+mechanism it names: a manifest of the laws `contributing-davekjohn` legislates, and a consumer-side
+check reporting any always-on consumer document that answers a listed law without declaring itself a
+seam answer.
+
+**The two facts that carry the decline, stated first because they are stronger than the structural
+argument below on their own.** First, **the law the check was written to catch has zero standing true
+positives.** `LAW-RELEASE-ORDER` was the acceptance test because
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378) had just made it the one
+known-real defect in the corpus. #1378 was then repaired (commit `1db93328`) — Block 2's cut-then-push
+became a default a live stage may answer differently, so the consumer's push-then-cut is now a
+sanctioned answer the plugin actively invites, not a divergence. All 3 of that law's true positives were
+in the English co-occurrence candidate and all 3 reclassify as sanctioned: the check's own reason for
+existing was repaired out from under it while it was being measured. Second, **the detector found 1 of
+the 3 defects that actually stand in the corpus.** The three: the stale `development.md` restatement in
+each BWJ consumer (2, filed as #1389) and `smartwatchbanden`'s supremacy inversion (1, see below). Only
+the `xoxowildhearts` `development.md` instance was ever flagged. The other two are false negatives —
+`smartwatchbanden`'s stale instance was missed because the term list wanted a word that section does not
+use, and the supremacy inversion was suppressed by the strict pointer match, the failure mode described
+next. Recall on the real defects is 1 in 3, alongside the precision below.
+
+**The corpus, corrected.** The original count of 13 documents counted this repo's own 4 always-on
+documents (root `CLAUDE.md`, `SPECIALISTS.md`, Chris's persona, Chris's lens) as if they were a
+consumer's, when this repo is the plugin's source and not a consumer at risk of drift — and it counted
+Chris's persona three times, once per repo, when it is a single external file `@`-imported from the same
+marketplace-clone path by all three repos, so 3 repos × 4 documents each collapses to 10 unique
+documents, not 12, before any exclusion is applied. Applying the source-repo guard and excluding
+plugin-shipped payload (`Source -eq 'external'`) removes this repo's 3 repo-specific always-on documents
+(`CLAUDE.md`, `SPECIALISTS.md`, the lens) and the shared persona entirely, leaving **8 consumer-only
+documents**: 6 always-on (`CLAUDE.md`, `SPECIALISTS.md`, the lens — 3 per repo × 2 BWJ consumers) plus 2
+non-always-on `contributing-davekjohn/CONTRIBUTING.md` (one per BWJ consumer).
+
+**Four candidates measured (raw findings / true positives / precision), over the 8 consumer-only
+documents:** a verbatim distinctive cue found **1 / 1 / 100%**; subject-term co-occurrence found
+**21 / 1 / 4.8%** in English and **3 / 2 / 67%** in Dutch, **24 / 3 / 12.5%** combined; the same test
+with a normative marker added found **13 / 1 / 8%** in English and **2 / 1 / 50%** in Dutch, **15 / 2 /
+13%** combined; a declaration-based check — does the section say it is a seam answer — found **88**
+(11 laws × 8 documents), zero declarations in any repo. The English and Dutch precisions move in
+opposite directions between C2 and C3, but the combined figures, 12.5% against 13%, are indistinguishable
+— the earlier apparent gap was an artifact of where three particular hits happened to sit, not a real
+effect of adding the marker.
+
+**The load-bearing structural reason: a strict pointer match suppressing a real contradiction is a
+demonstrated failure mode, measured at 1 in 4 — not a coin flip and not "almost always."** By
+construction a *flagged* finding is a section carrying no citation, so cites-then-contradicts can never
+appear among flagged findings; it can only appear among **suppressed** ones, and the full census there
+is 4 sections: 1 cites-then-contradicts, 3 cites-and-correctly-defers. The one is
+`smartwatchbanden`'s own preamble: it names `CONTRIBUTING-portable.md` as a pointer into the plugin and,
+four lines later, overrides it — *"Dit bestand blijft de grondwet. Bij tegenspraak wint `CLAUDE.md` en
+is de contributor-pagina de bug."* Every candidate suppresses that finding, because the portable page's
+filename sits right there. It is the cleanest real instance in the corpus and the detector is
+structurally blind to it — a pointer test built on "is the source mentioned nearby" cannot distinguish
+correct deference from restatement-with-citation-and-override, and 1 suppressed contradiction against 3
+suppressed correct deferrals is the demonstrated rate, not an assumption. The parallel to the stale-path
+decline above is exact, down to the shape of the failure: there the difference was *whose repo the line
+is about*, which the line never says; here the difference is *whether the sentence agrees with or
+contradicts the source it cites*, which no regex or term list reads.
+
+**The verdict, at any of the three modes the inbound item proposed.** No candidate is shippable as a
+gate, a SessionStart hook, or a deliberately-run `[INFO]`-only audit — the middle ground was measured
+too, because #1380 explicitly asked about "a session-start check rather than a manually-run audit," and
+the in-tree precedent exists (`check-script-contract.ps1`'s reachability half is always `[INFO]`, and
+the hook passes `-SkipReachability`). It fails on its own terms: a human triaging 24 sections by hand to
+find 3 real ones, at 1-in-8, with the flagship law gone, is not worth the run.
+
+**The declaration-based check (C4) keeps its own, separate reason.** It is the structurally sound
+design — a declaration is checkable the way a function signature is — and it reports 88/88 undeclared
+because no consumer has adopted the convention: born red, in exactly the shape this repo already names
+as a smell in itself. If it is ever revived it needs the convention bootstrapped first, the same way
+`Get-LiveStage` and its siblings existed as real, populated seams before the script contract's
+reachability half meant anything. Opt-in, per repo, `[INFO]` only, never `[ERROR]` against a convention
+that does not exist yet.
+
+**A third legitimate case surfaced that the third-rank corollary above does not name, and it is exactly
+why "consumer prose answers a listed law" cannot be the trigger on its own.** Sometimes the plugin
+*asks* for the answer to be written out: `cut-release`'s Block 2 declines the seam deliberately —
+*"No seam, deliberately"*, `Get-LiveStageCutOrder` exists nowhere — and tells a consumer running the
+non-default order to state it in its own `CLAUDE.md`. That case is filed as
+[#1388](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1388) rather than resolved here.
+
+**Record the alternative that IS proportionate, because a decline that names no better route invites the
+same proposal again.** Two narrow, literal, high-precision one-off greps, each aimed at one law instead
+of one framework carrying eleven at 12%: one for the literal string `development.md` outside the
+changelog and history paths, one for a supremacy declaration — `wins`/`wint` plus `CLAUDE.md` plus the
+contributing page's own filename, all three in the same sentence.
+
+**The manifest survives the decline** — a later revisit should not have to re-derive 11 laws from
+scratch:
+
+| Id | Canonical statement | Source | Seam |
+|---|---|---|---|
+| `LAW-RELEASE-ORDER` | Block 1 (cutting) always runs first; Block 2 (going live) only follows it, where a live stage exists. | `cut-release/SKILL.md` — "Order matters" | `Get-LiveStage` |
+| `LAW-NO-TRUNK-DEVDOC` | The branch's development document exists only for the branch's lifetime; the trunk carries no copy. | `DEVELOPMENT-portable.md` | none |
+| `LAW-BRANCH-DOC-PER-BRANCH` | One development document per branch, named after it — not a single shared `development.md`. | `CONTRIBUTING-portable.md` — "2. Branch" | none |
+| `LAW-SIGNIFICANCE-NOT-FROM-PREFIX` | Never infer significance/tier from the branch prefix — the prefix predicts nothing about impact. | `CONTRIBUTING-portable.md` — "Significance" | none |
+| `LAW-TIER0-NOT-NA` | Tier 0 can never be N/A; its floor is a score of 1. | `CONTRIBUTING-portable.md` — "Significance" | none |
+| `LAW-NOTREQUIRED-CHECK-DOES-NOT-BLOCK` | A failing not-required check never blocks the merge; `ship-pr` merges past it and relays its reason. | `CONTRIBUTING-portable.md` — "5. Merge" | none |
+| `LAW-SHIP-IN-BACKGROUND` | Run the merge step in the background — the required check waits regardless. | `CONTRIBUTING-portable.md` — "5. Merge" | none |
+| `LAW-PR-TITLE-COMPOSED` | No PR title is passed by hand — it is composed as `<branch type>: <Branch title>`. | `CONTRIBUTING-portable.md` — "4. Open the PR" | none |
+| `LAW-CLAIM-ISSUE-BEFORE-WORK` | Claim an issue before working it, and read the claim as well as write it. | `CONTRIBUTING-portable.md` — "1. New issue or task" | none |
+| `LAW-DOCCOMMIT-BEFORE-PUSH` | `open-pr` commits the development document alone, never `git add -A`, before anything is pushed. | `CONTRIBUTING-portable.md` — "4. Open the PR" | none |
+| `LAW-THIRD-RANK-ORDER` | The plugin's portable pages/skills outrank `contributing-davekjohn/CONTRIBUTING.md`, which outranks the floor. | `CONTRIBUTING-portable.md` — "A third rank sits above both" | none |
+
+**Any future attempt still needs the source-repo guard plus the exclusion of plugin-shipped payload
+(`Source -eq 'external'`)**, or this repo's own pages and the shared persona read as consumer drift,
+exactly as they did before the correction above. Do not revive this behind a rule that reads nearby text
+for the source and calls that deference — that is the exact test this entry measures as structurally
+blind to the one real contradiction it has to catch.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

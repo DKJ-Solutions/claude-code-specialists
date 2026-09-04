@@ -644,39 +644,75 @@ Assert-Equal $false ($types -contains 'Other') "no 'Other' -- it was a printed c
 # Read from the repo's own branch table where that is reachable, so the two cannot disagree.
 Assert-Equal ((Get-BranchTypes) -join ',') ($types -join ',') 'the list comes from Get-BranchTypes rather than a second copy'
 
+Write-Host "Format-ReleaseVersionHeading (the H2 the entries hang under)" -ForegroundColor Cyan
+# THE WORDING AND THE DATE FORM ARE DAVE'S (#1369) and hold for every note, so they are asserted literally.
+Assert-Equal 'Version 4.29.0 (Sep 04, 2026)' (Format-ReleaseVersionHeading -Version '4.29.0' -Date '2026-09-04') `
+    'version and date, in the form the issue specifies'
+Assert-Equal 'Version 3.5.0 (Aug 05, 2026)' (Format-ReleaseVersionHeading -Version '3.5.0' -Date '2026-08-05') `
+    'a single-digit day keeps its leading zero -- the column stays even down a list of releases'
+# INVARIANT CULTURE, ASSERTED UNDER A CULTURE THAT WOULD RENDER IT DIFFERENTLY. A published record must not
+# read differently depending on the machine that cut it: nl-NL abbreviates September as 'sep.' -- with the
+# period -- so without the invariant this assert fails on a Dutch-locale machine and passes in CI, which is
+# the worst shape a locale bug has.
+$prevCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+try {
+    [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo('nl-NL')
+    Assert-Equal 'Version 4.29.0 (Sep 04, 2026)' (Format-ReleaseVersionHeading -Version '4.29.0' -Date '2026-09-04') `
+        'the month name comes from the invariant culture, not from the machine'
+} finally {
+    [System.Threading.Thread]::CurrentThread.CurrentCulture = $prevCulture
+}
+# CONSERVATIVE ON ANYTHING IT CANNOT PARSE, the same rule Format-ReleaseDate follows in the page builder:
+# a form this has never seen is passed through rather than guessed at or blanked.
+Assert-Equal 'Version 1.0.0 (last Tuesday)' (Format-ReleaseVersionHeading -Version '1.0.0' -Date 'last Tuesday') `
+    'an unparseable date is passed through untouched'
+Assert-Equal 'Version 1.0.0' (Format-ReleaseVersionHeading -Version '1.0.0' -Date '') `
+    'no date at all gives the version alone rather than an empty bracket'
+
 Write-Host "Build-ReleaseNotes -TierGroups (the record)" -ForegroundColor Cyan
 $groups = @(Get-PullRequestEntriesByTier -Content $sample)
 $notes = Build-ReleaseNotes -TierGroups $groups -Version '3.5.0' -Date '2026-08-05' -Type 'Minor' -Title 'A title'
-Assert-Match $notes '^# Release notes v3\.5\.0' 'heading with version'
+Assert-Match $notes '^# Changelog Releases' 'a constant H1 -- the version is stated by the H2 that owns the entries, not twice'
 Assert-Match $notes '\*\*Date:\*\* 2026-08-05' 'date line'
 Assert-Match $notes '\*\*Type:\*\* Minor' 'type line'
 Assert-Match $notes 'A title' 'title included'
-# THE LEVELS ARE CHANGELOG.md'S OWN (#881, August 25, 2026): entries at '##' and their sections at
-# '###', with NO grouping heading above them -- so an entry copied out of this document pastes at the
-# level it was written at. The tier still decides the order; it simply no longer prints a heading.
+# THE LEVELS ARE CHANGELOG.md'S OWN (#881, August 25, 2026) -- AND THEY ARE READ FROM THE FORMAT RATHER
+# THAN SPELLED OUT HERE (#1369, September 4, 2026). #881 asserted the literal '##', which was the entry
+# level of the day; when CHANGELOG.md gained '## [Unreleased]' on August 26 and entries moved to H3, this
+# suite went on passing against a document that had started contradicting its own source again. So the
+# expectation is now COMPUTED from the same function the renderer asks, and the two cannot drift apart.
+$eh = '#' * (Get-EntryHeadingLevel)
+$es = '#' * (Get-EntrySectionLevel)
+$vh = '#' * ((Get-EntryHeadingLevel) - 1)
+Assert-Equal '###'  $eh 'the entry level this suite is written against is H3 -- stated so a move is visible here too'
+Assert-Equal '####' $es 'and its sections H4'
 foreach ($tierWord in 'Tier 2 - consumers', 'Tier 1 - colleagues', 'Tier 0 - developers') {
     Assert-NoMatch $notes "(?m)^#+ $tierWord`$" "no '$tierWord' grouping heading"
 }
-Assert-Match $notes ('(?s)(?m)^## #22 .*^### ' + $WhatRx) 'nesting: entry at ##, its sections at ###'
-Assert-Match $notes '(?s)## #22 .*## #21 .*## #20 ' 'the tiers still decide the order, without a heading to announce it'
+# THE VERSION HEADING IS THE PARENT THE ENTRIES NEEDED (#1369): entries at their written level would
+# otherwise hang under the H1 with H2 empty. Wording and date form are Dave's, and hold for every note.
+Assert-Match $notes "(?m)^$vh Version 3\.5\.0 \(Aug 05, 2026\)`$" 'the release occupies H2, naming its version and date'
+Assert-Match $notes "(?s)(?m)^$vh Version 3\.5\.0 .*^$eh #22 " 'and it sits above the entries rather than among them'
+Assert-Match $notes ('(?s)(?m)^' + $eh + ' #22 .*^' + $es + ' ' + $WhatRx) 'nesting: entry at H3, its sections at H4 -- the levels CHANGELOG.md writes'
+Assert-Match $notes "(?s)(?m)^$eh #22 .*^$eh #21 .*^$eh #20 " 'the tiers still decide the order, without a heading to announce it'
 # EVERY ENTRY BOUNDARY READS THE SAME, the tier seam included: a group joined on a bare blank line would
 # be the one place two entries are not divided by a rule, which is a heading in all but name.
 Assert-Equal 2 (@([regex]::Matches($notes, '(?m)^---$')).Count) 'two rules for three entries -- one per boundary, inside a tier and between tiers alike'
 # THE DEVELOPMENT NOTES ARE THE COMPLETE RECORD: tier 0 belongs in them, unlike in the other two
 # documents, and so do the declarations -- the cut EMPTIES the changelog, so this is the last place each
 # ranking's justification lives.
-Assert-Match $notes '(?m)^## #20 ' 'tier-0 entries ARE in the developer notes -- this tier is the record'
+Assert-Match $notes "(?m)^$eh #20 " 'tier-0 entries ARE in the developer notes -- this tier is the record'
 Assert-Match $notes '\| Tier \| Significance \| Why \|' 'the impact table survives into the record'
 Assert-Match $notes 'consumers must re-add the marketplace' "and so does each row's reason, which is the lasting half"
 # NO CATEGORY HEADINGS ANYWHERE -- the type is stated inside each entry now.
 foreach ($label in 'Features', 'Fixes', 'Maintenance') {
     Assert-NoMatch $notes "(?m)^#+ $label$" "no '$label' category heading"
 }
-Assert-Match $notes ('(?m)^### ' + $TypeRx + '$') 'the type is stated inside the entry instead'
+Assert-Match $notes ('(?m)^' + $es + ' ' + $TypeRx + '$') 'the type is stated inside the entry instead'
 # An empty tier is omitted rather than printed as a heading with nothing under it.
 $sparse = @([pscustomobject]@{ Tier = 2; Entries = @($e22) }, [pscustomobject]@{ Tier = 1; Entries = @() })
 $sparseNotes = Build-ReleaseNotes -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $sparseNotes '(?m)^## #22 ' 'a tier with entries is rendered'
+Assert-Match $sparseNotes "(?m)^$eh #22 " 'a tier with entries is rendered'
 Assert-NoMatch $sparseNotes 'Tier 1' 'a tier with no entries contributes nothing, not an empty section'
 Assert-NoMatch $sparseNotes '(?m)^---$' 'and no dangling rule where its boundary would have been'
 
@@ -686,21 +722,22 @@ Write-Host "Build-ReleaseNotes -- ranked from tier 1 up, and deliberately not at
 # so tier 0 inherits a defined order rather than losing one.
 $t1Group = @([pscustomobject]@{ Tier = 1; Entries = @($low, $high) })
 Assert-Match (Build-ReleaseNotes -TierGroups $t1Group -Version '3.5.0' -Date '2026-08-05' -Type 'Minor') `
-    '(?s)## #3 .*## #1 ' 'a tier-1 group is ranked by its own score'
+    "(?s)(?m)^$eh #3 .*^$eh #1 " 'a tier-1 group is ranked by its own score'
 $t0Group = @([pscustomobject]@{ Tier = 0; Entries = @($e20, $e21) })
 Assert-Match (Build-ReleaseNotes -TierGroups $t0Group -Version '3.5.0' -Date '2026-08-05' -Type 'Minor') `
-    '(?s)## #20 .*## #21 ' 'a tier-0 group keeps document order -- the record is not re-sorted'
+    "(?s)(?m)^$eh #20 .*^$eh #21 " 'a tier-0 group keeps document order -- the record is not re-sorted'
 
 Write-Host "Build-ReleaseNotes -Entries (arrival order, for a repo that declares no tier)" -ForegroundColor Cyan
 # SINCE #881 THIS DIFFERS FROM -TierGroups IN ORDER ONLY. Both render at these levels; a repo whose
 # entries declare nothing has no tier to rank on, so the arrival order is all there is to keep.
 $flatNotes = Build-ReleaseNotes -Entries $entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $flatNotes '(?m)^## #22 ' 'flat: entries sit at ##'
-Assert-Match $flatNotes ('(?m)^### ' + $WhatRx + '$') 'flat: their sections at ###'
+Assert-Match $flatNotes "(?m)^$eh #22 " 'flat: entries sit at the level they were written at'
+Assert-Match $flatNotes ('(?m)^' + $es + ' ' + $WhatRx + '$') 'flat: their sections one below it'
+Assert-Match $flatNotes "(?m)^$vh Version 3\.5\.0 \(Aug 05, 2026\)`$" 'flat: the version heading is written here too'
 Assert-NoMatch $flatNotes 'Tier \d - ' 'flat: no tier heading is invented'
 # -TierGroups wins when both arrive, which is what the doc promises.
 $bothArgs = Build-ReleaseNotes -Entries @($e21) -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $bothArgs '(?m)^## #22 ' '-TierGroups wins if both are given'
+Assert-Match $bothArgs "(?m)^$eh #22 " '-TierGroups wins if both are given'
 Assert-NoMatch $bothArgs '#21 ' 'and -Entries is then ignored rather than merged in'
 
 Write-Host "Build-ReleaseNotes -- link rewriting" -ForegroundColor Cyan
@@ -922,46 +959,6 @@ Assert-Equal "### #9 $midDot Fix $midDot 2026-01-01" (($hOnlyMeta -split "`n")[0
 $hLevel = Convert-EntryHeadingToTitle -EntryText "#### #5 $midDot Deeper $midDot Feat $midDot 2026-01-01`n`nBody."
 Assert-Equal '#### Deeper' (($hLevel -split "`n")[0]) 'the heading level is preserved, not normalized'
 
-Write-Host "Build-ConsumerNotes (the tier-2 entries, ranked and stripped)" -ForegroundColor Cyan
-$tier2 = @($groups | Where-Object { $_.Tier -eq 2 })[0]
-$hl = Build-ConsumerNotes -Entries $tier2.Entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor' -Title 'A release for people'
-Assert-Match $hl '(?m)^# Release notes v3\.5\.0 ' 'header names the version'
-Assert-Match $hl '\*\*Date:\*\* 2026-08-05' 'header carries the date'
-Assert-Match $hl 'A release for people' 'the -Title line is included'
-Assert-Match $hl '(?m)^## Consumer feature$' 'the entry is rendered with a bare title, at ##'
-Assert-NoMatch $hl "#22 $midDot" 'entry metadata is stripped in the consumer document'
-# THE SCORES AND THE TIER ARE STRIPPED, which is the whole reason -StripSignificance exists: a
-# self-assigned number printed at a consumer is a marketing claim, and this repo has measured what a
-# published guess costs (the retired remove-before-publishing marker). The reason stays in the development notes,
-# where it is auditable by the people who can check it.
-Assert-NoMatch $hl '\| Tier \| Significance \| Why \|' 'the impact table does not travel to the consumer'
-Assert-NoMatch $hl 'consumers must re-add the marketplace' "and neither does the row's justification"
-Assert-NoMatch $hl '(?m)^Tier: ' "nor the older 'Tier: N' line"
-# ORDERED BY THE CONSUMER SCORE, not the internal one: 'what does a consumer notice' is a different
-# question from 'what does the organisation get out of it', which is why they are separate documents.
-$c1 = New-FlatEntry -Heading "#31 $midDot Barely noticed" -Rows @('| 2 | 1 | cosmetic for them |', '| 1 | 5 | but huge internally |') -Pr 31
-$c2 = New-FlatEntry -Heading "#32 $midDot Must act" -Rows @('| 2 | 5 | they have to migrate |', '| 1 | 1 | nothing for us |') -Pr 32
-$hlOrder = Build-ConsumerNotes -Entries @($c1, $c2) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $hlOrder '(?s)^# .*## Must act.*## Barely noticed' 'ordered by the tier-2 score, so the internal five does not lead a consumer document'
-# THE CALLER SELECTS, so this function renders exactly what it is handed and derives no second half.
-$hlOne = Build-ConsumerNotes -Entries @($e22) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $hlOne '(?m)^## Consumer feature$' 'a single tier-2 entry renders on its own'
-Assert-NoMatch $hlOne 'For colleagues only' 'and nothing that was not handed in'
-# THE RETIRED MARKER AND ITS KNOBS. Asserted on absence: the selection now happens before this function
-# is called, and a marker reappearing here would mean the guess has been rebuilt.
-Assert-NoParameter -Command 'Build-ConsumerNotes' -Names @('StakeholderTypes', 'DevBlockComment', 'DevBlockHeading', 'OnlyTypes')
-Assert-NoMatch $hl 'For developers only' 'no remove-before-publishing marker is written'
-# An empty selection must not throw: the cut never gets here with nothing (its bump gate refuses a minor
-# without a tier-2 entry), so the only callers that can are a test and a hand run -- and for those a
-# header with no body is a truthful answer where an exception is not.
-$hlNone = Build-ConsumerNotes -Entries @() -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $hlNone '(?m)^# Release notes v3\.5\.0 ' 'an empty selection still returns the header'
-Assert-NoMatch $hlNone '(?m)^## ' 'and nothing under it'
-# Links are rewritten from the consumer file's depth, which equals the developer notes' depth.
-$hlLink = Build-ConsumerNotes -Entries @($linkEntry) -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $hlLink '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'root-relative links get the prefix here too'
-Assert-Match $hlLink '\[the site\]\(https://example\.com\)' 'external links untouched'
-
 # THE BRANCH ADMINISTRATION IS STRIPPED, and the fixtures above could not have caught its absence: they
 # are pre-dossier entries, whose metadata sits in the HEADING. Convert-EntryHeadingToTitle handled that
 # correctly all along -- the defect was that the August 6, 2026 format moved the same facts into named
@@ -1001,21 +998,6 @@ $dossier = @(
     '[PR #99](https://example.test/99) - merged 2026-08-10'
 ) -join "`n"
 
-$hlDossier = Build-ConsumerNotes -Entries @($dossier) -Version '4.2.0' -Date '2026-08-10' -Type 'Minor'
-# READ BEFORE STRIP, and this is the assert that pins the ORDER rather than the removal. The heading is
-# built FROM the 'Branch title' section that the same pass deletes, so a future edit that strips first
-# would leave every change in this document listed as '`fix/dossier` changelog' -- a slug, published.
-Assert-Match $hlDossier '(?m)^## A change with a readable name$' 'the heading is the readable title, so the strip ran AFTER the heading was built from it'
-Assert-NoMatch $hlDossier '(?m)^### Branch title'  'the title section itself does not travel'
-Assert-NoMatch $hlDossier '(?m)^### Branch ID'     'nor the creation timestamp'
-Assert-NoMatch $hlDossier '20260810-212615'        'nor its value'
-Assert-NoMatch $hlDossier '(?m)^### Branch type'   'nor the branch prefix'
-Assert-NoMatch $hlDossier '(?m)^### Pull Request'  'nor the PR section'
-Assert-NoMatch $hlDossier 'PR #99'                 'nor the PR number this reader has no use for'
-Assert-NoMatch $hlDossier '(?m)^Plugins:'          "nor the 'Plugins:' line, which is this repo's own selection administration"
-Assert-Match $hlDossier 'What the reader is actually here for\.' 'while the substance survives'
-Assert-NoMatch $hlDossier '\*\*Score:\*\* 4'       'and the score is still stripped, by the switch that always did it'
-
 # THE RECORD KEEPS EVERY ONE OF THEM -- the asymmetry IS the design, so it is asserted rather than assumed.
 # The development notes are the last place an entry's administration and its ranking justification live once
 # the cut has emptied CHANGELOG.md; a strip that reached them would delete the audit trail instead of
@@ -1039,6 +1021,47 @@ Assert-NoMatch $draft '(?m)^## For ' 'and it does not name its own reader -- the
 Assert-Match $draft '(?m)^### A change with a readable name$' 'its entries sit one level DEEPER than before -- they are under a section now, not under the H1'
 Assert-Match $draft '(?m)^## What it is worth$' "the organisation's value section is present"
 Assert-Match $draft '(?m)^## What was still open at this release$' 'and its open section'
+# THE BRANCH ADMINISTRATION THE DOSSIER FIXTURE EXISTS FOR. Asserted here since issue #1370, where the
+# retired Build-ConsumerNotes carried these -- and the draft is now the ONE document that travels outward,
+# passing the identical switch set (-BareTitles -RankByTier -StripSignificance -StripAdminSections). So
+# these moved rather than going with the function: what was dead was the renderer, not the property.
+#
+# READ BEFORE STRIP is what the heading assert above pins, and it is the reason the order matters rather
+# than only the removal: that heading is built FROM the 'Branch title' section this same pass deletes, so
+# an edit that stripped first would list every change here under '`fix/dossier` changelog' -- a slug,
+# published. Measured on the real v4.2.0 draft before the original repair: 125 of 396 rendered lines.
+Assert-NoMatch $draft '(?m)^#### Branch title' 'the title section itself does not travel'
+Assert-NoMatch $draft '20260810-212615'        'nor the creation timestamp'
+Assert-NoMatch $draft '(?m)^#### Branch type'  'nor the branch prefix'
+Assert-NoMatch $draft '(?m)^#### Pull Request' 'nor the PR section'
+Assert-NoMatch $draft 'PR #99'                 'nor the PR number this reader has no use for'
+Assert-NoMatch $draft '(?m)^Plugins:'          "nor the 'Plugins:' line, which is this repo's own selection administration"
+Assert-NoMatch $draft 'fix/dossier'            'nor the branch slug the readable title replaced'
+Assert-Match   $draft 'What the reader is actually here for\.' 'while the substance survives'
+# THE TWO LEGACY SIGNIFICANCE SHAPES, on a fixture that actually carries them -- $dossier declares its
+# significance in a named section, so the asserts above cannot see either. 'Recognise both, write one'
+# cuts in this direction too: an entry folded before August 2026 still has to strip on the way out.
+$dLegacy = Build-ReleaseNoteDraft -Entries @($e22) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor'
+Assert-NoMatch $dLegacy '\| Tier \| Significance \| Why \|' 'the impact table does not travel to an outside reader'
+Assert-NoMatch $dLegacy 'consumers must re-add the marketplace' "and neither does the row's justification"
+Assert-NoMatch $dLegacy "#22 $midDot" 'the entry metadata in the heading is stripped'
+Assert-Match   $dLegacy '(?m)^### Consumer feature$' 'while the readable half of that heading survives'
+# THE RETIRED remove-before-publishing MARKER AND ITS KNOBS, asserted on absence in both directions: the
+# selection happens before this function is called, so a knob or a marker reappearing here would mean the
+# guess has been rebuilt.
+Assert-NoParameter -Command 'Build-ReleaseNoteDraft' -Names @('StakeholderTypes', 'DevBlockComment', 'DevBlockHeading', 'OnlyTypes')
+Assert-NoMatch $dLegacy 'For developers only' 'no remove-before-publishing marker is written'
+# ORDERED BY THE AUDIENCE SCORE, not the internal one. 'What does this reader notice' is a different
+# question from 'what does the organisation get out of it', and both numbers travel in the entry -- so
+# ranking on the wrong one puts a change worth 1 to them above one they must act on.
+$c1 = New-FlatEntry -Heading "#31 $midDot Barely noticed" -Rows @('| 2 | 1 | cosmetic for them |', '| 1 | 5 | but huge internally |') -Pr 31
+$c2 = New-FlatEntry -Heading "#32 $midDot Must act" -Rows @('| 2 | 5 | they have to migrate |', '| 1 | 1 | nothing for us |') -Pr 32
+$dOrder = Build-ReleaseNoteDraft -Entries @($c1, $c2) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor'
+Assert-Match $dOrder '(?s)## What changed.*### Must act.*### Barely noticed' 'ordered by the audience score, so the internal five does not lead'
+# LINKS ARE REWRITTEN FROM THIS DOCUMENT'S OWN DEPTH, which is why an entry's text cannot simply be copied.
+$dLink = Build-ReleaseNoteDraft -Entries @($linkEntry) -Version '4.3.0' -Date '2026-08-11' -Type 'Minor'
+Assert-Match $dLink '\[the lint\]\(\.\./\.\./\.\./scripts/lint/x\.ps1\)' 'a changelog-relative link gets the prefix'
+Assert-Match $dLink '\[the site\]\(https://example\.com\)' 'and an external link is untouched'
 
 Write-Host "No generated release document carries trailing whitespace (inbound #1100)" -ForegroundColor Cyan
 # WHAT THIS GUARDS, AND WHY NO EXISTING ASSERT COULD SEE IT. The hard break under '**Date:**' was two
@@ -1056,13 +1079,11 @@ Write-Host "No generated release document carries trailing whitespace (inbound #
 # below it -- which the report itself did.
 foreach ($doc in @(
     @{ Name = 'Build-ReleaseNotes';     Text = $notes },
-    @{ Name = 'Build-ConsumerNotes';    Text = $hl },
     @{ Name = 'Build-ReleaseNoteDraft'; Text = $draft })) {
     $dirty = @(($doc.Text -split "`n") | Where-Object { $_ -match '[ \t]+$' })
     Assert-Equal 0 $dirty.Count "$($doc.Name): no generated line ends in whitespace"
 }
 Assert-Match $notes '(?m)^\*\*Date:\*\* 2026-08-05\\$' 'the hard break survives as a backslash rather than being dropped'
-Assert-Match $hl    '(?m)^\*\*Date:\*\* 2026-08-05\\$' 'in the consumer document too'
 # THE HAND-WRITTEN DRAFT IS THE ONE THAT BREAKS BOTH LABELS, and it is asserted separately because the
 # report named three emitting lines where there are four -- '**Type:**' one line below the third was
 # missed, which is the standing lesson that a count in a report is whatever the reporter's search matched.
@@ -1214,8 +1235,17 @@ Write-Host "the consumer tier produces markdown ONLY (no HTML renderer)" -Foregr
 foreach ($gone in @('ConvertTo-ReleaseHtml', 'Format-InlineMarkdown')) {
     Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "release-lib no longer defines $gone"
 }
-$tags = @([regex]::Matches($hl, '<[a-zA-Z/!][^>]*>') | ForEach-Object { $_.Value })
-Assert-Equal 0 $tags.Count "the generated document carries no HTML tags (found: $($tags -join ', '))"
+# THE SUBJECT IS A TAG, NOT A COMMENT (issue #1370). This scanned the retired consumer document, which
+# carried neither. The draft that replaced it as the one outward-travelling document carries its guidance
+# AS html comments, deliberately, for the writer to delete -- so moving the scan across unchanged would
+# have failed on the correct output. The comments are excluded BY NAME instead of the scan being dropped,
+# and it now covers both generated documents rather than the one that happened to be handy.
+foreach ($doc in @(
+    @{ Name = 'Build-ReleaseNotes';     Text = $notes },
+    @{ Name = 'Build-ReleaseNoteDraft'; Text = $draft })) {
+    $tags = @([regex]::Matches($doc.Text, '<(?!!--)[a-zA-Z/!][^>]*>') | ForEach-Object { $_.Value })
+    Assert-Equal 0 $tags.Count "$($doc.Name): no HTML tags (found: $($tags -join ', '))"
+}
 
 Write-Host "Set-ReleaseInternalNoteLink (the release history overview's Version cell)" -ForegroundColor Cyan
 # WHAT MOVED (Dave, August 5, 2026): the target document, not the mechanism. This used to rewrite the

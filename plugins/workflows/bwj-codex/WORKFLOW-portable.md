@@ -121,6 +121,37 @@ The colleague-facing wording is Claude's to draft; a colleague may refine it in 
 **without touching GitHub**. GitHub stays leading -- if the two ever disagree on substance, the
 GitHub issue is right and the Asana task is corrected to match.
 
+**A board may also carry a `Github Issue` text custom field** -- that capitalization is the field's
+literal, as-configured name in Asana, not a typo -- **and where it does, task creation is
+where it gets set.** It is optional -- most Asana projects have no such field, and a repo whose
+board carries none loses nothing by skipping it. Where it exists, it holds the **full issue URL,
+`https://...`, never the bare issue number** (Dave, September 4, 2026): Asana only renders a text
+custom field as a clickable link when its value is a complete URL, and a text field is the only type
+on offer here -- Asana has no native URL field type
+([source](https://forum.asana.com/t/new-you-can-now-use-links-in-custom-fields/24757)). The value is
+the same URL already sitting in the `Tracked on GitHub:` line above, written once more into the field
+so the board's own list and filter views can jump straight to the issue without opening the card
+first.
+
+**And a board may carry a `Github Type` select field beside it** -- again the field's literal,
+as-configured name -- **whose options are exactly the three issue types
+[step 1](#classify-it-as-you-file-it----three-fields-all-set-at-creation) chooses from**: `Bug`,
+`Feature`, `Task`. Where it exists it is set on the same creation call, **from the value step 1
+already decided**, never re-derived from the card. That is what makes it worth writing rather than
+leaving to a colleague: the answer is not being composed here the way the issue URL is, it is being
+carried one step forward -- so a ticket this workflow files cannot have a board type its own issue
+contradicts.
+
+**A card filled in by hand can, and on the BWJ board it did.** Measured September 4, 2026, while
+nothing had ever written the field: of 23 cards, **5** carried a type the GitHub issue contradicted,
+and in both directions -- `334` read `Task` against a **Bug** and `333` `Task` against a **Feature**,
+while `478`, `479` and `480` read `Feature` against a `Task`. That is not a drift rate for this
+procedure, because the procedure had never run; it is what a hand-fill costs, and it is the reason
+the value is carried forward instead of re-typed. A hand-copied enum that has drifted is worse than
+an empty one -- an empty field says *unknown*, a wrong one says *this* -- and the board reads as
+authoritative to the colleague looking at it. GitHub stays leading here as everywhere above: the
+card is corrected to match the issue, never the issue to match the card.
+
 ### 3. Cross-link both ways
 
 The link is stored on both sides, and one half is machine-readable because the automation in step 4
@@ -233,26 +264,36 @@ GitHub back-link for a project walk to follow -- the same gap the header-row mat
 needs **no `ASANA_PROJECT_GID`**: a repo whose project GID is still wrong or provisional gets its
 labels right anyway.
 
-**But `Prio-Score` belongs to ONE workspace, and that is the limit to know before relying on this
-step.** An Asana custom field is defined in a workspace and does not cross into another -- which is why
-this sweep looks the field up by *name* and never by GID. Set that against the two populations the step
-reaches and they come apart. A ticket **imported from** the board *is* a task on that board, so it
-scores normally. A ticket the workflow **files itself** lands in whatever `Get-AsanaProjectGid` points
-at, and where that project sits in a different workspace from the board, its tasks have no `Prio-Score`
-for the sweep to find -- not an empty one, none. So the paragraph above reads too generously: a wrong or
-provisional project GID costs an imported ticket nothing, and costs a self-filed one every label it
-could have had.
+**But `Prio-Score` has to be ON THE PROJECT, and that is the limit to know before relying on this
+step.** An Asana custom field is *defined* in a workspace and does not cross into another -- which is why
+this sweep looks the field up by *name* and never by GID -- but definition is not the operative test.
+A field only becomes readable on a task once it has separately been *added to* that task's project, via
+the project's own `custom_field_settings`. Two real BWJ boards sit in the very same workspace and answer
+that second question differently: `GitHub - SWB` carries `Prio-Score`, `GitHub - WH` carries no custom
+fields at all. Set the per-project test against the two populations the step reaches and they come apart.
+A ticket **imported from** the board *is* a task on that board, so it carries whatever fields the board
+carries. A ticket the workflow **files itself** lands in whatever `Get-AsanaProjectGid` points at, and
+where *that* project does not carry `Prio-Score` -- whether because it sits in a different workspace or
+simply because the field was never added to it -- its tasks have no `Prio-Score` for the sweep to find --
+not an empty one, none. So the paragraph above reads too generously: a project missing the field costs an
+imported ticket nothing, and costs a self-filed one every label it could have had.
 
 **Which gives `Get-AsanaProjectGid` an answer it did not have before.** Whichever project a repo mirrors
-into, it has to sit in the workspace that defines `Prio-Score`, or step 5 is a feature only imported
-tickets can use. Measured across both BWJ stores on September 2, 2026, the day after this shipped: of
+into, `Prio-Score` has to be added to it, or step 5 is a feature only imported tickets can use --
+`get_project` (`opt_fields=custom_field_settings.custom_field.name`) is the one call that answers whether
+it is. Measured across both BWJ stores on September 2, 2026, the day after this shipped: of
 the 12 open issues that resolved to a task, every one that came away with a label was an imported one
 (4 of the 5 matched by header row; the fifth was unscored), and no self-filed ticket was labelled in
-either repo. The workspace boundary is the reading of *why* -- inferred from the field model above
-rather than measured, because in that run the same self-filed tasks were unreadable to the session's own
-token, which is the separate cause described three bullets into step 7, and from outside the two cannot be
-told apart. Issue
-[#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213).
+either repo. **The workspace boundary was the first reading of *why*** -- inferred from the field model
+above rather than measured, because in that run the same self-filed tasks were unreadable to the
+session's own token, which is the separate cause described three bullets into step 7, and from outside
+the two cannot be told apart. Issue
+[#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213). **That reading turned out too
+narrow, in the safe-looking direction**: measured directly against both boards on September 4, 2026, they
+sit in the *same* workspace, and `GitHub - WH` still carries no `Prio-Score` -- a case the workspace rule
+cannot express, because nothing about it crosses a workspace boundary. The per-project test above is what
+actually gates the field. Issue
+[#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386).
 
 **Why this direction does not contradict "GitHub first".** That rule is about where a ticket is *born*
 and where its lifecycle is *tracked*. Priority is neither: it is the business's judgement, made in the
@@ -528,10 +569,13 @@ can read the org's projects to turn staging on.
   choice. It is not open any more: the board a card is staged on is the board the team reads, there is
   exactly **one** of those (Dave, September 2, 2026), and a task this workflow files anywhere else
   lands on no pipeline and is never staged. Put together with the `Prio-Score` constraint of step 5,
-  which independently requires that project to sit in the board's workspace, `Get-AsanaProjectGid`
+  which independently requires that project to carry the field -- added to it, not merely reachable
+  from its workspace -- `Get-AsanaProjectGid`
   has one correct value per repo: **the board itself**. A **provisional** GID is the case where both
   costs land at once -- such a ticket carries no prio label and never moves a column, and neither
-  failure says anything in a log.
+  failure says anything in a log. And the board itself is not automatically enough: `GitHub - WH`
+  proves a real board can still lack the field, so pointing `Get-AsanaProjectGid` at the right board is
+  necessary and not sufficient -- see step 5.
 
 ---
 

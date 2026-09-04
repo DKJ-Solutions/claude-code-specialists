@@ -66,6 +66,17 @@ function Get-GithubStatusMap {
         SubmitterPattern = ''
     }
 }
+
+# The GID of the board's 'Github Issue' text custom field (Asana Field settings -> the field's own
+# page shows its GID in the URL), so report-issue can set it at task creation with the full issue
+# URL. Optional: $null (the default) means the board carries no such field and the step is skipped.
+function Get-AsanaIssueFieldGid { $null }
+
+# The GID of the board's 'Github Type' select custom field, so report-issue can set it at task
+# creation from the issue type step 1 already chose. Optional in the same way: $null (the default)
+# means the board carries no such field. The field's OPTION GIDs are not configured -- report-issue
+# resolves Bug/Feature/Task by name from the project itself.
+function Get-AsanaTypeFieldGid { $null }
 ```
 
 **`SubmitterPattern` is the one value here that decides whether a whole column is used.** Stage 6 is
@@ -98,6 +109,35 @@ land on it.
 **A provisional GID is where both costs land at once**, and neither says anything in a log: such a
 ticket carries no prio label and never advances a stage. So if the real project is not known yet,
 record that both are incomplete until it is.
+
+**`Get-AsanaIssueFieldGid` is addressed by GID rather than by name, and that is worth flagging
+because it breaks the pattern step 5's `Prio-Score` reading sets.** The reconcile sweep of step 5
+looks that field up by *name*, because it is **reading** a task back and the Asana API hands back a
+custom field's name alongside its value -- no GID needed. Creating a task and setting one of its
+custom fields in the same call is the opposite direction: the `create task` call addresses a custom
+field by its GID, which Asana Field settings shows on the field's own page, in the URL. **The same
+one-workspace constraint
+[step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/bwj-codex/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
+already states for `Prio-Score` applies here too** -- an Asana custom field is defined in a
+workspace and does not cross into another, so this GID has to come from the same workspace
+`Get-AsanaWorkspaceGid` names. And it is **plainly optional**: `$null`, the default, means the board
+carries no `Github Issue` field, and `report-issue` skips the write silently -- a repo without the
+field loses nothing by leaving it unset.
+
+**`Get-AsanaTypeFieldGid` carries every one of those properties and is not restated here** -- same
+reason for a GID rather than a name, same silent-skip default, same constraint on where the field has
+to live. **What differs is one level of indirection, and it is the whole reason this seam is only
+half a seam.** A text field takes the value you send it; a select field takes the GID of one of its
+own **options**, so writing `Task` means finding out what `Task` is called in GIDs first.
+
+**Those option GIDs are deliberately not configured.** Three more values per repo, each pinning a
+name somebody can rename or rebuild in the Asana UI without anything failing -- and unlike the field
+GID they do not have to be pinned, because they are resolvable at run time from the project
+`Get-AsanaProjectGid` already names. So this seam answers *which field*, and `report-issue` answers
+*which option*, on a call it is already making. The one thing to tell the maintainer is what that
+buys: rebuild an option and nothing breaks; **rename** one away from `Bug`, `Feature` or `Task` and
+the write is skipped with a note rather than guessing, because an unmatched name on a board that
+reads as authoritative is worse than a blank.
 
 ## 3 -- print the CI secret and variables (the maintainer sets these)
 

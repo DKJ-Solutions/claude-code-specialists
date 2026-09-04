@@ -912,6 +912,17 @@ condition inside step 5 read as though the cut had already finished, which is wh
 version; a live push changes what customers see. Decision by Dave, August 5, 2026 — restated under 5.1, where
 it bites.
 
+**And where the answer is yes, this section is where the cut may not be — which is the shared page's call,
+not this one's** (inbound
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378), September 4, 2026). A live
+stage whose push can **fail or be partial** — no locking on the target, third parties writing to it, a
+per-file rather than wholesale push — runs the push *first* and makes the cut its documented closing act,
+because cutting first strands a tag, a Release and an audience document on a state no customer ever saw.
+The condition, and why it is prose rather than a seam, are in
+[`cut-release/SKILL.md`](../plugins/workflows/contributing-davekjohn/skills/cut-release/SKILL.md).
+Such a repo's checklist stops **before** 4.1 rather than at 4.7; nothing else about steps 4.1–4.6 changes.
+Here the question does not arise, because `Get-LiveStage` is empty.
+
 ---
 
 ## 5. SHIP MAIN / PUSH LIVE

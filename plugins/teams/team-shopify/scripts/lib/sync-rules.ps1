@@ -27,6 +27,12 @@
     produces. Its banner further down says what four unmerged branches in seven days looked like from the
     inside, which was: like four normal successful runs.
 
+    THE FIFTH HALF, ADDED ON INBOUND #1382, IS THE SECOND ONE THAT COMPOSES RATHER THAN QUERIES:
+    New-SyncLogEntry renders the SAME rows New-SyncPrBody renders, into the durable record a repo keeps
+    in its own tree. It reuses Get-SyncPrBodySection and Get-SyncFileKind rather than composing a second
+    time -- two composers side by side drift, and the direction they drift in is the silent one above: a
+    record that omits a verdict class still reads as complete.
+
     THE MERGED-PR PROOF IS NOT HERE, AND WAS, until issue #1194. Whether a merged PR proves THIS ref or
     only its recycled name was repaired here (inbound #1190) and in the workflow plugin's prune-merged.ps1
     (#1191) on the same day, independently, and the two copies had already diverged over the comparer
@@ -647,6 +653,104 @@ function Get-SyncPrBodySection {
         }
     }
     return $out
+}
+
+# ===================================================================================================
+# THE FIFTH HALF (inbound #1382): THE SAME ROWS, RENDERED A SECOND TIME, FOR A RECORD THAT STAYS
+#
+# THE PR BODY IS NOT A RECORD. It is composed once, read at the merge, and then it lives on GitHub and
+# nowhere the tree can index -- which matters most in the one repo family whose standing rule is that a
+# sync PR does NOT wait for review, so that body is the entire review moment. A sync branch is otherwise
+# the only branch that owes nothing durable at all: the entry gate exempts the prefix, nothing folds, and
+# the changelog stays clean by design. This makes it symmetric -- a sync owes a SYNC-LOG entry where it
+# owes no changelog entry.
+#
+# A SECOND RENDERING, NEVER A SECOND MEASUREMENT. It takes the rows the run already classified and hands
+# them to Get-SyncPrBodySection and Get-SyncFileKind -- the same two functions New-SyncPrBody uses. Two
+# composers side by side is the duplication that drifts: the moment a verdict class is added, one of them
+# learns about it and the other keeps reporting a complete-looking record that omits it. There is one
+# definition of what a row looks like in words, and it has two outputs.
+#
+# THE HEADING NAMES THE BRANCH, NOT THE PR. The entry is written and committed ON the sync branch, before
+# any pull request exists -- and the default seam answer (Get-ShopifySyncMerges $false) means the run
+# stops at the push and never learns a number at all. The branch name is the PR's head ref, so
+# 'gh pr list --head <branch> --state all' completes the trail; a PR field would be blank on the common
+# path, which is worse than a field that is not there.
+function New-SyncLogEntry {
+    <#
+    .SYNOPSIS
+        One sync-log entry: a dated heading naming the branch, then what was taken and what was held
+        back, each file with its kind and its reason.
+
+    .DESCRIPTION
+        Rows are the same classified objects New-SyncPrBody receives -- Status ('M'/'A'/'D'), Path and
+        Reason -- and both halves are listed for the same reason they are there: the taken half is what
+        a third party wrote, the held-back half is what the rule suppressed and nothing else records.
+
+        NEWEST AT THE TOP is the caller's job, not this function's. This returns one entry; sync-main
+        prepends it. The entry therefore opens with its own '## ' heading and ends with a blank line, so
+        concatenating two of them needs no separator logic at the call site.
+
+        THE DATE IS A PARAMETER rather than read from the clock here, so the suite can walk it and so the
+        entry carries the run's own date rather than whatever moment this line happened to execute at.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Branch,
+        [Parameter(Mandatory = $true)][string]$Date,
+        [object[]]$Take = @(),
+        [object[]]$Keep = @()
+    )
+
+    $lines = @("## $Date -- ``$Branch``")
+
+    $lines += Get-SyncPrBodySection -Rows $Take -Heading 'Taken from live' -EmptyText 'Nothing was taken from live.'
+    $lines += Get-SyncPrBodySection -Rows $Keep -Heading 'Held back, the trunk wins' -EmptyText 'Nothing was held back by the content rule.'
+
+    return (($lines -join "`n") + "`n`n")
+}
+
+# THE PREPEND IS HERE AND THE FILE I/O IS NOT, and the split is this file's own rationale applied: the
+# risk in writing a log is not the writing, it is deciding WHERE in the existing text the new entry goes.
+# That decision is a string in and a string out, so it is testable without a sync -- and it fails in the
+# silent direction, producing a well-formed file with the entry in the wrong place or the old content
+# duplicated. sync-main.ps1 keeps the part that touches a disk.
+function Add-SyncLogEntry {
+    <#
+    .SYNOPSIS
+        The sync log's full new text: this entry prepended to whatever the file already held.
+
+    .DESCRIPTION
+        NEWEST AT THE TOP, UNDER WHATEVER MASTHEAD THE FILE CARRIES. The masthead is defined as
+        everything above the first '## ' line, so a repo can put any title, pointer or preamble at the
+        top of its log without this function needing to recognise any of it. A file with no '## ' line
+        yet has no entries, and the entry goes after whatever is there.
+
+        LF THROUGHOUT, whatever the existing file holds. This runs on Windows and the log is read on
+        GitHub; a file that gains CRLF halfway makes every later entry show up as a whole-file diff.
+    #>
+    param(
+        [string]$Existing = '',
+        [Parameter(Mandatory = $true)][string]$Entry
+    )
+
+    $normalized = ([string]$Existing -replace "`r`n", "`n")
+    $lines      = @($normalized -split "`n")
+    $anchor     = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -like '## *') { $anchor = $i; break }
+    }
+
+    # '-gt 0' AND '-eq 0' ARE TWO ARMS ON PURPOSE, and this is the trap the function exists to contain.
+    # '$lines[0..($anchor - 1)]' with an anchor of 0 is '$lines[0..-1]', which PowerShell reads as "index
+    # 0 through the LAST index" and hands back the whole file -- so a log with no masthead would be
+    # duplicated rather than prepended to, silently, and only on that one shape.
+    if ($anchor -gt 0) {
+        # The head is joined without its final newline, so the one put back here is the one the split ate.
+        return (($lines[0..($anchor - 1)] -join "`n")) + "`n" + $Entry + (($lines[$anchor..($lines.Count - 1)] -join "`n"))
+    }
+    if ($anchor -eq 0) { return $Entry + ($lines -join "`n") }
+    if ($normalized.Trim()) { return $normalized.TrimEnd("`n") + "`n`n" + $Entry }
+    return $Entry
 }
 
 # ===================================================================================================

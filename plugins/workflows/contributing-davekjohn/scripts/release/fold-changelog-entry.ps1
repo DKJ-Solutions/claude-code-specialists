@@ -46,7 +46,7 @@ CHANGELOG.md, where '20260903-102422' sat above '20260903-103107'.
 IT RANKED ON (TIER, SIGNIFICANCE) UNTIL AUGUST 16, 2026 (issue #467), and the argument for it was that the cut
 EMPTIES the pending list, so document order at cut time IS the order the release documents inherit. That
 turned out to hold for exactly one section. Build-ReleaseNotes passes -RankByTier for every tier from 1
-up, and Build-ConsumerNotes always ranks at tier 2 -- both re-rank from the scores themselves and inherit
+up, and Build-ReleaseNoteDraft ranks at the repo's own audience tier -- both re-rank from the scores and inherit
 nothing. The one place that does inherit is the development notes' TIER 0 section, whose own comment asks
 for "complete and chronological, which is what a record is for" and was quietly getting score-descending
 order instead. So this made that comment true rather than breaking anything.
