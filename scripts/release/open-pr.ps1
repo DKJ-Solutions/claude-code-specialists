@@ -147,7 +147,7 @@
     dropping the label is the kindness it looks like. A seam that answers NO label for a prefix it knows
     is the one case that is not a finding (inbound #1395, September 4, 2026, measured in a consumer that
     abolished PR labels outright): there is nothing to look up, and the create sends no --label at all
-    rather than `--label ''`, which gh reads as a label that does not exist and refuses the create over.
+    rather than `--label ''` -- a label named '', which gh cannot find and refuses the whole create over.
 
     Lint gate (guardrail for main): before the push, scripts/lint/check-plugin-integrity.ps1 runs.
     If that finds errors (invalid marketplace/plugin manifests, missing agent-def frontmatter,
@@ -1121,7 +1121,6 @@ if (-not $existingPr) {
     if (-not $label) {
         Write-Host "label gate: scripts\lib\branch-info.ps1 gives the '$($info.Prefix)/' prefix no label - nothing to check, and the create sends no --label at all." -ForegroundColor DarkGray
     } else {
-
         # -Utf8 because a label name is DATA and routinely carries an emoji or an accent (#907), and
         # -DiscardStderr because gh's own progress is not the answer -- the exit code and the payload are.
         # --limit is load-bearing: `gh label list` defaults to 30, and a truncated list would refuse a PR

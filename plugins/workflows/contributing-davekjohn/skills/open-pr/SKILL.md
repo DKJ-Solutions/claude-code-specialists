@@ -449,7 +449,7 @@ same way, and the first sign of it was a failed create after a push.
 - **A query it cannot read is not an answer.** An old `gh` without `--json`, a network hiccup, or a repo
   with no labels at all leaves you with the behaviour this script always had: a warning, and `gh`
   judging the label at the create. The gate never becomes the reason a PR cannot be opened.
-- **A seam that names NO label is an answer, and the one case this gate has nothing to do.** If your
+- **A seam that names NO label is an answer, and the one case where this gate has nothing to do.** If your
   prefix table answers `Label = $null` -- a repo that has abolished PR labels entirely, because the issue
   **type** carries the classification now -- there is no lookup, no compare, and the create sends **no
   `--label` at all**. Read it against the first bullet rather than as an exception to it: that one is
