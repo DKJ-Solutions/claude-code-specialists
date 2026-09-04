@@ -109,6 +109,18 @@ written down in `ci.yml` and in the gate's own docstring so nobody re-derives it
 - [x] This repo's own `suite-durations.json` asserted for **format only, never freshness** -- a stale
       entry is ignored and a missing one is charged the maximum, so gating on either would break the
       trunk the moment somebody adds a suite, to protect against a cost the design already absorbs.
+- [x] The regeneration script was **run against the two runs it names**, and reproduced the committed
+      file exactly (65 rows from each, pool total 3552s). Running it rather than shipping it found
+      three defects a review would not have:
+      - a bare `gh ... 2>&1`, which `shared-scripts.tests.ps1` catches for the whole tree -- under
+        `$ErrorActionPreference = 'Stop'` a native command's redirected stderr arrives as an
+        ErrorRecord and kills the script on a progress line. Replaced with `Invoke-NativeCapture`;
+      - `powershell -File` does **not** split a comma-separated argument into an array, so
+        `-RunId a,b` bound one string and gh 404'd on a run id nobody typed. The script splits the
+        ids itself, so the `-File` and `-Command` forms agree;
+      - `-f` formats with the current culture, so the pool's heaviest suite printed as `236,8s` on
+        this machine -- a figure that reads as wrong everywhere it is pasted, out of a script whose
+        whole job is producing figures. Invariant culture now.
 - [x] Lint gate green (`check-plugin-integrity.ps1`, 0 errors over 31 checks), full suite gate green
       via `open-pr.ps1`.
 

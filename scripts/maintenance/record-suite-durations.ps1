@@ -45,9 +45,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Invoke-NativeCapture rather than a bare `gh ... 2>&1`: under 'Stop' a native command's redirected
+# stderr arrives as an ErrorRecord and kills the script on a line gh writes progress to. The lib runs
+# the call under 'Continue' and hands back the exit code separately, which is what shared-scripts.tests
+# asserts for every script in this tree.
+. (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+
 if (-not $RepoRoot) {
-    $RepoRoot = (& git rev-parse --show-toplevel 2>$null)
-    if ($LASTEXITCODE -ne 0 -or -not $RepoRoot) { throw 'Not in a git repository - pass -RepoRoot.' }
+    $top = Invoke-NativeCapture -FilePath 'git' -Arguments @('rev-parse', '--show-toplevel') -DiscardStderr
+    if ($top.ExitCode -ne 0) { throw 'Not in a git repository - pass -RepoRoot.' }
+    $RepoRoot = (@($top.Output) | Select-Object -First 1)
+    if (-not $RepoRoot) { throw 'Not in a git repository - pass -RepoRoot.' }
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $testsDir = Join-Path $RepoRoot 'scripts\tests'
@@ -69,14 +77,28 @@ if ($known.Count -eq 0) { throw "No *.tests.ps1 suites in $testsDir." }
 # merely mentions a suite and a number cannot match.
 $rowPattern = '\s(\d+(?:\.\d+)?)s\s+(\S+\.tests\.ps1)\s+started\s+\+'
 
+# SPLIT THE IDS OURSELVES, because `powershell -File` does not. Every documented way of running a
+# script in this repo is `-File`, and in that mode PowerShell passes each argument as a LITERAL string:
+# `-RunId 123,456` binds a one-element array holding the text "123,456", and gh then 404s on a run id
+# nobody typed. Measured here on the first run of this script. Splitting on commas and whitespace makes
+# the `-File` form and the `-Command` form (where the comma really is an array operator) agree.
+$runIds = @($RunId | ForEach-Object { "$_" -split '[,\s]+' } | Where-Object { $_ })
+if ($runIds.Count -eq 0) { throw 'No run ids given.' }
+
+$slugCall = Invoke-NativeCapture -FilePath 'gh' -Arguments @('repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner') -DiscardStderr
+if ($slugCall.ExitCode -ne 0) { throw 'gh could not resolve the current repository - is it authenticated here?' }
+$slug = (@($slugCall.Output) | Where-Object { "$_".Trim() } | Select-Object -First 1).Trim()
+
 $samples = @{}
-foreach ($id in $RunId) {
+foreach ($id in $runIds) {
     Write-Host "reading run $id ..." -ForegroundColor Cyan
-    $log = & gh run view $id --repo (& gh repo view --json nameWithOwner -q .nameWithOwner) --log 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "gh could not read run ${id}: $($log | Select-Object -First 3)" }
+    # -Utf8 because this output is PARSED, not echoed: Windows PowerShell 5.1 decodes a child's stdout
+    # with the console code page, so the same log yields different strings on cp850 and cp65001.
+    $run = Invoke-NativeCapture -FilePath 'gh' -Arguments @('run', 'view', $id, '--repo', $slug, '--log') -Utf8
+    if ($run.ExitCode -ne 0) { throw "gh could not read run ${id}: $(@($run.Output) | Select-Object -First 3)" }
 
     $found = 0
-    foreach ($line in $log) {
+    foreach ($line in $run.Output) {
         $m = [regex]::Match("$line", $rowPattern)
         if (-not $m.Success) { continue }
         $name = $m.Groups[2].Value
@@ -104,11 +126,16 @@ foreach ($name in ($samples.Keys | Sort-Object)) {
 }
 
 Write-Host ''
+# INVARIANT CULTURE, because these lines are MEASUREMENTS somebody copies into an issue or a changelog
+# entry. PowerShell's -f uses the current culture, so on a nl-NL console the pool's heaviest suite prints
+# as '236,8s' -- a figure that reads as wrong everywhere it is pasted, from a script whose whole job is
+# producing figures. The JSON below is unaffected: ConvertTo-Json serialises a double invariantly.
+$inv = [System.Globalization.CultureInfo]::InvariantCulture
 Write-Host ("{0} suites, slowest first:" -f $seconds.Count) -ForegroundColor Cyan
 $seconds.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 12 | ForEach-Object {
-    Write-Host ("  {0,7:0.0}s  {1}" -f $_.Value, $_.Key)
+    Write-Host ([string]::Format($inv, '  {0,7:0.0}s  {1}', $_.Value, $_.Key))
 }
-Write-Host ("  ... pool total {0:0}s" -f (($seconds.Values | Measure-Object -Sum).Sum))
+Write-Host ([string]::Format($inv, '  ... pool total {0:0}s', (($seconds.Values | Measure-Object -Sum).Sum)))
 
 if ($DryRun) {
     Write-Host 'dry run - nothing written.' -ForegroundColor Yellow
@@ -127,7 +154,7 @@ $doc = [ordered]@{
         'than no reading at all. Refresh with scripts/maintenance/record-suite-durations.ps1.'
     )
     recordedFrom = [ordered]@{
-        runs    = @($RunId)
+        runs    = @($runIds)
         date    = (Get-Date -Format 'yyyy-MM-dd')
         machine = 'windows-latest (4 cores), 4 shards x 4 lanes'
         method  = 'mean of the per-suite durations the gate printed in each shard log'
