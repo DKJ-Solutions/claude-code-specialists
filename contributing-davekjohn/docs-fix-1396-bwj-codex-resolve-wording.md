@@ -35,17 +35,35 @@
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Fix the "resolves the Asana task" wording in `plugins/workflows/README.md` (line 17) and
+      `README.md` (line 195) per issue #1396
 
 ### TEST
 
+- [~] No suite covers prose wording; the copy-editor's read (dead links, consistency) is the
+      applicable check here, run at PR time
+
 ### DEPLOY: docs/fix-1396-bwj-codex-resolve-wording
 
-**Score:**
+Fixes the second of two defects issue #1396 reported on the same two table cells: both
+`README.md` and `plugins/workflows/README.md` claimed that closing the GitHub issue **resolves**
+the mirrored Asana task. `bwj-codex`'s own README says the opposite in so many words ("It never
+ticks the task off, and it has no code path that could" -- Dave, September 1, 2026), and the
+`report-issue` skill agrees: closing the issue only makes the CI template post that the work is
+ready to test and move the card to `ReadyToTest`. Both cells now say that instead.
+
+The issue's other half -- "one rule" becoming false once the plugin gains a second chapter -- does
+**not** yet apply: that chapter ships in PR #1392, which is still open (blocked on CI) and does not
+touch either of these two files. Fixing that half now would have described a chapter `main` does
+not carry yet. Left for a follow-up once #1392 merges; noted on issue #1396 rather than closing it.
+
+**Score:** 1 -- cosmetic wording correction, no behavior change.
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- an internal documentation correction; nothing here reaches an external reader.
+
+**Score:** N/A
 
 #### Pull Request
 
