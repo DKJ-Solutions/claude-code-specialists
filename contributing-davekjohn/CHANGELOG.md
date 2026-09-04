@@ -32,6 +32,60 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/cut-release-live-stage-order · 20260904-210554
+
+The `cut-release` skill stated **cut-then-push** as a rule for a repo with a live stage — *"Block 1 always
+runs first; Block 2 only follows it"* — and this repo's `CONTRIBUTING.md` restated it at 4.7. It is a
+default now, and the repo picks the order from one property of its live target.
+
+**The condition, stated where the block is walked:** a push that cannot meaningfully fail — it either runs
+or errors loudly, nobody else writes to the target — cuts first, which is what most repos with a deploy
+step want, because the audience document then exists before anything reaches a customer. A push that can
+**fail or be partial** — no locking on the target, third parties editing it through a web UI while you
+work, a drift check that legitimately refuses, a per-file rather than wholesale push — pushes first and
+makes the cut the documented closing act of the push.
+
+**What the default gives up, now named rather than left to be discovered.** Cutting first in front of a
+fallible push produces a **stranded release**: the tag, the GitHub Release and the audience document all
+exist, permanently, describing a state no customer ever saw. Nothing detects it — every artefact is
+well-formed — and the only witness is whoever watched the push refuse. The `← LIVE` marker makes it
+visible: its own reasoning is that *only the person who did the push knows it succeeded*, which under
+cut-then-push makes the marker wrong by construction from the moment the cut lands until a human moves it.
+In the repo that reported this, that marker sat two releases behind.
+
+**No seam, deliberately.** `Get-LiveStageCutOrder` was the obvious shape and would have cost a script
+contract record, a blueprint entry and asserts to carry a value no script reads — the order is a sentence
+a person walks past in a checklist, where `Get-LiveStage` gates whether the block prints at all. It stays
+available if a second live-stage consumer ever wants the checklist rendered in its order rather than told
+which orders exist.
+
+**This was already the tree contradicting itself, which is what settled it against declaring the old rule
+universal.** `team-shopify`'s webshop-manager manual has documented push-then-cut for exactly this case
+all along — *"only when the user decides to push; the release is then cut by the release manager"* — so
+two pages shipped from one repo disagreed, and inbound
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378) found it from the outside.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A checklist that imposes itself is only as good as its right to impose. This page had one rule it could
+not justify, and the tell was that the repo shipping it already ran the other way somewhere else — the
+kind of contradiction that is invisible from inside, because each page reads as correct on its own. It
+took a consumer walking the checklist against a target that can refuse to surface it.
+
+**Score:** 2
+
+#### Pull Request
+
+Block 2's cut-then-push is a default a live stage can answer differently
+
+Plugins: contributing-davekjohn
+
+[PR #1383](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1383)
+
+---
+
 ### DEPLOY: docs/contributing-layering-third-rank · 20260904-205254
 
 `CONTRIBUTING-portable.md`'s layering section ranked only the two consumer documents (the floor and
