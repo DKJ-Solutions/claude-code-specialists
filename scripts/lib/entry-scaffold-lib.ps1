@@ -5259,6 +5259,16 @@ function Get-TrunkGap {
         $false under -NoFetch too, where the caller has already fetched and knows it. "3 behind the
         origin/main you last saw" is a different sentence from "3 behind origin/main", and a reader who
         is offline has to be told which one they got.
+
+        THE FETCH IS NARROWED TO THE TRUNK, AND -FetchAllRefs WIDENS IT FOR THE ONE CALLER THAT NEEDS
+        THE REST (issue #1416). The fold wants the smallest network call that answers the question and
+        nothing more. new-branch.ps1 wants the same answer AND reads refs/remotes/origin/<branch> moments
+        later, to tell a resume of a branch parked from another device from a fresh cut (#1139) -- and a
+        fetch narrowed to the trunk never brings that ref into existence, so the parked branch stays
+        invisible and a second, unrelated branch of the same name is cut at the current base. That is
+        exactly the bug #1139 closed, and it would come back silently. So the scope is the caller's to
+        state rather than this function's to guess: narrowed by default, widened by the caller that
+        knows it is reading more than the trunk off this fetch.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -5267,6 +5277,9 @@ function Get-TrunkGap {
         # Measure against the ref already on disk. For a caller that has just fetched itself and only
         # wants the count -- the fold's push-rejection path, which fetches once and then asks twice.
         [switch]$NoFetch,
+        # Fetch EVERY ref from origin rather than only <trunk>. For a caller that reads ANOTHER
+        # remote-tracking ref off the back of this same fetch -- see the header.
+        [switch]$FetchAllRefs,
         # 0 leaves Invoke-NativeCapture on its own default; the fold passes the same network bound it
         # already puts on its push, so a hung fetch cannot turn a refusal into a stall.
         [int]$TimeoutSeconds = 0
@@ -5290,9 +5303,14 @@ function Get-TrunkGap {
         # GIT'S OWN WORDS ARE KEPT HERE, not discarded. Issue #1313 measured that a failing fetch does not
         # leak a credential -- transport_anonymize_url strips userinfo from every "unable to access" line
         # -- and on that measurement DECLINED adding -DiscardStderr to three other fetches, for removing
-        # the only diagnosis a reader gets. Both callers of this function are about to refuse a fold or
-        # explain a rejected push, so git's reason is precisely what the operator needs to act on.
-        $fetchArgs = @('-C', $RepoRoot, 'fetch', 'origin', $Trunk, '--quiet')
+        # the only diagnosis a reader gets. A caller of this function is about to refuse a fold, to
+        # explain a rejected push or to warn about a stale base, so git's reason is precisely what the
+        # operator needs -- whether it prints the lines or keeps them is then its own call.
+        $fetchArgs = if ($FetchAllRefs) {
+            @('-C', $RepoRoot, 'fetch', 'origin', '--quiet')
+        } else {
+            @('-C', $RepoRoot, 'fetch', 'origin', $Trunk, '--quiet')
+        }
         $fetch = if ($TimeoutSeconds -gt 0) {
             Invoke-NativeCapture -FilePath 'git' -Arguments $fetchArgs -TimeoutSeconds $TimeoutSeconds
         } else {
