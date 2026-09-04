@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/contributing-layering-third-rank · 20260904-205254
+
+`CONTRIBUTING-portable.md`'s layering section ranked only the two consumer documents (the floor and
+`contributing-davekjohn/CONTRIBUTING.md`), leaving nothing to say where the plugin's own portable pages
+and skills sit relative to either — a vacuum a consumer had filled by declaring its own `CLAUDE.md`
+supreme over the shared law itself. A new subsection states the complete three-rank order (the plugin's
+law above both consumer layers, scoped to what the plugin actually legislates) and the operational
+corollary that keeps it: a consumer document may point at, or answer the seam of, a shared law, but never
+restate it — a restatement is a copy, and a copy diverges silently.
+
+Closes [#1379](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1379). Item 3 of that
+issue (a prose equivalent of `check-script-contract.ps1` enforcing the corollary automatically) is a
+standalone mechanism and is filed separately as
+[#1380](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1380).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — this repo already runs the ranking it describes (its `contributing-davekjohn/CONTRIBUTING.md`
+already says it wins over its own `CLAUDE.md`); the change closes a documentation gap a consumer had
+filled the wrong way, not a rule this repo itself was running incorrectly.
+
+**Score:** N/A
+
+#### Pull Request
+
+State the plugin-law rank above both consumer contributing layers
+
+Plugins: contributing-davekjohn
+
+[PR #1381](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1381)
+
+---
+
 ### DEPLOY: fix/sync-main-3b-offline-dryrun · 20260904-113834
 
 The documented offline `-MirrorPath` rehearsal of the pre-task sync works again:
