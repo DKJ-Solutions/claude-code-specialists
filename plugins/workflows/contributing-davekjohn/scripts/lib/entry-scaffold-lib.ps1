@@ -7120,7 +7120,7 @@ function Get-ProseParagraphUnits {
             wins, and the contributing page is simply wrong.        -> 0 findings
 
             > Bij tegenspraak wint
-            > `CLAUDE.md` en is de contributor-pagina de bug.       -> 0 findings
+            > `CLAUDE.md`.                                          -> 0 findings
 
         THE BLOCKQUOTE HALF IS THE ONE THAT MATTERS MOST, because the single real instance this whole
         check exists for lives in a blockquote. It happens to sit on one physical line today, so the
@@ -7251,9 +7251,9 @@ function Get-SupremacyDeclaration {
             paragraph       1      0      0%           0 of 2
 
         Zero, at the scope the decline actually named, on the one defect it was named to catch. The
-        reason is exact and worth keeping: the real sentence is
-        "Bij tegenspraak wint `CLAUDE.md` en is de contributor-pagina de bug" -- it names the contributing
-        page by a Dutch PROSE NOUN, 'de contributor-pagina', not by its filename. The third term is
+        reason is exact and worth keeping: the real clause (smartwatchbanden/CLAUDE.md:22) carries
+        'wint' beside `CLAUDE.md` and names the contributing page by a Dutch PROSE NOUN,
+        'de contributor-pagina', not by its filename. The third term is
         precisely the term that is absent. Loosening the scope to a paragraph does find something, and
         what it finds is a false positive; loosening the third term to catch prose nouns is the step into
         fuzzy matching that #1380 already declined.
@@ -7286,6 +7286,15 @@ function Get-SupremacyDeclaration {
         'CLAUDE.md:22' (the preamble inversion, the one #1380 could not see) and
         'contributing-davekjohn/CONTRIBUTING.md:306' (the SAME inversion stated from the other side, which
         the #1380 census never counted at all).
+
+        BOTH ARE CITED BY REPO, FILE AND LINE, AND THE EXCERPT STOPS AT THE ADJACENCY. That consumer is
+        private and this repository is public, so a measurement taken there quotes only what the finding
+        reads -- 'wint'/'wins' beside `CLAUDE.md`, which is this check's own pattern rather than anybody's
+        prose -- and the governance sentence around it stays in the consumer's tree. The rule is in
+        CLAUDE.md's public-repo bullet (Dave, September 5, 2026, issue #1420) and it binds the fixtures in
+        supremacy-declaration-gate.tests.ps1 too: a matcher reads structure, so a fixture needs the shape
+        and not the remaining words. Nothing about the verbatim-citation convention itself is weakened --
+        a bounded quote plus file:line is still re-verifiable, which a paraphrase is not.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
