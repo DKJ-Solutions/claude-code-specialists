@@ -123,7 +123,11 @@
     both places the take set is complete: the dry-run report and the pre-push report. A DRY RUN IS EXEMPT
     from the refusal for the reason it is exempt from the clean-tree check: it writes nothing, and asking
     "what would this do, and does it supersede the pile?" is exactly what somebody staring at four open
-    sync PRs needs, so the answer must not be a refusal.
+    sync PRs needs, so the answer must not be a refusal. That exemption reaches the step's own NETWORK
+    FAILURE too (inbound #1373): where 'git ls-remote' cannot list origin at all, a dry run reports that
+    the check could not run and carries on to the verdict -- which is the offline -MirrorPath rehearsal
+    .PARAMETER MirrorPath promises -- while a real run still refuses there, because only a real run can
+    push a branch onto the pile.
 
     WHAT IT NEVER DOES: it does not push to live, publish a theme, or delete one. It reads from live and
     writes to git. team-shopify's PreToolUse guard covers those three acts independently and is not
@@ -565,26 +569,52 @@ Write-Host ''
 Write-Host '[3b/6] previous sync branches ...' -ForegroundColor Yellow
 $standing   = @()
 #
-# BOUNDED, AND ITS FAILURE IS NOW A REFUSAL (inbound #1181). It used to run through
-# Invoke-SyncGitQuiet, which swallows stderr by design -- so a credential prompt, a dead remote or a
-# stall produced NO lines, and no lines is indistinguishable from "no sync branch on origin". That is
-# the silent miss this guard exists to end, arriving through the guard's own query. The refusal is the
-# direction the banner above already chose: a run that cannot be proven safe is refused, loudly.
+# BOUNDED, AND ITS FAILURE IS A REFUSAL ON A RUN THAT PUSHES (inbound #1181; DryRun carve-out #1373).
+# It used to run through Invoke-SyncGitQuiet, which swallows stderr by design -- so a credential prompt,
+# a dead remote or a stall produced NO lines, and no lines is indistinguishable from "no sync branch on
+# origin". That is the silent miss this guard exists to end, arriving through the guard's own query, and
+# on a real run the direction the banner above already chose holds: a run that cannot be proven safe is
+# refused, loudly.
+#
+# A DRY RUN IS THE ONE EXCEPTION, for the reason it is exempt from the refusal below. It writes nothing
+# and pushes nothing, so a standing predecessor it fails to notice stacks nothing -- and refusing here
+# withholds the verdict the dry run exists to produce, which is exactly what the documented offline
+# -MirrorPath rehearsal needs. So a dry run reports that the check could not run and carries on; it does
+# NOT read the failure as "none on origin", which is the false negative #1181 closed.
 $lsRemote = Invoke-NativeCapture -FilePath 'git' -Arguments @('ls-remote', '--heads', 'origin') `
                                  -DiscardStderr -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+$lsRemoteUnknown = $false
 if ($lsRemote.ExitCode -ne 0) {
-    Write-Host 'Could not list the heads on origin, so whether a previous run''s branch is still standing is UNKNOWN.' -ForegroundColor Red
-    if ($lsRemote.TimedOut) {
-        Write-Host "  'git ls-remote' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+    if ($DryRun) {
+        $why = if ($lsRemote.TimedOut) {
+            "'git ls-remote' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds"
+        } else {
+            "'git ls-remote --heads origin' exited $($lsRemote.ExitCode)"
+        }
+        Write-Host "      origin could not be listed ($why) -- the standing-predecessor check is skipped for this dry run." -ForegroundColor Yellow
+        Write-Host '      A real run refuses here; a dry run writes nothing, so it continues to the verdict below.' -ForegroundColor DarkGray
+        $lsRemoteUnknown = $true
     } else {
-        Write-Host "  'git ls-remote --heads origin' exited $($lsRemote.ExitCode)." -ForegroundColor Red
+        Write-Host 'Could not list the heads on origin, so whether a previous run''s branch is still standing is UNKNOWN.' -ForegroundColor Red
+        if ($lsRemote.TimedOut) {
+            Write-Host "  'git ls-remote' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
+        } else {
+            Write-Host "  'git ls-remote --heads origin' exited $($lsRemote.ExitCode)." -ForegroundColor Red
+        }
+        Write-Host '  Nothing was changed. Fix the remote or the credential and run again.' -ForegroundColor Red
+        exit 1
     }
-    Write-Host '  Nothing was changed. Fix the remote or the credential and run again.' -ForegroundColor Red
-    exit 1
 }
-$candidates = @(Get-SyncBranchNamesFromRefs -Prefix $branchPrefix -Lines @($lsRemote.Output))
+$candidates = @()
+if (-not $lsRemoteUnknown) {
+    $candidates = @(Get-SyncBranchNamesFromRefs -Prefix $branchPrefix -Lines @($lsRemote.Output))
+}
 
-if ($candidates.Count -eq 0) {
+if ($lsRemoteUnknown) {
+    # No ls-remote answer: there is no candidate set to prove merged or standing, and $standing stays
+    # empty -- so Write-SyncPredecessorVerdict below prints nothing, which is the honest report here.
+}
+elseif ($candidates.Count -eq 0) {
     Write-Host '      none on origin.'
 } else {
     # THE FETCH RUNS IN A DRY RUN TOO, and that is not a breach of "nothing will be written": it updates

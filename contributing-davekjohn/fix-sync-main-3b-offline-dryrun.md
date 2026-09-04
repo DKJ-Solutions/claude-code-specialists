@@ -33,19 +33,72 @@
 
 ### PLAN
 
+Inbound #1373. `sync-main.ps1`'s `[3b/6]` standing-predecessor guard runs
+`git ls-remote --heads origin` through `Invoke-NativeCapture` (inbound #1181) and
+`exit 1`s whenever `origin` cannot be listed -- with no `-DryRun` carve-out. That
+defeats the offline `-MirrorPath` rehearsal path the `.PARAMETER MirrorPath`
+docstring promises: `-DryRun -MirrorPath <dir> -RootOverride <dir>` against a
+checkout with no reachable `origin` stops at `[3b]` before printing any verdict.
+
+The guard's own design already waives its *refusal* for `-DryRun` (a dry run
+writes and pushes nothing, so an unnoticed standing predecessor causes no harm).
+The `ls-remote` hard-exit added by #1181 is the one spot at `[3b]` that is
+stricter than that. #1181's intent -- never read an unprovable `origin` as "no
+predecessor" on a run that pushes -- is fully served by keeping the hard refusal
+on non-`-DryRun` runs.
+
+Fix: on `-DryRun`, an unreadable `ls-remote` prints an explicit "could not check,
+skipped for this dry run" note (never "none on origin", which is the false
+negative #1181 closed) and continues to the verdict. Non-`-DryRun` is unchanged.
+Scoped out, deliberately: the `fetch` and `gh pr list` failure branches lower in
+`[3b]` -- both are only reachable once `ls-remote` has *succeeded*, i.e. `origin`
+was reachable, so #1181's loud refusal is right there.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `[Sylvester]` `plugins/teams/team-shopify/scripts/task/sync-main.ps1`: at
+  `[3b/6]`, the `ls-remote`-failure block gains a `$DryRun` branch that sets
+  `$lsRemoteUnknown = $true`, prints the softer note and falls through (skipping
+  the candidates/fetch/merged-PR block); the `# BOUNDED ...` comment and the
+  "A DRY RUN IS EXEMPT" header paragraph record the carve-out.
+- [x] `[Sylvester]` `scripts/task/sync-main.ps1`: the byte-identical same edit.
+- [x] `[Sylvester]` two copies byte-identical (`diff`), ASCII-clean, parse OK,
+  `build-shared-scripts.ps1 -Check` in sync.
 
 ### TEST
 
+- [x] `[Tycho]` `scripts/tests/sync-main.tests.ps1`, the `net/ls-remote` block:
+  a `-DryRun` against an unreachable `origin` now exits 0, still `-notmatch
+  'none on origin'`, names the skipped check, reaches `[5/6]` and the DRY RUN
+  summary; a real run against the same origin still refuses; static asserts pin
+  the non-`-DryRun` refusal message + `exit 1` and the distinct dry-run flag.
+- [x] `[Tycho]` `scripts/tests/sync-main.tests.ps1` -> OK 118/118;
+  `sync-rules.tests.ps1` OK 111; full `scripts/tests/*.tests.ps1` sweep exit 0,
+  no failures; `check-plugin-integrity.ps1` 0 errors.
+- [x] `[Victor + Edith + Sebastian + Marlowe]` reviewed the diff: no blocking
+  findings. Victor -- one nit (the comment-only `if ($lsRemoteUnknown)` arm),
+  kept with its explanatory comment. Edith -- "shut" -> "closed" for house-style
+  consistency, applied. Sebastian -- none; the softening is `-DryRun`-only and a
+  dry run mutates nothing, so #1181's pushing-run threat model is untouched.
+  Marlowe -- conclusion survives; fix restores a documented capability rather
+  than documenting its loss, and the degraded dry run says so plainly.
+
 ### DEPLOY: fix/sync-main-3b-offline-dryrun
 
-**Score:**
+The documented offline `-MirrorPath` rehearsal of the pre-task sync works again:
+`[3b]` no longer hard-exits a dry run when `origin` cannot be reached. A real
+(pushing) run still refuses there, exactly as inbound #1181 built it.
+
+**Score:** 2 -- restores a rehearsal path the plugin's own docstring promises but
+`[3b]` had closed; noticed by a maintainer who runs the sync offline against a
+mirror, and prevents a consumer working around it in their own test fixture.
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- team-shopify tooling internals. No subscriber of any consuming service
+notices whether the offline dry run stops at `[3b]` or prints its verdict.
+
+**Score:** N/A
 
 #### Pull Request
 

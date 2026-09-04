@@ -770,24 +770,40 @@ try {
     Assert-True ($shopLib.Count -eq 1 -and (Test-Path -LiteralPath $shopLib[0].MirrorPath -PathType Leaf)) `
         'net: and that mirror is present beside the mirrored sync-main.ps1'
 
-    # THE ls-remote REFUSAL, and this is the behavioural half. Before this branch the call ran through
-    # Invoke-SyncGitQuiet, so an unreachable origin produced no lines -- and no lines is exactly what "no
-    # sync branch on origin" looks like. The guard then reported 'none on origin' and let the run
-    # proceed, which is the silent miss the guard was filed to end, arriving through the guard's own
-    # query. A DRY RUN is what the case uses because it skips the trunk pull at [1/6]: that would fail
-    # first on a broken origin and never reach the step under test.
+    # THE ls-remote FAILURE: A REAL RUN REFUSES, A DRY RUN REPORTS AND CONTINUES (inbound #1181,
+    # DryRun carve-out #1373). Before #1181 the call ran through Invoke-SyncGitQuiet, so an unreachable
+    # origin produced no lines -- indistinguishable from "no sync branch on origin" -- and the guard
+    # reported 'none on origin' and let the run proceed: the silent miss the guard was filed to end.
+    # #1181 made it a hard refusal. #1373 is the follow-up: a DRY RUN writes and pushes nothing, so
+    # refusing there only withholds the verdict and breaks the documented offline -MirrorPath rehearsal
+    # (.PARAMETER MirrorPath). So a dry run now SKIPS the check and carries on to the verdict -- without
+    # ever reading the failure as 'none on origin', which is the false negative #1181 closed. A dry run is
+    # also the only run that reaches [3b] on a broken origin at all: a real run fails first at the [1/6]
+    # trunk pull, asserted just below.
     $netRepo = New-Consumer -Label 'net-lsremote' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
     Add-FixtureCommit -Dir $netRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
     Invoke-Git -C $netRepo remote set-url origin (Join-Path $netRepo 'no-such-origin.git')
-    $netRun = Invoke-Sync -Dir $netRepo -Mirror (New-Mirror -Label 'net-lsremote' -Files @{
+    $netMirror = New-Mirror -Label 'net-lsremote' -Files @{
         'sections/theme.liquid'       = 'v1'
         'sections/unrelated.liquid'   = 'u1'
         'sections/from-editor.liquid' = 'a third party wrote this'
-    }) -Extra @('-DryRun')
-    Assert-True ($netRun.Code -eq 1) 'net/ls-remote: an origin it cannot read refuses the run'
-    Assert-True ($netRun.Out -match 'Could not list the heads on origin') 'net/ls-remote: and says which query could not answer'
-    Assert-True ($netRun.Out -match 'UNKNOWN') 'net/ls-remote: naming the answer it does not have, rather than assuming one'
-    Assert-True ($netRun.Out -notmatch 'none on origin') 'net/ls-remote: it no longer reads an unreachable origin as ''no predecessor'''
+    }
+    $netRun = Invoke-Sync -Dir $netRepo -Mirror $netMirror -Extra @('-DryRun')
+    Assert-True ($netRun.Code -eq 0) 'net/ls-remote: a dry run against an unreadable origin continues instead of refusing'
+    Assert-True ($netRun.Out -match 'standing-predecessor check is skipped for this dry run') 'net/ls-remote: and says the check could not run'
+    Assert-True ($netRun.Out -notmatch 'none on origin') 'net/ls-remote: without reading the failure as ''no predecessor'' (the #1181 false negative)'
+    Assert-True ($netRun.Out -match '\[5/6\] comparing live against') 'net/ls-remote: the dry run reaches the verdict the offline -MirrorPath rehearsal exists for'
+    Assert-True ($netRun.Out -match 'DRY RUN') 'net/ls-remote: and is still plainly a dry run'
+
+    # A REAL RUN against the same broken origin still stops -- at the [1/6] trunk pull, ahead of [3b].
+    $netReal = Invoke-Sync -Dir $netRepo -Mirror $netMirror
+    Assert-True ($netReal.Code -eq 1) 'net/ls-remote: a real run against an unreadable origin still refuses'
+
+    # AND [3b]'s own hard refusal survives in the non-DryRun branch, where a real run would reach it --
+    # the carve-out is a distinct branch, not a softened refusal.
+    Assert-True ($src -match 'is still standing is UNKNOWN') 'net/ls-remote: [3b]''s real-run refusal message is intact'
+    Assert-True ($src -match "run again\.' -ForegroundColor Red\s*\r?\n\s*exit 1") 'net/ls-remote: and it still hard-exits right after it'
+    Assert-True ($src -match [regex]::Escape('if ($DryRun) {') -and $src -match [regex]::Escape('$lsRemoteUnknown = $true')) 'net/ls-remote: the dry-run path is a distinct branch that sets its own flag, not a softened refusal'
 
     # --- the merged test proves the REF, not its name (inbound #1190, shared by issue #1194) ---------
     # WHAT THIS PROTECTS CANNOT BE DRIVEN FROM THIS SUITE AT ALL, which is why it is asserted statically
