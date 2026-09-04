@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1401-duration-ceiling-load-sensitive · 20260904-223712
+
+The test gate's own suite no longer refuses a push because the machine was busy. Scenario 4b in
+[`../scripts/tests/test-suite-gate.tests.ps1`](../scripts/tests/test-suite-gate.tests.ps1) proves that
+the per-suite table prints a *runtime* and not a *finish time*, and it proved it with a hard-coded
+`-lt 4` second ceiling. That is the exact shape the same file forbids forty lines higher up: a timing
+FLOOR is guaranteed by `Start-Sleep`, a timing CEILING is guaranteed by nothing, because nothing bounds
+how slow a shared machine can be. Under a 65-suite gate run one of the fixture's 1.2s sleeps came in at
+5.1s, the assert failed, and `Invoke-WorkflowGates` refused to push a branch that had touched nothing
+the suite reads -- the same shape as #1232, one file over.
+
+The ceiling is now a comparison against the queue the fixture itself builds: `$maxDuration -lt
+$maxOffset`. Serially the last lane opens only after the five suites before it have run, so the largest
+offset is the SUM of five runtimes while a true duration is ONE of them -- and a duration column holding
+finish times reads `offset + runtime` for that same row, which exceeds the offset by construction,
+whatever the machine was doing. Contention scales both sides together, so the discriminator survives a
+loaded box in a way no second-count can. Measured on this branch: 1.7s against +8.2s, a 4.8x margin
+where the old ceiling had 2.4x and tripped at 5.1s.
+
+Widening the ceiling to 6-7s was the issue's own first suggestion, and it is declined in the comment
+rather than silently: it keeps the fragile shape and discriminates *worse* the more load there is,
+because contention inflates the defect's reading too -- and 6-7s lands within noise of the ~7.2s a
+finish-time column reports at rest, which is the one figure the assert must stay below. The retry
+mechanism #1232 landed on does not carry over either, for the reason in CREATE above.
+
+The assert still fails for the defect it exists to catch, and that is proved by mutation rather than by
+argument: re-introducing the #1358 defect in the duration column makes it read 10s against +8.3s and
+refuse. Closes [#1401](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1401).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the suite is source-repo-only. `native-capture-lib.ps1` is mirrored into the plugins and is
+unchanged by this branch; `scripts/tests/test-suite-gate.tests.ps1` is not payload, so no consumer of
+this marketplace runs it or notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+The test gate's duration assert compares against the queue instead of a fixed second-count
+
+[PR #1410](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1410)
+
+---
+
 ### DEPLOY: docs/fix-1394-per-project-test-in-adopt-bwj-asana · 20260904-222833
 
 Fixed [#1394](https://github.com/DaveKJohn/claude-code-specialists/issues/1394): `adopt-bwj-asana/SKILL.md`
