@@ -32,6 +32,52 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/prose-contract-check-declined · 20260904-220309
+
+A manifest-driven prose contract check — the analogue of `check-script-contract.ps1` for the laws this
+plugin legislates rather than the functions it calls — was measured against 11 laws over 8 consumer
+documents in the two consuming repos, and declined in every deployment mode: as a gate, as a session-start
+line, and as the deliberately-run advisory audit #1380 asked about. A verbatim cue fired once. Term
+co-occurrence reached 12.5% precision, adding a normative marker 13%, and a declaration-based check
+reported 88 of 88 laws undeclared because no consumer has the convention it looks for.
+
+Two measurements carry the decline. **The law the check was written to catch has no standing violation
+left:** `LAW-RELEASE-ORDER` was the acceptance test because #1378 had just made it the one known-real
+defect, and #1378's repair then made the consumer's order a sanctioned answer rather than a divergence —
+so the check's reason for existing was repaired out from under it mid-measurement. **And the detector
+found one of the three defects that actually stand in the corpus:** one instance was flagged, one was
+missed because the term list wanted a word that section does not use, and one was suppressed by the very
+pointer test meant to prevent false alarms. That last case is the structural reason, measured: a section
+that restates a law may also cite it, and a pointer test cannot tell correct deference from
+restatement-with-citation-and-override — 1 of the 4 suppressed sections in the corpus was hiding a real
+contradiction.
+
+The 11-law manifest is kept in the lens entry rather than discarded with the check, so a later revisit
+does not re-derive it. So is the proportionate alternative: two narrow literal greps, each aimed at one
+law, rather than one framework carrying eleven at 12% precision.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`CONTRIBUTING-portable.md` stops promising an enforcement mechanism that has come back negative. A
+consumer reading the layering section now learns that the prose half of the corollary is unenforced by
+design, and why in one sentence — so they can stop waiting for a gate that is not coming and lean on the
+ranking itself, which is what #1379 said makes a divergence nameable. Small: it changes one paragraph of
+a page they already have, and nothing they run.
+
+**Score:** 2
+
+#### Pull Request
+
+The prose contract check is measured and declined rather than left open
+
+Plugins: contributing-davekjohn
+
+[PR #1398](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1398)
+
+---
+
 ### DEPLOY: docs/fix-1396-bwj-codex-resolve-wording · 20260904-215537
 
 Fixes the second of two defects issue #1396 reported on the same two table cells: both
