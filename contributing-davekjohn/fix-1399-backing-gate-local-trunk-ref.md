@@ -35,17 +35,44 @@
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Fix `Get-GitParkBacking` (`scripts/lib/park-lib.ps1`) to prefer `refs/remotes/origin/<trunk>` over the bare local trunk name, falling back to the bare name only when no remote-tracking ref exists (#1399)
+- [x] Applied Victor's review finding: reuse the remote-tracking ref's own `rev-parse --verify` result instead of re-verifying the same ref a second time
 
 ### TEST
 
+- [x] Added regression coverage in `scripts/tests/backing-gate.tests.ps1` (sections 8-9): the exact false-negative repro (stale local trunk, branch caught up via `git merge origin/main`) and the fallback cases (no origin ref, no ref anywhere)
+- [x] `backing-gate.tests.ps1` and `park-cycle.tests.ps1` both green after the fix and after the two review fix-ups
+- [x] Victor (code review), Edith (copy edit), Sebastian (security review) ran on the diff -- no blocking findings; Edith's dangling test cross-reference and Victor's redundant-verify-call finding were both applied
+
 ### DEPLOY: fix/1399-backing-gate-local-trunk-ref
 
-**Score:**
+`open-pr`'s backing gate (issue #1026) is meant to refuse a push whose plan reads as finished with no
+real work committed on the branch. It measured that by diffing against a bare local trunk name
+(`main`), not the remote-tracking ref. The ordinary flow lets local `main` fall behind `origin/main`
+for the length of a branch -- `new-branch` warns but does not refuse -- and the documented way to catch
+up mid-branch is `git merge origin/main` (a rebase would need a force-push, which the safety rules
+block). That merge advances the branch's merge-base against *local* `main` to include every commit it
+just pulled in from origin, because local `main` itself never moves -- so those upstream commits were
+counted as the branch's own committed work, and the gate went silent exactly on the branch it exists to
+catch. Reproduced on PR #1398, where the gate stayed silent on a branch whose real work (two
+documentation files) sat uncommitted, and those files had to be committed by hand afterward.
+
+`Get-GitParkBacking` now prefers `refs/remotes/origin/<trunk>` when it exists (a local, no-network
+read of what the last fetch already recorded), and falls back to the bare local name only when it does
+not -- fixed inside the shared function, so neither `open-pr.ps1` nor `park-cycle.ps1` needed to change.
+Closes #1399.
+
+**Score:** 3 -- a clear improvement to the backing gate's own reliability, noticed the moment a branch
+hits the scenario the gate exists to catch (a local trunk fetched behind `origin` and caught up
+mid-branch), which is common enough to have already produced a real near-miss (PR #1398) rather than
+a hypothetical one.
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- this is an internal correctness fix to a git-plumbing detail of the branch-workflow gate,
+scoped to this repo's own maintainers running `open-pr`/`park-cycle`. It reaches no external audience.
+
+**Score:** N/A
 
 #### Pull Request
 
