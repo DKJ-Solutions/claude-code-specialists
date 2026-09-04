@@ -294,22 +294,18 @@ $guardExempt = @(
     'scripts\sync\check-script-contract.ps1',  # SessionStart: script-contract-sessioncheck
     'scripts\lint\check-git-identity.ps1',     # SessionStart: git-identity-sessioncheck (#1315)
     'scripts\lint\check-unfolded-entry.ps1',   # SessionStart: unfolded-entry-sessioncheck (#1270)
-    # SessionStart: retired-doc-name-sessioncheck (#1389). Same reason as the four above, and it carries
-    # the answer the guard could not give it: what this repo needs here is not a REFUSAL but a SKIP, and
-    # the check makes that decision itself on the guard's own condition 2 (a .claude-plugin/
-    # marketplace.json exists). Refusing would take the hook down at every session start here; skipping
-    # states the right thing -- this repo's pages are the source of the convention, not a copy of it.
-    'scripts\lint\check-retired-doc-name.ps1',
-    # SessionStart: supremacy-declaration-sessioncheck (#1415). The second of the two greps #1380's
-    # decline recorded, and the exemption is the same one its sibling directly above argues, for the same
-    # mechanism: the hook runs it from '${CLAUDE_PLUGIN_ROOT}/scripts/lint/', so Assert-OwnCopy would
-    # refuse it -- and the hook with it -- at every session start in this repo. It makes the SKIP
-    # decision itself on the guard's own condition 2. One difference worth stating rather than inheriting:
-    # for the retired-name check the skip is a REPAIR (this repo's pages narrate the rename history and
-    # would read as drift), while here it is only a GUARD -- measured on the day it was written, this
-    # repo's own always-on pages produce zero hits, because every supremacy sentence they carry names the
-    # plugin's page as the winner and the detector reads direction.
-    'scripts\lint\check-supremacy-declaration.ps1',
+    # SessionStart: consumer-prose-sessioncheck (#1389 + #1415, merged by #1421). Same reason as the four
+    # above, and it carries the answer the guard could not give it: what this repo needs here is not a
+    # REFUSAL but a SKIP, and the check makes that decision itself on the guard's own condition 2 (a
+    # .claude-plugin/marketplace.json exists). Refusing would take the hook down at every session start
+    # here; skipping states the right thing.
+    # THE SKIP MEANS SOMETHING DIFFERENT PER DETECTOR, which is worth stating rather than inheriting, and
+    # is one of the things that drifted while this was two exemptions: for the retired-name half it is a
+    # REPAIR (this repo's pages narrate the rename history and would read as consumer drift), while for
+    # the supremacy half it is only a GUARD -- measured on the day it was written, this repo's own
+    # always-on pages produce zero hits, because every supremacy sentence they carry names the plugin's
+    # page as the winner and the detector reads direction.
+    'scripts\lint\check-consumer-prose.ps1',
     'scripts\task\park-cycle.ps1'              # Stop: cycle-autopark (#900)
 )
 

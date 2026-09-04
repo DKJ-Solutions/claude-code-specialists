@@ -855,7 +855,7 @@ a sentence is not. The numbers are in that repo's own system-administration lens
 
 **One narrow slice of it IS enforced, and you will meet it at a session start rather than in a review.**
 The decline above is about reading what a *sentence* means; a **filename** needs no reading, so the
-`retired-doc-name-sessioncheck` SessionStart hook greps your own always-on documents — your `CLAUDE.md`
+`consumer-prose-sessioncheck` SessionStart hook greps your own always-on documents — your `CLAUDE.md`
 and everything it `@`-imports — plus your `contributing-davekjohn/README.md` and `CONTRIBUTING.md`, for
 every name this workflow's branch document has been *renamed away from*. Your changelog and your
 `releases/` are never read: a folded entry correctly names the file of its own day. When it fires it
@@ -869,8 +869,8 @@ describing it to you was not, and nothing reads your `CLAUDE.md`. Measured: both
 workflow were still stating a retired name as current, one day and six days after the rename, and no
 mechanism existed by which either of them could have found out.
 
-**A second narrow slice is enforced the same way, and it is aimed at THIS section — the rank order
-itself.** `supremacy-declaration-sessioncheck` greps the same documents for a line declaring your own
+**A second narrow slice is enforced the same way, by the same hook in the same pass, and it is aimed at
+THIS section — the rank order itself.** `consumer-prose-sessioncheck` also greps those documents for a line declaring your own
 `CLAUDE.md` the winner over this page's layer: the two tokens `CLAUDE.md` and `wins`/`wint` sitting
 directly beside each other, with nothing between them but markdown. Adjacency is the whole rule, and it
 is what makes the check safe to run against prose — *"this page wins"* over `CLAUDE.md` is this ranking
@@ -885,6 +885,14 @@ later sits among the findings such a test *suppresses* — invisible by construc
 both ends in practice, since you read your own page and follow it while the source repo never reads your
 page at all. Measured when the check was built: one live consumer carried two standing inversions, in
 its `CLAUDE.md` preamble and in its own `contributing-davekjohn/CONTRIBUTING.md`.
+
+**Both slices are one hook and one pass over your pages, and that is a cost decision rather than a
+tidiness one** ([#1421](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1421)). They
+shipped as two hooks for a day: two process launches, two loads of this workflow's libraries and two
+walks of the same handful of documents, paid at every session start in your repo, forever. Measured on a
+fixture carrying both defects, 990 ms for the pair against 533 ms merged — **~457 ms of every session
+start**. You get one report that may carry either block or both; a run never stops at the first defect it
+finds.
 
 **If you genuinely want your own constitution to lead, that is a seam answer, not a sentence.** The
 check reports rather than adjudicates, but the repair it names is the honest one: say so where the

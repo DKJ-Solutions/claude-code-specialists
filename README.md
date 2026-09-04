@@ -240,9 +240,13 @@ repo-neutral exceptions: the skill `specialists-init` (the adoption path itself)
 informational, read-only SessionStart hooks that never block — `roster-sessioncheck` (roster-drift
 signaling) in the **core team**, and in **`contributing-davekjohn`** the rest, among them
 `connector-sessioncheck` (sync signaling), `script-contract-sessioncheck` (signals when a repo's own
-workflow libs no longer expose a function the shared scripts call) and `retired-doc-name-sessioncheck`
-(signals when a repo's own always-on prose still names a convention the plugin has renamed,
-[#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389)); see the
+workflow libs no longer expose a function the shared scripts call) and `consumer-prose-sessioncheck`
+(signals when a repo's own always-on prose contradicts the plugin — a convention the plugin has renamed
+still stated as current, [#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389),
+or that repo's own `CLAUDE.md` declared above the workflow's contributing layer,
+[#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415) — two detectors over one
+corpus read once, merged into a single hook by
+[#1421](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1421)); see the
 [connectors README](connectors/README.md). **The set is not enumerated in prose anywhere** — it was, as
 three, and went stale twice inside two days as hooks were added; each plugin's `hooks/hooks.json` is the
 one place that cannot.

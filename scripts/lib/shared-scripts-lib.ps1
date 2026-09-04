@@ -655,52 +655,43 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
-            # The retired-name check (issue #1389). A renamed convention reached a consumer through
-            # nothing: no gate reads a consumer's CLAUDE.md, and check-script-contract covers FUNCTIONS,
-            # so a renamed file convention was outside it by construction. Measured -- both BWJ consumers
-            # still restated the retired single 'development.md' in their always-on documents, one day
-            # and six days after the rename, while the tooling around it had been made rename-proof on
-            # purpose.
+            # The consumer-prose check: TWO detectors over ONE corpus, read once (issue #1421). It was two
+            # registry rows, two mirrored scripts and two hooks for one day -- #1389's retired-name grep
+            # and #1415's supremacy-declaration grep, the two narrow literal greps the prose-contract
+            # decline (#1380) recorded as proportionate after declining the framework at 12.5% precision.
+            #
+            # WHAT EACH HALF CATCHES, because the pair is one hole with two shapes. #1389: a renamed
+            # convention reaches a consumer through nothing -- no gate reads a consumer's CLAUDE.md, and
+            # check-script-contract covers FUNCTIONS, so a renamed FILE CONVENTION is outside it by
+            # construction. Measured: both BWJ consumers still restated the retired single
+            # 'development.md' in their always-on documents, one day and six days after the rename, while
+            # the tooling around it had been made rename-proof on purpose. #1415: the one defect #1380
+            # called STRUCTURALLY invisible -- a pointer test flags sections carrying NO citation, so
+            # cites-then-contradicts can only appear among the SUPPRESSED findings. Measured in
+            # smartwatchbanden: two standing inversions of LAW-THIRD-RANK-ORDER, one of which #1380's own
+            # census never counted. Its recorded three-term shape was measured and REPLACED -- it scored 0
+            # findings and 0 recall on its own target, where adjacency of 'CLAUDE.md' and 'wins'/'wint'
+            # scores 3 raw / 2 reported / 2 true / 100%. The table is in Get-SupremacyDeclaration.
+            #
+            # WHY ONE ROW. Sharing Get-ConsumerProseDocuments removed the duplicated CORPUS and nothing
+            # else: the pair still cost two hook launches, two nested spawns, two dot-sources of
+            # entry-scaffold-lib.ps1 and measure-context-lib.ps1, and two walks of the same ~8-document
+            # closure, on every session start in every consumer. Measured on a consumer fixture carrying
+            # both defects: 492 + 498 = 990 ms for the pair, against 533 ms merged -- ~457 ms saved per
+            # session start, against ~155 ms for a bare hook launch. Neither hook had ever been released
+            # -- both landed after v4.29.0 and sat in [Unreleased] -- so the rename #1421 deferred the
+            # merge over cost no consumer anything.
             #
             # ITS ONLY CALLER IS THE HOOK, and there is no CI leg on purpose: a consumer's CI is not this
-            # repo's to add, and in the publishing repo the check skips itself (its own pages narrate the
-            # rename history correctly). So unlike check-unfolded-entry, which has a CI half, the
-            # SessionStart hook retired-doc-name-sessioncheck.ps1 IS the route rather than a convenience
-            # on top of one.
+            # repo's to add, and in the publishing repo the check skips itself. So unlike
+            # check-unfolded-entry, which has a CI half, the SessionStart hook consumer-prose-sessioncheck.ps1
+            # IS the route rather than a convenience on top of one.
             #
             # NO SKILL, on the same reasoning check-unfolded-entry and check-git-identity give: the
             # caller is automatic and nobody invokes it as a procedure. One command in its .SYNOPSIS
             # answers it early.
-            Name   = 'check-retired-doc-name'
-            Source = 'scripts\lint\check-retired-doc-name.ps1'
-            Plugin = 'contributing-davekjohn'
-            Skill  = ''
-            # A fixture root, plus an always-on root the suite can point at a scratch document tree.
-            # A consumer never types either.
-            SkillParamsExempt = @('RootOverride', 'RootDocument')
-            # Timeable with no arguments: reads the always-on closure and reports, no write of any kind.
-            MeasureArgs = @()
-        },
-        @{
-            # The supremacy-declaration check (issue #1415). The SECOND of the two narrow greps the
-            # prose-contract decline (#1380) recorded as proportionate; the first is check-retired-doc-name
-            # above, and this one had no tracker entry at all until #1415 -- only a sentence in a lens,
-            # which is how a recorded alternative quietly becomes a recorded alternative nobody builds.
-            #
-            # IT IS THE ONE DEFECT #1380 CALLED STRUCTURALLY INVISIBLE. A pointer test flags sections
-            # carrying no citation, so cites-then-contradicts can only appear among the SUPPRESSED
-            # findings -- correct deference and restatement-with-override look identical to it. Measured
-            # in smartwatchbanden: two standing inversions of LAW-THIRD-RANK-ORDER, one of which #1380's
-            # own census never counted.
-            #
-            # THE RECORDED SHAPE WAS MEASURED AND REPLACED. Three terms in one sentence scored 0 findings
-            # and 0 recall on its own target; adjacency of 'CLAUDE.md' and 'wins'/'wint' scores
-            # 3 raw / 2 reported / 2 true / 100%. The full table is in Get-SupremacyDeclaration.
-            #
-            # ITS ONLY CALLER IS THE HOOK, no CI leg, no skill -- the same three answers, for the same
-            # three reasons, that check-retired-doc-name gives directly above.
-            Name   = 'check-supremacy-declaration'
-            Source = 'scripts\lint\check-supremacy-declaration.ps1'
+            Name   = 'check-consumer-prose'
+            Source = 'scripts\lint\check-consumer-prose.ps1'
             Plugin = 'contributing-davekjohn'
             Skill  = ''
             # A fixture root, plus an always-on root the suite can point at a scratch document tree.
