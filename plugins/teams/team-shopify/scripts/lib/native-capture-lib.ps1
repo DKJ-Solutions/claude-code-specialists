@@ -526,6 +526,162 @@ function Get-GitFileTextAtRef {
     return ((@($show.Output) | ForEach-Object { "$_" }) -join "`n")
 }
 
+function Get-TestSuiteCostHints {
+    <#
+    .SYNOPSIS
+        Reads the optional per-suite duration hints sitting beside a test directory, or $null.
+
+    .DESCRIPTION
+        A HINT, NEVER A CONTRACT -- issue #1358, September 4, 2026. Invoke-TestSuiteGate uses these to
+        decide which shard a suite lands in and in what order the queue hands it a lane. It never uses
+        them to decide WHETHER a suite runs: every *.tests.ps1 in the directory runs exactly once across
+        the shards whether or not it appears here, a suite listed here that no longer exists is ignored,
+        and a missing, unreadable or empty file falls the gate back to the stride it used before. That
+        asymmetry is the whole safety argument for persisting anything at all -- stale data can only cost
+        wall clock, never coverage, which is the property the SORT ORDER note in Invoke-TestSuiteGate
+        would otherwise have to give up.
+
+        WHY THE FILE IS COMMITTED RATHER THAN WRITTEN BY THE GATE. The numbers that matter are CI's, and
+        only CI produces them: the same suites run 3.6-4.0x faster on a developer machine and the ratio is
+        NOT uniform across them -- entry-scaffold.tests.ps1 is ~11x -- so a gate that refreshed this file
+        from whatever machine last ran it would pack a hosted runner off workstation figures and do worse
+        than no data at all. It is regenerated deliberately from a CI run's own tables by
+        scripts/maintenance/record-suite-durations.ps1, which names the runs it read in the file.
+
+        A BAD FILE IS A WARNING AND A FALLBACK, NOT A THROW. The gate refuses to guess at a nonsensical
+        (Shard, ShardCount) because every wrong reading of those is silent and runs the wrong SET of
+        suites. This is the opposite case: the worst a corrupt hints file can do is a worse partition of
+        the same set, so refusing to run the tests over it would trade a real gate for a cosmetic one.
+    #>
+    param([Parameter(Mandatory)][string]$TestsDir)
+
+    $path = Join-Path $TestsDir 'suite-durations.json'
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+
+    try {
+        $doc = ConvertFrom-Json ((Get-Content -LiteralPath $path -Raw -Encoding UTF8))
+    } catch {
+        Write-Warning "test gate: $path is not readable JSON - using the stride. ($($_.Exception.Message))"
+        return $null
+    }
+    if (-not $doc -or -not $doc.seconds) {
+        Write-Warning "test gate: $path has no 'seconds' map - using the stride."
+        return $null
+    }
+
+    $hints = @{}
+    foreach ($p in $doc.seconds.PSObject.Properties) {
+        # A non-numeric or non-positive entry is DROPPED rather than defaulted to zero: zero would sort
+        # that suite to the very back of the queue, which is the one position a suite of unknown cost must
+        # never take. Dropping it makes it unknown, and unknown is charged the maximum below.
+        $value = $p.Value -as [double]
+        if ($null -ne $value -and $value -gt 0) { $hints[$p.Name] = [double]$value }
+    }
+    if ($hints.Count -eq 0) {
+        Write-Warning "test gate: $path holds no usable durations - using the stride."
+        return $null
+    }
+    return $hints
+}
+
+function Get-TestSuiteShardOrder {
+    <#
+    .SYNOPSIS
+        Selects one shard's suites and puts them in the order the gate should dequeue them.
+
+    .DESCRIPTION
+        TWO DECISIONS, ONE TABLE, AND THE ORDERING IS THE BIGGER HALF -- issue #1358, September 4, 2026.
+        Which suites a shard draws, and in which order its queue hands them a lane, are both answered from
+        the same duration hints, and simulated over this repo's measured 65-suite pool neither is worth
+        much without the other:
+
+            stride + name order (what this was)                 305s
+            stride + longest-first                              266s
+            LPT bin-pack + name order                           307s   <-- WORSE than doing nothing
+            LPT bin-pack + longest-first                        237s
+
+        Packing alone is not merely a small win, it is a LOSS: a balanced shard whose heaviest file is
+        dequeued late still ends on that file's tail, and balancing hands each shard a heavier heaviest
+        file than an unbalanced one did. That is the counter-intuitive result and the reason both halves
+        landed in one change rather than in the order they were thought of.
+
+        THE PACK IS LPT (longest-processing-time-first), the textbook greedy: walk the suites most
+        expensive first and give each to the shard holding the least work so far. THE ORDER WITHIN A SHARD
+        IS THE SAME SEQUENCE, which is list scheduling -- a lane never sits idle while an expensive suite
+        waits behind a cheap one, and the pool's tail is a short suite instead of a long one. Measured on
+        run 33842129201 before this existed: new-branch.tests.ps1 is alphabetically late, drew a lane at
+        +40.9s, ran 249.2s, and set its shard's 290s makespan single-handedly -- a 41s tail bought by
+        nothing but the letter it starts with.
+
+        WHAT THIS DOES NOT FIX, so nobody re-derives it: after both halves the pool sits at its longest
+        FILE (237s), and the only lever past that is inside a file. Splitting the longest one buys the
+        gap to the 16-lane work bound, ~15s on the measured pool -- which is what #1358 was filed to price
+        and why it is not being spent on preserving 340 asserts across ~2,950 lines.
+
+        SORT ORDER IS STILL THE CONTRACT, it is simply a different order. The key is (cost DESC, name ASC)
+        -- a total order, so a given (Shard, ShardCount) still selects the same files and is still
+        re-runnable by hand from two integers. What changed is that the answer now depends on the hints
+        file as well as the directory, which is why that file is committed rather than generated.
+
+        NO HINTS AT ALL IS THE STRIDE, byte for byte what every caller got before this. A consumer that
+        copies this lib and has no suite-durations.json is untouched, which is most of them.
+
+    .PARAMETER Suites
+        The pool, in any order. Anything with a .Name is accepted, so a test can pass fakes.
+
+    .PARAMETER Costs
+        Name -> seconds, from Get-TestSuiteCostHints. Null or empty selects the stride.
+
+    .PARAMETER Shard
+        1-based shard to select, or 0 with -ShardCount 0 for the whole pool.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Suites,
+        [hashtable]$Costs,
+        [int]$Shard = 0,
+        [int]$ShardCount = 0
+    )
+
+    if ($Suites.Count -eq 0) { return @() }
+
+    if (-not $Costs -or $Costs.Count -eq 0) {
+        $byName = @($Suites | Sort-Object -Property @{Expression = { $_.Name }})
+        if ($ShardCount -le 1) { return $byName }
+        return @($byName | ForEach-Object -Begin { $i = 0 } -Process {
+            if (($i % $ShardCount) -eq ($Shard - 1)) { $_ }
+            $i++
+        })
+    }
+
+    # A SUITE NOBODY HAS TIMED IS CHARGED THE MAXIMUM, which is the safe direction in both halves at once:
+    # it is packed into the emptiest shard and dequeued in the opening lanes, so a new suite that turns out
+    # to be expensive costs its own runtime and never a tail behind sixteen others. A new suite that is
+    # actually trivial costs nothing for starting early -- it finishes and frees its lane. The asymmetry is
+    # real, so the default follows it rather than a median.
+    $unknownCost = ($Costs.Values | Measure-Object -Maximum).Maximum
+    $costOf = {
+        param($suite)
+        if ($Costs.ContainsKey($suite.Name)) { [double]$Costs[$suite.Name] } else { [double]$unknownCost }
+    }
+
+    $ordered = @($Suites | Sort-Object -Property `
+        @{Expression = { & $costOf $_ }; Descending = $true}, @{Expression = { $_.Name }; Descending = $false})
+
+    if ($ShardCount -le 1) { return $ordered }
+
+    $bins = @(1..$ShardCount | ForEach-Object { , (New-Object System.Collections.ArrayList) })
+    $load = New-Object double[] $ShardCount
+    foreach ($suite in $ordered) {
+        # Lowest index wins a tie, so the assignment is reproducible rather than merely balanced.
+        $lightest = 0
+        for ($k = 1; $k -lt $ShardCount; $k++) { if ($load[$k] -lt $load[$lightest]) { $lightest = $k } }
+        $bins[$lightest].Add($suite) | Out-Null
+        $load[$lightest] += (& $costOf $suite)
+    }
+    return @($bins[$Shard - 1])
+}
+
+
 function Invoke-TestSuiteGate {
     <#
         Runs every *.tests.ps1 in $TestsDir as a child process and returns $true when they all passed.
@@ -664,24 +820,33 @@ function Invoke-TestSuiteGate {
         other caller passes neither parameter and gets the whole pool, unchanged, down to the wording of
         its summary line.
 
-        AND SHARDING HANDS THE GATE STRAIGHT BACK TO THE #714 REGIME, WHICH IS WHY A CALLER SHOULD NOT
-        KEEP RAISING ITS SHARD COUNT (issues #1354 and #1358, September 3, 2026). The paragraph above is
-        about the WHOLE pool, where 4 lanes against 2968 lane-seconds is contention. Inside one shard that
-        is no longer true: a quarter of the pool over the same 4 lanes is ~740 lane-seconds, the same order
-        as the slowest FILE, so each shard's wall clock collapses onto its own longest suite. Measured on
-        the first sharded runs, and exact rather than reconstructed because the stride puts those files in
-        queue positions 3-4 where they start at t0: a shard whose longest file was 183s took 183s, and one
-        whose longest was 206s took 207s. So a sharded job is max(longest file) plus its provisioning, and
-        no partition of whole files can beat its own longest member -- which is the same wall a
-        duration-aware bin-pack would reach, so recording durations to FEED ONE buys nothing here.
-        RECORDING THEM FOR A DIFFERENT REASON DOES, and this function now does it (see below). A partition
-        cannot beat its longest file, but that only helps once you know WHICH file that is -- and #1358's
-        answer to that was wrong in both directions until the gate began reporting it: it named the wrong
-        suite as the heaviest, and it put seven others outside a band they are in.
-        SO THE TWO PARAGRAPHS DO NOT DISAGREE, AND WHICH ONE APPLIES IS A QUESTION OF SCALE. Adding lanes
-        (more shards) pays while a shard's lane-seconds exceed its longest file, and stops dead at that
-        file. The trap is quoting the contention-bound paragraph after the shard count has already crossed
-        over into this one.
+        A SHARD IS BOUND BY max(ITS LONGEST FILE, ITS LANE-SECONDS / ITS LANES) -- AND UNTIL #1364 ONLY
+        THE FIRST TERM WAS EVER CHECKED (issues #1354 and #1358, corrected September 4, 2026). This
+        paragraph used to say a sharded job is max(longest file) plus provisioning, full stop, and drew
+        two conclusions from it: that raising the shard count stops paying, and that a duration-aware
+        bin-pack "would reach that same wall, so recording durations to FEED ONE buys nothing here." The
+        first conclusion survives. THE SECOND WAS FALSE, and this function now does feed one.
+        WHAT THE OLD READING MISSED is that it was only ever tested where the first term dominates. It
+        was measured on the four check-plugin-integrity-* suites because the stride happened to put those
+        in queue positions 3-4, which is also the only place a duration could be read off a log at all --
+        so the evidence was drawn entirely from the shards where the file was the binding constraint, and
+        generalised to the ones where it is not. Read off the first REAL per-suite tables (runs
+        33842129201 and 33812817842, 4 shards x 4 lanes): three of four shards finished ABOVE their
+        longest file, by 41-95s. Their lane-seconds over four lanes already exceeded it, so they were
+        work-bound, and no split of any file in them would have moved anything.
+        WHICH MAKES THE PARTITION THE LEVER, NOT THE FILES, and it was worth 305s -> 237s on the measured
+        pool -- see Get-TestSuiteShardOrder above for the four-way simulation, including the result that
+        packing WITHOUT reordering is worse than doing neither. The same measurement is what closes the
+        file-splitting question rather than opening it: at 237s the pool finally is at its longest file,
+        and splitting that file buys the ~15s gap to the 16-lane work bound, for the price of preserving
+        340 asserts across ~2,950 lines.
+        THE SHARD-COUNT CONCLUSION IS UNCHANGED, and now has the arithmetic it was missing: another
+        runner lowers only the second term. Once max(longest file) is the larger of the two -- which is
+        exactly where a balanced partition lands you -- an extra shard buys its own ~20s of provisioning
+        and nothing else.
+        AND #1358's OWN FIGURES ARE A STANDING WARNING about where all of this came from: until the gate
+        began reporting durations, it named the wrong suite as the pool's heaviest and put seven others
+        outside a band they are in.
         AND PAST THAT POINT THE LEVER IS INSIDE THE FILE, NOT AROUND IT -- so #714's "split the slowest
         file" is one answer and not the only one. What a heavy suite here actually costs is its child
         processes: the four check-plugin-integrity suites are ~100% their own lint invocations, and #1358
@@ -770,33 +935,26 @@ function Invoke-TestSuiteGate {
     }
     $poolTotal = $suites.Count
 
-    # THE PARTITION IS A STRIDE, NOT A CONTIGUOUS BLOCK, and that is the whole design (issue #1351).
-    # Taking suites 1-16 for shard 1, 17-32 for shard 2 and so on would pile correlated work into one
-    # shard: the heavy suites in this repo are heavy because they share a subject, and suites that share
-    # a subject share a NAME PREFIX and therefore sort adjacently. The four check-plugin-integrity-*
-    # suites are the measured case -- they are the pool's four most expensive files (#714 split them out
-    # of one ~160s file precisely because the gate parallelises per file), they are alphabetically
-    # consecutive, and a contiguous split puts all four in the same shard while another shard runs
-    # sixteen cheap ones. A stride puts them in four different shards, which is the balance this change
-    # exists to buy, WITHOUT this function having to know or store what anything costs. Verified on this
-    # repo's own 64-suite pool: 16/16/16/16, one heavy suite each.
+    # THE PARTITION IS COST-AWARE, AND SO IS THE QUEUE ORDER -- issues #1351 and #1358.
     #
-    # SORT ORDER IS THE CONTRACT. The stride is taken over the Sort-Object Name list above, so a given
-    # (Shard, ShardCount) always selects the same files -- a shard that goes red is re-runnable by hand
-    # with the same two integers. Adding a suite reshuffles the assignment, which is fine: nothing
-    # persists an assignment between runs, and every suite is independent by construction.
+    # BOTH DECISIONS LIVE IN Get-TestSuiteShardOrder, above, together with the measurements that set
+    # their shape and the reason neither half is worth building without the other. What matters here is
+    # only what this call does to the rest of this function: it returns THE SUITES THIS SHARD RUNS, in
+    # THE ORDER THE QUEUE BELOW SHOULD DEQUEUE THEM. Nothing downstream reorders it.
     #
-    # WHY NOT A LIST OF SUITE NAMES FROM THE CALLER. That is the shape the workflow would have to keep
-    # in sync with the directory, and this repo has measured what happens to a second copy of a list
-    # nobody looks at (#512's inline gate copy, which would have kept running the suites one at a time
-    # for days after both local callers were parallelised). Two integers cannot drift from the contents
-    # of a folder.
-    if ($ShardCount -gt 1 -and $suites.Count -gt 0) {
-        $suites = @($suites | ForEach-Object -Begin { $i = 0 } -Process {
-            if (($i % $ShardCount) -eq ($Shard - 1)) { $_ }
-            $i++
-        })
-    }
+    # THE STRIDE IS STILL IN THERE and is still what a caller without a suite-durations.json gets --
+    # including every consuming repo that copies this lib, which is most of them. What the stride was
+    # chosen for (never piling the alphabetically-adjacent check-plugin-integrity-* suites into one
+    # shard, WITHOUT this function having to know what anything costs) is unchanged in that path; the
+    # cost-aware path simply no longer has to approximate cost by name.
+    #
+    # WHY THE HINTS ARE READ HERE AND NOT PASSED IN. Same answer as the two integers: the alternative is
+    # a list the caller keeps in sync with a directory, and this repo has measured what happens to a
+    # second copy of a list nobody looks at (#512's inline gate copy, which would have kept running the
+    # suites one at a time for days after both local callers were parallelised). A file that lives beside
+    # the suites cannot drift from a workflow it is not written in.
+    $costHints = Get-TestSuiteCostHints -TestsDir $TestsDir
+    $suites = @(Get-TestSuiteShardOrder -Suites $suites -Costs $costHints -Shard $Shard -ShardCount $ShardCount)
 
     # Get-TestCommands BELONGS TO ONE SHARD, NOT TO EVERY SHARD (issue #1351). These are the repo's own
     # whole-stack commands -- 'npm test' and its kind -- and they are not a per-file pool this function
