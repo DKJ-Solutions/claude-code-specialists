@@ -32,6 +32,58 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/bwj-codex-sync-log · 20260904-220935
+
+`bwj-codex` is now the shared **extra layer** for BWJ's two Shopify store repos rather than only their
+ticket workflow, and it has a second chapter: **the sync log**,
+[`SYNC-LOG-portable.md`](../plugins/workflows/bwj-codex/SYNC-LOG-portable.md).
+
+A `sync/` branch mirrors what a **third party** changed on the live Shopify theme. It is exempt from
+the changelog by design -- that is somebody else's change, not the repo's -- which left it the only
+branch in the workflow owing **nothing durable at all**: the sole account of what was taken and what
+was held back was the PR body on GitHub, in two repos whose standing rule is that a sync PR does *not*
+wait for review. A sync now owes a sync-log entry where an ordinary branch owes a changelog entry:
+`bwj-codex/SYNC-LOG.md`, newest at the top, one entry per sync branch, never folded and never released.
+
+**The mechanism is `team-shopify`'s and the policy is `bwj-codex`'s**, which is the seam split the
+consumer repos already run. `sync-rules.ps1` gains `New-SyncLogEntry` and `Add-SyncLogEntry`;
+`sync-main.ps1` reads one new seam, `Get-ShopifySyncLogPath`. **Unanswered means no log** -- every
+Shopify consumer gets the machinery through the update, and none of them finds a new file in its tree
+because of it.
+
+Two things are deliberately *not* built, both named on the page rather than left as gaps. There is
+**no PR field** in an entry: it is committed on the sync branch before any PR exists, and the default
+seam never opens one, so the field would be blank on the common path -- the branch name is the head
+ref instead. And there is **no gate**: `sync-main.ps1` writes the entry in the same commit that
+creates the branch, the shape `new-branch.ps1` already uses, so a sync branch cannot land record-less
+and `contributing-davekjohn`'s generic entry gate never has to learn a `bwj-codex` concept.
+
+The entry is a **second rendering of the same rows**, not a second measurement: it shares
+`Get-SyncPrBodySection` and `Get-SyncFileKind` with the PR body, and a suite asserts the two produce
+identical bullets from identical rows -- the one assert that fails if they ever fork.
+
+Closes [#1382](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1382).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The two BWJ store repos get a record of third-party live-theme drift that survives the merge, in the
+tree, greppable -- where before it lived only in a PR body nobody re-reads. It costs them one line in
+`scripts/repo-config.ps1`. Every other consumer notices nothing, which is the design.
+
+**Score:** 3
+
+#### Pull Request
+
+the sync log: bwj-codex chapter two, and a sync branch that leaves a record in the tree
+
+Plugins: bwj-codex, team-shopify
+
+[PR #1392](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1392)
+
+---
+
 ### DEPLOY: docs/prose-contract-check-declined · 20260904-220309
 
 A manifest-driven prose contract check — the analogue of `check-script-contract.ps1` for the laws this
