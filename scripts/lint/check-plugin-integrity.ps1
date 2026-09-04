@@ -1724,6 +1724,16 @@ foreach ($ef in $entryTextsForHeadings) {
     $rel = $ef.Rel
     $masked = Get-FenceMaskedText -Text $ef.Text
     $ehLines = $masked -split "`r?`n"
+    # A DECLARED SECTION THAT APPEARS TWICE IN ONE ENTRY (issue #1367). Every named section is meant to
+    # appear once, and nothing downstream errors when one is doubled: the entry validates, every gate
+    # passes, and the damage only surfaces in a PUBLISHED Release body -- the same silent-in-both-directions
+    # shape as the split-entry rule above. The fold stamps and links the LAST 'Pull Request' heading while
+    # Get-PrDescription and the release renderer read the FIRST, so a doubled section shipped a Release
+    # bullet with no PR link, indistinguishable from one whose PR genuinely has no number. Keyed on the
+    # stamp-stripped name ($ehSectionRx's own capture), so a folded 'Pull Request <middot> <stamp>' and a
+    # scaffolded 'Pull Request' are recognised as the same section. Reset per entry -- 'Pull Request' in
+    # two different entries is the norm.
+    $ehSeenSections = @{}
     for ($i = 1; $i -lt $ehLines.Count; $i++) {
         $line = $ehLines[$i]
         if ($line -match $ehTooHighRx) {
@@ -1731,6 +1741,13 @@ foreach ($ef in $entryTextsForHeadings) {
             Add-Error "[entry-heading] ${rel}:$($ef.Offset + $i + 1): a '$lvl ' heading in an entry body, at or above the entry's own level. An entry heading is an H$ehEntryLevel, so an H$ehEntryLevel here becomes a SEPARATE entry the moment the fold pastes this section into CHANGELOG.md -- one that declares no impact and therefore reads as an undeclared tier 0 -- and an H1 climbs above every entry in the document. Use '$('#' * ($ehSectionLevel + 1)) ' or bold instead."
         } elseif (($line -match $ehSectionRx) -and -not (Test-IsDeclaredSectionHeading $line)) {
             Add-Error "[entry-heading] ${rel}:$($ef.Offset + $i + 1): '$($Matches[1])' is at the level of the entry's named sections but is not one of them ($($ehSectionNames -join ', ')). A section ends at the next heading of this level or above, so this truncates whichever section it sits in -- and if it is a misspelling of a real section heading, the entry silently loses that declaration and the tier/significance gates read nothing. Use '$('#' * ($ehSectionLevel + 1)) ' for a sub-heading, or correct the spelling."
+        } elseif ($line -match $ehSectionRx) {
+            $ehName = ([regex]::Match($line, $ehSectionRx)).Groups[1].Value
+            if ($ehSeenSections.ContainsKey($ehName)) {
+                Add-Error "[entry-heading] ${rel}:$($ef.Offset + $i + 1): a second '$ehName' section in this entry. Each named section is read once, and a repeat makes two readers disagree about which copy is the entry's -- the fold stamps and links the LAST 'Pull Request' heading, while the PR body and the release notes read the FIRST, so a doubled section ships a Release bullet with no PR link (issue #1367). Delete the duplicate and keep one."
+            } else {
+                $ehSeenSections[$ehName] = $true
+            }
         }
     }
 }
@@ -1820,6 +1837,22 @@ if (Test-Path -LiteralPath $clForHeadings) {
             $from = $clStarts[$b]
             $to = if ($b + 1 -lt $clStarts.Count) { $clStarts[$b + 1] - 1 } else { $clLines.Count - 1 }
             $firstDeclared = $null
+            # A DECLARED SECTION REPEATED WITHIN THIS ONE ENTRY (issue #1367). The branch-document pass
+            # above catches it on the PR; this half catches a copy that arrived through the fold -- the one
+            # write that lands directly on main, past every PR gate. Scoped to $from..$to because the same
+            # section name in two different entries is normal. Keyed on the stamp-stripped capture, so a
+            # folded 'Pull Request <middot> <stamp>' matches a plain 'Pull Request'.
+            $clSeenSections = @{}
+            for ($i = $from + 1; $i -le $to; $i++) {
+                if (Test-IsDeclaredSectionHeading $clLines[$i]) {
+                    $clName = ([regex]::Match($clLines[$i], $ehSectionRx)).Groups[1].Value
+                    if ($clSeenSections.ContainsKey($clName)) {
+                        Add-Error "[entry-heading] CHANGELOG.md:$($i + 1): a second '$clName' section in this H$ehEntryLevel. Each named section is read once -- the fold stamps and links the LAST 'Pull Request' heading while the release renderer reads the FIRST, so a doubled section renders a Release bullet with no PR link (issue #1367). Delete the duplicate and keep one."
+                    } else {
+                        $clSeenSections[$clName] = $true
+                    }
+                }
+            }
             for ($i = $from + 1; $i -le $to; $i++) {
                 if (Test-IsDeclaredSectionHeading $clLines[$i]) {
                     $firstDeclared = ([regex]::Match($clLines[$i], $ehSectionRx)).Groups[1].Value

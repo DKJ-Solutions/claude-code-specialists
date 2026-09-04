@@ -173,6 +173,44 @@ try {
     Assert-True ($r34c.Out -match 'not one of them') 'scenario 34: and the message lists the sections that ARE declared'
     Assert-True ($r34c.Out -match 'loses that declaration') 'scenario 34: naming the silent cost rather than only the rule'
 
+    # Defect three (issue #1367): a DECLARED section heading that appears TWICE in one entry. Both copies
+    # are valid names, so the misspelling rule above says nothing -- the entry validates and every gate
+    # passes, and the split only shows in a published Release body, because the fold links the LAST copy
+    # while the release renderer reads the FIRST. The fixture doubles 'Significance', which is exactly the
+    # shape the v4.29.0 body shipped ('#### Pull Request' twice, the linkless copy chosen).
+    $s34DupSection = @($s34Good) + @('', "$s34SectH Significance", '', 'A stray second copy.')
+    [System.IO.File]::WriteAllText($s34Entry, (($s34DupSection -join "`n") + "`n"), $Utf8NoBom)
+    $r34c2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34c2.Out -match 'entry-heading.*fix-a-branch-name\.md:23') 'scenario 34: a repeated declared section is reported, on the SECOND occurrence''s line'
+    Assert-True ($r34c2.Out -match "a second 'Significance' section") 'scenario 34: and the message names which section was doubled'
+    Assert-True ($r34c2.Out -match 'no PR link') 'scenario 34: naming the silent published cost, and #1367'
+
+    # The negative that keeps this from over-firing: a repeated heading QUOTED in a fence is a mention,
+    # not a use -- and this branch's own changelog entry does exactly that.
+    $s34DupFenced = @(
+        "$s34EntryH A fixture entry"
+        ''
+        "$s34SectH What does this change do?"
+        ''
+        'The doubled form looks like this:'
+        ''
+        '```markdown'
+        "$s34SectH Significance"
+        "$s34SectH Significance"
+        '```'
+        ''
+        "$s34SectH Significance"
+        ''
+        'Score: 2'
+        ''
+        "$s34SectH Type of change"
+        ''
+        'Fix'
+    )
+    [System.IO.File]::WriteAllText($s34Entry, (($s34DupFenced -join "`n") + "`n"), $Utf8NoBom)
+    $r34c3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34c3.Out -match 'entry-heading.*fix-a-branch-name')) 'scenario 34: a duplicated section heading inside a fence is a mention, not a finding'
+
     # Fence-aware: an entry that QUOTES a heading is discussing structure, not creating it -- the
     # mention-versus-use question this file answers in four other checks, and one this repo's own entry
     # files do (the entry for this very change quotes the format).
@@ -277,6 +315,35 @@ try {
     Assert-True ($r34g.Out -match 'entry-heading. CHANGELOG\.md:11') 'scenario 34: a body heading at the entry level is reported, with its line'
     Assert-True ($r34g.Out -match 'has been SPLIT') 'scenario 34: and the message names what happened to the entry rather than only the rule'
     Assert-True ($r34g.Out -match "first named section is 'Significance'") 'scenario 34: quoting the section it starts at, which is the evidence'
+
+    # A DECLARED SECTION REPEATED WITHIN ONE ENTRY, arriving through the fold (issue #1367). This is the
+    # half that catches a doubled section on the one write that lands directly on main, past every PR
+    # gate -- the v4.29.0 case, where '#### Pull Request' folded in twice and the Release body took the
+    # linkless copy. The fixture doubles 'Significance'.
+    $s34ClDup = @($s34ClGood) + @("$s34SectH Significance", '', 'A stray second copy of a section.')
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClDup -join "`n") + "`n"), $Utf8NoBom)
+    $r34g2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($r34g2.Out -match 'entry-heading. CHANGELOG\.md:27') 'scenario 34: a repeated declared section in a folded entry is reported, on the second occurrence'
+    Assert-True ($r34g2.Out -match "a second 'Significance' section in this H") 'scenario 34: and the message names the doubled section and #1367'
+
+    # THE NEGATIVE THAT SCOPES IT: the SAME section name in two DIFFERENT entries is the norm, not a
+    # duplicate -- the check resets per entry. Two well-formed entries, each with its own three sections.
+    $s34ClTwo = @(
+        '# Changelog'
+        ''
+        'Everything merged since the last release, furthest reach first.'
+        ''
+        "$s34EntryH #123 " + $s34Md + ' First entry'
+        ''
+    ) + $s34Sections + @('') + @(
+        "$s34EntryH #124 " + $s34Md + ' Second entry'
+        ''
+    ) + $s34Sections + @('')
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClTwo -join "`n") + "`n"), $Utf8NoBom)
+    $r34g3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($r34g3.Out -match 'entry-heading. CHANGELOG')) 'scenario 34: one section name per entry across two entries is not a duplicate -- the scan is per entry'
+
+    [System.IO.File]::WriteAllText($s34Cl, (($s34ClGood -join "`n") + "`n"), $Utf8NoBom)
 
     # THE FALSE POSITIVE THIS AVOIDS, and it is the reason the rule is not simply "an entry heading needs a
     # #NN": the fold cannot reach gh on a manual merge, and then it writes a legitimate entry with no number
