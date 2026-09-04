@@ -32,6 +32,197 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/fold-cross-device-duplicate-gate · 20260904-225721
+
+The fold's duplicate gate now reads a trunk it has actually checked, and a refused push says what
+happened instead of handing back git's exit code.
+
+`fold-changelog-entry.ps1`'s `ONE BRANCH, ONE ENTRY` gate reads `CHANGELOG.md` from the **working
+copy**, and that was the only trunk state it ever saw. On one machine that is the whole truth. Dave
+works one repo from more than one device at the same time, deliberately and permanently, so here it was
+a snapshot of whatever that checkout last pulled -- and the other device may already have folded the
+same branch.
+
+Three things changed, and the third is the one that matters:
+
+1. **The fold fetches before the gate reads.** A new `Get-TrunkGap` in `entry-scaffold-lib.ps1` freshens
+   `refs/remotes/origin/<trunk>` and counts `HEAD..origin/<trunk>`.
+2. **A trunk behind its upstream is refused**, with the count in the refusal and `-SkipTrunkCheck` as the
+   valve. This is where #1046's follow-up lands: `new-branch.ps1` deliberately only *warns*, because a
+   stale base under a branch is recoverable with a pull. The fold's next act is a commit **directly on
+   the trunk** under a named exception, so the same argument the duplicate gate already makes applies --
+   a fold that does not happen leaves the entry exactly where it was, and one pull resumes it.
+3. **A rejected push is diagnosed against the fetched remote.** This is the half a pre-pass structurally
+   cannot cover: the measured failure was a **race**, not a stale checkout. The trunk was current when
+   the gate read it, and the other device folded the same branch inside the window before the push. The
+   step used to report `git push exited 1` plus git's generic "the remote contains work that you do not
+   have locally" -- the same sentence a plain divergence gives, at the one moment the two situations need
+   **opposite** actions. Separating them took five commands typed by a person: a fetch, a log of
+   `HEAD..origin/main`, a grep of the remote changelog, a count, and a diff of the two entry bodies. All
+   five are derivable at that point, so all five now run.
+
+The verdict is inverted where it has to be: when every entry the commit carries is already upstream, the
+advice is **"Do NOT push this commit by hand"** rather than the old *"Push by hand"*, which in the
+measured incident would have produced exactly the two-entries-one-branch state #1082 was closed for. The
+**bodies** are compared rather than the blocks, because both devices stamp the heading at their own fold
+time and a whole-block comparison would report every genuine duplicate as a difference.
+
+It **diagnoses and stops, repairing nothing**, which is the report's own boundary. The fold commit is on
+the trunk by then, and every route off a trunk -- a reset, a rebase, a merge commit -- is a history
+operation the consumer's safety rules reserve to the operator. That is the expensive half of the measured
+incident: a denied rebase, a denied soft reset, an aborted mid-conflict merge on the trunk, and two
+commands finally hand-typed by Dave.
+
+Neither new gate can fire on a question it did not answer: `Get-TrunkGap` reports "could not measure" for
+a repo with no `origin/<trunk>` ref, and a caller must never read that as "behind" -- every fixture in
+this repo's own suite is such a repo.
+
+Inbound #1405, reported from `BWJ-ecommerce/smartwatchbanden` on September 4, 2026.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This is the one that reaches them. Every consumer runs the mirrored fold, and the reporting repo hit a
+state its own constitution forbade every route out of -- the tooling put a correct-looking commit on the
+trunk and then left the operator unable to resolve it unaided. A consumer working one repo from two
+devices now gets told, at the moment the push is refused, whether the work is already upstream and the
+local commit redundant, or whether it is real work that has to be integrated. That answer used to cost
+five hand-typed commands and, on the day it was measured, did not get made at all.
+
+**Score:** 4
+
+#### Pull Request
+
+the fold reads the trunk across devices, and a refused push says why
+
+Plugins: contributing-davekjohn
+
+[PR #1413](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1413)
+
+---
+
+### DEPLOY: docs/1408-closeout-ceiling-order · 20260904-224649
+
+Fixed [#1408](https://github.com/DaveKJohn/claude-code-specialists/issues/1408): the length ceiling
+[#1406](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1406) put into Chris's close-out
+stood beside the archived August 27, 2026 reasoning that had **refused a word budget**, with nothing on
+either page saying how the two fit -- so the next session to read the archive found a recorded argument
+against the guardrail it was standing under. The paragraph said *"the ceiling holds regardless"*, which is
+the one reading under which the objection lands.
+
+The repair is the order, because the objection was aimed at a ceiling applied *instead of* the duplication
+test and not *after* it. The persona now states both in sequence -- duplication filters first, so the
+sentence only the session can give is never what the ceiling meets; the ceiling then caps what survives,
+because *"not a duplicate"* is always satisfiable -- and says why that is not a budget: over the ceiling a
+surplus is **rehoused** into the branch document or an issue the receipt cites, not cut. And the figure the
+archive recorded as the observed consequence, *"two or three lines"*, becomes the stated rule in place of
+*"a handful of lines"*, which is the cruder form #1402 asked for.
+
+The archive is deliberately left as written. It is the record of a decision, its argument is true of the
+budget it was aimed at, and the live rule is where a rule is repaired.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Every consumer's orchestrator gets a number where it had *"a handful"*, and stops carrying a rule its own
+shipped history argues against -- a contradiction a consumer can only ever find at the moment it costs
+them, mid-close-out, with the archive quotable in defence of the length the ceiling exists to stop.
+Line-count neutral but one: the ordering and the figure are paid for by dropping the restatement of what
+the receipt contains, which the paragraph above it already names.
+
+**Score:** 2
+
+#### Pull Request
+
+state the order between the close-out's duplication test and its length ceiling
+
+Plugins: team-alpha
+
+[PR #1412](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1412)
+
+---
+
+### DEPLOY: fix/1401-duration-ceiling-load-sensitive · 20260904-223712
+
+The test gate's own suite no longer refuses a push because the machine was busy. Scenario 4b in
+[`../scripts/tests/test-suite-gate.tests.ps1`](../scripts/tests/test-suite-gate.tests.ps1) proves that
+the per-suite table prints a *runtime* and not a *finish time*, and it proved it with a hard-coded
+`-lt 4` second ceiling. That is the exact shape the same file forbids forty lines higher up: a timing
+FLOOR is guaranteed by `Start-Sleep`, a timing CEILING is guaranteed by nothing, because nothing bounds
+how slow a shared machine can be. Under a 65-suite gate run one of the fixture's 1.2s sleeps came in at
+5.1s, the assert failed, and `Invoke-WorkflowGates` refused to push a branch that had touched nothing
+the suite reads -- the same shape as #1232, one file over.
+
+The ceiling is now a comparison against the queue the fixture itself builds: `$maxDuration -lt
+$maxOffset`. Serially the last lane opens only after the five suites before it have run, so the largest
+offset is the SUM of five runtimes while a true duration is ONE of them -- and a duration column holding
+finish times reads `offset + runtime` for that same row, which exceeds the offset by construction,
+whatever the machine was doing. Contention scales both sides together, so the discriminator survives a
+loaded box in a way no second-count can. Measured on this branch: 1.7s against +8.2s, a 4.8x margin
+where the old ceiling had 2.4x and tripped at 5.1s.
+
+Widening the ceiling to 6-7s was the issue's own first suggestion, and it is declined in the comment
+rather than silently: it keeps the fragile shape and discriminates *worse* the more load there is,
+because contention inflates the defect's reading too -- and 6-7s lands within noise of the ~7.2s a
+finish-time column reports at rest, which is the one figure the assert must stay below. The retry
+mechanism #1232 landed on does not carry over either, for the reason in CREATE above.
+
+The assert still fails for the defect it exists to catch, and that is proved by mutation rather than by
+argument: re-introducing the #1358 defect in the duration column makes it read 10s against +8.3s and
+refuse. Closes [#1401](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1401).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the suite is source-repo-only. `native-capture-lib.ps1` is mirrored into the plugins and is
+unchanged by this branch; `scripts/tests/test-suite-gate.tests.ps1` is not payload, so no consumer of
+this marketplace runs it or notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+The test gate's duration assert compares against the queue instead of a fixed second-count
+
+[PR #1410](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1410)
+
+---
+
+### DEPLOY: docs/fix-1394-per-project-test-in-adopt-bwj-asana · 20260904-222833
+
+Fixed [#1394](https://github.com/DaveKJohn/claude-code-specialists/issues/1394): `adopt-bwj-asana/SKILL.md`
+still stated the one-workspace test for whether `Prio-Score` reaches a task, in a paragraph that cited
+step 5 of `WORKFLOW-portable.md` as its authority -- a test that step 5 stopped making once
+[#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386) replaced it with the
+per-project test (`custom_field_settings`), so the citation pointed a reader at the opposite claim. The
+same superseded workspace-only reasoning was also present, unflagged by the issue but found via its own
+suggested `grep -rn "one-workspace|does not cross" plugins/`, in the "propose one value" paragraph
+earlier in the same file, in `README.md`'s `Get-AsanaProjectGid` entry, and in `asana-mirror.ps1`'s
+`Get-PrioScoreFromTask` docstring -- all three corrected the same way, to the per-project test.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+Corrects a citation that pointed maintainers preparing a board for `Prio-Score`/`Github Issue`/`Github
+Type` at the wrong test, but only in reference material read before configuring the seam -- nothing in
+the shipped script behaviour changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+correct adopt-bwj-asana's stale one-workspace citation to match step 5's per-project test
+
+Plugins: bwj-codex
+
+[PR #1400](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1400)
+
+---
+
 ### DEPLOY: docs/closeout-receipt-length-bound · 20260904-222307
 
 Chris's close-out had three permitted shapes and a receipt-not-report rule, and still grew back into a

@@ -160,7 +160,15 @@ param(
     # a tool, which is the same test the entry scaffold gate's -Force is granted on. No case that needs it
     # has been measured; it exists so a false positive cannot wedge a fold that has to land, since this is
     # the step that writes the record and the branch is usually gone by the time anyone notices.
-    [switch]$Force
+    [switch]$Force,
+    # The escape valve for the trunk-freshness pre-pass, and for nothing else. Deliberately NOT -Force:
+    # that flag overrules a JUDGEMENT about content ("the changelog already carries an entry naming this
+    # branch"), and its own comment above says it is for the duplicate gate and nothing else. This one
+    # skips a MEASUREMENT of the checkout -- the same distinction open-pr.ps1 draws with
+    # -SkipLint/-SkipTests and ship-pr.ps1 with -SkipStaleCheck. Folding a duplicate and folding onto a
+    # stale trunk are two different mistakes, and one flag that waves through both is a flag nobody can
+    # use safely for either.
+    [switch]$SkipTrunkCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -530,6 +538,54 @@ if ($tierProblems.Count -gt 0) {
     Write-Host "Nothing was folded -- these entries could not be filed:" -ForegroundColor Red
     $tierProblems | ForEach-Object { Write-Host $_ -ForegroundColor Red }
     exit 1
+}
+
+# --- Pre-pass: THE TRUNK THE GATE IS ABOUT TO READ IS THE CURRENT ONE (inbound #1405) --------------
+#
+# WHAT THE DUPLICATE GATE COULD NOT SEE. Get-FoldedEntryForBranch below reads $changelogContent -- the
+# WORKING COPY -- and that is the only trunk state it has ever looked at. On one machine that is the
+# whole truth. Dave works one repo from more than one device at the same time, deliberately and
+# permanently, so here it is a snapshot of whichever trunk this checkout last pulled: the other device
+# may have folded this very branch already, and a gate reading a stale file says "no entry yet" with
+# complete confidence.
+#
+# WHY IT REFUSES WHERE new-branch.ps1 WARNS. That script's own comment (inbound #1046) says refusing
+# "matches the lane script and stays open as a follow-up", and holds back because it is mirrored into
+# every consumer and arrives by plugin UPDATE rather than by choice. The calculation is different here
+# and this is the place the follow-up lands: new-branch puts a stale BASE under a branch, which is
+# recoverable with an ordinary pull, while this script's next act is a commit DIRECTLY ON THE TRUNK
+# under a named exception. Get it wrong and the consumer is left holding a fold commit on main that
+# their own safety rules forbid every route out of -- no rebase on a shared branch, no reset --hard,
+# and a merge commit on main is not one of the permitted direct-to-trunk subjects, so even a pull
+# cannot finish. Measured: a denied rebase, a denied soft reset, an aborted mid-conflict merge left on
+# the trunk, and two commands finally hand-typed by Dave.
+#
+# SO THE SAME ARGUMENT THE DUPLICATE GATE ITSELF MAKES APPLIES, and it is the reason refusing is safe
+# rather than merely strict: a fold that does not happen leaves the entry file exactly where it is, on
+# a branch whose work is already merged. Nothing is lost by stopping and one pull resumes it, which is
+# what makes this the second place in this script where a refusal costs nothing.
+#
+# IT CANNOT REFUSE ON A QUESTION IT DID NOT ANSWER. Get-TrunkGap returns Measured=$false for a repo with
+# no origin/<trunk> ref -- no remote, or a clone that has never fetched -- and that is NOT "behind".
+# Every fixture in this repo's own suite is such a repo, so conflating the two would refuse every fold
+# in the gate.
+if (-not $SkipTrunkCheck) {
+    $trunkGap = Get-TrunkGap -RepoRoot $repoRoot -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    if ($trunkGap.Measured -and -not $trunkGap.Fresh) {
+        # Git's own reason is printed rather than swallowed -- see Get-TrunkGap's header for why this
+        # fetch keeps its stderr where new-branch.ps1's discards it.
+        $trunkGap.Output | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkYellow }
+        Write-Host "  (could not reach origin, so the count below is against the $($trunkGap.Ref) you last saw -- the real gap may be larger.)" -ForegroundColor DarkYellow
+    }
+    if ($trunkGap.Measured -and $trunkGap.Behind -gt 0) {
+        $seen = if ($trunkGap.Fresh) { "origin/$($trunkGap.Trunk)" } else { "the origin/$($trunkGap.Trunk) you last saw" }
+        Write-Host "Refused: this checkout is $($trunkGap.Behind) behind $seen, so nothing was folded." -ForegroundColor Red
+        Write-Host "  The duplicate gate reads CHANGELOG.md from THIS tree, and a stale one cannot show an entry another device has already folded." -ForegroundColor DarkGray
+        Write-Host "  Bring the trunk up to date and run the fold again:" -ForegroundColor DarkGray
+        Write-Host "    git checkout $($trunkGap.Trunk); git fetch --prune origin; git merge --ff-only origin/$($trunkGap.Trunk)" -ForegroundColor DarkGray
+        Write-Host "  Nothing is lost by stopping: the entry is still in the branch document, and the fold is the same one command later. -SkipTrunkCheck folds anyway." -ForegroundColor DarkGray
+        exit 1
+    }
 }
 
 # What this run actually folded -- the source for both the commit message and the committed pathspec.
@@ -1060,7 +1116,104 @@ if ($Commit) {
         if ($pushRun.ExitCode -ne 0) {
             Write-Host ($pushRun.Output -join "`n") -ForegroundColor Red
             $why = if ($pushRun.TimedOut) { "git push did not answer within $NativeCaptureNetworkTimeoutSeconds seconds; see the [timeout] lines above" } else { "git push exited $($pushRun.ExitCode)" }
-            Write-Host "Committed locally but NOT pushed ($why) -- the state this flag exists to avoid. Push by hand." -ForegroundColor Red
+
+            # --- WHY THE PUSH WAS REFUSED, ESTABLISHED HERE INSTEAD OF BY HAND (inbound #1405) ---------
+            #
+            # WHAT THIS STEP USED TO SAY, AND WHY IT WAS NOT ENOUGH. 'git push exited 1' plus git's own
+            # "the remote contains work that you do not have locally" is the SAME sentence a plain
+            # divergence gives -- and at this exact moment the two situations need OPPOSITE actions. If
+            # the remote merely moved, the fold commit is real work that has to be integrated and pushed.
+            # If the other device already folded THIS branch, the fold commit is a duplicate, and pushing
+            # it by hand -- which is precisely what this block used to advise -- produces the
+            # two-entries-one-branch state inbound #1082 was filed and closed for.
+            #
+            # IT IS A RACE, NOT A STALE CHECKOUT, WHICH IS WHY THE PRE-PASS ABOVE CANNOT COVER IT. The
+            # measured sequence had a trunk that was CURRENT when the fold started -- checkout, pull
+            # --ff-only, gate read, all correct -- and the other device folded the same branch inside the
+            # window between that read and this push. No check at the top of the run can close a window
+            # that opens after it. This is the only place standing on the far side of it.
+            #
+            # EVERYTHING NEEDED TO TELL THE TWO APART IS ALREADY IN HAND. Separating them took five
+            # commands typed by a person: a fetch, a log of HEAD..origin/main, a grep of the remote
+            # changelog for the entry heading, a count to prove it appeared once, and a diff of the two
+            # entry bodies to prove nothing was lost. All five are derivable right here, from the branch
+            # names this run just folded and a changelog the remote already has. So they are.
+            #
+            # THE BODIES ARE COMPARED, NOT THE BLOCKS. Both devices stamp the heading at THEIR fold time
+            # and the two stamps cannot match, so a whole-block comparison would report every genuine
+            # duplicate as a difference -- the one answer that would send the operator the wrong way.
+            #
+            # IT DIAGNOSES AND STOPS, REPAIRING NOTHING, DELIBERATELY. The fold commit is on the trunk by
+            # now, and every route off a trunk -- a reset, a rebase, a merge commit -- is a history
+            # operation the consumer's own safety rules reserve to the operator. Being exact about the
+            # state is the whole job here; deciding what to do about it is not this script's call.
+            $redundant = @()
+            $gap = $null
+            if (-not $pushRun.TimedOut) {
+                $gap = Get-TrunkGap -RepoRoot $repoRoot -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+                if (-not $gap.Measured) {
+                    Write-Host "  (origin/$($gap.Trunk) could not be measured, so why the push was refused is not established here.)" -ForegroundColor DarkYellow
+                } elseif ($gap.Behind -le 0) {
+                    Write-Host "  $($gap.Ref) holds nothing this checkout is missing, so a stale trunk is NOT the reason -- git's own words above are the diagnosis." -ForegroundColor DarkYellow
+                } else {
+                    $plural = if ($gap.Behind -eq 1) { 'commit' } else { 'commits' }
+                    Write-Host "  $($gap.Ref) moved $($gap.Behind) $plural while this fold was running:" -ForegroundColor Yellow
+                    $moved = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'log', '--oneline', "HEAD..$($gap.Ref)") -DiscardStderr
+                    if ($moved.ExitCode -eq 0) {
+                        $moved.Output | Where-Object { $_ -and "$_".Trim() } | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+                    }
+                    # Read straight out of the fetched ref: no checkout, and nothing in the working tree
+                    # is touched to answer this. git addresses its own paths with forward slashes on every
+                    # platform, so the repo-relative path is normalised rather than passed as written.
+                    $clSpec = ($changelogRel -replace '\\', '/')
+                    $remoteShow = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'show', "$($gap.Ref):$clSpec") -DiscardStderr
+                    $localShow  = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'show', "HEAD:$clSpec") -DiscardStderr
+                    if ($remoteShow.ExitCode -ne 0) {
+                        Write-Host "  (could not read $clSpec from $($gap.Ref), so the entries could not be compared.)" -ForegroundColor DarkYellow
+                    } else {
+                        $remoteText = ($remoteShow.Output -join "`n")
+                        $localText  = if ($localShow.ExitCode -eq 0) { ($localShow.Output -join "`n") } else { '' }
+                        # An entry block minus its heading line -- see THE BODIES ARE COMPARED above.
+                        $bodyOf = {
+                            param([string]$block)
+                            $ls = @(($block -replace "`r`n", "`n") -split "`n")
+                            if ($ls.Count -le 1) { return '' }
+                            return (($ls[1..($ls.Count - 1)] -join "`n").Trim())
+                        }
+                        foreach ($rec in $folded) {
+                            # Branch falls back to the FILE NAME when it could not be determined, and a file
+                            # name matches no heading -- so such a record reports "not upstream" and keeps
+                            # this run out of the redundant verdict, which is the safe direction.
+                            $b = $rec.Branch
+                            if (-not $b) { continue }
+                            $there = @(Get-EntryBlocksForBranch -ChangelogText $remoteText -Branch $b)
+                            if ($there.Count -eq 0) {
+                                Write-Host "  '$b' has NO entry on $($gap.Ref) -- this fold is real work rather than a duplicate." -ForegroundColor Yellow
+                                continue
+                            }
+                            $here = @(Get-EntryBlocksForBranch -ChangelogText $localText -Branch $b)
+                            $same = $false
+                            if ($here.Count -ge 1) { $same = ((& $bodyOf $here[0]) -eq (& $bodyOf $there[0])) }
+                            $times = if ($there.Count -eq 1) { 'once' } else { "$($there.Count) TIMES" }
+                            $bodyNote = if ($same) { 'and its body is identical to the one this run just wrote' } else { 'and its body DIFFERS from the one this run just wrote -- compare them before discarding anything' }
+                            Write-Host "  '$b' is ALREADY folded on $($gap.Ref): present $times, $bodyNote." -ForegroundColor Yellow
+                            if ($same) { $redundant += $b }
+                        }
+                    }
+                }
+            }
+
+            # ALL OF THEM, OR THE ADVICE DOES NOT CHANGE. In fold-all mode one entry may be upstream while
+            # another is genuinely new, and that commit still carries work: only a run whose every folded
+            # entry is already upstream is safe to call redundant.
+            $named = @($folded | Where-Object { $_.Branch })
+            if ($named.Count -gt 0 -and $redundant.Count -eq $named.Count) {
+                Write-Host "Committed locally but NOT pushed ($why). Do NOT push this commit by hand: every entry it carries is already on $($gap.Ref), so pushing it would fold the same branch twice." -ForegroundColor Red
+                Write-Host "  The local fold commit is redundant -- nothing in it is missing upstream, and discarding it loses no work." -ForegroundColor DarkGray
+                Write-Host "  What to do with a commit already sitting on the trunk is yours to decide: this script does not rewrite trunk history." -ForegroundColor DarkGray
+            } else {
+                Write-Host "Committed locally but NOT pushed ($why) -- the state this flag exists to avoid. Push by hand." -ForegroundColor Red
+            }
             exit 1
         }
         Write-Host "Pushed." -ForegroundColor Green

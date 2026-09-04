@@ -3604,6 +3604,35 @@ function Get-FoldedEntryForBranch {
     return $null
 }
 
+function Get-EntryBlocksForBranch {
+    <#
+        Every entry block in a changelog whose heading names $Branch, in document order -- an empty array
+        when none does.
+
+        WHY IT SITS BESIDE Get-FoldedEntryForBranch RATHER THAN INSIDE IT. That function answers "does
+        this branch already have an entry", and it stops at the FIRST hit deliberately: the list is
+        newest-first, so the first is the one a reader would be told about. Two questions need more than
+        the first, and both are asked by the fold at the one moment it can no longer assume anything --
+        when its push is rejected (inbound #1405). HOW MANY entries name the branch, because a duplicate
+        proves itself by appearing twice and a single upstream entry proves the opposite. And WHAT each
+        one says, because "the work is already upstream" is only safe to state once the upstream text has
+        been compared to the local one.
+
+        IT DEFINES NEITHER RULE ITSELF, which is the whole point of the shape. The entry BOUNDARY comes
+        from Get-ChangelogEntryBlocks and the NAME MATCH from Get-FoldedEntryForBranch, applied one block
+        at a time -- so the fence skipping, the backtick/bare delimiting and the whole-name test stay in
+        exactly one place each, and what this reports can never drift from what the gate enforces.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$ChangelogText,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Branch
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ChangelogText) -or [string]::IsNullOrWhiteSpace($Branch)) { return @() }
+    return @(Get-ChangelogEntryBlocks -Content $ChangelogText |
+        Where-Object { $null -ne (Get-FoldedEntryForBranch -ChangelogText $_ -Branch $Branch) })
+}
+
 function Get-EntryBlockHeadingLevel {
     <#
         Pure: the level of the heading an entry block OPENS with -- 2 for a block written in the flat
@@ -5199,6 +5228,88 @@ function Get-BranchTrunkName {
         if ($v) { return [string]$v }
     }
     return 'main'
+}
+
+function Get-TrunkGap {
+    <#
+        How far the tree at $RepoRoot is BEHIND the trunk on origin -- the one measurement, with the
+        consequence left to the caller.
+
+        WHY IT IS SHARED RATHER THAN INLINE. Two scripts meet the same hazard and owe two different
+        answers to it: new-branch.ps1 WARNS that a base is behind (inbound #1046), while the fold
+        REFUSES, because its commit lands directly on the trunk under a named exception and a stale
+        trunk turns that commit into a duplicate the operator cannot cheaply undo (inbound #1405). Same
+        diagnosis, different thing about to go wrong -- which is the shape Get-PreFlatChangelogRefusal
+        already uses in this file, where the measurement is shared and the consequence is the caller's.
+
+        THE LOCAL QUESTION GATES THE NETWORK ONE, which is what keeps this usable offline and inside a
+        test fixture. refs/remotes/origin/<trunk> is read FIRST: no such ref means no origin, or a clone
+        that has never fetched, and then there is nothing to compare against -- so no fetch is attempted
+        and Measured comes back $false. A caller MUST NOT read "could not measure" as "behind": every
+        fixture repo in this repo's own suite has no remote, and a caller that conflated the two would
+        refuse every fold in it.
+
+        HEAD..origin/<trunk> RATHER THAN A TRUNK-VS-ORIGIN COMPARISON, deliberately, and for the same
+        reason new-branch.ps1 chose it: it answers "what is my checkout missing", which is the question,
+        and it stays correct when HEAD is NOT the trunk. The fold runs detached at origin/<trunk> from a
+        ship-pr lane, and there this reads 0 instead of complaining about a local trunk ref the worktree
+        does not carry.
+
+        FRESH SAYS WHICH REF THE COUNT CAME FROM, and it means "this call refreshed the ref" -- so it is
+        $false under -NoFetch too, where the caller has already fetched and knows it. "3 behind the
+        origin/main you last saw" is a different sentence from "3 behind origin/main", and a reader who
+        is offline has to be told which one they got.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # Defaults to the repo's own trunk name, so a consumer on 'master' measures against theirs.
+        [string]$Trunk,
+        # Measure against the ref already on disk. For a caller that has just fetched itself and only
+        # wants the count -- the fold's push-rejection path, which fetches once and then asks twice.
+        [switch]$NoFetch,
+        # 0 leaves Invoke-NativeCapture on its own default; the fold passes the same network bound it
+        # already puts on its push, so a hung fetch cannot turn a refusal into a stall.
+        [int]$TimeoutSeconds = 0
+    )
+
+    if (-not $Trunk) { $Trunk = Get-BranchTrunkName }
+    $ref = "refs/remotes/origin/$Trunk"
+    $result = [pscustomobject]@{
+        Measured = $false
+        Fresh    = $false
+        Behind   = 0
+        Trunk    = $Trunk
+        Ref      = $ref
+        Output   = @()
+    }
+
+    $has = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', $ref) -DiscardStderr
+    if ($has.ExitCode -ne 0) { return $result }
+
+    if (-not $NoFetch) {
+        # GIT'S OWN WORDS ARE KEPT HERE, not discarded. Issue #1313 measured that a failing fetch does not
+        # leak a credential -- transport_anonymize_url strips userinfo from every "unable to access" line
+        # -- and on that measurement DECLINED adding -DiscardStderr to three other fetches, for removing
+        # the only diagnosis a reader gets. Both callers of this function are about to refuse a fold or
+        # explain a rejected push, so git's reason is precisely what the operator needs to act on.
+        $fetchArgs = @('-C', $RepoRoot, 'fetch', 'origin', $Trunk, '--quiet')
+        $fetch = if ($TimeoutSeconds -gt 0) {
+            Invoke-NativeCapture -FilePath 'git' -Arguments $fetchArgs -TimeoutSeconds $TimeoutSeconds
+        } else {
+            Invoke-NativeCapture -FilePath 'git' -Arguments $fetchArgs
+        }
+        $result.Fresh = ($fetch.ExitCode -eq 0)
+        $result.Output = @($fetch.Output | Where-Object { $_ -and "$_".Trim() })
+    }
+
+    $count = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-list', '--count', "HEAD..$ref") -DiscardStderr
+    if ($count.ExitCode -ne 0) { return $result }
+    $n = 0
+    if ([int]::TryParse((($count.Output -join '').Trim()), [ref]$n)) {
+        $result.Measured = $true
+        $result.Behind = $n
+    }
+    return $result
 }
 
 function Get-BranchFilePaths {
