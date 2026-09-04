@@ -32,6 +32,38 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/lint-en-tests-cancelled-run · 20260904-075826
+
+The `lint-en-tests` summary job -- the single required check, added in #1351 -- ran with `if: always()`,
+and `always()` is true even when a run is CANCELLED. A PR run superseded by `cancel-in-progress` has its
+four shards cancelled while the summary job runs on anyway, reads `cancelled != success`, and reports
+the required check as `failure` on a commit nothing merges, plus one wasted runner per cancellation.
+`if: ${{ !cancelled() }}` keeps every property the banner argues for -- true when a dependency failed
+or was skipped, so a red shard still produces a red verdict -- and is false only when the run itself
+was cancelled, so a superseded run now reports `cancelled`. This supersedes the `always()` choice
+recorded in the `feat/shard-ci-suites` entry above. Pinned by `scripts/tests/ci-shard.tests.ps1`,
+whose `if:` assert now requires `!cancelled()` and rejects a bare `always()`.
+
+**Score:** 1 -- it prevents a failure that has not misled anyone yet: a superseded PR run reads
+`failure` in the Actions list where nothing failed, the one place someone goes looking for a genuine
+red. `cancel-in-progress` keys on `github.ref` so the red check sits on a head SHA no PR check list
+reads; `ship-pr`'s check read is not affected.
+
+#### What makes this deploy extra special
+
+N/A -- CI run-history accuracy in the source repo. A subscriber of a consuming service never sees it,
+and the workflow change is inert for any repo that has not adopted the sharded `ci.yml`.
+
+**Score:** N/A
+
+#### Pull Request
+
+lint-en-tests summary job: !cancelled() instead of always(), so a superseded run reports cancelled not failure
+
+[PR #1357](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1357)
+
+---
+
 ### DEPLOY: docs/gate-durations-close-the-trap · 20260904-002930
 
 Two documents were telling readers to do the thing that had just been fixed. `ci.yml`'s floor comment and
