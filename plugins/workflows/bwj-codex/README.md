@@ -1,15 +1,32 @@
-# bwj-codex -- BWJ's shared ticket workflow, packaged so two repos cannot drift on it
+# bwj-codex -- BWJ's shared extra layer, packaged so two repos cannot drift on it
 
-**This is the one way BWJ's two Shopify stores -- `BWJ-ecommerce/smartwatchbanden` and
-`BWJ-ecommerce/xoxowildhearts` -- handle a discovered issue.** The two repos are identical in
-behaviour and differ only in brand, and the connector register already flags them as the pair most
-at risk of quietly diverging. This plugin is the thing that holds them together on one point: what
-happens between spotting a problem and it being tracked where every BWJ colleague can see it.
+**This is the shared law layer for BWJ's two Shopify stores -- `BWJ-ecommerce/smartwatchbanden` and
+`BWJ-ecommerce/xoxowildhearts`.** The two repos are identical in behaviour and differ only in brand,
+and the connector register already flags them as the pair most at risk of quietly diverging. This
+plugin is the thing that holds them together on the points that belong to exactly these two repos
+and to none of the others Dave runs.
+
+**It has two chapters, and each has its own page:**
+
+| chapter | the page | what it answers |
+|---|---|---|
+| **ticket handling** | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | what happens between spotting a problem and it being tracked where every BWJ colleague can see it |
+| **the sync log** | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | what a `sync/` branch owes -- a durable record of what a third party did on the live theme, in the tree rather than only in a merged PR body |
+
+The two are separate chapters rather than sections of one page because they answer different
+questions for different readers, and the second one was added later, on inbound
+[#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382). Shipping several portable
+pages is the established form here -- `contributing-davekjohn` carries three.
+
+**Both chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
+elsewhere (`.github/` in each repo, and `team-shopify` respectively); what this plugin states is what
+the two repos *owe*, which is Dave's house rule for them rather than a fact about Asana or Shopify.
 
 ## It is an add-on, not a replacement
 
 `bwj-codex` **layers on top of `contributing-davekjohn`** -- it does not stand in for it. It
-extends exactly one seam of that workflow: *ticket-work, the layer before the branch*. It says
+extends exactly two seams of that workflow: *ticket-work, the layer before the branch*, and *what a
+`sync/` branch owes*, which that workflow deliberately exempts and leaves to the repo. It says
 **nothing** about how a branch is named, what a change owes before it can open a PR, or what a
 release is -- those are still `contributing-davekjohn`'s answers, unchanged. So the two do not hand
 the specialists two contradicting answers to the same question; they answer different questions.
@@ -25,7 +42,7 @@ Enabling this without `team-alpha` gives you a skill with nobody to invoke it; i
 `contributing-davekjohn` to be enabled, because its rule begins where that workflow's ticket-work
 step begins.
 
-## The rule, in one paragraph
+## Chapter one -- ticket handling, in one paragraph
 
 A discovered issue is **created on GitHub first** -- GitHub is the source of truth, full technical
 detail, the normal `team-alpha` filing bar unchanged. It is **classified in the same breath**: an issue
@@ -80,11 +97,29 @@ The whole rule, with the field-by-field shape of the Asana variant and the cross
 [`WORKFLOW-portable.md`](WORKFLOW-portable.md) -- that is the page to read, and the page to point BWJ
 colleagues at.
 
+## Chapter two -- the sync log, in one paragraph
+
+A `sync/` branch mirrors what a **third party** changed on the live Shopify theme. It is deliberately
+exempt from the changelog -- that is somebody else's change, not this repo's -- which until inbound
+[#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382) left it the only branch in
+the workflow owing **nothing durable at all**: the sole account of what was taken and what was held
+back was the PR body on GitHub, in two repos whose standing rule is that a sync PR does *not* wait
+for review. So a sync now owes a **sync-log entry** where an ordinary branch owes a changelog entry:
+`bwj-codex/SYNC-LOG.md` in the repo's own root, newest at the top, one entry per sync branch, written
+and committed by `sync-main.ps1` in the same breath as the branch itself. It is never folded, never
+cut, and never reaches a release note.
+
+The mechanism is `team-shopify`'s and reaches every Shopify consumer; the **policy** is this
+plugin's, and it is silent until a repo answers one seam -- `Get-ShopifySyncLogPath`. The whole rule,
+the entry's shape, and why there is no gate are in
+[`SYNC-LOG-portable.md`](SYNC-LOG-portable.md).
+
 ## What is in this folder
 
 | what | what it holds |
 |---|---|
-| [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | the rule in prose -- the human-facing page, read alongside your repo's own Asana config |
+| [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | chapter one in prose -- ticket handling, read alongside your repo's own Asana config |
+| [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | chapter two in prose -- what a `sync/` branch owes, where the record lands, and what it stays out of |
 | [`skills/`](skills/) | the skills a specialist invokes |
 | [`templates/`](templates/) | the CI mechanism to **copy** into each repo's `.github/` -- GitHub only runs workflows from a repo's own `.github/`, so what ships here is the reference to copy and diff against, the same pattern as `contributing-davekjohn/templates/pull_request_template.md` |
 
@@ -104,9 +139,19 @@ The hooks and blueprint a workflow carries "only where it needs them" -- this on
 
 ## What it expects from your repo -- the seam
 
-The `report-issue` skill needs to know which Asana workspace and project a mirrored task lands in,
-and the CI mechanism needs the project. That is answered by two functions in your repo-owned
-`scripts/repo-config.ps1` -- the same file `contributing-davekjohn` already dot-sources:
+Both chapters answer themselves out of your repo-owned `scripts/repo-config.ps1` -- the same file
+`contributing-davekjohn` already dot-sources.
+
+**Chapter two needs exactly one function**, and it is the switch that turns the whole chapter on:
+
+- `Get-ShopifySyncLogPath` -- where the log lives, repo-root-relative. Answer it `'bwj-codex/SYNC-LOG.md'`
+  in **both** repos. Leave it out and no log is written at all, which is the default every other
+  Shopify consumer gets. The machinery is `team-shopify`'s, so it is already present; this answer is
+  what asks it to run. `adopt-shopify-floor` lists it among the optional Shopify seams it writes into
+  that file as commented guidance.
+
+**Chapter one needs the Asana answers.** The `report-issue` skill needs to know which workspace and
+project a mirrored task lands in, and the CI mechanism needs the project:
 
 - `Get-AsanaWorkspaceGid` -- the Asana workspace GID.
 - `Get-AsanaStageMap` -- which numbered section of the board each stage of the cycle is, plus the
@@ -138,6 +183,13 @@ it needs no workspace of its own.
 ## Enabling it
 
 An ordinary plugin change: enable `bwj-codex` in `.claude/settings.json` alongside `team-alpha`
-and `contributing-davekjohn`, then run [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) once.
-Disabling it removes nothing it already wrote to your repo -- the CI workflow and the config stay;
-the skill that reads them stops.
+and `contributing-davekjohn`, then run [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) once for
+chapter one, and answer `Get-ShopifySyncLogPath` for chapter two.
+
+**Chapter two needs no adopt step of its own**, which is why it has no skill. There is no folder to
+create and no CI to wire: the first sync creates `bwj-codex/SYNC-LOG.md` and every sync after it
+prepends. An empty log scaffolded on adoption day would read as "no syncs have happened" and "nobody
+ran the adopt step" in exactly the same way, and one of those is a fault.
+
+Disabling the plugin removes nothing it already wrote to your repo -- the CI workflow, the config and
+the sync log stay; the skills and the pages that explain them stop.
