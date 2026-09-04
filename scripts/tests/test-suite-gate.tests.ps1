@@ -301,8 +301,9 @@ Write-Host "GATE-RESULT: `$r"
     # THE SERIAL RUN IS THE PERFECT DISCRIMINATOR and it is why this rides scenario 4's fixture rather
     # than building its own: with -MaxParallel 1, suite six starts around +6s and runs for ~1.2s. A
     # duration column holding finish times would read ~7.2s for it. So the two readings differ by 6x
-    # here, which no timing noise can bridge -- and the assert is a CEILING on every row plus a FLOOR on
-    # the largest offset, which together say "these are runtimes and the queueing really happened".
+    # here, which no timing noise can bridge -- and the assert is a FLOOR on the largest offset plus a
+    # comparison of the largest duration AGAINST that offset, which together say "these are runtimes and
+    # the queueing really happened".
     Write-Host "per-suite durations are recorded, and a queued suite is not charged for its wait" -ForegroundColor Cyan
     $rows = @($ser.Lines | ForEach-Object {
         if ($_ -match '^\s+([\d.,]+)s\s+(\S+\.tests\.ps1)\s+started \+([\d.,]+)s') {
@@ -321,7 +322,25 @@ Write-Host "GATE-RESULT: `$r"
     $maxOffset = ($rows | Measure-Object -Property Offset -Maximum).Maximum
     Assert-True ($maxOffset -ge 5) "serially the last lane really opened late (largest offset +$([math]::Round($maxOffset,1))s)"
     $maxDuration = ($rows | Measure-Object -Property Duration -Maximum).Maximum
-    Assert-True ($maxDuration -lt 4) "yet NO row is charged for that wait -- every duration is a runtime (largest $([math]::Round($maxDuration,1))s, not ~7s)"
+    # THE COMPARISON IS AGAINST THE QUEUE, NOT AGAINST A SECOND-COUNT (issue #1401). This read
+    # `$maxDuration -lt 4` until September 4, 2026 -- and a 4s ceiling is the very thing the rule at the
+    # top of this scenario forbids: a timing FLOOR is guaranteed by Start-Sleep, a timing CEILING is
+    # guaranteed by nothing, because nothing bounds how slow a shared machine can be. Measured: one of
+    # these 1.2s sleeps came in at 5.1s during a 65-suite gate run and the gate refused the push, for a
+    # race the branch under test had no part in; standalone on the same tree, moments later, 3.3s.
+    #
+    # WIDENING THE CEILING WAS THE OBVIOUS REPAIR AND IS THE WRONG ONE. It keeps the fragile shape, and it
+    # discriminates WORSE the more load there is: contention inflates the defect's reading too, so the gap
+    # a fixed number has to sit inside moves out from under it. 6-7s also lands within noise of the ~7.2s
+    # a finish-time column would report at rest, which is the one figure this assert must stay below.
+    #
+    # WHAT IS LOAD-INVARIANT IS THE RATIO THE FIXTURE ITSELF BUILDS. Serially the last lane opens only
+    # after the five before it have run, so $maxOffset is the SUM of five runtimes while a true duration is
+    # ONE of them -- the same 6x gap, now expressed as a comparison rather than as a constant. A duration
+    # column holding finish times reads offset + runtime for that row, which exceeds $maxOffset BY
+    # CONSTRUCTION, whatever the machine was doing. Contention scales both sides together, so this survives
+    # a loaded box in a way no second-count can, and it still FAILS for the defect it was written to catch.
+    Assert-True ($maxDuration -lt $maxOffset) "yet NO row is charged for that wait -- the largest duration ($([math]::Round($maxDuration,1))s) is one runtime, still under the last lane's own wait (+$([math]::Round($maxOffset,1))s), where a finish time would have to exceed it"
 
     # Sorted slowest first, which is the whole reason to print it: the makespan-setter is findable.
     $sortedDesc = $true
