@@ -35,8 +35,8 @@
 
 Issue [#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415): the **second** of
 the two narrow literal greps the prose-contract decline (#1380) recorded as proportionate. The first
-shipped yesterday as `check-retired-doc-name.ps1` (#1389, PR #1414); the second had no tracker entry at
-all until #1415, only a sentence in a lens.
+landed earlier the same day as `check-retired-doc-name.ps1` (#1389, PR #1414); the second had no tracker
+entry at all until #1415, only a sentence in a lens.
 
 #### What the issue asked for, and the precondition it set
 
@@ -106,6 +106,23 @@ it **retired**, to explain why it removed it.
 - [x] Declare the deliberate `Assert-OwnCopy` omission in `source-repo-guard.tests.ps1`'s exemption list,
       with the difference from its sibling stated rather than inherited.
 
+#### Two things the security review raised, both filed rather than fixed here
+
+- **[#1419](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1419)** -- this check and its
+  sibling both echo a raw line out of a consumer's markdown into output the hooks scan for `[ERROR]`,
+  without the `Format-SafePathToken` treatment #309 built for exactly that. Not fixed on this branch on
+  the reviewer's own reasoning: the two are the same shape, and one sanitizing while the other does not is
+  worse than both being consistent. Reading #309 sharpened the report rather than confirming it -- the
+  helper already exists and its docstring already claims *"every point where such a value enters a
+  message"* -- and also weakened it: unlike #309, where the forged lines WERE the finding, here the echoed
+  lines only ever print on a path that has already emitted a real `[ERROR]`, so nothing flips a verdict.
+- **[#1420](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1420)** -- both consumers are
+  private, and this branch publishes verbatim wording out of one of them into a public repo. The first of
+  the two sentences was already on `main` (via #1380), the second is new here. Not a secret by the bar
+  `CLAUDE.md` sets, and the citing convention is what makes these measurements auditable -- but whether a
+  *private* source gets quoted word for word is a convention question for the whole tree, not this
+  branch's to settle.
+
 #### One doc deliberately not touched
 
 The root `README.md` names three session hooks as examples and then says, in the same paragraph, that
@@ -128,6 +145,38 @@ and `hooks/hooks.json` stays the one authority that cannot go stale.
       clean in `xoxowildhearts` (the quoted historical line correctly suppressed), skip here.
 - [x] Measure the seventh session hook's cost, and re-measure the sibling in the same run rather than
       quoting its recorded figure -- 781 ms against 799 ms.
+- [x] Review chain: Victor (code), Edith (copy), Sebastian (security), Nolan (cost), in parallel on the
+      diff. Two findings repaired here -- the wrapping false negative and a date contradiction across
+      three passages; two filed (#1419, #1420); two more filed as deferred design (#1421, #1422).
+- [x] Re-run everything after the repair: new suite 37/37, `retired-doc-name-gate` 25/25,
+      `source-repo-guard` 46/46, lint gate 0 errors, and the live-consumer run re-measured.
+
+#### The one significant defect review found, and it was nearly invisible
+
+The detector matched per **physical line**. This repo's prose convention hard-wraps at about 100 columns,
+so an ordinary declaration puts `CLAUDE.md` at the end of one line and `wins` at the start of the next --
+and the check reported **nothing**. Reproduced in both forms before repairing, and the second is the one
+that matters:
+
+- `...between the two, \`CLAUDE.md\`` / `wins, and the contributing page is wrong.` -> 0 findings
+- `> Bij tegenspraak wint` / `> \`CLAUDE.md\` en is de contributor-pagina de bug.` -> 0 findings
+
+**The blockquote form is the frightening one, because the single real instance this whole check exists
+for lives in a blockquote.** It happens to sit on one physical line today, so the check found it and every
+test passed. One editor re-wrapping that paragraph would have silently emptied the gate with nothing
+going red.
+
+Repaired with `Get-ProseParagraphUnits` + `Resolve-ProseUnitLine`: match on the paragraph a reader sees
+(blockquote markers stripped, continuation lines joined) while still resolving a finding to the physical
+line somebody has to open. Bounded at the paragraph deliberately -- a whole-document join would let a gap
+bridge unrelated paragraphs and, worse, let one unbalanced quotation mark swallow the rest of the file
+into a single "quoted" span and suppress every real finding after it. The same reasoning
+`Get-EntryCodeSpans` already carries in this file: *"a span may legitimately wrap a line in prose"*.
+
+**Precision was re-earned after the widening, not assumed**: still 2 findings in `smartwatchbanden`, both
+true; `xoxowildhearts` still clean, which is now a stronger result than before -- at paragraph scope its
+retired-page quotation is a live false-positive risk that the quote-span suppression has to catch, and
+does. The source repo still measures zero without the skip, so the "guard, not repair" note above stands.
 
 #### One defect the suite caught in itself, kept because it is a real trap
 
