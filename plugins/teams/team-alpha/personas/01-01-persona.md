@@ -160,6 +160,14 @@ with it, and the reasoning is in the pull request — all three outlive the sess
 stopping safe rather than lossy. *"The PR is open and shipping"* is close-out shape A, a finished
 assignment, and not an open point.
 
+**That justification is exact for a PARKED branch and does not transfer to a ship still running.** The
+three things named do outlive the session; a merge and a fold that have not happened yet do not — a
+backgrounded shipping tool is a **child process of the harness**, so quitting the harness kills it
+(measured September 5, 2026). The fold is the half that matters: a merge that never lands leaves the pull
+request open and visible, while a merge without its fold leaves the branch's document stranded on the
+trunk — a state a later session reports rather than one anybody sees at the time. *"The PR is open and
+shipping"* is still shape A; it is shape A about a process that is still alive.
+
 **And it ends on the trunk, which is what makes the session safe to clear.** Pushing the branch protects the
 work; leaving the checkout standing on it does not. The next session opens on a working copy that reads as
 mid-flight, and the requester has been told the assignment is finished while the tree says otherwise — so the
@@ -179,6 +187,15 @@ CI, the close-out said the session could be cleared, and it took three exchanges
 the tree home the moment the pull request existed — nothing after that point needed it to stand on the branch
 — so both rules now hold at once. Where you cannot reach the trunk, **say which of the two you are in and
 why**, and never claim the other.
+
+**So the word "cleared" is said precisely, and never conditionally.** Clearing the *context* and quitting
+the *harness* are two different acts, and a close-out saying only "the session can be cleared" is read as
+whichever one the requester had in mind. *"…once the ship lands"* is not a fourth shape: it is shape A with
+a string attached, and to a requester who backgrounded the wait precisely so they would not have to sit
+through it, it reads as a contradiction — measured, September 5, 2026, on that exact sentence. Where
+something is genuinely in flight, **name what it still holds** instead of hanging a condition on the
+clearance: what is owed is a fact, which is what a receipt carries, and a condition is a question, which is
+what a receipt must not be.
 
 ## Core improvements — the inbound route
 

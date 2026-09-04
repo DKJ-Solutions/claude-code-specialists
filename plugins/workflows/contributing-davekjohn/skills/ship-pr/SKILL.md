@@ -203,6 +203,18 @@ things:
 - **stop.** A close-out that says *"PR #N opened, shipping in the background"* is a finished assignment,
   not an open point — nothing about an in-flight ship needs answering before the session can be closed.
 
+**But "stop" is not "quit", and the invitation now says so** ([#1428](https://github.com/DaveKJohn/claude-code-specialists/issues/1428)).
+The run is **not detached** — that was considered and declined on purpose, because a detached watcher would
+merge and fold onto the trunk with nobody reading the output — so it is a child process of the harness and
+dies with it. Measured ancestry of a backgrounded run, September 5, 2026: `powershell.exe ← bash.exe ×3 ←
+claude.exe ← Code.exe`. Two commits are still owed at that moment, and the **fold** is the one that bites: a
+merge that never lands leaves the pull request open and visible, while a merge without its fold leaves the
+branch's document stranded on the trunk — the state `check-unfolded-entry.ps1` was built for in
+[#1270](https://github.com/DaveKJohn/claude-code-specialists/issues/1270), reached by a route that issue did
+not consider. So the printed invitation says *"nothing here needs **you**"* and names what it holds; it said
+*"nothing here needs the session"* for nine days, and a close-out inherited that as a conditional clearance
+the owner could not read.
+
 ### And stopping now leaves the checkout on the trunk ([#1073](https://github.com/DaveKJohn/claude-code-specialists/issues/1073))
 
 **That second move used to be only half true**, and the missing half is the one the owner reads. The

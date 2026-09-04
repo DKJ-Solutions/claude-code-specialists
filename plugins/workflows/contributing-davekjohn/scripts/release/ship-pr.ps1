@@ -717,9 +717,31 @@ function Wait-CheckRegistration {
 # #985 was filed, and a detached watcher would merge and fold onto the trunk with nobody reading the output.
 # The gates at step 4 already read refs/heads/<branch> for exactly this shape (#970), so the hand-off needed
 # permission and a reminder rather than machinery -- and #972 then closed the one place that still wrote.
+#
+# AND IT SAYS "YOU" RATHER THAN "THE SESSION", BECAUSE THE SESSION IS EXACTLY WHAT IT DOES NEED (issue
+# #1428, September 5, 2026). The line read "Nothing here needs the session" for nine days, and the
+# paragraph above is why that was false the whole time: the detached watcher was DECLINED, so nothing here
+# outlives the harness. Measured ancestry of a backgrounded run, Windows 11, Claude Code in a VS Code
+# terminal:
+#     powershell.exe <- bash.exe <- bash.exe <- bash.exe <- claude.exe <- powershell.exe <- Code.exe
+# A descendant of claude.exe, killed with it. So backgrounding buys that nobody has to WATCH -- not that
+# the run has been handed to something that survives you.
+#
+# WHICH MAKES THE FOLD THE PART WORTH NAMING, and the second line names it. A merge that never happens
+# leaves the PR open and visible, so it announces itself. A merge that happens WITHOUT its fold leaves the
+# branch's document stranded on the trunk with nothing saying so -- #1270's defect, reached by a route
+# #1270 did not consider: not "merged from the GitHub UI" but "merged by a ship whose process was killed".
+# check-unfolded-entry.ps1 reports it at the NEXT session start, so it is caught rather than silent; it is
+# still a repair after the fact, which is why the invitation names the two commits instead of relying on it.
+#
+# WHAT IS DELIBERATELY NOT CLAIMED HERE is that clearing the context is safe while quitting is not. It
+# follows from the ancestry -- the process hangs off claude.exe, not off the conversation -- but it was not
+# measured, and a line telling a reader which of two things they may do has to be right about both. So the
+# invitation states what is still HELD and leaves the choice to the reader.
 $waitBegan = Get-Date
 Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor Cyan
-Write-Host "  Nothing here needs the session -- background this run and the wait costs nothing." -ForegroundColor DarkGray
+Write-Host "  Nothing here needs YOU -- background this run and the wait costs nothing." -ForegroundColor DarkGray
+Write-Host "  It does need this session's process: the merge and the fold are still owed, and both run from here (#1428)." -ForegroundColor DarkGray
 Write-Host "  Step 2b has already put this tree where a finished chain leaves it, so the close-out is honest (#1073)." -ForegroundColor DarkGray
 Write-Host "  The next piece of work still belongs in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
 # The wait itself is Wait-CheckRegistration (defined above), so the watch loop below can re-enter the
