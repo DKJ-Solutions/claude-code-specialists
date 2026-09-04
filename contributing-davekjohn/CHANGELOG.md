@@ -32,6 +32,61 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1416-trunk-gap-one-definition · 20260904-232313
+
+`new-branch.ps1` no longer measures the trunk gap itself. The ref probe, the fetch, the
+`HEAD..origin/<trunk>` count and the fresh-versus-last-seen distinction are `Get-TrunkGap`'s, which is
+where #1405 put them, and the scaffolder now calls it instead of carrying a second copy.
+
+The two copies existed for one merge. `Get-TrunkGap` was written *because* `new-branch.ps1` had already
+established the shape -- the function's header cites that block for the ref-gating, the `HEAD..` choice and
+the fresh/stale wording -- and moving the scaffolder onto it was deliberately scoped out of a fix for the
+fold. Nothing was broken; the cost was the ordinary one, that two copies of a measurement drift when only
+one of them is corrected.
+
+`Get-TrunkGap` gains one switch, `-FetchAllRefs`, and it is load-bearing rather than thoroughness. The
+default fetch is narrowed to the trunk, which is right for the fold and wrong for the scaffolder: the
+resume probe reads `refs/remotes/origin/<branch>` off the back of that same fetch, and that ref is the only
+thing that tells a branch parked from another device from a fresh cut (#1139). A narrowed fetch never
+brings it into existence, so the swap without the switch would have reopened #1139 -- silently, in a run
+where the scaffold, the commit and the push all look correct and only the branch's *work* is missing. So
+the scope is the caller's to state, and the suite's parked-branch fixture is what holds it in place.
+
+**What did not change, deliberately.** `new-branch.ps1` still warns and does not refuse. The issue names
+that as a separate question and it is not this branch's: the fold refuses because its next act is a commit
+directly on the trunk, while a stale base under a branch is recoverable with an ordinary pull, and the
+scaffolder is mirrored into every consumer's plugin cache and arrives by plugin update rather than by
+choice. That asymmetry may well be correct and permanent, and it is nobody's to settle inside a dedup:
+it is filed as #1417, with the three shapes it could take and the reason each one costs something.
+
+Every sentence the script prints is byte-identical, which is what the wording asserts in
+`new-branch.tests.ps1` hold. One measurement did move: the gap is now taken on a resume too, since the
+count is a local `rev-list` against a ref already on disk. It is not printed there, for the reason it never
+was -- on a resume `HEAD` is wherever the operator was standing, so the trunk's gap is not that branch's.
+
+Reason: nothing observable changes for anyone running this script. What it prevents has not happened yet
+-- one of the two copies being corrected and the other left behind, which is how the next reader gets two
+answers to "how far behind is this checkout" and no way to tell which one their script took.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A. A consumer running the mirrored `new-branch.ps1` sees exactly the run they saw before -- same
+warning, same count, same two places it is printed, same silence where the question cannot be asked.
+
+**Score:** N/A
+
+#### Pull Request
+
+new-branch reads the trunk gap from Get-TrunkGap instead of measuring it again
+
+Plugins: contributing-davekjohn
+
+[PR #1418](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1418)
+
+---
+
 ### DEPLOY: feat/1389-retired-doc-name-check · 20260904-230550
 
 A renamed convention now reaches a consumer through something. This workflow's branch document has been
