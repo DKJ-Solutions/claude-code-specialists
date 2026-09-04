@@ -121,6 +121,18 @@ The colleague-facing wording is Claude's to draft; a colleague may refine it in 
 **without touching GitHub**. GitHub stays leading -- if the two ever disagree on substance, the
 GitHub issue is right and the Asana task is corrected to match.
 
+**A board may also carry a `Github Issue` text custom field** -- that capitalization is the field's
+literal, as-configured name in Asana, not a typo -- **and where it does, task creation is
+where it gets set.** It is optional -- most Asana projects have no such field, and a repo whose
+board carries none loses nothing by skipping it. Where it exists, it holds the **full issue URL,
+`https://...`, never the bare issue number** (Dave, September 4, 2026): Asana only renders a text
+custom field as a clickable link when its value is a complete URL, and a text field is the only type
+on offer here -- Asana has no native URL field type
+([source](https://forum.asana.com/t/new-you-can-now-use-links-in-custom-fields/24757)). The value is
+the same URL already sitting in the `Tracked on GitHub:` line above, written once more into the field
+so the board's own list and filter views can jump straight to the issue without opening the card
+first.
+
 ### 3. Cross-link both ways
 
 The link is stored on both sides, and one half is machine-readable because the automation in step 4
