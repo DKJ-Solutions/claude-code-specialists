@@ -130,39 +130,54 @@ jobs:
   suites:
     runs-on: windows-latest
     strategy:
-      # FOUR, AND THE FLOOR IS WHY IT IS NOT MORE. The gate's cost within a shard is its slowest FILE
-      # (#714), so no partition of whole files can go below the longest one and more shards cannot help --
-      # each extra runner just pays its own ~20s of provisioning and checkout. Four gives 16 suites per
-      # shard over 4 lanes, which is enough for the pool's ~2968 lane-seconds to stop being the binding
-      # constraint; past that the longest file is all that is left.
+      # FOUR, AND A SHARD'S FLOOR IS max(ITS LONGEST FILE, ITS LANE-SECONDS / 4) -- issue #1358,
+      # corrected September 4, 2026 against the first REAL per-suite tables. This comment used to name
+      # only the first term, on #714's authority, and concluded that more shards cannot help and that a
+      # duration-aware assignment would hit the same wall. THE SECOND TERM IS THE ONE THAT WAS BINDING.
+      # Read off runs 33842129201 and 33812817842 (the tables the gate prints, not timestamps): three of
+      # four shards finished 41-95s ABOVE their longest file, because a quarter of the pool over four
+      # lanes already exceeded it. Shard 3 ran 317s with a 221.8s heaviest file.
       #
-      # THE FLOOR IS ~200s, NOT THE ~51s THIS COMMENT USED TO CLAIM -- issue #1358, corrected September 3,
-      # 2026. The 51s figure predated the shard matrix and was never a CI measurement. Measured on runs
-      # 33802607836 and 33803180318, the four check-plugin-integrity-* suites draw queue positions 3-4 of
-      # their shards, so with 4 lanes they start at t0 and their duration is exact rather than
-      # reconstructed: the heaviest ran 250.9s and 212.5s. That is the whole regime -- a shard whose
-      # longest file was 183s took 183s, one whose longest was 206s took 207s -- so this job is
-      # max(longest file) + ~20s, and the four shard makespans on those runs were 183/137/283/237s and
-      # 243/179/286/207s.
+      # WHY THE OLD READING LOOKED SOLID: it was measured on the four check-plugin-integrity-* suites,
+      # which the stride happened to place in queue positions 3-4 -- the only positions where a duration
+      # could be read off a log at all. So the evidence came entirely from the shards where the file WAS
+      # the binding constraint, and was generalised to the ones where it is not.
       #
-      # ~30s CAME OFF THAT FLOOR in #1358 by making the lint parse and walk the script set once instead of
-      # twice (see Get-PsScriptCommandAsts in check-plugin-integrity.ps1): those four suites are ~100% lint
-      # invocations -- 52 of them in the heaviest, at ~1.12s each on a workstation -- and they measured
-      # 58.7/55.7/51.0/34.5s before and 50.8/48.9/44.7/30.3s after, with every assert count unchanged.
+      # SO THE PARTITION IS THE LEVER, AND IT IS NOW COST-AWARE. Invoke-TestSuiteGate packs shards
+      # longest-first over scripts/tests/suite-durations.json and dequeues each shard in the same order;
+      # simulated over the measured pool that is 305s -> 237s. Both halves were needed: packing WITHOUT
+      # reordering measures 307s, which is worse than doing neither. See Get-TestSuiteShardOrder for the
+      # four-way simulation, and note the file is a HINT -- delete it and this job runs the old stride,
+      # with the same suites and the same coverage.
+      #
+      # AND THAT IS WHY THE SHARD COUNT STILL DOES NOT GO UP. Another runner lowers only the second term.
+      # At 237s the pool is finally at its longest FILE, so a fifth shard buys its own ~20s of
+      # provisioning and nothing else. The remaining lever is inside that file, and #1358 priced it: a
+      # split takes the floor the last ~15s to the 16-lane work bound, for the price of preserving 340
+      # asserts across ~2,950 lines. Not bought.
+      #
+      # ~30s CAME OFF THE PER-FILE COST separately in #1358, by making the lint parse and walk the script
+      # set once instead of twice (see Get-PsScriptCommandAsts in check-plugin-integrity.ps1): those four
+      # suites are ~100% lint invocations -- 52 of them in the heaviest, at ~1.12s each on a workstation --
+      # and they measured 58.7/55.7/51.0/34.5s before and 50.8/48.9/44.7/30.3s after, every assert count
+      # unchanged. A caller staring at a slow required check should price that route before buying a runner.
+      #
       # DO NOT RECONSTRUCT DURATIONS FROM LOG TIMESTAMPS -- THE GATE PRINTS THEM (#1358, PR #1364). Each
       # shard's log carries a 'per-suite durations, slowest first' table holding every suite's duration,
       # the offset at which its lane opened, and a marker on the one that set the makespan. Read that.
       # WHY THE WARNING IS STILL HERE now that the table exists: the gate buffers each suite's output
       # until that suite completes, so a log timestamp is a FINISH time and always was. Subtracting the
       # shard start from it is a duration only for a suite in queue positions 1-4 -- and that is how the
-      # figures on #1358 came to name a five-file plateau, by extending the method to two suites sitting
-      # 5th and 9th in a 4-lane queue and reading their lane wait as runtime. The table is the answer to
-      # that; the timestamps are still there and still misleading.
+      # figures on #1358 came to name a five-file plateau that has four, by extending the method to two
+      # suites sitting 5th and 9th in a 4-lane queue and reading their lane wait as runtime. The table is
+      # the answer to that; the timestamps are still there and still misleading.
       #
-      # AND THE CORRECTED COUNT IS NOT 'FOUR' EITHER -- do not quote one from this comment's own history.
-      # The first RECORDED run named a different heaviest suite than #1358 did and put roughly a dozen
-      # files in the expensive band, seven of which appear in none of the five. Anything about which files
-      # are heavy comes from the table on a 4-lane run, not from a workstation and not from prose.
+      # AND DO NOT QUOTE A COUNT OF HEAVY FILES FROM THIS COMMENT'S OWN HISTORY -- it has said five and it
+      # has said four, and the recorded tables say about a dozen, seven of which appear in neither list.
+      # They also named a different heaviest suite than #1358 did. Anything about which files are heavy
+      # comes from the table on a 4-lane run, not from a workstation and not from prose. That is also what
+      # suite-durations.json is: those tables, written down, and regenerated by
+      # scripts/maintenance/record-suite-durations.ps1 rather than retyped.
       #
       # fail-fast IS FALSE, DELIBERATELY. The default would cancel the surviving shards the moment one goes
       # red, which costs exactly the information this repo needs most from a red gate: these suites have a

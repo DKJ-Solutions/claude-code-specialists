@@ -147,6 +147,143 @@ $thin = Invoke-TestSuiteGate -TestsDir $fixtureDir -Shard 20 -ShardCount 20 -Max
 Assert-True ($thin -match 'more shards than suites') 'an empty slice says more shards than suites'
 Assert-True ($thin -notmatch 'no \*\.tests\.ps1 suites found') 'and does not claim the directory is empty when it holds twelve'
 
+Write-Host "== the cost-aware partition: hints change the packing, never the cover (#1358) ==" -ForegroundColor Cyan
+
+# WHY THESE ARE MOSTLY DIRECT-FUNCTION ASSERTS while the stride above is tested through a real gate run.
+# The stride's claim is about which files got HANDED to child processes, and only a real run proves that.
+# The claims here are about ORDER as well as membership, and a completed-suite transcript cannot show
+# dequeue order -- twelve trivial fixtures all finish in milliseconds, so their completion order is a
+# race, not a reading. Get-TestSuiteShardOrder is pure and returns the queue itself, so it is asserted
+# directly and the cover is re-checked through the gate underneath.
+
+function New-FakeSuite { param([string]$Name) [pscustomobject]@{ Name = $Name } }
+
+# Eleven suites whose alphabetical order is the REVERSE of their cost order, so any assert below that
+# passes cannot be passing on the name sort by accident.
+$costPool = @(
+    (New-FakeSuite 'a.tests.ps1'), (New-FakeSuite 'b.tests.ps1'), (New-FakeSuite 'c.tests.ps1'),
+    (New-FakeSuite 'd.tests.ps1'), (New-FakeSuite 'e.tests.ps1'), (New-FakeSuite 'f.tests.ps1'),
+    (New-FakeSuite 'g.tests.ps1'), (New-FakeSuite 'h.tests.ps1'), (New-FakeSuite 'i.tests.ps1'),
+    (New-FakeSuite 'j.tests.ps1'), (New-FakeSuite 'k.tests.ps1')
+)
+$costs = @{
+    'a.tests.ps1' = 1.0;  'b.tests.ps1' = 2.0;  'c.tests.ps1' = 3.0;  'd.tests.ps1' = 4.0
+    'e.tests.ps1' = 5.0;  'f.tests.ps1' = 6.0;  'g.tests.ps1' = 7.0;  'h.tests.ps1' = 8.0
+    'i.tests.ps1' = 9.0;  'j.tests.ps1' = 10.0; 'k.tests.ps1' = 100.0
+}
+
+# THE ORDER IS THE HALF THAT PAYS, and it is the reverse of the name sort here by construction.
+$wholeOrder = @(Get-TestSuiteShardOrder -Suites $costPool -Costs $costs | ForEach-Object { $_.Name })
+Assert-True ($wholeOrder[0] -eq 'k.tests.ps1') 'the whole pool is dequeued longest-first, not alphabetically'
+Assert-True ($wholeOrder[-1] -eq 'a.tests.ps1') 'and the cheapest suite is last, where an idle lane costs nothing'
+Assert-True ($wholeOrder.Count -eq $costPool.Count) 'and ordering drops nothing'
+
+# THE COVER SURVIVES THE PACK. This is the one property that must hold no matter how wrong the numbers
+# are -- stale hints may cost wall clock, never coverage.
+$packed = @(1..4 | ForEach-Object { ,@(Get-TestSuiteShardOrder -Suites $costPool -Costs $costs -Shard $_ -ShardCount 4 | ForEach-Object { $_.Name }) })
+$packedAll = @($packed | ForEach-Object { $_ })
+Assert-True ($packedAll.Count -eq 11) "four cost-packed shards run all 11 suites (ran $($packedAll.Count))"
+Assert-True (@($packedAll | Sort-Object -Unique).Count -eq 11) 'every suite is in exactly one shard under the pack'
+
+# THE PACK IS BY COST, NOT BY COUNT -- the assert that distinguishes it from the stride. k costs 100 of
+# the pool's 155, so a cost-aware pack gives its shard almost nothing else, while a stride would hand
+# that shard two more suites regardless.
+$kShard = @($packed | Where-Object { $_ -contains 'k.tests.ps1' })[0]
+Assert-True ($kShard.Count -lt 3) "the shard holding the 100s suite draws fewer than three suites (drew $($kShard.Count)) -- cost, not count"
+$loads = @($packed | ForEach-Object { $s = 0.0; foreach ($n in $_) { $s += $costs[$n] }; $s })
+$strideLoads = @(1..4 | ForEach-Object { $i = $_ - 1; $s = 0.0; for ($j = $i; $j -lt $costPool.Count; $j += 4) { $s += $costs[$costPool[$j].Name] }; $s })
+Assert-True (($loads | Measure-Object -Maximum).Maximum -le ($strideLoads | Measure-Object -Maximum).Maximum) `
+    "the heaviest packed shard is no heavier than the heaviest strided one ($(($loads | Measure-Object -Maximum).Maximum)s vs $(($strideLoads | Measure-Object -Maximum).Maximum)s)"
+
+# WITHIN A SHARD THE ORDER IS STILL DESCENDING. A balanced shard whose heaviest file is dequeued last
+# ends on that file's tail, which is why packing without ordering measured WORSE than doing neither.
+foreach ($shardNames in $packed) {
+    if ($shardNames.Count -lt 2) { continue }
+    $vals = @($shardNames | ForEach-Object { $costs[$_] })
+    $sorted = @($vals | Sort-Object -Descending)
+    Assert-True (($vals -join ',') -eq ($sorted -join ',')) "shard order is longest-first within the shard ($($shardNames -join ','))"
+}
+
+# AN UNTIMED SUITE IS CHARGED THE MAXIMUM, so it opens in the first lanes rather than trailing sixteen
+# others. This is the one default that decides whether a new heavy suite costs its runtime or a tail.
+$withNew = @($costPool + (New-FakeSuite 'zz-brand-new.tests.ps1'))
+$newOrder = @(Get-TestSuiteShardOrder -Suites $withNew -Costs $costs | ForEach-Object { $_.Name })
+Assert-True ($newOrder[0] -eq 'k.tests.ps1' -and $newOrder[1] -eq 'zz-brand-new.tests.ps1') `
+    'a suite with no recorded duration is charged the maximum and dequeued in the opening lanes'
+
+# DETERMINISM AND THE TIE-BREAK. Equal costs must not leave the order to hashtable enumeration, or a
+# red shard stops being re-runnable by hand from two integers.
+$tied = @((New-FakeSuite 'y.tests.ps1'), (New-FakeSuite 'x.tests.ps1'), (New-FakeSuite 'w.tests.ps1'))
+$tiedCosts = @{ 'y.tests.ps1' = 5.0; 'x.tests.ps1' = 5.0; 'w.tests.ps1' = 5.0 }
+$tiedOrder = @(Get-TestSuiteShardOrder -Suites $tied -Costs $tiedCosts | ForEach-Object { $_.Name })
+Assert-True (($tiedOrder -join ',') -eq 'w.tests.ps1,x.tests.ps1,y.tests.ps1') 'equal costs fall back to the name sort, so the order is total'
+$repeat = @(Get-TestSuiteShardOrder -Suites $costPool -Costs $costs -Shard 2 -ShardCount 4 | ForEach-Object { $_.Name })
+Assert-True (($repeat -join ',') -eq ($packed[1] -join ',')) 'the same (Shard, ShardCount) packs the same suites in the same order on a second call'
+
+# NO HINTS IS THE STRIDE, byte for byte -- the path every consuming repo without a durations file takes.
+$noHints = @(1..4 | ForEach-Object { ,@(Get-TestSuiteShardOrder -Suites $costPool -Costs $null -Shard $_ -ShardCount 4 | ForEach-Object { $_.Name }) })
+Assert-True (($noHints[0] -join ',') -eq 'a.tests.ps1,e.tests.ps1,i.tests.ps1') 'with no hints shard 1 is still every fourth suite in name order'
+Assert-True (@(@($noHints | ForEach-Object { $_ }) | Sort-Object -Unique).Count -eq 11) 'and the strided cover is still clean'
+$emptyHints = @(Get-TestSuiteShardOrder -Suites $costPool -Costs @{} -Shard 1 -ShardCount 4 | ForEach-Object { $_.Name })
+Assert-True (($emptyHints -join ',') -eq ($noHints[0] -join ',')) 'an EMPTY hints table is the stride too, not a pack that puts everything in shard 1'
+
+Write-Host "== the hints file: a bad one degrades to the stride rather than failing the gate ==" -ForegroundColor Cyan
+
+$hintDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ci-shard-hints-$PID")
+if (Test-Path -LiteralPath $hintDir) { Remove-Item -Recurse -Force -LiteralPath $hintDir }
+New-Item -ItemType Directory -Path $hintDir -Force | Out-Null
+$hintFile = Join-Path $hintDir 'suite-durations.json'
+
+Assert-True ($null -eq (Get-TestSuiteCostHints -TestsDir $hintDir)) 'no file at all returns null -- the untouched path for a consumer'
+
+Set-Content -LiteralPath $hintFile -Value '{ this is not json' -Encoding Ascii
+Assert-True ($null -eq (Get-TestSuiteCostHints -TestsDir $hintDir -WarningAction SilentlyContinue)) 'unparseable JSON returns null rather than throwing'
+
+Set-Content -LiteralPath $hintFile -Value '{ "note": "no seconds map here" }' -Encoding Ascii
+Assert-True ($null -eq (Get-TestSuiteCostHints -TestsDir $hintDir -WarningAction SilentlyContinue)) 'a file with no seconds map returns null'
+
+Set-Content -LiteralPath $hintFile -Value '{ "seconds": { "a.tests.ps1": "slow", "b.tests.ps1": 0, "c.tests.ps1": -4 } }' -Encoding Ascii
+Assert-True ($null -eq (Get-TestSuiteCostHints -TestsDir $hintDir -WarningAction SilentlyContinue)) `
+    'non-numeric, zero and negative entries are all dropped -- zero would sort a suite to the very back'
+
+Set-Content -LiteralPath $hintFile -Value '{ "seconds": { "a.tests.ps1": 12.5, "b.tests.ps1": "slow" } }' -Encoding Ascii
+$mixed = Get-TestSuiteCostHints -TestsDir $hintDir -WarningAction SilentlyContinue
+Assert-True ($null -ne $mixed -and $mixed.Count -eq 1 -and $mixed['a.tests.ps1'] -eq 12.5) `
+    'one bad entry does not discard the good ones beside it'
+Remove-Item -Recurse -Force -LiteralPath $hintDir -ErrorAction SilentlyContinue
+
+# THE GATE READS IT, AND THE COVER STILL HOLDS THROUGH A REAL RUN. Everything above is the pure function;
+# this is the only assert that proves the gate actually calls it and still hands every file to a child.
+$fixtureHints = Join-Path $fixtureDir 'suite-durations.json'
+$fixtureCosts = [ordered]@{}
+foreach ($n in $fixtureNames) { $fixtureCosts["$n.tests.ps1"] = 13 - [int]$n.Substring(1) }
+@{ seconds = $fixtureCosts } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $fixtureHints -Encoding Ascii
+try {
+    $hintedRuns = @(1..4 | ForEach-Object { Get-ShardRun -Shard $_ -ShardCount 4 })
+    $hintedAll  = @($hintedRuns | ForEach-Object { $_.Ran })
+    Assert-True ($hintedAll.Count -eq 12) "with a hints file present the four shards still run 12 suites (ran $($hintedAll.Count))"
+    Assert-True (@($hintedAll | Sort-Object -Unique).Count -eq 12) 'and still exactly once each -- hints move suites between shards, never out of the pool'
+    Assert-True ((($hintedRuns[0].Ran | Sort-Object) -join ',') -ne 's01,s05,s09') `
+        'and the assignment is no longer the stride, which is the proof the gate read the file at all'
+} finally {
+    Remove-Item -LiteralPath $fixtureHints -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "== this repo's own durations file ==" -ForegroundColor Cyan
+
+# FORMAT ONLY, AND DELIBERATELY NOT FRESHNESS. A stale entry is ignored and a missing one is charged the
+# maximum, so neither can cost coverage -- gating on either would break the trunk the moment somebody
+# adds or deletes a suite, to protect against a cost this design already absorbs. What IS worth an
+# assert is that the file the gate reads on every CI run is still readable at all.
+$realHints = Get-TestSuiteCostHints -TestsDir (Join-Path $repoRoot 'scripts\tests')
+Assert-True ($null -ne $realHints) 'scripts/tests/suite-durations.json parses and holds usable durations'
+if ($realHints) {
+    Assert-True (@($realHints.Keys | Where-Object { $_ -notlike '*.tests.ps1' }).Count -eq 0) 'and every key names a suite file'
+    Assert-True (@($realHints.Values | Where-Object { $_ -le 0 }).Count -eq 0) 'and every value is a positive number of seconds'
+}
+$realDoc = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\tests\suite-durations.json') -Raw | ConvertFrom-Json
+Assert-True (@($realDoc.recordedFrom.runs).Count -gt 0) 'and it names the CI runs it was recorded from, so a reader can re-derive or age it'
+
 if (Test-Path -LiteralPath $fixtureDir) { Remove-Item -Recurse -Force -LiteralPath $fixtureDir }
 
 # ------------------------------------------------------------------------------------------------
