@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/bwj-github-issue-field-convention · 20260904-211725
+
+Documents and closes the write-side of #1377: `bwj-codex` now states the `Github Issue` Asana
+custom-field convention -- the full issue URL, never a bare number, because Asana only renders a
+text field as a clickable link when its value is a complete URL. `adopt-bwj-asana`'s step 2
+proposes an optional `Get-AsanaIssueFieldGid` seam (defaults to `$null`; addressed by GID rather
+than by name, unlike `Prio-Score`, because writing a field at creation needs its GID where reading
+one back can go by name), and `report-issue`'s step 2 sets that field on task creation when a repo
+has configured it. The read-side fallback discussed in the issue is deliberately left out.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A BWJ store repo running `adopt-bwj-asana` (or re-reading `report-issue`) now finds a documented,
+optional convention for the board's `Github Issue` field instead of a silent gap filled in by
+hand. Nothing changes automatically -- the seam defaults to `$null` and stays silent until a
+maintainer sets it -- so no existing repo is affected unless it opts in.
+
+**Score:** 2
+
+#### Pull Request
+
+Document and write the bwj-codex Github Issue Asana field convention
+
+Plugins: bwj-codex
+
+[PR #1384](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1384)
+
+---
+
 ### DEPLOY: fix/cut-release-live-stage-order · 20260904-210554
 
 The `cut-release` skill stated **cut-then-push** as a rule for a repo with a live stage — *"Block 1 always
