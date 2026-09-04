@@ -644,39 +644,75 @@ Assert-Equal $false ($types -contains 'Other') "no 'Other' -- it was a printed c
 # Read from the repo's own branch table where that is reachable, so the two cannot disagree.
 Assert-Equal ((Get-BranchTypes) -join ',') ($types -join ',') 'the list comes from Get-BranchTypes rather than a second copy'
 
+Write-Host "Format-ReleaseVersionHeading (the H2 the entries hang under)" -ForegroundColor Cyan
+# THE WORDING AND THE DATE FORM ARE DAVE'S (#1369) and hold for every note, so they are asserted literally.
+Assert-Equal 'Version 4.29.0 (Sep 04, 2026)' (Format-ReleaseVersionHeading -Version '4.29.0' -Date '2026-09-04') `
+    'version and date, in the form the issue specifies'
+Assert-Equal 'Version 3.5.0 (Aug 05, 2026)' (Format-ReleaseVersionHeading -Version '3.5.0' -Date '2026-08-05') `
+    'a single-digit day keeps its leading zero -- the column stays even down a list of releases'
+# INVARIANT CULTURE, ASSERTED UNDER A CULTURE THAT WOULD RENDER IT DIFFERENTLY. A published record must not
+# read differently depending on the machine that cut it: nl-NL abbreviates September as 'sep.' -- with the
+# period -- so without the invariant this assert fails on a Dutch-locale machine and passes in CI, which is
+# the worst shape a locale bug has.
+$prevCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+try {
+    [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo('nl-NL')
+    Assert-Equal 'Version 4.29.0 (Sep 04, 2026)' (Format-ReleaseVersionHeading -Version '4.29.0' -Date '2026-09-04') `
+        'the month name comes from the invariant culture, not from the machine'
+} finally {
+    [System.Threading.Thread]::CurrentThread.CurrentCulture = $prevCulture
+}
+# CONSERVATIVE ON ANYTHING IT CANNOT PARSE, the same rule Format-ReleaseDate follows in the page builder:
+# a form this has never seen is passed through rather than guessed at or blanked.
+Assert-Equal 'Version 1.0.0 (last Tuesday)' (Format-ReleaseVersionHeading -Version '1.0.0' -Date 'last Tuesday') `
+    'an unparseable date is passed through untouched'
+Assert-Equal 'Version 1.0.0' (Format-ReleaseVersionHeading -Version '1.0.0' -Date '') `
+    'no date at all gives the version alone rather than an empty bracket'
+
 Write-Host "Build-ReleaseNotes -TierGroups (the record)" -ForegroundColor Cyan
 $groups = @(Get-PullRequestEntriesByTier -Content $sample)
 $notes = Build-ReleaseNotes -TierGroups $groups -Version '3.5.0' -Date '2026-08-05' -Type 'Minor' -Title 'A title'
-Assert-Match $notes '^# Release notes v3\.5\.0' 'heading with version'
+Assert-Match $notes '^# Changelog Releases' 'a constant H1 -- the version is stated by the H2 that owns the entries, not twice'
 Assert-Match $notes '\*\*Date:\*\* 2026-08-05' 'date line'
 Assert-Match $notes '\*\*Type:\*\* Minor' 'type line'
 Assert-Match $notes 'A title' 'title included'
-# THE LEVELS ARE CHANGELOG.md'S OWN (#881, August 25, 2026): entries at '##' and their sections at
-# '###', with NO grouping heading above them -- so an entry copied out of this document pastes at the
-# level it was written at. The tier still decides the order; it simply no longer prints a heading.
+# THE LEVELS ARE CHANGELOG.md'S OWN (#881, August 25, 2026) -- AND THEY ARE READ FROM THE FORMAT RATHER
+# THAN SPELLED OUT HERE (#1369, September 4, 2026). #881 asserted the literal '##', which was the entry
+# level of the day; when CHANGELOG.md gained '## [Unreleased]' on August 26 and entries moved to H3, this
+# suite went on passing against a document that had started contradicting its own source again. So the
+# expectation is now COMPUTED from the same function the renderer asks, and the two cannot drift apart.
+$eh = '#' * (Get-EntryHeadingLevel)
+$es = '#' * (Get-EntrySectionLevel)
+$vh = '#' * ((Get-EntryHeadingLevel) - 1)
+Assert-Equal '###'  $eh 'the entry level this suite is written against is H3 -- stated so a move is visible here too'
+Assert-Equal '####' $es 'and its sections H4'
 foreach ($tierWord in 'Tier 2 - consumers', 'Tier 1 - colleagues', 'Tier 0 - developers') {
     Assert-NoMatch $notes "(?m)^#+ $tierWord`$" "no '$tierWord' grouping heading"
 }
-Assert-Match $notes ('(?s)(?m)^## #22 .*^### ' + $WhatRx) 'nesting: entry at ##, its sections at ###'
-Assert-Match $notes '(?s)## #22 .*## #21 .*## #20 ' 'the tiers still decide the order, without a heading to announce it'
+# THE VERSION HEADING IS THE PARENT THE ENTRIES NEEDED (#1369): entries at their written level would
+# otherwise hang under the H1 with H2 empty. Wording and date form are Dave's, and hold for every note.
+Assert-Match $notes "(?m)^$vh Version 3\.5\.0 \(Aug 05, 2026\)`$" 'the release occupies H2, naming its version and date'
+Assert-Match $notes "(?s)(?m)^$vh Version 3\.5\.0 .*^$eh #22 " 'and it sits above the entries rather than among them'
+Assert-Match $notes ('(?s)(?m)^' + $eh + ' #22 .*^' + $es + ' ' + $WhatRx) 'nesting: entry at H3, its sections at H4 -- the levels CHANGELOG.md writes'
+Assert-Match $notes "(?s)(?m)^$eh #22 .*^$eh #21 .*^$eh #20 " 'the tiers still decide the order, without a heading to announce it'
 # EVERY ENTRY BOUNDARY READS THE SAME, the tier seam included: a group joined on a bare blank line would
 # be the one place two entries are not divided by a rule, which is a heading in all but name.
 Assert-Equal 2 (@([regex]::Matches($notes, '(?m)^---$')).Count) 'two rules for three entries -- one per boundary, inside a tier and between tiers alike'
 # THE DEVELOPMENT NOTES ARE THE COMPLETE RECORD: tier 0 belongs in them, unlike in the other two
 # documents, and so do the declarations -- the cut EMPTIES the changelog, so this is the last place each
 # ranking's justification lives.
-Assert-Match $notes '(?m)^## #20 ' 'tier-0 entries ARE in the developer notes -- this tier is the record'
+Assert-Match $notes "(?m)^$eh #20 " 'tier-0 entries ARE in the developer notes -- this tier is the record'
 Assert-Match $notes '\| Tier \| Significance \| Why \|' 'the impact table survives into the record'
 Assert-Match $notes 'consumers must re-add the marketplace' "and so does each row's reason, which is the lasting half"
 # NO CATEGORY HEADINGS ANYWHERE -- the type is stated inside each entry now.
 foreach ($label in 'Features', 'Fixes', 'Maintenance') {
     Assert-NoMatch $notes "(?m)^#+ $label$" "no '$label' category heading"
 }
-Assert-Match $notes ('(?m)^### ' + $TypeRx + '$') 'the type is stated inside the entry instead'
+Assert-Match $notes ('(?m)^' + $es + ' ' + $TypeRx + '$') 'the type is stated inside the entry instead'
 # An empty tier is omitted rather than printed as a heading with nothing under it.
 $sparse = @([pscustomobject]@{ Tier = 2; Entries = @($e22) }, [pscustomobject]@{ Tier = 1; Entries = @() })
 $sparseNotes = Build-ReleaseNotes -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $sparseNotes '(?m)^## #22 ' 'a tier with entries is rendered'
+Assert-Match $sparseNotes "(?m)^$eh #22 " 'a tier with entries is rendered'
 Assert-NoMatch $sparseNotes 'Tier 1' 'a tier with no entries contributes nothing, not an empty section'
 Assert-NoMatch $sparseNotes '(?m)^---$' 'and no dangling rule where its boundary would have been'
 
@@ -686,21 +722,22 @@ Write-Host "Build-ReleaseNotes -- ranked from tier 1 up, and deliberately not at
 # so tier 0 inherits a defined order rather than losing one.
 $t1Group = @([pscustomobject]@{ Tier = 1; Entries = @($low, $high) })
 Assert-Match (Build-ReleaseNotes -TierGroups $t1Group -Version '3.5.0' -Date '2026-08-05' -Type 'Minor') `
-    '(?s)## #3 .*## #1 ' 'a tier-1 group is ranked by its own score'
+    "(?s)(?m)^$eh #3 .*^$eh #1 " 'a tier-1 group is ranked by its own score'
 $t0Group = @([pscustomobject]@{ Tier = 0; Entries = @($e20, $e21) })
 Assert-Match (Build-ReleaseNotes -TierGroups $t0Group -Version '3.5.0' -Date '2026-08-05' -Type 'Minor') `
-    '(?s)## #20 .*## #21 ' 'a tier-0 group keeps document order -- the record is not re-sorted'
+    "(?s)(?m)^$eh #20 .*^$eh #21 " 'a tier-0 group keeps document order -- the record is not re-sorted'
 
 Write-Host "Build-ReleaseNotes -Entries (arrival order, for a repo that declares no tier)" -ForegroundColor Cyan
 # SINCE #881 THIS DIFFERS FROM -TierGroups IN ORDER ONLY. Both render at these levels; a repo whose
 # entries declare nothing has no tier to rank on, so the arrival order is all there is to keep.
 $flatNotes = Build-ReleaseNotes -Entries $entries -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $flatNotes '(?m)^## #22 ' 'flat: entries sit at ##'
-Assert-Match $flatNotes ('(?m)^### ' + $WhatRx + '$') 'flat: their sections at ###'
+Assert-Match $flatNotes "(?m)^$eh #22 " 'flat: entries sit at the level they were written at'
+Assert-Match $flatNotes ('(?m)^' + $es + ' ' + $WhatRx + '$') 'flat: their sections one below it'
+Assert-Match $flatNotes "(?m)^$vh Version 3\.5\.0 \(Aug 05, 2026\)`$" 'flat: the version heading is written here too'
 Assert-NoMatch $flatNotes 'Tier \d - ' 'flat: no tier heading is invented'
 # -TierGroups wins when both arrive, which is what the doc promises.
 $bothArgs = Build-ReleaseNotes -Entries @($e21) -TierGroups $sparse -Version '3.5.0' -Date '2026-08-05' -Type 'Minor'
-Assert-Match $bothArgs '(?m)^## #22 ' '-TierGroups wins if both are given'
+Assert-Match $bothArgs "(?m)^$eh #22 " '-TierGroups wins if both are given'
 Assert-NoMatch $bothArgs '#21 ' 'and -Entries is then ignored rather than merged in'
 
 Write-Host "Build-ReleaseNotes -- link rewriting" -ForegroundColor Cyan

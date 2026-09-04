@@ -1146,6 +1146,41 @@ function Get-RelativeLinkPath {
     return ($parts -join '/')
 }
 
+function Format-ReleaseVersionHeading {
+    <#
+        Pure: the heading a release note's entries sit under -- 'Version 4.29.0 (Sep 04, 2026)' from
+        '4.29.0' and '2026-09-04'.
+
+        WHY THIS HEADING EXISTS AT ALL (Dave, issue #1369). An entry is written at H3 and has been since
+        August 26, 2026; this document promoted it to H2, so the record a reader arrives at contradicted
+        the changelog the entry was copied out of. Putting the entries back at their written level leaves
+        an H1 with H3 children unless something occupies H2 -- and what belongs there is the release the
+        entries landed in. That is the shape CHANGELOG.md itself has, which is the comparison the issue was
+        filed on: a generic H1, a container H2, the entry at H3.
+
+        THE WORDING IS DAVE'S AND HOLDS FOR EVERY NOTE -- 'Version 4.29.0 (Sep 04, 2026)'. The date is
+        parsed EXACTLY and with the invariant culture, so a heading in a published record cannot change
+        with the locale of the machine that cut it; one that does not parse is passed through untouched
+        rather than guessed at, since a caller may hand a form this has never seen. The same two rules
+        Format-ReleaseDate applies in the page builder, for the same reason -- and that function is not
+        reused because it renders a different shape ('14 Aug 2026') and lives in a script this lib must
+        not depend on.
+
+        A CALL WITH NO DATE gets the version alone rather than an empty bracket.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Date
+    )
+    $raw = $Date.Trim()
+    if (-not $raw) { return "Version $Version" }
+    $parsed = [datetime]::MinValue
+    $ok = [datetime]::TryParseExact($raw, 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::None, [ref]$parsed)
+    $shown = if ($ok) { $parsed.ToString('MMM dd, yyyy', [System.Globalization.CultureInfo]::InvariantCulture) } else { $raw }
+    return "Version $Version ($shown)"
+}
+
 function Build-ReleaseNotes {
     <#
         Builds the full changelog notes -- the tier-0 <changelog root>/<X>.x/<X.Y.Z>.md file, which is
@@ -1156,8 +1191,9 @@ function Build-ReleaseNotes {
         are explicitly normalized to LF (#103, Victor #5), alongside the link rewriting below.
 
         TWO SHAPES, ONE FUNCTION (the tier model, August 5, 2026) -- AND SINCE #881 THEY DIFFER ONLY IN
-        ORDER, NOT IN LEVEL. Both render entries at '##' and their sections at '###', which is exactly what
-        CHANGELOG.md writes, so an entry copied out of this document pastes at the level it was written at:
+        ORDER, NOT IN LEVEL. Both render entries at Get-EntryHeadingLevel and their sections one below it,
+        which is exactly what CHANGELOG.md writes, so an entry copied out of this document pastes at the
+        level it was written at:
 
           -TierGroups  the pending entries grouped by tier. Renders each tier's entries IN THE ORDER GIVEN,
                        ranked within the tier, as one continuous flat list -- no grouping heading. A tier
@@ -1172,6 +1208,22 @@ function Build-ReleaseNotes {
         accepted -- that it marked the boundary between what reached a consumer and what stayed internal --
         is a claim about ATTRIBUTION, which the repo's own documentation is the right place for. The record
         stays a record: what changed, at the levels it was written at.
+
+        AND THE LEVEL IS NOW ASKED FOR RATHER THAN SPELLED OUT (Dave, issue #1369, September 4, 2026), which
+        is what #881 was always about and what a literal could not keep. #881 set these entries to '##'
+        because that was the level CHANGELOG.md wrote them at; three weeks later, on August 26, 2026,
+        CHANGELOG.md gained its '## [Unreleased]' heading and every entry moved to H3 -- and this renderer,
+        holding a number instead of the question, went on promoting them. Nothing errored and no gate fired:
+        the document simply started contradicting its own source again, in exactly the way #881 had repaired,
+        with the comment above it and its own test both still asserting the old claim was true. Reading
+        Get-EntryHeadingLevel means the next move of that pair carries this document with it.
+
+        THE VERSION HEADING IS THE OTHER HALF (see Format-ReleaseVersionHeading). Entries at H3 under an H1
+        would skip a level, so the release they landed in occupies H2 -- and the document's own H1 becomes
+        the constant it always effectively was, since the version is now stated by the heading that owns it
+        rather than twice in four lines. The metadata pair below it STAYS: new-internal-note.ps1 reads
+        '**Date:**' and '**Type:**' out of this document to build the internal note, so dropping them would
+        degrade a consumer's two-document flow to '(fill in)' and a warning.
     #>
     param(
         [AllowEmptyCollection()][string[]]$Entries = @(),
@@ -1229,7 +1281,7 @@ function Build-ReleaseNotes {
             # this document is the record of WHAT CHANGED, and where each change reached is answered by the
             # repo's own documentation rather than by a wrapper around the record.
             $rankByTier = if ([int]$group.Tier -ge 1) { [int]$group.Tier } else { 0 }
-            $sections += (Format-RankedEntries -Entries $linked -EntryLevel 2 -RankByTier $rankByTier)
+            $sections += (Format-RankedEntries -Entries $linked -EntryLevel (Get-EntryHeadingLevel) -RankByTier $rankByTier)
         }
         # THE SAME SEPARATOR BETWEEN GROUPS AS WITHIN ONE. Format-RankedEntries joins its own entries with
         # '---'; with the heading gone, joining the groups on a bare blank line would make the tier seam
@@ -1238,7 +1290,7 @@ function Build-ReleaseNotes {
         $body = ($sections -join "`n`n---`n`n")
     } else {
         $linked = @($Entries | ForEach-Object { Convert-EntryRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
-        $body = Format-RankedEntries -Entries $linked -EntryLevel 2
+        $body = Format-RankedEntries -Entries $linked -EntryLevel (Get-EntryHeadingLevel)
     }
 
     $titleLine = if ($Title) { "$Title`n`n" } else { '' }
@@ -1249,10 +1301,19 @@ function Build-ReleaseNotes {
     $summaryBlock = if ($Summary) {
         (($Summary -replace "`r`n", "`n").TrimEnd() + "`n`n---`n`n")
     } else { '' }
+    # THE H1 IS A CONSTANT AND THE VERSION SITS IN THE H2 (Dave, #1369) -- 'Changelog Releases', the wording
+    # from the issue, chosen to mirror CHANGELOG.md's own '# Changelog'. It reads as the name of the document
+    # FAMILY rather than of one release, which is what lets the version be stated once, by the heading that
+    # owns the entries beneath it, instead of in an H1 and a date line four lines above it.
+    #
     # THE HARD BREAK IS A BACKSLASH, NOT TWO SPACES (inbound #1100) -- see Build-AudienceNote below for the
     # measurement and why the break itself is kept.
-    $header = "# Release notes v$Version`n`n**Date:** $Date\`n**Type:** $Type`n`n$titleLine$summaryBlock"
-    return ($header + $body + "`n")
+    $header = "# Changelog Releases`n`n**Date:** $Date\`n**Type:** $Type`n`n$titleLine$summaryBlock"
+    # The container the entries hang under, so H1 -> H3 does not skip a level. Written even for a release
+    # with no pending entry at all: the heading states which release this document IS, which is exactly the
+    # question an empty one still has to answer.
+    $versionHeading = ('#' * ((Get-EntryHeadingLevel) - 1)) + ' ' + (Format-ReleaseVersionHeading -Version $Version -Date $Date)
+    return ($header + $versionHeading + "`n`n" + $body + "`n")
 }
 
 # ==================================================================================================
@@ -1629,10 +1690,15 @@ function Build-ReleaseNoteDraft {
         # THE SAME SWITCHES THE CONSUMER DOCUMENT USED, called rather than re-derived: the score orders the
         # section and is then stripped, and the branch administration goes. Entries sit one level deeper
         # than before because they now live under a section heading rather than under the H1.
+        # THE LEVEL IS ASKED FOR RATHER THAN SPELLED OUT (#1369). It was the literal 3, which happens to be
+        # the right answer today and is right for the same reason Build-ReleaseNotes' 2 was wrong: an entry
+        # belongs at the level it was WRITTEN at, and that level moved once already without either renderer
+        # noticing. Same value, no change to any note -- the literal simply stops being a second statement
+        # of a fact entry-scaffold-lib.ps1 owns.
         # RANKED ON THE AUDIENCE TIER, not on 2. This is a sort key rather than a filter -- what an entry
         # is worth to THIS document's reader decides where it sits -- so ranking a tier-1 repo's entries on
         # a tier they never scored would read every score as absent and collapse the order to arrival.
-        $body = Format-RankedEntries -Entries $linked -EntryLevel 3 -BareTitles -RankByTier $AudienceTier `
+        $body = Format-RankedEntries -Entries $linked -EntryLevel (Get-EntryHeadingLevel) -BareTitles -RankByTier $AudienceTier `
             -StripSignificance -StripAdminSections
         $out.Add("## $($w.SectionAudience)")
         $out.Add('')
