@@ -37,17 +37,40 @@ Rewrite the per-field GID paragraph (and two more instances found by the same gr
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Rewrote `adopt-bwj-asana/SKILL.md` lines 118-123 (the `Get-AsanaIssueFieldGid` paragraph) and
+  lines 101-105 (the prio-labels bullet) to the per-project `custom_field_settings` test, matching
+  `WORKFLOW-portable.md` step 5's current wording, and added the `#1386` citation alongside `#1213`.
+- [x] Ran the grep the issue suggested (`one-workspace|does not cross`) and found two more instances
+  of the same superseded claim: `README.md`'s `Get-AsanaProjectGid` entry and
+  `asana-mirror.ps1`'s `Get-PrioScoreFromTask` docstring. Rewrote both the same way. Left the archived
+  changelog entries and `WORKFLOW-portable.md` step 5 itself alone -- the changelog is a frozen
+  historical record and step 5 already carries the corrected reasoning.
 
 ### TEST
 
+- [x] Read `WORKFLOW-portable.md` lines 255-300 to confirm step 5's current wording before rewriting
+  anything against it, rather than trusting the issue body's quotation.
+- [x] Re-ran the grep after the edits -- the three script/doc hits left are the CRLF comment in
+  `release-lib.ps1` (unrelated "does not cross" usage) and the two archived changelog entries
+  (deliberately untouched).
+
 ### DEPLOY: docs/fix-1394-asana-workspace-claim
 
-**Score:**
+Fixes a stale citation in `adopt-bwj-asana`'s config-seam guidance: it told a maintainer that an
+Asana custom field is usable anywhere in the same workspace, when the real (per-project
+`custom_field_settings`) test had already been established in step 5 by #1386. Prevents a failure
+that has not happened yet: a maintainer picking `Get-AsanaProjectGid`/field GIDs by workspace alone
+could pick a project that is in the right workspace but never had the field added to it -- exactly the
+`GitHub - WH` counterexample the issue measured -- and silently lose prio labels or custom-field
+writes with nothing in a log to say why.
+
+**Score:** 1
 
 #### What makes this deploy extra special
 
-**Score:**
+Internal engineering documentation only -- no subscriber-facing behavior changes.
+
+**Score:** N/A
 
 #### Pull Request
 
