@@ -33,55 +33,66 @@
 
 ### PLAN
 
-Inbound #1379 asked for three things; its items 1 and 2 landed in PR #1381 and item 3 — a prose
-equivalent of `check-script-contract.ps1` — was deferred here as needing its own design pass. That pass
-was a measurement, and it came back negative: all four candidate detectors measure like the stale-path
-check this repo already declined. Dave chose to record the decline rather than ship a weakened version.
+Inbound #1379 asked for three things; items 1 and 2 landed in PR #1381 and item 3 — a prose equivalent
+of `check-script-contract.ps1` — was deferred to #1380 as needing its own design pass. That pass was a
+measurement. It came back negative, was red-teamed, re-run with the source-repo guard applied, and came
+back negative more clearly. Dave chose to record the decline rather than ship a weakened check.
 
 ### CREATE
 
 - [x] Record the measured decline in `.claude/specialists/lenses/05-15-extension.md`, in the shape of the
-      stale-path entry beside it — corpus, the four candidates' counts, the structural reason, and a
-      closing "do not revive it behind a nearby-text rule"
+      stale-path entry beside it — the corrected corpus, the four candidates, the structural reason, the
+      11-law manifest preserved for a later revisit, and a closing "do not revive it behind a nearby-text
+      rule"
 - [x] Repair `CONTRIBUTING-portable.md`'s dangling sentence, which promised the check as "left as a
       follow-up" — it now states that it was measured and declined, and why, without shipping the numbers
       to consumers
-- [~] Build the manifest + the check itself — dropped, and the drop IS the deliverable: measured over 11
-      laws and 13 documents in 3 real repos, no candidate is shippable (the numbers are in the lens entry)
+- [x] Re-run the measurement after the red-team: subtract the corpus contamination the first pass named
+      but never applied, split the suppressed sections properly, and measure the manually-run audit mode
+      that #1380 explicitly asked about and the first pass never tested
+- [~] Build the manifest + the check itself — dropped, and the drop IS the deliverable. The manifest is
+      preserved in the lens entry; the check is not built, and the numbers saying why are there too
 
 ### TEST
 
+- [x] Every figure in the lens entry and in this entry comes from the source-guarded re-run; the four
+      claims the re-run retracted appear nowhere
 - [x] Both new issue links resolve, and the portable page carries no relative link into
       `.claude/specialists/lenses/`, which is not shipped with the plugin
 
 ### DEPLOY: docs/prose-contract-check-declined
 
 A manifest-driven prose contract check — the analogue of `check-script-contract.ps1` for the laws this
-plugin legislates rather than the functions it calls — was measured against 11 laws over 13 documents in
-three real repos, and declined. Four candidate detectors were measured: a verbatim cue (1 finding), term
-co-occurrence (27 findings, ~17 false in English), the same with a normative marker (19 findings, ~11
-false), and a declaration-based check (110 findings, 100% undeclared and so born red on day one).
+plugin legislates rather than the functions it calls — was measured against 11 laws over 8 consumer
+documents in the two consuming repos, and declined in every deployment mode: as a gate, as a session-start
+line, and as the deliberately-run advisory audit #1380 asked about. A verbatim cue fired once. Term
+co-occurrence reached 12.5% precision, adding a normative marker 13%, and a declaration-based check
+reported 88 of 88 laws undeclared because no consumer has the convention it looks for.
 
-The reason it is declined is structural rather than a matter of tuning: **a section that restates a law
-almost always also names the mechanism it is talking about**, so a pointer test cannot tell correct
-deference from restatement-with-citation-and-override. The cleanest real divergence in the corpus is
-suppressed by every candidate for exactly that reason — a consumer names `CONTRIBUTING-portable.md` as a
-pointer into the plugin and overrides it four lines later. That is the same failure shape as the
-stale-path check declined on August 9, 2026, where the difference was whose repo the line was about.
+Two measurements carry the decline. **The law the check was written to catch has no standing violation
+left:** `LAW-RELEASE-ORDER` was the acceptance test because #1378 had just made it the one known-real
+defect, and #1378's repair then made the consumer's order a sanctioned answer rather than a divergence —
+so the check's reason for existing was repaired out from under it mid-measurement. **And the detector
+found one of the three defects that actually stand in the corpus:** one instance was flagged, one was
+missed because the term list wanted a word that section does not use, and one was suppressed by the very
+pointer test meant to prevent false alarms. That last case is the structural reason, measured: a section
+that restates a law may also cite it, and a pointer test cannot tell correct deference from
+restatement-with-citation-and-override — 1 of the 4 suppressed sections in the corpus was hiding a real
+contradiction.
 
-`CONTRIBUTING-portable.md` stops promising the check as a follow-up and states the outcome instead. The
-measurement, both caveats and the by-products are in the system-administration lens, beside the other
-declines, so the rule is not revived blind.
+The 11-law manifest is kept in the lens entry rather than discarded with the check, so a later revisit
+does not re-derive it. So is the proportionate alternative: two narrow literal greps, each aimed at one
+law, rather than one framework carrying eleven at 12% precision.
 
 **Score:** 3
 
 #### What makes this deploy extra special
 
-A consumer reading the layering section no longer meets a promise of enforcement that has come back
-negative. The paragraph now says the prose half of the corollary is unenforced by design, and names the
-reason in one sentence, so a consumer can stop waiting for a gate that is not coming and rely on the
-ranking itself — which is what #1379 said was the part that closes the gap. Small: it changes one
-paragraph of a page they already have, and nothing they run.
+`CONTRIBUTING-portable.md` stops promising an enforcement mechanism that has come back negative. A
+consumer reading the layering section now learns that the prose half of the corollary is unenforced by
+design, and why in one sentence — so they can stop waiting for a gate that is not coming and lean on the
+ranking itself, which is what #1379 said makes a divergence nameable. Small: it changes one paragraph of
+a page they already have, and nothing they run.
 
 **Score:** 2
 
