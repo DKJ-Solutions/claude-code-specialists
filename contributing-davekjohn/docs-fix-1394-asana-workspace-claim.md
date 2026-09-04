@@ -56,7 +56,7 @@ Rewrite the per-field GID paragraph (and two more instances found by the same gr
 
 ### DEPLOY: docs/fix-1394-asana-workspace-claim
 
-Fixes a stale citation in `adopt-bwj-asana`'s config-seam guidance: it told a maintainer that an
+Fixes #1394. Fixes a stale citation in `adopt-bwj-asana`'s config-seam guidance: it told a maintainer that an
 Asana custom field is usable anywhere in the same workspace, when the real (per-project
 `custom_field_settings`) test had already been established in step 5 by #1386. Prevents a failure
 that has not happened yet: a maintainer picking `Get-AsanaProjectGid`/field GIDs by workspace alone
