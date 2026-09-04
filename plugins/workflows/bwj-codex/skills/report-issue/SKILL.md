@@ -26,6 +26,8 @@ colleague-facing translation is a judgement call, not a transform. The full rule
 - Confirm `gh auth status` is clean.
 - Read `Get-AsanaWorkspaceGid` and `Get-AsanaProjectGid` from the repo's `scripts/repo-config.ps1`.
   If either is missing, run [`adopt-bwj-asana`](../adopt-bwj-asana/SKILL.md) first.
+- Read `Get-AsanaIssueFieldGid` from the same file. It is optional and defaults to `$null` -- a
+  board with no `Github Issue` custom field leaves it unset, and step 2 skips writing to it.
 - Confirm the Asana MCP tools are available in this session. If they are not, you still do step 1 and
   then stop with a clear note -- never skip the GitHub issue.
 
@@ -76,6 +78,12 @@ Tracked on GitHub: <issue URL>
 
 Create it in the project `Get-AsanaProjectGid` names, in the workspace `Get-AsanaWorkspaceGid`
 names, via the Asana MCP `create task` tool. Note the task GID and URL.
+
+**Where `Get-AsanaIssueFieldGid` returns a GID, set that custom field on the same `create task`
+call, to the full issue URL** -- the same URL already going into the `Tracked on GitHub:` line
+above, never the bare issue number: Asana only renders a text custom field as a clickable link when
+its value is a complete URL. Where it is `$null` -- the default, and the common case -- skip the
+field silently; the board carries none and there is nothing to set.
 
 **Put it straight into the `Filed` section** -- the board's sections are the cycle's stages, and
 `Filed` means *tracked on GitHub now*. Read `Get-AsanaStageMap` from `scripts/repo-config.ps1` for the

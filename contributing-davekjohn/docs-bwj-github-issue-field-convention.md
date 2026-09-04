@@ -33,19 +33,47 @@
 
 ### PLAN
 
+Fixes #1377: `bwj-codex` neither writes nor reads the BWJ board's `Github Issue` Asana custom
+field, so the full-URL convention Dave settled on September 4, 2026 drifts back to a hand-filled
+state one card at a time. Scope held to the write-at-creation shape the issue itself recommends
+(candidate 2, plus the doc it always needs); the read-side fallback (candidate 3) is explicitly
+out of scope -- the issue notes it is only worth adding if the write side lands *and* sweep (b)
+already covers the close-update gap from the GitHub side.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Document the `Github Issue` field convention (full URL, never a bare number, and why) in
+      `WORKFLOW-portable.md`; propose the optional `Get-AsanaIssueFieldGid` seam in
+      `adopt-bwj-asana/SKILL.md`; wire `report-issue/SKILL.md` to read that seam and set the
+      field at task creation.
 
 ### TEST
 
+- [x] No script changed (`report-issue` has no script of its own; the new seam is a proposed
+      config stub, not executable code), so nothing here needs a test suite. Reviewed by Edith
+      for language/consistency and by re-reading `Get-PrioScoreFromTask` in
+      `templates/asana-mirror.ps1` to verify the name-vs-GID claim the new prose makes.
+
 ### DEPLOY: docs/bwj-github-issue-field-convention
 
-**Score:**
+Documents and closes the write-side of #1377: `bwj-codex` now states the `Github Issue` Asana
+custom-field convention -- the full issue URL, never a bare number, because Asana only renders a
+text field as a clickable link when its value is a complete URL. `adopt-bwj-asana`'s step 2
+proposes an optional `Get-AsanaIssueFieldGid` seam (defaults to `$null`; addressed by GID rather
+than by name, unlike `Prio-Score`, because writing a field at creation needs its GID where reading
+one back can go by name), and `report-issue`'s step 2 sets that field on task creation when a repo
+has configured it. The read-side fallback discussed in the issue is deliberately left out.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+A BWJ store repo running `adopt-bwj-asana` (or re-reading `report-issue`) now finds a documented,
+optional convention for the board's `Github Issue` field instead of a silent gap filled in by
+hand. Nothing changes automatically -- the seam defaults to `$null` and stays silent until a
+maintainer sets it -- so no existing repo is affected unless it opts in.
+
+**Score:** 2
 
 #### Pull Request
 
