@@ -133,6 +133,25 @@ the same URL already sitting in the `Tracked on GitHub:` line above, written onc
 so the board's own list and filter views can jump straight to the issue without opening the card
 first.
 
+**And a board may carry a `Github Type` select field beside it** -- again the field's literal,
+as-configured name -- **whose options are exactly the three issue types
+[step 1](#classify-it-as-you-file-it----three-fields-all-set-at-creation) chooses from**: `Bug`,
+`Feature`, `Task`. Where it exists it is set on the same creation call, **from the value step 1
+already decided**, never re-derived from the card. That is what makes it worth writing rather than
+leaving to a colleague: the answer is not being composed here the way the issue URL is, it is being
+carried one step forward -- so a ticket this workflow files cannot have a board type its own issue
+contradicts.
+
+**A card filled in by hand can, and on the BWJ board it did.** Measured September 4, 2026, while
+nothing had ever written the field: of 23 cards, **5** carried a type the GitHub issue contradicted,
+and in both directions -- `334` read `Task` against a **Bug** and `333` `Task` against a **Feature**,
+while `478`, `479` and `480` read `Feature` against a `Task`. That is not a drift rate for this
+procedure, because the procedure had never run; it is what a hand-fill costs, and it is the reason
+the value is carried forward instead of re-typed. A hand-copied enum that has drifted is worse than
+an empty one -- an empty field says *unknown*, a wrong one says *this* -- and the board reads as
+authoritative to the colleague looking at it. GitHub stays leading here as everywhere above: the
+card is corrected to match the issue, never the issue to match the card.
+
 ### 3. Cross-link both ways
 
 The link is stored on both sides, and one half is machine-readable because the automation in step 4
