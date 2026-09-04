@@ -32,6 +32,52 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1417-new-branch-refuse-stale-base · 20260905-000004
+
+`new-branch.ps1` now **refuses** to cut a branch from a base behind `origin/<trunk>`, where it previously
+warned twice and cut anyway. `-SkipStaleBase` cuts from it regardless, and restores the old run exactly --
+branch, document, and the warning at both ends.
+
+The refusal costs nothing, which is the argument for it: the check sits before the checkout, so a refused
+run leaves no branch, no document, no commit and no push -- nothing to unpick, and one `git pull --ff-only`
+resumes the same command. That is the property #1405 named for the fold's own refusal, reached here by a
+different route.
+
+It cannot reach a resume. #1046 warned instead of refusing because this file arrives in a consumer by
+plugin **update** rather than by choice, landing on the script you are told to re-run to resume a parked
+branch. The first half of that stands and is why the escape is one flag; the second does not, because the
+base block is gated on *"not resuming"*. The suite now asserts that where it could actually fail -- a
+resume on a trunk two commits behind, no valve, exit 0.
+
+`worktree-lane.ps1` passes the valve when it delegates, so lanes behave exactly as before: it fetched and
+based the worktree at `origin/<trunk>` seconds earlier, so there is no operator choice to gate, and the
+refusal's own remedy (`git pull --ff-only`) is not the remedy for a detached worktree.
+
+Reason: it closes the hazard #1046 measured -- a complete duplicate of already-merged work, branch, commit,
+PR and every gate green on both, from a base 17 commits behind. Anyone who cuts a branch this way notices
+the day it first refuses.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It settles a question two issues deliberately left open, by reading the code instead of the reports: the
+reason `new-branch` held back named a route the refusal provably cannot reach, and the precedent it was
+measured against turns out not to refuse the thing it was cited for. Both corrections are written down
+where the next reader meets them rather than only in the issue.
+
+**Score:** 2
+
+#### Pull Request
+
+new-branch refuses a stale base, with -SkipStaleBase as the valve
+
+Plugins: contributing-davekjohn
+
+[PR #1425](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1425)
+
+---
+
 ### DEPLOY: feat/1415-supremacy-declaration-check · 20260904-235353
 
 A consumer is now told, at session start, when its own always-on prose declares its `CLAUDE.md` the
