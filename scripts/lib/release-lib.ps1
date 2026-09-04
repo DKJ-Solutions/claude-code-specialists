@@ -723,8 +723,8 @@ function Get-EntryPlugins {
 #
 # The old name asserted the base -- repo-root-relative -- and that assertion is exactly what stopped
 # being true, so keeping it would have left the one line a reader checks first saying the wrong thing.
-# Nothing outside this file called it by either name: it is a lib function behind Build-ReleaseNotes,
-# Build-ConsumerNotes and Build-ReleaseNoteDraft, and a consumer runs the SCRIPTS rather than the lib.
+# Nothing outside this file called it by either name: it is a lib function behind Build-ReleaseNotes
+# and Build-ReleaseNoteDraft, and a consumer runs the SCRIPTS rather than the lib.
 
 function Convert-EntryRelativeLinks {
     <#
@@ -1275,7 +1275,7 @@ function Build-ReleaseNotes {
             # THE SCORES ARE NOT STRIPPED HERE, and this is the one document where they survive. The cut
             # EMPTIES the changelog, so these notes are the last place holding the reason behind each
             # ranking; deleting it would leave every order asserted with its justification thrown away. The
-            # documents that travel outward strip it -- see Build-ConsumerNotes. What does NOT survive the
+            # document that travels outward strips it -- see Build-ReleaseNoteDraft. What does NOT survive the
             # heading's removal is the tier NUMBER: an entry states its scores and never names its tier, so
             # that heading was carrying the attribution alone. Dropping it is the deliberate half of #881 --
             # this document is the record of WHAT CHANGED, and where each change reached is answered by the
@@ -1452,68 +1452,37 @@ function Convert-EntryHeadingToTitle {
     return "$($hm.Groups[1].Value) $title$rest"
 }
 
-function Build-ConsumerNotes {
-    <#
-        Builds the consumer document (releases/consumer/<dir>/<X.Y.Z>.md) from the TIER-2 entries of
-        the release. Pure string out, hard LF -- a new standalone file, like Build-ReleaseNotes.
-
-        $Entries is the selection, not the whole release: the caller passes the tier-2 group's entries and
-        this renders all of them. The selection lives in the caller because grouping is
-        Get-PullRequestEntriesByTier's job -- it already resolves every entry's declared impact once, and
-        doing it again here would be a second reader of one fact.
-
-        AN EMPTY SELECTION RETURNS THE HEADER AND NOTHING ELSE, rather than throwing. cut-release never
-        gets here with nothing (its bump gate refuses a minor with no tier-2 entry), so a throw would
-        only ever fire in a test or a hand call -- and a document that says "this release has nothing
-        for a consumer" is a truthful answer to a strange question, while an exception is not.
-
-        -BareTitles is passed to the renderer rather than applied here, so the score is read off each entry
-        before anything about it is reduced -- see Format-RankedEntries for what stripping too early costs.
-        Links are rewritten first, at the same depth the developer notes use (both documents sit three
-        folders down).
-
-        -StripAdminSections is passed for the same reason and has the same ordering constraint, one step
-        sharper: the four sections it deletes include the one -BareTitles READS to build the heading. Both
-        travel to the renderer so that order lives in one place rather than being re-established here.
-    #>
-    param(
-        [AllowEmptyCollection()][string[]]$Entries = @(),
-        [Parameter(Mandatory)][string]$Version,
-        [Parameter(Mandatory)][string]$Date,
-        [Parameter(Mandatory)][string]$Type,
-        [string]$Title = '',
-        [string]$LinkPrefix = '../../../'
-    )
-    $real = @($Entries | Where-Object { $_ -and $_.Trim() })
-    $linked = @($real | ForEach-Object { Convert-EntryRelativeLinks -EntryText $_ -Prefix $LinkPrefix })
-    # ORDERED BY THE CONSUMER SCORE, not the internal one (issue #467). This is the only document whose
-    # reader is the consumer, and 'what does a consumer notice' is a different question from 'what does the
-    # organisation get out of it' -- which is precisely why the two are separate documents and separate
-    # scores. Ordering this one by the internal score would answer its question with a proxy.
-    #
-    # RE-SORTING HERE IS NOT A SECOND ESTIMATE. Both numbers were written once, by the author, on the
-    # branch, and both travel in the entry; this reads the other one rather than forming a new opinion. The
-    # reproducibility the two-moment problem needed is a property of the numbers being stored, not of
-    # there being only one sort.
-    #
-    # AND THE SCORES THEMSELVES ARE STRIPPED, which is the whole reason -StripSignificance exists. A
-    # self-assigned number printed at a consumer is a marketing claim, and this repo has measured what a
-    # published guess costs -- the retired remove-before-publishing marker is in this file's history for exactly that.
-    # The number does its work by deciding the order and then gets out of the way; the reason stays in the
-    # development notes, where it is auditable by the people who can check it.
-    $body = if ($linked.Count -gt 0) {
-        Format-RankedEntries -Entries $linked -EntryLevel 2 -BareTitles -RankByTier 2 -StripSignificance -StripAdminSections
-    } else {
-        ''
-    }
-
-    $rocket = [char]::ConvertFromUtf32(0x1F680)
-    $titleLine = if ($Title) { "$Title`n`n" } else { '' }
-    # Backslash hard break, not two spaces (inbound #1100) -- see Build-AudienceNote below.
-    $header = "# Release notes v$Version $rocket`n`n**Date:** $Date\`n**Type:** $Type`n`n$titleLine"
-
-    return ($header + $body + "`n")
-}
+# --- DELETED: Build-ConsumerNotes, the tier-2 renderer of the retired two-document flow -----------
+#
+# It built releases/consumer/<dir>/<X.Y.Z>.md from a release's tier-2 entries, back when a cut wrote
+# TWO hand-written documents -- a consumer one and an internal one. Those became ONE on August 11,
+# 2026 (commit f239ed57): Build-ReleaseNoteDraft below, a named section per reader, on the measurement
+# that 38% of the internal note was material the consumer document already carried in a second
+# register. That commit dropped the CALL and left the FUNCTION, with no note saying why -- so unlike
+# the two records above this was left behind rather than kept.
+#
+# WHY IT WENT NOW (issue #1370, September 4, 2026). #1369 repaired the hard-coded '-EntryLevel 2' out
+# of Build-ReleaseNotes, an entry having been written at H3 since August 26, 2026. This function still
+# passed the literal 2, so release-lib held two answers to one question and the one left behind was the
+# stale one -- and its own test pinned that answer ("at ##"), which is why the repair could not reach
+# it. Measured before removing it: no caller anywhere in this repo or in the shipped contributing-davekjohn
+# mirror, and releases/consumer/ does not exist here.
+#
+# AND WHY DELETED RATHER THAN LEVELLED, which is the choice #1370 left open. Levelling alone would have
+# left the entries hanging under this document's H1 with H2 empty -- the same skip the version heading
+# was added to Build-ReleaseNotes to close -- so the honest repair needed a container heading too: a
+# design decision about a document nothing generates, for a reader nothing writes to. Deleting removes
+# the second answer instead of correcting it.
+#
+# WHAT STILL COVERS A CONSUMER WHO HAS ONE OF THESE DOCUMENTS. check-plugin-integrity.ps1 reads
+# releases/consumer/ as an ARCHIVE and holds it to the same link rule as the current note tree -- it
+# reads FILES, so nothing there depended on this function. A consumer pinned to a pre-August-12
+# plugin version has the old lib AND the old cut-release together, so this removal cannot reach them.
+#
+# ITS OTHER ROLE PASSED TO Build-ReleaseNoteDraft. Four comments cited it as the renderer that "always
+# ranks at tier 2" while Build-ReleaseNotes ranks from 1 up -- the pair that showed the changelog's own
+# order was not load-bearing (issue #467). The draft ranks at a fixed tier too (-RankByTier
+# $AudienceTier), so the argument survives under a name that still exists, and those comments now say so.
 
 function Build-ReleaseNoteDraft {
     <#
