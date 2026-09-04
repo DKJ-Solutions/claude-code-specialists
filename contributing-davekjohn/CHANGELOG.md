@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/fix-1396-bwj-codex-resolve-wording · 20260904-215537
+
+Fixes the second of two defects issue #1396 reported on the same two table cells: both
+`README.md` and `plugins/workflows/README.md` claimed that closing the GitHub issue **resolves**
+the mirrored Asana task. `bwj-codex`'s own README says the opposite in so many words ("It never
+ticks the task off, and it has no code path that could" -- Dave, September 1, 2026), and the
+`report-issue` skill agrees: closing the issue only makes the CI template post that the work is
+ready to test and move the card to `ReadyToTest`. Both cells now say that instead.
+
+The issue's other half -- "one rule" becoming false once the plugin gains a second chapter -- does
+**not** yet apply: that chapter ships in PR #1392, which is still open (blocked on CI) and does not
+touch either of these two files. Fixing that half now would have described a chapter `main` does
+not carry yet. Left for a follow-up once #1392 merges; noted on issue #1396 rather than closing it.
+
+**Score:** 1 -- cosmetic wording correction, no behavior change.
+
+#### What makes this deploy extra special
+
+N/A -- an internal documentation correction; nothing here reaches an external reader.
+
+**Score:** N/A
+
+#### Pull Request
+
+Fix the wrong 'resolves the Asana task' claim in two READMEs (issue #1396)
+
+[PR #1397](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1397)
+
+---
+
 ### DEPLOY: docs/fix-1388-corollary-delegated-law-exception · 20260904-214401
 
 `CONTRIBUTING-portable.md`'s restatement corollary named three permitted moves for a consumer document
