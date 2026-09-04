@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/fix-1386-step5-per-project-not-workspace · 20260904-213204
+
+`WORKFLOW-portable.md` step 5 blamed a self-filed ticket's missing `Prio-Score` on a workspace
+boundary; measured against the real BWJ boards the two boards sit in the SAME workspace and still
+differ, because a custom field also has to be added to the project (`custom_field_settings`), not
+merely defined in a reachable workspace. Step 5 and its echo in step 7 now name that per-project test
+instead, with the `GitHub - WH` / `GitHub - SWB` measurement as evidence -- a refinement of #1213 rather
+than a duplicate.
+
+**Score:** 3 -- corrects a step that reads as safe when it silently is not: a maintainer following the
+old text would conclude a same-workspace project is fine, exactly where `GitHub - WH` shows it is not.
+
+#### What makes this deploy extra special
+
+A BWJ store repo troubleshooting why its self-filed tickets never gain a prio label now gets the test
+that actually explains it (is the field added to this project?) instead of one that predicts nothing
+useful once workspaces already agree.
+
+**Score:** 2
+
+#### Pull Request
+
+Fix step 5 workspace framing: per-project custom_field_settings gates Prio-Score, not the workspace boundary
+
+Plugins: bwj-codex
+
+[PR #1387](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1387)
+
+---
+
 ### DEPLOY: docs/bwj-github-issue-field-convention · 20260904-211725
 
 Documents and closes the write-side of #1377: `bwj-codex` now states the `Github Issue` Asana
