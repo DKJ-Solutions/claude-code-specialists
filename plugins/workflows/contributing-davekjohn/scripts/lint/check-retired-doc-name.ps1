@@ -42,6 +42,15 @@
     NO gh, NO NETWORK. Every input is a file in the working copy, which is what lets the SessionStart
     hook run this in a consumer with no token.
 
+    WHAT IT PRINTS OUT OF A CONSUMER'S FILES IS SANITIZED (#1419). The finding names a path and echoes
+    the offending LINE, and the hook forwards this whole report into session context while deciding what
+    to surface by matching '[ERROR]' over it -- so a raw echo lets untrusted text choose how loudly it is
+    reported. The two values go through check-report-lib.ps1's Format-SafePathToken and
+    Format-SafeProseToken; the plugin's own strings (the retired name, the "since" sentence) stay raw.
+    The prose form substitutes square brackets rather than deleting them, because in a sentence a bracket
+    is ordinary and the only property needed is that no marker can form -- argued in full in that
+    function's docstring, and disclosed to the reader in the footer this check prints.
+
     ONE CALLER, and it is automatic: the SessionStart hook retired-doc-name-sessioncheck.ps1 in the
     workflow plugin, which reports it at the start of every session in every consumer. NO CI leg,
     deliberately -- a consumer's CI is not this repo's to add, and here the check skips by design.
@@ -103,6 +112,15 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 
+# THE SANITIZERS, for the two values below that come out of a CONSUMER'S OWN FILES (#1419). This report
+# is forwarded into session context by retired-doc-name-sessioncheck.ps1, and that hook -- like every
+# other one -- decides what to surface by matching '[ERROR]' over this whole output. So a path or a line
+# of prose reaching it raw is untrusted text choosing how loudly it is reported. Nothing else is
+# supplied from here: the report markers are written literally below, because this check's shape is one
+# [ERROR] header with an indented block under it rather than the counted Write-Failure lines the
+# roster/connector checks emit.
+. (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+
 # THE WALK IS NOT REIMPLEMENTED HERE. Get-AlwaysOnDocuments owns the '@'-import closure -- the hop cap,
 # the cycle guard, the fenced-block skip and the tree/external split this check needs -- and a second
 # walk would be a second definition of the always-on path. Loaded guarded rather than required: a tree
@@ -127,8 +145,12 @@ if ($findings.Count -eq 0) {
 
 Write-Host "[ERROR] $($findings.Count) retired name(s) of the branch's development document are still stated here as current:" -ForegroundColor Red
 foreach ($f in $findings) {
-    Write-Host "          $($f.Rel):$($f.Line)  names '$($f.Name)'" -ForegroundColor Red
-    Write-Host "            $($f.Text)" -ForegroundColor DarkYellow
+    # Rel and Text are the consumer's; Name and Since are the PLUGIN'S OWN and stay raw. Name comes from
+    # Get-BranchFileLegacyNames and Since is a sentence written in entry-scaffold-lib.ps1 -- sanitizing
+    # either would be theatre, and would quietly cap or reshape text this repo controls. Rel is a path,
+    # so it takes the path-shaped sanitizer; Text is a sentence, so it takes the prose-shaped one.
+    Write-Host "          $(Format-SafePathToken -Value $f.Rel):$($f.Line)  names '$($f.Name)'" -ForegroundColor Red
+    Write-Host "            $(Format-SafeProseToken -Value $f.Text)" -ForegroundColor DarkYellow
     Write-Host "            -> $($f.Since)" -ForegroundColor Red
 }
 Write-Host '        A consumer document may POINT at a shared convention, state this repo''s answer to a' -ForegroundColor Red
@@ -136,4 +158,6 @@ Write-Host '        seam the plugin names, or say NOTHING -- never restate the c
 Write-Host '        The rule is in CONTRIBUTING-portable.md, "The two contributing layers, and which one' -ForegroundColor Red
 Write-Host '        wins"; a restatement does not fail on the day it is written, only on the day the' -ForegroundColor Red
 Write-Host '        plugin''s answer moves under it. Replace each line above with a pointer.' -ForegroundColor Red
+Write-Host '        The echoed line is a PREVIEW, not the text: square brackets are shown as round ones' -ForegroundColor DarkGray
+Write-Host '        so nothing in it can be read as a marker of ours. Open it at the file and line above.' -ForegroundColor DarkGray
 exit 1
