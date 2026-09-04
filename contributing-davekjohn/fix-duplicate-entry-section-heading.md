@@ -33,21 +33,59 @@
 
 ### PLAN
 
-Cause verified: the second '#### Pull Request' was hand-authored in commit 1af31be4 (a docs: commit), not by open-pr. Fix: extend check 13 [entry-heading] in check-plugin-integrity.ps1 to flag a declared section heading repeated within one entry, in both the branch-document and CHANGELOG.md passes. Then Tycho adds a scenario-34 test.
+Issue #1367. The reported cause -- "open-pr's PR-link writer appended a second `#### Pull Request`
+section" -- did not survive verification. Git history for `docs/language-layers-bypass-restored-v1`
+shows the second heading was hand-authored in commit `1af31be4`, an ordinary `docs:` work commit that
+touched only `.claude/rules/language-layers.md` and the branch document; `open-pr.ps1` writes no
+`[PR #NN]` link into the branch document at all -- the fold does, afterward. So the root cause is a
+hand-editing slip while writing the DEPLOY section, and the gap is that `check-plugin-integrity.ps1`
+check 13 (`[entry-heading]`) validates that each `####` heading IS a declared section but never that a
+declared section appears only ONCE. Downstream, the fold stamps/links the LAST `Pull Request` heading
+while `Get-PrDescription` and the release renderer read the FIRST, so the v4.29.0 Release body took the
+copy with no PR link -- silent in both directions, the same shape as #1268 and #952.
+
+Fix: extend check 13 to flag a declared section heading repeated within one entry, in both passes it
+already walks (the branch document / root entry files, and `CHANGELOG.md` below its intro).
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `check-plugin-integrity.ps1` check 13, branch-document/entry-file pass: track declared section
+  headings per entry (stamp-stripped name), raise `[entry-heading]` on the second occurrence.
+- [x] Same check, `CHANGELOG.md` pass: per-entry (`$from..$to`) duplicate detection, so a copy that
+  arrives through the fold is caught on the one write that lands directly on `main`.
+- [~] Touch `open-pr.ps1` / the fold -- dropped: the reported cause is disproven, no script doubles the
+  section. The gate is the repair.
 
 ### TEST
 
+- [x] `scripts/tests/check-plugin-integrity-entries.tests.ps1` scenario 34, three new cases: a doubled
+  declared section in an entry file (reported on the second occurrence, names the section and #1367), a
+  doubled section folded into `CHANGELOG.md`, and two negatives -- a duplicate quoted inside a fence,
+  and the same section name in two different entries.
+- [x] Full `check-plugin-integrity.ps1` green on the real tree (0 errors); the three sibling entry
+  suites green; entries suite 78 -> 85 asserts.
+- [x] Lint + tests green, then PR + merge + fold.
+
 ### DEPLOY: fix/duplicate-entry-section-heading
 
-**Score:**
+`check-plugin-integrity.ps1`'s entry-heading check (check 13) now refuses a changelog entry whose
+declared section heading appears more than once -- `#### Pull Request` written twice, say. Both copies
+are valid names, so nothing errored before: the entry validated, every gate passed, and the split only
+showed in a published GitHub Release body, because the fold stamps and links the last `Pull Request`
+heading while the PR body and the release notes read the first. `v4.29.0`'s Release body shipped a
+bullet with no PR link that way (issue #1367). The check catches it in both places it already
+walks -- the branch's development document (on the PR, and in CI) and `CHANGELOG.md` below its intro
+(after a fold, the one write that lands directly on `main`) -- and a heading quoted inside a code fence
+is a mention, not a finding.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- an internal lint gate. No subscriber of any service reaches it; the entry files and `CHANGELOG.md`
+it guards are developer-facing.
+
+**Score:** N/A
 
 #### Pull Request
 
