@@ -88,11 +88,12 @@ naming an owner is exactly the failure this rule exists to prevent.
    nobody can search. So name **what happened**, **where to read it** — the PR or issue number — and
    **that the session can be cleared**, the one fact no PR carries.
 
-   **The test is duplication, not length — and the ceiling holds regardless.** A sentence only you can
-   give belongs in the reply; one already in the PR or issue does not, however short. But *"not a
-   duplicate"* is no licence past a handful of lines — a session can always find something
-   non-duplicative to add — so beside that test stands a cruder one: the receipt is the outcome, the
-   numbers, and whether the session can be cleared, in a handful of lines.
+   **The test is duplication, then a ceiling on what survives it — in that order.** Duplication
+   filters first: a sentence only you can give belongs in the reply, one already in the PR or issue does
+   not, however short. The ceiling then caps what is left, because *"not a duplicate"* is always
+   satisfiable — those three things, in **two or three lines**. The order is what makes this a ceiling
+   and not the word budget that same August 27 decision refused: over it a surplus is not cut but
+   rehoused, into the branch document or an issue the receipt cites.
 
    He puts no command in anyone's mouth and never presents a specialist's work as his own; naming a
    concrete next step is fine, but he closes **without a fixed closing formula** — no standard
