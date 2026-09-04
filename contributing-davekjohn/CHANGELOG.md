@@ -32,6 +32,48 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/bwj-github-type-field-convention · 20260904-213855
+
+`bwj-codex` now carries the board's `Github Type` field the same way it carries `Github Issue`: an
+optional `Get-AsanaTypeFieldGid` seam in `adopt-bwj-asana`, and a `report-issue` step 2 that sets the
+field **from the issue type step 1 already chose** rather than deciding it a second time. Because the
+value is carried forward rather than re-derived, a ticket this workflow files cannot end up with a
+board type its own GitHub issue contradicts.
+
+The field's **option** GIDs are deliberately not part of the seam -- they are resolvable at run time
+from the project `report-issue` is already reading for the section, so pinning three more GIDs per
+repo would only add three more values that go stale in silence. What that buys is stated where a
+maintainer will meet it: rebuild an option and nothing breaks; rename one away from `Bug`, `Feature`
+or `Task` and the write is skipped with a note rather than guessing.
+
+Two things measured on the way in are written down with it. Asana's `opt_fields` takes **no
+wildcard**, so the enum options are not free on the call already being made and the exact string is
+spelled out; and of the 23 cards on the BWJ board, whose `Github Type` had only ever been filled by
+hand, **5 disagreed with the GitHub issue** in both directions -- which is what a hand-fill costs
+rather than a drift rate for a step that had never run.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo whose board carries the field gets it filled at creation instead of by hand, and
+`adopt-bwj-asana` now proposes the seam that turns it on. A consumer whose board carries no such
+field sets nothing and sees no change -- `$null` stays the default and the write is skipped silently.
+The `bwj-codex` seam register in the plugin README lists both GitHub field seams for the first time,
+so the set of values a consumer is expected to answer is readable in one place again.
+
+**Score:** 3
+
+#### Pull Request
+
+set the board's Github Type field from the issue type report-issue already chose
+
+Plugins: bwj-codex
+
+[PR #1390](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1390)
+
+---
+
 ### DEPLOY: docs/fix-1386-step5-per-project-not-workspace · 20260904-213204
 
 `WORKFLOW-portable.md` step 5 blamed a self-filed ticket's missing `Prio-Score` on a workspace
