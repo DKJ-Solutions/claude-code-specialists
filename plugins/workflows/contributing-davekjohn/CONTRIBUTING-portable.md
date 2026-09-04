@@ -808,3 +808,50 @@ a suggestion: the failure is silent by construction.
 **And the drift that prompts the removal is itself the evidence for doing the pass.** The same page's
 gate list named three test suites on a day its root `CLAUDE.md` named ten. A page far enough out of date
 to be worth retiring is exactly the page whose contents you can no longer predict from memory.
+
+### A third rank sits above both, and nothing named it until inbound #1379
+
+**Both layers above are consumer documents, and a consumer document only ever comes second.** Everything
+this section has ranked so far is one repo's own floor against that same repo's workflow folder — it never
+said where the law that ships **with this plugin** — this page, the sibling portable pages, and the
+skills that carry their mechanics — sits relative to either. That is a real vacuum rather than an implied
+answer, and a consumer filled it in good faith the other way up: it declared its `CLAUDE.md` the
+constitution, supreme over its own contributing page on any disagreement. Both rules read as reasonable in
+isolation, and together they invert: this page says the workflow's page wins, the consumer says its floor
+wins and is the only place a rule is ever changed. The measured instance is
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378) — `cut-release`'s own
+mechanics fix a cut-then-push order, the consumer's `CLAUDE.md` documented push-then-cut, and the
+disagreement did not read as drift. It read as the constitution exercising a supremacy it had declared in
+writing, and no gate could flag it, because no gate reads a contributing page or a `CLAUDE.md`.
+
+**So the complete order, on the matters this plugin actually legislates, is three ranks and not two:**
+
+```
+the plugin's portable pages + skills        (the shared law)
+        >  contributing-davekjohn/CONTRIBUTING.md   (this repo's answers to its seams)
+        >  the floor                        (root CONTRIBUTING.md, or CLAUDE.md where the repo keeps its floor there)
+```
+
+**Scoped as narrowly as it should be.** This ranking governs only what the plugin actually legislates —
+the branch/PR/release mechanics, the gates, the tier model, the shapes described on these portable pages.
+A repo's own rules that the plugin has no opinion on — its live theme's id, its store domain, its
+front-end tokens, the safety rules it runs under — are not in that set at all, and nothing here outranks
+them. Restating that scope matters because the failure this section describes looks exactly like
+diligence: a repo folds a shared rule into its always-on `CLAUDE.md` *in order to* keep one document
+self-contained, and the fold is where the divergence gets in.
+
+**The rank alone will not be obeyed, so here is the corollary that actually keeps it: a consumer document
+may point at a shared law, state this repo's answer to a seam the law names, or say nothing about it. It
+may not restate the law in its own words.** A restatement is a copy, and a copy does not fail on the day
+it is written — only on the day the plugin's answer moves under it and the copy does not move with it.
+This is the same rule this workflow already applies one layer down, to code: a returned local copy of a
+shared function is not a bug on day one, it is a bug the day the two diverge (`check-script-contract.ps1`
+exists for exactly that shape). Nothing yet enforces the prose version of it — the gap a manifest-driven
+prose contract check could close is real, and is left as a follow-up rather than built into this section,
+because it needs its own design (what counts as an agreeing restatement, how the manifest is authored)
+rather than a paragraph.
+
+**Read this section end to end before writing a repo's own layering answer.** "Which file carries the
+floor is yours" and "the workflow's page wins" above are still both true and both local to the two
+consumer layers; this third rank does not change either, it completes the sentence neither of them ever
+finished.
