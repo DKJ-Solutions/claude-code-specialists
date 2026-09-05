@@ -33,21 +33,66 @@
 
 ### PLAN
 
-Rewrite the plugin name and the two consumer-facing folder paths in dkj-policy/releases/README.md to dkj-policy, leaving the dated sentences alone.
+Rewrite the plugin name and the two consumer-facing folder paths in dkj-policy/releases/README.md to
+dkj-policy, leaving the dated sentences alone.
+
+#### The bound, and why it is exactly three lines
+
+[#1454](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1454) names three undated,
+present-tense statements in `releases/README.md`. They are neither history preserved under #952 nor
+rename-tolerant fallbacks, which is the reason
+[#1447](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1447) gave for scoping that
+file's other occurrences out. Lines 137 and 143 are #1447's own stated scope and are **not** touched
+here: that repair sits on the parked branch `fix/1447-release-page-path` and is still open.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `releases/README.md:5` -- the plugin is named `dkj-policy`, not `contributing-davekjohn`. This
+      is the plugin's name rather than the folder's, so it is a distinct defect from #1437's folder
+      rename rather than a missed occurrence of it.
+- [x] `releases/README.md:51` -- the path the `adopt-workflow-folder` skill actually scaffolds is
+      `dkj-policy/releases/README.md`, so the sentence no longer names a path the skill it cites does
+      not write.
+- [x] `releases/README.md:56` -- `Get-ReleaseHistoryPath`'s computed default composes the folder from
+      `Get-WorkflowFolderName`, which returns `dkj-policy` for a repo that has none of the three
+      folders. The sentence now names what a fresh consumer actually gets.
 
 ### TEST
 
+- [x] Re-verified all three of the issue's cited evidence points in this checkout before editing:
+      `.claude-plugin/marketplace.json:27` registers `"name": "dkj-policy"` and no
+      `contributing-davekjohn` plugin; `adopt-workflow-folder.ps1:401` writes
+      `dkj-policy/releases/README.md`; `seam-lib.ps1:188` iterates
+      `@('dkj-policy', 'contributing-davekjohn', 'workflow-davekjohn')` first-hit-wins and falls
+      through to `'dkj-policy'`.
+- [x] The lint gate and the full suite, run through `open-pr.ps1` -- the same gate CI runs.
+
 ### DEPLOY: fix/1454-releases-readme-folder-name
 
-**Score:**
+`releases/README.md` told an agent setting this workflow up in another repo that the plugin is called
+`contributing-davekjohn`, that the `adopt-workflow-folder` skill scaffolds a
+`contributing-davekjohn/releases/README.md`, and that `Get-ReleaseHistoryPath` points at a
+`contributing-davekjohn/releases/history.md` if left alone. All three are false, and false in the same
+direction: a fresh consumer has none of the three folder names on disk, so every script hands them
+`dkj-policy` while this page addressed them in the second person about a folder they do not have.
+
+#1437 renamed the folder and #1447 covers the two `releases/page/` statements it left behind. These
+three were scoped out of that branch because #1447 states its own bound -- and one of them is not a
+folder-rename miss at all: line 5 names the **plugin**, which was never called `contributing-davekjohn`.
+
+Three sentences rewritten. The dated sentences around them keep the name they were written with, and
+lines 137 and 143 are left for #1447.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+The section these three sit in is `### How to build your own version of this page` -- the one document
+that exists to answer *"what does this look like in my repo"*, addressed in the second person to a
+consumer adopting the workflow. That is the worst place in the tree for a stale name, because the
+reader has nothing of their own to check it against yet.
+
+**Score:** 3
 
 #### Pull Request
 
