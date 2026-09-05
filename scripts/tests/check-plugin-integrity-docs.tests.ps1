@@ -47,7 +47,7 @@ try {
     # positive-only test would pass against a check that examines nothing at all.
     Write-Host "check 18: shared-script parameters vs. their skill" -ForegroundColor Cyan
     $parkSrc   = Join-Path $Fixture 'scripts\task\park-branch.ps1'
-    $parkSkill = Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\skills\park\SKILL.md'
+    $parkSkill = Join-Path $Fixture 'plugins\workflows\dkj-policy\skills\park\SKILL.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $parkSrc) -Force | Out-Null
     New-Item -ItemType Directory -Path (Split-Path -Parent $parkSkill) -Force | Out-Null
     # A real param block, so the AST reader is what is being exercised -- not a string the test planted.
@@ -128,7 +128,7 @@ try {
     # false, against 4 claims with 3 correct), and a rule keyed on names is one rename away from going
     # silent -- which is exactly what just happened to the collision itself.
     Write-Host "check 20: a claimed section count vs. the scaffolder" -ForegroundColor Cyan
-    $shapeDoc = Join-Path $Fixture 'contributing-davekjohn\branch\README.md'
+    $shapeDoc = Join-Path $Fixture 'dkj-policy\branch\README.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $shapeDoc) -Force | Out-Null
 
     # 44. A wrong count is reported, naming the file, the claim and the truth.
@@ -176,7 +176,7 @@ try {
     # across a line break. A test that only pinned the exclusion would pass against a check that still sees
     # nothing.
     Write-Host "check 20b: the changelog intro is held, its entries stay history" -ForegroundColor Cyan
-    $shapeCl = Join-Path $Fixture 'contributing-davekjohn\CHANGELOG.md'
+    $shapeCl = Join-Path $Fixture 'dkj-policy\CHANGELOG.md'
     $shapeEntry = @(
         ''
         '## #123 ' + ([char]0x00B7) + ' A real entry'
@@ -203,7 +203,7 @@ try {
     #     requires and this one deliberately does not. This is the exact sentence that was on main.
     Write-ShapeChangelog 'Everything merged since the last release: one `##` per change, and under it three named sections.'
     $e4 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($e4.Out -match '\[entry-shape\] contributing-davekjohn[\\/]CHANGELOG\.md:3: says an entry has 3') `
+    Assert-True ($e4.Out -match '\[entry-shape\] dkj-policy[\\/]CHANGELOG\.md:3: says an entry has 3') `
         'entry-shape: a stale count in the changelog intro is reported, with its line, and needs no level marker'
 
     # 48. THE RELAXATION IS CONFINED TO THE HEAD. The same markerless claim below the first entry heading
@@ -222,7 +222,7 @@ try {
     #     bypass -- and the drift that prompted this was written exactly that way.
     Write-ShapeChangelog "Everything merged since the last release: one $docEntryH per change, and under it three`nnamed $docSectH sections."
     $e6 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True ($e6.Out -match '\[entry-shape\] contributing-davekjohn[\\/]CHANGELOG\.md:3: says an entry has 3') `
+    Assert-True ($e6.Out -match '\[entry-shape\] dkj-policy[\\/]CHANGELOG\.md:3: says an entry has 3') `
         'entry-shape: a claim split across a line break in the intro is caught, at the line it starts on'
 
     # 50. And the right count clears it -- taken from the scaffolder, not from the literal 'six', so this
@@ -245,7 +245,7 @@ try {
     # absolute path reads as a line to paste. A test that only pinned the positive would pass against a
     # stricter check that starts accusing the teardown page and needs a list to quiet it back down.
     Write-Host "check 22: a skill's command must not point at the author's disk" -ForegroundColor Cyan
-    $cmdSkill = Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\skills\adopt-config\SKILL.md'
+    $cmdSkill = Join-Path $Fixture 'plugins\workflows\dkj-policy\skills\adopt-config\SKILL.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $cmdSkill) -Force | Out-Null
     function Write-CmdSkill([string]$Path) {
         [System.IO.File]::WriteAllText($cmdSkill,
@@ -293,7 +293,7 @@ try {
     #        the contract. That contract is ONE promise since issue #865: a placeholder line the matcher
     #        recognises. Scenario 57 is where the retired half is written down.
     Write-Host "  check 24: the PR template's two promises" -ForegroundColor DarkCyan
-    $prtRefFixture = Join-Path $Fixture 'plugins\workflows\contributing-davekjohn\templates\pull_request_template.md'
+    $prtRefFixture = Join-Path $Fixture 'plugins\workflows\dkj-policy\templates\pull_request_template.md'
     $prtOwnFixture = Join-Path $Fixture '.github\pull_request_template.md'
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.github') -Force | Out-Null
 

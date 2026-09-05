@@ -24,8 +24,8 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
 | know **where this runs** (Chat / Cowork / Claude Code) | [Where this runs](#where-this-runs-chat-cowork-and-claude-code) |
-| **contribute a change** | [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) — one page: the standard branch + PR workflow, which holds with no plugin installed, and the entry, the fold and the cut layered on top of it |
-| see **the version history** | [`releases/history.md`](contributing-davekjohn/releases/history.md) |
+| **contribute a change** | [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md) — one page: the standard branch + PR workflow, which holds with no plugin installed, and the entry, the fold and the cut layered on top of it |
+| see **the version history** | [`releases/history.md`](dkj-policy/releases/history.md) |
 
 Everything below this table is the underlying explanation, and the page is long on purpose: it is the
 architecture record as much as the landing page. **[INSTALL.md](INSTALL.md) holds both
@@ -105,16 +105,16 @@ shipped alongside them was.
 [`scripts/repo-config.ps1`](scripts/repo-config.ps1) looks like the seam that makes the workflow
 adaptable, and its 19 functions genuinely do let a consumer change the trunk name, the merge method and
 the folder grouping. But those are *parameters* of a single changelog model, and the model itself is
-fixed in [`entry-scaffold-lib.ps1`](plugins/workflows/contributing-davekjohn/scripts/lib/entry-scaffold-lib.ps1). A consumer
+fixed in [`entry-scaffold-lib.ps1`](plugins/workflows/dkj-policy/scripts/lib/entry-scaffold-lib.ps1). A consumer
 could tune our way of working; they could not have their own. And
-[`check-script-contract.ps1`](plugins/workflows/contributing-davekjohn/scripts/sync/check-script-contract.ps1) *enforces*
+[`check-script-contract.ps1`](plugins/workflows/dkj-policy/scripts/sync/check-script-contract.ps1) *enforces*
 that they supply those functions — so a repo that worked differently was not adapted to. It was told at
 every session start that it was misconfigured.
 
 **What the packaging now does about it.** Both files named above are in the paths they are because the
 47% moved out on the same day: the workflow skills, their scripts, the two session hooks that audit a
 repo against this way of working, and the libs only those scripts read now ship as
-[`contributing-davekjohn`](#teams-and-workflows--whats-the-difference) — enabled by choice, absent
+[`dkj-policy`](#teams-and-workflows--whats-the-difference) — enabled by choice, absent
 by default. The enforcement went with them, which is the half that mattered most: a repo that works
 differently is no longer told anything at session start, because the checker that had the opinion is
 not there. And `specialists-init` stops scaffolding what it cannot justify — a consumer without the
@@ -128,7 +128,7 @@ enforcement out fixed the repo that works differently; it left the repo that wor
 re-deriving twenty values by hand, because the checker only ever named the **fallback** a shared script
 uses — never what this repo chose, or why. The pack therefore ships a **config blueprint**: each seam
 function with the source's own text, comments and reasoning included, and a marker saying whether that
-answer is safe to take. The [`adopt-config`](plugins/workflows/contributing-davekjohn/skills/adopt-config/SKILL.md)
+answer is safe to take. The [`adopt-config`](plugins/workflows/dkj-policy/skills/adopt-config/SKILL.md)
 skill reads it, **places** what states the shared way of working, and **proposes** — never places — what
 states what a repo *is*, in a document a person works through.
 
@@ -146,10 +146,10 @@ repo.** That split arrived on August 8, 2026, when the branch/release workflow m
 into a pack of its own — the packaging consequence of
 [the plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo). Read the table with
 that split in mind: `team-lifehub`, `team-shopify` and `team-ecomm` are add-on teams,
-`contributing-davekjohn` is the one answer offered to the workflow question, and only the core team is
+`dkj-policy` is the one answer offered to the workflow question, and only the core team is
 for everyone. **Teams stack** — a consuming repo enables `team-alpha` plus as many add-on teams as its
 domain calls for. **Workflows are opt-in** — a repo that enables none keeps the way of working it
-already had. There is one general workflow, `contributing-davekjohn`, plus one deliberately narrow,
+already had. There is one general workflow, `dkj-policy`, plus one deliberately narrow,
 additive one — see below.
 
 **"At most one workflow" was a checked rule until August 26, 2026, and it is recorded here rather than
@@ -169,7 +169,7 @@ workflow is ever added here, nothing will notice both being enabled, so that day
 question again rather than finding the check gone.
 
 **That day came on August 31, 2026, and the question was answered rather than skipped:
-`bwj-codex` is a deliberate second workflow.** It is safe alongside `contributing-davekjohn`
+`dkj-policy-bwj` is a deliberate second workflow.** It is safe alongside `dkj-policy`
 because it is **additive and non-overlapping** — it extends only the *ticket-work* step that sits
 before a branch (how a discovered issue is filed and mirrored to Asana in BWJ's two Shopify store
 repos) and, since [#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382), what a
@@ -193,8 +193,8 @@ and an unclassifiable name switches the check off for itself.
 | [`team-lifehub/`](plugins/teams/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
-| [`contributing-davekjohn/`](plugins/workflows/contributing-davekjohn/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
-| [`bwj-codex/`](plugins/workflows/bwj-codex/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `bwj-codex/SYNC-LOG.md` instead, written by `team-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-bwj-asana`), no specialists, no hooks. Extends only the ticket-work step of `contributing-davekjohn` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `contributing-davekjohn` — the sync chapter also expects `team-shopify`. |
+| [`dkj-policy/`](plugins/workflows/dkj-policy/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
+| [`dkj-policy-bwj/`](plugins/workflows/dkj-policy-bwj/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead, written by `team-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-bwj-asana`), no specialists, no hooks. Extends only the ticket-work step of `dkj-policy` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `dkj-policy` — the sync chapter also expects `team-shopify`. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -206,7 +206,7 @@ consumer's repo lens); the add-on teams name their domain explicitly, because on
 enables them.
 
 **The workflow slot sits on neither team axis, and the plugin in it answers a different question than
-"what kind of repo is this".** `contributing-davekjohn` carries an owner's name because it is *his* branch
+"what kind of repo is this".** `dkj-policy` carries an owner's name because it is *his* branch
 discipline, not a standard. A repo that adopts the specialists gets colleagues; it does not get somebody
 else's branch discipline along with them — and since August 26, 2026 that is true **by there being
 nothing in the slot to receive**, rather than by a `workflow-default` plugin standing in the slot to
@@ -223,7 +223,7 @@ Two of the plugins serve a **commercial webshop** and are built to work together
 - **`team-shopify`** — the *platform* layer: theme code, store management, configuration for a Shopify store.
 - **`team-ecomm`** — the platform-agnostic *disciplines* that any webshop needs: SEO, CRO, and performance/SEA.
 
-They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `team-ecomm`. The other plugins — `team-alpha` (the core team), `team-lifehub` and the workflow plugin `contributing-davekjohn` — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
+They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `team-ecomm`. The other plugins — `team-alpha` (the core team), `team-lifehub` and the workflow plugin `dkj-policy` — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
 
 ## What lives here and what doesn't
 
@@ -240,7 +240,7 @@ at repo level deliberately, because they differ per repo (or are safety-critical
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
 repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), and a set of
 informational, read-only SessionStart hooks that never block — `roster-sessioncheck` (roster-drift
-signaling) in the **core team**, and in **`contributing-davekjohn`** the rest, among them
+signaling) in the **core team**, and in **`dkj-policy`** the rest, among them
 `connector-sessioncheck` (sync signaling), `script-contract-sessioncheck` (signals when a repo's own
 workflow libs no longer expose a function the shared scripts call) and `consumer-prose-sessioncheck`
 (signals when a repo's own always-on prose contradicts the plugin — a convention the plugin has renamed
@@ -254,7 +254,7 @@ three, and went stale twice inside two days as hooks were added; each plugin's `
 one place that cannot.
 
 **And since August 26, 2026 one hook that acts rather than reports**, which is a real widening of that list
-and named as such: `cycle-autopark` (a **Stop** hook, in `contributing-davekjohn`) commits and pushes the
+and named as such: `cycle-autopark` (a **Stop** hook, in `dkj-policy`) commits and pushes the
 branch's `<branch>.md` to `origin` after every turn, until a PR publishes it
 ([#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900)). It writes to git, so it is not
 read-only — but it is still not a *guardrail*: it blocks nothing, refuses nothing, and exits 0 on every
@@ -278,7 +278,7 @@ The full picture, top-level folder by folder:
   [README](plugins/README.md) states that split side by side, with the test question that decides
   which kind a new plugin is): the teams under
   [`plugins/teams/`](plugins/teams/) (`team-alpha`, `team-lifehub`, `team-shopify`, `team-ecomm`) and
-  the workflow under [`plugins/workflows/`](plugins/workflows/) (`contributing-davekjohn`, the only one),
+  the workflow under [`plugins/workflows/`](plugins/workflows/) (`dkj-policy`, the only one),
   each of those two directories carrying its own README for what belongs in it
   and the rules that govern it. One folder per plugin, each carrying
   `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and beside the four teams
@@ -306,21 +306,22 @@ The full picture, top-level folder by folder:
   [`scripts/README.md`](scripts/README.md) is the directory-by-directory map, with the entry points and
   the four gates. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `team-alpha`, the
-  branch/release workflow in `contributing-davekjohn` — see its own
-  [README](plugins/workflows/contributing-davekjohn/scripts/README.md).
-- **`contributing-davekjohn/`** — the workflow's own root folder, and since August 27, 2026 the home of
+  branch/release workflow in `dkj-policy` — see its own
+  [README](plugins/workflows/dkj-policy/scripts/README.md).
+- **`dkj-policy/`** — the workflow's own root folder (named `contributing-davekjohn/` from August 27
+  until September 5, 2026, #1437), and since August 27, 2026 the home of
   every document the contribution cycle produces or governs. Its
-  [`CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) is the centre of it: the standard branch +
+  [`CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md) is the centre of it: the standard branch +
   PR workflow, which holds with no plugin installed, and this repo's answers to the workflow's seams on
-  top of it. Beside it sit [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md), the open branch's
+  top of it. Beside it sit [`CHANGELOG.md`](dkj-policy/CHANGELOG.md), the open branch's
   `<branch>.md` while one is open, and `releases/` — what a cut *generated*
   (`changelog/<X>.x/<X.Y.Z>.md`, the complete note per version, and `github/<X>.x/<X.Y.Z>.md`, that
   version's GitHub Release body), the hand-written note per version under `audience/`, the dated list of
   every release ever cut in
-  [`releases/history.md`](contributing-davekjohn/releases/history.md), and this repo's seam answers in
-  [`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md). The cutting process itself travels
+  [`releases/history.md`](dkj-policy/releases/history.md), and this repo's seam answers in
+  [`dkj-policy/releases/README.md`](dkj-policy/releases/README.md). The cutting process itself travels
   with the plugin as
-  [`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md).
+  [`RELEASES-portable.md`](plugins/workflows/dkj-policy/RELEASES-portable.md).
 - **`.claude/`** — the repo layer, on the seam described under
   [The seam, specified](#the-seam-specified): `specialists/SPECIALISTS.md` (the inclusion carrying the
   body import, the lens import and the roster), `specialists/lenses/` (this repo's own repo lenses),
@@ -335,7 +336,7 @@ The full picture, top-level folder by folder:
   **`.github/`** (`pull_request_template.md`, the issue templates + three workflows: `workflows/ci.yml`,
   the CI gate that runs the lint + test suites on every PR and push to `main`, plus
   `workflows/claude.yml` and `workflows/claude-code-review.yml`, which answer an `@claude` mention and
-  review each PR. Only `ci.yml`'s job blocks a merge; see [`CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md)).
+  review each PR. Only `ci.yml`'s job blocks a merge; see [`CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md)).
 
 ## Consumption
 
@@ -360,7 +361,7 @@ beyond any one consumer:
 whose `version` is the release it belongs to, bumped in lockstep across every plugin. Because
 `claude plugin update` pins the cache to a specific version (see [Versioning](#versioning)), the
 cached `version` is *exactly* the installed release. The full history of that release lives in this
-repo's [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md) and [`contributing-davekjohn/releases/`](contributing-davekjohn/releases/) — and a consumer has both, because
+repo's [`CHANGELOG.md`](dkj-policy/CHANGELOG.md) and [`dkj-policy/releases/`](dkj-policy/releases/) — and a consumer has both, because
 the marketplace source is a git clone of the whole repository at
 `~/.claude/plugins/marketplaces/<marketplace>/`, not a per-plugin extract.
 
@@ -407,10 +408,10 @@ repo itself, which consumes itself) only pulls in merged changes after the `vers
 bumped — a merge without a release stays invisible to consumers, and a shared agent-def change
 therefore always lands here first, never the other way around. The full mechanics — cutting a
 release, the three release documents, the lint guardrails — are in
-[`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md#cutting-a-release),
-with this repo's release list in [`releases/history.md`](contributing-davekjohn/releases/history.md) and its own answers to the
+[`RELEASES-portable.md`](plugins/workflows/dkj-policy/RELEASES-portable.md#cutting-a-release),
+with this repo's release list in [`releases/history.md`](dkj-policy/releases/history.md) and its own answers to the
 workflow in
-[`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md).
+[`dkj-policy/releases/README.md`](dkj-policy/releases/README.md).
 
 ## Manuals — the split model
 
@@ -732,7 +733,7 @@ what a skill costs the sessions that carry it, and giving a branch its own workt
 ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-bwj-asana`<!-- /skills:all --> are the
 deliberate exceptions: a checklist with no script of its own (see below); a skill that must not have
 one — `orchestrator` reads a persona file into the conversation, and the environment it exists for is
-precisely the one where `powershell` is absent; and the two `bwj-codex` procedures, which run over
+precisely the one where `powershell` is absent; and the two `dkj-policy-bwj` procedures, which run over
 `gh` and the Asana MCP with a judgement call in the middle (the colleague-facing translation) rather
 than a transform a script could carry. Either way, the specialists' craft and judgment
 live in the persona/manual context (agent defs), not in skills. That's a deliberate split, but it
@@ -773,7 +774,7 @@ shares once the version bump is committed (tag + push, branch cleanup), as a che
 of its own (issue #177). That checklist also covers the GitHub Release, whose body is the highest
 release tier the repo has and whose other tiers go along as
 attachments — a manual closing step this repo takes at every release (see
-[RELEASES-portable.md](plugins/workflows/contributing-davekjohn/RELEASES-portable.md#cutting-a-release)),
+[RELEASES-portable.md](plugins/workflows/dkj-policy/RELEASES-portable.md#cutting-a-release)),
 just not one `cut-release.ps1`
 itself automates. *Which* bumps get a Release is repo policy and lives in the release manager's lens,
 not in the portable checklist.
@@ -793,8 +794,8 @@ Read the `version` in your cached `<plugin>/.claude-plugin/plugin.json`. It trav
 cache, so once `claude plugin update` has pinned your install to a version, that number is exactly the
 release you are on. Every plugin bumps in lockstep, so any one of them answers the question.
 
-For **what changed** in that release, read [`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md) and
-[`contributing-davekjohn/releases/`](contributing-davekjohn/releases/) in the marketplace clone you already have —
+For **what changed** in that release, read [`CHANGELOG.md`](dkj-policy/CHANGELOG.md) and
+[`dkj-policy/releases/`](dkj-policy/releases/) in the marketplace clone you already have —
 `~/.claude/plugins/marketplaces/claude-code-specialists/`. See [Consumption](#consumption) above for
 the mechanics.
 
@@ -1325,11 +1326,11 @@ its own marketplace. See [One product, one repository](#one-product-one-reposito
 
 Changes to this repo go through a branch + Pull Request to `main`, and that much holds whether or not
 any plugin is installed — it is the **standard workflow**, three rules long, and since August 27, 2026 it
-opens [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) rather than a page
+opens [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md) rather than a page
 of its own at the root. **The branch dossier, the changelog entry that folds at the merge, the significance
-model and the release cut are the `contributing-davekjohn` layer on top**, and they are described further
+model and the release cut are the `dkj-policy` layer on top**, and they are described further
 down that same page — this repo's answers — over
-[`CONTRIBUTING-portable.md`](plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md), the half
+[`CONTRIBUTING-portable.md`](plugins/workflows/dkj-policy/CONTRIBUTING-portable.md), the half
 that travels with the plugin. Where the two disagree, the plugin's page wins.
 
 The governance is in [`CLAUDE.md`](CLAUDE.md): the safety rules, the three direct-on-`main` exceptions
@@ -1347,8 +1348,8 @@ which is what [The seam, specified](#the-seam-specified) is for.
   commands.
 - **Disconnecting it again?** [UNINSTALL.md](UNINSTALL.md) is its mirror — the repo teardown and the
   machine-side removal, in the order they have to happen.
-- **Releases** — the full version history is in [`releases/history.md`](contributing-davekjohn/releases/history.md); the
+- **Releases** — the full version history is in [`releases/history.md`](dkj-policy/releases/history.md); the
   cutting-a-release mechanics travel with the workflow plugin as
-  [`RELEASES-portable.md`](plugins/workflows/contributing-davekjohn/RELEASES-portable.md), with this repo's
+  [`RELEASES-portable.md`](plugins/workflows/dkj-policy/RELEASES-portable.md), with this repo's
   answers to it in
-  [`contributing-davekjohn/releases/README.md`](contributing-davekjohn/releases/README.md).
+  [`dkj-policy/releases/README.md`](dkj-policy/releases/README.md).

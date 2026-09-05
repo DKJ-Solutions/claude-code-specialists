@@ -146,7 +146,7 @@ function New-FoldFixture {
 
     # AND THE SEAM IS PATCHED BACK OUT OF THE COPIED CONFIG (August 27, 2026). The marketplace file above
     # settles what the COMPUTED default answers, and that was enough while this repo stated no changelog
-    # seam. It now states one -- contributing-davekjohn/CHANGELOG.md -- and a verbatim copy of
+    # seam. It now states one -- dkj-policy/CHANGELOG.md -- and a verbatim copy of
     # repo-config.ps1 brings that answer into the fixture, where it beats the default and points every
     # assertion in this suite at a file the fixture never wrote. Patched rather than worked around,
     # following the precedent in cut-release-drive.tests.ps1: the intent stated above is the root layout,

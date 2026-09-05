@@ -55,7 +55,7 @@
     is checkable by anyone with npm's shopify on PATH.
 
     NOT Invoke-NativeCapture, AND THE REASON IS THE SHAPE RATHER THAN THE DANCE. That lib (registered
-    for contributing-davekjohn and, since inbound #1181, for team-shopify) centralises exactly this
+    for dkj-policy and, since inbound #1181, for team-shopify) centralises exactly this
     EAP dance for git and gh, and reusing it was the first thing tried. Two things rule it out here:
 
       1. IT CAPTURES; THESE CALLS HAVE TO STREAM. 'theme pull' and 'theme push' are the two longest

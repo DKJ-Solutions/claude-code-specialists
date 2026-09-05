@@ -204,7 +204,7 @@ days.
 **The lever is unchanged and the constraint on it is unchanged**, so this is a re-measurement rather than
 a new proposal: the `paths:`-scoped candidates were assessed above and the easy room was spent then. What
 has arrived since is a large, genuinely path-scoped body — the release, changelog, tier and significance
-machinery, inert until somebody touches `contributing-davekjohn/**`, `CHANGELOG.md` or runs a cut. It is also
+machinery, inert until somebody touches `dkj-policy/**`, `CHANGELOG.md` or runs a cut. It is also
 the body with the worst failure mode if scoped: a rule that is gone after a `/compact` is gone in the
 middle of a release, which is exactly when it is being followed.
 
@@ -245,7 +245,7 @@ earlier tables, which is the second half of the under-count):
 | `.claude/specialists/SPECIALISTS.md` (the seam) | 7,982 | ~2,600 | 3.12 |
 | **documents** | **113,793** | **~36,500** | |
 | `team-alpha` listing | — | 3,009 | **API-measured** |
-| `contributing-davekjohn` listing | — | 2,317 | **API-measured** |
+| `dkj-policy` listing | — | 2,317 | **API-measured** |
 | **total** | | **~41,800** | range ~40,600–43,900 |
 
 **~41,800 tokens, not ~30,205.** The plugin listing has also *fallen* since v2.10.0 — 3,009 against the
@@ -414,7 +414,7 @@ only while it says when each one was opened.
    inside the writing and nobody waited for. The gate share breaks down as 231s of suites inside the cut,
    200s of the same suites when the note's pull request opened, and 8m 36s of `lint-en-tests` on that pull
    request, which is **56%** of the release and the only place a real reduction can come from. The full table
-   is in [`releases/audience/4.x/4.4.0.md`](../../../contributing-davekjohn/releases/audience/4.x/4.4.0.md).
+   is in [`releases/audience/4.x/4.4.0.md`](../../../dkj-policy/releases/audience/4.x/4.4.0.md).
 
    **Two cautions travel with the number, and they matter more than it does.** That release carried **two**
    entries against `v4.2.0`'s seven, so it measures the clock well and the writing gain not at all — less to
@@ -455,7 +455,7 @@ only while it says when each one was opened.
    | `teardown-protocol.tests.ps1` | extracts a `Where-Object` from the real `specialists-teardown/SKILL.md` and executes it — its own docstring says outright that rewriting the doc turns the suite red |
    | `script-contract.tests.ps1` | the real `cut-release/SKILL.md`, asserting its text contains `Get-LiveStage` |
    | `shared-scripts.tests.ps1` | copies the real `.github/pull_request_template.md` into a fixture and asserts every comment line was substituted and no checkbox survives |
-   | `release-lib.tests.ps1` | the real release list via `Get-ReleaseHistoryPath` -- `contributing-davekjohn/releases/history.md` since August 27, 2026 -- asserting the overview targets major `'4'` — the live pin `CLAUDE.md` already records |
+   | `release-lib.tests.ps1` | the real release list via `Get-ReleaseHistoryPath` -- `dkj-policy/releases/history.md`, in the workflow folder since August 27, 2026 -- asserting the overview targets major `'4'` — the live pin `CLAUDE.md` already records |
 
    **Two findings worth keeping beside the number.** First, the counter-intuitive result is the one that
    most needed checking, and it held: `check-plugin-integrity.tests.ps1` — the lint-gate suite, which
@@ -510,7 +510,7 @@ only while it says when each one was opened.
    | minor / major (carries a document) | **14m 34s** | 231s suites in the cut · 200s the same suites at `open-pr` · **443s** median `lint-en-tests` on that pull request |
    | patch (no document, no pull request) | **3m 51s** | the 231s cut suites alone |
 
-   The two local legs are cited from [`releases/audience/4.x/4.4.0.md`](../../../contributing-davekjohn/releases/audience/4.x/4.4.0.md),
+   The two local legs are cited from [`releases/audience/4.x/4.4.0.md`](../../../dkj-policy/releases/audience/4.x/4.4.0.md),
    which took them from git timestamps. **The 7m 48s CI run on the release commit is excluded** because it
    blocks nobody.
 
@@ -992,7 +992,7 @@ than one machine's ordinary noise.
 meets this on day one — so neither stayed in this lens. The measurement discipline is a hard rule in
 Nolan's own manual (*"a gate figure names what it included and which machine produced it"*, the scope-and-machine
 sibling of the unit, sample, factor and copy rules), and the DEPLOY-section half is
-[`DEVELOPMENT-portable.md`](../../../plugins/workflows/contributing-davekjohn/DEVELOPMENT-portable.md)
+[`DEVELOPMENT-portable.md`](../../../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md)
 rule 8, because a figure written there folds into `CHANGELOG.md` and then into a release document. This
 section is the evidence they cite, which is this repo's convention for where a measurement lives.
 
@@ -1015,9 +1015,9 @@ above requires, on the one line anybody copies. Filed as
 it is a script change, this branch is documentation, and the fix wants a test.
 
 **The three figures themselves needed no repair.** They sit only in
-`contributing-davekjohn/development-fix-ship-pr-stale-ci-certificate.md`, in its CREATE and TEST
+`dkj-policy/development-fix-ship-pr-stale-ci-certificate.md`, in its CREATE and TEST
 sections; `fold-changelog-entry.ps1` folds **only** DEPLOY and removes the document, so none of them
-reaches the trunk, and a grep over `scripts/`, `plugins/` and `contributing-davekjohn/` finds them
+reaches the trunk, and a grep over `scripts/`, `plugins/` and `dkj-policy/` finds them
 nowhere else. The convention gap was the whole issue.
 
 ### Inside the invocation — where a plateau suite's time actually goes (September 3, 2026)

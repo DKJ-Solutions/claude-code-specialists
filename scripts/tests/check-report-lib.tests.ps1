@@ -169,8 +169,8 @@ try {
     # The reason for a THIRD sibling: each existing one destroys something a sentence needs. The id form
     # eats the punctuation that makes prose prose, and the path form -- right for a path -- eats the
     # square brackets that in prose are a markdown link.
-    $sentence = 'see (the guide): contributing-davekjohn/development.md'
-    Assert-Equal 'see the guide contributing-davekjohn/development.md' (Format-SafeToken -Value $sentence) 'the id-shaped sanitizer eats the punctuation -- the defect this function avoids'
+    $sentence = 'see (the guide): dkj-policy/development.md'
+    Assert-Equal 'see the guide dkj-policy/development.md' (Format-SafeToken -Value $sentence) 'the id-shaped sanitizer eats the punctuation -- the defect this function avoids'
     Assert-Equal $sentence (Format-SafeProseToken -Value $sentence) 'an ordinary prose line passes through untouched'
 
     $link = 'see [the guide](CONTRIBUTING.md) about development.md'

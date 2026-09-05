@@ -120,7 +120,7 @@ convention the repo has held consistently rather than one invented here. Re-meas
 **The previous figures are kept here as the thing that went wrong, because the failure is instructive**:
 this table read *"14 manuals, 4 personas and 9 skills"* and *"103 references across the 9 skills"*, and
 by August 15 none of the three counts held — a manual had been added, and the August 8 workflow split
-had moved nine of `team-alpha`'s skills into `contributing-davekjohn`, leaving four. **`CLAUDE.md` points at
+had moved nine of `team-alpha`'s skills into `dkj-policy`, leaving four. **`CLAUDE.md` points at
 this table as the evidence for the whole source-vs-lens doctrine**, so a reader who checked it found the
 numbers wrong and had no way to tell whether the doctrine was wrong with them. The claim itself was
 false too, by exactly two person names — both now moved to the lens that should have held them, which

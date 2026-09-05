@@ -13,7 +13,7 @@ document rather than as the back half of an install manual.
 
 **Why the procedure is what it is** — which step was added when, and what was measured to justify it —
 is not on this page. It lives in the release record:
-[`releases/history.md`](../contributing-davekjohn/releases/history.md) indexes every version with the changes
+[`releases/history.md`](../dkj-policy/releases/history.md) indexes every version with the changes
 behind it. This page tells you what to do; that one tells you why it changed.
 
 > **Budget most of the time for the last step.** The bootstrap places the whole seam in seconds and the
@@ -68,7 +68,7 @@ the [root README](../README.md).
 
 **The workflow slot is different in kind, so decide about it deliberately rather than by habit — and
 "decide" now means deciding whether to fill it at all.** One plugin answers "how does work move through
-this repo": `contributing-davekjohn`, which carries no specialists at all but is DaveKJohn's own branch,
+this repo": `dkj-policy`, which carries no specialists at all but is DaveKJohn's own branch,
 changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `ship-pr`,
 `fold-changelog`, `cut-release`, `park`, `fix-mojibake` among others). **Leaving the slot empty is what
 this page's default settings block does, and it is a complete answer** — your repo keeps the way of
@@ -112,7 +112,7 @@ path are in the
 > **The adoption commit lands on the trunk, and it is the one exception — it is spent by using it**
 > (inbound [#1085](https://github.com/DaveKJohn/claude-code-specialists/issues/1085)). Everything this
 > step and the next two write — the seam, the lenses, the two script scaffolds, the `@`-import, and the
-> whole `contributing-davekjohn/` folder if you enabled that workflow — is one sizeable commit, and it
+> whole `dkj-policy/` folder if you enabled that workflow — is one sizeable commit, and it
 > **cannot** go through the branch-and-PR cycle it is installing. That is not a preference: `new-branch`
 > refuses without `scripts/lib/branch-info.ps1`, which is one of the files this step writes, so before it
 > there is no branch to put the work on. The gates are downstream of the same commit for the same reason
@@ -121,7 +121,7 @@ path are in the
 >
 > So commit it directly, **say so in the commit message**, and let the cycle start with the *next*
 > change. Worth writing down because the documents you are handed on the same day say the opposite as a
-> rule: `contributing-davekjohn`'s contribution page describes a cycle in which every change goes
+> rule: `dkj-policy`'s contribution page describes a cycle in which every change goes
 > through a branch and a PR, and a `CLAUDE.md` written from this family's scaffolding carries "never
 > directly on `main`" as a safety rule. A reader who takes those literally on day one has a
 > contradiction with two exits, and both are wrong — hand-building a branch and a PR that can meet none
@@ -148,7 +148,7 @@ gets everything under `created`, which is the sample above. A repo that already 
 `scripts/repo-config.ps1` sees that one move to `already present` instead. So a figure that is *higher*
 than the sample is not an error, and neither is one that is lower: what matters is that each pair adds up
 and that the skill names anything it skipped. If you enabled an add-on team as well, expect its
-specialists on top of these. `contributing-davekjohn`, on the other hand, changes nothing here: it carries no
+specialists on top of these. `dkj-policy`, on the other hand, changes nothing here: it carries no
 specialists, so this sample's numbers hold whether or not it is enabled alongside `team-alpha`.
 
 > The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
@@ -190,8 +190,8 @@ The set as of this release:
 
 | skill | shipped by | what your repo lacks without it | what reports it |
 |---|---|---|---|
-| `adopt-config` | `contributing-davekjohn` | the seam values that state the shared way of working — step 1 *scaffolds* `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`, this answers them | `script-contract-sessioncheck` |
-| `adopt-workflow-folder` | `contributing-davekjohn` | `contributing-davekjohn/` itself — the only location the shared scripts read the branch dossier and the release documents from | `script-contract-sessioncheck` |
+| `adopt-config` | `dkj-policy` | the seam values that state the shared way of working — step 1 *scaffolds* `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`, this answers them | `script-contract-sessioncheck` |
+| `adopt-workflow-folder` | `dkj-policy` | `dkj-policy/` itself — the only location the shared scripts read the branch dossier and the release documents from | `script-contract-sessioncheck` |
 | `adopt-shopify-floor` | `team-shopify` | the live-theme guard's id half, a starter `.theme-check.yml`, and the CI gate that runs it | `shopify-floor-sessioncheck` |
 
 **Enumerate it from your own slash list rather than from this table.** A plugin added after this release

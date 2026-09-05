@@ -20,12 +20,12 @@
                                           teams/agent-shared/ (the source of the generated shared
                                           blocks) and the README/ADOPTION pages
         README.md, LICENSE                context for whoever opens the business repo
-        contributing-davekjohn/CHANGELOG.md   the changelog, at the path it has had since August 27, 2026
+        dkj-policy/CHANGELOG.md              the changelog -- in the workflow folder since August 27, 2026
         .github/ISSUE_TEMPLATE/           the inbound path the docs link to
         .gitignore, .gitattributes        so a clone behaves the same
 
     WHAT DOES NOT. scripts/, .claude/, connectors/, CLAUDE.md, SECURITY.md, and the whole of
-    contributing-davekjohn/ EXCEPT its CHANGELOG.md -- which is named as its own published path above
+    dkj-policy/ EXCEPT its CHANGELOG.md -- which is named as its own published path above
     rather than travelling with the folder. That is one file out of a maintainer's folder, and it is
     there because the changelog is context for whoever opens the business repo wherever this repo
     happens to keep it (August 27, 2026: it moved into that folder together with CONTRIBUTING.md and
@@ -120,7 +120,7 @@
     Publishes the same set to a different target, for a second organisation.
 
 .EXAMPLE
-    ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/dev-plugins -Plugins team-alpha,contributing-davekjohn -DryRun
+    ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/dev-plugins -Plugins team-alpha,dkj-policy -DryRun
 
     A different subset to a different target -- for an organisation that does have repositories.
 #>
@@ -170,7 +170,7 @@ $PublishedPaths = @(
     'plugins'
     'README.md'
     'LICENSE'
-    'contributing-davekjohn/CHANGELOG.md'
+    'dkj-policy/CHANGELOG.md'
     '.github/ISSUE_TEMPLATE'
     '.gitignore'
     '.gitattributes'

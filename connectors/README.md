@@ -179,9 +179,9 @@ structural path difference.
 
 ## The session check (automatic)
 
-The **`contributing-davekjohn`** plugin carries a **SessionStart hook**
-([`hooks/hooks.json`](../plugins/workflows/contributing-davekjohn/hooks/hooks.json) +
-[`connector-sessioncheck.ps1`](../plugins/workflows/contributing-davekjohn/hooks/connector-sessioncheck.ps1)) that, when a
+The **`dkj-policy`** plugin carries a **SessionStart hook**
+([`hooks/hooks.json`](../plugins/workflows/dkj-policy/hooks/hooks.json) +
+[`connector-sessioncheck.ps1`](../plugins/workflows/dkj-policy/hooks/connector-sessioncheck.ps1)) that, when a
 session starts, locates the workshop checkout and runs the connectors check there.
 
 **It moved out of the core on August 8, 2026, and the reason is what this register is.** The check
@@ -292,9 +292,9 @@ which then lands here through the normal branch + PR flow. This hook is one of t
 exceptions to the rule that plugins carry no hooks/skills — the full list is in the root README under
 [What lives here and what doesn't](../README.md#what-lives-here-and-what-doesnt), and it has grown since
 this paragraph first named its two siblings — and shrank again on August 26, 2026: three SessionStart
-hooks (`connector-sessioncheck` and `script-contract-sessioncheck` in `contributing-davekjohn`,
+hooks (`connector-sessioncheck` and `script-contract-sessioncheck` in `dkj-policy`,
 `roster-sessioncheck` in the core team), one Stop hook (`cycle-autopark`, also
-`contributing-davekjohn` — the first hook here that *acts* instead of reporting, #900) plus the skill
+`dkj-policy` — the first hook here that *acts* instead of reporting, #900) plus the skill
 `specialists-init`. Mind the **version gate**: consumers only receive the
 hook after a release bump plus `claude plugin marketplace update <marketplace>` and
 `claude plugin update <plugin>@<marketplace> --scope project` (neither the refresh nor the scope flag

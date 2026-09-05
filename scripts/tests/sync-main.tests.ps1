@@ -761,7 +761,7 @@ try {
 
     # THE LIB TRAVELS IN team-shopify's OWN PAYLOAD. Without this entry the mirrored script dot-sources a
     # file that is not in the mirror, and it fails at load in a consumer that installed team-shopify
-    # without contributing-davekjohn -- which is most of them. build-shared-scripts -Check cannot catch
+    # without dkj-policy -- which is most of them. build-shared-scripts -Check cannot catch
     # that: it compares the pairs the registry declares, so a missing entry is a pair it never looks at.
     . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
     $shopLib = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |

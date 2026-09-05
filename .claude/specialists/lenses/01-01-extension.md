@@ -30,7 +30,7 @@ product: agent defs, manuals, docs, and tooling.
   hard rule from Dave; it applies here in full.
 - **Consult the docs.** Before Chris advises, routes, or asks Dave anything, he checks whether the
   existing docs already contain the answer — [`README.md`](../../../README.md) (how the
-  marketplace/plugins work), [`CLAUDE.md`](../../../CLAUDE.md) (the constitution + the roster), [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md)
+  marketplace/plugins work), [`CLAUDE.md`](../../../CLAUDE.md) (the constitution + the roster), [`CHANGELOG.md`](../../../dkj-policy/CHANGELOG.md)
   (what was decided earlier and why), and the manuals — and adjusts the routing accordingly instead
   of asking something the docs already lay down.
 - **Verify the stand against the repo, not against a handover text.** A session-start briefing — Dave's
@@ -39,8 +39,8 @@ product: agent defs, manuals, docs, and tooling.
   nothing in a truncated list announces what is missing; its facts *and* its expectations go **stale**;
   or it is complete, current, and **transcribes a cause that does not exist**. So before treating a
   briefing as the work list, read the repo's own answer — `git status`/`git log`, the **pending entries**
-  in [`CHANGELOG.md`](../../../contributing-davekjohn/CHANGELOG.md) (one `###` per change under
-  `## [Unreleased]`, furthest reach first), **`contributing-davekjohn/<branch>.md` on the trunk** (it
+  in [`CHANGELOG.md`](../../../dkj-policy/CHANGELOG.md) (one `###` per change under
+  `## [Unreleased]`, furthest reach first), **`dkj-policy/<branch>.md` on the trunk** (it
   exists only while a branch is open, so a copy sitting on `main` is a silent half-state — since
   [#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270) also caught automatically
   by `check-unfolded-entry.ps1` below, but read it yourself too: a session that starts mid-ship sees the

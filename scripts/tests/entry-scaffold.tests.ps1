@@ -228,7 +228,7 @@ try {
 # thing that can say the run finished at all. So it is asserted, once, here.
 Assert-Equal 0 $script:roundTripCode 'the round-trip run finished -- a fixture missing one of the shared libs cannot pass silently any more'
 
-# ONE DOCUMENT, AT THE NAME THIS BRANCH OWNS: contributing-davekjohn/development-feat-round-trip-v1.md,
+# ONE DOCUMENT, AT THE NAME THIS BRANCH OWNS: dkj-policy/development-feat-round-trip-v1.md,
 # not feat-round-trip-v1.md in the root and not a pair under branch/. The path comes from the same lib the
 # readers use -- and since #1255 that lib has to be TOLD the branch, because the name carries it. Asked
 # without one it answers the pre-#1255 shared name, which is a real answer for callers that want the
@@ -265,7 +265,7 @@ Assert-Equal $stepsBefore @(Get-BranchProgressFindings -Text $withProse).Count '
 # made to write and refresh them. Inbound #810 is what the arrangement still cost: the guidance was in the
 # file NEXT TO the one you write in. The merged document carries its own, so the reference is gone and this
 # assert is that it stays gone -- a directory nobody maintains is a directory that drifts.
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixture 'contributing-davekjohn\branch'))) 'the writer creates no branch/ directory -- the document carries its own guidance'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixture 'dkj-policy\branch'))) 'the writer creates no branch/ directory -- the document carries its own guidance'
 
 # AND THE GUIDANCE IS IN THE FILE A BRANCH ACTUALLY GETS, which is the half #810 reported. Asserted on one
 # of the blocks the report named rather than on "some comment exists": a document that kept the headings and
@@ -1648,9 +1648,14 @@ Assert-True ($bfp.OlderDeployment.EndsWith('branch-changelog.md')) 'and its entr
 # work right now: every branch open on the day of the rename has development-cycle.md and not
 # development.md. Asserted on the current folder, because that pair is the one that existed -- there was
 # never a workflow-davekjohn/development.md, the folder having been renamed the day before.
-Assert-True ($bfp.PriorNameFile.EndsWith('contributing-davekjohn/development-cycle.md')) 'the pre-#963 filename is still named, under the CURRENT folder'
+Assert-True ($bfp.PriorNameFile.EndsWith('dkj-policy/development-cycle.md')) 'the pre-#963 filename is still named, under the CURRENT folder'
 Assert-True ($bfp.PriorFolderFile.EndsWith('workflow-davekjohn/development-cycle.md')) 'and the pre-#886 folder still carries the pre-#963 filename, which is the pair that really existed'
 Assert-True (-not (@($bfp.PSObject.Properties.Value) -contains 'workflow-davekjohn/development.md')) 'and the pair that never existed is NOT in the table -- a name to read that nothing can have written'
+# THE PRE-#1437 FOLDER IS THE MIRROR IMAGE OF THAT LAST ONE (September 5, 2026). 'development.md' DID exist
+# inside contributing-davekjohn/ -- from August 27 to September 3, 2026 -- so unlike the workflow-davekjohn/
+# pair above it is a name something actually wrote, and it is in the table rather than deliberately absent.
+Assert-True ($bfp.ContribFolderShared.EndsWith('contributing-davekjohn/development.md')) 'the pre-#1437 folder carries the pre-#1255 shared name, which unlike the pre-#886 pair really existed'
+Assert-True ($bfp.ContribFolderFile.EndsWith('contributing-davekjohn/development-cycle.md')) 'and its pre-#963 filename'
 
 # THE DUAL-READ IS WHAT KEEPS A BRANCH IN FLIGHT WHOLE, so it is measured on a tree rather than asserted
 # about the strings: a repo holding only an old name must resolve to that name, or its entry is invisible
@@ -1664,7 +1669,7 @@ Assert-True (-not (@($bfp.PSObject.Properties.Value) -contains 'workflow-davekjo
 $resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID"
 if (Test-Path -LiteralPath $resolveFx) { Remove-Item -Recurse -Force -LiteralPath $resolveFx }
 New-Item -ItemType Directory -Path (Join-Path $resolveFx ($bfp.Directory -replace '/', '\')) -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $resolveFx 'contributing-davekjohn\branch') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $resolveFx 'dkj-policy\branch') -Force | Out-Null
 try {
     Assert-Equal $bfp.File (Resolve-BranchFilePath -Kind Cycle -RepoRoot $resolveFx) 'nothing present: the resolver names the CURRENT one, so a writer creates that'
     [System.IO.File]::WriteAllText((Join-Path $resolveFx ($bfp.LegacyCycle -replace '/', '\')), "# ``feat/in-flight`` cycle`n")
@@ -2078,7 +2083,7 @@ $adminEntry = @(
     ''
     '### Pull Request'
     ''
-    'Plugins: contributing-davekjohn'
+    'Plugins: dkj-policy'
     ''
     '[PR #1](https://example.test/1) - merged 2026-08-10'
 ) -join "`n"
@@ -2285,7 +2290,7 @@ Write-Host "Get-EntryLinkTargets / Get-EntryLinkFindings -- the entry's links re
 # #914 made Get-ChangelogPath isolate-by-default, and the fixtures below cover both answers: the root, which
 # is this repo's own, and the workflow folder, which is every consumer's default and is also the directory
 # the entry itself sits in -- so there the correct link is the one that already reads correctly in the file.
-# ONE '../' SINCE AUGUST 23, 2026, not two: the document sits directly in contributing-davekjohn/ rather than in
+# ONE '../' SINCE AUGUST 23, 2026, not two: the document sits directly in dkj-policy/ rather than in
 # a branch/ subdirectory of it, so the wrong-but-resolving form an author naturally writes is one level
 # shallower. The depth comes from the seam (Get-BranchFilePaths.Directory), which is what the suggester
 # reads -- so this fixture is the depth the suggester will actually try.
@@ -2332,7 +2337,7 @@ $typoFindings = @(Get-EntryLinkFindings -EntryText $typo -RepoRoot $repoRootForL
 Assert-Equal 1 $typoFindings.Count 'a path that resolves from nowhere is still reported'
 Assert-Equal '' $typoFindings[0].Suggested 'but no repair is suggested for it -- there is nothing to compute one from'
 # TWO ROOT DOCUMENTS THAT REALLY ARE AT THE ROOT. This named CHANGELOG.md until August 27, 2026, when that
-# file moved into contributing-davekjohn/ and the assert started reporting a finding it was written to prove
+# file moved into dkj-policy/ and the assert started reporting a finding it was written to prove
 # absent -- correctly, since the default destination here IS the repo root. CLAUDE.md is the substitute
 # because the point is a link that resolves at the destination, not which document it names.
 Assert-Equal 0 (@(Get-EntryLinkFindings -EntryText '[ok](CLAUDE.md) and [ok2](README.md)' -RepoRoot $repoRootForLinks)).Count 'an entry whose links are all root-relative passes'

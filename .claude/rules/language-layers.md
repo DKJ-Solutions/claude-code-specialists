@@ -5,8 +5,8 @@ paths:
   - "plugins/**/hooks/**"
   - ".github/**"
   - "releases/**"
-  - "contributing-davekjohn/releases/**"
-  - "contributing-davekjohn/CHANGELOG.md"
+  - "dkj-policy/releases/**"
+  - "dkj-policy/CHANGELOG.md"
   - ".gitignore"
 ---
 
@@ -54,7 +54,7 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   `## Releases`/plugin-CHANGELOG intro texts, the date label) were translated in that pass.
   `CHANGELOG.md` itself is now fully English (its intro paragraphs and every `## Releases` reference
   line were translated on July 22, 2026 — Dave's decision). The archived changelog notes
-  (`contributing-davekjohn/releases/changelog/*.md`) stay in their original language, so older ones
+  (`dkj-policy/releases/changelog/*.md`) stay in their original language, so older ones
   remain Dutch.
 - **The script layer is ASCII, and a character the script must EMIT is written as a code point.** Measured
   August 19, 2026, on the branch that gave the changelog entry's heading a middle dot: typed literally into
@@ -122,10 +122,11 @@ discovery — as an earlier pass did for `.github/workflows/ci.yml` — not a qu
   predecessor in the drift-check (`scripts/lint/check-consumer-drift.ps1`) and the bootstrap templates,
   and the `[ERROR]` marker alongside its legacy predecessor in the connector session hook
   (`connector-sessioncheck.ps1`).
-- **History** — the archived per-release notes under `contributing-davekjohn/releases/changelog/*.md` (at
+- **History** — the archived per-release notes under `dkj-policy/releases/changelog/*.md` (at
   `releases/development/*.md` until August 26, 2026, #914) are this repo's narrow
   exception to the norm and may remain in their original language (older ones are Dutch).
-  `CHANGELOG.md` and the release history (both under `contributing-davekjohn/` since August 27, 2026 --
+  `CHANGELOG.md` and the release history (both under the workflow folder since August 27, 2026, named
+  `contributing-davekjohn/` then and `dkj-policy/` since September 5, 2026, #1437 --
   the changelog beside this folder's contributing page, the list as `releases/history.md`) are themselves fully English (translated July 22, 2026,
   Dave's decision), so the exception no longer covers them.
 

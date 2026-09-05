@@ -672,9 +672,9 @@ try {
     # ONE DOCUMENT, AND NO branch/ DIRECTORY AT ALL. The second half is the assert that would catch a
     # scaffolder still writing the retired pair beside the new file -- which would leave two entries for one
     # branch, the exact half-state the merge removes.
-    $wfDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'contributing-davekjohn') -Filter '*.md' -File)
+    $wfDirFiles = @(Get-ChildItem -LiteralPath (Join-Path $fixtureBC 'dkj-policy') -Filter '*.md' -File)
     Assert-Equal 1 $wfDirFiles.Count 'exactly one branch document, no duplicate per branch'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'contributing-davekjohn\branch'))) 'and no branch/ directory is created any more'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixtureBC 'dkj-policy\branch'))) 'and no branch/ directory is created any more'
 
     Write-Host "new-branch.ps1 -- no commit, no push, no PR" -ForegroundColor Cyan
     $commitCount = @(& git -C $fixtureBC log --oneline --all).Count
@@ -682,7 +682,7 @@ try {
     $remotes = @(& git -C $fixtureBC remote)
     Assert-Equal 0 $remotes.Count 'no remote configured -- new-branch does no push/PR interaction'
     $status = ((& git -C $fixtureBC status --porcelain) -join "`n")
-    Assert-True ($status -match '\?\? contributing-davekjohn/') 'the branch files are untracked -- no git add/commit performed'
+    Assert-True ($status -match '\?\? dkj-policy/') 'the branch files are untracked -- no git add/commit performed'
 
     # --- (b2) THE VERSION SUFFIX IS NOT COMPLETED, IN BOTH DIRECTIONS (Dave, September 3, 2026) -------
     # new-branch no longer appends '-v1'. This block is the guard against a restore: a bare name must stay
@@ -1189,7 +1189,7 @@ Write-Output `$t.Type
     Assert-True (Test-Phrase -Text $rNp.Out -Phrase 'local only') '-NoPush: says the branch stayed local'
     Assert-True (-not (Test-BranchOnRemote -Bare $bareP -Ref 'refs/heads/feat/kept-local-v1')) '-NoPush: the branch ref is NOT on origin'
     # Asserted on the commit count, not on `git status --porcelain`: git COLLAPSES a wholly untracked
-    # directory to `?? contributing-davekjohn/` and never names the file inside it, so a status match on
+    # directory to `?? dkj-policy/` and never names the file inside it, so a status match on
     # the document would have failed for a reason that has nothing to do with the switch.
     Assert-Equal 1 @(& git -C $fixtureP log --oneline).Count '-NoPush: nothing was committed -- only the fixture commit stands'
 
@@ -1250,7 +1250,7 @@ Write-Output `$t.Type
     # the operator something to unpick: no branch, no document, and HEAD still where it started.
     $branchesS = ((& git -C $fixStale branch --list 'feat/cut-from-stale-v1') -join '').Trim()
     Assert-True (-not [bool]$branchesS) 'stale base: and NO branch was created -- the refusal is before the checkout'
-    $docS = Join-Path $fixStale (Join-Path 'contributing-davekjohn' 'feat-cut-from-stale-v1.md')
+    $docS = Join-Path $fixStale (Join-Path 'dkj-policy' 'feat-cut-from-stale-v1.md')
     Assert-True (-not (Test-Path -LiteralPath $docS)) 'stale base: and no branch document was scaffolded either'
     $headS = ((& git -C $fixStale rev-parse --abbrev-ref HEAD) -join '').Trim()
     Assert-Equal 'main' $headS 'stale base: and HEAD is left exactly where the operator was standing'

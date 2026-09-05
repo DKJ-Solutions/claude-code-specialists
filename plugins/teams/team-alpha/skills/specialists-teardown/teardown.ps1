@@ -671,12 +671,12 @@ if ($VendorScripts) {
         }
         # NO SILENT CAP (August 8, 2026). Since the branch/release workflow became its own plugin, this
         # payload is the CORE's only -- the sync/check scripts and their lib. new-branch, open-pr,
-        # ship-pr, fold-changelog and cut-release ship in contributing-davekjohn and are not
+        # ship-pr, fold-changelog and cut-release ship in dkj-policy and are not
         # reachable from here: the two plugins are separately versioned and separately installed, so
         # copying across their cache directories would be a runtime dependency on a path a version
         # mismatch silently breaks. Stated rather than left to be discovered, because a vendor run that
         # lists four files reads as "that was all of it".
-        $notes += "-VendorScripts covers this plugin's payload only. If you also run contributing-davekjohn, its scripts (new-branch, open-pr, ship-pr, fold-changelog-entry, cut-release and the libs they dot-source) are NOT in this list -- copy them out of that plugin's own scripts/ directory before you uninstall it."
+        $notes += "-VendorScripts covers this plugin's payload only. If you also run dkj-policy, its scripts (new-branch, open-pr, ship-pr, fold-changelog-entry, cut-release and the libs they dot-source) are NOT in this list -- copy them out of that plugin's own scripts/ directory before you uninstall it."
         $verb = if ($Apply) { 'vendored' } else { 'to vendor' }
         $note = "-VendorScripts: $($vendored.Count) script(s) $verb into scripts/, $($vendorCurrent.Count) already current"
         if ($vendorSkipped.Count -gt 0) {

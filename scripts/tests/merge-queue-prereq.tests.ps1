@@ -64,7 +64,7 @@ function Assert-True {
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $ciPath = Join-Path $repoRoot '.github\workflows\ci.yml'
 $shipPath = Join-Path $repoRoot 'scripts\release\ship-pr.ps1'
-$shipMirror = Join-Path $repoRoot 'plugins\workflows\contributing-davekjohn\scripts\release\ship-pr.ps1'
+$shipMirror = Join-Path $repoRoot 'plugins\workflows\dkj-policy\scripts\release\ship-pr.ps1'
 
 $ci = Get-Content -LiteralPath $ciPath -Raw
 $ship = Get-Content -LiteralPath $shipPath -Raw

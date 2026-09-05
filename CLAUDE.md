@@ -8,8 +8,8 @@ specific to this repo comes last**, under
 **Everything in this file holds on its own**, and that is deliberate. Two plugins layer on top of it
 where they are installed, and nothing below assumes either one is:
 
-- **`contributing-davekjohn`** — the branch, entry and release mechanics, on its own page
-  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md).
+- **`dkj-policy`** — the branch, entry and release mechanics, on its own page
+  [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md).
 - **`team-alpha`** — the specialists, reached through the single `@`-import at the foot of this file.
 
 Uninstall both and this guide still describes how the repo is run: the rules below are the repo's own,
@@ -192,7 +192,7 @@ under **"Guarding the language convention,"** so it travels to every consuming r
 `lint-en-tests`, the legacy markers, the archived release notes) — is in
 [`.claude/rules/language-layers.md`](.claude/rules/language-layers.md).** It is path-scoped to
 `scripts/**`, the plugin-carried `plugins/**/scripts/**` and `plugins/**/hooks/**`, `.github/**`,
-`releases/**`, `contributing-davekjohn/releases/**` and `contributing-davekjohn/CHANGELOG.md`, so it
+`releases/**`, `dkj-policy/releases/**` and `dkj-policy/CHANGELOG.md`, so it
 loads when you touch one of those layers instead of in every session. Two things to know before moving anything else there: a
 `paths:`-scoped rule is **lost after a `/compact`** until a matching file is read again, and a rule
 *without* `paths:` loads unconditionally and therefore **saves nothing** — the scoping is the saving.
@@ -202,8 +202,9 @@ July 20, 2026; sharpened July 21 and July 26, 2026.
 ### Structure — where everything lives
 
 The full repo layout (`.claude-plugin/`, `plugins/` incl. `teams/agent-shared/`, `connectors/` at the root,
-`scripts/`, `contributing-davekjohn/` (the changelog, the contributing page and the release history since
-August 27, 2026), `.claude/`, and the root docs + `.github/`) is described in
+`scripts/`, `dkj-policy/` (the changelog, the contributing page and the release history since
+August 27, 2026; the folder was `contributing-davekjohn/` until September 5, 2026, #1437),
+`.claude/`, and the root docs + `.github/`) is described in
 [README.md](README.md#repo-layout). Since August 3, 2026 the plugins sit **one** level down in
 `plugins/<plugin>/` instead of two in `claude-code-plugins/claude-specialists/<plugin>/`: that second
 level existed to hold several product families side by side, which the
@@ -225,9 +226,9 @@ plugin wherever it sits. Reader-facing statement, and what the move changed for 
 **This section stands on its own, and that is deliberate.** Everything below holds in this repo
 whether or not a plugin is installed — the branch, the PR, the required CI check, the lint and test
 gates, and the three direct-on-`main` exceptions with their bounds. **The layer on top** is the
-`contributing-davekjohn` plugin, which carries its own page:
+`dkj-policy` plugin, which carries its own page:
 
-📄 **[`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md)**
+📄 **[`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md)**
 
 **When the plugin is installed, that page applies on top of this one — and where the two disagree, the
 plugin's page wins.** It does not replace anything below; it adds the workflow's own mechanics (the four
@@ -273,7 +274,7 @@ The constitution above, concretely implemented here:
 - **Five more gates arrive with the workflow plugin**, and all of them read the branch's own document.
   Four run locally: the **scaffold gate** refuses to push an entry still carrying the wording
   `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
-  `contributing-davekjohn/<branch>.md` has an unresolved step above its DEPLOY heading, the
+  `dkj-policy/<branch>.md` has an unresolved step above its DEPLOY heading, the
   **backing gate** refuses to push when that plan reads as finished while nothing is committed on the
   branch behind it and the work sits uncommitted in the working copy, and the
   **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
@@ -284,13 +285,13 @@ The constitution above, concretely implemented here:
   deliberately not among the three**: its subject is what sits uncommitted in a working copy, and a CI
   runner checks out a commit, so there the measurement always reads zero. Their mechanics, escape valves and
   the measurements behind them are in
-  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
+  [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
   sits at the point where it fires rather than in a list of its own.
 - **And one guard fires *after* the merge, on the trunk.** The fold runs from `ship-pr.ps1` only, so a
   PR merged from the GitHub UI never folds it and the entry stays trapped in the development document on
   `main`, with nothing saying so ([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270),
   the residual [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244) left). Since
-  September 3, 2026 `check-unfolded-entry.ps1` reports a per-branch `contributing-davekjohn/<branch>.md` sitting
+  September 3, 2026 `check-unfolded-entry.ps1` reports a per-branch `dkj-policy/<branch>.md` sitting
   on the trunk whose branch is not the one checked out — from a CI workflow on every `push` to `main`
   (merger-independent, **advisory**, not in `main-ci-gate`) and from a SessionStart hook in every
   consumer. It is Sylvester's; the reasoning is in
@@ -299,7 +300,7 @@ The constitution above, concretely implemented here:
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
   and that is why they are the three (Dave, August 23, 2026):
   1. The **fold commit** after a merge: [`fold-changelog-entry.ps1`](scripts/release/fold-changelog-entry.ps1)
-     folds the entry into `contributing-davekjohn/CHANGELOG.md` and clears it, and with `-Commit`/`-Push`
+     folds the entry into `dkj-policy/CHANGELOG.md` and clears it, and with `-Commit`/`-Push`
      makes that commit itself. **Bounded to two paths** — that changelog and the branch's development
      document, which the same run **removes** — and the commit names them, so nothing else in the tree
      can ride along. Committing stays opt-in, because it is this exception being used.
@@ -308,7 +309,7 @@ The constitution above, concretely implemented here:
      carried a name the bound did not list — which put its own fold outside the exception it runs under.
      So the bound is still exactly two paths and still checkable after the fact, because the commit prints
      the path it actually touched; it is simply no longer a spelling that goes stale under the tooling it
-     governs. Today's writer is `contributing-davekjohn/<branch>.md` — **one document per
+     governs. Today's writer is `dkj-policy/<branch>.md` — **one document per
      branch since September 3, 2026** (#1255), where it was the single `development.md`, and **named after
      the branch alone since later that same day** (#1335), where it was `development-<branch>.md`. That
      fixed path did not collide on checkout, which is what the old reasoning said, but it collided on
@@ -317,12 +318,12 @@ The constitution above, concretely implemented here:
      is the reason it is named by its resolver rather than spelled out — two more renames landed in one day,
      and the resolver is what keeps a branch opened before either of them from folding outside the exception.
   2. The **release commit** (only on explicit request): [`cut-release.ps1`](scripts/release/cut-release.ps1)
-     bumps all plugin versions in lockstep, generates the release notes in `contributing-davekjohn/releases/`,
+     bumps all plugin versions in lockstep, generates the release notes in `dkj-policy/releases/`,
      **empties the changelog down to its intro**, commits that on `main`, and tags `vX.Y.Z`.
      Deliberately no branch/PR — just like the fold. **A major additionally needs two preparation
      commits ahead of it** (Dave, August 9, 2026), under this same exception and bounded just as
      narrowly: a **major** only, **two paths** only (the new `#### N.x` section in
-     [`contributing-davekjohn/releases/history.md`](contributing-davekjohn/releases/history.md) and the assert in
+     [`dkj-policy/releases/history.md`](dkj-policy/releases/history.md) and the assert in
      [`release-lib.tests.ps1`](scripts/tests/release-lib.tests.ps1) that pins which major it targets),
      and only once a cut has been **explicitly asked for**. Outside a cut, both files take the
      ordinary branch + PR route.
@@ -338,7 +339,7 @@ The constitution above, concretely implemented here:
   **An exception is only safe while it stays the size it was granted at**, which is why every bound
   above is stated here rather than left to the layer below. How the three actually run, the
   measurements behind each, and both halves of that August 4 reversal are in
-  [`contributing-davekjohn/CONTRIBUTING.md`](contributing-davekjohn/CONTRIBUTING.md) -- the fold under its PULL
+  [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md) -- the fold under its PULL
   REQUEST step, the release commit and the notes commit under CUT RELEASE --
   and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
@@ -353,7 +354,7 @@ The constitution above, concretely implemented here:
   measurement cites its instance verbatim is not weakened by this and must not be: a citation is
   auditable and a paraphrase is not, and this tree has scar tissue from measurements rewritten until
   nothing in them was checkable. What is bounded is the *excerpt*. The **repo name, the file and the
-  line** are published as before — they are already in `connectors/` and in the `bwj-codex` skill — and
+  line** are published as before — they are already in `connectors/` and in the `dkj-policy-bwj` skill — and
   they are what carries the provenance, so the quote itself shrinks to the characters the check, the
   count or the argument actually turns on. Everything the finding does not read is the consumer's own
   wording and stays in the consumer's own tree.

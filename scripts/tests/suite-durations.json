@@ -27,7 +27,7 @@
                     "branch-document-path.tests.ps1":  9.6,
                     "branch-entry-gate.tests.ps1":  142.2,
                     "branch-info.tests.ps1":  4.5,
-                    "bwj-codex.tests.ps1":  8.9,
+                    "dkj-policy-bwj.tests.ps1":  8.9,
                     "check-plugin-integrity-commands.tests.ps1":  143.9,
                     "check-plugin-integrity-docs.tests.ps1":  216.2,
                     "check-plugin-integrity-entries.tests.ps1":  193.2,

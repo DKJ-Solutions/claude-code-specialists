@@ -224,7 +224,7 @@ Assert-True ($plannedBlock.Success -and $plannedBlock.Value -match 'bodyRelPath'
     'the generated GitHub Release body is guarded too, at every release'
 # THE TIER-0 NOTES' LINK PREFIX IS DERIVED, NOT DEFAULTED (issue #914, August 26, 2026). Build-ReleaseNotes
 # defaults $LinkPrefix to '../../../', the depth of a root sitting directly under releases/ -- and #914 moved
-# this repo's root one level deeper, into contributing-davekjohn/. The call had been relying on that default
+# this repo's root one level deeper, into dkj-policy/. The call had been relying on that default
 # since the function existed, so the move would have written every relative link in every note one
 # directory short, with nothing erroring: a dead relative link inside a tagged, immutable document, found by
 # a reader. Asserted on the CALL, because that is where the mistake was, and on the derivation rather than on
@@ -443,7 +443,7 @@ Assert-True $versionCell.Success "found the line that builds the overview row's 
 Assert-True ($versionCell.Success -and $versionCell.Value -notmatch '"notes/') `
     'the Version cell carries no bare "notes/" literal -- the short form the two asserts above cannot see'
 # SINCE AUGUST 14, 2026 THE CELL IS A COMPUTED RELATIVE PATH, not a leaf stripped with
-# `-replace '^releases/'`: a consumer whose history lives at contributing-davekjohn/releases/README.md is
+# `-replace '^releases/'`: a consumer whose history lives at dkj-policy/releases/README.md is
 # the root-outside-releases/ case the old line's own comment said no repo had asked for yet. The cell
 # must come from Get-RelativeLinkPath, anchored on the history file's directory, fed by the seam.
 Assert-True ($versionCell.Success -and $versionCell.Value -match 'Get-RelativeLinkPath') `

@@ -43,7 +43,7 @@ $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Generator  = Join-Path $RepoRoot 'scripts\sync\build-config-blueprint.ps1'
 $Adopt      = Join-Path $RepoRoot 'scripts\task\adopt-config.ps1'
 $ContractLib = Join-Path $RepoRoot 'scripts\lib\script-contract-lib.ps1'
-$Artefact   = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\blueprint\config-blueprint.json'
+$Artefact   = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\blueprint\config-blueprint.json'
 $Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) "config-blueprint-test-fixture-$PID"
 
 $script:pass = 0
@@ -290,7 +290,7 @@ Assert-Equal 0 $shared.Count "no `$script: variable is assigned by more than one
 # hand a consumer.
 #
 # NINE UNTIL AUGUST 27, 2026, when this repo moved its changelog and its release history into
-# contributing-davekjohn/ and therefore had to STATE Get-ChangelogPath and Get-ReleaseInternalNotesRoot --
+# dkj-policy/ and therefore had to STATE Get-ChangelogPath and Get-ReleaseInternalNotesRoot --
 # the first to differ from its own computed answer, the second because that one still branches on the
 # source and would have recreated the root releases/ directory the move had just emptied. The two roots
 # whose defaults stopped branching at #914 are still unstated, which is why it is seven and not five.
@@ -367,7 +367,7 @@ $answers = & {
 } $repoConfig
 Assert-Equal 'someone/their-repo' $answers.RepoName 'the consumer keeps its own repo name'
 Assert-Equal '.claude/specialists/SPECIALISTS.md' $answers.RosterPath 'an adopted function answers'
-Assert-Equal 'contributing-davekjohn/releases/history.md' $answers.HistoryPath 'an adopted function answers (in the workflow folder since August 27, 2026, which reverses the August 19 answer: the durability worry that sent the list back to the repo root was answered by #885 making that folder permanent)'
+Assert-Equal 'dkj-policy/releases/history.md' $answers.HistoryPath 'an adopted function answers (in the workflow folder since August 27, 2026, which reverses the August 19 answer: the durability worry that sent the list back to the repo root was answered by #885 making that folder permanent)'
 Assert-Equal 'Chore' $answers.Fallback 'an adopted function answers'
 Assert-True ($null -ne $answers.BodyHolder -and $answers.BodyHolder.Length -gt 0) 'a function that sits below the shared assignment block still answers (extraction bug 2)'
 

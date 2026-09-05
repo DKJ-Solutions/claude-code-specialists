@@ -72,7 +72,7 @@ routes; every specialist executes according to the shared safety rules and their
 
 SessionStart hooks the enabled plugins ship -- `roster-sessioncheck` in the core team and the rest in
 
-`contributing-davekjohn`, all read-only and none of them blocking -- and one Stop hook that acts rather
+`dkj-policy`, all read-only and none of them blocking -- and one Stop hook that acts rather
 
 than reports (`cycle-autopark`, #900 -- it pushes the branch's development cycle to origin until a PR
 
