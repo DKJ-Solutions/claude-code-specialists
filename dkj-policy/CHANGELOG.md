@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1447-release-page-path · 20260905-192056
+
+Two path statements in `dkj-policy/releases/README.md` repaired after the #1437 folder rename. The
+table row for the release page's output directory and the path-token paragraph both still named
+`contributing-davekjohn/releases/page/`, which exists nowhere. The second one was actively misleading:
+it told the reader `.gitignore` keeps that path out of git, while `.gitignore` covers
+`dkj-policy/releases/page/` only -- so a token dropped where the document pointed would have been
+committed into a public repository, which is precisely what that paragraph is there to prevent.
+
+**Score:** 1 -- documentation-only, and the failure it prevents has not happened. Naming it, because
+that is the part a later reader can use: publishing a no-login URL token into a public repo, on the
+document's own instruction.
+
+#### What makes this deploy extra special
+
+A stale path is normally cosmetic. This one had inverted its own safety claim: the sentence warning
+that the token must stay out of git named the one directory `.gitignore` does not cover. The repair is
+two words; what it is worth is that the document's guarantee is checkable again --
+`git check-ignore` now agrees with the path the prose names.
+
+**Score:** N/A -- internal to this repo's own release tooling; no subscriber of a service reads it.
+
+#### Pull Request
+
+the release-page path in dkj-policy/releases/README.md
+
+[PR #1457](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1457)
+
+---
+
 ### DEPLOY: fix/1454-releases-readme-folder-name · 20260905-191304
 
 `releases/README.md` told an agent setting this workflow up in another repo that the plugin is called
