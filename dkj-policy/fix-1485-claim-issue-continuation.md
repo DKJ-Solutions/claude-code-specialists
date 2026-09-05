@@ -61,7 +61,7 @@ surfaces #1485 names, and no wider.
 
 ### TEST
 
-- [ ] Lint gate + all suites green (`open-pr.ps1` runs both)
+- [x] Lint gate + all suites green (`open-pr.ps1` runs both)
 
 ### DEPLOY: fix/1485-claim-issue-continuation
 
