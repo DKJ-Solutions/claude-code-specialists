@@ -32,6 +32,35 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/bwj-codex-scaffold-sync-log · 20260905-110435
+
+`bwj-codex`'s `adopt-bwj-asana` skill now scaffolds `bwj-codex/SYNC-LOG.md` (masthead only, no
+entries) the moment the plugin is adopted, instead of leaving the file to appear on the first `sync/`
+branch. `SYNC-LOG-portable.md` and the plugin `README.md` are updated to match, including why the
+reversal removes the ambiguity the original design was written to avoid rather than reintroducing it.
+
+**Score:** 2 -- a documented behaviour change in one workflow plugin's adopt step; noticed by anyone
+who re-reads `SYNC-LOG-portable.md` or `adopt-bwj-asana`, nothing else in this repo depends on it.
+
+#### What makes this deploy extra special
+
+A BWJ store repo (`smartwatchbanden` or `xoxowildhearts`) that runs `adopt-bwj-asana` after this ships
+gets `bwj-codex/SYNC-LOG.md` immediately, ready for the first sync branch, instead of only after it.
+Reaches exactly the two repos this plugin targets, and only at (re-)adopt time.
+
+**Score:** 2 -- small and non-breaking; a repo that already has the file (from a prior sync) sees no
+change at all, since the new step never overwrites an existing file.
+
+#### Pull Request
+
+bwj-codex scaffolds an empty SYNC-LOG.md at adopt time
+
+Plugins: bwj-codex
+
+[PR #1436](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1436)
+
+---
+
 ### DEPLOY: docs/1396-bwj-codex-two-chapters · 20260905-104626
 
 Fixes #1396. The root `README.md` and `plugins/workflows/README.md` overview tables described
