@@ -71,10 +71,26 @@ point of this plugin is that the two cannot diverge. Stated here so nobody has t
 **The folder is `bwj-codex/`**, matching the plugin that owns the rule, exactly as
 `contributing-davekjohn/` matches the workflow that owns the branch documents.
 
-**Nothing scaffolds it, deliberately.** The file appears the first time there is something to put in
-it -- the run that writes the first entry creates the file and its folder. An empty log scaffolded on
-adoption day says "no syncs have happened" and "nobody has run the adopt step" in exactly the same
-way, and one of those is a fault.
+**The file is scaffolded at adopt time, carrying nothing but a masthead** (Dave, September 5, 2026):
+
+```markdown
+# Sync log
+
+One entry per `sync/` branch, newest at the top. Written and committed by `sync-main.ps1` -- never
+folded into `CHANGELOG.md`, never read by a release.
+```
+
+`adopt-bwj-asana`'s own step for this creates the file the moment the plugin is adopted; the first
+sync's run then prepends its entry underneath, exactly as `Add-SyncLogEntry` already does for any file
+carrying a masthead above its first `## ` line.
+
+**This reverses the original design, and the reversal is what removes the ambiguity rather than
+reintroducing it.** The file used to appear only on the first sync, on the reasoning that an empty log
+scaffolded on adoption day would read as "no syncs have happened" and "nobody has run the adopt step"
+in exactly the same way. That was a real ambiguity while scaffolding was optional -- one repo's empty
+file could mean either. It stops being one once scaffolding is **always** the same step of adoption: an
+empty file then means exactly one thing, "adopted, no sync yet", the same way an empty `CHANGELOG.md`
+under its own intro reads as "nothing pending" rather than "nobody set this repo up".
 
 ## What the log must stay out of
 
@@ -177,8 +193,10 @@ optional answers:
 function Get-ShopifySyncLogPath { return 'bwj-codex/SYNC-LOG.md' }
 ```
 
-That is the whole adoption. There is no folder to create, no template to copy and no CI to wire: the
-first sync creates the file, and every sync after it prepends.
+There is no template to copy and no CI to wire. **There is now a file to scaffold**, and it is
+[`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md)'s step, not a separate skill of its own: once the
+seam above is answered, that step creates `bwj-codex/SYNC-LOG.md` with its masthead and nothing else,
+ready for the first sync to prepend under.
 
 **Both repos answer it with the same path.** The two are one business running one procedure; a log at
 a different address in each is the drift this plugin exists to prevent.
