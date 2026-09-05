@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1444-stranded-page-token · 20260905-184311
+
+The release page's path token is the one file in this system that cannot be rebuilt: it is the only
+lock on a public page, it is deliberately uncommitted in a public repo, and nothing in git remembers
+the URL it forms. It lives in a directory derived from the note root and ignored by git -- two good
+decisions that meet badly, because renaming the folder above it moves every tracked file and leaves the
+token where it was. `git mv` cannot see an ignored sibling by construction, so the miss is silent on
+the day it happens, and what is left over reads like rename debris.
+
+`build-release-notes-page.ps1` now asks whether a token exists **anywhere in the tree** rather than
+whether one exists at the derived path. A copy found elsewhere is named and never adopted: `-Worker`
+points at the folder to move, and `-InitToken` -- whose refusal was the design's whole safety property
+and which read the derived path alone -- refuses on it too. Where no copy is found, the refusal still
+names the move that hides one, because the operator who has just renamed a folder is the reader most
+likely to be looking at it.
+
+Measured on this repo: #1437's rename left exactly that orphan (#1444), and the token is gone from this
+machine with it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- the person who reads a release page never sees any of this. It is a guard between the operator
+and one irreversible mistake.
+
+**Score:** N/A
+
+#### Pull Request
+
+The missing-token refusal points at the copy a folder move left behind
+
+Plugins: dkj-policy
+
+[PR #1452](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1452)
+
+---
+
 ### DEPLOY: fix/1446-tip-utf8-decode · 20260905-183608
 
 `new-branch.ps1` reads the remote tip's subject with **`-Utf8`**, so the control-and-format strip added in
