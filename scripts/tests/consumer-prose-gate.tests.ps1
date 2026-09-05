@@ -534,11 +534,21 @@ try {
 
     # THE SKIP, and it is measured on a real marketplace file rather than asserted about this repo: the
     # same tree answers [ERROR] twice without one and [OK] with one -- so the skip covers BOTH detectors.
+    #
+    # BOTH DIRECTIONS SINCE #1422: the skip narrowed from "publishes plugins" to
+    # Test-IsWorkflowSourceRepo's "publishes THIS workflow", so a manifest publishing somebody else's
+    # product is a consumer and is judged. The negative case is asserted first, being the one the old
+    # broad file test would have passed as [OK] -- and here it must still produce BOTH blocks.
     New-Item -ItemType Directory -Path (Join-Path $both '.claude-plugin') -Force | Out-Null
-    Set-Text -Dir $both -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [] }'
+    Set-Text -Dir $both -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "some-other-product" } ] }'
     $r = Invoke-Script -Dir $both
-    Assert-True ($r.Code -eq 0 -and $r.Out -match 'publishes the plugin') `
-        'a repo that publishes plugins is skipped -- and the skip silences both detectors at once'
+    Assert-True ($r.Code -eq 1 -and ([regex]::Matches($r.Out, '\[ERROR\]')).Count -eq 2) `
+        'a repo publishing ANOTHER product is a consumer of this workflow -- both detectors still judged, not skipped'
+
+    Set-Text -Dir $both -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "contributing-davekjohn" } ] }'
+    $r = Invoke-Script -Dir $both
+    Assert-True ($r.Code -eq 0 -and $r.Out -match 'publishes the workflow') `
+        'a repo that publishes THIS workflow is skipped -- and the skip silences both detectors at once'
 
     # --- consumer-prose-sessioncheck.ps1, the hook (always exit 0) ---------------------------------
     Write-Host ''

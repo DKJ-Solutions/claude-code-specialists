@@ -32,6 +32,117 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1432-source-test-census · 20260905-102625
+
+`Test-IsWorkflowSourceRepo`'s docstring no longer opens its inline-site list with a count. The figure
+said six while both the census and the bullets stood at five -- wrong on the day it was written, the
+intended sixth being `adopt-workflow-folder.ps1`, which the same docstring already describes as
+having *stopped* being an inline site. It then drifted to seven as the two consumer-prose checks
+arrived and back to five when #1422 pointed them at the function: three values in nine days, while
+the bullets stayed correct throughout.
+
+That list exists to arbitrate which question a new site should ask -- the broad "does this repo
+publish plugins" or this function's "is this repo the source of this workflow" -- and #1422 had
+already added the paragraph telling the reader to take it as evidence of a distinction rather than as
+a current inventory. A count is an inventory claim, so it is gone rather than corrected to five,
+which is why the figure cannot go stale a fourth time. A note in its place records the three values
+and points at `grep` as the inventory that is always current.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. The docstring travels to consumers in the plugin mirror, but it documents how *this* repo's own
+call sites are written and no consumer adds one; nothing a consumer runs changes behaviour.
+
+**Score:** N/A
+
+#### Pull Request
+
+The source test's inline-site census drops a count that contradicts its own closing paragraph
+
+Plugins: contributing-davekjohn
+
+[PR #1433](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1433)
+
+---
+
+### DEPLOY: fix/1399-backing-gate-local-trunk-ref · 20260905-101346
+
+`open-pr`'s backing gate (issue #1026) is meant to refuse a push whose plan reads as finished with no
+real work committed on the branch. It measured that by diffing against a bare local trunk name
+(`main`), not the remote-tracking ref. The ordinary flow lets local `main` fall behind `origin/main`
+for the length of a branch -- `new-branch` warns but does not refuse -- and the documented way to catch
+up mid-branch is `git merge origin/main` (a rebase would need a force-push, which the safety rules
+block). That merge advances the branch's merge-base against *local* `main` to include every commit it
+just pulled in from origin, because local `main` itself never moves -- so those upstream commits were
+counted as the branch's own committed work, and the gate went silent exactly on the branch it exists to
+catch. Reproduced on PR #1398, where the gate stayed silent on a branch whose real work (two
+documentation files) sat uncommitted, and those files had to be committed by hand afterward.
+
+`Get-GitParkBacking` now prefers `refs/remotes/origin/<trunk>` when it exists (a local, no-network
+read of what the last fetch already recorded), and falls back to the bare local name only when it does
+not -- fixed inside the shared function, so neither `open-pr.ps1` nor `park-cycle.ps1` needed to change.
+Closes #1399.
+
+**Score:** 3 -- a clear improvement to the backing gate's own reliability, noticed the moment a branch
+hits the scenario the gate exists to catch (a local trunk fetched behind `origin` and caught up
+mid-branch), which is common enough to have already produced a real near-miss (PR #1398) rather than
+a hypothetical one.
+
+#### What makes this deploy extra special
+
+N/A -- this is an internal correctness fix to a git-plumbing detail of the branch-workflow gate,
+scoped to this repo's own maintainers running `open-pr`/`park-cycle`. It reaches no external audience.
+
+**Score:** N/A
+
+#### Pull Request
+
+Backing gate measures against origin/<trunk> so upstream commits merged into the branch no longer silence it
+
+Plugins: contributing-davekjohn
+
+[PR #1411](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1411)
+
+---
+
+### DEPLOY: feat/1422-shared-check-preamble · 20260905-011053
+
+Five consumer-facing lint checks opened with the same ~30-line preamble, and it had already drifted:
+four resolved the repo root on one line and crashed outside a git checkout, while the fifth carried a
+tolerant variant nobody had reconciled. The dual-context root resolution and the always-on prose walk
+now have one definition in `scripts/lib/consumer-check-lib.ps1`, and each check keeps its own verdict
+on what that definition cannot decide -- a session check has nothing to judge outside a checkout, a
+CI gate must refuse there.
+
+The same pass closed a hole the duplication was hiding. Both prose checks skipped *"a repo that
+publishes plugins"* by testing `marketplace.json` inline, where the question they mean is *"is this
+repo the source of this workflow"* -- the distinction #998 already exists for. A repo publishing
+another product while consuming this workflow was silently exempted from both checks; it is now
+judged, with an assert in each suite pinning it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the subject is this repo's own lint layer and the shared scripts a consumer runs. No
+subscriber of a service notices a preamble having one definition instead of five. The behaviour that
+did change reaches a consuming repo that also publishes a marketplace of its own, which no current
+consumer is.
+
+**Score:** N/A
+
+#### Pull Request
+
+One definition for the lint checks' shared preamble
+
+Plugins: contributing-davekjohn
+
+[PR #1431](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1431)
+
+---
+
 ### DEPLOY: fix/1424-superseded-entry-note · 20260905-003549
 
 The release note stops contradicting itself. Three entries pending in one `## [Unreleased]` block will

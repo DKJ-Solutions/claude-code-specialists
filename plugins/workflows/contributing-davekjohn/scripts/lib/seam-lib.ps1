@@ -92,8 +92,8 @@ function Test-IsWorkflowSourceRepo {
         safe answer when it cannot tell is "treat this as a consumer".
 
         WHO STILL USES THE BROAD `Test-Path` TEST INLINE, DELIBERATELY, AND WHY IT IS NOT DUPLICATION.
-        The one-file check appears at six further sites and asks a different question at each. It is not
-        factored in here because factoring it would suggest they all mean this:
+        The one-file check still appears inline at the sites below, asking a different question at each.
+        It is not factored in here because factoring it would suggest they all mean this:
 
           * `Get-ReleasePluginTier`'s fallback (cut-release.ps1) -- "does this repo publish plugins whose
             versions the cut must bump in lockstep". Broad is exactly right; that IS the question.
@@ -107,6 +107,35 @@ function Test-IsWorkflowSourceRepo {
 
         adopt-workflow-folder.ps1 DID mean this one and now calls it: refusing a genuine consumer the
         folder scaffold because it happens to publish plugins is the concrete harm #998 was filed about.
+
+        AND SO DID THE PROSE CHECK, since #1422. check-retired-doc-name.ps1 and
+        check-supremacy-declaration.ps1 arrived in September 2026 -- AFTER the census above was written --
+        each carrying its own inline `Test-Path .claude-plugin/marketplace.json` skip with its own comment.
+        #1421 then folded the pair into a single check-consumer-prose.ps1, so it is ONE caller now and both
+        detectors sit behind one skip. Their question is this one: the skip exists because THIS WORKFLOW'S
+        conventions are authored here, which is what makes the rename narration and the supremacy sentences
+        correct prose rather than consumer drift. Under the broad test a repo publishing another product
+        while consuming this workflow was skipped in silence -- #998's harm in the mirror direction, since
+        here it costs a check that never runs rather than a scaffold that is refused. It calls this function
+        now, so the bullets above are unchanged: it was never among them.
+
+        WHICH IS THE PART WORTH TAKING FROM THIS. The census did not go wrong, it went INCOMPLETE, silently,
+        because a census in a docstring is a snapshot and the tree kept being written. Two authors reached
+        for the inline one-file test while the named function sat one dot-source away -- each following the
+        sibling in front of them, which is precisely the choice this list exists to arbitrate and precisely
+        the reader it never reached. So read the bullets as evidence of a distinction rather than as a
+        current inventory, and when you add a site, decide which question you are asking before copying
+        whichever idiom is nearest.
+
+        WHICH IS ALSO WHY THERE IS NO LONGER A COUNT HERE (#1432). That first sentence used to open with
+        one -- "at six further sites" -- and the figure was wrong on the day it was written: the census
+        stood at five, the bullets named five, and the sixth was adopt-workflow-folder.ps1, which the
+        paragraph below already describes as having STOPPED being an inline site. It then drifted to seven
+        as the two prose checks arrived and back to five when #1422 pointed them here, so in nine days it
+        was wrong at three different values while the bullets stayed correct throughout. A number is an
+        inventory claim, which is the one thing the paragraph above tells you not to read this list as --
+        and the bullets do the arbitrating regardless, because what a new author needs is the question,
+        never the total. `grep` is the inventory and it is always current.
     #>
     param([Parameter(Mandatory)][string]$RepoRoot)
     $manifest = Join-Path $RepoRoot '.claude-plugin\marketplace.json'

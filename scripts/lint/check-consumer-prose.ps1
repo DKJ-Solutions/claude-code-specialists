@@ -114,15 +114,32 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the source
-# root copy falls back to the git root. Same resolution as every other mirrored script.
-$repoRoot = if ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+# THE ROOT COMES FROM ONE DEFINITION (#1422). Dot-sourced guarded, so a mirror built before this lib
+# existed degrades to the old inline form rather than throwing.
+$checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
+if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
 
-# THE SKIP. See the docstring: a repair for the retired-name detector and a guard for the supremacy one,
-# borrowed verbatim from the source-repo guard's condition 2, which uses the same file for the
-# mirror-image purpose -- there it is what keeps a consumer out, here it is what keeps the publisher out.
-if (Test-Path -LiteralPath (Join-Path $repoRoot '.claude-plugin\marketplace.json') -PathType Leaf) {
-    Write-Host '[OK] this repo publishes the plugin -- its own pages are the source of these conventions, not a copy of them.'
+$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+    Resolve-CheckRepoRoot -RootOverride $RootOverride
+} elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+
+# '' MEANS "COULD NOT TELL", and for an advisory session check that is nothing to judge rather than a
+# failure. THE RESOLUTION IS SHARED, THE VERDICT IS NOT: this runs from a SessionStart hook, where a
+# fixture tree or a session started outside a checkout must not strand the hook, so it exits 0 -- while
+# a CI gate reading the same '' must refuse.
+if (-not $repoRoot) {
+    Write-Host '[OK] no git checkout here -- no always-on prose to judge.'
+    exit 0
+}
+
+# THE SKIP. See the docstring: a repair for the retired-name detector and a guard for the supremacy one.
+# Since #1422 it asks Test-IsWorkflowSourceRepo rather than re-testing the manifest file inline -- the
+# question both detectors mean is "is this repo the source of THIS workflow's conventions", and the broad
+# 'does this repo publish plugins' test answers a different one that Dave's one-product-one-repository
+# rule guarantees will come apart.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+if (Test-IsWorkflowSourceRepo -RepoRoot $repoRoot) {
+    Write-Host '[OK] this repo publishes the workflow -- its own pages are the source of these conventions, not a copy of them.'
     exit 0
 }
 
@@ -139,21 +156,16 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 # THE SANITIZERS, for every value below that comes out of a CONSUMER'S OWN FILES (#1419).
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
-# THE WALK IS NOT REIMPLEMENTED HERE, and it happens ONCE -- which is the saving #1421 is about.
-# Get-AlwaysOnDocuments owns the '@'-import closure (the hop cap, the cycle guard, the fenced-block skip
-# and the tree/external split); Get-ConsumerProseDocuments owns which of those documents a consumer-prose
-# check may look in, and both detectors below are handed the same rows. Loaded guarded rather than
-# required: a tree that does not carry measure-context-lib.ps1 still gets the workflow folder's own pages
-# judged, which is where one of #1389's two measured instances sat.
-$documents = @()
-$measureLib = Join-Path $PSScriptRoot '..\lib\measure-context-lib.ps1'
-if (Test-Path -LiteralPath $measureLib -PathType Leaf) {
-    . $measureLib
-    $root = if ($RootDocument) { $RootDocument } else { Join-Path $repoRoot 'CLAUDE.md' }
-    if (Test-Path -LiteralPath $root -PathType Leaf) {
-        $documents = @(Get-AlwaysOnDocuments -RootDocument $root -RepoRoot $repoRoot)
-    }
-}
+# THE WALK IS NOT REIMPLEMENTED HERE, and it happens ONCE -- which is the saving #1421 is about. Since
+# #1422 its LOADING is not restated either: Get-CheckProseCorpus owns the guarded measure-context-lib load
+# and the Get-AlwaysOnDocuments call. Get-AlwaysOnDocuments still owns the '@'-import closure (the hop cap,
+# the cycle guard, the fenced-block skip and the tree/external split); Get-ConsumerProseDocuments owns
+# which of those documents a consumer-prose check may look in, and both detectors below are handed the
+# same rows. Still guarded rather than required: a tree that carries neither lib gets @() and still has
+# the workflow folder's own pages judged, which is where one of #1389's two measured instances sat.
+$documents = if (Get-Command Get-CheckProseCorpus -ErrorAction SilentlyContinue) {
+    @(Get-CheckProseCorpus -RepoRoot $repoRoot -RootDocument $RootDocument)
+} else { @() }
 
 $retired  = @(Get-RetiredDocNameMention -RepoRoot $repoRoot -Documents $documents)
 $inverted = @(Get-SupremacyDeclaration -RepoRoot $repoRoot -Documents $documents)

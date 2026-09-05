@@ -24,6 +24,15 @@
     park note describes both shapes; the gate refuses one and warns on the other. Case 5 pins that they
     still agree, because a park that alarms over a gate that stays silent is the drift this repo pays for.
 
+    SECTIONS 8-9 EXERCISE Get-GitParkBacking ITSELF, WITH REAL GIT REPOS (issue #1399, September 4,
+    2026), rather than the duck-typed shapes the rest of this file tests against. The bug lived in the
+    git plumbing: a bare local trunk name in '$Trunk...HEAD' silently over-counts a branch's committed
+    work once local main has fallen behind origin/main and the branch has caught up via
+    'git merge origin/main' (the documented way -- a rebase would need a force-push, which the safety
+    rules block). Section 8 reproduces that exact false-negative; section 9 pins the fallback (no
+    origin ref -> the bare local name, exactly as before the fix) and that the returned Trunk field
+    still names the bare trunk regardless of which ref actually answered the count.
+
     Dependency-free (no Pester), same style as the rest of the suite.
 #>
 $ErrorActionPreference = 'Stop'
@@ -163,6 +172,119 @@ foreach ($name in @('park-lib', 'open-pr')) {
         Assert-True (Test-Path -LiteralPath $pair[0].MirrorPath) "$name's mirror exists in the plugin tree"
         $mir = [System.IO.File]::ReadAllText($pair[0].MirrorPath)
         Assert-True ($mir -match 'Get-BranchBackingFinding') "$name's mirror carries the new condition"
+    }
+}
+
+# --- 8 & 9. Get-GitParkBacking and a stale local trunk ref (#1399) -----------------------------
+# REAL GIT REPOS FROM HERE ON, unlike the duck-typed fixtures above -- the bug lived in the git
+# plumbing itself (which ref '$Trunk...HEAD' is measured against), not in the object shape the rest
+# of this file tests.
+$script:gitFixtures = @()
+
+function New-GitFixture {
+    <# A minimal throwaway repo with a bare 'origin', for exercising the real git calls behind
+       Get-GitParkBacking. Same conventions as park-cycle.tests.ps1's New-Fixture: symbolic-ref onto
+       an unborn HEAD (works whatever init.defaultBranch says locally), gpgsign off (#1287). #>
+    param([Parameter(Mandatory = $true)][string]$Label, [switch]$NoOrigin)
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("backing-gate-test-$PID-$Label")
+    if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $bareRemote = "$dir.git"
+    if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $dir init -q 2>$null | Out-Null
+        & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
+        & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
+        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
+        & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $dir 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
+        & git -C $dir add -A 2>$null | Out-Null
+        & git -C $dir commit -q -m 'init' 2>$null | Out-Null
+        if (-not $NoOrigin) {
+            & git init --bare -q $bareRemote 2>$null | Out-Null
+            & git -C $dir remote add origin $bareRemote 2>$null | Out-Null
+            & git -C $dir push -q -u origin main 2>$null | Out-Null
+        }
+    } finally { $ErrorActionPreference = $prevEap }
+    $script:gitFixtures += $dir
+    if (-not $NoOrigin) { $script:gitFixtures += $bareRemote }
+    return $dir
+}
+
+function Invoke-GitQuiet {
+    <# One EAP-safe git call, output discarded -- the fixture-building idiom park-cycle.tests.ps1 uses
+       throughout, repeated here (rather than dot-sourced from there) so this file stays free-standing. #>
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    $prevEap = $ErrorActionPreference
+    try { $ErrorActionPreference = 'Continue'; & git @Arguments 2>$null | Out-Null }
+    finally { $ErrorActionPreference = $prevEap }
+}
+
+function Get-GitOutput {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    $prevEap = $ErrorActionPreference
+    try { $ErrorActionPreference = 'Continue'; return ((& git @Arguments) | Out-String).Trim() }
+    finally { $ErrorActionPreference = $prevEap }
+}
+
+try {
+    # -- 8. THE FALSE-NEGATIVE ITSELF: a caught-up branch with zero real commits of its own ---------
+    # Local main is left one commit behind origin/main -- exactly what the normal flow allows (new-
+    # branch's own base warning only warns) -- and the branch catches up the documented way,
+    # 'git merge origin/main', which is a fast-forward here since the branch was never ahead. That
+    # merge makes the branch's tip equal to origin/main's, so a diff against the STALE bare 'main'
+    # (still at the old commit) would count the upstream commit's own file as this branch's committed
+    # work. The fix prefers refs/remotes/origin/main, which 'git push' already advanced locally when
+    # the upstream commit was pushed -- no fetch needed -- so the diff lands on zero real commits.
+    Write-Host "`n== 8. Get-GitParkBacking prefers the remote-tracking ref over a stale local trunk ==" -ForegroundColor Cyan
+    $fix8a = New-GitFixture -Label '8a'
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'checkout', '-q', '-b', 'feat/caught-up-v1')
+    $shaA = Get-GitOutput -Arguments @('-C', $fix8a, 'rev-parse', 'main')
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'checkout', '-q', 'main')
+    [System.IO.File]::WriteAllText((Join-Path $fix8a 'shared.txt'), "upstream change`n", (New-Object System.Text.UTF8Encoding $false))
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'add', '-A')
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'commit', '-q', '-m', 'upstream work')
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'push', '-q', 'origin', 'main')
+    # 'git push' updates refs/remotes/origin/main locally on success -- modelling a fetch that already
+    # happened, with no second clone or working copy required.
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'checkout', '-q', 'feat/caught-up-v1')
+    # Reset LOCAL main back one commit. main is not checked out here, so this is a clean ref move, not
+    # a working-copy edit -- and it is exactly the state the issue names: local main behind origin/main.
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'update-ref', 'refs/heads/main', $shaA)
+    Invoke-GitQuiet -Arguments @('-C', $fix8a, 'merge', '-q', 'origin/main')
+
+    $backing8a = Get-GitParkBacking -RepoRoot $fix8a -Trunk 'main'
+    Assert-Equal 0 $backing8a.Committed 'stale local trunk: the remote-tracking ref is used, so a caught-up branch with no real commits reports zero'
+    Assert-True $backing8a.CommittedKnown 'stale local trunk: the figure is measured, not unknown'
+    Assert-Equal 'main' $backing8a.Trunk "stale local trunk: the Trunk field still names the bare trunk ('main'), not the ref it resolved to"
+
+    # -- 9. THE FALLBACK, unchanged from before the fix ----------------------------------------------
+    Write-Host "`n== 9. Get-GitParkBacking falls back to the bare trunk name when no origin ref exists ==" -ForegroundColor Cyan
+    $fix9a = New-GitFixture -Label '9a' -NoOrigin
+    Invoke-GitQuiet -Arguments @('-C', $fix9a, 'checkout', '-q', '-b', 'feat/no-origin-v1')
+    [System.IO.File]::WriteAllText((Join-Path $fix9a 'own-work.txt'), "real commit`n", (New-Object System.Text.UTF8Encoding $false))
+    Invoke-GitQuiet -Arguments @('-C', $fix9a, 'add', '-A')
+    Invoke-GitQuiet -Arguments @('-C', $fix9a, 'commit', '-q', '-m', 'own work')
+
+    # 9a. No origin at all -> no refs/remotes/origin/main to prefer, so the bare local 'main' answers,
+    # exactly as before #1399 -- and here it is the RIGHT answer, because nothing pulled main out of
+    # sync with anything: one real commit on the branch, correctly counted.
+    $backing9a = Get-GitParkBacking -RepoRoot $fix9a -Trunk 'main'
+    Assert-Equal 1 $backing9a.Committed "no origin: falls back to the bare local trunk name and counts the branch's own commit"
+    Assert-True $backing9a.CommittedKnown 'no origin: the figure is measured via the local ref'
+
+    # 9b. Neither the remote-tracking ref nor a same-named local ref exists (an unrecognised trunk
+    # name) -> CommittedKnown stays $false, same as before the fix. 'not measured' and '0' are
+    # different claims -- Get-BranchBackingFinding above already covers why conflating them is wrong.
+    $backing9b = Get-GitParkBacking -RepoRoot $fix9a -Trunk 'nonexistent-trunk'
+    Assert-True (-not $backing9b.CommittedKnown) 'no ref anywhere: CommittedKnown stays false, same as before the fix'
+    Assert-Equal 0 $backing9b.Committed 'no ref anywhere: the default zero, not a measured zero'
+    Assert-Equal 'nonexistent-trunk' $backing9b.Trunk 'no ref anywhere: Trunk still echoes back whatever name was asked for'
+} finally {
+    foreach ($f in $script:gitFixtures) {
+        if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
     }
 }
 
