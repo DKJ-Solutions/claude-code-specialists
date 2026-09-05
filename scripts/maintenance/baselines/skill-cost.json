@@ -19,57 +19,57 @@
                                    "OnInvoke":  2600,
                                    "Version":  "4.17.0"
                                },
-    "contributing-davekjohn/adopt-config":  {
+    "dkj-policy/adopt-config":  {
                                             "AlwaysOn":  150,
                                             "OnInvoke":  1600,
                                             "Version":  "4.17.0"
                                         },
-    "contributing-davekjohn/adopt-workflow-folder":  {
+    "dkj-policy/adopt-workflow-folder":  {
                                                      "AlwaysOn":  180,
                                                      "OnInvoke":  2900,
                                                      "Version":  "4.17.0"
                                                  },
-    "contributing-davekjohn/check-branch-entry":  {
+    "dkj-policy/check-branch-entry":  {
                                                   "AlwaysOn":  170,
                                                   "OnInvoke":  1500,
                                                   "Version":  "4.17.0"
                                               },
-    "contributing-davekjohn/cut-release":  {
+    "dkj-policy/cut-release":  {
                                            "AlwaysOn":  320,
                                            "OnInvoke":  16300,
                                            "Version":  "4.17.0"
                                        },
-    "contributing-davekjohn/fix-mojibake":  {
+    "dkj-policy/fix-mojibake":  {
                                             "AlwaysOn":  230,
                                             "OnInvoke":  2200,
                                             "Version":  "4.17.0"
                                         },
-    "contributing-davekjohn/fold-changelog":  {
+    "dkj-policy/fold-changelog":  {
                                               "AlwaysOn":  240,
                                               "OnInvoke":  6000,
                                               "Version":  "4.17.0"
                                           },
-    "contributing-davekjohn/new-branch":  {
+    "dkj-policy/new-branch":  {
                                           "AlwaysOn":  170,
                                           "OnInvoke":  7500,
                                           "Version":  "4.17.0"
                                       },
-    "contributing-davekjohn/open-pr":  {
+    "dkj-policy/open-pr":  {
                                        "AlwaysOn":  260,
                                        "OnInvoke":  7600,
                                        "Version":  "4.17.0"
                                    },
-    "contributing-davekjohn/park":  {
+    "dkj-policy/park":  {
                                     "AlwaysOn":  190,
                                     "OnInvoke":  2400,
                                     "Version":  "4.17.0"
                                 },
-    "contributing-davekjohn/release-notes-page":  {
+    "dkj-policy/release-notes-page":  {
                                                   "AlwaysOn":  240,
                                                   "OnInvoke":  3100,
                                                   "Version":  "4.17.0"
                                               },
-    "contributing-davekjohn/ship-pr":  {
+    "dkj-policy/ship-pr":  {
                                        "AlwaysOn":  220,
                                        "OnInvoke":  7100,
                                        "Version":  "4.17.0"

@@ -126,7 +126,7 @@ function New-CutFixture {
     }
 
     # THE SECOND DEPARTURE, and unconditional (August 27, 2026). This repo moved its changelog, its release
-    # list and its internal-note root into contributing-davekjohn/ and now STATES all three seams, so a
+    # list and its internal-note root into dkj-policy/ and now STATES all three seams, so a
     # verbatim copy carries those answers into a fixture whose whole layout -- and every path this suite
     # asserts on -- is the root one. Patched by the same targeted replacement as the tier above, and for the
     # same reason: every OTHER answer stays grounded in the real file. What this suite tests is the CUT, not
@@ -233,9 +233,9 @@ A fixture release page.
 
 $HistoryMajors
 "@
-    New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn\releases\audience\1.x') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn\releases\changelog\1.x') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $root 'contributing-davekjohn\releases\github\1.x') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'dkj-policy\releases\audience\1.x') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'dkj-policy\releases\changelog\1.x') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $root 'dkj-policy\releases\github\1.x') -Force | Out-Null
 
     # A git repo with NO remote: -NoPush is belt, this is braces.
     Push-Location $root
@@ -301,7 +301,7 @@ try {
 
     # The changelog note carries the entry that was folded away, which is the whole point of writing
     # it before emptying the file.
-    $notePath = Join-Path $root 'contributing-davekjohn\releases\changelog\1.x\1.4.1.md'
+    $notePath = Join-Path $root 'dkj-policy\releases\changelog\1.x\1.4.1.md'
     Assert-True (Test-Path -LiteralPath $notePath) 'happy path: the changelog note was written at the grouped path'
     if (Test-Path -LiteralPath $notePath) {
         Assert-Match 'A fixture change' (Get-Content -LiteralPath $notePath -Raw) 'happy path: and it carries the entry the CHANGELOG lost'
@@ -356,7 +356,7 @@ try {
     $root4 = New-CutFixture -Name 'tier1' -AudienceTier 1 -EntryTopTier 1
     $r4 = Invoke-Cut -Root $root4 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-Equal 0 $r4.Code 'tier 1: the minor is earned by the tier-1 entry and the cut succeeds'
-    $note4 = Join-Path $root4 'contributing-davekjohn\releases\audience\1.x\1.5.0.md'
+    $note4 = Join-Path $root4 'dkj-policy\releases\audience\1.x\1.5.0.md'
     Assert-True (Test-Path -LiteralPath $note4) 'tier 1: the hand-written note was drafted'
     if (Test-Path -LiteralPath $note4) {
         $n4 = Get-Content -LiteralPath $note4 -Raw
@@ -391,7 +391,7 @@ try {
     $root5 = New-CutFixture -Name 'tier2' -EntryTopTier 2
     $r5 = Invoke-Cut -Root $root5 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-Equal 0 $r5.Code 'tier 2: the minor is earned by the tier-2 entry and the cut succeeds'
-    $note5 = Join-Path $root5 'contributing-davekjohn\releases\audience\1.x\1.5.0.md'
+    $note5 = Join-Path $root5 'dkj-policy\releases\audience\1.x\1.5.0.md'
     Assert-True (Test-Path -LiteralPath $note5) 'tier 2: the hand-written note was drafted'
     if (Test-Path -LiteralPath $note5) {
         $n5 = Get-Content -LiteralPath $note5 -Raw
@@ -413,7 +413,7 @@ try {
     # release the manifests have never heard of.
     Write-Host ""
     Write-Host "cut-release.ps1 -- a baseline that disagrees with the recorded release numbering refuses" -ForegroundColor Cyan
-    $recordedHistory = "#### 1.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n| [1.9.9](../contributing-davekjohn/releases/changelog/1.x/1.9.9.md) | 2026-08-20 | Patch | Recorded, but untagged and unbumped |`n"
+    $recordedHistory = "#### 1.x`n`n| Version | Date | Type | Title |`n|---|---|---|---|`n| [1.9.9](../dkj-policy/releases/changelog/1.x/1.9.9.md) | 2026-08-20 | Patch | Recorded, but untagged and unbumped |`n"
     $root6 = New-CutFixture -Name 'baseline' -HistoryMajors $recordedHistory
     $r6 = Invoke-Cut -Root $root6 -Arguments @('-Bump', 'patch', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-True ($r6.Code -ne 0) 'baseline: refused with a non-zero exit'
@@ -436,7 +436,7 @@ try {
     $root7 = New-CutFixture -Name 'statedtype' -HistoryMajors $recordedHistory
     $r7 = Invoke-Cut -Root $root7 -Arguments @('-Version', '1.4.1', '-Type', 'patch', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-Equal 0 $r7.Code 'stated type: the cut runs'
-    $note7 = Join-Path $root7 'contributing-davekjohn\releases\changelog\1.x\1.4.1.md'
+    $note7 = Join-Path $root7 'dkj-policy\releases\changelog\1.x\1.4.1.md'
     Assert-True (Test-Path -LiteralPath $note7) 'stated type: the changelog note was written'
     if (Test-Path -LiteralPath $note7) {
         Assert-Match '(?m)^\*\*Type:\*\*\s*Patch' (Get-Content -LiteralPath $note7 -Raw) 'stated type: and it is labelled Patch -- the type the author stated, not the one the baseline implied'

@@ -644,7 +644,7 @@ infrastructure.
   **The second half — the supremacy-declaration detector** (issue
   [#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415), September 4, 2026):
   does a consumer's own always-on prose declare *its* `CLAUDE.md` the winner over
-  `contributing-davekjohn/CONTRIBUTING.md`, inverting `LAW-THIRD-RANK-ORDER`? The **second** of the two
+  `dkj-policy/CONTRIBUTING.md`, inverting `LAW-THIRD-RANK-ORDER`? The **second** of the two
   narrow literal greps the declined framework recorded, and the one that entry measures every candidate
   as **structurally blind** to: a pointer test flags only sections that cite nothing, so
   cites-then-contradicts can live nowhere but among the findings it suppresses.
@@ -778,7 +778,7 @@ infrastructure.
     it while still exiting `0`. Caught during the fix above, before it shipped: the degrade path is an
     `else`, and an assert pinned that a block *after* the failing one still printed.
 - **`scripts/lib/release-lib.ps1`** — the pure release helpers (version bump, emptying `CHANGELOG.md` down
-  to its intro, and the assembly of the changelog notes under `contributing-davekjohn/releases/changelog/`)
+  to its intro, and the assembly of the changelog notes under `dkj-policy/releases/changelog/`)
   that [`cut-release.ps1`](../../../scripts/release/cut-release.ps1) dot-sources; deliberately
   pure so [Tycho #18](04-18-extension.md) can test them in isolation. The release *process* is
   [Rendall #06](05-06-extension.md)'s domain; Sylvester guards the script mechanics underneath.
@@ -837,7 +837,7 @@ authorship for him in consumers that never granted it.
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
   `plugins/teams/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
-  `plugins/workflows/contributing-davekjohn/` (everything branch- and release-shaped). Three things to
+  `plugins/workflows/dkj-policy/` (everything branch- and release-shaped). Three things to
   know before touching it:
   - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
     both used to look for a script's documenting page at a hardcoded `plugins\teams\team-alpha\skills\…`,
@@ -1223,7 +1223,7 @@ than a clear-out** (Dave, August 7, 2026;
 [#508](https://github.com/DaveKJohn/claude-code-specialists/issues/508)). Two of those descriptions were
 measured stale during a sweep that was looking for exactly that, one of them consumer-facing. The
 alternative — deleting the shape from every document and pointing at
-the generated reference under `contributing-davekjohn/branch/templates/`, a directory the merged development
+the generated reference under `dkj-policy/branch/templates/`, a directory the merged development
 cycle has since retired — was weighed and declined: the prose costs every reader on
 every read, while a check costs nothing per read. **What is checked is the section COUNT, not the
 section names**, and that was settled by measuring four candidate rules against the tree rather than by
@@ -1271,7 +1271,7 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
-the DEPLOY section of `contributing-davekjohn/<branch>.md`, so everything else it asked was already answered four lines lower. Measured
+the DEPLOY section of `dkj-policy/<branch>.md`, so everything else it asked was already answered four lines lower. Measured
 over 60 PRs before removing anything: `Type of change` had exactly **one of four** boxes ticked every
 single time, a fact the entry states under `### Branch type` and which the GitHub label takes from
 `Get-BranchInfo` rather than from the tick; of the checklist, `Requested by Dave` and
@@ -1300,7 +1300,7 @@ the prefix checklist: **5 of their 60 PRs ticked two rows and 2 ticked none**, w
 **The template's shape is shipped, and the placeholder list moved so a gate could reach it** (same
 issue). `.github/pull_request_template.md` cannot live in the plugin — GitHub reads it only from that
 path in the consumer's own repo — so what ships is a reference to copy and diff against, at
-`plugins/workflows/contributing-davekjohn/templates/pull_request_template.md`, held byte for byte to
+`plugins/workflows/dkj-policy/templates/pull_request_template.md`, held byte for byte to
 `Get-PrTemplateReference`. The three recognised placeholder strings were three literals inside
 `open-pr.ps1`, which meant **nothing outside that script could read them**: the reference could not be
 held against the list that has to recognise it, and that gap is the defect the issue reported. They now
@@ -1357,7 +1357,7 @@ the boundary is the **plugin root**, not `plugins/`, and scenario 37 of
 `check-plugin-integrity-links.tests.ps1` exists to pin exactly that difference. The report also argued
 from an expected count of **zero** (*"which is itself the reason not to build it yet"*) and stated that
 nothing had shipped; the real count was **17 escapes in 5 files**, every one passing check 4, and
-resolved inside the installed copies (`team-alpha` 4.21.0, `contributing-davekjohn` 4.22.0) **all 17 are
+resolved inside the installed copies (`team-alpha` 4.21.0, `dkj-policy` 4.22.0) **all 17 are
 dead**. That inverted its conclusion rather than qualifying it: the repo's name-a-risk-and-leave-it rule
 holds until something bites, and this had bitten seventeen times in released payload.
 
@@ -1378,7 +1378,7 @@ marketplace clone deliberately, and an absolute URL is the repair being asked fo
 instead of code — was measured and declined** (Dave, September 4, 2026;
 [#1380](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1380)). Inbound
 [#1379](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1379) asked for the two-sided
-mechanism it names: a manifest of the laws `contributing-davekjohn` legislates, and a consumer-side
+mechanism it names: a manifest of the laws `dkj-policy` legislates, and a consumer-side
 check reporting any always-on consumer document that answers a listed law without declaring itself a
 seam answer.
 
@@ -1407,7 +1407,7 @@ documents, not 12, before any exclusion is applied. Applying the source-repo gua
 plugin-shipped payload (`Source -eq 'external'`) removes this repo's 3 repo-specific always-on documents
 (`CLAUDE.md`, `SPECIALISTS.md`, the lens) and the shared persona entirely, leaving **8 consumer-only
 documents**: 6 always-on (`CLAUDE.md`, `SPECIALISTS.md`, the lens — 3 per repo × 2 BWJ consumers) plus 2
-non-always-on `contributing-davekjohn/CONTRIBUTING.md` (one per BWJ consumer).
+non-always-on `dkj-policy/CONTRIBUTING.md` (one per BWJ consumer).
 
 **Four candidates measured (raw findings / true positives / precision), over the 8 consumer-only
 documents:** a verbatim distinctive cue found **1 / 1 / 100%**; subject-term co-occurrence found
@@ -1502,7 +1502,7 @@ below the declined one.
 **And it found one more standing defect than this entry's census knew about.** The census above counts
 the suppressed sections as 4: 1 contradiction, 3 correct deferrals. The contradiction is
 `smartwatchbanden`'s `CLAUDE.md` preamble — but the same inversion is stated a second time, from the
-other side, in that repo's own `contributing-davekjohn/CONTRIBUTING.md`, and no candidate measured here
+other side, in that repo's own `dkj-policy/CONTRIBUTING.md`, and no candidate measured here
 ever counted it. Two standing instances, one repo.
 
 **One inheritance was asked for and turns out to be a guard rather than a repair, which is worth saying
@@ -1530,7 +1530,7 @@ scratch:
 | `LAW-PR-TITLE-COMPOSED` | No PR title is passed by hand — it is composed as `<branch type>: <Branch title>`. | `CONTRIBUTING-portable.md` — "4. Open the PR" | none |
 | `LAW-CLAIM-ISSUE-BEFORE-WORK` | Claim an issue before working it, and read the claim as well as write it. | `CONTRIBUTING-portable.md` — "1. New issue or task" | none |
 | `LAW-DOCCOMMIT-BEFORE-PUSH` | `open-pr` commits the development document alone, never `git add -A`, before anything is pushed. | `CONTRIBUTING-portable.md` — "4. Open the PR" | none |
-| `LAW-THIRD-RANK-ORDER` | The plugin's portable pages/skills outrank `contributing-davekjohn/CONTRIBUTING.md`, which outranks the floor. | `CONTRIBUTING-portable.md` — "A third rank sits above both" | none |
+| `LAW-THIRD-RANK-ORDER` | The plugin's portable pages/skills outrank `dkj-policy/CONTRIBUTING.md`, which outranks the floor. | `CONTRIBUTING-portable.md` — "A third rank sits above both" | none |
 
 **Any future attempt still needs the source-repo guard plus the exclusion of plugin-shipped payload
 (`Source -eq 'external'`)**, or this repo's own pages and the shared persona read as consumer drift,

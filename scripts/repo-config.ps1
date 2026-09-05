@@ -269,19 +269,20 @@ function Get-MojibakePaths {
     $paths = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '*.md' -File |
         Select-Object -ExpandProperty FullName)
 
-    # contributing-davekjohn/ -- the workflow's own root folder, which holds the branch's entry and step list
+    # dkj-policy/ -- the workflow's own root folder, which holds the branch's entry and step list
     # (under branch/, covered by the root glob above until the split moved them on August 6, 2026, and
     # under this folder since August 14, 2026; the folder itself renamed off 'workflow-davekjohn/' on
-    # August 26, 2026, #886). The entry is the single highest-value file in this set: its text is pasted
+    # August 26, 2026, #886, and off 'contributing-davekjohn/' on September 5, 2026, #1437). The entry is
+    # the single highest-value file in this set: its text is pasted
     # verbatim into CHANGELOG.md and from there into the release notes, so a mis-decode caught anywhere
     # later has already been copied twice.
     # -Recurse covers the folder's other pages -- the release notes under releases/audience/ and, in a
     # consumer, the scaffolded docs. It also covered branch/templates/ until the merged development document
     # retired that directory on August 23, 2026.
-    # BOTH NAMES ARE SCANNED, and the reason is what this check is for: a repo mid-rename has prose in
+    # EVERY NAME IS SCANNED, and the reason is what this check is for: a repo mid-rename has prose in
     # whichever folder it still uses, and a mojibake check that silently skips the folder a consumer
     # actually has is worse than no check -- it reports a clean run over nothing.
-    foreach ($workflowFolderName in @('contributing-davekjohn', 'workflow-davekjohn')) {
+    foreach ($workflowFolderName in @('dkj-policy', 'contributing-davekjohn', 'workflow-davekjohn')) {
         $workflowDir = Join-Path $RepoRoot $workflowFolderName
         if (Test-Path -LiteralPath $workflowDir) {
             $paths += @(Get-ChildItem -LiteralPath $workflowDir -Recurse -Filter '*.md' -File |
@@ -314,7 +315,7 @@ function Get-MojibakePaths {
     # preserves a mis-decode nobody wrote.
     #
     # THIS REPO NO LONGER HAS THAT DIRECTORY (August 27, 2026): its notes sit under
-    # contributing-davekjohn/releases/ and arrive through the recurse above. The block stays, because the
+    # dkj-policy/releases/ and arrive through the recurse above. The block stays, because the
     # Test-Path is what makes it correct rather than stale -- a repo that still keeps notes at its root
     # gets them scanned, and one that does not pays a single Test-Path. Removing it would narrow a
     # consumer's coverage to buy nothing here.
@@ -441,7 +442,7 @@ function Get-ReleaseNotesGrouping {
 # recorded three paragraphs up -- amended rather than silently flipped, so both readings stay legible.
 # That answer sent the list back to the repo root on one premise: an index of releases had no business
 # sitting in "a plugin folder that a teardown removes". THE PREMISE EXPIRED BEFORE THE ANSWER DID.
-# Issue #885 settled that contributing-davekjohn/ is PERMANENT -- no command in this plugin removes it and
+# Issue #885 settled that dkj-policy/ is PERMANENT -- no command in this plugin removes it and
 # no future teardown may, precisely because it holds a repo's own changelog and release history -- and
 # UNINSTALL.md's "what is left behind" list says so to every consumer. Once that is true the durability
 # worry is answered a different way, and the folder is the safer home rather than the riskier one. It is
@@ -452,7 +453,11 @@ function Get-ReleaseNotesGrouping {
 # its seam-ANSWERS page. The list and the answers are two different documents that shared a filename only
 # because they sat at different directory levels. 'history.md' is the name Get-DefaultReleaseHistoryPath
 # already computes for a consumer, so the source stops being the one repo that names it differently.
-$script:ReleaseHistoryPath = 'contributing-davekjohn/releases/history.md'
+#
+# AND UNDER dkj-policy/ SINCE SEPTEMBER 5, 2026 (#1437), when the folder renamed with the plugin it is
+# named after. The seam VALUES below carry today's name; every dated sentence around them keeps the name
+# it was written with, which is the #952 rule.
+$script:ReleaseHistoryPath = 'dkj-policy/releases/history.md'
 
 function Get-ReleaseHistoryPath {
     <# Repo-root-relative path to the file that lists every release this repo has cut. #>
@@ -463,18 +468,18 @@ function Get-ReleaseHistoryPath {
 #
 # THE SAME MOVE, ON THE SAME DAY AND FOR THE SAME REASON as the release history above -- read that record
 # first. Get-DefaultChangelogPath computes 'CHANGELOG.md' for a repo that publishes plugins, i.e. for the
-# workflow's SOURCE, and 'contributing-davekjohn/CHANGELOG.md' for everybody else. This repo is the source
+# workflow's SOURCE, and 'dkj-policy/CHANGELOG.md' for everybody else. This repo is the source
 # and now answers the consumer's way, so the seam has to be stated rather than left to the default.
 #
 # NOT A CHANGE OF MIND ABOUT THE DEFAULT. The default is right about what a repo adopting this workflow
 # should get and says nothing about what THIS repo prefers; the seam exists for exactly this, a repo that
 # wants to differ from its computed answer. Nothing about a consumer changes here.
 #
-# WHAT IT COSTS. A relative link inside a changelog entry now resolves from contributing-davekjohn/ rather
+# WHAT IT COSTS. A relative link inside a changelog entry now resolves from dkj-policy/ rather
 # than from the repo root, because that is where the fold pastes it. new-branch composes the branch
 # document's guidance from this very seam, so a writer is told the right thing without having to know it,
 # and check-plugin-integrity validates each entry's links against the same resolved location.
-$script:ChangelogPath = 'contributing-davekjohn/CHANGELOG.md'
+$script:ChangelogPath = 'dkj-policy/CHANGELOG.md'
 
 function Get-ChangelogPath {
     <# Repo-root-relative path to the changelog the fold writes into and the cut empties. #>
@@ -486,7 +491,7 @@ function Get-ChangelogPath {
 # default -- and recreate a root releases/ directory the August 27, 2026 move above just emptied. The
 # other two generated roots (changelog/, github/) need no statement: their defaults stopped branching on
 # the source at #914 and already point into this folder.
-$script:ReleaseInternalNotesRoot = 'contributing-davekjohn/releases/internal'
+$script:ReleaseInternalNotesRoot = 'dkj-policy/releases/internal'
 
 function Get-ReleaseInternalNotesRoot {
     <# Repo-root-relative directory the generated internal (tier 1) note is written into. #>
@@ -520,8 +525,9 @@ function Get-ReleaseInternalNotesRoot {
 # This is a repo-level rename, so it is stated here, which is the only place that can state it.
 #
 # UNDER contributing-davekjohn/ SINCE AUGUST 14, 2026 (Dave; the folder renamed off workflow-davekjohn/ on
-# August 26, #886). It moved together with the release history that day, which went back to the repo root
-# on August 19 while this stayed -- the split the paragraph below finishes. The
+# August 26, #886, and on to dkj-policy/ on September 5, #1437). It moved together with the release
+# history that day, which went back to the repo root on August 19 while this stayed -- the split the
+# paragraph below finishes. The
 # hand-kept release pages are the workflow's portable belongings, so they live in its folder -- the same
 # answer the adopt-workflow-folder scaffold proposes to every consumer.
 #
@@ -537,7 +543,7 @@ function Get-ReleaseInternalNotesRoot {
 # That reasoning was about durability rather than ownership, and Get-ReleaseHistoryPath's own record above
 # is where it is answered. The history-table row and the note's link prefix are both computed from these seam values, which is
 # what makes each of these repointings a few lines rather than a dead-link generator.
-$script:ReleaseNoteRoot = 'contributing-davekjohn/releases/audience'
+$script:ReleaseNoteRoot = 'dkj-policy/releases/audience'
 
 function Get-ReleaseNoteRoot {
     <# Repo-root-relative directory the hand-written release note is written into and read back from. #>
@@ -654,9 +660,9 @@ function Get-ReservedRootMd {
 # mismatch a storefront repo has with its management -- one tier serving two audiences badly.
 #
 # So this repo writes two documents per release plus a generated announcement:
-#   contributing-davekjohn/releases/changelog/<X>.x/<X.Y.Z>.md  tier 0  developers  -- every release, complete, raw
-#   contributing-davekjohn/releases/audience/<X>.x/<X.Y.Z>.md   tiers 1+2         -- minor/major here, hand-written
-#   contributing-davekjohn/releases/github/<X>.x/<X.Y.Z>.md     generated         -- every release, the announcement
+#   dkj-policy/releases/changelog/<X>.x/<X.Y.Z>.md  tier 0  developers  -- every release, complete, raw
+#   dkj-policy/releases/audience/<X>.x/<X.Y.Z>.md   tiers 1+2         -- minor/major here, hand-written
+#   dkj-policy/releases/github/<X>.x/<X.Y.Z>.md     generated         -- every release, the announcement
 #
 # EACH ROOT ANSWERS ONE QUESTION, WHICH IS WHY THE BODY HAS ITS OWN (Dave, August 12, 2026). The generated
 # announcement used to be written into the tier-0 root as '<X.Y.Z>-github-body.md' -- the one generated
@@ -877,7 +883,7 @@ function Get-ReleasePageTitle {
 #
 # THE TOKEN IS NOT IN THIS REPOSITORY, and that is the half to remember. This repo is public, so a
 # committed token would be a lock with its key taped to the door -- it lives in
-# contributing-davekjohn/releases/page/worker-path-token.txt, which .gitignore keeps out. Nothing in git
+# dkj-policy/releases/page/worker-path-token.txt, which .gitignore keeps out. Nothing in git
 # therefore remembers the URL: whoever creates it records it outside the repo. A consumer whose repo
 # is PRIVATE has the opposite answer available and should take it, since a tracked token survives a
 # lost machine.

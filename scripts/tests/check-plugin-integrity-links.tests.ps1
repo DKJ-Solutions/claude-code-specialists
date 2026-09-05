@@ -147,12 +147,12 @@ try {
     # And the root form is asserted DEAD on the legacy file, which is the direction pin: a repair that
     # simply left $RepoRoot in place, or one that dropped the case altogether, fails one of the three.
     Write-Host "check 4 coverage -- an entry's links are judged where the text LANDS" -ForegroundColor Cyan
-    $entryDirFx = Join-Path $Fixture 'contributing-davekjohn\branch'
+    $entryDirFx = Join-Path $Fixture 'dkj-policy\branch'
     New-Item -ItemType Directory -Path $entryDirFx -Force | Out-Null
     $entryFx    = Join-Path $entryDirFx 'branch-deployment.md'
     $progressFx = Join-Path $entryDirFx 'branch-cycle.md'
-    $devFx      = Join-Path $Fixture 'contributing-davekjohn\development.md'
-    # 'connectors/README.md' exists in this fixture. From contributing-davekjohn/ -- where this fixture's
+    $devFx      = Join-Path $Fixture 'dkj-policy\development.md'
+    # 'connectors/README.md' exists in this fixture. From dkj-policy/ -- where this fixture's
     # CHANGELOG.md resolves to -- it is reached with one '../', and the bare root form is dead there.
     [System.IO.File]::WriteAllText($entryFx,
         "## Fixture entry`n`nSee [the connectors README](../connectors/README.md), [the root form](connectors/README.md) and [nope]($deadLink).`n", $Utf8NoBom)
@@ -166,13 +166,13 @@ try {
     $b4 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($b4.Out -match 'dead link ''\.\./connectors/README\.md''')) `
         'entry links: the link that reads correctly beside the changelog is NOT dead -- that is where the fold puts the text'
-    Assert-True (-not ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\development.md'))) `
+    Assert-True (-not ($b4.Out -match [regex]::Escape('.\dkj-policy\development.md'))) `
         "entry links: today's document is judged from its own directory, because the changelog sits there too"
     Assert-True ($b4.Out -match 'dead link ''connectors/README\.md''') `
         'entry links: the ROOT form IS dead on the legacy name -- the base is the changelog, not the repo root'
-    Assert-True ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\branch\branch-deployment.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
+    Assert-True ($b4.Out -match [regex]::Escape('.\dkj-policy\branch\branch-deployment.md') -and $b4.Out -match [regex]::Escape($deadLink)) `
         'entry links: a genuinely dead link in the entry IS still reported -- the rebase is not a way out of the check'
-    Assert-True (-not ($b4.Out -match [regex]::Escape('.\contributing-davekjohn\branch\branch-cycle.md'))) `
+    Assert-True (-not ($b4.Out -match [regex]::Escape('.\dkj-policy\branch\branch-cycle.md'))) `
         'entry links: the step list keeps the ordinary nested convention -- it never travels, so ../../ is correct there'
 
     Remove-Item -LiteralPath $entryFx, $progressFx, $devFx -Force
@@ -773,7 +773,7 @@ try {
         '<!-- skills:plugin -->'
         '| skill | when |'
         '|---|---|'
-        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | scaffolds `contributing-davekjohn/`, and takes `--force` |'
+        '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | scaffolds `dkj-policy/`, and takes `--force` |'
         '| [`skill-beta`](skills/skill-beta/SKILL.md) | stays out of the built-in `/continue` way |'
         '| `not-a-skill` | a backticked token with no link at all -- prose, not a claim |'
         '<!-- /skills:plugin -->'

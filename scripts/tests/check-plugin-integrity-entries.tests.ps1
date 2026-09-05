@@ -264,7 +264,7 @@ try {
 
     # The CHANGELOG half, which is what cut-release actually parses -- and the half that catches damage
     # arriving through the fold, the one write that happens directly on main past every PR gate.
-    $s34Cl = Join-Path $Fixture 'contributing-davekjohn\CHANGELOG.md'
+    $s34Cl = Join-Path $Fixture 'dkj-policy\CHANGELOG.md'
     $s34ClGood = @(
         '# Changelog'
         ''

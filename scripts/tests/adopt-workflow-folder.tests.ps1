@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Tests for scripts/task/adopt-workflow-folder.ps1 -- the scaffold that places the workflow's own
-    root folder (contributing-davekjohn/) in a consuming repo.
+    root folder (dkj-policy/) in a consuming repo.
 
 .DESCRIPTION
     What is covered, and why these four:
@@ -88,7 +88,7 @@ function New-FixtureConsumer {
         [System.IO.File]::WriteAllText((Join-Path $root 'releases\notes\0.x\0.1.0.md'), "# 0.1.0`n")
     }
     if ($AsWorkflowSource -or $AsOtherPluginSource) {
-        $plugin = if ($AsWorkflowSource) { 'contributing-davekjohn' } else { 'some-other-product' }
+        $plugin = if ($AsWorkflowSource) { 'dkj-policy' } else { 'some-other-product' }
         $manifest = '{ "name": "fixture", "plugins": [ { "name": "' + $plugin + '", "source": "./x" } ] }'
         New-Item -ItemType Directory -Path (Join-Path $root '.claude-plugin') -Force | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $root '.claude-plugin\marketplace.json'), $manifest)
@@ -123,9 +123,9 @@ function Invoke-Adopt {
 # Every file -Apply must place. Read from the same claim the script makes rather than restated per
 # assert, so a target added there fails ONE list here instead of passing unexamined.
 $ExpectedFiles = @(
-    'contributing-davekjohn\README.md',
-    'contributing-davekjohn\CONTRIBUTING.md',
-    'contributing-davekjohn\releases\README.md'
+    'dkj-policy\README.md',
+    'dkj-policy\CONTRIBUTING.md',
+    'dkj-policy\releases\README.md'
 )
 
 try {
@@ -138,8 +138,8 @@ try {
     $r1 = Invoke-Adopt -Dir $c1
     Assert-Equal 0 $r1.Code 'dry run: exit 0'
     Assert-Match 'DRY RUN' $r1.Out 'dry run: says so out loud'
-    Assert-Match '\[create\]\s+contributing-davekjohn/README\.md' $r1.Out 'dry run: lists the folder README as to-create'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c1 'contributing-davekjohn'))) 'dry run: the folder was not created'
+    Assert-Match '\[create\]\s+dkj-policy/README\.md' $r1.Out 'dry run: lists the folder README as to-create'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c1 'dkj-policy'))) 'dry run: the folder was not created'
 
     # --- 2. -Apply places the whole folder ----------------------------------------------------------
     Write-Host "adopt-workflow-folder -- -Apply places every file" -ForegroundColor Cyan
@@ -154,20 +154,20 @@ try {
     # folder was also their reference. The document exists only while a branch is open now, so placing one
     # would hand them a file their own first fold deletes -- the only entry in this list that is not
     # permanently theirs.
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\development.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\branch'))) '-Apply: and no branch/ directory is placed any more'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'dkj-policy\development.md'))) '-Apply: the branch document is NOT placed -- it lives only while a branch is open'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'dkj-policy\branch'))) '-Apply: and no branch/ directory is placed any more'
     # NEITHER IS THE AUDIENCE ROOT (issue #1150). It was placed as a .gitkeep on the stated ground that
     # "the audience root must exist before the first cut writes into it" -- a premise cut-release itself
     # contradicts: it creates the note's own parent before writing. So the file bought nothing, while what
     # it did buy was an empty committed directory asserting a destination the unanswered seam did not use.
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'contributing-davekjohn\releases\audience'))) '-Apply: the audience root is NOT placed -- the first cut creates it'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c2 'dkj-policy\releases\audience'))) '-Apply: the audience root is NOT placed -- the first cut creates it'
     # THE FOLDER PAGE MUST NOT CARRY A HISTORY TABLE, and this assert is the regression guard on inbound
     # #786. It did until August 20, 2026: the page was scaffolded with a '## Release history' heading, a
     # table, and a VUL-IN promising that the cut would insert its rows there -- while this same command's
     # closing advice told the reader to leave Get-ReleaseHistoryPath at the repo root. Two statements in
     # one run that cannot both be true, and the consumer who followed the advice got a table that stays
     # empty forever. The page now points at the seam's answer instead.
-    $relText = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\releases\README.md'), [System.Text.Encoding]::UTF8)
+    $relText = [System.IO.File]::ReadAllText((Join-Path $c2 'dkj-policy\releases\README.md'), [System.Text.Encoding]::UTF8)
     Assert-True ($relText -notmatch '\| Version \| Date \| Type \| Title \|') '-Apply: the folder page carries NO history table (the list is not here)'
     # MATCHED ON THE LIST'S OWN PATH, not on 'releases/README.md'. That was the pattern until
 # August 27, 2026, and it was passing on the wrong sentence: the scaffolded page names the seam's answer
@@ -184,7 +184,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     # ASSERTED AGAINST Get-EntryHeadingLevel RATHER THAN AGAINST '###'. Pinning the literal would pass while
     # the sentence went stale again at the next shift, which is exactly the failure being repaired -- and it
     # would also turn red for a repo that legitimately overrode the level. The constant is the claim.
-    $clText = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\CHANGELOG.md'), [System.Text.Encoding]::UTF8)
+    $clText = [System.IO.File]::ReadAllText((Join-Path $c2 'dkj-policy\CHANGELOG.md'), [System.Text.Encoding]::UTF8)
     $entryHashes = '#' * (Get-EntryHeadingLevel)
     Assert-Match ('one `' + $entryHashes + '` per change') $clText '-Apply: the changelog intro states the heading level the fold writes'
     Assert-True ($clText -notmatch 'one `#{1,2}` per change') '-Apply: and no longer states a shallower one'
@@ -196,11 +196,11 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     # --- 3. Additive: a re-run never overwrites what somebody wrote --------------------------------
     Write-Host "adopt-workflow-folder -- re-run keeps every existing file" -ForegroundColor Cyan
     $marker = '# HAND-EDITED -- the scaffold must never win over this line'
-    [System.IO.File]::WriteAllText((Join-Path $c2 'contributing-davekjohn\CONTRIBUTING.md'), $marker)
+    [System.IO.File]::WriteAllText((Join-Path $c2 'dkj-policy\CONTRIBUTING.md'), $marker)
     $r3 = Invoke-Adopt -Dir $c2 -ScriptArgs @('-Apply')
     Assert-Equal 0 $r3.Code 're-run: exit 0'
-    Assert-Match '\[exists\]\s+contributing-davekjohn/CONTRIBUTING\.md' $r3.Out 're-run: the edited file is reported as left alone'
-    $kept = [System.IO.File]::ReadAllText((Join-Path $c2 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match '\[exists\]\s+dkj-policy/CONTRIBUTING\.md' $r3.Out 're-run: the edited file is reported as left alone'
+    $kept = [System.IO.File]::ReadAllText((Join-Path $c2 'dkj-policy\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Equal $marker $kept 're-run: the hand-edited content survives byte for byte'
 
     # --- 4. THE SOURCE OF THIS WORKFLOW is refused ---------------------------------------------------
@@ -209,12 +209,12 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $r4 = Invoke-Adopt -Dir $c4 -ScriptArgs @('-Apply')
     Assert-Equal 1 $r4.Code 'workflow source: exit 1'
     Assert-Match 'REFUSED' $r4.Out 'workflow source: says it is refusing, and why'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c4 'contributing-davekjohn'))) 'workflow source: nothing was written'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c4 'dkj-policy'))) 'workflow source: nothing was written'
 
     # --- 4b. A repo that publishes OTHER plugins is NOT refused (issue #998) -------------------------
     # THE CASE THIS SCRIPT USED TO GET WRONG, and the harm was concrete: the refusal was `Test-Path
     # marketplace.json`, so a repo publishing an unrelated product was told it "arranges
-    # contributing-davekjohn/ by hand" and turned away from the one command that scaffolds the folder it
+    # dkj-policy/ by hand" and turned away from the one command that scaffolds the folder it
     # needs. Under Dave's own one-product-one-repository rule that repo is the next product, and it
     # consumes this workflow like any other consumer.
     Write-Host "adopt-workflow-folder -- a repo publishing OTHER plugins is a consumer" -ForegroundColor Cyan
@@ -222,7 +222,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $rOther = Invoke-Adopt -Dir $cOther -ScriptArgs @('-Apply')
     Assert-Equal 0 $rOther.Code 'other plugins: exit 0 -- not refused'
     Assert-True ($rOther.Out -notmatch 'REFUSED') 'other plugins: no refusal in the output'
-    Assert-True (Test-Path -LiteralPath (Join-Path $cOther 'contributing-davekjohn\README.md')) 'other plugins: the folder really was scaffolded'
+    Assert-True (Test-Path -LiteralPath (Join-Path $cOther 'dkj-policy\README.md')) 'other plugins: the folder really was scaffolded'
 
     # --- 5. The two generated note roots #914 moved (issue #955) -------------------------------------
     # BOTH DIRECTIONS ARE ASSERTED, and the silent one is the half that matters. A warning that fires
@@ -259,7 +259,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-True ($r6.Flat -notmatch 'a generated-notes tree is still sitting at') 'no stranded tree: and the warning stays silent'
 
     # --- 6. The note-root seam: answered for a fresh adoption, never for anybody else (issue #1150) ---
-    # THE CONTRADICTION THIS BLOCK GUARDS. This command scaffolded contributing-davekjohn/releases/audience/
+    # THE CONTRADICTION THIS BLOCK GUARDS. This command scaffolded dkj-policy/releases/audience/
     # and its own pages said the cut drafts the note there, while Get-ReleaseNoteRoot's shared fallback
     # writes to releases/notes/ at the repo root. Both statements are produced by the same run, so one
     # clean adoption plus one clean release left a fresh consumer with an empty committed directory and
@@ -277,7 +277,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-Equal 0 $r7.Code 'seam fresh: exit 0'
     $cfg7 = [System.IO.File]::ReadAllText((Join-Path $c7 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
     Assert-Match 'function Get-ReleaseNoteRoot' $cfg7 'seam fresh: the answer was written into scripts/repo-config.ps1'
-    Assert-Match "'contributing-davekjohn/releases/audience'" $cfg7 'seam fresh: and it points into the folder this run just scaffolded'
+    Assert-Match "'dkj-policy/releases/audience'" $cfg7 'seam fresh: and it points into the folder this run just scaffolded'
     # THE GENERATED SOURCE IS PARSED, not merely matched. This block writes PowerShell into somebody
     # else's lib, and the failure mode it already produced once in development is a file that greps
     # correctly and does not parse -- an array literal splits an unparenthesised 'a' + $x + 'b' into three
@@ -291,7 +291,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     # keeps 5.1 from decoding the file as the system ANSI code page.
     $head7 = [System.IO.File]::ReadAllBytes((Join-Path $c7 'scripts\repo-config.ps1'))[0..2]
     Assert-Equal '239-187-191' ($head7 -join '-') 'seam fresh: their file''s byte-order mark survived the append'
-    $con7 = [System.IO.File]::ReadAllText((Join-Path $c7 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    $con7 = [System.IO.File]::ReadAllText((Join-Path $c7 'dkj-policy\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Match ('`releases/audience/` is where\s+' + $NoteSentence) $con7 'seam fresh: and the scaffolded page names that same destination'
 
     Write-Host "adopt-workflow-folder -- notes already at the fallback: the seam is left alone" -ForegroundColor Cyan
@@ -302,7 +302,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-True ($cfg8 -notmatch 'Get-ReleaseNoteRoot') 'seam has-notes: NOTHING was written into their lib'
     Assert-True (Test-Path -LiteralPath (Join-Path $c8 'releases\notes\0.x\0.1.0.md')) 'seam has-notes: and their existing note was not touched'
     Assert-Match 'left UNANSWERED' $r8.Flat 'seam has-notes: the run says out loud that it declined'
-    $con8 = [System.IO.File]::ReadAllText((Join-Path $c8 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    $con8 = [System.IO.File]::ReadAllText((Join-Path $c8 'dkj-policy\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Match ('`releases/notes/` at your repo root is where\s+' + $NoteSentence) $con8 'seam has-notes: and the page names where their notes ACTUALLY go'
 
     Write-Host "adopt-workflow-folder -- an answer already given always wins" -ForegroundColor Cyan
@@ -312,7 +312,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $cfg9 = [System.IO.File]::ReadAllText((Join-Path $c9 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
     Assert-Equal 1 ([regex]::Matches($cfg9, 'function Get-ReleaseNoteRoot').Count) 'seam answered: their function was not duplicated or overwritten'
     Assert-Match 'already answered here' $r9.Flat 'seam answered: the run reports it as left alone'
-    $con9 = [System.IO.File]::ReadAllText((Join-Path $c9 'contributing-davekjohn\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
+    $con9 = [System.IO.File]::ReadAllText((Join-Path $c9 'dkj-policy\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Match ('`my/own/notes/` at your repo root is where\s+' + $NoteSentence) $con9 'seam answered: and the page names THEIR answer, not the source''s'
 
     # NO LIB TO WRITE INTO. specialists-init owns that file's existence, exactly as adopt-config says when
@@ -322,7 +322,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $r10 = Invoke-Adopt -Dir $c10 -ScriptArgs @('-Apply')
     Assert-Equal 0 $r10.Code 'seam no-config: exit 0'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c10 'scripts\repo-config.ps1'))) 'seam no-config: no lib was conjured up'
-    Assert-True (Test-Path -LiteralPath (Join-Path $c10 'contributing-davekjohn\README.md')) 'seam no-config: the folder was scaffolded anyway'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c10 'dkj-policy\README.md')) 'seam no-config: the folder was scaffolded anyway'
     Assert-Match 'has no scripts/repo-config\.ps1' $r10.Flat 'seam no-config: and the run says why the seam is unanswered'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

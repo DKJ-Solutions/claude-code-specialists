@@ -67,13 +67,13 @@ function Get-SharedScriptPairs {
         @{
             Name   = 'fold-changelog-entry'
             Source = 'scripts\release\fold-changelog-entry.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'fold-changelog'
         },
         @{
             Name   = 'open-pr'
             Source = 'scripts\release\open-pr.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'open-pr'
         },
         @{
@@ -94,7 +94,7 @@ function Get-SharedScriptPairs {
             # scripts.
             Name   = 'check-script-contract'
             Source = 'scripts\sync\check-script-contract.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             # No skill, and none is wanted: this runs from a SessionStart hook and reports. Nobody
             # invokes it as a procedure, so there is no procedure to write down.
             Skill  = ''
@@ -107,7 +107,7 @@ function Get-SharedScriptPairs {
         @{
             Name   = 'new-branch'
             Source = 'scripts\task\new-branch.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'new-branch'
         },
         @{
@@ -116,13 +116,13 @@ function Get-SharedScriptPairs {
             # A repo-local copy would be a copy of the answer to a shared problem.
             Name   = 'worktree-lane'
             Source = 'scripts\task\worktree-lane.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'worktree-lane'
         },
         @{
             Name   = 'park-branch'
             Source = 'scripts\task\park-branch.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'park'
         },
         @{
@@ -137,7 +137,7 @@ function Get-SharedScriptPairs {
             # reach for this: the page carries disable-model-invocation, and the hook is what runs it.
             Name   = 'park-cycle'
             Source = 'scripts\task\park-cycle.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'park'
         },
         @{
@@ -146,7 +146,7 @@ function Get-SharedScriptPairs {
             # mechanism that will drift. Nothing in the plugin deleted a branch anywhere before this.
             Name   = 'prune-merged'
             Source = 'scripts\task\prune-merged.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'prune-merged'
         },
         @{
@@ -173,7 +173,7 @@ function Get-SharedScriptPairs {
             # answers $null on every machine, always.
             Name   = 'check-policy-drift'
             Source = 'scripts\task\check-policy-drift.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'check-policy-drift'
             # A fixture root, plus an always-on root the suite can point at a scratch document tree.
             # A consumer never types either.
@@ -190,7 +190,7 @@ function Get-SharedScriptPairs {
             # because it merges to main and then commits directly to main.
             Name   = 'ship-pr'
             Source = 'scripts\release\ship-pr.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             # The gap declared here on August 4, 2026 is closed: the route the cut-release skill sends
             # the reader to ("the normal new-branch -> ship-pr route") now has a page. It documents
             # verify-resolved-issues too, which is why that entry points here rather than at one of
@@ -204,7 +204,7 @@ function Get-SharedScriptPairs {
             # and pr-issues-lib/native-capture-lib are both mirrored already.
             Name   = 'verify-resolved-issues'
             Source = 'scripts\release\verify-resolved-issues.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             # No skill of its own, and that is right: it IS ship-pr's step 6 and runs from there, so
             # whatever documents ship-pr documents this. That page now exists and carries a section for
             # running this step on its own, so the inherited gap is closed with ship-pr's rather than
@@ -217,7 +217,7 @@ function Get-SharedScriptPairs {
             # the part that made it unusable elsewhere -- moved into the seam as Get-MojibakePaths.
             Name   = 'fix-mojibake'
             Source = 'scripts\maintenance\fix-mojibake.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             # The gap declared here on August 4, 2026 is closed. It was mirrored because three repos had
             # each written their own copy -- three people needing it and none with a page to read -- and
             # that same argument is why the page had to follow the mirror rather than wait for someone to
@@ -233,7 +233,7 @@ function Get-SharedScriptPairs {
             # details` (the count_tokens API) rather than counting anything itself, so the figure it
             # reports is the authoritative one and not a second, disagreeing estimate.
             #
-            # IT TRAVELS IN contributing-davekjohn, and the alternative was cheaper: a repo-level skill
+            # IT TRAVELS IN dkj-policy, and the alternative was cheaper: a repo-level skill
             # would cost every consumer nothing, since only the repo that AUTHORS skills ever runs
             # this. Dave chose the plugin on August 22, 2026 -- the standing portable-first rule for
             # ways of working, against a precisely known ~200 always-on tokens, and against
@@ -245,7 +245,7 @@ function Get-SharedScriptPairs {
             # registered script that could time itself, which is a good enough reason on its own.
             Name   = 'measure-skill'
             Source = 'scripts\maintenance\measure-skill.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'measure-skill'
             # A fixture root, so the suite can drive the script against a scratch tree. A consumer
             # never types it, and documenting it would invite someone to.
@@ -258,7 +258,7 @@ function Get-SharedScriptPairs {
             # scripts/tests/measure-skill.tests.ps1 against captured output.
             Name    = 'measure-skill-lib'
             Source  = 'scripts\lib\measure-skill-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -285,7 +285,7 @@ function Get-SharedScriptPairs {
             # pass 2 refuses to store.
             Name   = 'measure-always-on'
             Source = 'scripts\maintenance\measure-always-on.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'measure-skill'
         },
         @{
@@ -297,7 +297,7 @@ function Get-SharedScriptPairs {
             # scripts/tests/measure-always-on.tests.ps1.
             Name    = 'measure-context-lib'
             Source  = 'scripts\lib\measure-context-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -315,7 +315,7 @@ function Get-SharedScriptPairs {
             # where it is, so there is no seam a consumer has to answer.
             Name    = 'consumer-check-lib'
             Source  = 'scripts\lib\consumer-check-lib.ps1'
-            Plugin  = 'contributing-davekjohn'
+            Plugin  = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -342,13 +342,13 @@ function Get-SharedScriptPairs {
             # not assumed from the absence of a uniqueness assertion.
             Name    = 'check-report-lib-workflow'
             Source  = 'scripts\lib\check-report-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
             Name    = 'native-capture-lib'
             Source  = 'scripts\lib\native-capture-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -359,7 +359,7 @@ function Get-SharedScriptPairs {
             # WHY team-shopify NEEDS ITS OWN COPY (inbound #1181, September 1, 2026): sync-main.ps1 became
             # a caller. Its five git network calls ran unguarded and unbounded -- the same hang #1179
             # measured, in the script that pushes a commit holding a third party's in-flight edits -- and
-            # the guard lives in this lib. team-shopify and contributing-davekjohn are separately
+            # the guard lives in this lib. team-shopify and dkj-policy are separately
             # versioned and separately installed, and a Shopify consumer may run the first without the
             # second, so reaching into the workflow plugin's cache would be a dependency a version
             # mismatch breaks silently. sync-main.ps1's dot-source is UNGUARDED for the matching reason:
@@ -387,11 +387,11 @@ function Get-SharedScriptPairs {
             # second entry carries its plugin in its name; nothing about that needs restating.
             Name    = 'merged-pr-lib'
             Source  = 'scripts\lib\merged-pr-lib.ps1'
-            Plugin  = 'contributing-davekjohn'
+            Plugin  = 'dkj-policy'
             LibOnly = $true
         },
         @{
-            # The second mirror of merged-pr-lib. team-shopify and contributing-davekjohn are separately
+            # The second mirror of merged-pr-lib. team-shopify and dkj-policy are separately
             # versioned and separately installed, and a Shopify consumer may run the first without the
             # second, so reaching into the workflow plugin's cache would be a dependency a version
             # mismatch breaks silently -- the same reason native-capture-lib is registered twice five
@@ -416,7 +416,7 @@ function Get-SharedScriptPairs {
             # without this lib present would now fail, which is why the list is kept current.
             Name    = 'seam-lib'
             Source  = 'scripts\lib\seam-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -431,13 +431,13 @@ function Get-SharedScriptPairs {
             # directory, so there is no seam a consumer has to answer.
             Name    = 'gate-lib'
             Source  = 'scripts\lib\gate-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -446,7 +446,7 @@ function Get-SharedScriptPairs {
             # above -- open-pr is mirrored and would otherwise dot-source a file the consumer does not have.
             Name    = 'pr-body-lib'
             Source  = 'scripts\lib\pr-body-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -461,7 +461,7 @@ function Get-SharedScriptPairs {
             # is repo-owned, so no contract row follows.
             Name    = 'park-lib'
             Source  = 'scripts\lib\park-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -477,7 +477,7 @@ function Get-SharedScriptPairs {
             # contract row follows.
             Name    = 'worktree-lib'
             Source  = 'scripts\lib\worktree-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -488,7 +488,7 @@ function Get-SharedScriptPairs {
             # empty document inside the release tag while the written version landed afterwards anyway.
             Name   = 'new-internal-note'
             Source = 'scripts\release\new-internal-note.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             # Documented inside the cut-release skill (step 2) rather than separately: it is a step of
             # cutting a release, and it cannot run before the cut has produced its input.
             Skill  = 'cut-release'
@@ -500,7 +500,7 @@ function Get-SharedScriptPairs {
             # a drift guard that drifts. So it travels with both rather than living in either.
             Name    = 'entry-scaffold-lib'
             Source  = 'scripts\lib\entry-scaffold-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -511,7 +511,7 @@ function Get-SharedScriptPairs {
             # mirror would otherwise load a file it does not have.
             Name    = 'script-contract-lib'
             Source  = 'scripts\lib\script-contract-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -525,7 +525,7 @@ function Get-SharedScriptPairs {
             # it would generate a blueprint of itself and overwrite the one it adopts from.
             Name   = 'adopt-config'
             Source = 'scripts\task\adopt-config.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'adopt-config'
             # A test points the command at a fixture blueprint instead of the shipped one. A consumer
             # never types it, and documenting it would invite someone to.
@@ -539,7 +539,7 @@ function Get-SharedScriptPairs {
             # folder down.
             Name   = 'adopt-workflow-folder'
             Source = 'scripts\task\adopt-workflow-folder.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'adopt-workflow-folder'
         },
         @{
@@ -555,7 +555,7 @@ function Get-SharedScriptPairs {
             # waits for Dave's own eye rather than merging on the gates.
             Name   = 'cut-release'
             Source = 'scripts\release\cut-release.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'cut-release'
         },
         @{
@@ -567,7 +567,7 @@ function Get-SharedScriptPairs {
             # from the consumer's own root before calling in.
             Name    = 'release-lib'
             Source  = 'scripts\lib\release-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -578,7 +578,7 @@ function Get-SharedScriptPairs {
             # argument for one source rather than for a second.
             Name   = 'build-release-notes-page'
             Source = 'scripts\release\build-release-notes-page.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'release-notes-page'
             # A fixture root, so the suite can build a page from a synthetic tree instead of this repo's
             # real notes. A consumer never types it.
@@ -597,7 +597,7 @@ function Get-SharedScriptPairs {
             # registry is for. Without it the mirror would build a page from a template it does not have.
             Name    = 'release-notes-page-template'
             Source  = 'scripts\release\release-notes-page-template.html'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -614,7 +614,7 @@ function Get-SharedScriptPairs {
             # reader into every consumer session that has no marketplace.
             Name    = 'plugin-tree-lib'
             Source  = 'scripts\lib\plugin-tree-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -629,7 +629,7 @@ function Get-SharedScriptPairs {
             # loaded yet.
             Name    = 'source-repo-guard-lib'
             Source  = 'scripts\lib\source-repo-guard-lib.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             LibOnly = $true
         },
         @{
@@ -655,7 +655,7 @@ function Get-SharedScriptPairs {
         @{
             # THE GUARD LIB HAS TO REACH team-shopify TOO, now that a shared script travels there. It only
             # ever fires from inside the copy a reader wrongly ran, so a version that stayed behind in
-            # contributing-davekjohn's mirror could never fire for adopt-shopify-floor. Registered per plugin
+            # dkj-policy's mirror could never fire for adopt-shopify-floor. Registered per plugin
             # rather than per script for the same reason check-report-lib is: the pair names a destination,
             # and one destination cannot serve two.
             Name    = 'source-repo-guard-lib'
@@ -678,7 +678,7 @@ function Get-SharedScriptPairs {
             # exemption was.
             Name   = 'check-branch-entry'
             Source = 'scripts\lint\check-branch-entry.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = 'check-branch-entry'
             # A fixture root, so the suite can judge scratch trees. A consumer never types it.
             SkillParamsExempt = @('RootOverride')
@@ -697,11 +697,11 @@ function Get-SharedScriptPairs {
             # reason -- a person who wants the answer early runs the one command in its .SYNOPSIS.
             Name   = 'check-unfolded-entry'
             Source = 'scripts\lint\check-unfolded-entry.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = ''
             # A fixture root, so the suite (and the hook) can judge a tree other than the checkout.
             SkillParamsExempt = @('RootOverride')
-            # Timeable with no arguments: reads contributing-davekjohn/ and reports, no write of any kind.
+            # Timeable with no arguments: reads dkj-policy/ and reports, no write of any kind.
             MeasureArgs = @()
         },
         @{
@@ -742,7 +742,7 @@ function Get-SharedScriptPairs {
             # answers it early.
             Name   = 'check-consumer-prose'
             Source = 'scripts\lint\check-consumer-prose.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = ''
             # A fixture root, plus an always-on root the suite can point at a scratch document tree.
             # A consumer never types either.
@@ -765,7 +765,7 @@ function Get-SharedScriptPairs {
             # and nobody invokes it as a procedure. One command in its .SYNOPSIS answers it early.
             Name   = 'check-git-identity'
             Source = 'scripts\lint\check-git-identity.ps1'
-            Plugin = 'contributing-davekjohn'
+            Plugin = 'dkj-policy'
             Skill  = ''
             # A fixture root, plus the two identity overrides the suite needs to put this in front of
             # every state without a keyring or a git identity of its own.

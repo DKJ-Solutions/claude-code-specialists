@@ -158,7 +158,7 @@ try {
         'The install back then was `claude plugin install team-alpha@claude-code-specialists`, with no'
         'scope flag and no refresh -- which is exactly what that release documented.'
     )
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'contributing-davekjohn\CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'dkj-policy\CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
     $rL24 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($rL24.Out -match $LifecycleFindingPattern)) 'scenario 24: history is not held to the current rules'
     Assert-True ($rL24.Out -match '\[lifecycle\] checked 0') 'scenario 24: the history command was not even counted as enforced'
@@ -486,7 +486,7 @@ try {
     #     this check in silence.
     Write-Host "check 30 -- history is not rewritten, so it is not a subject" -ForegroundColor Cyan
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), "# Contributing`n`nNothing here.`n", $Utf8NoBom)
-    $s50Path = Join-Path $Fixture 'contributing-davekjohn\CHANGELOG.md'
+    $s50Path = Join-Path $Fixture 'dkj-policy\CHANGELOG.md'
     $s50Prev = if (Test-Path -LiteralPath $s50Path) { [System.IO.File]::ReadAllText($s50Path, [System.Text.Encoding]::UTF8) } else { $null }
     $s50Lines = @(
         '# Changelog'

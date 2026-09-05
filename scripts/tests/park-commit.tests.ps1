@@ -129,7 +129,7 @@ function Write-Doc {
 # --- 1. THE CASE THIS FUNCTION EXISTS FOR: a dirty document, committed -----------------------------
 Write-Host "`n== 1. a dirty named path is committed ==" -ForegroundColor Cyan
 $d1   = New-Fixture -Label 'dirty'
-$rel1 = 'contributing-davekjohn/development-fix-x-v1.md'
+$rel1 = 'dkj-policy/development-fix-x-v1.md'
 Write-Doc -Dir $d1 -Rel $rel1 -Text "## Development: fix/x-v1`n"
 $before = Get-Head -Dir $d1
 $r1 = Invoke-GitParkCommit -RepoRoot $d1 -Branch 'fix/x-v1' -Scope 'BranchFiles' -Paths @($rel1)
@@ -154,7 +154,7 @@ Assert-Equal $head2 (Get-Head -Dir $d1)        'and HEAD did not move'
 # along into a commit nobody asked to publish.
 Write-Host "`n== 3. unrelated work does not ride along ==" -ForegroundColor Cyan
 $d3   = New-Fixture -Label 'bounded'
-$rel3 = 'contributing-davekjohn/development-fix-y-v1.md'
+$rel3 = 'dkj-policy/development-fix-y-v1.md'
 Write-Doc -Dir $d3 -Rel $rel3 -Text "## Development: fix/y-v1`n"
 Write-Doc -Dir $d3 -Rel 'src/staged.txt'   -Text "staged`n"
 Write-Doc -Dir $d3 -Rel 'src/untracked.txt' -Text "untracked`n"
@@ -181,7 +181,7 @@ Assert-True (-not ($files3 -match 'staged\.txt'))   'and nothing else'
 Write-Host "`n== 4. a named path that is not there ==" -ForegroundColor Cyan
 $d4    = New-Fixture -Label 'absent'
 $head4 = Get-Head -Dir $d4
-$r4 = Invoke-GitParkCommit -RepoRoot $d4 -Branch 'fix/z-v1' -Scope 'BranchFiles' -Paths @('contributing-davekjohn/nope.md')
+$r4 = Invoke-GitParkCommit -RepoRoot $d4 -Branch 'fix/z-v1' -Scope 'BranchFiles' -Paths @('dkj-policy/nope.md')
 Assert-True  ([bool]$r4.Ok)              'Ok is true'
 Assert-True  (-not $r4.Committed)        'Committed is false'
 Assert-Equal $head4 (Get-Head -Dir $d4)  'and HEAD did not move'
@@ -226,13 +226,13 @@ if ($null -ne $r6) {
 Write-Host "`n== 7. -Continuation ==" -ForegroundColor Cyan
 $d7 = New-Fixture -Label 'continuation'
 $withNote = Invoke-GitParkCommit -RepoRoot $d7 -Branch 'fix/c-v1' -Scope 'BranchFiles' `
-                                 -Paths @('contributing-davekjohn/nope.md') `
+                                 -Paths @('dkj-policy/nope.md') `
                                  -Continuation 'pushing the existing commits as-is' 6>&1
 $withNoteText = ($withNote | Out-String)
 Assert-True ($withNoteText -match 'pushing the existing commits as-is\.') 'the pusher gets its clause'
 
 $without = Invoke-GitParkCommit -RepoRoot $d7 -Branch 'fix/c-v1' -Scope 'BranchFiles' `
-                                -Paths @('contributing-davekjohn/nope.md') 6>&1
+                                -Paths @('dkj-policy/nope.md') 6>&1
 $withoutText = ($without | Out-String)
 Assert-True ($withoutText -match 'nothing to stage in this scope\.') 'and without one the line simply stops'
 Assert-True (-not ($withoutText -match 'pushing')) 'never claiming a push it did not make'

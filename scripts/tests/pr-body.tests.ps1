@@ -761,7 +761,7 @@ foreach ($f in $oldFolderForms) {
 # September 3, 2026). That loop keys on the FOLDER rename -- it derives the migrated form from the
 # pre-#886 one -- so it can only speak for strings that have a 'workflow-davekjohn' partner. The
 # DOCUMENT renames have none, by the asymmetry stated above, and #1255 walked straight through the
-# gap: it REPLACED 'contributing-davekjohn/development.md' with the per-branch form instead of
+# gap: it REPLACED 'dkj-policy/development.md' with the per-branch form instead of
 # appending, which is the #952 defect a second time, and every suite stayed green.
 #
 # So the history is pinned here as a set, and the assert is a superset test rather than an equality.
@@ -776,22 +776,22 @@ $publishedForms = @(
     "<!-- Filled from workflow-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
     "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
     "<!-- Filled from the DEPLOY section of workflow-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
-    "<!-- Filled from contributing-davekjohn/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
-    "<!-- Filled from contributing-davekjohn/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
-    "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
-    "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
-    "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
+    "<!-- Filled from dkj-policy/branch/branch-changelog.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from dkj-policy/branch/branch-deployment.md. Opening a PR by hand? Paste that file's body here. -->",
+    "<!-- Filled from the DEPLOY section of dkj-policy/development-cycle.md. Opening a PR by hand? Paste that section's body here. -->",
+    "<!-- Filled from the DEPLOY section of dkj-policy/development-cycle.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->",
+    "<!-- Filled from the DEPLOY section of dkj-policy/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->"
 )
 foreach ($published in $publishedForms) {
     Assert-True ($known -contains $published) `
         "a form this family has published is still recognised -- the list is append-only: '$published'"
 }
 # THE ONE THE PER-BRANCH RENAME DROPPED, named on its own line as well, because a loop reports the
-# string and not the reason. 'contributing-davekjohn/development.md' was the WRITTEN placeholder from
+# string and not the reason. 'dkj-policy/development.md' was the WRITTEN placeholder from
 # August 27 to September 3, 2026, so it is what every template scaffolded in that week carries right
 # now -- in this repo and in every consumer that adopted a release in it. Unrecognised, their PR
 # bodies lose their description silently, which is the outcome this whole list exists to prevent.
-Assert-True ($known -contains "<!-- Filled from the DEPLOY section of contributing-davekjohn/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->") `
+Assert-True ($known -contains "<!-- Filled from the DEPLOY section of dkj-policy/development.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->") `
     'the pre-#1255 shared-document form is still recognised, so a template scaffolded that week is still filled in'
 # THE WRITTEN ONE IS THE LAST ONE, asserted here rather than trusted, because Get-PrTemplateCanonicalPlaceholder
 # takes it by position and every rename appends. A form added in the wrong place silently changes which
@@ -802,12 +802,12 @@ Assert-Equal $known[$known.Count - 1] (Get-PrTemplateCanonicalPlaceholder) `
 # literal path -- a template is scaffolded once and read on every branch, so it cannot name one branch's
 # document. The assert follows the shape for the same reason it followed the name before: to catch a
 # placeholder left describing a document that no longer exists.
-Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'contributing-davekjohn/<branch>\.md') `
+Assert-True ((Get-PrTemplateCanonicalPlaceholder) -match 'dkj-policy/<branch>\.md') `
     'and it names the document by its current filename shape'
 # THE PRE-#1335 FORM IS STILL RECOGNISED, and that is the append-only rule this list exists for: a template
 # scaffolded on the day the prefix went is still carrying it, and dropping the form is exactly the defect
 # #952 measured -- a rewrite that left the tolerated set matching only the repos needing no tolerance.
-Assert-True ($known -contains "<!-- Filled from the DEPLOY section of contributing-davekjohn/development-<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->") `
+Assert-True ($known -contains "<!-- Filled from the DEPLOY section of dkj-policy/development-<branch>.md, heading and all. Opening a PR by hand? Paste that whole section here, starting at its '## DEPLOY:' line. -->") `
     'the pre-#1335 prefixed form is still recognised'
 
 $canonical = Get-PrTemplateCanonicalPlaceholder
@@ -828,7 +828,7 @@ Assert-True ($reference[0] -eq (Get-PrTemplateCanonicalPlaceholder)) `
 
 # The shipped file on disk, not just the function: a reference nobody can copy is not a reference. The
 # lint gate holds these byte for byte; this asserts the file exists at the path the docs send people to.
-$refOnDisk = Join-Path $PSScriptRoot '..\..\plugins\workflows\contributing-davekjohn\templates\pull_request_template.md'
+$refOnDisk = Join-Path $PSScriptRoot '..\..\plugins\workflows\dkj-policy\templates\pull_request_template.md'
 Assert-True (Test-Path -LiteralPath $refOnDisk) `
     'the reference template is actually shipped at the path the skill and CONTRIBUTING-portable name'
 if (Test-Path -LiteralPath $refOnDisk) {

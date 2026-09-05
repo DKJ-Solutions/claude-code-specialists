@@ -148,7 +148,7 @@
          prefix; that hook was retired with workflow-default and the argument above is the one that
          survives it.)
      24. the PR template keeps the two promises open-pr makes about it: the shipped reference under
-         plugins/workflows/contributing-davekjohn/templates/ byte for byte against Get-PrTemplateReference,
+         plugins/workflows/dkj-policy/templates/ byte for byte against Get-PrTemplateReference,
          and THIS repo's own .github/pull_request_template.md only to the contract (one placeholder line
          the matcher recognises). Deliberately weaker for the second, which is genuinely repo-owned: a
          byte rule would refuse a correct change the day it grows a section. A heading is no longer part
@@ -628,7 +628,7 @@ $linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
 # file at PLUGIN level matched no rule at all, which is where a plugin's own README.md sits: the first page
 # a consumer reads, its links never once validated. Measured on the day this was widened: six such files,
 # five of them already in the tree (plugins\teams\README.md, plugins\workflows\README.md, both workflow
-# plugin READMEs, and contributing-davekjohn\scripts\README.md) and the sixth the portable contribution guide
+# plugin READMEs, and dkj-policy\scripts\README.md) and the sixth the portable contribution guide
 # added by that same change -- a consumer-facing page whose whole purpose is to be copied, and whose dead
 # links would therefore be copied with it. All six were clean, so this arrives green; the point is that
 # nothing would have said otherwise.
@@ -831,13 +831,13 @@ foreach ($lf in $linkFiles) {
     # contributing-davekjohn/ on August 27 -- so the special case went on demanding the root form that the
     # fold then breaks. Measured: a DEPLOY link written as '../plugins/...' -- correct for BOTH
     # the branch's development document and the changelog, which now sit in one directory -- was refused as dead, and the form
-    # this check accepted resolved from contributing-davekjohn/ after the fold and was dead there. Precisely
+    # this check accepted resolved from dkj-policy/ after the fold and was dead there. Precisely
     # the failure the paragraph above says this case exists to prevent, running backwards.
     #
     # THE SPECIAL CASE SURVIVES THE REPAIR RATHER THAN BEING DROPPED, which is the part that is not
     # obvious: for TODAY'S name the base now equals the file's own directory, so this branch and the
     # fall-through agree and it looks like dead weight. The LEGACY names do not agree -- they sit in
-    # contributing-davekjohn/branch/, one level BELOW the changelog -- and a branch open since before the
+    # dkj-policy/branch/, one level BELOW the changelog -- and a branch open since before the
     # August 23 merge still carries one. Dropping the case would judge those where they sit, which is the
     # original defect at a smaller radius.
     #
@@ -1431,7 +1431,7 @@ $lifecycleFiles = @($linkFiles | Where-Object {
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
     # The moved release pages are the same history at their workflow-folder address (August 14, 2026).
-    if ($rel -match '^contributing-davekjohn\\releases\\') { return $false }
+    if ($rel -match '^dkj-policy\\releases\\') { return $false }
     # A root <branch-name>.md entry file is history in the making; same reasoning as CHANGELOG.md.
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
     # branch/ is the same subject at its new address. Both files: the entry is history in the making, and
@@ -2035,7 +2035,7 @@ Write-Coverage -Category 'mojibake' -Checked $mjFiles `
     } elseif ($mjFiles -eq 0) {
         'the repair tool ran but did not state how many files it examined, so this count is not evidence of scope'
     } else {
-        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root (the changelog and the root docs), every *.md under contributing-davekjohn/ (the entry whose text is pasted into CHANGELOG.md, the step list, and the templates), plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
+        'the set this repo names in Get-MojibakePaths (scripts/repo-config.ps1): every *.md in the root (the changelog and the root docs), every *.md under dkj-policy/ (the entry whose text is pasted into CHANGELOG.md, the step list, and the templates), plus every *.md under plugins/ and every note under releases/. Peeled by the inverse round trip rather than matched against a table of known sequences'
     })
 
 # --- 15. unbound output samples: an expectation that cannot hold everywhere -------------------------------
@@ -2336,7 +2336,7 @@ Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
 #
 # History is excluded exactly as checks 11 and 12 exclude it: CHANGELOG.md's ENTRIES and the per-plugin
 # copies, the release notes, RELEASE.md, and the branch's own document, which is history in the making.
-# contributing-davekjohn/CONTRIBUTING.md is deliberately NOT excluded -- it is a document ABOUT the shape,
+# dkj-policy/CONTRIBUTING.md is deliberately NOT excluded -- it is a document ABOUT the shape,
 # which is precisely this check's subject. Two pages used to carry that role and both are gone into it:
 # branch/README.md at the merge on August 23, 2026, and this folder's own CLAUDE.md on August 26 (#886).
 # One page now, and the check reaches it the same way.
@@ -2421,7 +2421,7 @@ $scFiles = @($linkFiles | Where-Object {
     if ($rel -match '(^|\\)RELEASE\.md$') { return $false }
     if ($rel -match '^releases\\') { return $false }
     # The moved release pages are the same history at their workflow-folder address (August 14, 2026).
-    if ($rel -match '^contributing-davekjohn\\releases\\') { return $false }
+    if ($rel -match '^dkj-policy\\releases\\') { return $false }
     if (($rel -notmatch '\\') -and (Test-IsChangelogEntryFile -Path $_)) { return $false }
     # The branch's own document only -- NOT the whole folder. It is history in the making above and a scratch
     # pad below; the folder's own pages are the convention itself and are checked.
@@ -2466,7 +2466,7 @@ if (Test-Path -LiteralPath $scChangelog) {
 }
 
 Write-Coverage -Category 'entry-shape' -Checked $scChecked `
-    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; contributing-davekjohn/branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
+    -Note "claim(s) about how many '$('#' * $scLevel)' sections a changelog entry has, held against the $scExpected the scaffolder writes. The rule is the COUNT and not the section NAMES, chosen by measuring four candidates against this tree: matching names accuses two correct documents, because 'What does this change do?' and 'Type of change' are retired entry sections AND live headings of the PR template. History is excluded as in checks 11 and 12; dkj-policy/branch/README.md is not, being a document about the shape, and neither is CHANGELOG.md's INTRO -- the entries below it are history, the intro is a live statement about the present mechanism that every cut copies through verbatim, so it gets its own pass with the level marker optional"
 
 # --- 21. The config blueprint matches what the source's own libs say right now -----------------------------
 #
@@ -2580,6 +2580,13 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # 2026, when 'workflow-bwj' was renamed 'bwj-codex' -- a codex is a body of law, i.e. a way of working,
 # and the leading word names whose. 'workflow-*' is still accepted: it is what a plugin from anybody
 # else would be called, and refusing it would make this family's renames somebody else's problem.
+#
+# AND '*-policy' / '*-policy-*' JOINED ON SEPTEMBER 5, 2026 (#1437), when 'contributing-davekjohn' became
+# 'dkj-policy' and 'dkj-policy-bwj' became 'dkj-policy-bwj'. Same shape, same reason: a policy IS a way of
+# working, the leading word says whose, and the trailing one -- where there is one -- says which ministry
+# under it. THE RETIRED SHAPES STAY ACCEPTED rather than being swapped out, which is this repo's standing
+# answer to a rename (#952): a consumer who has not migrated still resolves a 'contributing-*' plugin, and
+# a check that recognised only today's spelling would report their working install as unclassifiable.
 $kindChecked = 0
 foreach ($p in $publishedPlugins) {
     $kindChecked++
@@ -2588,16 +2595,16 @@ foreach ($p in $publishedPlugins) {
         if ($rel -notmatch '^plugins\\teams\\') {
             Add-Error "[plugin-kind] '$($p.Name)' is a team by its name but its source is '$rel' -- a team belongs under plugins/teams/."
         }
-    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*' -or $p.Name -like '*-codex') {
+    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*' -or $p.Name -like '*-codex' -or $p.Name -like '*-policy' -or $p.Name -like '*-policy-*') {
         if ($rel -notmatch '^plugins\\workflows\\') {
-            Add-Error "[plugin-kind] '$($p.Name)' is a way of working by its name but its source is '$rel' -- 'workflow-*', 'contributing-*' and '*-codex' all belong under plugins/workflows/."
+            Add-Error "[plugin-kind] '$($p.Name)' is a way of working by its name but its source is '$rel' -- 'workflow-*', 'contributing-*', '*-codex', '*-policy' and '*-policy-*' all belong under plugins/workflows/."
         }
     } else {
-        Add-Error "[plugin-kind] '$($p.Name)' is none of 'team-*', 'workflow-*', 'contributing-*' or '*-codex'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the name, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
+        Add-Error "[plugin-kind] '$($p.Name)' is none of 'team-*', 'workflow-*', 'contributing-*', '*-codex', '*-policy' or '*-policy-*'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the name, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
     }
 }
 Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
-    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name, and sits in the directory its name claims -- 'workflow-*', 'contributing-*' and '*-codex' all map to plugins/workflows/, the directory naming the KIND while the rest of the name says whose it is. The naming half is the one that cannot be seen by reading the tree: the directory rule is derived from the name, so an unclassifiable plugin is silently held to nothing" })
+    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name, and sits in the directory its name claims -- 'workflow-*', 'contributing-*', '*-codex', '*-policy' and '*-policy-*' all map to plugins/workflows/, the directory naming the KIND while the rest of the name says whose it is. The naming half is the one that cannot be seen by reading the tree: the directory rule is derived from the name, so an unclassifiable plugin is silently held to nothing" })
 
 # --- 24. the PR template keeps the two promises open-pr makes about it ------------------------------------
 # WHAT THIS IS FOR, measured at a consumer rather than imagined (#573). open-pr fills the PR body's
@@ -2631,7 +2638,7 @@ Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
 # repo that does not define it is correct, exactly the shape recorded for Get-BranchTypes.
 $prtChecked = 0
 $prtNote = ''
-$prtRefRel = 'plugins\workflows\contributing-davekjohn\templates\pull_request_template.md'
+$prtRefRel = 'plugins\workflows\dkj-policy\templates\pull_request_template.md'
 $prtRefPath = Join-Path $RepoRoot $prtRefRel
 $prtExpected = ((Get-PrTemplateReference) -join "`n").TrimEnd()
 if (-not (Test-Path -LiteralPath $prtRefPath)) {
@@ -2779,7 +2786,7 @@ Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
 # findable by neither reading nor this gate, and the first three bytes are the only vantage point from which
 # it exists at all.
 #
-# A REPAIR, NOT A PRECAUTION. plugins/workflows/contributing-davekjohn/skills/adopt-config/SKILL.md shipped with
+# A REPAIR, NOT A PRECAUTION. plugins/workflows/dkj-policy/skills/adopt-config/SKILL.md shipped with
 # EF BB BF in 4.1.0 -- the only one of the eleven skills across the two shipped plugins to carry it, and the
 # only model-invocable one absent from the agent's skill listing. A frontmatter parser that wants '---' at
 # offset 0 sees a BOM in front of it and reads the file as having no frontmatter, so the skill has no name
@@ -2922,7 +2929,7 @@ Write-Coverage -Category 'script-ascii' -Checked $asciiScripts.Count `
 # tree returns 12 lines and only 3 are imports:
 #   - 7 are PowerShell '@(...)' expressions inside fenced blocks. Fences are tracked, exactly as check 4
 #     argues for links: illustrating a thing is not doing it.
-#   - 1 is PROSE -- contributing-davekjohn/releases/changelog/1.x/1.16.0.md, a paragraph that happens to wrap onto
+#   - 1 is PROSE -- dkj-policy/releases/changelog/1.x/1.16.0.md, a paragraph that happens to wrap onto
 #     '@-imported here (this maintenance repo ...)'. Get-ImportLinePath takes the rest of the line as the
 #     path, which is right for the always-on walk (it never meets prose) and wrong for a scan set that
 #     includes archived release notes. A target containing WHITESPACE is therefore not an import here.
@@ -2998,7 +3005,7 @@ Write-Coverage -Category 'import' -Checked $importScanFiles.Count `
 # wrong instrument for a document that claims to list every skill of ONE plugin:
 #
 #   * its canonical set is repo-wide -- built from Get-PluginSubdirs over every published plugin -- so a
-#     span in plugins/workflows/contributing-davekjohn/README.md, which enumerates the 16 that plugin
+#     span in plugins/workflows/dkj-policy/README.md, which enumerates the 16 that plugin
 #     ships, would report the team plugins' skills as 'missing';
 #   * every backtick-quoted token inside its span is a claimed name, which is why its own author
 #     condition is 'wrap tightly'. That table is two columns and three of its rows carry a backticked
@@ -3032,7 +3039,7 @@ Write-Coverage -Category 'import' -Checked $importScanFiles.Count `
 #
 # WHY IT MUST STAY OPT-IN, measured across all four plugins before it was proposed (#920): a generic
 # rule -- 'a plugin README lists every skill it ships' -- would be born needing an exemption list.
-# contributing-davekjohn ships 16 and lists 16; team-alpha ships 4 and lists 0; team-shopify ships 4
+# dkj-policy ships 16 and lists 16; team-alpha ships 4 and lists 0; team-shopify ships 4
 # and lists 0; team-ecomm ships 0. So a non-opt-in version produces 8 findings on two documents that
 # never claimed to enumerate anything, which is the shape this repo has scar tissue from (check 10's
 # own prose scan rejected at 147 hits, the stale-path check declined at 124, check 27's exemption
@@ -3187,7 +3194,7 @@ Write-Coverage -Category 'skill-list-plugin' -Checked $pluginSkillSpanCount `
 # THE SIZE, RECOUNTED. #1066 reported zero findings and argued from that ("today's expected answer is
 # zero, which is itself the reason not to build it yet"), and added that the defect "never shipped".
 # The real count on the day the check landed was 17 escapes across 5 files, every one passing check 4 --
-# and resolving all 17 inside the INSTALLED copies (team-alpha 4.21.0, contributing-davekjohn 4.22.0)
+# and resolving all 17 inside the INSTALLED copies (team-alpha 4.21.0, dkj-policy 4.22.0)
 # rather than in this tree, all 17 are dead. Not one of them, all of them. That inverts the report's own
 # conclusion instead of qualifying it: the failure mode has bitten, in released payload, so the repo's
 # name-it-and-leave-it rule no longer holds it back.

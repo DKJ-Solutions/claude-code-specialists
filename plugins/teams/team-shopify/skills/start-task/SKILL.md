@@ -24,7 +24,7 @@ So this page opens the branch, and nothing else. When a change is ready to be lo
 **`team-shopify` ships no `start-task` script**, and that is a decision rather than an omission — though a
 narrower one than it used to be. What made the step unshareable was the preview theme, and that half has
 now moved out into `push-preview`, which the team *does* ship. What is left is a branch, and a branch is
-whatever your repo's own convention says it is: `contributing-davekjohn` consumers have `new-branch`, others
+whatever your repo's own convention says it is: `dkj-policy` consumers have `new-branch`, others
 have their own script, conventionally at `scripts/task/start-task.ps1`.
 
 **If your repo has no such script, this skill has nothing to run — say so rather than improvising one.**
@@ -36,7 +36,7 @@ exactly the estate this split cleaned up.
 
 The branch name, in the form **your repo** uses. This page carries no list of prefixes on purpose: a
 taxonomy hardcoded here would contradict whichever one the repo actually has, and it is the repo that
-refuses a bad name. Read it from `CLAUDE.md`, and — in a repo that also runs `contributing-davekjohn` — from
+refuses a bad name. Read it from `CLAUDE.md`, and — in a repo that also runs `dkj-policy` — from
 the seam at `scripts/lib/branch-info.ps1` (`Get-BranchTypes`, `Test-BranchName`), which is where that repo
 states it once for every script that asks. Classify by *what actually changes*.
 

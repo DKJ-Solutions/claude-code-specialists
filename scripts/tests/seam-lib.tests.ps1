@@ -15,7 +15,7 @@
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/seam-lib.tests.ps1
 
     What is asserted:
-      1. a consumer whose seam resolves OUTSIDE contributing-davekjohn/ is refused (exit 1), and the
+      1. a consumer whose seam resolves OUTSIDE dkj-policy/ is refused (exit 1), and the
          refusal names the seam and the offending path;
       2. a consumer whose seam resolves INSIDE the folder passes, including the exact-match
          'workflow-davekjohn' case and the backslash-separated case (proving the '\' -> '/'
@@ -66,7 +66,7 @@ function New-Fixture {
         explicitly, the same fixture shape every other suite in this folder uses.
 
           (default)          a consumer: no .claude-plugin/marketplace.json at all;
-          -Source            the source of THIS workflow: a marketplace publishing 'contributing-davekjohn';
+          -Source            the source of THIS workflow: a marketplace publishing 'dkj-policy';
           -PublishesOther    a repo that publishes plugins but NOT this workflow.
 
         THE THIRD SHAPE IS THE POINT OF ISSUE #998 (August 27, 2026) and did not exist before it. This
@@ -82,7 +82,7 @@ function New-Fixture {
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     if ($Source -or $PublishesOther) {
-        $plugin = if ($Source) { 'contributing-davekjohn' } else { 'some-other-product' }
+        $plugin = if ($Source) { 'dkj-policy' } else { 'some-other-product' }
         $manifest = '{ "name": "fixture", "plugins": [ { "name": "' + $plugin + '", "source": "./x" } ] }'
         New-Item -ItemType Directory -Path (Join-Path $dir '.claude-plugin') -Force | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $dir '.claude-plugin\marketplace.json'), $manifest, $Utf8NoBom)
@@ -113,10 +113,10 @@ function Test-ReturnsNormally {
 # kept deliberately: they are what proves an unmigrated consumer's seams still resolve, and this guard
 # refuses with exit 1 rather than warning, so losing that tolerance would be a hard stop rather than a
 # nuisance.
-Assert-True (Test-ReturnsNormally $consumerDir 'contributing-davekjohn/CHANGELOG.md' 'Get-ChangelogPath') `
+Assert-True (Test-ReturnsNormally $consumerDir 'dkj-policy/CHANGELOG.md' 'Get-ChangelogPath') `
     'consumer, in-folder path under the CURRENT folder name: passes'
-Assert-True (Test-ReturnsNormally $consumerDir 'contributing-davekjohn' 'Get-ChangelogPath') `
-    'consumer, exact match "contributing-davekjohn" with no trailing path: passes'
+Assert-True (Test-ReturnsNormally $consumerDir 'dkj-policy' 'Get-ChangelogPath') `
+    'consumer, exact match "dkj-policy" with no trailing path: passes'
 Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn/CHANGELOG.md' 'Get-ChangelogPath') `
     'consumer, in-folder path under the PRE-RENAME folder name: still passes'
 Assert-True (Test-ReturnsNormally $consumerDir 'workflow-davekjohn' 'Get-ChangelogPath') `
@@ -226,7 +226,7 @@ $r = Invoke-AssertChild $consumerDir 'README.md' 'Get-ChangelogPath'
 Assert-True ($r.Code -eq 1) 'consumer, path outside the folder: exits 1'
 Assert-True ($r.Flat -match 'Get-ChangelogPath') 'and the refusal names the seam'
 Assert-True ($r.Flat -match 'README\.md') 'and the offending path'
-Assert-True ($r.Flat -match 'contributing-davekjohn') 'and the folder it should have resolved inside'
+Assert-True ($r.Flat -match 'dkj-policy') 'and the folder it should have resolved inside'
 Assert-True ($r.Flat -match "'CHANGELOG\.md'") `
     "and it names the one answer that WOULD have been accepted, so the reader is not left guessing"
 
@@ -288,18 +288,18 @@ Assert-True (@(Get-PreIsolationSeamPath -SeamName 'Get-SomethingNobodyDefined').
 Write-Host "seam-lib.ps1 -- the computed defaults: source vs consumer" -ForegroundColor Cyan
 
 # Both fixtures need the folder to exist, because Get-WorkflowFolderName prefers what is there.
-New-Item -ItemType Directory -Path (Join-Path $consumerDir 'contributing-davekjohn') -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $sourceDir   'contributing-davekjohn') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $consumerDir 'dkj-policy') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $sourceDir   'dkj-policy') -Force | Out-Null
 
 $dfltChangelogSrc = Get-DefaultReleaseChangelogNotesRoot -RepoRoot $sourceDir
 $dfltChangelogCon = Get-DefaultReleaseChangelogNotesRoot -RepoRoot $consumerDir
-Assert-True ($dfltChangelogSrc -eq 'contributing-davekjohn/releases/changelog') `
+Assert-True ($dfltChangelogSrc -eq 'dkj-policy/releases/changelog') `
     "the changelog notes root is inside the folder in a SOURCE repo: '$dfltChangelogSrc'"
 Assert-True ($dfltChangelogSrc -eq $dfltChangelogCon) `
     'and it is the SAME answer for a consumer -- #914 removed the source branch, it did not move it'
 
 $dfltGithubSrc = Get-DefaultReleaseGithubNotesRoot -RepoRoot $sourceDir
-Assert-True ($dfltGithubSrc -eq 'contributing-davekjohn/releases/github') `
+Assert-True ($dfltGithubSrc -eq 'dkj-policy/releases/github') `
     "the GitHub-body root is inside the folder in a SOURCE repo too: '$dfltGithubSrc'"
 Assert-True ($dfltGithubSrc -eq (Get-DefaultReleaseGithubNotesRoot -RepoRoot $consumerDir)) `
     'and the same for a consumer, for the same reason'
@@ -307,7 +307,7 @@ Assert-True ($dfltGithubSrc -eq (Get-DefaultReleaseGithubNotesRoot -RepoRoot $co
 # AND THE OTHER THREE STOPPED BRANCHING TOO (issue #998, August 27, 2026), so ALL FIVE now answer one
 # string for every repo. The three held out on the reasoning that a changelog and a release list exist
 # whichever tooling cut them, so a source keeps them at its root. Both halves expired: #980 moved this
-# repo's changelog and release list into contributing-davekjohn/ and STATED the seams, so the root answer
+# repo's changelog and release list into dkj-policy/ and STATED the seams, so the root answer
 # was inert in the one repo it was written for; and the test the branch rested on detects "publishes
 # plugins" rather than "is this workflow's source", so its only surviving effect was to hand a root file
 # to some future repo for a reason unrelated to changelogs.
@@ -316,9 +316,9 @@ Assert-True ($dfltGithubSrc -eq (Get-DefaultReleaseGithubNotesRoot -RepoRoot $co
 # that no branch remains, and a pair of literals would still pass if somebody reinstated a branch that
 # happened to compute the same two strings.
 foreach ($pair in @(
-        @{ Fn = 'Get-DefaultChangelogPath';             Want = 'contributing-davekjohn/CHANGELOG.md' },
-        @{ Fn = 'Get-DefaultReleaseHistoryPath';        Want = 'contributing-davekjohn/releases/history.md' },
-        @{ Fn = 'Get-DefaultReleaseInternalNotesRoot';  Want = 'contributing-davekjohn/releases/internal' })) {
+        @{ Fn = 'Get-DefaultChangelogPath';             Want = 'dkj-policy/CHANGELOG.md' },
+        @{ Fn = 'Get-DefaultReleaseHistoryPath';        Want = 'dkj-policy/releases/history.md' },
+        @{ Fn = 'Get-DefaultReleaseInternalNotesRoot';  Want = 'dkj-policy/releases/internal' })) {
     $src = & $pair.Fn -RepoRoot $sourceDir
     $con = & $pair.Fn -RepoRoot $consumerDir
     Assert-True ($src -eq $pair.Want) "$($pair.Fn): a SOURCE repo gets the isolated answer '$src'"
@@ -333,7 +333,7 @@ foreach ($pair in @(
 # it arranges that folder by hand.
 Write-Host "seam-lib.ps1 -- Test-IsWorkflowSourceRepo means what its name says (issue #998)" -ForegroundColor Cyan
 Assert-True (Test-IsWorkflowSourceRepo -RepoRoot $sourceDir) `
-    'a marketplace publishing contributing-davekjohn IS this workflow''s source'
+    'a marketplace publishing dkj-policy IS this workflow''s source'
 Assert-True (-not (Test-IsWorkflowSourceRepo -RepoRoot $consumerDir)) `
     'a repo with no marketplace at all is not'
 $otherDir = New-Fixture -Label 'publishes-other' -PublishesOther

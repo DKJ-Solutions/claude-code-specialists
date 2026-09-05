@@ -15,7 +15,7 @@
       1. IT NEVER REFUSES. Report-only is the whole design -- an exit code would be a verdict it has not
          earned, and a gate here would be #1380's declined check wearing a different hat. Every fixture
          asserts the code as well as the text, including the empty tree and the tree with findings.
-      2. THE RANK-1 ORDER. contributing-davekjohn before a companion plugin is the top rung's own internal
+      2. THE RANK-1 ORDER. dkj-policy before a companion plugin is the top rung's own internal
          order out of "A third rank sits above both". A sort that lost it would still print every page
          and read as correct.
       3. THE SOURCE-REPO SKIP IS THE HOOKS' SKIP. The two detector FUNCTIONS carry no skip -- it lives in
@@ -38,8 +38,8 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\check-policy-drift.ps1'
-$Skill    = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\skills\check-policy-drift\SKILL.md'
-$Mirror   = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\scripts\task\check-policy-drift.ps1'
+$Skill    = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\skills\check-policy-drift\SKILL.md'
+$Mirror   = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\scripts\task\check-policy-drift.ps1'
 . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 
@@ -139,7 +139,7 @@ try {
     Assert-True ($r.Out -match 'REPORT ONLY') 'the hand-over states that nothing was edited'
 
     # --- The rank-1 order -------------------------------------------------------------------------
-    # A companion plugin sorts before contributing-davekjohn alphabetically, which is the whole point of
+    # A companion plugin sorts before dkj-policy alphabetically, which is the whole point of
     # pinning this: a plain Sort-Object would print the order upside down and still look right.
     Write-Host ''
     Write-Host 'Rank 1 -- the top rung has an internal order'
@@ -149,28 +149,28 @@ try {
 {
   "name": "fixture",
   "plugins": [
-    { "name": "contributing-davekjohn", "source": "./plugins/workflows/contributing-davekjohn" },
-    { "name": "bwj-codex", "source": "./plugins/workflows/bwj-codex" }
+    { "name": "dkj-policy", "source": "./plugins/workflows/dkj-policy" },
+    { "name": "dkj-policy-bwj", "source": "./plugins/workflows/dkj-policy-bwj" }
   ]
 }
 '@
-    Add-FixturePlugin -Dir $source -Name 'contributing-davekjohn' -Page 'CONTRIBUTING-portable.md'
-    Add-FixturePlugin -Dir $source -Name 'bwj-codex' -Page 'WORKFLOW-portable.md'
+    Add-FixturePlugin -Dir $source -Name 'dkj-policy' -Page 'CONTRIBUTING-portable.md'
+    Add-FixturePlugin -Dir $source -Name 'dkj-policy-bwj' -Page 'WORKFLOW-portable.md'
     Set-Text -Dir $source -Rel '.claude/settings.json' -Text @'
 {
   "enabledPlugins": {
-    "bwj-codex@fixture": true,
-    "contributing-davekjohn@fixture": true
+    "dkj-policy-bwj@fixture": true,
+    "dkj-policy@fixture": true
   }
 }
 '@
     $r = Invoke-Report -Dir $source
-    $atPrime = $r.Out.IndexOf('contributing-davekjohn', [System.StringComparison]::Ordinal)
-    $atCompanion = $r.Out.IndexOf('bwj-codex', [System.StringComparison]::Ordinal)
+    $atPrime = $r.Out.IndexOf('dkj-policy', [System.StringComparison]::Ordinal)
+    $atCompanion = $r.Out.IndexOf('dkj-policy-bwj', [System.StringComparison]::Ordinal)
     Assert-True ($r.Code -eq 0) 'a tree publishing both plugins -- exit 0'
     Assert-True ($atPrime -ge 0 -and $atCompanion -ge 0) 'both plugins are located and printed'
     Assert-True ($atPrime -ge 0 -and $atCompanion -gt $atPrime) `
-        'contributing-davekjohn is printed BEFORE the companion, against the alphabetical order'
+        'dkj-policy is printed BEFORE the companion, against the alphabetical order'
     Assert-True ($r.Out -match 'CONTRIBUTING-portable\.md' -and $r.Out -match 'WORKFLOW-portable\.md') `
         "each plugin's own portable page is named, discovered rather than listed"
 

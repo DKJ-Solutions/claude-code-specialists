@@ -537,7 +537,7 @@ function Get-RosterIgnoredIds {
 $repoConfigWorkflowPart = @'
 # --- The workflow plugin's half -------------------------------------------------------------------
 # These are read by the branch/release scripts (open-pr, fold-changelog, ship-pr, cut-release). They
-# are here because this repo enabled contributing-davekjohn; without that plugin nothing
+# are here because this repo enabled dkj-policy; without that plugin nothing
 # reads them. Fill in the VUL-IN values below and remove the VUL-IN markers.
 
 # VUL-IN: GitHub repo hosting this repository (owner/name), e.g. 'DaveKJohn/my-repo'.
@@ -696,15 +696,16 @@ $repoConfigRosterPart = $repoConfigRosterPart.Replace('__SEAM_ROSTER_PATH__', $s
 # question is the lesson of inbound #294. A chain that could not be read at all degrades to "no": the
 # roster half is what every consumer needs, and writing a workflow half nobody reads is the defect being
 # repaired, so the safe direction is to leave it out and say so.
-# TWO NAMES ARE ACCEPTED WHILE CONSUMERS MIGRATE (#886, August 26, 2026). The plugin was renamed
-# 'workflow-davekjohn' -> 'contributing-davekjohn', and this reader is in the CORE team, which every
+# EVERY PRIOR NAME IS ACCEPTED WHILE CONSUMERS MIGRATE (#886, August 26, 2026; #1437, September 5, 2026).
+# The plugin was renamed 'workflow-davekjohn' -> 'contributing-davekjohn' -> 'dkj-policy', and this reader
+# is in the CORE team, which every
 # consumer enables and updates on its own schedule -- so a consumer can be on a core that knows the new
-# name while their settings still say the old one. Matching only the new name would then write the roster
+# name while their settings still say an old one. Matching only the new name would then write the roster
 # half alone and say the pack is not enabled, which is the exact silent-degradation defect the paragraph
-# above describes as the thing being repaired. The old name is a migration allowance, not a second
-# supported id: it can go once every register entry has moved.
-$workflowPluginName  = 'contributing-davekjohn'
-$workflowPluginNames = @($workflowPluginName, 'workflow-davekjohn')
+# above describes as the thing being repaired. The old names are a migration allowance, not second
+# supported ids: each can go once every register entry has moved off it.
+$workflowPluginName  = 'dkj-policy'
+$workflowPluginNames = @($workflowPluginName, 'contributing-davekjohn', 'workflow-davekjohn')
 # Which of those names this repo actually enabled, captured once: $hasWorkflowPack asks whether
 # there is one, and the settings proposal further down needs to know WHICH -- a consumer still on the
 # migration name has that segment in their plugin path, and a rule anchored on the other spelling
@@ -975,7 +976,8 @@ $settingsPath = Join-Path $claudeDir 'settings.json'
 # PowerShell rules take the same shape as Bash rules.
 #
 # NAMED BY THE PLUGIN THAT IS ACTUALLY ENABLED, not by the current id -- $workflowNameHere, resolved
-# where $hasWorkflowPack is: a consumer still on the migration name 'workflow-davekjohn' has that
+# where $hasWorkflowPack is: a consumer still on a migration name ('contributing-davekjohn',
+# 'workflow-davekjohn') has that
 # segment in their cache path, and a rule anchored on the other spelling would match nothing for them.
 # THE RULES ARE DATA, AND THE TWO FILES ARE BOTH RENDERINGS OF IT (inbound #1124). The annotated .jsonc
 # below and the merged .json beside it have to carry the SAME rules -- a proposal explaining why a rule
@@ -1022,7 +1024,7 @@ $allowJsonc
     @'
     // Empty on purpose: no workflow plugin is enabled here, so there is no scripted entry point to
     // permit -- this repo keeps the way of working it already had, and its commands are its own.
-    // The 'deny' half below still applies. Enable 'contributing-davekjohn' and re-run
+    // The 'deny' half below still applies. Enable 'dkj-policy' and re-run
     // specialists-init, and this half is filled in with that workflow's entry points.
     "allow": [],
 '@

@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\lint\check-unfolded-entry.ps1'
-$Hook     = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\hooks\unfolded-entry-sessioncheck.ps1'
+$Hook     = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\hooks\unfolded-entry-sessioncheck.ps1'
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 
 $script:pass  = 0
@@ -39,7 +39,7 @@ function Assert-True {
 function New-Tree {
     param([Parameter(Mandatory = $true)][string]$Label)
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("unfoldedgate-$PID-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
-    New-Item -ItemType Directory -Path (Join-Path $dir 'contributing-davekjohn') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $dir 'dkj-policy') -Force | Out-Null
     $script:trees += $dir
     return $dir
 }
@@ -94,16 +94,16 @@ try {
 
     $empty = New-Tree -Label 'empty'
     Assert-True (@(Get-UnfoldedTrunkEntry -RepoRoot $empty -CurrentBranch 'main').Count -eq 0) `
-        'empty contributing-davekjohn/ -- no findings'
+        'empty dkj-policy/ -- no findings'
 
     $nodir = Join-Path ([System.IO.Path]::GetTempPath()) ("unfoldedgate-$PID-nodir-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
     Assert-True (@(Get-UnfoldedTrunkEntry -RepoRoot $nodir -CurrentBranch 'main').Count -eq 0) `
-        'no contributing-davekjohn/ directory at all -- no findings, no throw'
+        'no dkj-policy/ directory at all -- no findings, no throw'
 
     $onMain = New-Tree -Label 'onmain'
     Set-Doc -Dir $onMain -Branch 'feat/alpha'
     $f = @(Get-UnfoldedTrunkEntry -RepoRoot $onMain -CurrentBranch 'main')
-    Assert-True ($f.Count -eq 1 -and $f[0].DeclaredBranch -eq 'feat/alpha' -and $f[0].Rel -match 'contributing-davekjohn/feat-alpha\.md$') `
+    Assert-True ($f.Count -eq 1 -and $f[0].DeclaredBranch -eq 'feat/alpha' -and $f[0].Rel -match 'dkj-policy/feat-alpha\.md$') `
         'a written per-branch doc, HEAD = main -- one finding naming the file and the branch it declares'
 
     $onOwn = New-Tree -Label 'onown'

@@ -45,7 +45,7 @@ which this half is the summary of.
 is not there). A complete, pasteable file; if you already have one, merge these two keys into it.
 Strict JSON — no comments, no trailing commas. `team-alpha` is the only plugin you need: **there is no
 default workflow to receive**, and a repo that enables none keeps the way of working it already had. Add a
-line per add-on team you want, and add `contributing-davekjohn` only if you deliberately want that method (see
+line per add-on team you want, and add `dkj-policy` only if you deliberately want that method (see
 [Enabling the workflow](#enabling-the-workflow)).
 
 ```json
@@ -139,7 +139,7 @@ belongs to, and why**, before doing it. Look for that invariant, not for a fixed
 
 An install writes **nothing** into your repo — it is a clone into the plugin cache — and Step 2 answers
 only what `team-alpha` needs. Every other plugin that owns repo state ships its own `adopt-*` skill:
-`adopt-config` and `adopt-workflow-folder` (`contributing-davekjohn`), `adopt-shopify-floor`
+`adopt-config` and `adopt-workflow-folder` (`dkj-policy`), `adopt-shopify-floor`
 (`team-shopify`). Your slash list holds exactly the ones your enabled plugins ship, namespaced as
 `<plugin>:adopt-*`, and each is additive and a dry run until you add `-Apply`. Skip this and a session
 check reports what is missing at every session start — which is how a consumer ends up discovering the
@@ -161,7 +161,7 @@ that reliably surface while you do it.
 **There is no default workflow, and that is the answer rather than a gap.** Your repo already has a way
 of working before any plugin is installed — its branch conventions, its contribution guide, its release
 steps — so a plugin claiming the slot by default would claim something that was never empty. Enable
-`contributing-davekjohn` if you deliberately want *that* method; enable nothing and the specialists use plain
+`dkj-policy` if you deliberately want *that* method; enable nothing and the specialists use plain
 git/gh against your own conventions.
 
 A second plugin, `workflow-default`, used to hold the slot and describe itself as "the workflow a repo
@@ -215,12 +215,79 @@ your own lenses, which do not travel with the plugin.
 
 ---
 
+## Migrating off `contributing-davekjohn` and `bwj-codex` (#1437, September 5, 2026)
+
+> **This section is for a repo that has this family installed under the ids it used up to
+> September 5, 2026** — `contributing-davekjohn@claude-code-specialists` and, in BWJ's two store repos,
+> `bwj-codex@claude-code-specialists`. It is shorter than the section below because it is a rename and
+> nothing else: no plugin gained or lost a skill, a script, a gate or a seam on the day it happened.
+
+| old plugin id | new plugin id |
+|---|---|
+| `contributing-davekjohn@claude-code-specialists` | `dkj-policy@claude-code-specialists` |
+| `bwj-codex@claude-code-specialists` | `dkj-policy-bwj@claude-code-specialists` |
+
+**Why the names moved.** `dkj-policy` is the top rung of the order this family legislates — the page that
+outranks a consumer's root `CLAUDE.md` on every subject it addresses — and `contributing-davekjohn` named
+only one of the things it does. `dkj-policy-bwj` is a ministry under it: the same policy, narrowed to the
+two repos it binds. Nothing about the precedence rule changed; the names now say what the rule already did.
+
+```powershell
+# 1. Refresh -- do this first, every time
+claude plugin marketplace update claude-code-specialists
+
+# 2. Uninstall the retired ids -- skip whichever you never enabled
+claude plugin uninstall contributing-davekjohn@claude-code-specialists --scope project
+claude plugin uninstall bwj-codex@claude-code-specialists --scope project
+
+# 3. Refresh again, then install the new ids
+claude plugin marketplace update claude-code-specialists
+claude plugin install dkj-policy@claude-code-specialists --scope project
+# Only BWJ's two store repos need the second one:
+claude plugin install dkj-policy-bwj@claude-code-specialists --scope project
+```
+
+**4. Restart your Claude Code session.**
+
+### Your folder, and what happens if you do not rename it
+
+The workflow's own root folder is named after the plugin, so its current name is **`dkj-policy/`** and the
+`adopt-workflow-folder` skill scaffolds that name from now on. **Renaming your existing folder is optional
+and nothing breaks if you leave it**: `Get-WorkflowFolderName` prefers whichever folder is actually there,
+newest name first, and every seam default is composed from its answer — so a repo still holding
+`contributing-davekjohn/` (or `workflow-davekjohn/`, from the rename before this one) keeps its changelog,
+its release history and its branch documents exactly where they are.
+
+What that costs is one thing worth knowing before you decide: **the scaffolder writes the new name.** Run
+`adopt-workflow-folder` in a repo that still has the old folder and you get a second folder beside the one
+holding your history. So either rename yours in one commit —
+
+```powershell
+git mv contributing-davekjohn dkj-policy
+```
+
+— or leave it alone and do not re-run the scaffolder. The half-way state is the one to avoid.
+
+**If you rename it, your seams may need repointing too.** A repo that STATED `Get-ChangelogPath` or any of
+the four release-note roots in its own `scripts/repo-config.ps1` wrote the folder name into that answer;
+a repo that left them at the computed default did not, and is carried across for free. `check-script-contract`
+names every seam you have stated, which is the fastest way to see which of the two you are.
+
+### `bwj-codex/SYNC-LOG.md`, for the two store repos
+
+The sync log's location is a seam — `Get-ShopifySyncLogPath` — so this rename does not move it. The
+recommended answer is now `'dkj-policy-bwj/SYNC-LOG.md'`; a repo that keeps answering
+`'bwj-codex/SYNC-LOG.md'` is answering the seam correctly and stays where it is. Move it only if you want
+the folder to match the plugin, and move the seam answer in the same commit.
+
+---
+
 ## Migrating from the old plugin names
 
 > **This section is for a repo that already has this family installed under the plugin ids it used
 > before it split into teams and a workflow** — `specialists@claude-code-specialists`,
 > `specialists-lifehub@claude-code-specialists`, `specialists-shopify@claude-code-specialists`,
-> `specialists-ecomm@claude-code-specialists`, or `specialists-contributing-davekjohn@claude-code-specialists`.
+> `specialists-ecomm@claude-code-specialists`, or `specialists-workflow-davekjohn@claude-code-specialists`.
 > It is neither the quickstart above (you are not adopting for the first time) nor the adoption manual
 > below (you are not connecting a repo that has never seen this family) — it is a third procedure, and
 > it earns its own section because a mechanical id swap alone silently loses something neither of the
@@ -233,7 +300,7 @@ your own lenses, which do not travel with the plugin.
 | `specialists-lifehub@claude-code-specialists` | `team-lifehub@claude-code-specialists` |
 | `specialists-shopify@claude-code-specialists` | `team-shopify@claude-code-specialists` |
 | `specialists-ecomm@claude-code-specialists` | `team-ecomm@claude-code-specialists` |
-| `specialists-contributing-davekjohn@claude-code-specialists` | `contributing-davekjohn@claude-code-specialists` |
+| `specialists-workflow-davekjohn@claude-code-specialists` | `dkj-policy@claude-code-specialists` |
 
 Every plugin is now either a **team** (who the specialists are) or a **workflow** (how work moves
 through the repo) — see
@@ -244,13 +311,14 @@ the one genuinely new rule in this table rather than a renaming of an old one.
 ### Decide your workflow first
 
 **Which half of this applies to you depends on one thing: whether you had
-`specialists-contributing-davekjohn` enabled.**
+`specialists-workflow-davekjohn` enabled.**
 
-- **If you did**, its replacement in the table — `contributing-davekjohn` — is a workflow, so a
-  straight swap carries your answer across and you are covered -- note that the id has been renamed once
-  more since, from `contributing-davekjohn` to `contributing-davekjohn`
-  ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)), so the name in the table is
-  the one to enable.
+- **If you did**, its replacement in the table — `dkj-policy` — is a workflow, so a
+  straight swap carries your answer across and you are covered -- note that the id has been renamed twice
+  since: from `workflow-davekjohn` to `contributing-davekjohn`
+  ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)) and from that to `dkj-policy`
+  ([#1437](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1437)), so the name in the table
+  is the one to enable.
 - **If you did not**, the table gives you back every team and leaves you with **no workflow enabled at
   all** — because none of the ids you are removing was one, so the swap has nothing to carry over.
   That is the case for every consumer in this project's own register, and it is the part of the
@@ -266,7 +334,7 @@ Decide on purpose, before you touch a command, whether you want the one plugin t
   to occupy this position and describe it as a workflow of its own; it was removed on August 26, 2026
   ([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)), because an empty slot needed
   no plugin to represent it.
-- **`contributing-davekjohn`** — the specific branch, changelog and release model. It asks your repo for two
+- **`dkj-policy`** — the specific branch, changelog and release model. It asks your repo for two
   files it reads, `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` — already covered under
   [Enabling the workflow](#enabling-the-workflow), which applies here unchanged: the `specialists-init` run
   under [After the reinstall](#after-the-reinstall) below scaffolds both.
@@ -290,7 +358,7 @@ replacement plus the one workflow you decided on above, then restart.
 > to remove a plugin its catalogue no longer advertises. **Measured on 2026-08-09**, on the source repo
 > itself, in exactly this order: after
 > `claude plugin marketplace update claude-code-specialists` the uninstalls of
-> `specialists@claude-code-specialists` and `specialists-contributing-davekjohn@claude-code-specialists`
+> `specialists@claude-code-specialists` and `specialists-workflow-davekjohn@claude-code-specialists`
 > both returned `✔ Successfully uninstalled plugin`. `uninstall` resolves against your install record,
 > not against the catalogue. What is *not* claimed here is anything about whether `uninstall` refreshes
 > the cache — nobody has tested that, and this page has been caught generalising an untested claim from
@@ -305,7 +373,7 @@ claude plugin uninstall specialists@claude-code-specialists --scope project
 claude plugin uninstall specialists-lifehub@claude-code-specialists --scope project
 claude plugin uninstall specialists-shopify@claude-code-specialists --scope project
 claude plugin uninstall specialists-ecomm@claude-code-specialists --scope project
-claude plugin uninstall specialists-contributing-davekjohn@claude-code-specialists --scope project
+claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists --scope project
 ```
 
 ```powershell
@@ -321,7 +389,7 @@ claude plugin install team-shopify@claude-code-specialists --scope project
 claude plugin install team-ecomm@claude-code-specialists --scope project
 
 # 3c. The workflow -- opt-in. Uncomment it only if you deliberately want this method.
-# claude plugin install contributing-davekjohn@claude-code-specialists --scope project
+# claude plugin install dkj-policy@claude-code-specialists --scope project
 ```
 
 **4. Restart your Claude Code session.**
@@ -337,7 +405,7 @@ go in, and any diff beyond that is formatting.
 Once the new session comes up, re-run `specialists-init` (see [Step 2](#step-2--run-the-bootstrap-skill)
 above). It is purely additive, so a repo that already has its seam, its lenses and its roster keeps all
 of that; it only adds what the newly installed plugin brings — a new add-on team's specialists, or
-`contributing-davekjohn`'s two script scaffolds. Then verify the same way a fresh install does: the
+`dkj-policy`'s two script scaffolds. Then verify the same way a fresh install does: the
 `installed_plugins.json` query under [Step 1](#step-1--enable-and-install) above, read against your new
 ids rather than your old ones. One `project` line per plugin you just installed, each ending in
 `payload present`, is what you are checking for — the count is part of the check here exactly as it is
@@ -384,7 +452,7 @@ might find, the third is what you are moving to:
 Read the same three rows for an add-on team (`specialists-shopify` → `plugins/teams/team-shopify/`) and
 for the workflow — with one exception worth knowing before you go looking for it: the workflow plugin
 **first shipped in `v3.8.0`**, so it only ever existed under the flat layout
-(`plugins/specialists-contributing-davekjohn/`). There is no two-level form of that path to find.
+(`plugins/specialists-workflow-davekjohn/`). There is no two-level form of that path to find.
 
 So the line in your `.claude/specialists/SPECIALISTS.md` changes as follows — **bound to this repo's
 layout as of `v4.5.0`, which the table above is read off, and to the marketplace name
@@ -433,14 +501,14 @@ count moves while you are rewriting prefixes, you have edited one line too many.
 
 ### If you call the shared workflow scripts yourself
 
-**Two things `contributing-davekjohn@4.0.0` changed that a consumer building on those scripts has to act on**,
+**Two things `dkj-policy@4.0.0` changed that a consumer building on those scripts has to act on**,
 neither of which was named as a breaking change when it shipped (inbound
 [#556](https://github.com/DaveKJohn/claude-code-specialists/issues/556) and
 [#557](https://github.com/DaveKJohn/claude-code-specialists/issues/557), both measured on 2026-08-09). If
 you only ever invoke the skills, both are handled for you and you can skip this.
 
 **`scripts/release/new-changelog-entry.ps1` is gone.** It existed in `specialists@3.1.2` and does not exist
-in `contributing-davekjohn@4.0.0`; what it did now lives in `scripts/lib/entry-scaffold-lib.ps1` plus
+in `dkj-policy@4.0.0`; what it did now lives in `scripts/lib/entry-scaffold-lib.ps1` plus
 `scripts/task/new-branch.ps1`. Resolved through the documented seam it fails **loudly** — the lookup says
 the script does not exist in the plugin — so nothing goes quietly wrong; the problem was that nothing said
 it was coming.
@@ -454,9 +522,9 @@ it was coming.
   warn**, not a refusal, and the entry's type falls back to whatever `Get-EntryFallbackType` says.
 
 **The branch's own file moved out of your repo root.** A branch used to carry `<branch-name>.md` beside
-your `README.md`; it now carries one `contributing-davekjohn/<branch>.md`, which holds both jobs as
+your `README.md`; it now carries one `dkj-policy/<branch>.md`, which holds both jobs as
 sections — `### PLAN` / `### CREATE` / `### TEST` for what still has to happen, and
-`### DEPLOY: <branch>` for what the change does. It was a pair under `contributing-davekjohn/branch/`
+`### DEPLOY: <branch>` for what the change does. It was a pair under `dkj-policy/branch/`
 between August 6 and August 23, 2026, with reference copies under `branch/templates/`; both are gone, and
 the guidance those copies held is inside the document.
 
@@ -540,7 +608,7 @@ of their own who wants to work with the specialists team. Everything below is th
 the deeper explanation sits behind the links and is deliberately not repeated here.
 
 **Why the procedure is what it is** — which step was added when, and what was measured to justify it —
-is not on this page. It lives in the release record: [`releases/history.md`](contributing-davekjohn/releases/history.md)
+is not on this page. It lives in the release record: [`releases/history.md`](dkj-policy/releases/history.md)
 indexes every version with the changes behind it. This page tells you what to do; that one tells you
 why it changed.
 
@@ -567,7 +635,7 @@ the [root README](README.md).
 
 **The workflow slot is different in kind, so decide about it deliberately rather than by habit — and
 "decide" now means deciding whether to fill it at all.** One plugin answers "how does work move through
-this repo": `contributing-davekjohn`, which carries no specialists at all but is DaveKJohn's own branch,
+this repo": `dkj-policy`, which carries no specialists at all but is DaveKJohn's own branch,
 changelog and release method as skills plus scripts (`new-branch`, `open-pr`, `ship-pr`,
 `fold-changelog`, `cut-release`, `park`, `fix-mojibake` among others). **Leaving the slot empty is the
 default and a complete answer** — your repo keeps its own conventions, which it never stopped having.
@@ -735,7 +803,7 @@ not be.
 > *"in your repo's `.claude/`"* as something still to be **installed** rather than **created**.
 
 Set the marketplace source and the plugins you want in it (always the core team; a workflow only if you
-deliberately want `contributing-davekjohn`'s method — there is no default one, see
+deliberately want `dkj-policy`'s method — there is no default one, see
 [Enabling the workflow](#enabling-the-workflow) in the quickstart half; an add-on team only if your repo has
 that domain). What follows is a **complete, pasteable file** — if you already have a
 `.claude/settings.json`, merge these two keys into the object that is there instead of pasting over it:
@@ -802,7 +870,7 @@ of your repo, preceded once by a refresh of that cached clone:
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
 claude plugin install team-alpha@claude-code-specialists --scope project    # 2. then install, per plugin
-# and line 2 again for each add-on team you enabled, and for contributing-davekjohn if you enabled it
+# and line 2 again for each add-on team you enabled, and for dkj-policy if you enabled it
 ```
 
 **Line 1 matters most right here, because this is the command the failure was measured on.** Without
@@ -1028,7 +1096,7 @@ in place. Earlier releases said *"Plugin `specialists` is not installed at scope
 and easy to misread as "not installed at all". Whatever the phrasing, the failure means the command
 looked in the wrong scope. Do not answer it by re-running the install either: a scopeless install adds
 a **second, machine-wide record** beside the project one. For **what changed**, read
-[`CHANGELOG.md`](contributing-davekjohn/CHANGELOG.md) and [`releases/`](contributing-davekjohn/releases/history.md) — and you already have both,
+[`CHANGELOG.md`](dkj-policy/CHANGELOG.md) and [`releases/`](dkj-policy/releases/history.md) — and you already have both,
 because your marketplace source is a git clone of the whole repository at
 `~/.claude/plugins/marketplaces/claude-code-specialists/`, not a per-plugin extract.
 
@@ -1179,7 +1247,7 @@ literally true here. Don't trust the skill counter those two commands print as e
 it excludes any skill with `disable-model-invocation: true`, and **skills from the team plugins and the
 workflow plugin alike carry that flag** — `team-alpha`'s `specialists-init`, `specialists-teardown` and
 `sync-roster`, and `cut-release`, `fold-changelog`, `open-pr` and `ship-pr` from
-`contributing-davekjohn`. So an unchanged count, or even `0 skills`, proves nothing about whether a new
+`dkj-policy`. So an unchanged count, or even `0 skills`, proves nothing about whether a new
 skill has actually landed. The only reliable check is the slash list itself.
 
 ### Getting out again

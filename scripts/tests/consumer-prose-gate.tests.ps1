@@ -26,10 +26,10 @@
     THE MEASURED INSTANCES ARE ALL FIXTURES HERE, in the STRUCTURE they were found in.
     #1389, both BWJ consumers: the retired single 'development.md' still restated in an always-on
     document, one day and six days after the rename -- once in the consumer's own CLAUDE.md and once in
-    contributing-davekjohn/CONTRIBUTING.md, the second being the page #1380's detector never read.
+    dkj-policy/CONTRIBUTING.md, the second being the page #1380's detector never read.
     #1415, BWJ-ecommerce/smartwatchbanden, September 4, 2026: the Dutch preamble inversion in
     CLAUDE.md:22 ('wint' beside `CLAUDE.md`, inside a blockquote), and the same inversion stated from the
-    other side in contributing-davekjohn/CONTRIBUTING.md:306 (`CLAUDE.md` beside 'wins', under bold
+    other side in dkj-policy/CONTRIBUTING.md:306 (`CLAUDE.md` beside 'wins', under bold
     markup). The second is the one #1380's census never counted at all.
 
     STRUCTURE, NOT WORDING, AND THAT IS THE BOUND RATHER THAN AN ACCIDENT. Those consumers are private
@@ -65,7 +65,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\lint\check-consumer-prose.ps1'
-$Hook     = Join-Path $RepoRoot 'plugins\workflows\contributing-davekjohn\hooks\consumer-prose-sessioncheck.ps1'
+$Hook     = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\hooks\consumer-prose-sessioncheck.ps1'
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\measure-context-lib.ps1')
 
@@ -82,7 +82,7 @@ function Assert-True {
 function New-Tree {
     param([Parameter(Mandatory = $true)][string]$Label)
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("consumerprose-$PID-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
-    New-Item -ItemType Directory -Path (Join-Path $dir 'contributing-davekjohn') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $dir 'dkj-policy') -Force | Out-Null
     $script:trees += $dir
     return $dir
 }
@@ -216,7 +216,7 @@ try {
 
     # The first measured instance: a consumer's own always-on CLAUDE.md restating the retired name.
     $retiredRoot = New-Tree -Label 'retiredroot'
-    Set-Text -Dir $retiredRoot -Rel 'CLAUDE.md' -Text "# Consumer`n`nElke branch krijgt zijn eigen ``contributing-davekjohn/$retired``."
+    Set-Text -Dir $retiredRoot -Rel 'CLAUDE.md' -Text "# Consumer`n`nElke branch krijgt zijn eigen ``dkj-policy/$retired``."
     $f = @(Get-Mentions -Dir $retiredRoot)
     Assert-True ($f.Count -eq 1 -and $f[0].Rel -eq 'CLAUDE.md' -and $f[0].Line -eq 3 -and $f[0].Name -eq $retired) `
         "a retired name in the consumer's own CLAUDE.md -- one finding naming the document, the line and the name"
@@ -232,15 +232,15 @@ try {
     # The second measured instance, and the one #1380's detector missed: the folder's own contributor
     # page. It is NOT always-on, so it is in the set only because the lib names it.
     $retiredFolder = New-Tree -Label 'retiredfolder'
-    Set-Text -Dir $retiredFolder -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# Contributing`n`nWelke scripts wonen in de plugin: zie $retired."
+    Set-Text -Dir $retiredFolder -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# Contributing`n`nWelke scripts wonen in de plugin: zie $retired."
     $f = @(Get-Mentions -Dir $retiredFolder)
     Assert-True ($f.Count -eq 1 -and $f[0].Rel -eq "$($paths.Directory)/CONTRIBUTING.md") `
         'the workflow folder CONTRIBUTING.md is scanned with no CLAUDE.md present at all'
 
     # THE EXCLUSION THAT IS NOT OPTIONAL.
     $retiredArchive = New-Tree -Label 'retiredarchive'
-    Set-Text -Dir $retiredArchive -Rel 'contributing-davekjohn/CHANGELOG.md' -Text "# Changelog`n`n### DEPLOY: old/branch`n`nRenamed $retired at the time."
-    Set-Text -Dir $retiredArchive -Rel 'contributing-davekjohn/releases/history.md' -Text "Historic: $retired."
+    Set-Text -Dir $retiredArchive -Rel 'dkj-policy/CHANGELOG.md' -Text "# Changelog`n`n### DEPLOY: old/branch`n`nRenamed $retired at the time."
+    Set-Text -Dir $retiredArchive -Rel 'dkj-policy/releases/history.md' -Text "Historic: $retired."
     Assert-True ((Get-Mentions -Dir $retiredArchive).Count -eq 0) `
         'the changelog and releases/ are never read -- a folded entry correctly names the file of its day'
 
@@ -266,7 +266,7 @@ try {
     # One line, one repair: two different retired names on one line are two findings, the same name
     # twice on one line is two spans -- but no span is claimed twice.
     $retiredTwice = New-Tree -Label 'retiredtwice'
-    Set-Text -Dir $retiredTwice -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`nBoth $retired and $retired appear here."
+    Set-Text -Dir $retiredTwice -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`nBoth $retired and $retired appear here."
     $f = @(Get-Mentions -Dir $retiredTwice)
     Assert-True ($f.Count -eq 2 -and @($f | Where-Object { $_.Line -eq 3 }).Count -eq 2) `
         'the same retired name twice on one line -- two spans, both reported, neither doubled'
@@ -293,10 +293,10 @@ try {
     Assert-True ($f[0].Match -match 'wint') `
         'the Dutch verb is matched, and the match is reported so the finding names what fired'
 
-    # MEASURED INSTANCE 2 -- smartwatchbanden/contributing-davekjohn/CONTRIBUTING.md:306, the same
+    # MEASURED INSTANCE 2 -- smartwatchbanden/dkj-policy/CONTRIBUTING.md:306, the same
     # inversion from the other side, on a page that is NOT always-on.
     $english = New-Tree -Label 'english'
-    Set-Text -Dir $english -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# Contributing`n`nSo when this page and ``CLAUDE.md`` disagree, **``CLAUDE.md`` wins.**"
+    Set-Text -Dir $english -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# Contributing`n`nSo when this page and ``CLAUDE.md`` disagree, **``CLAUDE.md`` wins.**"
     $f = @(Get-Declarations -Dir $english)
     Assert-True ($f.Count -eq 1 -and $f[0].Rel -eq "$($paths.Directory)/CONTRIBUTING.md") `
         'the folder CONTRIBUTING.md is scanned with no CLAUDE.md present at all'
@@ -306,28 +306,28 @@ try {
     # DIRECTION. The law stated CORRECTLY carries both terms and must NOT fire. This is the assert that
     # separates this detector from the co-occurrence design #1380 measured at 12.5% and declined.
     $correct = New-Tree -Label 'correct'
-    Set-Text -Dir $correct -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# Contributing`n`nThis page sits on top of ``CLAUDE.md``, and where they disagree, this page wins."
+    Set-Text -Dir $correct -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# Contributing`n`nThis page sits on top of ``CLAUDE.md``, and where they disagree, this page wins."
     Assert-True ((Get-Declarations -Dir $correct).Count -eq 0) `
         'the rank order stated CORRECTLY carries both terms and does not fire -- adjacency reads direction'
 
     # And the near miss on the same line: a clause between the two tokens ends the adjacency, because it
     # is a different claim.
     $between = New-Tree -Label 'between'
-    Set-Text -Dir $between -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# Contributing`n`nWhere ``CLAUDE.md``, which we treat as the floor, disagrees, the portable page wins."
+    Set-Text -Dir $between -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# Contributing`n`nWhere ``CLAUDE.md``, which we treat as the floor, disagrees, the portable page wins."
     Assert-True ((Get-Declarations -Dir $between).Count -eq 0) `
         'a whole clause between the two tokens is not adjacency -- no finding'
 
     # THE ONE SUPPRESSION, pinned by the instance that produced it: xoxowildhearts quoting the closing
     # line of a page it RETIRED, to explain why it removed it. Somebody else's words, reported.
     $quoted = New-Tree -Label 'quoted'
-    Set-Text -Dir $quoted -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# Contributing`n`nIts own closing line conceded the point: *`"when this page and ``CLAUDE.md`` disagree, ``CLAUDE.md`` wins.`"* It was retired."
+    Set-Text -Dir $quoted -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# Contributing`n`nIts own closing line conceded the point: *`"when this page and ``CLAUDE.md`` disagree, ``CLAUDE.md`` wins.`"* It was retired."
     Assert-True ((Get-Declarations -Dir $quoted).Count -eq 0) `
         'a hit sitting wholly inside a quotation span is suppressed -- a retired page being narrated'
 
     # ... and the suppression is a SPAN test, not a "this line contains a quote mark" test: an unquoted
     # declaration on a line that also carries an unrelated quotation still fires.
     $mixed = New-Tree -Label 'mixed'
-    Set-Text -Dir $mixed -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# Contributing`n`nWe call it the `"grondwet`" here: on any disagreement ``CLAUDE.md`` wins."
+    Set-Text -Dir $mixed -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# Contributing`n`nWe call it the `"grondwet`" here: on any disagreement ``CLAUDE.md`` wins."
     # @() BEFORE .Count, and it is load-bearing rather than style: PowerShell unwraps a single-element
     # array on return, and under Set-StrictMode -Version Latest '.Count' on the resulting scalar THROWS
     # rather than answering 1. Every assert here that expects exactly one finding wraps first for that
@@ -344,7 +344,7 @@ try {
     Write-Host 'Get-SupremacyDeclaration -- hard-wrapped prose'
 
     $wrapped = New-Tree -Label 'wrapped'
-    Set-Text -Dir $wrapped -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`nOn any real conflict between the two, ``CLAUDE.md```nwins, and the contributing page is simply wrong."
+    Set-Text -Dir $wrapped -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`nOn any real conflict between the two, ``CLAUDE.md```nwins, and the contributing page is simply wrong."
     $f = @(Get-Declarations -Dir $wrapped)
     Assert-True ($f.Count -eq 1 -and $f[0].Line -eq 3) `
         'a declaration hard-wrapped across two lines is found, and names the line it BEGINS on'
@@ -353,21 +353,21 @@ try {
     # It sits on one physical line today, so a line-scoped detector found it -- one re-wrap of that
     # paragraph would have emptied the gate with every test still green.
     $bq = New-Tree -Label 'blockquote'
-    Set-Text -Dir $bq -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`n> Bij tegenspraak wint`n> ``CLAUDE.md``."
+    Set-Text -Dir $bq -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`n> Bij tegenspraak wint`n> ``CLAUDE.md``."
     $f = @(Get-Declarations -Dir $bq)
     Assert-True ($f.Count -eq 1 -and $f[0].Line -eq 3) `
         "a wrapped BLOCKQUOTE declaration is found -- the '>' markers are stripped, not read as text"
 
     # The bound on the join: a paragraph break is where a unit ends, so a gap may not bridge one.
     $across = New-Tree -Label 'across'
-    Set-Text -Dir $across -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`nSomething about ``CLAUDE.md```n`nwins is a new paragraph here."
+    Set-Text -Dir $across -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`nSomething about ``CLAUDE.md```n`nwins is a new paragraph here."
     Assert-True ((Get-Declarations -Dir $across).Count -eq 0) `
         'adjacency does not bridge a blank line -- the paragraph is the largest unit joined'
 
     # ... and the suppression has to survive the join too, or widening the match would have re-admitted
     # the very false positive the quotation rule was built for.
     $qWrapped = New-Tree -Label 'qwrapped'
-    Set-Text -Dir $qWrapped -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`nIts closing line conceded: *`"when this page and ``CLAUDE.md```ndisagree, ``CLAUDE.md`` wins.`"* It was retired."
+    Set-Text -Dir $qWrapped -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`nIts closing line conceded: *`"when this page and ``CLAUDE.md```ndisagree, ``CLAUDE.md`` wins.`"* It was retired."
     Assert-True ((Get-Declarations -Dir $qWrapped).Count -eq 0) `
         'a quotation that itself wraps still suppresses -- the quote span is read on the joined unit'
 
@@ -380,22 +380,22 @@ try {
     Write-Host 'Get-SupremacyDeclaration -- list items'
 
     $stars = New-Tree -Label 'stars'
-    Set-Text -Dir $stars -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`n* Read the constitution in ``CLAUDE.md```n* wins arguments only when they cite the rank order."
+    Set-Text -Dir $stars -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`n* Read the constitution in ``CLAUDE.md```n* wins arguments only when they cite the rank order."
     Assert-True ((Get-Declarations -Dir $stars).Count -eq 0) `
         "two '*' bullets do not bridge into a declaration that exists in neither item"
 
     $dashes = New-Tree -Label 'dashes'
-    Set-Text -Dir $dashes -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`n- Read the constitution in ``CLAUDE.md```n- wins arguments only when they cite the rank order."
+    Set-Text -Dir $dashes -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`n- Read the constitution in ``CLAUDE.md```n- wins arguments only when they cite the rank order."
     Assert-True ((Get-Declarations -Dir $dashes).Count -eq 0) "'-' bullets do not bridge either"
 
     $numbered = New-Tree -Label 'numbered'
-    Set-Text -Dir $numbered -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`n1. Read the constitution in ``CLAUDE.md```n2. wins arguments only when they cite the rank order."
+    Set-Text -Dir $numbered -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`n1. Read the constitution in ``CLAUDE.md```n2. wins arguments only when they cite the rank order."
     Assert-True ((Get-Declarations -Dir $numbered).Count -eq 0) 'numbered items do not bridge either'
 
     # The other edge of the same rule: a real declaration INSIDE one bullet is still found, and so is one
     # that wraps within its own item -- the item is a unit, not a dead zone.
     $inBullet = New-Tree -Label 'inbullet'
-    Set-Text -Dir $inBullet -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`n* On any real conflict between the two, ``CLAUDE.md```n  wins outright.`n* Something else entirely."
+    Set-Text -Dir $inBullet -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`n* On any real conflict between the two, ``CLAUDE.md```n  wins outright.`n* Something else entirely."
     $f = @(Get-Declarations -Dir $inBullet)
     Assert-True ($f.Count -eq 1 -and $f[0].Line -eq 3) `
         'a declaration wrapped inside ONE bullet is still found, at the line it begins on'
@@ -403,7 +403,7 @@ try {
     # And the marker test must not catch bold at the start of a line -- '**text**' has no space after the
     # first '*', which is the whole difference between a bullet and emphasis.
     $boldStart = New-Tree -Label 'boldstart'
-    Set-Text -Dir $boldStart -Rel 'contributing-davekjohn/CONTRIBUTING.md' -Text "# C`n`n**On any real conflict ``CLAUDE.md`` wins outright.**"
+    Set-Text -Dir $boldStart -Rel 'dkj-policy/CONTRIBUTING.md' -Text "# C`n`n**On any real conflict ``CLAUDE.md`` wins outright.**"
     Assert-True (@(Get-Declarations -Dir $boldStart).Count -eq 1) `
         "a line opening with '**bold**' is not read as a list item"
 
@@ -429,8 +429,8 @@ try {
     Write-Host 'Get-SupremacyDeclaration -- the shared exclusions'
 
     $supArchive = New-Tree -Label 'suparchive'
-    Set-Text -Dir $supArchive -Rel 'contributing-davekjohn/CHANGELOG.md' -Text "# Changelog`n`n### DEPLOY: old/branch`n`nBack then ``CLAUDE.md`` wins was the rule."
-    Set-Text -Dir $supArchive -Rel 'contributing-davekjohn/releases/history.md' -Text "Historic: ``CLAUDE.md`` wins."
+    Set-Text -Dir $supArchive -Rel 'dkj-policy/CHANGELOG.md' -Text "# Changelog`n`n### DEPLOY: old/branch`n`nBack then ``CLAUDE.md`` wins was the rule."
+    Set-Text -Dir $supArchive -Rel 'dkj-policy/releases/history.md' -Text "Historic: ``CLAUDE.md`` wins."
     Assert-True ((Get-Declarations -Dir $supArchive).Count -eq 0) `
         'the changelog and releases/ are never read -- a folded entry correctly states the rule of its day'
 
@@ -491,7 +491,7 @@ try {
     # THE ASSERT THE MERGE EXISTS FOR. One invocation, both defects, BOTH blocks -- the first finding
     # must not short-circuit the second, or a session start reports one defect and hides the other.
     $both = New-Tree -Label 'both'
-    Set-Text -Dir $both -Rel 'CLAUDE.md' -Text "# Consumer`n`nElke branch krijgt zijn eigen ``contributing-davekjohn/$retired``.`n`n> **Deze pagina staat bovenaan.** Bij tegenspraak wint ``CLAUDE.md``."
+    Set-Text -Dir $both -Rel 'CLAUDE.md' -Text "# Consumer`n`nElke branch krijgt zijn eigen ``dkj-policy/$retired``.`n`n> **Deze pagina staat bovenaan.** Bij tegenspraak wint ``CLAUDE.md``."
     $r = Invoke-Script -Dir $both
     Assert-True ($r.Code -eq 1) 'a tree carrying BOTH defects -- exit 1'
     Assert-True ($r.Out -match 'POINT at a shared convention' -and $r.Out -match 'THE ORDER RUNS THE OTHER WAY') `
@@ -545,7 +545,7 @@ try {
     Assert-True ($r.Code -eq 1 -and ([regex]::Matches($r.Out, '\[ERROR\]')).Count -eq 2) `
         'a repo publishing ANOTHER product is a consumer of this workflow -- both detectors still judged, not skipped'
 
-    Set-Text -Dir $both -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "contributing-davekjohn" } ] }'
+    Set-Text -Dir $both -Rel '.claude-plugin/marketplace.json' -Text '{ "name": "fixture", "plugins": [ { "name": "dkj-policy" } ] }'
     $r = Invoke-Script -Dir $both
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'publishes the workflow') `
         'a repo that publishes THIS workflow is skipped -- and the skip silences both detectors at once'

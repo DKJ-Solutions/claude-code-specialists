@@ -1,6 +1,6 @@
 {
   "name": "claude-code-specialists",
-  "description": "The Claude Specialists system by Dave (DaveKJohn): a team of specialized Claudes under one Chief of Staff. Every plugin here is either a TEAM — who the specialists are — or a WORKFLOW — how work moves through the repo they land in. Teams stack: enable the core team plus whichever add-on teams fit the repo. Workflows mostly do not — two that answered the same question differently would collide — so there is one general workflow, plus bwj-codex, a deliberately narrow additive layer extending the ticket-work step and what a sync branch owes. One product, one repository, one marketplace.",
+  "description": "The Claude Specialists system by Dave (DaveKJohn): a team of specialized Claudes under one Chief of Staff. Every plugin here is either a TEAM — who the specialists are — or a WORKFLOW — how work moves through the repo they land in. Teams stack: enable the core team plus whichever add-on teams fit the repo. Workflows mostly do not — two that answered the same question differently would collide — so there is one general workflow, plus dkj-policy-bwj, a deliberately narrow additive layer extending the ticket-work step and what a sync branch owes. One product, one repository, one marketplace.",
   "owner": { "name": "Dave (DaveKJohn)" },
   "plugins": [
     {
@@ -24,14 +24,14 @@
       "description": "Add-on team for commercial webshop repos (any platform): Sergio (SEO), Craig (CRO), Sean (performance/SEA), with room to grow into the wider e-commerce craft (lifecycle/email, analytics). Complementary to a platform team like team-shopify — a commercial webshop repo can enable both. Teams stack."
     },
     {
-      "name": "contributing-davekjohn",
-      "source": "./plugins/workflows/contributing-davekjohn",
-      "description": "DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. A workflow is not a team but a method, and the name says whose it is — a consuming repo has its own way of working, and the specialists adapt to it. Enable this only if you want THIS one. Requires team-alpha."
+      "name": "dkj-policy",
+      "source": "./plugins/workflows/dkj-policy",
+      "description": "DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. A workflow is not a team but a method, and the name says whose it is: DKJ's policy, the top rung of the order, not a baseline every consumer inherits. Enable this only if you want THIS one. Requires team-alpha."
     },
     {
-      "name": "bwj-codex",
-      "source": "./plugins/workflows/bwj-codex",
-      "description": "BWJ's codex — the binding rules the working environment of BWJ's two Shopify store repos (smartwatchbanden and xoxowildhearts) operates under, so both run one identical procedure and cannot drift. An ADDITIVE add-on to contributing-davekjohn — it extends the ticket-work layer before a branch and what a sync branch owes, and contradicts nothing that workflow decides. Two chapters. TICKET HANDLING: a discovered issue is filed on GitHub first, then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue makes a CI workflow the plugin ships as a template post an update saying the work is ready to test and move the card — it never ticks the task off. THE SYNC LOG: a sync branch mirrors what a third party changed on the live theme and is exempt from the changelog by design, so it owes a sync-log entry instead — bwj-codex/SYNC-LOG.md, newest first, written and committed by team-shopify's sync-main.ps1 in the same breath as the branch, never folded and never released. Carries no specialists. Requires team-alpha and contributing-davekjohn; the sync chapter also expects team-shopify. Enable this only in BWJ's two store repos."
+      "name": "dkj-policy-bwj",
+      "source": "./plugins/workflows/dkj-policy-bwj",
+      "description": "BWJ's codex — the binding rules the working environment of BWJ's two Shopify store repos (smartwatchbanden and xoxowildhearts) operates under, so both run one identical procedure and cannot drift. An ADDITIVE add-on to dkj-policy — it extends the ticket-work layer before a branch and what a sync branch owes, and contradicts nothing that workflow decides. Two chapters. TICKET HANDLING: a discovered issue is filed on GitHub first, then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue makes a CI workflow the plugin ships as a template post an update saying the work is ready to test and move the card — it never ticks the task off. THE SYNC LOG: a sync branch mirrors what a third party changed on the live theme and is exempt from the changelog by design, so it owes a sync-log entry instead — dkj-policy-bwj/SYNC-LOG.md, newest first, written and committed by team-shopify's sync-main.ps1 in the same breath as the branch, never folded and never released. Carries no specialists. Requires team-alpha and dkj-policy; the sync chapter also expects team-shopify. Enable this only in BWJ's two store repos."
     }
   ]
 }
