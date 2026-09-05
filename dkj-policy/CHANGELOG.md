@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1470-sessionstart-hooks-sentence · 20260905-220048
+
+One sentence in the `specialists-init` skill page named its own evidence in a way that did not parse:
+it introduced *"the two SessionStart hooks"* and then apposed two files that are not hooks. The
+paragraph's claim was always true -- four places do name `/team-alpha:specialists-init` in full and
+say the repo owner has to type it -- but the sentence carrying it could not be checked by a reader,
+which is the only thing that makes such a citation worth writing. It now names all four, each with
+the hook file and the script behind it.
+
+The page carries `disable-model-invocation`, so a model never reads it; the reader here is the repo
+owner adopting the family for the first time, and they are exactly the reader who has no other way to
+verify that the no-bare-imperative rule is honoured anywhere. A citation they cannot follow is worse
+than none, because it looks like evidence.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing structural -- one paragraph, no mechanism, no script. What is worth keeping is the method: the
+intent the report said it could not determine was recoverable from the tree, in a comment sitting
+directly above one of the lines the sentence cites. `adopt-config.ps1` says of itself *"Not a
+SessionStart hook like the roster check, but the same trap"*, which settles both that the sentence
+meant a list of four and that its author knew the distinction. Reading the cited code before guessing
+at the wording is what turned "needs someone who remembers" into a mechanical repair.
+
+**Score:** 1 -- cosmetic on the page itself; the failure it prevents is a reader checking a citation,
+finding it names the wrong kind of thing, and discounting the paragraph's claim along with it.
+
+#### Pull Request
+
+The specialists-init 'two SessionStart hooks' sentence names its four places
+
+Plugins: team-alpha
+
+[PR #1472](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1472)
+
+---
+
 ### DEPLOY: docs/merge-adopt-config-workflow-folder · 20260905-212108
 
 `adopt-config` and `adopt-workflow-folder` were two separately-named skills for the same plugin,
