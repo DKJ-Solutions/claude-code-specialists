@@ -2,7 +2,7 @@
   "name": "dkj-policy-bwj",
   "displayName": "Claude Specialists - DKJ policy for BWJ",
   "description": "The shared law layer for BWJ's two Shopify stores (smartwatchbanden and xoxowildhearts), packaged so both repos run one identical procedure and cannot drift on it. Two chapters. TICKET HANDLING: a discovered issue is created on GitHub first (GitHub is the source of truth), then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue makes a CI workflow post an update saying the work is ready to test and move the card, never ticking the task off - only the colleague who asked for it can do that. THE SYNC LOG: a 'sync/' branch mirrors what a third party changed on the live theme, is exempt from the changelog by design, and therefore owes a sync-log entry instead - dkj-policy-bwj/SYNC-LOG.md, newest at the top, written and committed by team-shopify's sync-main.ps1 in the same breath as the branch, never folded and never released. It is an ADDITIVE add-on to 'dkj-policy', not a replacement: it extends only the ticket-work layer before a branch and what a sync branch owes, and says nothing about branch naming, what an ordinary change owes before a PR, or what a release is. Both chapters are policy rather than mechanism: the Asana CI lives in each repo's .github/ and the sync machinery in 'team-shopify'. Requires the core team 'team-alpha' and 'dkj-policy'; the sync chapter also expects 'team-shopify'. Enable this only in BWJ's two Shopify store repos.",
-  "version": "4.29.0",
+  "version": "4.30.0",
   "author": { "name": "DaveKJohn" },
   "keywords": ["specialists", "workflow", "claude-code", "asana", "issue-tracking", "shopify", "bwj", "sync-log", "opt-in"]
 }
