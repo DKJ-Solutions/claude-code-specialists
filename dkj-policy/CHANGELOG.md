@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1454-releases-readme-folder-name · 20260905-191304
+
+`releases/README.md` told an agent setting this workflow up in another repo that the plugin is called
+`contributing-davekjohn`, that the `adopt-workflow-folder` skill scaffolds a
+`contributing-davekjohn/releases/README.md`, and that `Get-ReleaseHistoryPath` points at a
+`contributing-davekjohn/releases/history.md` if left alone. All three are false, and false in the same
+direction: a fresh consumer has none of the three folder names on disk, so every script hands them
+`dkj-policy` while this page addressed them in the second person about a folder they do not have.
+
+#1437 renamed the folder and #1447 covers the two `releases/page/` statements it left behind. These
+three were scoped out of that branch because #1447 states its own bound -- and one of them is not a
+folder-rename miss at all: line 5 names the **plugin**, which was never called `contributing-davekjohn`.
+
+Three sentences rewritten. The dated sentences around them keep the name they were written with, and
+lines 137 and 143 are left for #1447.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The section these three sit in is `### How to build your own version of this page` -- the one document
+that exists to answer *"what does this look like in my repo"*, addressed in the second person to a
+consumer adopting the workflow. That is the worst place in the tree for a stale name, because the
+reader has nothing of their own to check it against yet.
+
+**Score:** 3
+
+#### Pull Request
+
+Correct three present-tense contributing-davekjohn references in the releases README
+
+[PR #1458](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1458)
+
+---
+
 ### DEPLOY: fix/claude-md-install-record-claim · 20260905-190509
 
 `CLAUDE.md` no longer states that this repo carries an install record as a settled fact. Inbound #1449
