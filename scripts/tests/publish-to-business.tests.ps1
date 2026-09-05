@@ -184,7 +184,7 @@ function New-FilterFixture {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText((Join-Path $Dir '.claude-plugin\marketplace.json'), $manifest, $utf8NoBom)
 
-    foreach ($p in @(@{ kind = 'teams'; n = 'core' }, @{ kind = 'teams'; n = 'extra' }, @{ kind = 'workflows'; n = 'flow' })) {
+    foreach ($p in @(@{ kind = 'dkj-teams'; n = 'core' }, @{ kind = 'dkj-teams'; n = 'extra' }, @{ kind = 'workflows'; n = 'flow' })) {
         $pdir = Join-Path $Dir "plugins\$($p.kind)\$($p.n)\.claude-plugin"
         New-Item -ItemType Directory -Path $pdir -Force | Out-Null
         "{ ""name"": ""$($p.n)"", ""version"": ""1.0.0"" }" |

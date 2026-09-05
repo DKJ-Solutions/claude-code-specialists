@@ -3215,8 +3215,8 @@ Write-Coverage -Category 'skill-list-plugin' -Checked $pluginSkillSpanCount `
 # worth having rather than a detail of it. #1066 proposed the rule as "must resolve to a target also
 # under plugins/, because that is the subtree the plugin cache contains". The cache contains no such
 # subtree, and the weaker rule passes the one link that had ALREADY SHIPPED dead: cut-release's
-# SKILL.md line 123 pointed at '../../../../teams/dkj-team-alpha/manuals/06-25-manual.md', which stays
-# under plugins/ here and resolves to '<cache>/<marketplace>/teams/dkj-team-alpha/...' in a consumer,
+# SKILL.md line 123 pointed at '../../../../teams/team-alpha/manuals/06-25-manual.md', which stays
+# under plugins/ here and resolves to '<cache>/<marketplace>/teams/team-alpha/...' in a consumer,
 # where the family level does not exist. Verified against the installed v4.22.0 copy on disk, not
 # inferred. The manual it names does travel -- it simply never travels to that path.
 #

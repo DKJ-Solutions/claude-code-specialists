@@ -1370,7 +1370,7 @@ Write-Host "Get-TouchedPlugins -- a nested plugin tree" -ForegroundColor Cyan
 # plugins/ into plugins/dkj-teams/, beside the only plugins that consume its blocks -- so the file below is
 # no longer a path that merely fails to reach a plugin root, it is a path that shares a PREFIX with the
 # grouping directory the real plugins sit in. That is the harder case, and it is the one this repo now
-# has: the old '^plugins/([a-z0-9][a-z0-9-]*)/' regex would have read it as a plugin called 'teams'.
+# has: the old '^plugins/([a-z0-9][a-z0-9-]*)/' regex would have read it as a plugin called 'dkj-teams'.
 $nestedRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
 {"plugins": [
   {"name": "dkj-team-alpha",         "source": "./plugins/dkj-teams/dkj-team-alpha"},
@@ -1391,7 +1391,7 @@ Assert-Equal 2 $nestedTouched.Count 'a plugin two levels down is found'
 # comparison would have passed through the rename and told nobody.
 Assert-Equal 'dkj-policy' $nestedTouched[0] 'the NAME comes from the marketplace, not from the folder above it'
 Assert-Equal 'dkj-team-alpha' $nestedTouched[1] 'and so does the second'
-Assert-Equal $false ([bool]($nestedTouched -contains 'teams')) 'plugin source nested INSIDE a grouping directory is not read as a plugin named after that directory'
+Assert-Equal $false ([bool]($nestedTouched -contains 'dkj-teams')) 'plugin source nested INSIDE a grouping directory is not read as a plugin named after that directory'
 Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/dkj-teams/agent-shared/lens-optional.md'))).Count 'agent-shared beside the teams it feeds is still under no plugin root'
 Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/dkj-teams/README.md'))).Count 'a file in the grouping directory itself belongs to no plugin'
 

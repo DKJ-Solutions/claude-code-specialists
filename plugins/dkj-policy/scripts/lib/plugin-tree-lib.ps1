@@ -160,7 +160,7 @@ function Get-PluginNameForPath {
             plugins that consume it, and this function needed no edit for it -- which is the property
             it was extracted to have;
           * a plugin root at any depth matches, so plugins/dkj-teams/dkj-team-alpha/ works without this
-            function knowing that 'teams' exists.
+            function knowing that 'dkj-teams' exists.
 
         Accepts either separator in $Path, since callers hand it both: gh supplies forward slashes and
         Get-ChildItem supplies backslashes. The comparison is ordinal and case-sensitive for the reason
