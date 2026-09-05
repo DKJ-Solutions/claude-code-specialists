@@ -58,6 +58,9 @@ question from this one.
 - [x] Mirror to `plugins/workflows/contributing-davekjohn/scripts/task/new-branch.ps1`, byte-identical.
 - [x] The shipped skill page: the fourth resume shape, the table of why every existing guard misses it,
       and the sample output.
+- [x] Sanitize and cap the remote tip line before printing it (Sebastian's review). `%an`/`%s` are free
+      text chosen by whoever pushed the commit, and this is the first place in the repo that prints
+      externally-authored text to a console -- which an agent session also reads.
 
 #### What the suite changed about the design
 
@@ -70,7 +73,7 @@ other side of it.
 
 ### TEST
 
-- [x] `new-branch.tests.ps1` (y): the reported state -- a local ref at the older tip, origin advanced by
+- [x] `new-branch.tests.ps1` (y1): the reported state -- a local ref at the older tip, origin advanced by
       another identity with the incident's verbatim park subject. Asserts the count, the author, the
       subject, both copies, that the checkout still happened, and that HEAD is **not** fast-forwarded
       behind your back.
@@ -80,7 +83,10 @@ other side of it.
 - [x] (y4): the `$branchOnOrigin` route carries no gap, because it is created at the remote tip.
 - [x] New fixture helper `Add-OriginBranchCommits` -- the other session finishing and parking, with the
       author and subject as parameters because they are what the check prints.
-- [x] Suite green: 241 asserts.
+- [x] (y5)/(y6): an adversarial remote tip (ANSI escape, RTL override, zero-width joiner) is stripped
+      and a 400-character subject capped -- with the payload asserted PRESENT on the remote first, so
+      the strip asserts cannot pass vacuously.
+- [x] Suite green: 254 asserts.
 - [x] Lint gate green (0 errors) and all suites green.
 
 ### DEPLOY: fix/1439-parked-branch-remote-head
@@ -96,6 +102,11 @@ remote head of the branch under your feet: `git status` prints the same line for
 fetched", `prune-merged -IncludeRemote` is for branches you are *not* on, and `cycle-autopark` makes the
 collision more likely rather than less, because it is what puts the other session's work on the shared
 ref. The last one cost two full gate runs, a 508-line script and a new test suite, all built blind.
+
+The tip line is stripped of control and format characters and capped at 120 before it is printed: it is
+the one piece of text this script emits that somebody else wrote, and an escape sequence in a commit
+subject repaints the terminal it lands in. The neighbouring adversarial case points the other way on
+purpose -- a malicious `-Title` must land fully and unchanged, because that goes into a file.
 
 It costs no network call -- the base measurement already fetches every ref -- and it warns rather than
 refusing, because the legitimate divergence (your own autopark from another device) sits on the intended
