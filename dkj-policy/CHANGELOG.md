@@ -32,6 +32,61 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1467-rename-workflows-to-dkj-policy · 20260905-224147
+
+`plugins/workflows/` is `plugins/dkj-policy/`, and the prime ministry's own files sit at that root with
+`dkj-policy-bwj/` nested inside it as a ministry. That completes the government metaphor #1437 opened:
+the directory used to name the KIND -- a way of working -- and now names the government, with the rank
+order carried by the tree instead of by a sentence.
+
+The two READMEs that ended up in one folder are one page now. `plugins/dkj-policy/README.md` is the
+plugin's own, and it absorbed the consumer-facing halves of the old kind page -- why there is no default
+workflow, what enabling and disabling actually mean. The naming and directory doctrine went the other
+way, up to `plugins/README.md`, where the same rule for teams already lived.
+
+**The `[plugin-kind]` gate narrowed, deliberately, and that is the part worth reading twice.** Only two
+name shapes still claim a directory: `team-*` claims `plugins/teams/`, and `*-policy` / `*-policy-*`
+claim `plugins/dkj-policy/`. `workflow-*`, `contributing-*` and `*-codex` keep the naming half and lose
+the directory half -- there is no directory left to send them to, and pointing a stranger's workflow at
+this government would be worse than saying nothing. The else-branch is untouched: a name matching none
+of the five shapes is still an error, because a plugin silently held to nothing is the failure that has
+actually happened here.
+
+Archived release notes were split rather than swept: their link **targets** are repointed so navigation
+still works, and their **prose** is untouched, because `plugins/workflows/...` in a 4.8.0 note is a
+correct statement about the layout that shipped in 4.8.0.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**If your repo ran `adopt-workflow-folder`, one line of your own CI breaks the moment this lands, and
+re-running the skill will not repair it.** `.github/workflows/branch-entry.yml` checks this repo out at
+`ref: main` -- not at a tag -- and runs the gate by path, so the break arrives before you update any
+plugin. The skill is additive and never overwrites, so the file it wrote once is yours to edit:
+
+```text
+- .workflow-scripts/plugins/workflows/dkj-policy/scripts/lint/check-branch-entry.ps1
++ .workflow-scripts/plugins/dkj-policy/scripts/lint/check-branch-entry.ps1
+```
+
+That is the whole migration -- one line, one file, and it is the only place a consumer's own tree names
+a shared script by path. Nothing else moves for you: plugin **ids** are unchanged, so
+`claude plugin install/enable`, `${CLAUDE_PLUGIN_ROOT}` and every skill invocation resolve exactly as
+before, and the orchestrator `@`-import points into `plugins/teams/`, which this change does not touch.
+
+**Score:** 5
+
+#### Pull Request
+
+Rename plugins/workflows to plugins/dkj-policy
+
+Plugins: dkj-policy, dkj-policy-bwj
+
+[PR #1474](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1474)
+
+---
+
 ### DEPLOY: docs/1473-readme-hook-count · 20260905-222228
 
 The README's plugin table no longer tells a reader how many session hooks `dkj-policy` ships. It
