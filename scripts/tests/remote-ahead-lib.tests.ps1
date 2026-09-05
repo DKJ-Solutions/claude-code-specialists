@@ -201,8 +201,12 @@ try {
 
     # --- 9. open-pr's gate sits BEFORE the lint+test gate, and blocks -------------------------
     Write-Host "`n== 9. open-pr asks before spending the gate, and refuses rather than warns ==" -ForegroundColor Cyan
-    $idxRemoteAheadFetch = $openPrText.IndexOf("'fetch', 'origin'")
-    $idxWorkflowGatesPr  = $openPrText.IndexOf("Invoke-WorkflowGates -RepoRoot `$repoRoot -SkipLint:`$SkipLint -SkipTests:`$SkipTests -Context 'the PR'")
+    # Single-quoted literals throughout -- like gate-lib.tests.ps1's own landmark checks -- rather than
+    # a double-quoted string with backtick-escaped '$'. CI (windows-latest, en-US) read the
+    # backtick-escaped form as -1 twice in a row while this exact byte-identical file passed locally
+    # (nl-NL) every time; single-quoting removes the escape entirely rather than explaining the gap.
+    $idxRemoteAheadFetch = $openPrText.IndexOf('''fetch'', ''origin''')
+    $idxWorkflowGatesPr  = $openPrText.IndexOf('Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context ''the PR''')
     Assert-True ($idxRemoteAheadFetch -ge 0 -and $idxWorkflowGatesPr -ge 0) 'both landmarks are found'
     Assert-True ($idxRemoteAheadFetch -lt $idxWorkflowGatesPr) 'the single-branch fetch runs before the PR-path gate call'
     $remoteAheadGateBlock = [regex]::Match($openPrText, "(?s)# --- Remote-ahead gate.*?\n\n# THE GATES BELOW").Value
