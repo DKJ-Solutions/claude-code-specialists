@@ -532,6 +532,101 @@ Assert-True ($cutSrc -match "like \`"\*@\`$marketplaceName\`"") `
 Assert-True ($cutSrc -match '(?s)function Write-SelfConsumptionReminder.*?catch \{') `
     'and it is wrapped so a reminder can never break a cut that has already committed and tagged'
 
+Write-Host ""
+Write-Host "cut-release.ps1 -- the reminder prints only an update command this repo's route can RUN" -ForegroundColor Cyan
+# WHY THIS BLOCK RUNS THE FUNCTION WHERE EVERY OTHER ONE READS THE SOURCE (issue #1445). The reason
+# stated above -- "driving the whole script needs a repo to cut" -- is about the SCRIPT, and does not
+# reach this one function: it takes no parameters, and its only couplings are $repoRoot and
+# Get-MarketplaceJsonText, both of which a fixture can supply. So it is lifted out by the PowerShell
+# parser (never by regex -- the discriminator lesson check 18 already paid for) and driven for real.
+#
+# It has to be a run rather than a source match, because the defect this pins was invisible in the
+# source: the old function printed a perfectly well-formed `claude plugin update <id> --scope project`
+# that satisfied every assert above, and failed at the only place it mattered -- in the repo it was
+# printed for. `enabledPlugins` is the DECLARATIVE route and `plugin update` operates on an INSTALL
+# RECORD, so what has to be pinned is which of the two the printed line was chosen against. Measured
+# 2026-09-05 in this repo right after the v4.30.0 cut: both update commands refused, "not installed".
+$reminderFn = ([System.Management.Automation.Language.Parser]::ParseInput($cutReleaseText, [ref]$null, [ref]$null)).FindAll(
+    { param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Write-SelfConsumptionReminder' }, $true)
+Assert-True ($reminderFn.Count -eq 1) `
+    'the reminder is liftable as a single function definition, which is what lets the asserts below run it'
+
+if ($reminderFn.Count -eq 1) {
+    . (Join-Path $RepoRoot 'scripts\lib\check-report-lib.ps1')
+    Invoke-Expression $reminderFn[0].Extent.Text
+    function Get-MarketplaceJsonText { '{"name":"fixture-marketplace"}' }
+
+    $rcFixture = Join-Path ([System.IO.Path]::GetTempPath()) ("cut-release-reminder-" + [guid]::NewGuid().ToString('N'))
+    $rcRepo    = Join-Path $rcFixture 'repo'
+    $rcHome    = Join-Path $rcFixture 'home'
+    New-Item -ItemType Directory -Force -Path (Join-Path $rcRepo '.claude') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $rcHome '.claude\plugins') | Out-Null
+    Set-Content -LiteralPath (Join-Path $rcRepo '.claude\settings.json') -Encoding UTF8 -Value @'
+{ "enabledPlugins": { "alpha@fixture-marketplace": true, "beta@fixture-marketplace": true, "other@some-other-marketplace": true } }
+'@
+    # $repoRoot is what the function closes over, exactly as it does inside the script.
+    $repoRoot = (Resolve-Path -LiteralPath $rcRepo).Path
+    $rcSavedProfile = $env:USERPROFILE
+    $rcAdmin = Join-Path $rcHome '.claude\plugins\installed_plugins.json'
+
+    # Get-InstallRecord resolves the user home from $env:USERPROFILE -- the documented way a fixture
+    # controls the administration, and the same one check-report-lib.tests.ps1 uses.
+    function Set-RcAdmin { param([string[]]$Ids)
+        $recs = ($Ids | ForEach-Object {
+            '"{0}": [{{ "scope": "project", "installPath": "x", "version": "9.9.9", "projectPath": {1} }}]' -f
+                $_, (ConvertTo-Json $repoRoot)
+        }) -join ','
+        Set-Content -LiteralPath $rcAdmin -Encoding UTF8 -Value ('{ "version": 2, "plugins": { ' + $recs + ' } }')
+        $env:USERPROFILE = $rcHome
+    }
+
+    try {
+        # 1. THE DEFECT ITSELF. No install record for this repo -> no update command may be printed,
+        #    because every one of them would refuse. The refresh is what remains, and it is sufficient:
+        #    measured here, it advanced the clone and the plugins resolved from it on the next session.
+        Set-RcAdmin -Ids @()
+        $outDecl = (Write-SelfConsumptionReminder 6>&1 | Out-String)
+        Assert-True ($outDecl -match 'claude plugin marketplace update fixture-marketplace') `
+            'declarative route: the marketplace refresh is still printed -- it is the whole remedy there'
+        Assert-True ($outDecl -notmatch 'claude plugin update') `
+            'declarative route: NO update command is printed, because an install record is what that command needs'
+        Assert-True ($outDecl -match 'alpha@fixture-marketplace' -and $outDecl -match 'beta@fixture-marketplace') `
+            'declarative route: the plugins are still named, so the reader knows what the refresh covers'
+        Assert-True ($outDecl -notmatch 'other@some-other-marketplace') `
+            'and a plugin from another marketplace is still none of this reminder business'
+
+        # 2. THE OTHER ROUTE, measured rather than assumed (the report flagged it as inferred).
+        #    `claude plugin install --scope project` DOES write a record, and `plugin update` then works.
+        Set-RcAdmin -Ids @('alpha@fixture-marketplace', 'beta@fixture-marketplace')
+        $outInst = (Write-SelfConsumptionReminder 6>&1 | Out-String)
+        Assert-True ($outInst -match 'claude plugin update alpha@fixture-marketplace --scope project') `
+            'install-record route: the update command IS printed, with the scope this repo already paid for'
+        Assert-True ($outInst -match 'claude plugin update beta@fixture-marketplace --scope project') `
+            'install-record route: and for every enabled plugin that has a record here'
+
+        # 3. MIXED, which is the case that proves the choice is made PER PLUGIN rather than once for the
+        #    repo -- the two routes can coexist, and a repo-wide answer would be wrong for one of them.
+        Set-RcAdmin -Ids @('alpha@fixture-marketplace')
+        $outMixed = (Write-SelfConsumptionReminder 6>&1 | Out-String)
+        Assert-True ($outMixed -match 'claude plugin update alpha@fixture-marketplace --scope project') `
+            'mixed: the plugin WITH a record gets its update command'
+        Assert-True ($outMixed -notmatch 'claude plugin update beta@fixture-marketplace') `
+            'mixed: and the plugin without one does not, in the same run'
+
+        # 4. AN UNREADABLE ADMINISTRATION IS NOT EVIDENCE OF ABSENCE. Test-PluginInstalledHere is
+        #    permissive there by design, and this pins that the reminder inherits it: "I could not look"
+        #    must restore the old line, never suppress a command that would have worked.
+        Set-Content -LiteralPath $rcAdmin -Encoding UTF8 -Value 'not json {{{'
+        $env:USERPROFILE = $rcHome
+        $outBad = (Write-SelfConsumptionReminder 6>&1 | Out-String)
+        Assert-True ($outBad -match 'claude plugin update alpha@fixture-marketplace --scope project') `
+            'unreadable administration: the update command is printed anyway, because absence of evidence is not evidence of absence'
+    } finally {
+        $env:USERPROFILE = $rcSavedProfile
+        Remove-Item -LiteralPath $rcFixture -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1

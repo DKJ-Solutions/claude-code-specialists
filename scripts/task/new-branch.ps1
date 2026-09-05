@@ -480,7 +480,17 @@ if ($branchExists -and $remoteRef.ExitCode -eq 0) {
         # by an identity that is not yours says "another session has already built this" in a way that "1
         # commit behind" never does -- and it is the one line that tells a fast-forward of your own
         # autopark apart from a collision. Read off the remote-tracking ref, so still no network call.
-        $tip = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'log', '-1', '--format=%h %an: %s', "refs/remotes/origin/$Name") -DiscardStderr
+        # -Utf8 IS LOAD-BEARING HERE, AND THE STRIP BELOW IS WHY (issue #1446, September 5, 2026).
+        # Without it Windows PowerShell 5.1 decodes git's stdout with [Console]::OutputEncoding, so on a
+        # cp850 console the three UTF-8 bytes of an RTL override (e2 80 ae) arrive as the three ORDINARY
+        # PRINTABLE characters they map to there -- and \p{Cf} does not match an ordinary printable
+        # character, so the sanitiser passes them straight through. The round trip is byte-identical, so
+        # the payload is reconstituted the moment anything downstream decodes as UTF-8: the guard was
+        # green in CI (a UTF-8 console) and silently absent on every default Windows console, which is
+        # the only place it was written for. The output of THIS call is data a matcher inspects
+        # character by character, which is exactly the case Invoke-NativeCapture's docstring reserves
+        # the flag for.
+        $tip = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'log', '-1', '--format=%h %an: %s', "refs/remotes/origin/$Name") -DiscardStderr -Utf8
         $tipLine = if ($tip.ExitCode -eq 0) { (($tip.Output -join ' ').Trim()) } else { '' }
         # AND IT IS STRIPPED BEFORE IT IS PRINTED, because it is the one piece of text this script emits
         # that SOMEBODY ELSE WROTE. %an and %s are free text chosen by whoever pushed that commit.
