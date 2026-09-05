@@ -8,10 +8,10 @@ into the cycle page as its first step — the layer this repo has no work in, an
 
 | here | what it holds | portable half |
 |---|---|---|
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **the centre of this folder** — the standard branch + PR workflow, the workflow's contributing layer AND the working rules a session needs here, on one page. Two of those three merged on August 26, 2026 (#886) and the standard workflow arrived from the root on August 27. It wins over the [root CLAUDE.md](../CLAUDE.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/workflows/dkj-policy/CONTRIBUTING-portable.md) |
-| [`CHANGELOG.md`](CHANGELOG.md) | what is pending for the next release: one `##` entry per merged branch, folded in at the merge and emptied by a cut. Here since August 27, 2026, stated in `Get-ChangelogPath` | *(the format travels in [`DEVELOPMENT-portable.md`](../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md))* |
-| `<branch>.md` | the branch's own document, one per branch and present only while that branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-portable.md`](../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md) |
-| [`releases/`](releases/) | the dated list of every release ever cut ([`history.md`](releases/history.md), here since August 27, 2026), the published audience notes, the generated changelog and GitHub-Release trees, and this repo's seam answers in its own [`README.md`](releases/README.md) | [`RELEASES-portable.md`](../plugins/workflows/dkj-policy/RELEASES-portable.md) |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **the centre of this folder** — the standard branch + PR workflow, the workflow's contributing layer AND the working rules a session needs here, on one page. Two of those three merged on August 26, 2026 (#886) and the standard workflow arrived from the root on August 27. It wins over the [root CLAUDE.md](../CLAUDE.md) on conflict | [`CONTRIBUTING-portable.md`](../plugins/dkj-policy/CONTRIBUTING-portable.md) |
+| [`CHANGELOG.md`](CHANGELOG.md) | what is pending for the next release: one `##` entry per merged branch, folded in at the merge and emptied by a cut. Here since August 27, 2026, stated in `Get-ChangelogPath` | *(the format travels in [`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md))* |
+| `<branch>.md` | the branch's own document, one per branch and present only while that branch is open: its plan, and the DEPLOY section that folds into the changelog | [`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md) |
+| [`releases/`](releases/) | the dated list of every release ever cut ([`history.md`](releases/history.md), here since August 27, 2026), the published audience notes, the generated changelog and GitHub-Release trees, and this repo's seam answers in its own [`README.md`](releases/README.md) | [`RELEASES-portable.md`](../plugins/dkj-policy/RELEASES-portable.md) |
 
 In this repo the portable pages resolve as relative links because this is the plugin's **source**; in a
 consumer they live in the plugin install instead, which is why the consumer version of this page (the
@@ -68,7 +68,7 @@ default — that is an answer, not an omission.
 ## Where the rest lives
 
 - The document a branch works in, its four phases and the three step marks:
-  [`DEVELOPMENT-portable.md`](../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md).
+  [`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md).
   **This repo keeps no local half of it** (Dave, August 23, 2026), which is the one place the portable/local
   split is not followed, and deliberately: that page was `branch/README.md`, and once the two branch files
   merged its prose would have had to be reproduced byte-for-byte by a *portable* formatter inside every
@@ -84,7 +84,7 @@ default — that is an answer, not an omission.
   that runs — the plugin ships no `scripts/lint/` — so there, the document is the only statement of its own
   shape. That is also why the guidance lives inside it.
 - The cycle as a portable page, with the seams named:
-  [`CONTRIBUTING-portable.md`](../plugins/workflows/dkj-policy/CONTRIBUTING-portable.md) — and the
+  [`CONTRIBUTING-portable.md`](../plugins/dkj-policy/CONTRIBUTING-portable.md) — and the
   reason the split exists at all is
   [inbound #566](https://github.com/DaveKJohn/claude-code-specialists/issues/566), from a consumer who tried to
   adopt this page and measured why it could not be done.

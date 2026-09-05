@@ -80,7 +80,7 @@ entries rather than off which section they sit in.
   *checkout* and says nothing about *merge*, which is where the collision lives — every merge to `main` left
   every **other** open PR conflicting on that one path, and a conflicting PR gets no check suite at all, so
   it could never go green and could never merge. The measurement is in
-  [`DEVELOPMENT-portable.md`](../../../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
+  [`DEVELOPMENT-portable.md`](../../../plugins/dkj-policy/DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
 - **The fold takes that section, not the file** (August 23, 2026). It splits at the DEPLOY heading and
   leaves the plan where it is; publishing somebody's ticked checkboxes as a change description is exactly
   what that boundary prevents.
@@ -128,7 +128,7 @@ entries rather than off which section they sit in.
 #### Entry format
 
 **The format, the filename rule (including why a `-v2` suffix breaks the auto-delete), and the `##`-in-a-
-body trap are all in the portable [`fold-changelog` skill](../../../plugins/workflows/dkj-policy/skills/fold-changelog/SKILL.md)** —
+body trap are all in the portable [`fold-changelog` skill](../../../plugins/dkj-policy/skills/fold-changelog/SKILL.md)** —
 they are properties of the shared scripts, so a consumer meets them identically. Local instances worth
 keeping: the `##` trap was seen in **v2.13.2**, where a body's two subheadings came out looking like two
 extra release categories next to `## Fixes`, and it is the same
@@ -161,7 +161,7 @@ description while building; ownership of the entry mechanism stays Rendall's.
    (`fold: <branch> changelog (#NN)`) and pushes, in one step. **The `-Commit`/`-Push`
    opt-in, the path-scoped commit, the "check you are really on `main`" guard against
    `gh pr merge --delete-branch`, and the always-fold-with-`-Branch` rule for working from two machines
-   are all in the portable [`fold-changelog` skill](../../../plugins/workflows/dkj-policy/skills/fold-changelog/SKILL.md)** —
+   are all in the portable [`fold-changelog` skill](../../../plugins/dkj-policy/skills/fold-changelog/SKILL.md)** —
    properties of the shared script, met identically by any consumer. Measured here on July 16, 2026 (the
    stranded checkout) and PRs #46/#47 (the two-machine collision), and the flags arrived August 2, 2026
    after four hand-typed fold commits in one session. Repo-specific half: this fold commit runs under
@@ -211,7 +211,7 @@ Never inline the development notes regardless: `gh release create`'s body has a 
 `<X.Y.Z>.md` and an asset's name is its basename, so two of them collide. The mechanism (including why
 `gh`'s `file#label` syntax does not solve it) is in the `cut-release` skill's step 5, portable, with the
 failing request that proves it. Measured here at `v3.3.0`. See
-[RELEASES-portable.md](../../../plugins/workflows/dkj-policy/RELEASES-portable.md#cutting-a-release)
+[RELEASES-portable.md](../../../plugins/dkj-policy/RELEASES-portable.md#cutting-a-release)
 for the full mechanics. The
 `version` in each
 `.claude-plugin/plugin.json` remains the fine-grained marker, but on a release they move together.
@@ -384,7 +384,7 @@ and nothing about being post-tag causing friction.
 and written in anyway. This lens, the one place Rendall would actually look, was the one that never said it.
 
 **Rendall notes the clock before he starts.** Step 0a of the
-[`cut-release` skill](../../../plugins/workflows/dkj-policy/skills/cut-release/SKILL.md) asks for the
+[`cut-release` skill](../../../plugins/dkj-policy/skills/cut-release/SKILL.md) asks for the
 end-to-end duration — from before the cut to the published Release — written into the release document's
 organisational section. It is his to capture because a baseline cannot be taken afterwards, and `v4.3.0` is
 the instance: a whole cycle aimed at the thirty-minute release, improved it, and left no post-change figure
@@ -461,7 +461,7 @@ committed, and only then is picked up by the consuming repos.
 **A milestone release: `-SummaryFile <path>`.** The mechanics — that the file normally lives outside the
 repo, that a missing or empty one is a hard stop, that its links are left exactly as authored, and the rule
 to say plainly whether anything breaks — are in the portable
-[`cut-release` skill](../../../plugins/workflows/dkj-policy/skills/cut-release/SKILL.md#a-milestone-release---summaryfile).
+[`cut-release` skill](../../../plugins/dkj-policy/skills/cut-release/SKILL.md#a-milestone-release---summaryfile).
 The local instance behind that last rule: **the seam, the largest change in 2.x, broke nothing** — it is
 backward compatible by construction, every reader accepts the old layouts — so a `major` bump here can be
 one a consumer needs to do nothing about, and the summary has to say so or they sit on an old version
@@ -784,7 +784,7 @@ fifty-one pull requests in ten days"** (our effort, not their outcome), carried 
 lint check we measured and declined (tier-0 material in a tier-2 document), used in-house vocabulary
 (*"against the tree they describe"*), had to tell the reader to skip to the bottom for the useful part,
 and linked them into the development notes. The seven tests are in the
-[`cut-release` skill](../../../plugins/workflows/dkj-policy/skills/cut-release/SKILL.md) — the portable
+[`cut-release` skill](../../../plugins/dkj-policy/skills/cut-release/SKILL.md) — the portable
 half, so a consumer receives them — each one carried by what a named dev-tool changelog actually does.
 
 **The split between prose and gate was measured, not assumed, and that is the transferable part.**

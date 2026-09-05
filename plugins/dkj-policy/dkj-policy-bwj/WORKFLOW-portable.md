@@ -9,7 +9,7 @@ It is a layer on top of `dkj-policy`, not a replacement for it. It extends that
 workflow's **ticket-work step -- the layer before the branch** -- and changes nothing else:
 branch naming, what a change owes before a PR, and what a release is are still that workflow's
 answers. Read this page after
-[`dkj-policy`'s ticket-work section](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch),
+[`dkj-policy`'s ticket-work section](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch),
 which this one sharpens rather than repeats.
 
 **And "a layer on top" is a RANK, not a figure of speech.** Where a repo installs both plugins, this
@@ -20,10 +20,10 @@ to override `dkj-policy` itself.
 
 **The order is stated once, over there, and this line only names which rung this page sits on.** The
 binary choice a consumer actually makes is
-[Precedence -- full adoption, or none](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy/CONTRIBUTING-portable.md#precedence--full-adoption-or-none);
+[Precedence -- full adoption, or none](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#precedence--full-adoption-or-none);
 the ranking worked out in detail, what it is scoped to, and the corollary that actually keeps it (a
 consumer document may point at a shared law or answer a seam it names, but may not restate it) are in
-[A third rank sits above both](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy/CONTRIBUTING-portable.md#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379).
+[A third rank sits above both](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379).
 Read both there rather than here: a second copy of a rank order is exactly the restatement that
 corollary forbids.
 
@@ -80,7 +80,7 @@ it in every BWJ repo, which is a wider decision than these two.
 #### The `tier-1` label -- the reach axis, carried onto issues
 
 The label is the
-[tier model](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy/RELEASES-portable.md#the-tier-model)
+[tier model](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/RELEASES-portable.md#the-tier-model)
 applied to an issue instead of a changelog entry. Both BWJ repos answer `Get-ReleaseAudienceTier = 1`, so:
 
 - **`tier-1` present** -- management and the commissioner notice it.

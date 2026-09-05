@@ -38,8 +38,8 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\check-policy-drift.ps1'
-$Skill    = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\skills\check-policy-drift\SKILL.md'
-$Mirror   = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\scripts\task\check-policy-drift.ps1'
+$Skill    = Join-Path $RepoRoot 'plugins\dkj-policy\skills\check-policy-drift\SKILL.md'
+$Mirror   = Join-Path $RepoRoot 'plugins\dkj-policy\scripts\task\check-policy-drift.ps1'
 . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 
@@ -149,8 +149,8 @@ try {
 {
   "name": "fixture",
   "plugins": [
-    { "name": "dkj-policy", "source": "./plugins/workflows/dkj-policy" },
-    { "name": "dkj-policy-bwj", "source": "./plugins/workflows/dkj-policy-bwj" }
+    { "name": "dkj-policy", "source": "./plugins/dkj-policy" },
+    { "name": "dkj-policy-bwj", "source": "./plugins/dkj-policy/dkj-policy-bwj" }
   ]
 }
 '@

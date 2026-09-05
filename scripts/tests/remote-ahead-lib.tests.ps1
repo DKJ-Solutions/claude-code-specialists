@@ -240,8 +240,8 @@ try {
         $mirText = [System.IO.File]::ReadAllText($rPair[0].MirrorPath)
         Assert-Equal $srcText.Length $mirText.Length 'source and mirror are byte-identical in length'
     }
-    $mirrorNewBranchPath = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\scripts\task\new-branch.ps1'
-    $mirrorOpenPrPath    = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\scripts\release\open-pr.ps1'
+    $mirrorNewBranchPath = Join-Path $RepoRoot 'plugins\dkj-policy\scripts\task\new-branch.ps1'
+    $mirrorOpenPrPath    = Join-Path $RepoRoot 'plugins\dkj-policy\scripts\release\open-pr.ps1'
     Assert-True (Test-Path -LiteralPath $mirrorNewBranchPath) 'the mirrored new-branch.ps1 exists'
     Assert-True (Test-Path -LiteralPath $mirrorOpenPrPath) 'the mirrored open-pr.ps1 exists'
     if ((Test-Path -LiteralPath $mirrorNewBranchPath) -and (Test-Path -LiteralPath $mirrorOpenPrPath)) {

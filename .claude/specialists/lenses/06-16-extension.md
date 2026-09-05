@@ -143,8 +143,8 @@ Both stay as they are; what follows is the note that was missing.
   day it was written down) lives with the code, in `branch-info.ps1`, which is also the one place that
   admits the count can no longer be reproduced.
 - **The "81 of 89" tier measurement**, in both
-  [`RELEASES-portable.md`](../../../plugins/workflows/dkj-policy/RELEASES-portable.md) and
-  [`CONTRIBUTING-portable.md`](../../../plugins/workflows/dkj-policy/CONTRIBUTING-portable.md).
+  [`RELEASES-portable.md`](../../../plugins/dkj-policy/RELEASES-portable.md) and
+  [`CONTRIBUTING-portable.md`](../../../plugins/dkj-policy/CONTRIBUTING-portable.md).
   This one is the weaker case and is recorded as such: it is a portable-vs-portable pair, both shipped,
   both hand-maintained, and it is a *number* rather than a rule — so a re-measurement has to be applied
   twice, which is exactly the failure the rule above says to avoid. It stays because the two documents

@@ -9,6 +9,18 @@ a repo has until it chooses this one is its own way of working, which it never s
 specialists come from [the teams](https://github.com/DaveKJohn/claude-code-specialists/tree/main/). Enabling this without `team-alpha` gives you skills with
 nobody to invoke them.
 
+**This folder is the government, and its ministries sit inside it.** `dkj-policy` is the prime ministry:
+its own files are at this root, and a ministry — a deliberately narrow layer extending one step of the
+cycle for one set of repos — is a sub-directory beside them, the way
+[`dkj-policy-bwj/`](dkj-policy-bwj/) is. A ministry is a separate published plugin with its own manifest
+and its own opt-in, so it is never enabled by enabling this one; nesting states the rank order, not a
+bundle. Until September 5, 2026 this directory was `plugins/workflows/` and carried a README of its own
+about the *kind*; that page is folded into this one, and what remains of it — the naming and directory
+rule the lint gate enforces — is one level up in
+[`../README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/README.md),
+beside the same rule for teams
+([#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467)).
+
 ## What it is, in one paragraph
 
 A branch is never entry-less: creating one writes the two files it works in — a changelog entry and a step
@@ -61,6 +73,8 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`hooks/`](hooks/) | read-only SessionStart checks that never block, all belonging to running this across several repos — among them `connector-sessioncheck`, `script-contract-sessioncheck`, `consumer-prose-sessioncheck` (your own always-on prose contradicting this workflow — two detectors over one corpus read once, since #1421: a convention this workflow has renamed, still stated as current, #1389, and your own `CLAUDE.md` declared the winner over this workflow's contributing layer, inverting the rank order, #1415) — plus one **Stop** hook that acts rather than reports: `cycle-autopark` pushes the branch's `<branch>.md` to `origin` after every turn, until a PR publishes it (#900). **The set is deliberately not counted here**: this cell said "two" and went stale twice inside two days, and [`hooks/hooks.json`](hooks/hooks.json) is the one place that cannot |
 | [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-config` skill |
 | [`templates/`](templates/) | the one file in this cycle that has to be **copied** rather than imported: `pull_request_template.md`. GitHub reads a PR template only from `.github/` in your own repo, so what ships here is the reference to copy and to diff against — see the [`open-pr` skill](skills/open-pr/SKILL.md) for the one promise it makes: the placeholder line |
+
+| [`dkj-policy-bwj/`](dkj-policy-bwj/) | **not this plugin's payload — a ministry under it.** BWJ's codex: the binding rules its two Shopify store repos (smartwatchbanden, xoxowildhearts) operate under, in two chapters. **Ticket handling** — file on GitHub first, mirror to Asana as a colleague-friendly variant; closing the GitHub issue only makes a CI template post that the work is ready to test and move the card to `ReadyToTest`, and never resolves the task itself. **The sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead ([#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382)). Two skills, no specialists, no hooks. Separately published and separately enabled; it has [its own README](dkj-policy-bwj/README.md) |
 
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
@@ -147,6 +161,14 @@ placeholder overrides a documented fallback that is usually right; absent beats 
 
 ## One workflow, and no guard on it any more
 
+**There is no default workflow, and that is the answer rather than a gap.** A sibling plugin,
+`workflow-default`, described as *"the workflow a repo gets when it has not chosen one"*, existed until
+August 26, 2026; removing it was Dave's call on a simple reading. **A consuming repo already has its own
+way of working before any plugin is installed** — its contributing rules, its branch conventions, its
+release steps, written by whoever runs it. A plugin asserting itself as the *default* method claims a
+slot that was never empty. So the honest shape is one opt-in and no baseline: enable nothing here and
+you keep exactly what you had, which is what you wanted.
+
 **Two enabled workflow plugins would hand the specialists two contradicting answers to the same
 question** — how a branch is named, what a change owes before it can open a PR, what a release is — with
 nothing in the session saying which one is this repo's. That was not hypothetical while a second one
@@ -177,6 +199,7 @@ stay; the skills and scripts that read them stop.
 
 ## Enabling it
 
-Part of the adoption path in [`../../INSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/);
-[`../../UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/) is the mirror. It requires the core team `team-alpha`, which
-every consuming repo enables anyway.
+Part of the adoption path in [`INSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/);
+[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/) is the mirror. It requires the core team `team-alpha`, which
+every consuming repo enables anyway. Enabling or disabling it is an ordinary plugin change rather than a
+migration, and there is no second one to switch between: the two directions are **on** and **off**.

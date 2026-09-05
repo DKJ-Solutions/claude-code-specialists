@@ -43,7 +43,7 @@ pointed at are enforced by the ruleset and by CI — but a first-time contributo
 **The cycle itself is described once, with the plugin**, naming the *seam* wherever a repo owns the answer
 instead of asserting one repo's answer as the rule:
 
-📄 **[The contribution cycle — the portable half](../plugins/workflows/dkj-policy/CONTRIBUTING-portable.md)**
+📄 **[The contribution cycle — the portable half](../plugins/dkj-policy/CONTRIBUTING-portable.md)**
 
 Read that first. **This page is this repo's set of answers to it, arranged as the five steps work actually
 moves through** (Dave, [#894](https://github.com/DaveKJohn/claude-code-specialists/issues/894)). That
@@ -101,7 +101,7 @@ built** — that is the standing agreement, and it is what keeps the discovery i
 of inside it.
 
 **The rules are portable and travel with this plugin**, as this step's own section in
-[`CONTRIBUTING-portable.md`](../plugins/workflows/dkj-policy/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch):
+[`CONTRIBUTING-portable.md`](../plugins/dkj-policy/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch):
 where the provenance boundary between a copied field and our own judgement sits, how to tell a gap from a
 notice, why six kinds of question are not gaps, and what the log carries. **They were a page of their own,
 `TICKETWORK-portable.md`, until August 30, 2026** — the portable cycle began at the branch, so the rules for
@@ -163,7 +163,7 @@ an assignee is somebody's. The tracker is the only thing two sessions share, so 
 indistinguishable from an untouched one, which is how the same repair gets built twice and discovered at the
 merge. A claim with no branch and no recent activity is a question for Dave rather than a locked door.
 
-**The step that performs it is [`claim-issue`](../plugins/workflows/dkj-policy/skills/claim-issue/SKILL.md)**, and it exists because this
+**The step that performs it is [`claim-issue`](../plugins/dkj-policy/skills/claim-issue/SKILL.md)**, and it exists because this
 rule was written down for as long as the workflow has and enforced by nothing — `gh issue edit <n>
 --add-assignee @me`, left to a session to remember, to type, and to read the result of. Measured here on
 September 5, 2026 ([#1456](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1456)): **0 of 67**
@@ -172,7 +172,7 @@ repo. That report's own corrective action was *behavioural*; the skill is what m
 does the three things the one-liner cannot — it never sends `@me` (see below), it **refuses on a closed
 issue**, which `--add-assignee` claims silently, and it **refuses one somebody else holds**, which
 `--add-assignee` joins. It writes one assignee and nothing else: the branch stays
-[`new-branch`](../plugins/workflows/dkj-policy/skills/new-branch/SKILL.md)'s, one step later.
+[`new-branch`](../plugins/dkj-policy/skills/new-branch/SKILL.md)'s, one step later.
 
 **`@me` writes whichever account `gh` holds, which is not always the one your commits will name.** It
 resolves through the GitHub API, while the branch a second session correlates the claim with carries the
@@ -227,7 +227,7 @@ collided on *merge*: every merge to `main` left every other open PR conflicting 
 gets **no check suite at all** — so `lint-en-tests` could never go green and the PR could never merge. The
 full measurement, including why the fold is not the fix and why a `.gitattributes` merge strategy would not
 have worked either, is in
-[`DEVELOPMENT-portable.md`](../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
+[`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
 **Nothing identifies a document by its filename**, then or now: the fold and all four gates read the branch
 out of the document's own heading, which is what keeps a `-v2` suffix free.
 
@@ -237,7 +237,7 @@ under whichever of the four owns it, and everything between the title and `### P
 guidance. No gate reads a heading, so both are conventions a writer keeps — measured the day they were
 stated: `check-branch-entry.ps1` gives byte-identical output at four headings and at five. Recorded, with
 that measurement, in
-[`DEVELOPMENT-portable.md`](../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md).
+[`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md).
 
 **Pick the prefix by what actually changes**, not by which files move along: `docs/` is purely text, `feat/`
 is a capability that is new or larger than it was, even when documentation comes with it.
@@ -265,7 +265,7 @@ the last word is a prediction, and a hand-typed number is the honest form.
 editor tracking what it last read refuses the next write until it has read again — one read fixes it and
 nothing is lost. The fold no longer joins that list: it removes the document rather than rewriting it, so
 there is nothing left to re-read. The portable statement, with the measurement, is in
-[`DEVELOPMENT-portable.md`](../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md#the-file-is-written-under-you-once-per-cycle).
+[`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md#the-file-is-written-under-you-once-per-cycle).
 
 **The HTML comments are the form, not somebody's notes.** They say what a good answer looks like, and the fold
 strips them on the way to `CHANGELOG.md`, so leaving one standing is not a defect. There is no template beside
@@ -358,7 +358,7 @@ lanes, and the harness killed two runs of it for running out of memory. `-MaxPar
 and forwarded by `ship-pr.ps1` — runs them **smaller** instead of not at all, so the branch still carries a
 measurement. `-MaxParallel 4` passed the same 68 suites in 888s against the default's 716s: 24% slower, and
 it finishes. The numbers, and why the default was deliberately left alone, are on the
-[`open-pr` skill page](../plugins/workflows/dkj-policy/skills/open-pr/SKILL.md#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
+[`open-pr` skill page](../plugins/dkj-policy/skills/open-pr/SKILL.md#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
 
 Its own number because the three gates below fire *here*, at the push, and because what it publishes is fixed
 at this moment: 3.2 is what it puts in the body, and 3.2.4 locks that body against later edits to the
@@ -373,7 +373,7 @@ own workflow gates on the label would otherwise go green on a label that says no
 label, the prefix, the seam file and the labels that do exist. Measured in a consumer on September 1, 2026
 (inbound [#1221](https://github.com/DaveKJohn/claude-code-specialists/issues/1221)), where two labels were
 deleted org-wide because the issue **type** now carries that classification — the seam table was correct the
-day before. Full mechanics on the [`open-pr` skill page](../plugins/workflows/dkj-policy/skills/open-pr/SKILL.md#the-label-gate-does-the-label-your-seam-names-still-exist).
+day before. Full mechanics on the [`open-pr` skill page](../plugins/dkj-policy/skills/open-pr/SKILL.md#the-label-gate-does-the-label-your-seam-names-still-exist).
 
 ### 3.2. Copy the last DEPLOY into the PR
 
@@ -391,7 +391,7 @@ filled-in working copy, pushed the empty scaffold, published the filled-in body,
 It commits that one file and nothing else — never `git add -A`, and anything else you had staged stays
 staged. Why it commits rather than refusing, and why neither the dirty-tree warning nor the backing gate
 covered it, are on the
-[`open-pr` skill page](../plugins/workflows/dkj-policy/skills/open-pr/SKILL.md#the-document-commit-what-the-pr-says-is-what-the-branch-carries).
+[`open-pr` skill page](../plugins/dkj-policy/skills/open-pr/SKILL.md#the-document-commit-what-the-pr-says-is-what-the-branch-carries).
 
 #### 3.2.1. the scaffold gate, on the changelog entry itself
 
@@ -642,7 +642,7 @@ at 73 merged PRs in a week is **9h 45m** of session time.
 
 **The condition is not optional, because step 5 checks out `main` in this tree.** So the next move after
 backgrounding a ship is either a **lane** —
-[`worktree-lane.ps1 -Name`](../plugins/workflows/dkj-policy/skills/worktree-lane/SKILL.md), the
+[`worktree-lane.ps1 -Name`](../plugins/dkj-policy/skills/worktree-lane/SKILL.md), the
 worktree is where you build and the primary checkout is where you ship — or nothing at all. A close-out that
 reads *"PR #N opened, shipping in the background"* is a finished assignment, not an open point. Anything else
 started in the primary gets `HEAD` pulled out from under it mid-branch, which is the hazard the two gates in
@@ -811,8 +811,8 @@ additionally needs ten minors in the current major line. In code that is one lin
 The audience of each release document follows the **tier**, not the bump, which is what keeps that looser rule
 honest: a tier-1-only minor writes the internal note and no consumer document, so nobody outside is handed a
 document about work they cannot see. Full model:
-[the tier model](../plugins/workflows/dkj-policy/RELEASES-portable.md#the-tier-model) and
-[what a release must earn](../plugins/workflows/dkj-policy/RELEASES-portable.md#what-a-release-must-earn).
+[the tier model](../plugins/dkj-policy/RELEASES-portable.md#the-tier-model) and
+[what a release must earn](../plugins/dkj-policy/RELEASES-portable.md#what-a-release-must-earn).
 
 ### 4.2. Cut the `## [Unreleased]` section out of the changelog
 
@@ -910,7 +910,7 @@ and had to stop.
 prose is never rewritten. **What that protects is a line that was TRUE when it was published** — going stale
 afterwards is the record working. A line that was **false when it was written** is not protected by it, and
 correcting one restores the record rather than breaking it; the rule, and how to mark the correction, is in
-[`RELEASES-portable.md`](../plugins/workflows/dkj-policy/RELEASES-portable.md#once-it-has-landed-it-is-a-published-record--and-that-protects-only-what-was-true).
+[`RELEASES-portable.md`](../plugins/dkj-policy/RELEASES-portable.md#once-it-has-landed-it-is-a-published-record--and-that-protects-only-what-was-true).
 **The worked example is one sentence carried across two adjacent notes**: the publication item in `4.10.0.md`
 was true at its merge and overtaken an hour later — stale, deliberately untouched — while `4.11.0.md` inherited
 it, updated the count without re-reading the target, and was therefore false on arrival and is corrected. That
@@ -939,7 +939,7 @@ stage whose push can **fail or be partial** — no locking on the target, third 
 per-file rather than wholesale push — runs the push *first* and makes the cut its documented closing act,
 because cutting first strands a tag, a Release and an audience document on a state no customer ever saw.
 The condition, and why it is prose rather than a seam, are in
-[`cut-release/SKILL.md`](../plugins/workflows/dkj-policy/skills/cut-release/SKILL.md).
+[`cut-release/SKILL.md`](../plugins/dkj-policy/skills/cut-release/SKILL.md).
 Such a repo's checklist stops **before** 4.1 rather than at 4.7; nothing else about steps 4.1–4.6 changes.
 Here the question does not arise, because `Get-LiveStage` is empty.
 

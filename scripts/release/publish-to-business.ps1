@@ -40,8 +40,10 @@
     source repo's scripts/repo-config.ps1 names the plugins that travel; -Plugins overrides it, and an
     absent or empty answer means "all of them", which is what this script did before the seam existed.
     Excluded plugin folders are pruned after the copy and the manifest is rebuilt to match, so the two
-    cannot disagree. A kind-directory left with no plugin in it (plugins/workflows/ and its README) is
-    removed whole rather than published as a page describing plugins that are not there.
+    cannot disagree. A kind-directory left with no plugin in it (plugins/teams/ and its README) is
+    removed whole rather than published as a page describing plugins that are not there. It read
+    plugins/workflows/ until #1467 renamed that directory to plugins/dkj-policy/, which is a plugin root
+    rather than a kind directory and is therefore pruned as a plugin.
 
     THAT NOW ALSO GOVERNS agent-shared/, and it is the one behaviour the August 17, 2026 move changed.
     While that folder sat directly under plugins/ it was in no kind-directory, so it travelled on every
@@ -414,8 +416,17 @@ function Select-PublishedPlugins {
     }
 
     # Which directories under plugins/ hold a plugin at all, measured BEFORE pruning. Afterwards, one
-    # that has been emptied of plugins is removed whole: plugins/workflows/ carries its own README
-    # about the workflows, and a page describing plugins that are not there is worse than no page.
+    # that has been emptied of plugins is removed whole: a kind directory carries its own README about
+    # what is in it, and a page describing plugins that are not there is worse than no page. It named
+    # plugins/workflows/ until #1467; plugins/teams/ is the one such directory left, since
+    # plugins/dkj-policy/ is a plugin root in its own right and is pruned by the loop above instead.
+    #
+    # ONE RISK THE NESTING ADDS, NAMED RATHER THAN GUARDED. Dropping 'dkj-policy' removes
+    # plugins/dkj-policy/ recursively and takes the ministry nested inside it along, even if
+    # 'dkj-policy-bwj' is in $keep. That combination is incoherent -- a ministry requires its prime
+    # ministry -- and Assert-MarketplaceIntegrity below throws on it by name, loudly, because the kept
+    # source no longer resolves. So it cannot ship a silently broken tree, which is where a guard would
+    # earn its place; build one the day it actually happens.
     $pluginsRoot = Join-Path $Root 'plugins'
     $kindDirs = @()
     if (Test-Path -LiteralPath $pluginsRoot -PathType Container) {

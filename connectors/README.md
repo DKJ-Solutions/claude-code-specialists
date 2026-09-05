@@ -180,8 +180,8 @@ structural path difference.
 ## The session check (automatic)
 
 The **`dkj-policy`** plugin carries a **SessionStart hook**
-([`hooks/hooks.json`](../plugins/workflows/dkj-policy/hooks/hooks.json) +
-[`connector-sessioncheck.ps1`](../plugins/workflows/dkj-policy/hooks/connector-sessioncheck.ps1)) that, when a
+([`hooks/hooks.json`](../plugins/dkj-policy/hooks/hooks.json) +
+[`connector-sessioncheck.ps1`](../plugins/dkj-policy/hooks/connector-sessioncheck.ps1)) that, when a
 session starts, locates the workshop checkout and runs the connectors check there.
 
 **It moved out of the core on August 8, 2026, and the reason is what this register is.** The check

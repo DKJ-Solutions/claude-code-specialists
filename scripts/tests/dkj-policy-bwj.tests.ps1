@@ -15,7 +15,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$PluginRoot = Join-Path $RepoRoot 'plugins\workflows\dkj-policy-bwj'
+$PluginRoot = Join-Path $RepoRoot 'plugins\dkj-policy\dkj-policy-bwj'
 
 $script:pass = 0
 $script:fail = 0
@@ -74,7 +74,7 @@ Write-Host "`n-- marketplace --" -ForegroundColor Cyan
 $marketplace = Get-Content -LiteralPath (Join-Path $RepoRoot '.claude-plugin\marketplace.json') -Raw | ConvertFrom-Json
 $entry = $marketplace.plugins | Where-Object { $_.name -eq 'dkj-policy-bwj' }
 Assert-True ($null -ne $entry) 'dkj-policy-bwj is listed in marketplace.json'
-Assert-Equal './plugins/workflows/dkj-policy-bwj' $entry.source 'marketplace source points at the plugin folder'
+Assert-Equal './plugins/dkj-policy/dkj-policy-bwj' $entry.source 'marketplace source points at the plugin folder'
 
 $alphaManifest = Get-Content -LiteralPath (Join-Path $RepoRoot 'plugins\teams\team-alpha\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
 Assert-Equal $alphaManifest.version $manifest.version 'version is in lockstep with team-alpha'

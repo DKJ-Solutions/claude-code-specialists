@@ -70,8 +70,12 @@ infrastructure.
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
   runs before a release. **Check 23, `[plugin-kind]`, added August 9, 2026, and its reason was replaced on
   August 26, 2026 rather than left standing:** every published plugin must be `team-*` under
-  `plugins/teams/` or `workflow-*` under `plugins/workflows/`, and a name carrying neither prefix is an
-  error rather than a style note. It used to have teeth because the core team's `workflow-sessioncheck`
+  `plugins/teams/` or a way of working by name, and a name carrying neither shape is an
+  error rather than a style note. Since
+  [#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) only `*-policy` /
+  `*-policy-*` still carry a directory rule on the workflow side — `plugins/dkj-policy/`, the government,
+  with the prime ministry at its root and each ministry a level inside it; `workflow-*`,
+  `contributing-*` and `*-codex` are accepted by name and held to no location. It used to have teeth because the core team's `workflow-sessioncheck`
   hook decided what counted as a workflow by that prefix alone — that hook was retired with
   `workflow-default` under [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886), so the
   borrowed justification is gone. **What replaced it is internal to the check and stronger for it:** the
@@ -848,7 +852,7 @@ authorship for him in consumers that never granted it.
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
   `plugins/teams/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
-  `plugins/workflows/dkj-policy/` (everything branch- and release-shaped). Three things to
+  `plugins/dkj-policy/` (everything branch- and release-shaped). Three things to
   know before touching it:
   - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
     both used to look for a script's documenting page at a hardcoded `plugins\teams\team-alpha\skills\…`,
@@ -1311,7 +1315,7 @@ the prefix checklist: **5 of their 60 PRs ticked two rows and 2 ticked none**, w
 **The template's shape is shipped, and the placeholder list moved so a gate could reach it** (same
 issue). `.github/pull_request_template.md` cannot live in the plugin — GitHub reads it only from that
 path in the consumer's own repo — so what ships is a reference to copy and diff against, at
-`plugins/workflows/dkj-policy/templates/pull_request_template.md`, held byte for byte to
+`plugins/dkj-policy/templates/pull_request_template.md`, held byte for byte to
 `Get-PrTemplateReference`. The three recognised placeholder strings were three literals inside
 `open-pr.ps1`, which meant **nothing outside that script could read them**: the reference could not be
 held against the list that has to recognise it, and that gap is the defect the issue reported. They now

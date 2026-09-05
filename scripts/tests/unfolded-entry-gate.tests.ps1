@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\lint\check-unfolded-entry.ps1'
-$Hook     = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\hooks\unfolded-entry-sessioncheck.ps1'
+$Hook     = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\unfolded-entry-sessioncheck.ps1'
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 
 $script:pass  = 0

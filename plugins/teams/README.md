@@ -1,7 +1,7 @@
 # The teams — who the specialists are
 
 **Every plugin in this directory is a team: a set of specialists a repo can enable.** Its sibling
-[`../workflows/`](../workflows/) holds the other kind of plugin, which answers a different question —
+[`../dkj-policy/`](../dkj-policy/) holds the other kind of plugin, which answers a different question —
 not *who* the specialists are, but *how* work moves through the repo. That split is the organising
 idea behind both directories: it is put side by side one level up, in
 [`../README.md`](../README.md), and argued in full in the root README under
@@ -28,15 +28,20 @@ invisible, since nobody reads both pages in one sitting.
 `team-alpha` is the foundation and belongs in every consuming repo. Each further team **adds
 specialists**, so enabling two of them raises no conflict — a Shopify store repo that is also a
 commercial webshop legitimately enables `team-shopify` and `team-ecomm` alongside the core. That is
-the property that separates this directory from `../workflows/`, where **at most one** plugin may be
-enabled at a time: a team hands the repo more colleagues, while a workflow hands it an answer to a
-question that can only have one.
+the property that separates this directory from `../dkj-policy/`: a team hands the repo more
+colleagues, while a workflow hands it an answer to a question that can only have one.
+
+**That used to read "where **at most one** plugin may be enabled at a time", and it had been false
+twice over.** [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) retired the check
+that counted enabled workflows, and `dkj-policy-bwj` has been a second enabled one since August 31,
+2026 — additive rather than competing, which is why it is safe. The distinction the sentence exists to
+draw survives: stacking teams is *free*, while a second way of working has to be shown not to answer a
+question the first one already answers.
 
 ## The name is load-bearing, and so is sitting here
 
-A team is named `team-<name>` and lives under `plugins/teams/`; a workflow is named
-`workflow-<name>` and lives under `plugins/workflows/`. Since August 9, 2026 that pairing is checked
-rather than merely conventional — lint check 23 (`[plugin-kind]`) in
+A team is named `team-<name>` and lives under `plugins/teams/`. Since August 9, 2026 that pairing is
+checked rather than merely conventional — lint check 23 (`[plugin-kind]`) in
 [`check-plugin-integrity.ps1`](../../scripts/lint/check-plugin-integrity.ps1) holds every published
 plugin to it.
 
@@ -45,8 +50,17 @@ core team's `workflow-sessioncheck` hook counted enabled workflows **by the `wor
 nothing else**, so a plugin whose name did not say which kind it was would be invisible to that count.
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) retired that hook along with
 `workflow-default`, and the naming rule kept its teeth on a reason of its own: **the directory half is
-derived from the name.** A plugin matching neither prefix is held to no location rule at all, so an
-unprefixed name switches the check off for itself rather than merely reading untidily.
+derived from the name.** A plugin matching no known shape is held to no location rule at all, so an
+unclassifiable name switches the check off for itself rather than merely reading untidily.
+
+**The other side of that pairing is no longer symmetrical, and this page used to claim it was.** It read
+*"a workflow is named `workflow-<name>` and lives under `plugins/workflows/`"*; since
+[#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) that directory is
+`plugins/dkj-policy/` and names the **government** rather than the kind, so only `*-policy` and
+`*-policy-*` are held to a location there. `workflow-*`, `contributing-*` and `*-codex` are still
+accepted as names and held to no directory at all. The teams' half is untouched — which is exactly why
+it is worth saying here, on the page a reader consults precisely because they assume the two halves
+match.
 
 ## What a team folder holds
 

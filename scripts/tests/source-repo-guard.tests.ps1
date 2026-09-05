@@ -91,7 +91,7 @@ try {
     Write-Host 'The in-repo plugin mirror is NOT refused' -ForegroundColor Cyan
     # Lint check 8 holds this byte-identical to the source, so running it is not the staleness the guard is
     # about. Refusing it would also make the drift lint's own fixtures unrunnable.
-    $mirror = Join-Path $src 'plugins\workflows\dkj-policy\scripts\task\park-branch.ps1'
+    $mirror = Join-Path $src 'plugins\dkj-policy\scripts\task\park-branch.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $mirror) -Force | Out-Null
     Set-Content -LiteralPath $mirror -Value '# in-repo mirror' -Encoding UTF8
     Assert-Equal $null (Get-OwnCopyPath -ScriptPath $mirror -RepoRoot $src) 'the mirror inside the repo is allowed'

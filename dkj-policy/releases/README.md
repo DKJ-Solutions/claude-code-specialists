@@ -4,7 +4,7 @@ Releases in this repo are cut by the shared release workflow: the tier model, wh
 the release documents, and how one is cut. **That process is not this repo's own** — it is what the
 `dkj-policy` plugin does, in every repo that enables it, and it is described once, with the plugin:
 
-📄 **[Releases — the portable half](../../plugins/workflows/dkj-policy/RELEASES-portable.md)**
+📄 **[Releases — the portable half](../../plugins/dkj-policy/RELEASES-portable.md)**
 
 Read that first. **This page is this repo's set of answers to it**: the seam values in force here, the
 local decisions, and the measured instances behind the portable rules.
@@ -46,7 +46,7 @@ measurement lives.
 
 > **To an agent setting this workflow up in another repo:** do not copy this page's process half — there
 > is none any more. The process ships with the plugin as
-> [`RELEASES-portable.md`](../../plugins/workflows/dkj-policy/RELEASES-portable.md) and stays current
+> [`RELEASES-portable.md`](../../plugins/dkj-policy/RELEASES-portable.md) and stays current
 > through plugin updates, which is exactly what a hand-maintained mirror cannot do (two consumers measured
 > that cost before this split — inbound #646). Your own `dkj-policy/releases/README.md` (the
 > `adopt-workflow-folder` skill scaffolds it) holds only what this section holds: a pointer to the
@@ -127,7 +127,7 @@ attachment list is the development notes alone.
 **The notes are also readable as one hosted page** (Dave, August 15, 2026). `build-release-notes-page.ps1`
 builds every document under `audience/` into one page with a picker per release; the portable half — what
 the page is, why it is generated rather than edited, and what hosting it decides — is in
-[`RELEASES-portable.md`](../../plugins/workflows/dkj-policy/RELEASES-portable.md#giving-that-note-a-reader-shaped-home--the-release-notes-page).
+[`RELEASES-portable.md`](../../plugins/dkj-policy/RELEASES-portable.md#giving-that-note-a-reader-shaped-home--the-release-notes-page).
 This repo's answers:
 
 | | |

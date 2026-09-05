@@ -104,7 +104,7 @@ land on it.
   project, via the project's own `custom_field_settings` -- sitting in the same workspace as the board
   is not enough to guarantee that -- so a task created in a project that does not carry the field can
   never carry a `Prio-Score`, and the sweep of
-  [step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
+  [step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
   then reaches only the tickets *imported from* the board
   ([#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213),
   [#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386)).
@@ -122,7 +122,7 @@ custom field's name alongside its value -- no GID needed. Creating a task and se
 custom fields in the same call is the opposite direction: the `create task` call addresses a custom
 field by its GID, which Asana Field settings shows on the field's own page, in the URL. **The same
 per-project constraint
-[step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
+[step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
 already states for `Prio-Score` applies here too** -- an Asana custom field only becomes usable once it
 has been *added to* a project via that project's own `custom_field_settings`, and definition in the
 right workspace is not enough to guarantee that, so this GID has to come from a field that is actually
@@ -223,7 +223,7 @@ existing BWJ repos.
 ## 5 -- check the board's sections are numbered
 
 The stage model of
-[step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy-bwj/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
+[step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
 reads a card's stage off the **number its section's name starts with**, and takes the *meaning* of
 each number from `Get-AsanaStageMap`. **This step is where both halves are established, and it comes
 before step 2's proposal can be written** -- read the sections of the project and report them:
@@ -278,7 +278,7 @@ the model reads a stale column -- which looks exactly like a board that works.
 ## 6 -- point the repo's governance at the rule
 
 Add a line to the repo's `CLAUDE.md` (or a repo lens) pointing at
-`~/.claude/plugins/marketplaces/claude-code-specialists/plugins/workflows/dkj-policy-bwj/WORKFLOW-portable.md`
+`~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md`
 so a session reads the BWJ ticket rule the same way it reads the other portable pages.
 
 ## 7 -- scaffold the sync-log folder (chapter two)

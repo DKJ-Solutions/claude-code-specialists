@@ -202,7 +202,7 @@ function Get-OwnCopyPath {
     # 3. The same path below 'scripts', taken from the RUNNING script rather than passed in by each caller
     #    -- a per-caller string is one rename away from pointing at the wrong file, and it would be a
     #    string no test reads. The LAST 'scripts' segment is the right one: a mirror path carries two
-    #    ('plugins\workflows\<p>\scripts\task\x.ps1'), and the one that matters is the innermost.
+    #    ('scripts\plugins\dkj-policy\scripts\task\x.ps1'), and the one that matters is the innermost.
     $parts = $scriptFull -split '[\\/]+'
     $idx = -1
     for ($i = 0; $i -lt $parts.Count; $i++) {
