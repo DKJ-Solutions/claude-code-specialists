@@ -31,3 +31,50 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: fix/1445-reminder-install-route · 20260905-181831
+
+`cut-release`'s closing self-consumption reminder no longer prints a command that cannot run in the repo it
+is printed for. It used to read `.claude/settings.json` and emit
+`claude plugin update <id> --scope project` for every enabled plugin -- but `enabledPlugins` is the
+**declarative** route while `plugin update` operates on an **install record**, so in a repo adopted that way
+the very source the reminder consulted was the one guaranteeing the command it printed would refuse. Measured
+here immediately after the v4.30.0 cut: the refresh succeeded, both update commands answered
+`Plugin "..." is not installed`.
+
+It now asks the install administration which of the two routes each enabled plugin actually took, through the
+shared `Test-PluginInstalledHere` rather than a second private reader, and prints per plugin: an id with a
+record for this path keeps its update command, an id without one is named under the marketplace refresh --
+which is its whole remedy, a restart being what applies it. Both routes were measured rather than reasoned
+about, because the report flagged the second as inferred and the repair differed per answer; the finding that
+settled the shape is that `claude plugin install --scope project` writes the **same** `enabledPlugins` key the
+declarative route uses, so the two are indistinguishable from settings and detection had to come from
+elsewhere. Where the administration is absent or unreadable the old line is printed unchanged -- absence of
+evidence is not evidence of absence, and that default is inherited from the shared predicate rather than
+re-decided.
+
+The reminder's premise, its conditionality and its 2026-08-15 reasoning are untouched: this is the remedy it
+names, not the reason it exists.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo that cuts its own releases with this plugin gets the same correction, and it matters most
+for the adoption route `INSTALL.md` does *not* document -- settings keys without an install. Such a repo used
+to end every cut with a hard failure against a machine that was in fact fully up to date, with no way to tell
+that from a real one. A repo adopted the documented way (`claude plugin install --scope project`) sees no
+change at all: it has a record, so it still gets its update command.
+
+**Score:** 2
+
+#### Pull Request
+
+Self-consumption reminder: only print an update command the repo's adoption route can run
+
+Plugins: dkj-policy
+
+[PR #1448](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1448)
+
+---
+
