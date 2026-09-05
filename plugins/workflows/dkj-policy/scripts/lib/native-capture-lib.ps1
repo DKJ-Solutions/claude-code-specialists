@@ -99,6 +99,19 @@ $script:NativeCaptureNetworkTimeoutSeconds = 120
 # real verdict -- but a caller who needs certainty reads TimedOut instead of the number.
 $script:NativeCaptureTimeoutExitCode = 124
 
+# THE LINE ABOVE WHICH Invoke-TestSuiteGate WARNS ABOUT RESIDENT powershell.exe PROCESSES (issue #1464,
+# September 5, 2026). A harness-killed gate run does not reap the Start-Process children it already
+# started, so they outlive it -- and an immediate retry can be OOM-killed too, even with -MaxParallel
+# set correctly, because the retry's own budget assumed memory a prior run's orphans were still
+# holding. Measured on one machine: 5 processes at rest, 28 orphaned after one kill.
+# THE NUMBER IS A HEURISTIC, NOT A DIAGNOSIS, and it is picked to sit between two measured bands rather
+# than at either one: this file's own SHARDING notes put a legitimately busy run at 16-18 concurrent
+# lanes, and the orphan count above put a fouled one at 28+. 20 clears the first with margin and sits
+# under the second, but a false positive on an unusually wide dev box costs one line of noise -- this
+# is Write-Warning, never a gate failure -- and a false negative just misses one chance to explain a
+# kill that would otherwise look like "the machine is slow today".
+$script:ResidentPowerShellWarnThreshold = 20
+
 function Format-GateSeconds {
     <#
         The elapsed-seconds figure Invoke-TestSuiteGate prints, FORMATTED INVARIANTLY -- and that is not
@@ -682,6 +695,32 @@ function Get-TestSuiteShardOrder {
 }
 
 
+function Get-ResidentPowerShellCount {
+    <#
+        The number of powershell.exe processes on this MACHINE right now (this repo's gate targets
+        Windows PowerShell 5.1 -- see this file's header). Split out from Invoke-TestSuiteGate as its
+        own function for exactly one reason: OS-wide process state is not something a test fixture can
+        set up, but a plain function can be shadowed by redefining it after this file is dot-sourced --
+        the same seam Get-TestCommands above already relies on for the same purpose.
+
+        Returns 0 rather than throwing when Get-Process itself refuses (not a case this repo has hit --
+        the caller uses this figure to WARN, and a diagnostic that can fail the run it is only trying
+        to comment on would be worse than no diagnostic at all).
+
+        WHY A COUNT AND A WARNING, AND NOT A REAP (issue #1464). The issue that asked for this named two
+        heavier options -- track and reap spawned PIDs on the gate's own exit paths, or run the lanes
+        inside a Windows job object so the tree dies with the parent by construction -- and declined to
+        propose either from inside a report. Both are real changes to Invoke-TestSuiteGate's spawn model,
+        for a hazard that is namable far more cheaply than it is fixable: this function is the cheap half,
+        landed on its own rather than waiting on a rewrite neither this fix nor that issue commits to.
+    #>
+    try {
+        return @(Get-Process -Name 'powershell' -ErrorAction Stop).Count
+    } catch {
+        return 0
+    }
+}
+
 function Invoke-TestSuiteGate {
     <#
         Runs every *.tests.ps1 in $TestsDir as a child process and returns $true when they all passed.
@@ -708,6 +747,17 @@ function Invoke-TestSuiteGate {
         NOT -SkipTests AWARE. The caller owns the escape valve, because the two differ: open-pr's is
         -SkipTests, the cut's is its own flag, and a lib that knew about either would be reaching into its
         callers' parameter sets.
+
+        A KILLED RUN'S CHILDREN OUTLIVE IT, AND THE NEXT RUN CANNOT SEE THAT -- issue #1464, September 5,
+        2026. Start-Process children are never tracked past this function's own $running list, which lives
+        in memory this process loses the moment something kills it -- a harness OOM-kill, most measured --
+        so nothing here ever reaps them. An immediate retry can then be killed too, even with -MaxParallel
+        set correctly, because the retry's own memory budget assumed room a prior run's orphans were still
+        holding: measured as 28 orphaned processes and 1.7 GB free where -MaxParallel alone reported nothing
+        wrong. This function does not reap anything -- see Get-ResidentPowerShellCount above for why a
+        warning is what shipped and a job-object rewrite of the spawn model did not. It prints one line
+        naming the resident count when it looks anomalous, so the NEXT kill reads as "something is still
+        draining" instead of "the machine got slower".
 
         THE REPO'S OWN TEST COMMANDS RUN HERE TOO (inbound #644, August 13, 2026). The gate globbed
         scripts\tests\*.tests.ps1 and nothing else, while both callers describe it as "all test suites
@@ -919,6 +969,18 @@ function Invoke-TestSuiteGate {
     }
     if ($ShardCount -gt 0 -and ($Shard -lt 1 -or $Shard -gt $ShardCount)) {
         throw "Invoke-TestSuiteGate: -Shard must be between 1 and -ShardCount ($ShardCount) -- got $Shard."
+    }
+
+    # ADVISORY ONLY, AND CHECKED BEFORE THIS RUN ADDS A SINGLE CHILD OF ITS OWN (issue #1464). See
+    # $script:ResidentPowerShellWarnThreshold and Get-ResidentPowerShellCount above for the numbers and
+    # the reasoning; this never blocks the run, because a resident count says nothing about whose
+    # processes they are or whether they are about to exit on their own -- it only names what a silent
+    # kill would not have: that the number was already unusual before this run started.
+    $residentPowerShell = Get-ResidentPowerShellCount
+    if ($residentPowerShell -gt $script:ResidentPowerShellWarnThreshold) {
+        Write-Warning ("test gate: $residentPowerShell powershell processes already resident before " +
+            "this run started -- a recent gate may still be draining; consider waiting or lowering " +
+            "-MaxParallel.")
     }
 
     # The repo's own extra test commands (inbound #644) -- read via Get-Command like every other optional
