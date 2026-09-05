@@ -736,14 +736,32 @@ function Wait-CheckRegistration {
 #
 # WHAT IS DELIBERATELY NOT CLAIMED HERE is that clearing the context is safe while quitting is not. It
 # follows from the ancestry -- the process hangs off claude.exe, not off the conversation -- but it was not
-# measured, and a line telling a reader which of two things they may do has to be right about both. So the
-# invitation states what is still HELD and leaves the choice to the reader.
+# measured, and a line telling a reader which of two things they may do has to be right about both.
+#
+# AND THE INVITATION NO LONGER NEEDS THAT MEASUREMENT, because the reader's real question was never "may I
+# clear?" but "how do I get on with the next thing?" (Dave, September 5, 2026, on #1428). A SECOND TERMINAL
+# answers it without asking anything of this process: this one stays alive, so the merge and the fold
+# complete AND the completion lands in a conversation that still exists -- the vanished-notification half
+# of #1428, solved rather than mitigated. Naming only what is unsafe was itself the defect: a line that
+# withholds a clearance and offers nothing in its place cancels backgrounding at the one place the reader
+# actually reads it, which is how "nothing here needs the session" came to BLOCK the very workflow it was
+# written to enable.
+#
+# THE TIMING RULE IS WHY THIS LINE CARRIES IT, and it is the whole rule. Step 1 is the one step that reads
+# the WORKING TREE, so this checkout is single-occupancy for its minute or more (#1145; measured on PR
+# #1144, one suite of 55 red inside the gate and green standalone on the same commit seconds later).
+# Everything from step 2b down reads refs and the PR instead, deliberately. So THIS line -- printed the
+# moment step 1 is over, read by the reader who is about to act on it -- is the go-ahead, and no separate
+# instruction has to be remembered. The lane keeps the two sessions off one HEAD entirely and is detached
+# at origin/<trunk> rather than standing on it, so it does not take the trunk away from step 5's fold
+# either (#1069).
 $waitBegan = Get-Date
 Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor Cyan
 Write-Host "  Nothing here needs YOU -- background this run and the wait costs nothing." -ForegroundColor DarkGray
 Write-Host "  It does need this session's process: the merge and the fold are still owed, and both run from here (#1428)." -ForegroundColor DarkGray
-Write-Host "  Step 2b has already put this tree where a finished chain leaves it, so the close-out is honest (#1073)." -ForegroundColor DarkGray
-Write-Host "  The next piece of work still belongs in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
+Write-Host "  So leave this one running and carry on in a SECOND terminal -- do not quit the harness." -ForegroundColor DarkGray
+Write-Host "  This line is the go-ahead: step 1 is over, the tree is free (#1145), and step 2b already put it back on the trunk (#1073)." -ForegroundColor DarkGray
+Write-Host "  Open that second terminal in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
 # The wait itself is Wait-CheckRegistration (defined above), so the watch loop below can re-enter the
 # SAME wait when `--watch` starts before the checks register (#1350). $maxWaitSec stays a script
 # variable because that re-entry passes it, and $waited carries the seconds already spent so the 180s

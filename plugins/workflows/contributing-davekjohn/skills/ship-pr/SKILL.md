@@ -215,6 +215,40 @@ not consider. So the printed invitation says *"nothing here needs **you**"* and 
 *"nothing here needs the session"* for nine days, and a close-out inherited that as a conditional clearance
 the owner could not read.
 
+#### And what the owner MAY do is a second terminal — say that, not only what is unsafe
+
+**Withholding a clearance and offering nothing in its place is the worse half of the same defect.** Dave,
+September 5, 2026, on what he was actually after: *"Een PR-ship duurt soms 10 minuten. Ik wil niet zitten
+wachten."* The point of backgrounding is to get on with the next issue, and a line that only says *"do not
+quit"* leaves the reader holding a session he no longer wants and cannot safely release. **A second
+terminal beside this one answers it and asks nothing of the process:** terminal 1 stays alive, so the merge
+and the fold complete *and* the completion notification lands in a conversation that still exists — the
+vanished-outcome problem solved rather than mitigated; terminal 2 carries the next issue, so nobody waits.
+
+**One timing rule, and the ship prints its own go-ahead.** Step 1 is the only step that reads the **working
+tree**, so this checkout is single-occupancy while its lint gate and suites walk it — measured on
+[PR #1144](https://github.com/DaveKJohn/claude-code-specialists/pull/1144), one suite of 55 red inside the
+gate and green standalone on the same commit seconds later
+([#1145](https://github.com/DaveKJohn/claude-code-specialists/issues/1145)). Everything from step 2b down
+reads refs and the PR instead, deliberately, which is what lets the tree go home before the CI wait. So:
+
+> Wait for terminal 1 to print `ship-pr: waiting for the CI check(s) on PR #N`. That line means step 1 is
+> over and the tree is free. Then open terminal 2 **in a lane** — `worktree-lane.ps1 -Name <name>` — a
+> separate directory, so the two sessions stop sharing a `HEAD` at all.
+
+A lane is detached at `origin/<trunk>` rather than standing on it, so it does not take the trunk away from
+step 5's fold either ([#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069)).
+
+**And the two sessions share nothing but the tracker**, which is the orchestrator's standing rule and it
+bites hardest here: terminal 2 cannot see terminal 1's branch or intent, and under one account the assignee
+cannot name the machine. So claim the issue before working it — and **read** the claim as well as write it.
+
+**What is still not measured, and no longer needs to be:** whether a `/clear` leaves the backgrounded run
+alive. It follows from the ancestry — the process hangs off `claude.exe`, not off the conversation — and
+nobody has cleared a context mid-ship to confirm it. The second terminal removes the reason to: it frees the
+*person* rather than the *session*, so the unmeasured row stops being load-bearing. Until somebody measures
+it, no document claims either answer.
+
 ### And stopping now leaves the checkout on the trunk ([#1073](https://github.com/DaveKJohn/claude-code-specialists/issues/1073))
 
 **That second move used to be only half true**, and the missing half is the one the owner reads. The

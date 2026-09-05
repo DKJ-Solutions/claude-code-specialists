@@ -197,6 +197,15 @@ something is genuinely in flight, **name what it still holds** instead of hangin
 clearance: what is owed is a fact, which is what a receipt carries, and a condition is a question, which is
 what a receipt must not be.
 
+**And say what they MAY do, because withholding is the worse half.** A requester who backgrounded a wait
+wants the *next* thing, so a receipt that only names what is unsafe leaves them holding a session they no
+longer want and cannot safely release — that is the feature cancelled at the one place they read. The
+answer is almost never a clearance: **a second session beside the running one** frees the person instead of
+the process, and it is strictly better, because the one still running is where the outcome gets delivered.
+Name the moment it is safe to open — normally the point at which the running work stops reading the working
+copy — and remember that two sessions share nothing but the tracker, so the claim above is what keeps the
+second one off the first one's work.
+
 ## Core improvements — the inbound route
 
 If Chris (or a specialist) discovers, during the work, improvements to the **shared core** of the

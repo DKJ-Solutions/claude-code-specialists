@@ -38,12 +38,22 @@ close-out did not offer a clearance it could not keep, it **withheld** one he wa
 is three moves -- background the ship, `/clear`, start the next issue -- so the repair has to say
 *positively* that a `/clear` is safe, not merely stop promising anything.
 
-**That is blocked on a measurement nobody has taken**: whether a `/clear` leaves the backgrounded run
-alive. The ancestry rules out quitting the harness and says nothing about `/clear`. The probe is set up and
-needs one deliberate `/clear` from Dave; the protocol is in the issue.
+**The first half of that landed while the positive half was blocked on a measurement nobody had taken**:
+whether a `/clear` leaves the backgrounded run alive. The ancestry rules out quitting the harness and says
+nothing about `/clear`.
 
-**What is on this branch is the half that stands regardless** -- the false line, the measured ancestry, and
-the bound on the parking rule. The positive half waits for the measurement rather than guessing at it.
+**That measurement is no longer load-bearing, and the branch is finished without it** (Dave, on the issue,
+September 5, 2026): *"ik kan in VSC gewoon meerdere terminalen openen met claude"*. A **second terminal**
+answers the real question -- how to get on with the next issue -- without asking anything of the process.
+Terminal 1 stays alive, so the merge and the fold complete **and** the completion notification lands in a
+conversation that still exists; terminal 2 carries the next issue, so nobody waits. That dissolves both open
+steps at once: the positive statement stops depending on the `/clear` row, and the vanished-notification
+blocker stops needing one of its four options.
+
+**One timing rule comes with it**, and the ship already prints its own go-ahead: step 1 is the only step
+that reads the working tree, so this checkout is single-occupancy for that minute (#1145, measured on
+PR #1144). `ship-pr: waiting for the CI check(s) on PR #N` is therefore the line that says the tree is
+free -- read at exactly the moment the reader is about to act on it.
 
 ### CREATE
 
@@ -56,14 +66,24 @@ the bound on the parking rule. The positive half waits for the measurement rathe
 - [x] Chris's persona body: bound the parking justification to a PARKED branch, and say "cleared"
       precisely and never conditionally.
 - [x] `ship-pr` skill page: *"stop" is not "quit"*, with the ancestry and the fold named.
-- [ ] BLOCKED ON THE MEASUREMENT: say it positively. Once the probe answers, the printed line and
-      Chris's close-out rule state that a `/clear` is safe during a ship and that quitting Claude Code
-      or closing the terminal is not. Naming only what is unsafe is what the corrected issue rejects.
-- [ ] BLOCKED ON DAVE: the vanished notification. Even if the process survives, the completion lands
-      in a conversation that no longer exists, so the outcome reaches nobody. Four options are in the
-      issue and the choice is his.
+- [x] SAY IT POSITIVELY, and without the measurement. `ship-pr.ps1` prints what the reader MAY do --
+      leave this one running, carry on in a SECOND terminal, open it in a lane -- and names this very
+      line as the go-ahead, because step 1 is the only step that reads the working tree.
+- [x] `ship-pr.ps1`: the comment block records why a second terminal replaces the `/clear` question
+      rather than answering it, and the #1145 timing rule that makes this line the right place for it.
+- [x] Chris's persona body: *say what they MAY do*, portable -- a second session beside the running one
+      frees the person rather than the process, and the running one is where the outcome is delivered.
+- [x] `ship-pr` skill page: the second-terminal route in full -- the timing rule quoted as the line to
+      wait for, the lane, the tracker claim between two sessions, and what stays unmeasured.
+- [x] Rebuild the plugin mirror again after those edits.
+- [~] The vanished notification, shapes 1-3 -- dropped: the second terminal solves it rather than
+      mitigating it, because terminal 1 is still there when the completion lands. The four options stay
+      on the issue for a reader who has no second terminal; none is built here.
 - [~] Shape 4 -- revisiting the detached watcher declined in #985 -- dropped here: repo-settings-
       adjacent, and the issue names it as Dave's.
+- [~] The `/clear` probe -- dropped: it was set up on another machine, and this session's two attempts
+      to re-run it were refused by the harness's auto-mode classifier. Nothing here claims either
+      answer, which is what the issue asks for while it is unmeasured.
 
 ### TEST
 
@@ -74,6 +94,12 @@ the bound on the parking rule. The positive half waits for the measurement rathe
 - [x] `ship-pr.ps1` parses clean after the edit (`[Parser]::ParseFile`, 0 errors).
 - [x] `check-plugin-integrity.ps1` green: 0 errors across all 30 checks. The suites are `open-pr`'s own
       gate and run at the push, so they are not a step here.
+- [x] The single-occupancy claim re-verified before it was printed as advice: `ship-pr.ps1`'s own step
+      list and `open-pr.ps1:161` both state it, and PR #1144 is the measurement behind it. So the
+      printed go-ahead names a rule the script already documents rather than a new one.
+- [x] `worktree-lane.ps1 -Name` verified to exist as printed, and the lane's detached-at-`origin/<trunk>`
+      property (#1069) re-read before it was cited as the reason it does not disturb step 5's fold.
+- [x] Re-run after the second round of edits: parse 0 errors, lint 0 errors across all 30 checks.
 
 ### DEPLOY: fix/1428-ship-invitation-honest
 
@@ -81,10 +107,16 @@ the bound on the parking rule. The positive half waits for the measurement rathe
 is exactly what it needs. The run is not detached — that was declined on purpose in #985, because a
 detached watcher would merge and fold onto the trunk with nobody reading the output — so it is a child
 process of the harness and dies with it, with two commits still owed. The invitation now says *"nothing
-here needs **you**"* and names what it holds, and the comment block carries the measured ancestry beside
-the decline it contradicts. It also records what is deliberately not claimed: that clearing the context is
-safe while quitting is not follows from the ancestry but was never measured, and a line telling a reader
-which of two things they may do has to be right about both.
+here needs **you**"*, names what it holds, and — the half that matters more — **says what you may do
+instead of only what you may not**: leave this one running and carry on in a second terminal, opened in a
+lane. Withholding a clearance and offering nothing in its place cancels backgrounding at the one place the
+reader reads it, which is how a line written to free the session came to block the workflow it was for.
+
+The go-ahead is printed rather than remembered: step 1 is the only step that reads the working tree, so
+`ship-pr: waiting for the CI check(s) on PR #N` is itself the signal that the checkout is free (#1145,
+measured on PR #1144). The `/clear` question is deliberately left unanswered — the process hangs off
+`claude.exe` rather than off the conversation, but nobody has measured it, and a second terminal removes
+the reason to.
 
 **Score:** 3
 
@@ -96,7 +128,11 @@ to a *parked* branch — where the branch, its plan and the pull request genuine
 "cleared" is now said precisely and never conditionally, because *"the session can be cleared once the
 ship lands"* is shape A with a string attached. The failure being prevented is narrow and real: a quit
 between the merge and the fold strands the branch's document on the trunk, which is #1270's defect by a
-route #1270 did not consider. It costs ~1.5 KB on the always-on persona path.
+route #1270 did not consider. And the persona now carries the positive half too, portably: a requester who
+backgrounded a wait wants the *next* thing, so the answer is a second session beside the running one rather
+than a clearance of it — strictly better, because the one still running is where the outcome gets
+delivered. Two sessions share nothing but the tracker, so the claim rule already in that body is what keeps
+the second one off the first one's work. It costs ~2.2 KB on the always-on persona path.
 
 **Score:** 3
 
