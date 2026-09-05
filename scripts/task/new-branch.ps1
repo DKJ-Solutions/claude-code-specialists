@@ -126,17 +126,40 @@
     from a doc, a lens or a habit would otherwise fail on a parameter that is no longer there. It prints
     one line saying so, and -NoPush is the switch that now changes something.
 
+.PARAMETER Resolves
+    (Optional) the issue number(s) this branch is being cut to fix, as a string: -Resolves '331,332' (a
+    leading '#' and whitespace/semicolon separators are also accepted; ConvertTo-IssueNumberList parses
+    it). NOT a declaration open-pr.ps1 will read later -- that gate takes its own -Resolves, separately,
+    when the PR opens.
+
+    WHAT THIS BUYS (issue #1409, the gap #1282 left open). Get-TargetIssueWarnings already runs at
+    open-pr time, which is the LAST step -- a warning there has nothing left to save, because the branch,
+    its commits, its reviews and its test runs are already spent. Passed here, the same check runs BEFORE
+    the checkout, so a branch cut to fix an issue another PR already closed is caught before any of that
+    cost is paid. Same shape as the stale-base check above: it WARNS and does not refuse -- a shared
+    number, a reopened issue, or a rival PR abandoned mid-flight must not wedge a real branch -- and it is
+    printed twice, here and as the last line of the run, for the same reason the stale-base warning is.
+
+    NARROWS THE WINDOW RATHER THAN CLOSING IT. It only ever sees what -Resolves is given; an issue decided
+    later, or only named in -Intent text, is invisible to it -- there is no PR body yet to scan. And it
+    needs `gh` and a readable repo name (scripts\repo-config.ps1's Get-RepoName): where either is missing,
+    it says so and is skipped, exactly like every other optional gh call in this workflow.
+
 .EXAMPLE
     ./scripts/task/new-branch.ps1 -Name feat/new-plugin -Title "New domain plugin"
 
 .EXAMPLE
     ./scripts/task/new-branch.ps1 -Name feat/spotify-dashboard -Title "Spotify dashboard" -Intent "Skeleton + routing done; next: wire the API client."
+
+.EXAMPLE
+    ./scripts/task/new-branch.ps1 -Name fix/1402-something -Title "Fix something" -Resolves 1402
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Name,
     [string]$Title = "",
     [string]$Intent = "",
+    [string]$Resolves = "",
     # Explicit override of the repo root, for a caller that creates the branch in a tree OTHER than
     # the one it is standing in -- worktree-lane.ps1 opening a lane is the case this exists for. Same
     # parameter, same reasoning and same name as fold-changelog-entry.ps1 has carried since #101.
@@ -189,6 +212,10 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 }
 . $branchInfoPath
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
+# THE ALREADY-DONE CHECK'S PURE HALF (issue #1409). Shared with the plugin mirror, like the two libs
+# beside it -- ConvertTo-IssueNumberList and Get-TargetIssueWarnings are what -Resolves below runs
+# against, before anything else in this script has read a single line of it.
+. (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
 # AND THE SEAM READER (inbound #967). The guidance this script writes into the document states WHERE a
 # relative link in the DEPLOY section has to resolve from, and that is the changelog's directory -- a seam,
 # not the repo root, since #914 made it isolate-by-default. Resolved in the script and passed in, the way
@@ -220,12 +247,21 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 # than scaffold prose: 'Chore' is a legitimate final value and can never be evidence of an unedited entry.
 $stubFallbackType = 'Chore'
 
+# THE ALREADY-DONE CHECK'S REPO NAME (issue #1409). Deliberately NOT $repoName: repo-config.ps1 backs
+# Get-RepoName with $script:RepoName, and at script top level a same-named local IS that script-scope
+# variable (PowerShell variable names are case-insensitive) -- exactly the $stubFallbackType /
+# $EntryFallbackType collision documented above, one function down. $ghRepoName cannot collide with it.
+$ghRepoName = ''
+
 $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $configPath) {
     try {
         . $configPath
         if (Get-Command Get-EntryFallbackType -ErrorAction SilentlyContinue) {
             $v = Get-EntryFallbackType; if ($v) { $stubFallbackType = $v }
+        }
+        if (Get-Command Get-RepoName -ErrorAction SilentlyContinue) {
+            $ghRepoName = Get-RepoName
         }
     } catch {
         Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- writing the development document with the built-in default wording."
@@ -441,6 +477,84 @@ if ($gap.Measured -and -not $resuming) {
     # one the unmeasurable branch above already wrote. Both sentences would be true and neither would be
     # wrong; two of them in a row just read as a script that has lost track of what it is answering.
     Write-Host "Base not compared: '$Name' already exists, so nothing is being cut from a base." -ForegroundColor DarkGray
+}
+
+# --- THE ALREADY-DONE CHECK, BEFORE HEAD MOVES (issue #1409, the gap #1282's own check left open) ---
+#
+# #1282 built Get-TargetIssueWarnings and wired it into open-pr.ps1 -- the LAST step of a branch's life,
+# after the checkout, the commits, the reviews and the test runs. #1409 measured what that costs: a
+# session claimed #1402 correctly (open, unassigned, claimed by name), cut a branch, wrote two commits, a
+# full development document and ran two subagent reviews plus 65 test suites, and only THEN learned from
+# open-pr's own warning that PR #1406 had already closed #1402 -- opened and merged in the seven minutes
+# after the claim. The claim step could not have caught it either: the other session had never assigned
+# itself, so an unassigned issue read as untouched rather than as someone else's live work.
+#
+# SAME MOVE AS THE STALE-BASE CHECK ABOVE, FOR THE SAME REASON: measure before the checkout, WARN and
+# never refuse (#1282's own call -- a shared number, a reopened issue, or an abandoned rival PR must not
+# wedge a real branch), and repeat the warning as the LAST line of the run, because the scaffold, the
+# commit and the push all print AFTER this point and would otherwise bury it exactly as the base warning
+# would have been.
+#
+# EXPLICIT -RESOLVES ONLY -- this narrows the window rather than closing it, as #1409 says of its own
+# proposal. There is no PR body yet to scan for a mention, so an issue only named in -Intent, or decided
+# after the branch is cut, is invisible here; that gap is unaddressed and may not be addressable.
+#
+# GH IS OPTIONAL, AND THIS IS THE ONLY PLACE IN THE SCRIPT THAT ASKS FOR IT. -Resolves is opt-in, so the
+# ordinary run -- no issue number given -- still asks nothing of gh and stays exactly as usable offline as
+# this script's own docstring promises for scripts\lib\branch-info.ps1.
+$alreadyDoneNote = ''
+$resolveList = @(ConvertTo-IssueNumberList -Value $Resolves)
+if ($resolveList.Count -gt 0) {
+    $targetList = ($resolveList | ForEach-Object { "#$_" }) -join ', '
+    if (-not $ghRepoName) {
+        Write-Warning "already-done check: scripts\repo-config.ps1 supplies no Get-RepoName -- the check for $targetList is skipped."
+    } else {
+        # OPEN ISSUES: the same query open-pr.ps1's Get-OpenIssueNumbers makes, inlined rather than
+        # shared -- that function is a closure over open-pr's own $repo and warning text, and the two
+        # callers differ in exactly those two things. --limit 1000, not 200: an issue past the page
+        # boundary would read as "not open" and let the check pass in silence, the one outcome this
+        # exists to prevent.
+        $openAll = $null
+        $openQuery = Invoke-NativeCapture -FilePath 'gh' -Arguments @('issue', 'list', '--repo', $ghRepoName, '--state', 'open', '--limit', '1000', '--json', 'number') -DiscardStderr
+        if ($openQuery.ExitCode -ne 0) {
+            Write-Warning "could not ask gh which issues are open (exit $($openQuery.ExitCode)) -- the already-done check for $targetList cannot check and will not block."
+        } else {
+            try {
+                # ASSIGN FIRST, WRAP SECOND -- Windows PowerShell 5.1 hands a parsed JSON array to the
+                # pipeline as ONE object; the same 5.1 trap this file's own header warns every caller of
+                # pr-issues-lib.ps1 about.
+                $parsedOpen = ($openQuery.Output -join "`n") | ConvertFrom-Json
+                $openAll = @(@($parsedOpen) | Where-Object { $_ -and $_.number } | ForEach-Object { [int]$_.number })
+            } catch {
+                $openAll = $null
+            }
+        }
+
+        # CLAIMING PRs: the same search open-pr.ps1 makes before the branch's OWN PR exists, so
+        # -CurrentBranch is $Name rather than a discovered head -- correct either way, since this branch
+        # cannot yet carry a PR of its own to exclude.
+        $otherPrsJson = ''
+        $searchTerms = (($resolveList | ForEach-Object { "$_" }) -join ' OR ') + ' in:body'
+        $prSearch = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'list', '--repo', $ghRepoName, '--state', 'all', '--search', $searchTerms, '--json', 'number,state,headRefName,body', '--limit', '60') -DiscardStderr
+        if ($prSearch.ExitCode -eq 0) {
+            $otherPrsJson = ($prSearch.Output -join "`n")
+        } else {
+            Write-Warning "could not ask gh whether another PR already resolves $targetList (exit $($prSearch.ExitCode)) -- the already-done check runs on issue state alone."
+        }
+
+        $doneWarnings = @(Get-TargetIssueWarnings -TargetIssues $resolveList -OpenIssues $openAll -OtherPrsJson $otherPrsJson -CurrentBranch $Name)
+        if ($doneWarnings.Count -gt 0) {
+            $parts = @()
+            foreach ($w in $doneWarnings) {
+                $says = @()
+                if ($w.IsClosed) { $says += 'is already CLOSED' }
+                foreach ($p in $w.ClaimingPrs) { $says += "is already resolved by PR #$($p.Number) ($($p.State.ToLowerInvariant()))" }
+                $parts += "issue #$($w.Issue) " + ($says -join ', and it ')
+            }
+            $alreadyDoneNote = "already-done check: " + ($parts -join '; ') + " -- this branch may repeat work that is already merged. If that is deliberate (a shared number, the issue reopened, cited only as context), nothing to do."
+            Write-Warning $alreadyDoneNote
+        }
+    }
 }
 
 # Note: Test-BranchName above only catches the explicitly named hard rejects (empty/'main'/
@@ -801,6 +915,13 @@ if ($NoPush) {
 # ends on a green 'created and checked out'.
 if ($staleBaseNote) {
     Write-Warning "$staleBaseNote Bring the base up to date (git pull --ff-only) or reopen this as a lane before you build on it."
+}
+
+# THE REPEAT, same reason and same shape as the stale-base repeat above (issue #1409): the already-done
+# check fires before HEAD moves, and everything since then -- the checkout, the scaffold, the commit, the
+# push -- prints in between and buries the first copy.
+if ($alreadyDoneNote) {
+    Write-Warning $alreadyDoneNote
 }
 
 exit 0
