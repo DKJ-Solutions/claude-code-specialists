@@ -32,6 +32,51 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1428-ship-invitation-honest · 20260905-115322
+
+`ship-pr` told you *"nothing here needs the session"* before it backgrounded the CI wait, and the session
+is exactly what it needs. The run is not detached — that was declined on purpose in #985, because a
+detached watcher would merge and fold onto the trunk with nobody reading the output — so it is a child
+process of the harness and dies with it, with two commits still owed. The invitation now says *"nothing
+here needs **you**"*, names what it holds, and — the half that matters more — **says what you may do
+instead of only what you may not**: leave this one running and carry on in a second terminal, opened in a
+lane. Withholding a clearance and offering nothing in its place cancels backgrounding at the one place the
+reader reads it, which is how a line written to free the session came to block the workflow it was for.
+
+The go-ahead is printed rather than remembered: step 1 is the only step that reads the working tree, so
+`ship-pr: waiting for the CI check(s) on PR #N` is itself the signal that the checkout is free (#1145,
+measured on PR #1144). The `/clear` question is deliberately left unanswered — the process hangs off
+`claude.exe` rather than off the conversation, but nobody has measured it, and a second terminal removes
+the reason to.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Consumers running `contributing-davekjohn` read that line on every ship, and the orchestrator's own rule
+is what their close-outs are written from. Both are corrected here: the parking justification is bounded
+to a *parked* branch — where the branch, its plan and the pull request genuinely outlive the session — and
+"cleared" is now said precisely and never conditionally, because *"the session can be cleared once the
+ship lands"* is shape A with a string attached. The failure being prevented is narrow and real: a quit
+between the merge and the fold strands the branch's document on the trunk, which is #1270's defect by a
+route #1270 did not consider. And the persona now carries the positive half too, portably: a requester who
+backgrounded a wait wants the *next* thing, so the answer is a second session beside the running one rather
+than a clearance of it — strictly better, because the one still running is where the outcome gets
+delivered. Two sessions share nothing but the tracker, so the claim rule already in that body is what keeps
+the second one off the first one's work. It costs ~2.2 KB on the always-on persona path.
+
+**Score:** 3
+
+#### Pull Request
+
+The backgrounded ship's invitation says what it actually holds
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1438](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1438)
+
+---
+
 ### DEPLOY: feat/1421-merge-consumer-prose-checks · 20260905-112316
 
 The two consumer-prose session checks are one check, one hook and one suite. They already shared their
