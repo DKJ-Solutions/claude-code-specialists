@@ -3,10 +3,11 @@ name: adopt-bwj-asana
 description: >-
   One-time setup of bwj-codex in a BWJ store repo (smartwatchbanden or xoxowildhearts): copy the
   asana-mirror CI mechanism into .github/, propose the Asana config seam for scripts/repo-config.ps1,
-  print the repo secret and variables the CI needs, check that the classification labels exist, and
-  report whether the board's sections are numbered so the stage model can read them. Strictly additive and dry-run by default; it
-  never overwrites an existing file, and it renames nothing on the board. Run this right after
-  enabling the plugin, or when report-issue reports the Asana config seam missing.
+  print the repo secret and variables the CI needs, check that the classification labels exist, report
+  whether the board's sections are numbered so the stage model can read them, and scaffold chapter
+  two's bwj-codex/SYNC-LOG.md with its masthead, ready for the first sync branch. Strictly additive and
+  dry-run by default; it never overwrites an existing file, and it renames nothing on the board. Run
+  this right after enabling the plugin, or when report-issue reports the Asana config seam missing.
 ---
 
 # adopt-bwj-asana -- place the CI mechanism and the config seam
@@ -278,6 +279,26 @@ the model reads a stale column -- which looks exactly like a board that works.
 Add a line to the repo's `CLAUDE.md` (or a repo lens) pointing at
 `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/workflows/bwj-codex/WORKFLOW-portable.md`
 so a session reads the BWJ ticket rule the same way it reads the other portable pages.
+
+## 7 -- scaffold the sync-log folder (chapter two)
+
+Chapter two's record needs somewhere to land before the first `sync/` branch ever runs. If
+`Get-ShopifySyncLogPath` is answered (propose it alongside the Asana seams in step 2, in the same
+`scripts/repo-config.ps1`, if it is not already) -- `'bwj-codex/SYNC-LOG.md'` in both store repos --
+create the file it names, with nothing in it but a masthead:
+
+```markdown
+# Sync log
+
+One entry per `sync/` branch, newest at the top. Written and committed by `sync-main.ps1` -- never
+folded into `CHANGELOG.md`, never read by a release.
+```
+
+**If the file already exists, leave it alone** -- the same rule step 1 uses for the CI mechanism: this
+only ever adds, never overwrites. `Add-SyncLogEntry` reads everything above the first `## ` line as the
+masthead and prepends new entries beneath it, so this is not a stub waiting to be replaced -- it is the
+permanent header the first real entry lands under. See
+[`SYNC-LOG-portable.md`](../../SYNC-LOG-portable.md) for the rule this scaffolds.
 
 ## What this skill does not do
 

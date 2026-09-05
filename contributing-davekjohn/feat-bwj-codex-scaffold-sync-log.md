@@ -33,19 +33,47 @@
 
 ### PLAN
 
+Dave asked for `bwj-codex`'s sync-log folder to be scaffolded at adopt time instead of appearing only
+on the first sync branch, with an empty file ready and waiting. This reverses the "nothing scaffolds
+it, deliberately" reasoning `SYNC-LOG-portable.md` shipped on September 1, 2026 -- but that reasoning's
+own premise (an empty file is ambiguous between "no sync yet" and "adoption never happened") stops
+holding once scaffolding becomes an unconditional part of adoption rather than an optional extra.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add a step to `adopt-bwj-asana/SKILL.md` that creates `bwj-codex/SYNC-LOG.md` with a masthead
+      (no entries), leaving an existing file untouched -- mirrors step 1's "stop, do not overwrite" rule
+- [x] Update `SYNC-LOG-portable.md` ("Where the record lives", "Adopting it in a repo") to state the
+      new behaviour and why the reversal is safe rather than a re-introduction of the old ambiguity
+- [x] Update `bwj-codex/README.md`'s "Enabling it" section, which claimed chapter two needed no adopt
+      step and no skill
 
 ### TEST
 
+- [x] `scripts/lint/check-plugin-integrity.ps1` -- 0 errors (link-scan, skill-param and skill-command
+      checks all read the touched skill/doc pages)
+- [x] Confirmed no other file in the tree repeats the retired "nothing scaffolds it, deliberately" or
+      "no adopt step of its own" wording (`grep` over the repo)
+- [ ] Lint + tests green, then PR + merge + fold
+
 ### DEPLOY: feat/bwj-codex-scaffold-sync-log
 
-**Score:**
+`bwj-codex`'s `adopt-bwj-asana` skill now scaffolds `bwj-codex/SYNC-LOG.md` (masthead only, no
+entries) the moment the plugin is adopted, instead of leaving the file to appear on the first `sync/`
+branch. `SYNC-LOG-portable.md` and the plugin `README.md` are updated to match, including why the
+reversal removes the ambiguity the original design was written to avoid rather than reintroducing it.
+
+**Score:** 2 -- a documented behaviour change in one workflow plugin's adopt step; noticed by anyone
+who re-reads `SYNC-LOG-portable.md` or `adopt-bwj-asana`, nothing else in this repo depends on it.
 
 #### What makes this deploy extra special
 
-**Score:**
+A BWJ store repo (`smartwatchbanden` or `xoxowildhearts`) that runs `adopt-bwj-asana` after this ships
+gets `bwj-codex/SYNC-LOG.md` immediately, ready for the first sync branch, instead of only after it.
+Reaches exactly the two repos this plugin targets, and only at (re-)adopt time.
+
+**Score:** 2 -- small and non-breaking; a repo that already has the file (from a prior sync) sees no
+change at all, since the new step never overwrites an existing file.
 
 #### Pull Request
 
