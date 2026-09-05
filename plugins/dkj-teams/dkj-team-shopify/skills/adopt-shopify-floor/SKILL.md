@@ -44,7 +44,7 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
 
 | parameter | what it does |
 |---|---|
-| `-Apply` | write the files. Without it the command is a dry run that prints the plan and touches nothing -- the same default `adopt-config` and `adopt-workflow-folder` use. |
+| `-Apply` | write the files. Without it the command is a dry run that prints the plan and touches nothing -- the same default `adopt-config.ps1` and `adopt-workflow-folder.ps1` use. |
 | `-LiveThemeId` | the live theme's **numeric** id. Given, the seam function is written *answered* and the session check goes quiet because the guard is genuinely armed. Omitted, the block is written commented out and the check keeps reporting -- see below for why that is the right way round. Find the id with `shopify theme list --store <your-store>.myshopify.com`; it is the one marked `[live]`. |
 | `-StoreDomain` | the store the **pre-task sync** pulls from, e.g. `your-store.myshopify.com`. Given, `Get-ShopifyStoreDomain` is written *answered* and the [`sync-main`](../sync-main/SKILL.md) skill works on its first run. Omitted, it is written commented out like the theme id, and `sync-main` refuses rather than guessing which store to read. |
 
@@ -63,7 +63,7 @@ what is configurable.
 This is the one thing in here that looks like an oversight and is not. A stub returning `VUL-IN` would
 be **worse than no function at all**: the session check reads a non-empty answer as *answered*, so the
 stub would silence the report while the id half of rule 3 stayed exactly as inert as before -- a hole
-with a comment on it. `adopt-config` settled the same question the same way for the values only a repo
+with a comment on it. `adopt-config.ps1` settled the same question the same way for the values only a repo
 can decide, and for the same reason.
 
 So without `-LiveThemeId` the block lands as a paste-ready comment in the right file, with the command

@@ -46,6 +46,14 @@
     wrangler.toml beside it, in a 'page' directory next to the note root. None of the output belongs
     in version control -- it is a derivative of documents that are already tracked.
 
+    AND AN ABSENT wrangler.toml IS REPORTED RATHER THAN WRITTEN IN SILENCE. It shares the gitignored
+    page directory with the path token and is lost by the same mechanisms, so "it is not here" is as
+    likely to mean the directory was rebuilt from nothing as it is to mean a first run -- and the
+    fresh one carries none of what a consumer had edited into the old one (an account id, a custom
+    domain, a route). Reported, not refused: a first-ever deploy looks identical from here. Measured
+    on issue #1479, which found the write reporting itself in green during the very run that had
+    just restored a token belonging to an existing deployment.
+
     THE PATH TOKEN IS AN INPUT, NEVER INVENTED. The worker serves the page at /notes/<token> and
     that path is the only lock on it: no login, anyone with the link can read. So a token this
     script made up on the fly would not mean "a new path", it would mean "every link already sent
@@ -889,6 +897,14 @@ $workerPath = Join-Path $pageDir 'worker.js'
 # WRITTEN ONLY WHEN ABSENT. A consumer edits this file -- an account id, a custom domain, a route --
 # and regenerating it every run would silently discard that. A name that has drifted from the seam
 # is reported instead of corrected, because which of the two is wrong is not this script's to decide.
+#
+# AND THE ABSENT BRANCH IS THE ONE THAT REPORTS (issue #1479), because it is the only one that cannot
+# honour "never overwritten": there was nothing to overwrite. This file sits in the same gitignored
+# directory as the path token and is lost by the same mechanisms, so an absent one is as likely to
+# mean "the directory was rebuilt from nothing" as "first run here". Same shape as the -InitToken
+# note above -- reported, not refused, since a first-ever deploy looks identical from here. There is
+# deliberately NO second condition on it: -Worker has already refused an empty worker name, so
+# reaching this line IS the evidence that this repo hosts the page.
 $wranglerPath = Join-Path $pageDir 'wrangler.toml'
 if (-not (Test-Path -LiteralPath $wranglerPath -PathType Leaf)) {
     $wrangler = @"
@@ -902,7 +918,15 @@ workers_dev = true
 # here if you work across several accounts -- this file is written once and never overwritten.
 "@
     [System.IO.File]::WriteAllText($wranglerPath, $wrangler, $Utf8NoBom)
-    Write-Host "  wrangler : $wranglerPath (written -- it is yours from now on, never overwritten)" -ForegroundColor Green
+    Write-Host "  wrangler : $wranglerPath (written -- it is yours from now on, never overwritten)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  NOTE: it was ABSENT -- the one case here that cannot honour 'never overwritten', because" -ForegroundColor Yellow
+    Write-Host "  there was nothing to overwrite. Reaching this line means a worker name is configured" -ForegroundColor Yellow
+    Write-Host "  ('$($config.WorkerName)'), so a wrangler.toml may well have stood here and been lost with the" -ForegroundColor Yellow
+    Write-Host "  rest of this gitignored directory. Whatever it carried beyond the lines above -- an" -ForegroundColor Yellow
+    Write-Host "  account id, a custom domain, a route -- is NOT in this one, and nothing here remembers" -ForegroundColor Yellow
+    Write-Host "  what it said. Read it before you deploy: a first-ever deploy is the legitimate case and" -ForegroundColor Yellow
+    Write-Host "  looks identical from here, which is why this is a note and not a refusal." -ForegroundColor Yellow
 } else {
     $declared = [regex]::Match([System.IO.File]::ReadAllText($wranglerPath, [System.Text.Encoding]::UTF8), '(?m)^\s*name\s*=\s*"([^"]+)"')
     if ($declared.Success -and $declared.Groups[1].Value -ne $config.WorkerName) {

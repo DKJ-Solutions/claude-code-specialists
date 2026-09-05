@@ -32,6 +32,74 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1479-wrangler-toml-silent-write · 20260905-233824
+
+`build-release-notes-page.ps1 -Worker` no longer writes a fresh `wrangler.toml` in silence. That file
+shares the gitignored page directory with the path token and is lost by the same mechanisms, so an
+absent one is as likely to mean the directory was rebuilt from nothing as it is to mean a first run --
+and the generated replacement carries none of what a consumer had edited in (an account id, a custom
+domain, a route). The write now says so, in the same reported-not-refused shape as the `-InitToken`
+note, because a first-ever deploy looks identical from there. The one run that finds the file already
+present stays silent, so the note belongs to the write rather than to every build.
+
+The condition the report proposed -- gate the note on a non-empty `Get-ReleasePageWorkerName` -- is
+deliberately not there: `-Worker` already refuses an empty worker name above this line, so reaching the
+write is itself that evidence, and the comment says so to stop the no-op being added back as a
+tightening.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the reader of a release note is not the person running `-Worker` in their own checkout; this
+reaches whoever hosts the page, which is a maintainer.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report the fresh wrangler.toml write instead of passing it off as routine
+
+Plugins: dkj-policy
+
+[PR #1482](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1482)
+
+---
+
+### DEPLOY: docs/1477-retired-adopt-skill-names · 20260905-232622
+
+Five live pages still told a reader to invoke `adopt-config` or `adopt-workflow-folder` -- the two skills
+[#1471](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1471) merged into `adopt-dkj-policy`,
+deleting both `SKILL.md` pages. They now name the surviving skill and the part of it that does the work.
+Four of the seven lines were beyond what [#1477](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1477)
+listed, which said so in as many words: the class is wider than the lines it had measured.
+
+The third site the issue named, the registry entry in `scripts/lib/shared-scripts-lib.ps1`, is deliberately
+untouched. It was filed as inferred rather than measured, and reading the code collapses it: `Name` is the
+script's own filename and the field a gate resolves a documenting page from is `Skill`, which has read
+`adopt-dkj-policy` since the merge.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Both halves of the adoption path were wrong for a consumer: `INSTALL.md` step 4 named two skills their slash
+list does not hold, and the plugin's own README named a third one two screens below its skill table naming
+the right one. That is the first page a new consumer reads and the one moment a wrong skill name costs them
+a support round rather than a shrug.
+
+**Score:** 3
+
+#### Pull Request
+
+the live pages name adopt-dkj-policy, not the two skills it replaced
+
+Plugins: dkj-policy, team-shopify
+
+[PR #1481](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1481)
+
+---
+
 ### DEPLOY: docs/1467-rename-workflows-to-dkj-policy · 20260905-224147
 
 `plugins/workflows/` is `plugins/dkj-policy/`, and the prime ministry's own files sit at that root with

@@ -23,7 +23,9 @@
       6. the path token is an INPUT: -Worker refuses without one instead of inventing one, and
          -InitToken refuses to replace one. That refusal is the whole safety property, because an
          invented token means every link already sent 404s while everything reports success;
-      7. wrangler.toml is written once and never overwritten, since a consumer edits it.
+      7. wrangler.toml is written once and never overwritten, since a consumer edits it -- and the
+         one write that CANNOT honour that promise, because there was nothing there to overwrite,
+         says so instead of reporting itself as routine (issue #1479).
 
     Fixture paths carry $PID: the test gate is a throttled PARALLEL scheduler, so two runs at one
     fixed temp path tear down each other's tree mid-assert.
@@ -345,10 +347,18 @@ try {
     $wrangler = Join-Path $pageDir7 'wrangler.toml'
     Assert-True (Test-Path -LiteralPath $wrangler) 'wrangler: written on the first -Worker run'
     Assert-Match 'name = "fixture-release-notes"' ([System.IO.File]::ReadAllText($wrangler, [System.Text.Encoding]::UTF8)) 'wrangler: carries the seam name'
+
+    # The write is the one branch that cannot honour "never overwritten" -- there was nothing to
+    # overwrite -- and the file is lost by the same mechanisms as the token beside it, so it is
+    # reported rather than passed off as routine (issue #1479). $w2 is the run that wrote it.
+    Assert-Match 'may well have stood here' $w2.Out 'wrangler: the first write says the old file may have been lost, not just that a new one exists'
+    Assert-Match 'account id, a custom domain, a route' $w2.Out 'wrangler: and names what a lost one would have carried'
+    Assert-True (-not ($w1.Out -match 'may well have stood here')) 'wrangler: the refused run wrote no wrangler.toml and says nothing about one'
     [System.IO.File]::WriteAllText($wrangler, "name = `"fixture-release-notes`"`nmain = `"worker.js`"`n# EDITED BY HAND", $Utf8NoBom)
     $w5 = Invoke-Build -Root $r7 -ScriptArgs @('-Worker')
     Assert-Equal 0 $w5.Code 'wrangler: a later run succeeds'
     Assert-Match 'EDITED BY HAND' ([System.IO.File]::ReadAllText($wrangler, [System.Text.Encoding]::UTF8)) 'wrangler: a hand edit survives the rebuild'
+    Assert-True (-not ($w5.Out -match 'may well have stood here')) 'wrangler: and the note belongs to the WRITE -- a run that found the file says nothing'
 
     # A name that has drifted from the seam is reported rather than corrected: which of the two is
     # wrong is not the script's to decide.
