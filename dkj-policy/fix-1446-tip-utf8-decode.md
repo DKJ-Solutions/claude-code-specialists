@@ -66,6 +66,27 @@ where it previously saw three ordinary printable ones.
 which is [#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443)'s knob, on the
 branch that has to go second because this one unblocks the gate for it.
 
+**And the flag is load-bearing, which the run above does not by itself establish.** Two repairs landed
+together, so "the suite is green" is also what a test repair that quietly papers over the defect would
+produce. Three runs on a **cp850** console (`chcp 850`, ACP Windows-1252), each in a console of its own:
+
+| tree under test | result |
+|---|---|
+| `main` at `40d3755a` | **3 failed, 251 passed** -- the premise assert and both strip asserts |
+| this branch with `-Utf8` reverted | **2 failed, 253 passed** |
+| this branch | **all 255 passed** |
+
+**The middle row is the proof.** With the premise assert repaired the fixture reads correctly, and the two
+asserts describing the actual attack are *still red* -- so they were reporting the bypass, not the mangled
+read, and the flag is what closes it. The first row reproduces the issue's own measurement here rather
+than transcribing it.
+
+**Every number above was measured in a console opened for it, because this machine's session console is
+cp65001** -- the CI environment, where the defect cannot appear. The first two runs made on this branch
+were taken there, came back green, and proved nothing; they are named rather than dropped, because the
+asymmetry the issue reports is the same one that makes a green run in the wrong console look like an
+answer.
+
 ### DEPLOY: fix/1446-tip-utf8-decode
 
 `new-branch.ps1` reads the remote tip's subject with **`-Utf8`**, so the control-and-format strip added in
