@@ -285,6 +285,32 @@ try {
     Assert-Equal 1 $w3.Code 'token: a second -InitToken refuses'
     Assert-Equal $token ([System.IO.File]::ReadAllText((Join-Path $pageDir7 'worker-path-token.txt'), [System.Text.Encoding]::UTF8)).Trim() 'token: and leaves the existing one exactly as it was'
 
+    # A copy the operator still HAS, in a folder nothing points at any more, is the likeliest reason
+    # this one is missing -- so the refusal names that move even when it finds no copy (issue #1444).
+    Assert-Match 'renamed or repointed' $w1.Out 'token: with no copy anywhere, the refusal still names the move that hides one'
+
+    # --- 7b. A token left behind by a folder move -------------------------------------------------
+    # THE CASE THIS EXISTS FOR: the page directory is derived from the note root and gitignored, so
+    # renaming the folder that holds the release documents moves every tracked file and leaves the
+    # token where it was. Both refusals ask "is there a token anywhere in this tree", because "is
+    # there one HERE" answers no on exactly the day that matters (issue #1444).
+    Write-Host "worker -- a token left behind by a folder move is found, never overwritten" -ForegroundColor Cyan
+    $r7b   = New-FixtureRepo -Label 'stray' -WorkerName 'fixture-release-notes'
+    $stray = Join-Path $r7b 'old-releases\page'
+    New-Item -ItemType Directory -Force -Path $stray | Out-Null
+    $strayToken = Join-Path $stray 'worker-path-token.txt'
+    [System.IO.File]::WriteAllText($strayToken, ('a' * 32), $Utf8NoBom)
+
+    $s1 = Invoke-Build -Root $r7b -ScriptArgs @('-Worker')
+    Assert-Equal 1 $s1.Code 'stray: -Worker still refuses -- the copy is named, never adopted'
+    Assert-Match ([regex]::Escape('old-releases')) $s1.Out 'stray: the refusal names where the copy actually is'
+    Assert-Match 'MOVE that folder' $s1.Out 'stray: and says to move it, not to make a second token'
+
+    $s2 = Invoke-Build -Root $r7b -ScriptArgs @('-Worker', '-InitToken')
+    Assert-Equal 1 $s2.Code 'stray: -InitToken refuses too -- its guard asks whether a token exists ANYWHERE'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $r7b 'releases\page\worker-path-token.txt'))) 'stray: and no second token was minted'
+    Assert-Equal ('a' * 32) ([System.IO.File]::ReadAllText($strayToken, [System.Text.Encoding]::UTF8)).Trim() 'stray: the copy it found is left exactly as it was'
+
     # --- 8. -Worker without the seam --------------------------------------------------------------
     Write-Host "worker -- hosting needs the worker name" -ForegroundColor Cyan
     $w4 = Invoke-Build -Root $r1 -ScriptArgs @('-Worker')
