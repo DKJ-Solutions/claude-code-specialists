@@ -126,6 +126,7 @@ below changes for you, and nothing here asks you to run anything.
 | [`release-notes-page`](skills/release-notes-page/SKILL.md) | after a release — builds the hand-written notes into one browsable page for the reader they are written for, and optionally the Cloudflare Worker that hosts it |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |
 | [`measure-skill`](skills/measure-skill/SKILL.md) | pricing what a skill costs the sessions that carry it — always-on against on-invoke tokens, the delta against a stored baseline, and the wall-clock of the script behind it |
+| [`check-policy-drift`](skills/check-policy-drift/SKILL.md) | a consumer's root `CLAUDE.md` may have drifted from a plugin's policy — locates the docs to compare (this plugin's always, `bwj-codex`'s too when installed) and reports contradictions; never edits anything |
 
 <!-- /skills:plugin -->
 

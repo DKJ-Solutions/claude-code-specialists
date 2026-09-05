@@ -12,6 +12,12 @@ answers. Read this page after
 [`contributing-davekjohn`'s ticket-work section](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch),
 which this one sharpens rather than repeats.
 
+**And it sits second, not first.** Where a repo installs both plugins, `contributing-davekjohn`'s
+policy outranks this one exactly as it outranks the repo's own root `CLAUDE.md` -- see
+[the canonical statement](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md#precedence--full-adoption-or-none).
+This page's own rank sits beneath that one and above the repo's root `CLAUDE.md`: it sharpens the
+ticket-work step, it does not get to override `contributing-davekjohn` itself.
+
 **How to read this page.** It travels with the plugin, so a link that walks out of this plugin's own
 folder is written as an absolute URL -- an installed plugin is read from its own cache directory,
 where the repo tree around it does not exist. Measurements and issue numbers on this page are the

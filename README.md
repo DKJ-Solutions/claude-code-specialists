@@ -632,7 +632,7 @@ hand-written list here was named as three and went stale twice inside two days) 
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
-`cut-release`, `adopt-config`, `adopt-workflow-folder`,
+`cut-release`, `adopt-config`, `adopt-workflow-folder`, `check-policy-drift`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `prune-merged`,
 `measure-skill`, `worktree-lane`, `report-issue`, `adopt-bwj-asana`, `orchestrator`)<!-- /skills:all -->
 remain available there.
@@ -716,7 +716,7 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`,
+`start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`, `check-policy-drift`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
 `prune-merged`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
 **mechanism** (branch, PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a

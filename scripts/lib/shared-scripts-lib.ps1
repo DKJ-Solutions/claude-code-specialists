@@ -511,6 +511,24 @@ function Get-SharedScriptPairs {
             Skill  = 'adopt-workflow-folder'
         },
         @{
+            # Locates the documents check-policy-drift compares (feat/plugin-policy-precedence): a
+            # consumer's root CLAUDE.md against contributing-davekjohn's portable policy (always) and
+            # bwj-codex's (when that plugin is also enabled and installed here). Read-only, on-demand,
+            # like adopt-config -- never a hook or a gate. The comparison itself is a judgement call
+            # about prose (report-issue's shape: "no script of its own"); this script's job ends at
+            # printing WHERE the right documents are, reusing the same enable/install mechanism
+            # check-roster-sync and check-script-contract already read rather than inventing a second
+            # one.
+            Name   = 'check-policy-drift'
+            Source = 'scripts\task\check-policy-drift.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = 'check-policy-drift'
+            # All three exist so the test suite can point the locator at a fixture repo/cache/home
+            # instead of the real machine. A consumer never types them, and documenting them would
+            # invite someone to -- same reasoning as check-roster-sync's three above.
+            SkillParamsExempt = @('RepoRootOverride', 'CacheRootOverride', 'UserHomeOverride')
+        },
+        @{
             # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the
             # owner's goal is one release workflow rather than two that resemble each other. The audit
             # that produced the issue named three divergences; reading both files found six, and the

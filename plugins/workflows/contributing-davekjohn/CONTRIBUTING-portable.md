@@ -38,6 +38,38 @@ belongs on a branch (inbound
 
 ---
 
+## Precedence — full adoption, or none
+
+Enabling `contributing-davekjohn` is not a customisation layered beside a consumer's own root
+`CLAUDE.md` — it is a policy that outranks it, deliberately (Dave, September 5, 2026). From the moment
+the plugin is installed, this page and the sibling portable pages it ships with stand above whatever the
+consumer's root `CLAUDE.md` says on the same subject, full stop.
+[Further down](#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379) that ranking is
+worked out in detail, for the branch/PR/release mechanics this plugin actually legislates. What belongs
+here, ahead of the cycle itself, is the choice that sits above even that detail.
+
+**The choice is binary, and there is no third position.** A consumer either installs this plugin and
+runs the cycle below in full, or it does not install it and keeps its root `CLAUDE.md` as its own,
+entire, unchallenged policy. There is no blend, no partial adoption, no keeping the scripts while
+overriding the rule that governs them. One ship, one captain: a repo that installs the crew does not
+also get to steer from the passenger deck.
+
+**Where the two disagree on a subject this plugin actually addresses, the plugin is the one that is
+right.** A root `CLAUDE.md` clause that contradicts what this page or a sibling portable page says is
+not a customisation somebody chose — it is a standing error nobody has corrected yet, because nothing
+reads the two documents together and only one of them can be true once the plugin is installed. Fixing
+it is ordinary work in the consumer's own repo: an edit to that `CLAUDE.md`, on that repo's own branch +
+PR route, made by that repo's own contributor — never something a plugin update reaches into a
+downstream repo to rewrite silently. Locating every place a consumer's document has drifted this way is
+a separate, later piece (the on-demand `check-policy-drift` skill); this page states the target the
+correction moves toward, not the scan that finds it.
+
+A repo running a second plugin that extends this workflow settles that plugin's own place in the order
+on **that plugin's own** portable page — this one states only where `contributing-davekjohn` itself
+stands: above the floor, without exception, from the moment it is installed.
+
+---
+
 ## The cycle
 
 ### 1. New issue or task — where the work comes from
