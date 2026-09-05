@@ -309,6 +309,13 @@ Assert-True ($captureLib -match '(?m)^function Invoke-TestSuiteGate') 'which is 
 $ciYml = [System.IO.File]::ReadAllText((Join-Path $RepoRoot '.github\workflows\ci.yml'))
 Assert-True ($ciYml -match 'Invoke-TestSuiteGate') 'CI runs the same shared gate as well'
 Assert-True ($ciYml -notmatch 'Get-ChildItem[^\r\n]*tests') 'and no longer walks scripts/tests itself'
+# AND ALL FOUR CALLERS CAN CHOOSE THE LANE COUNT (issue #1443, September 5, 2026). CI always could; the
+# three local callers could not, because the parameter existed at the bottom of the chain and nowhere in
+# between -- so the only route past a gate that would not FINISH was -SkipTests, the switch that says this
+# run did not measure. Asserted HERE for cut-release specifically, because this is the caller where that
+# substitution costs most: the line above declares -SkipTests, and this script commits and tags on main.
+Assert-True ($cutReleaseText -match '(?m)\[int\]\$MaxParallel = 0') 'cut-release declares -MaxParallel, defaulting to 0'
+Assert-True ($cutReleaseText -match 'Invoke-TestSuiteGate[^\r\n]*-MaxParallel \$MaxParallel') 'and hands it to the shared gate -- 0 meaning "resolve your own default", exactly as before'
 # BEFORE THE FIRST WRITE, like the lint above it: a release that fails halfway leaves a half-bumped tree on
 # main under one of this repo's two direct-commit exceptions, which is where a failure costs most to undo.
 #
