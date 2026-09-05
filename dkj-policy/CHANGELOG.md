@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1453-token-recovery-from-worker · 20260905-201057
+
+The release page's path token is the one file in this system that cannot be rebuilt, and both of its
+refusals used to describe the loss as worse than it is. The token is deliberately uncommitted in a
+public repo and nothing in git remembers the URL it forms -- but the script writes that route into the
+worker bundle as a **literal**, so a deployment that is still up is itself a copy of the token, held by
+Cloudflare rather than by any machine of yours. "There is no token on this disk" and "the URL is gone"
+are different findings, and only the first one is answered by looking at your own tree.
+
+`build-release-notes-page.ps1` now names three ways back rather than two, in the order worth trying:
+the URL you have, then the deployment -- the worker's code view, or the Workers script API -- and only
+then `-InitToken` for a fresh path. The ordering is the repair, because `-InitToken` is the step that
+404s every link already sent, and a recovery instruction that reached it second walked the reader past
+the recoverable route to the irreversible one. `-InitToken` now also says so at the moment it runs,
+where the repo names a worker and a live page may already be serving the old token.
+
+Measured on this repo: with every local copy genuinely gone (#1453), the conclusion drawn was that
+every link already sent was unrecoverable -- and #1444 had reached the same reading one issue earlier.
+Both followed from tooling that never mentioned the deployment.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the person a release page is written for never meets any of this. It is a guard between the
+operator and an irreversible step, and it earns its place by changing what that operator concludes on
+the one day the token is missing.
+
+**Score:** N/A
+
+#### Pull Request
+
+The token refusal names the deployment before it names -InitToken
+
+Plugins: dkj-policy
+
+[PR #1461](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1461)
+
+---
+
 ### DEPLOY: feat/claim-issue-skill · 20260905-195949
 
 The claim rule, performed. A `claim-issue` skill and script put an issue on the account **this
