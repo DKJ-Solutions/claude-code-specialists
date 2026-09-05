@@ -40,7 +40,7 @@
          push. Two gh reads decide it (the trunk's rules, then this account's bypass on the ruleset
          carrying them); it cannot be read off the merge, which the PR's own check satisfies. Asked in
          the same place and for the same reason, and an unreadable ruleset warns rather than refuses.
-      1. open-pr.ps1 [-SkipLint] [-SkipTests] -- runs the local lint + test gate,
+      1. open-pr.ps1 [-SkipLint] [-SkipTests] [-MaxParallel <n>] -- runs the local lint + test gate,
          pushes, and opens the PR. If a gate fails, nothing is pushed and this stops here.
 
          AND IT IS THE ONE STEP THAT READS THE WORKING TREE, so it is the one window in which THIS
@@ -199,6 +199,16 @@
 .PARAMETER SkipTests
     Passed through to open-pr.ps1 (skip the test gate -- escape valve).
 
+.PARAMETER MaxParallel
+    Passed through to open-pr.ps1: how many test suites its test gate runs at once. 0 (the default)
+    is not forwarded at all, so an ordinary run is byte-identical to before.
+
+    THE PAIR MATTERS MORE HERE THAN ANYWHERE (issue #1443). This is the script a session reaches for,
+    and the one whose gate runs unattended while the session does something else -- so it is the one
+    where a gate that will not finish used to leave -SkipTests as the only way forward. Running the
+    suites SMALLER and running them NOT AT ALL are the two answers, and only one of them measures.
+    open-pr.ps1's own .PARAMETER MaxParallel carries the numbers behind that.
+
 .PARAMETER Force
     Passed through to open-pr.ps1: ship an entry that still carries its scaffold wording (the scaffold
     gate's escape valve).
@@ -249,7 +259,9 @@ param(
     [int]$PollSeconds = 15,
     [string]$Resolves = '',
     [switch]$NoResolves,
-    [switch]$RefreshBody
+    [switch]$RefreshBody,
+    # Lanes for open-pr's test gate; 0 forwards nothing. See .PARAMETER MaxParallel.
+    [int]$MaxParallel = 0
 )
 $ErrorActionPreference = 'Stop'
 
@@ -470,6 +482,10 @@ $openArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $P
 if ($Title) { $openArgs += @('-Title', $Title) }
 if ($SkipLint)    { $openArgs += '-SkipLint' }
 if ($SkipTests)   { $openArgs += '-SkipTests' }
+# FORWARDED ONLY WHEN NON-ZERO, for the same reason -Title is (#506, and now #1443): open-pr's own
+# default IS 0, so passing it explicitly would be a no-op that puts a lane count on the command line of
+# every ordinary run -- and a reader of that line would take it for a deliberate choice.
+if ($MaxParallel -gt 0) { $openArgs += @('-MaxParallel', "$MaxParallel") }
 if ($Force)       { $openArgs += '-Force' }
 if ($RefreshBody) { $openArgs += '-RefreshBody' }
 # Handed over as the raw string. open-pr.ps1 parses it itself precisely BECAUSE this hop goes through

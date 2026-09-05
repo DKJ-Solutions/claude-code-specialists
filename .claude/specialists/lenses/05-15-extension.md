@@ -89,6 +89,17 @@ infrastructure.
   developer's machine stays usable, and on a four-core runner nobody is sitting at, that reservation would
   cost half the box.
 
+  **AND SINCE [#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443) CI is no longer
+  the only caller that can choose** (September 5, 2026). `open-pr.ps1` and `ship-pr.ps1` take the same
+  `-MaxParallel` and hand it down through `Invoke-WorkflowGates`, which had been the missing hop: the
+  parameter existed at the bottom of the chain and at the top of CI's, and nowhere in between. Measured on
+  this machine — 18 cores, so 16 lanes — the default passed once at 716s and was then **killed twice by
+  the harness for running out of memory**, where `-MaxParallel 4` passed in 888s. The reservation formula
+  reasons about cores; what ran out was memory. **The default is unchanged**, deliberately: one machine is
+  not a measurement of the formula, and what #1443 was actually about is that the only way past a gate
+  that would not finish was `-SkipTests` — a skip and a smaller run leaving the same trace afterwards.
+  The consumer-facing half is in the `open-pr` skill page, which is where a session reads it.
+
   **EVERY PUSH TO `main` IS ITS OWN CONCURRENCY GROUP, and before
   [#1294](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1294) half of them were never
   gated at all.** The block used to key one group on `github.ref`, i.e. one group for the whole trunk,

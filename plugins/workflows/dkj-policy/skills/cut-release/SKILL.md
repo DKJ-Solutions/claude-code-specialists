@@ -216,6 +216,15 @@ a release for a missing timestamp would be ceremony rather than a guard.
      suites locally and again in CI. A release could be committed, tagged and pushed with a suite red.
      Separate from `-SkipLint` for the same reason those two are separate in `open-pr`: two tools, and
      skipping one is no reason to skip the other.
+   - **`-MaxParallel <n>`** sets how many suites that gate runs at once; `0`, the default, leaves the
+     resolution where it always was (`ProcessorCount - 2`, floor 2). **This is the one to reach for when
+     the gate will not *finish***, and it matters more here than at a PR: the sentence above is the reason
+     `-SkipTests` is not an acceptable answer to a gate that dies, because this script commits and tags on
+     the main branch. Measured on an 18-core machine, the default's 16 lanes were killed twice for running
+     out of memory where `-MaxParallel 4` passed the same 68 suites in 888s against 716s — 24% slower, and
+     it finishes ([#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443)). The rest
+     of the numbers are on the
+     [`open-pr` skill page](../open-pr/SKILL.md#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
    - **`-SkipTierGate`** cuts a bump the pending changelog entries have not earned. **Expect not to need
      it.** Where the pending entries declare their impact, **the bump follows the highest tier pending**:
 
