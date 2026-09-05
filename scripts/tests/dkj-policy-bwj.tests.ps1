@@ -53,7 +53,7 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 Assert-Equal 'dkj-policy-bwj' $manifest.name 'plugin.json name is dkj-policy-bwj'
 
 foreach ($rel in @('README.md', 'WORKFLOW-portable.md',
-                   'skills\report-issue\SKILL.md', 'skills\adopt-bwj-asana\SKILL.md',
+                   'skills\report-issue\SKILL.md', 'skills\adopt-dkj-policy-bwj\SKILL.md',
                    'templates\asana-mirror.yml', 'templates\asana-mirror.ps1')) {
     Assert-True (Test-Path -LiteralPath (Join-Path $PluginRoot $rel)) "ships $rel"
 }
@@ -62,7 +62,7 @@ Assert-True (-not (Test-Path -LiteralPath (Join-Path $PluginRoot 'agents'))) 'ca
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $PluginRoot 'manuals'))) 'carries no manuals/ (workflow rule)'
 
 # skill folder name matches its frontmatter name:
-foreach ($skill in @('report-issue', 'adopt-bwj-asana')) {
+foreach ($skill in @('report-issue', 'adopt-dkj-policy-bwj')) {
     $txt = Get-Content -LiteralPath (Join-Path $PluginRoot "skills\$skill\SKILL.md") -Raw
     $nm  = [regex]::Match($txt, '(?m)^name:\s*(\S+)\s*$')
     Assert-Equal $skill $nm.Groups[1].Value "skill '$skill' frontmatter name matches its folder"

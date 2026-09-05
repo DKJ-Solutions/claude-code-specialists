@@ -1536,7 +1536,7 @@ function Set-IssuePrioLabel {
         Returns $true when it changed something, $false when the issue already read correctly or the
         edit failed. Nothing is done when there is nothing to do, so a re-run is quiet.
 
-        `gh issue edit` fails outright on a label the repo does not have; adopt-bwj-asana creates all
+        `gh issue edit` fails outright on a label the repo does not have; adopt-dkj-policy-bwj creates all
         four, which is why that step and this function ship together.
     #>
     param(
