@@ -32,6 +32,38 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1409-already-done-check-in-new-branch · 20260905-103229
+
+`new-branch.ps1` takes an optional `-Resolves "<n[,n...]>"` and runs the same already-done check
+`open-pr` already ran (`Get-TargetIssueWarnings`, from #1282) -- but before the checkout, not after.
+Issue #1409 measured what the old timing cost: a branch correctly claimed for #1402 was cut, given
+two commits, a full development document and two subagent reviews plus 65 test suites, only to learn
+from `open-pr`'s own warning that a rival PR had already closed #1402 seven minutes after the claim.
+Passed here, the same finding surfaces before any of that is spent. It warns and never refuses -- a
+shared number, a reopened issue, or an abandoned rival PR must not wedge a real branch -- and, like
+the stale-base warning beside it, is printed twice so the scaffold and the push cannot bury it. `gh`
+is asked for only when `-Resolves` is given, so every other run stays exactly as offline-usable as
+before.
+
+**Score:** 3 -- a consumer who reaches for `-Resolves` sees a real branch's worth of wasted work
+avoided the moment they touch it; every other call is untouched.
+
+#### What makes this deploy extra special
+
+Nothing beyond the deploy itself -- N/A.
+
+**Score:** N/A
+
+#### Pull Request
+
+Warn on an already-done issue before new-branch.ps1 cuts anything
+
+Plugins: contributing-davekjohn
+
+[PR #1434](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1434)
+
+---
+
 ### DEPLOY: docs/1432-source-test-census · 20260905-102625
 
 `Test-IsWorkflowSourceRepo`'s docstring no longer opens its inline-site list with a count. The figure
