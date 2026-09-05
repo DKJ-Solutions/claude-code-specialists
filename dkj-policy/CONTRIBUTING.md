@@ -158,11 +158,21 @@ report and is wrong, which is worse than the original defect because it now carr
 measurement behind each is in the
 [`triage-inbound` skill](../.claude/skills/triage-inbound/SKILL.md).
 
-**Claim an issue before working it** — `gh issue edit <n> --add-assignee @me` — and read the claim as well as
-write it: an issue that already carries an assignee is somebody's. The tracker is the only thing two sessions
-share, so an unassigned issue is indistinguishable from an untouched one, which is how the same repair gets
-built twice and discovered at the merge. A claim with no branch and no recent activity is a question for
-Dave rather than a locked door.
+**Claim an issue before working it** — and read the claim as well as write it: an issue that already carries
+an assignee is somebody's. The tracker is the only thing two sessions share, so an unassigned issue is
+indistinguishable from an untouched one, which is how the same repair gets built twice and discovered at the
+merge. A claim with no branch and no recent activity is a question for Dave rather than a locked door.
+
+**The step that performs it is [`claim-issue`](../plugins/workflows/dkj-policy/skills/claim-issue/SKILL.md)**, and it exists because this
+rule was written down for as long as the workflow has and enforced by nothing — `gh issue edit <n>
+--add-assignee @me`, left to a session to remember, to type, and to read the result of. Measured here on
+September 5, 2026 ([#1456](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1456)): **0 of 67**
+assigned issues carried `DaveKJohn`, an identity holding 132 merged PRs and 83 authored issues in the same
+repo. That report's own corrective action was *behavioural*; the skill is what makes it mechanical, and it
+does the three things the one-liner cannot — it never sends `@me` (see below), it **refuses on a closed
+issue**, which `--add-assignee` claims silently, and it **refuses one somebody else holds**, which
+`--add-assignee` joins. It writes one assignee and nothing else: the branch stays
+[`new-branch`](../plugins/workflows/dkj-policy/skills/new-branch/SKILL.md)'s, one step later.
 
 **`@me` writes whichever account `gh` holds, which is not always the one your commits will name.** It
 resolves through the GitHub API, while the branch a second session correlates the claim with carries the
@@ -172,7 +182,8 @@ and nothing reports it. Measured September 3, 2026 ([#1315](https://github.com/D
 account on #1314 and it had to be corrected by hand. Since then
 [`check-git-identity.ps1`](../scripts/lint/check-git-identity.ps1) reports the split from a SessionStart hook
 in every repo that has this plugin, so a session is told before it claims anything. Where it fires, **claim by
-name** until the two agree.
+name** until the two agree — which is what `claim-issue` does for you: it reads both identities and writes the
+**git** one, because the commits are the half nothing can rewrite afterwards.
 
 **These rules are Chris's, stated here rather than owned here.** The filing bar, the six inbound checks and
 the claim live in the orchestrator's persona body, which ships with `team-alpha` — so where this paragraph
@@ -339,6 +350,15 @@ Dave's word, and for why the default is that they do not.
 `open-pr.ps1` is the one entry point: it runs the lint and test gates first, then pushes, then opens the PR.
 On an error or a failing suite **nothing is pushed and no PR is opened** — `-SkipLint` / `-SkipTests` are the
 escape valves, and using one is a decision rather than a convenience.
+
+**A gate that will not *finish* is a third case, and `-SkipTests` is the wrong answer to it**
+([#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443), September 5, 2026). The test
+gate runs the suites in parallel and works the lane count out from the core count; on this machine that is 16
+lanes, and the harness killed two runs of it for running out of memory. `-MaxParallel <n>` — on `open-pr.ps1`
+and forwarded by `ship-pr.ps1` — runs them **smaller** instead of not at all, so the branch still carries a
+measurement. `-MaxParallel 4` passed the same 68 suites in 888s against the default's 716s: 24% slower, and
+it finishes. The numbers, and why the default was deliberately left alone, are on the
+[`open-pr` skill page](../plugins/workflows/dkj-policy/skills/open-pr/SKILL.md#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
 
 Its own number because the three gates below fire *here*, at the push, and because what it publishes is fixed
 at this moment: 3.2 is what it puts in the body, and 3.2.4 locks that body against later edits to the

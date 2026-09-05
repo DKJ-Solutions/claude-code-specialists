@@ -32,6 +32,222 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/claim-issue-skill · 20260905-195949
+
+The claim rule, performed. A `claim-issue` skill and script put an issue on the account **this
+checkout commits as** before any work on it begins -- and refuse the three states the documented
+one-liner cannot see: a **closed** issue, which `gh issue edit --add-assignee` claims silently; one
+**somebody else holds**, which it joins; and a **split identity**, where `@me` writes the tracker
+account while every commit lands under another name. The claim is **read back** afterwards, because
+`--add-assignee` reports success for a login GitHub drops. Two supporting libs, one of them extracted
+from `check-git-identity.ps1` so the identity reads have a single source, a 27-assert suite, and the
+three documents that state the rule now name the step that performs it.
+
+**Score:** 4 -- it changes what happens at the start of every piece of issue work, and it does so
+without being asked: the skill is model-invocable, so *"fix issue 1234"* now claims before it fixes. A
+consumer notices the first time a session refuses to start on a closed issue.
+
+#### What makes this deploy extra special
+
+It closes a rule that had been enforced by memory alone, and the measurement is unusually blunt about
+what that was worth: **0 of 67** assigned issues in this repo carried the identity with **132** merged
+PRs and **83** authored issues
+([#1456](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1456), filed the day before
+this branch, whose own corrective action was *behavioural*). The rule was not unclear, unknown or
+disputed -- it was simply never the thing anybody remembered to type. This repo's standing answer to
+that is a gate rather than a firmer sentence, and the same measurement is why the skill is
+model-invocable rather than reserved for an explicit `/claim-issue`: a step nobody may take until it is
+typed has exactly the failure mode being repaired.
+
+**Score:** N/A -- workflow tooling between a repo and its tracker; no subscriber of a service reads it.
+
+#### Pull Request
+
+the claim-issue skill
+
+Plugins: dkj-policy, team-alpha
+
+[PR #1463](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1463)
+
+---
+
+### DEPLOY: docs/1456-capped-listing-measurement · 20260905-194439
+
+A fifth measured instance under the `triage-inbound` skill's fifth pattern, plus the mechanism behind
+it. #1456 reported an absence that does not exist -- `DaveKJohn` is in fact the most-assigned identity
+here, 88 of 221 assigned issues -- and all three of its figures reproduce exactly from a single `gh`
+listing capped at `--limit 200`/`300`. The headline `67` was that account's own assignee count inside
+the window, reported as the count that excluded it.
+
+The four instances already recorded are reports that were real and mis-sized. This one is the variant
+where the mis-measurement is the whole finding, so the pattern's intro now says so rather than leaving
+its name to carry it.
+
+**Score:** 2 -- a skill only a pickup reads, and it changes no gate. It earns more than cosmetic because
+the mechanism is reproducible and silent: `gh issue list`/`gh pr list` return the newest `--limit` rows
+and say nothing about what they left out, so a windowed figure is indistinguishable from a full-history
+one in the report that quotes it.
+
+#### What makes this deploy extra special
+
+One capped window produced **three** mutually consistent figures, all three wrong. That is the part
+worth carrying: a report whose numbers agree with each other is not thereby corroborated -- they can
+share a single bad window. The report also carried its own counterexample, citing #1450 as claimed by
+the filing session while #1450 is assigned to `DaveKJohn`, one of the 88 it argued do not exist.
+
+**Score:** N/A -- internal triage evidence for this repo's own pickups; no subscriber of a service
+reads it.
+
+#### Pull Request
+
+Record the capped-listing measurement failure in triage-inbound
+
+[PR #1462](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1462)
+
+---
+
+### DEPLOY: fix/1447-release-page-path · 20260905-192056
+
+Two path statements in `dkj-policy/releases/README.md` repaired after the #1437 folder rename. The
+table row for the release page's output directory and the path-token paragraph both still named
+`contributing-davekjohn/releases/page/`, which exists nowhere. The second one was actively misleading:
+it told the reader `.gitignore` keeps that path out of git, while `.gitignore` covers
+`dkj-policy/releases/page/` only -- so a token dropped where the document pointed would have been
+committed into a public repository, which is precisely what that paragraph is there to prevent.
+
+**Score:** 1 -- documentation-only, and the failure it prevents has not happened. Naming it, because
+that is the part a later reader can use: publishing a no-login URL token into a public repo, on the
+document's own instruction.
+
+#### What makes this deploy extra special
+
+A stale path is normally cosmetic. This one had inverted its own safety claim: the sentence warning
+that the token must stay out of git named the one directory `.gitignore` does not cover. The repair is
+two words; what it is worth is that the document's guarantee is checkable again --
+`git check-ignore` now agrees with the path the prose names.
+
+**Score:** N/A -- internal to this repo's own release tooling; no subscriber of a service reads it.
+
+#### Pull Request
+
+the release-page path in dkj-policy/releases/README.md
+
+[PR #1457](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1457)
+
+---
+
+### DEPLOY: fix/1454-releases-readme-folder-name · 20260905-191304
+
+`releases/README.md` told an agent setting this workflow up in another repo that the plugin is called
+`contributing-davekjohn`, that the `adopt-workflow-folder` skill scaffolds a
+`contributing-davekjohn/releases/README.md`, and that `Get-ReleaseHistoryPath` points at a
+`contributing-davekjohn/releases/history.md` if left alone. All three are false, and false in the same
+direction: a fresh consumer has none of the three folder names on disk, so every script hands them
+`dkj-policy` while this page addressed them in the second person about a folder they do not have.
+
+#1437 renamed the folder and #1447 covers the two `releases/page/` statements it left behind. These
+three were scoped out of that branch because #1447 states its own bound -- and one of them is not a
+folder-rename miss at all: line 5 names the **plugin**, which was never called `contributing-davekjohn`.
+
+Three sentences rewritten. The dated sentences around them keep the name they were written with, and
+lines 137 and 143 are left for #1447.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The section these three sit in is `### How to build your own version of this page` -- the one document
+that exists to answer *"what does this look like in my repo"*, addressed in the second person to a
+consumer adopting the workflow. That is the worst place in the tree for a stale name, because the
+reader has nothing of their own to check it against yet.
+
+**Score:** 3
+
+#### Pull Request
+
+Correct three present-tense contributing-davekjohn references in the releases README
+
+[PR #1458](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1458)
+
+---
+
+### DEPLOY: fix/claude-md-install-record-claim · 20260905-190509
+
+`CLAUDE.md` no longer states that this repo carries an install record as a settled fact. Inbound #1449
+measured the opposite on one machine and cited a precedent (#1371) that, on inspection, measured the
+opposite of what it was cited for too — the record's presence is real but per-machine, and the paragraph
+now says so, rather than asserting either "always present" or "always absent".
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A — internal documentation accuracy, no subscriber of the service is affected.
+
+**Score:** N/A
+
+#### Pull Request
+
+CLAUDE.md states an install record's presence as a fixed repo fact, not a per-machine one
+
+[PR #1459](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1459)
+
+---
+
+### DEPLOY: feat/1443-gate-lane-knob · 20260905-185207
+
+`open-pr.ps1`, `ship-pr.ps1` and `cut-release.ps1` now take **`-MaxParallel <n>`** and hand it down to the
+test gate, so a gate that will not *finish* can be run **smaller** instead of not at all. `0` -- the
+default -- resolves exactly where it always did, inside `Invoke-TestSuiteGate`, so an ordinary run is
+unchanged.
+
+The parameter has existed at the bottom of the chain since the gate was written, and `ci.yml` passes it.
+What was missing was every hop above it: `Invoke-WorkflowGates` sat between the two PR scripts and the gate
+without carrying it, and `cut-release` calls the gate directly and never declared it. So on a developer's
+machine the only route past a gate that dies was `-SkipTests` -- and that is strictly worse than a smaller
+run, because it is the switch that says *this run did not measure*. Afterwards a branch pushed past a
+memory limit reads exactly like one that skipped its suites for a bad reason.
+
+**`cut-release` is the caller #1443 did not name and the one where it costs most.** The other two open a
+PR, and a PR that does not open costs a retry; this one commits and tags on the trunk, where `-SkipTests`
+means a release can be cut with a suite red.
+
+Measured on the machine that filed [#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443)
+-- 18 cores, so 16 lanes, same 68 suites, same function: the default passed once at 716s and was then
+**killed twice by the harness for running out of memory**, where `-MaxParallel 4` passed in 888s. 24%
+slower, and it finishes. Intermittent rather than a ceiling -- 16 lanes fits when the machine is quiet --
+which is why this is a knob and not a new default. Worth knowing beside it: a starved run can also go
+**false red**, and the killed run's log carried two `[FAIL]` lines in a suite that is 108/108 green run
+alone.
+
+**The default lane formula is deliberately untouched.** The reservation reasons about cores; what ran out
+was memory, and one machine is not a measurement of a formula. This adds the way past, not a new policy.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer reaches all three scripts through the plugin mirror, and their machines are the ones this
+repo cannot measure -- more cores, more suites, or a laptop already running something else. Until now their
+only answer to a gate that would not finish was the escape valve that erases the evidence, on the one run
+whose whole job is to produce it. `cut-release` is the sharp end of that for them exactly as it is here.
+
+The flag is documented where a session actually reads it: the `open-pr` skill page carries the numbers and
+the *reach for this before `-SkipTests`* rule, and the `ship-pr` and `cut-release` pages an entry each
+that forwards to it.
+
+**Score:** 3
+
+#### Pull Request
+
+open-pr, ship-pr and cut-release carry the test gate's lane knob through
+
+Plugins: dkj-policy
+
+[PR #1455](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1455)
+
+---
+
 ### DEPLOY: fix/1444-stranded-page-token · 20260905-184311
 
 The release page's path token is the one file in this system that cannot be rebuilt: it is the only

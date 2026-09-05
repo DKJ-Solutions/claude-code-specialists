@@ -277,11 +277,40 @@
     `-SkipLint` / `-SkipTests` still work here and still mean what they mean everywhere else. A green
     run also records gate evidence like any other, so a later `open-pr` on the identical tree skips what
     this already proved.
+
+.PARAMETER MaxParallel
+    How many test suites the test gate runs at once. 0 (the default) leaves the resolution to
+    Invoke-TestSuiteGate exactly as before -- ProcessorCount minus two, floor 2 -- so passing nothing
+    is byte-identical to the behaviour this parameter was added to.
+
+    IT EXISTS BECAUSE THE DEFAULT CAN FAIL TO FINISH (issue #1443, September 5, 2026). Each lane
+    spawns a `powershell` child that spawns children of its own, and the reservation formula reasons
+    about CORES, not memory. Measured on an 18-core machine, same 68 suites, same function: 16 lanes
+    passed once in 716s and was then killed twice by the harness for running the machine out of
+    memory; `-MaxParallel 4` passed in 888s. 24% slower, and it finishes.
+
+    THE ALTERNATIVE WAS STRICTLY WORSE, which is the whole argument for the knob. Before this, the
+    only route past a gate that would not finish was -SkipTests -- the switch that says "this run did
+    not measure" -- so a branch pushed past a memory limit is afterwards indistinguishable from one
+    that skipped its suites for a bad reason. A lane count keeps the measurement inside the run that
+    is supposed to make it, and the gate prints the number of lanes it used.
+
+    AND A MEMORY-STARVED RUN CAN GO FALSE RED, not only die: the killed run's log carried two [FAIL]
+    lines in a suite that is 108/108 green run alone. So a killed run's failures are no more
+    trustworthy than a killed run's verdict -- the same class of untrustworthy red as the tree-moved
+    warning above, reached by a different cause.
+
+    THE DEFAULT IS DELIBERATELY UNCHANGED. Whether the reservation formula should account for memory
+    as well as cores is a separate question, on one machine's worth of evidence, and #1443 did not
+    measure it. This adds the way past, not a new policy.
 .EXAMPLE
     ./scripts/release/open-pr.ps1
 
 .EXAMPLE
     ./scripts/release/open-pr.ps1 -Resolves '331,332'
+
+.EXAMPLE
+    ./scripts/release/open-pr.ps1 -MaxParallel 4
 #>
 [CmdletBinding()]
 param(
@@ -293,7 +322,9 @@ param(
     [switch]$NoResolves,
     [switch]$Force,
     [switch]$RefreshBody,
-    [switch]$GatesOnly
+    [switch]$GatesOnly,
+    # Lanes for the test gate; 0 keeps Invoke-TestSuiteGate's own default. See .PARAMETER MaxParallel.
+    [int]$MaxParallel = 0
 )
 $ErrorActionPreference = 'Stop'
 
@@ -386,7 +417,7 @@ if ($GatesOnly) {
         Write-Warning ("-GatesOnly runs the gates and nothing else, so these were ignored: " + ($ignored -join ', ') + ".")
     }
 
-    if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context 'the gate run' -FailureConsequence 'nothing else ran, nothing was written')) {
+    if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -MaxParallel $MaxParallel -Context 'the gate run' -FailureConsequence 'nothing else ran, nothing was written')) {
         exit 1
     }
     Write-Host "gates green -- nothing was pushed and no PR was opened (-GatesOnly)." -ForegroundColor Green
@@ -1312,7 +1343,7 @@ Fast-forward it and read what is there before trying again:
 # -GatesOnly (handled near the top, right after the pre-flights) is that route, and what it runs is
 # THIS function rather than a second copy of it: the whole value of the flag is that the two cannot
 # describe the tree differently.
-if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context 'the PR' -FailureConsequence 'branch not pushed, no PR opened')) {
+if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -MaxParallel $MaxParallel -Context 'the PR' -FailureConsequence 'branch not pushed, no PR opened')) {
     exit 1
 }
 

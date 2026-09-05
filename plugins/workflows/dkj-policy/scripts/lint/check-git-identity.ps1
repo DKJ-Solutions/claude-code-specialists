@@ -109,82 +109,12 @@ if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
     if ($repoRoot) { $repoRoot = $repoRoot.Trim() }
 }
 
-. (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
-
-function Test-GitHubLoginShape {
-    <#
-        GitHub's own username rule: 1-39 characters, alphanumeric or single hyphens, and it may
-        neither begin nor end with a hyphen. This is the whole false-positive guard -- a value that
-        fails it cannot be an account, so a difference from the active login proves nothing and is
-        not reported. The lookahead is what forbids a double hyphen and a trailing one in one pass.
-    #>
-    param([string]$Value)
-    if (-not $Value) { return $false }
-    return ($Value -match '^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$')
-}
-
-function Get-ActiveGhAccount {
-    <#
-        The account `gh` currently acts as, read from `gh auth status` -- which reports it from the
-        keyring, so this makes no network call. Returns '' when gh is absent, logged out, or its
-        output does not name an account.
-
-        WHY IT PARSES TEXT. `gh auth status` has no --json, and the alternative that does
-        (`gh api user --jq .login`) is a network round-trip at every session start. The shape parsed
-        is the pair of lines gh has printed since v2:
-
-            github.com
-              * Logged in to github.com account <name> (keyring)
-              - Active account: true
-
-        MULTIPLE ACCOUNTS CAN BE LOGGED IN, and only one is active -- `@me` binds to that one. So the
-        account name is remembered as a candidate and only committed to when its own 'Active account:
-        true' line follows. A single logged-in account prints that line too, so the common case needs
-        no special handling. With no active line anywhere the answer is the last name seen, which is
-        what a pre-multi-account gh printed.
-    #>
-    $res = $null
-    try {
-        $res = Invoke-NativeCapture -FilePath 'gh' -Arguments @('auth', 'status') -Utf8
-    } catch {
-        return ''
-    }
-    if (-not $res) { return '' }
-
-    $candidate = ''
-    $active = ''
-    foreach ($line in @($res.Output)) {
-        $text = [string]$line
-        $m = [regex]::Match($text, 'account\s+(\S+)')
-        if ($m.Success) { $candidate = $m.Groups[1].Value }
-        if ($text -match 'Active account:\s*true' -and $candidate) { $active = $candidate }
-    }
-    if ($active) { return $active }
-    return $candidate
-}
-
-function Get-GitUserName {
-    <#
-        `git config user.name` for the checkout, read with -C so the answer is the repo's own rather
-        than whatever directory the hook happened to start in. An empty repo root falls back to the
-        plain call, which then reads the global config -- the right answer for a session with no
-        checkout.
-    #>
-    param([string]$RepoRoot)
-    $gitArgs = @()
-    if ($RepoRoot) { $gitArgs += @('-C', $RepoRoot) }
-    $gitArgs += @('config', 'user.name')
-    $res = $null
-    try {
-        $res = Invoke-NativeCapture -FilePath 'git' -Arguments $gitArgs -Utf8 -DiscardStderr
-    } catch {
-        return ''
-    }
-    if (-not $res -or $res.ExitCode -ne 0) { return '' }
-    $value = (@($res.Output) | Where-Object { $_ -and ([string]$_).Trim() } | Select-Object -First 1)
-    if (-not $value) { return '' }
-    return ([string]$value).Trim()
-}
+# THE THREE IDENTITY READS ARE A LIB NOW, not this file's own (claim-issue.ps1). They were written
+# here because this was the only caller; the claim step needs the same three -- it has to ACT under
+# the account this checkout commits as -- and it cannot reach them by dot-sourcing this file, which
+# runs its whole comparison and exits on load. What stays here is the half that is genuinely this
+# script's: what it does with the two names once it has them.
+. (Join-Path $PSScriptRoot '..\lib\git-identity-lib.ps1')
 
 # The overrides exist so the suite can put this script in front of every state without a keyring or a
 # git identity of its own. 'NONE' is the spelling for "absent"; see the .PARAMETER blocks.

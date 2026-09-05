@@ -562,6 +562,46 @@ try {
         Assert-Equal 2 ([regex]::Matches($mirrorOpenPrText, 'Invoke-WorkflowGates -RepoRoot \$repoRoot').Count) 'the mirrored open-pr.ps1 calls it at both sites'
     }
 
+    # --- 17. the lane knob reaches the test gate, unchanged (issue #1443) -------------------------
+    # THE WHOLE CHANGE IS A PASSTHROUGH, so the only thing worth asserting is that the number arrives
+    # and that nothing on the way invents a policy of its own. Run for real, with a FAKE
+    # Invoke-TestSuiteGate that records what it was handed -- which is exactly the seam case 15b
+    # proves is read from the caller's scope, used here in the other direction.
+    Write-Host "`n== 17. -MaxParallel travels from the caller to the test gate ==" -ForegroundColor Cyan
+
+    $script:SeenMaxParallel = 'never called'
+    function Invoke-TestSuiteGate {
+        param([string]$TestsDir, [string]$Context, [int]$MaxParallel = 0, [int]$Shard = 0, [int]$ShardCount = 0)
+        $script:SeenMaxParallel = $MaxParallel
+        return $true
+    }
+
+    # 17a. A number passed in arrives as that number.
+    $r17 = New-GitFixture
+    Assert-True (Invoke-WorkflowGates -RepoRoot $r17 -SkipLint -MaxParallel 4 -Context 'test' -FailureConsequence 'x') 'the call succeeds with the fake test gate'
+    Assert-Equal 4 $script:SeenMaxParallel '-MaxParallel 4 arrives at Invoke-TestSuiteGate as 4'
+
+    # 17b. NOT PASSING IT IS THE OLD BEHAVIOUR, and 0 is what makes that true: Invoke-TestSuiteGate's
+    # own `-le 0` branch resolves the default, so gate-lib forwarding a literal 0 is indistinguishable
+    # from the call this replaced, which passed no -MaxParallel at all. This is the assertion that
+    # keeps a well-meaning "resolve it here instead" from silently moving the policy up a level.
+    $script:SeenMaxParallel = 'never called'
+    $r17default = New-GitFixture
+    Assert-True (Invoke-WorkflowGates -RepoRoot $r17default -SkipLint -Context 'test' -FailureConsequence 'x') 'the call succeeds without a lane count'
+    Assert-Equal 0 $script:SeenMaxParallel 'and Invoke-TestSuiteGate is handed 0 -- its own default, resolved by it and not by gate-lib'
+
+    # 17c. And the two scripts above it carry the parameter through rather than dropping it. Shape,
+    # not behaviour: running open-pr for real would run the actual gate, which is the thing this
+    # branch exists to make smaller.
+    $shipPrPath = Join-Path $RepoRoot 'scripts\release\ship-pr.ps1'
+    $shipPr     = [System.IO.File]::ReadAllText($shipPrPath)
+    Assert-True ($openPr -match '\[int\]\$MaxParallel = 0')  'open-pr.ps1 declares -MaxParallel, defaulting to 0'
+    Assert-True ($shipPr -match '\[int\]\$MaxParallel = 0')  'ship-pr.ps1 declares it too'
+    Assert-Equal 2 ([regex]::Matches($openPr, 'Invoke-WorkflowGates -RepoRoot \$repoRoot[^\r\n]*-MaxParallel \$MaxParallel').Count) 'and open-pr forwards it at BOTH call sites -- the PR path and -GatesOnly'
+    # ship-pr forwards only a non-zero value: open-pr's own default IS 0, so forwarding it always
+    # would put a lane count on the command line of every ordinary run for no effect.
+    Assert-True ($shipPr -match '\$MaxParallel -gt 0.*\$openArgs \+=') 'ship-pr forwards it to open-pr only when it was actually asked for'
+
 } finally {
     if (Test-Path -LiteralPath $FixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $FixtureRoot -ErrorAction SilentlyContinue

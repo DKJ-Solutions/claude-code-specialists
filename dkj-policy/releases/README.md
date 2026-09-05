@@ -2,7 +2,7 @@
 
 Releases in this repo are cut by the shared release workflow: the tier model, what a release must earn,
 the release documents, and how one is cut. **That process is not this repo's own** — it is what the
-`contributing-davekjohn` plugin does, in every repo that enables it, and it is described once, with the plugin:
+`dkj-policy` plugin does, in every repo that enables it, and it is described once, with the plugin:
 
 📄 **[Releases — the portable half](../../plugins/workflows/dkj-policy/RELEASES-portable.md)**
 
@@ -48,12 +48,12 @@ measurement lives.
 > is none any more. The process ships with the plugin as
 > [`RELEASES-portable.md`](../../plugins/workflows/dkj-policy/RELEASES-portable.md) and stays current
 > through plugin updates, which is exactly what a hand-maintained mirror cannot do (two consumers measured
-> that cost before this split — inbound #646). Your own `contributing-davekjohn/releases/README.md` (the
+> that cost before this split — inbound #646). Your own `dkj-policy/releases/README.md` (the
 > `adopt-workflow-folder` skill scaffolds it) holds only what this section holds: a pointer to the
 > portable page, your seam values and your local decisions.
 >
 > **Your release list does not go on this page — it goes beside it**, in
-> `contributing-davekjohn/releases/history.md`, which is where `Get-ReleaseHistoryPath` already points if you
+> `dkj-policy/releases/history.md`, which is where `Get-ReleaseHistoryPath` already points if you
 > leave it alone (issue #885). The two are separate documents at the same address, which is exactly why the
 > list is not called `README.md`. If you have been cutting releases into a `releases/README.md` at your repo
 > root, that is a **layout rather than a mistake** — repoint the seam at it and keep one list, or leave the
@@ -134,13 +134,13 @@ This repo's answers:
 |---|---|
 | `Get-ReleasePageTitle` | `Claude Specialists` — the **product's** name, not the repository's and not what the page is. It is the masthead eyebrow and half the window title; the heading is the template's own *Release notes*. Without it the fallback would head the page `claude-code-specialists`, which is a true answer and not one to send anybody. It carried `-- release notes` until 2026-08-21, which printed those words twice |
 | `Get-ReleasePageWorkerName` | `ccs-release-notes` |
-| where the output lands | `contributing-davekjohn/releases/page/`, derived from `Get-ReleaseNoteRoot` rather than configured — the note root already says where this repo keeps its release documents |
+| where the output lands | `dkj-policy/releases/page/`, derived from `Get-ReleaseNoteRoot` rather than configured — the note root already says where this repo keeps its release documents |
 | what is committed | **nothing from that directory.** The page and the worker are derivatives of the tracked documents, and a 400 KB file changing every release would dirty the tree `cut-release.ps1` refuses to run on |
 
 **The path token is deliberately not in this repository, and that costs something worth stating.** The
 worker serves the page at `/notes/<32 hex>` with no login, so the path is the only lock — and this repo is
 **public**, which would put the key beside the door. It lives in
-`contributing-davekjohn/releases/page/worker-path-token.txt`, which `.gitignore` keeps out, so **nothing in git
+`dkj-policy/releases/page/worker-path-token.txt`, which `.gitignore` keeps out, so **nothing in git
 remembers the URL**: the file on the machine that made it is the only copy, and whoever creates it records
 the finished URL outside the repo. A consumer whose repository is private has the opposite answer available
 and should take it — a tracked token is what survives a lost machine.

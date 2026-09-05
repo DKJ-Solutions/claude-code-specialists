@@ -783,6 +783,56 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # THE CLAIM ITSELF -- the step both always-on documents prescribe and neither performs. The
+            # claim rule has been written down since Chris's persona body carried it and enforced by
+            # nothing: `gh issue edit <n> --add-assignee @me`, left to a session to remember, to type,
+            # and to read the result of. The entry above REPORTS the identity hazard; this one is what
+            # acts on it, and on the two the one-liner cannot see -- a closed issue (which it claims
+            # silently) and an issue somebody else holds (which it joins).
+            #
+            # IT TRAVELS IN dkj-policy because a claim is tracker mechanics, which is that plugin's
+            # subject: it sits with new-branch, open-pr and ship-pr, one step earlier in the same
+            # sequence. Nothing in it is Shopify-specific or repo-specific -- Get-RepoName is read
+            # defensively and gh's own resolution stands without it.
+            #
+            # AND IT IS MODEL-INVOCABLE, unlike start-task and sync-roster. The pain it removes is that
+            # a session hears "fix issue 1234" and starts fixing; a skill nobody may invoke until it is
+            # typed leaves exactly that path open.
+            Name   = 'claim-issue'
+            Source = 'scripts\task\claim-issue.ps1'
+            Plugin = 'dkj-policy'
+            Skill  = 'claim-issue'
+            # A fixture root, so the suite can point the repo-config read at a scratch tree. A consumer
+            # never types it, and documenting it would invite someone to.
+            SkillParamsExempt = @('RootOverride')
+            # NO MeasureArgs, and that is the declaration rather than an omission: the script's only
+            # no-argument form does not exist (-Issue is mandatory) and every form it does have either
+            # writes to a live tracker or spends two network round trips on one. A timing harness must
+            # not claim an issue as a side effect of measuring.
+        },
+        @{
+            # The identity a checkout ACTS as versus the one it COMMITS as, read once for both callers
+            # (issue #1315). It was written inside check-git-identity.ps1, which reports the split;
+            # claim-issue.ps1 has to ACT under the right name and cannot dot-source that file, which
+            # runs its comparison and exits on load. Extracting beat a second copy of
+            # Get-ActiveGhAccount's multi-account parse -- the subtle one, and the one a repo whose
+            # branch-prefix table says "do it here -- and nowhere else" does not get to keep two of.
+            Name    = 'git-identity-lib'
+            Source  = 'scripts\lib\git-identity-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # claim-issue's two decisions -- which account, and whether this issue may be claimed at
+            # all. A lib for the reason measure-skill-lib is one: everything around them is a gh
+            # round-trip a suite cannot run, so the decisions are the half that CAN be pinned, and they
+            # are where all four refusals live. Pinned by scripts/tests/claim-issue.tests.ps1.
+            Name    = 'claim-issue-lib'
+            Source  = 'scripts\lib\claim-issue-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
             # The pre-task sync (inbound #787, August 20, 2026). THE HIGHEST-RISK SCRIPT IN A SHOPIFY
             # CONSUMER, and it was written twice by hand before it shipped -- destructively the first
             # time, in both repos. A live theme has no locking and no merge, so work starts by mirroring

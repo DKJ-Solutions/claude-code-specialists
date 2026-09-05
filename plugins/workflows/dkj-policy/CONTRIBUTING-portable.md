@@ -120,6 +120,14 @@ assignee is somebody's. The tracker is the only thing two sessions share: neithe
 so an unassigned issue is indistinguishable from an untouched one, which is how the same repair gets built
 twice and discovered at the merge.
 
+**[`claim-issue`](skills/claim-issue/SKILL.md) performs it**, and it exists because a rule enforced by
+memory alone is one that gets skipped — measured in this plugin's own source repo, where **0 of 67**
+assigned issues carried the identity holding 132 merged PRs there. It does the three things the obvious
+one-liner cannot: it never sends `@me` (which binds to your `gh` account, not the one your commits will
+name), it **refuses a closed issue**, which `gh issue edit --add-assignee` claims silently, and it
+**refuses one somebody else holds**, which that command joins. It writes one assignee and nothing else —
+the branch stays step 2's.
+
 **Whether your issue labels line up with your branch prefixes is decided here rather than at step 2.** An
 issue whose label already names the prefix its branch will get reads as work; one that does not is
 classified twice. Your prefixes are your own (step 2) and your labels are your tracker's — **nothing in
