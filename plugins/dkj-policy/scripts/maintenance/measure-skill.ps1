@@ -447,7 +447,7 @@ if ($UpdateBaseline) {
         # IT MERGES, IT DOES NOT REPLACE, and that is a repair rather than a nicety. -UpdateBaseline
         # used to write exactly what this run measured, so a scoped run -- one -Plugin, or one -Skill --
         # silently deleted every baseline entry outside its own scope. Measured while building this:
-        # `-Plugin team-alpha -UpdateBaseline` reduced an 18-skill baseline to 4 and reported success.
+        # `-Plugin dkj-team-alpha -UpdateBaseline` reduced an 18-skill baseline to 4 and reported success.
         # A run narrower than the file must update its own rows and leave the rest standing.
         $merged = [ordered]@{}
         $carried = 0

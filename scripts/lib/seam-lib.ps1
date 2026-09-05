@@ -147,7 +147,7 @@ function Test-IsWorkflowSourceRepo {
     # -contains against the property NAMES rather than reaching for $json.plugins: under Set-StrictMode a
     # missing property THROWS, and a manifest with no plugins array is a real shape -- the fixture in
     # adopt-workflow-folder.tests.ps1 writes '{}' and caught this the first time the suite ran. Same
-    # idiom, same reason, as the settings walk in team-shopify's floor session check.
+    # idiom, same reason, as the settings walk in dkj-team-shopify's floor session check.
     if ($null -eq $json) { return $false }
     if (-not ($json.PSObject.Properties.Name -contains 'plugins')) { return $false }
     foreach ($plugin in @($json.plugins)) {

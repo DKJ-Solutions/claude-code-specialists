@@ -148,13 +148,13 @@ function New-CutFixture {
   "name": "claude-code-specialists",
   "owner": { "name": "fixture" },
   "plugins": [
-    { "name": "team-fixture",     "source": "./plugins/teams/team-fixture" },
+    { "name": "team-fixture",     "source": "./plugins/dkj-teams/team-fixture" },
     { "name": "workflow-fixture", "source": "./plugins/workflows/workflow-fixture" }
   ]
 }
 "@
     foreach ($p in @(
-        @{ Path = 'plugins\teams\team-fixture';         Name = 'team-fixture' },
+        @{ Path = 'plugins\dkj-teams\team-fixture';         Name = 'team-fixture' },
         @{ Path = 'plugins\workflows\workflow-fixture'; Name = 'workflow-fixture' })) {
         Write-Utf8 (Join-Path $root "$($p.Path)\.claude-plugin\plugin.json") @"
 {
@@ -289,7 +289,7 @@ try {
 
     # Lockstep is the property a consumer depends on: team-fixture and workflow-fixture must move
     # together, because a consumer running both needs matching versions.
-    $v1 = (Get-Content -LiteralPath (Join-Path $root 'plugins\teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    $v1 = (Get-Content -LiteralPath (Join-Path $root 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     $v2 = (Get-Content -LiteralPath (Join-Path $root 'plugins\workflows\workflow-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.1' $v1 'happy path: the team plugin was bumped to the patch version'
     Assert-Equal '1.4.1' $v2 'happy path: the workflow plugin moved with it -- lockstep, not per plugin'
@@ -328,7 +328,7 @@ try {
     $root2 = New-CutFixture -Name 'unearned'
     $r2 = Invoke-Cut -Root $root2 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-True ($r2.Code -ne 0) 'unearned minor: refused with a non-zero exit'
-    $v3 = (Get-Content -LiteralPath (Join-Path $root2 'plugins\teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    $v3 = (Get-Content -LiteralPath (Join-Path $root2 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.0' $v3 'unearned minor: NOTHING was written -- the gate runs before the first write'
     Assert-Equal '' (Get-GitOut -Root $root2 -GitArgs @('tag','--list')).Trim() 'unearned minor: and no tag was created'
 
@@ -341,7 +341,7 @@ try {
     $r3 = Invoke-Cut -Root $root3 -Arguments @('-Version', '2.0.0', '-NoPush', '-SkipLint', '-SkipTests', '-SkipTierGate')
     Assert-True ($r3.Code -ne 0) 'new major: refused with a non-zero exit'
     Assert-Equal '' (Get-GitOut -Root $root3 -GitArgs @('tag','--list')).Trim() 'new major: no tag was created'
-    $v4 = (Get-Content -LiteralPath (Join-Path $root3 'plugins\teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    $v4 = (Get-Content -LiteralPath (Join-Path $root3 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.0' $v4 'new major: and no version was bumped -- the refusal leaves the tree untouched'
 
     # --- 4. The audience section follows the repo's tier, not the literal 2 (inbound #747) ---------
@@ -421,7 +421,7 @@ try {
     # is behind -- a refusal naming one of them leaves exactly the question that caused the defect.
     Assert-Match '1\.4\.0' $r6.Out 'baseline: the message names the baseline it read'
     Assert-Match '1\.9\.9' $r6.Out 'baseline: and the version the overview records'
-    $v6 = (Get-Content -LiteralPath (Join-Path $root6 'plugins\teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    $v6 = (Get-Content -LiteralPath (Join-Path $root6 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.0' $v6 'baseline: nothing was written -- the check runs with the other guardrails, before the first write'
     Assert-Equal '' (Get-GitOut -Root $root6 -GitArgs @('tag','--list')).Trim() 'baseline: and no tag was created'
 

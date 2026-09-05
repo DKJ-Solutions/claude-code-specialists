@@ -6,7 +6,7 @@ repo*, offered as something a repo can deliberately pick up. There is no sibling
 a repo has until it chooses this one is its own way of working, which it never stopped having.
 
 **It carries no specialists.** A workflow changes how the existing ones work, not who they are; the
-specialists come from [the teams](https://github.com/DaveKJohn/claude-code-specialists/tree/main/). Enabling this without `team-alpha` gives you skills with
+specialists come from [the teams](https://github.com/DaveKJohn/claude-code-specialists/tree/main/). Enabling this without `dkj-team-alpha` gives you skills with
 nobody to invoke them.
 
 **This folder is the government, and its ministries sit inside it.** `dkj-policy` is the prime ministry:
@@ -153,7 +153,7 @@ answered by the repo rather than baked into the plugin:
   grouping, and the rest.
 - **`scripts/lib/branch-info.ps1`** — your branch taxonomy: which prefixes exist and what each one means.
 
-`specialists-init` (from `team-alpha`) scaffolds both, and **the `adopt-dkj-policy` skill's Part 2 fills them in**: it *places*
+`specialists-init` (from `dkj-team-alpha`) scaffolds both, and **the `adopt-dkj-policy` skill's Part 2 fills them in**: it *places*
 the answers that state a shared way of working and *proposes* — never places — the answers that state what
 your repo **is**. A `decide` answer is deliberately never written as a stub, because a stub returning a
 placeholder overrides a documented fallback that is usually right; absent beats wrong.
@@ -199,6 +199,6 @@ stay; the skills and scripts that read them stop.
 ## Enabling it
 
 Part of the adoption path in [`INSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/);
-[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/) is the mirror. It requires the core team `team-alpha`, which
+[`UNINSTALL.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/) is the mirror. It requires the core team `dkj-team-alpha`, which
 every consuming repo enables anyway. Enabling or disabling it is an ordinary plugin change rather than a
 migration, and there is no second one to switch between: the two directions are **on** and **off**.

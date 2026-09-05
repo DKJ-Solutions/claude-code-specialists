@@ -31,8 +31,8 @@ land here, because a script travels to whichever plugin owns the surface that ca
 | where the mirror lands | why there |
 |---|---|
 | `dkj-policy` (this folder) | the branch/PR/release way of working, which is what this plugin *is* |
-| `team-shopify` | the store-facing scripts, whose surface belongs to the platform team |
-| `team-alpha` | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
+| `dkj-team-shopify` | the store-facing scripts, whose surface belongs to the platform team |
+| `dkj-team-alpha` | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
 
 *A fourth destination, `workflow-default`, held one pair — `lib/check-report-lib.ps1` again — until
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) removed that plugin on
@@ -42,7 +42,7 @@ August 26, 2026.*
 stale** — three times over, so far. Three rows were missing when the count was last checked (August 15,
 2026 — `adopt-workflow-folder`, `session-status` and `source-repo-guard-lib`, each registered but never
 listed), re-measuring on August 26 found the header, the destination split and the row list all wrong at
-once, the split not even naming `team-shopify` as a destination, and a third re-measurement
+once, the split not even naming `dkj-team-shopify` as a destination, and a third re-measurement
 ([#1486](https://github.com/DaveKJohn/claude-code-specialists/issues/1486), September 6, 2026) found 21
 more rows absent — every row from `task/claim-issue.ps1` down through `lib/claim-issue-lib.ps1` in the
 table above, now added. `session-status` has since gone the other way: it was removed along with `/lock`

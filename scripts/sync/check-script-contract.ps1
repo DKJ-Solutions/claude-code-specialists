@@ -291,7 +291,7 @@ if ($contractLibs.Count -gt 0 -and $presentLibs.Count -eq 0) {
     # marker; the short of it is that the refused model's next move is the absolute path into the
     # plugin cache, and this line is where that temptation is created. The 'adopt-dkj-policy'
     # imperative further down is NOT the same case and stays as it is: that skill carries no flag.
-    Write-Host ("  [BOOTSTRAP] this repo has none of the libs the shared workflow scripts expect (" + ($contractLibs -join ', ') + ") -- it has not been set up yet. Nothing is broken: those files are what /team-alpha:specialists-init puts down as scaffolds for you to fill in. That command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. Until then this check reports nothing further, because every required function would otherwise be listed against a file that does not exist yet.") -ForegroundColor Yellow
+    Write-Host ("  [BOOTSTRAP] this repo has none of the libs the shared workflow scripts expect (" + ($contractLibs -join ', ') + ") -- it has not been set up yet. Nothing is broken: those files are what /dkj-team-alpha:specialists-init puts down as scaffolds for you to fill in. That command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. Until then this check reports nothing further, because every required function would otherwise be listed against a file that does not exist yet.") -ForegroundColor Yellow
     Write-CheckSummary
     exit 0
 }

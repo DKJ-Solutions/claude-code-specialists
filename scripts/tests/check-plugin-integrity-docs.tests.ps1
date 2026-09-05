@@ -484,7 +484,7 @@ try {
     #        BOM before any regex in this script runs, and no editor shows it -- so the assertions below
     #        pin the byte-level reading as much as the finding.
     Write-Host "  check 26: frontmatter opens with '---', with no byte-order mark" -ForegroundColor DarkCyan
-    $bomSkill = Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\SKILL.md'
+    $bomSkill = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\skills\skill-alpha\SKILL.md'
     $bomGoodBytes = [System.IO.File]::ReadAllBytes($bomSkill)
 
     # 66. The measured defect, in the exact shape it shipped: three bytes in front of a correct file.
@@ -526,7 +526,7 @@ try {
     # 70. THE REGISTRATION SCOPE. A deeper references/SKILL.md is a progressive-disclosure page that
     #     nothing registers, so there is no positional frontmatter parse for a BOM to break. The depth
     #     decoy already in this fixture is the subject, given a BOM it must NOT be reported for.
-    $bomDecoy = Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\references\SKILL.md'
+    $bomDecoy = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\skills\skill-alpha\references\SKILL.md'
     $bomDecoyGood = [System.IO.File]::ReadAllBytes($bomDecoy)
     [System.IO.File]::WriteAllBytes($bomDecoy, (@([byte]0xEF, [byte]0xBB, [byte]0xBF) + $bomDecoyGood))
     $fmb4 = Invoke-Integrity -FixtureRoot $Fixture
@@ -586,7 +586,7 @@ try {
     #        names that layer explicitly, and a SessionStart hook that does not parse fails silently --
     #        the harness reports it and the session simply continues without what the hook was there to
     #        say. A parse error there was invisible to this gate for as long as the hooks were out.
-    $hookProbe = Join-Path $Fixture 'plugins\teams\team-alpha\hooks\probe-sessioncheck.ps1'
+    $hookProbe = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\hooks\probe-sessioncheck.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $hookProbe) -Force | Out-Null
     [System.IO.File]::WriteAllText($hookProbe, ($asciiCleanBody + '$sep = ' + "'" + [char]0x00B7 + "'`n"), $Utf8NoBom)
     $sa4 = Invoke-Integrity -FixtureRoot $Fixture
@@ -646,13 +646,13 @@ try {
     # matters: a gate that now accepts MORE cannot be seen to have started accepting everything. So all
     # four states are asserted, not just the new one.
     #
-    # The fixture's team-alpha carries no specialists, so this scenario builds its own pair and removes
+    # The fixture's dkj-team-alpha carries no specialists, so this scenario builds its own pair and removes
     # them again -- every other check in this file reads that plugin too, and a stray agent def would
     # change what checks 7 and 26 walk for the scenarios below.
     Write-Host "check 6b: a manual may be backed by a persona, and must then be named by it" -ForegroundColor Cyan
-    $spAgents   = Join-Path $Fixture 'plugins\teams\team-alpha\agents'
-    $spManuals  = Join-Path $Fixture 'plugins\teams\team-alpha\manuals'
-    $spPersonas = Join-Path $Fixture 'plugins\teams\team-alpha\personas'
+    $spAgents   = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\agents'
+    $spManuals  = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\manuals'
+    $spPersonas = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\personas'
     New-Item -ItemType Directory -Path $spManuals  -Force | Out-Null
     New-Item -ItemType Directory -Path $spPersonas -Force | Out-Null
     $spManualPath  = Join-Path $spManuals  '99-99-manual.md'

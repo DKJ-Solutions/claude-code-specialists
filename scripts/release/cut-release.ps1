@@ -540,7 +540,7 @@ if ($pluginTier) {
     $marketplaceName = Get-MarketplaceName -MarketplaceJson (Get-MarketplaceJsonText)
     # KEYED ON THE PLUGIN NAME rather than the manifest path. The key is only ever read back in
     # Get-LockstepVersion's error text, where a lockstep disagreement has to be readable at a glance --
-    # 'team-alpha: 3.9.0' says which plugin is out of step; an absolute path makes the reader work out
+    # 'dkj-team-alpha: 3.9.0' says which plugin is out of step; an absolute path makes the reader work out
     # the same fact from a folder name.
     $manifestContents = @{}
     foreach ($p in $manifests) { $manifestContents[$p.Name] = (Get-Content -Path $p.ManifestPath -Raw -Encoding UTF8) }
@@ -1268,8 +1268,8 @@ function Write-SelfConsumptionReminder {
         declarative way has no record -- and this function used to read only the settings key, which made
         the very source it consulted the one that guaranteed the command it printed could not succeed:
 
-            claude plugin update team-alpha@claude-code-specialists --scope project
-            -> Failed to update plugin "...": Plugin "team-alpha" is not installed
+            claude plugin update dkj-team-alpha@claude-code-specialists --scope project
+            -> Failed to update plugin "...": Plugin "dkj-team-alpha" is not installed
 
         Both halves were measured rather than reasoned about, because the report that found this flagged
         the second as inferred and the repair differs per answer:

@@ -45,7 +45,7 @@ $EntryScaffoldSrc  = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # all, which is how its absence showed up: every single case failed at exit 1 before the first assert.
 $WorktreeLibSrc    = Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1'
 # And for the merged-PR proof itself (issue #1194): the map and the two-part test every proof-(b) case
-# below is decided by, shared with team-shopify's sync-main.ps1 since the same mechanism turned out to
+# below is decided by, shared with dkj-team-shopify's sync-main.ps1 since the same mechanism turned out to
 # have been repaired twice in one day. Same reason as worktree-lib above -- and it was rediscovered the
 # same way the moment the dot-source was added and this line was not.
 $MergedPrLibSrc    = Join-Path $RepoRoot 'scripts\lib\merged-pr-lib.ps1'

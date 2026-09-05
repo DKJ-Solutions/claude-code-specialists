@@ -9,7 +9,7 @@
     ]
   },
   "enabledPlugins": {
-    "team-alpha@claude-code-specialists": true,
+    "dkj-team-alpha@claude-code-specialists": true,
     "dkj-policy@claude-code-specialists": true
   },
   "extraKnownMarketplaces": {

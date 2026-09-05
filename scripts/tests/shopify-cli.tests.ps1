@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Contract tests for scripts/lib/shopify-cli-lib.ps1 -- Invoke-ShopifyCli, the one place team-shopify's
+    Contract tests for scripts/lib/shopify-cli-lib.ps1 -- Invoke-ShopifyCli, the one place dkj-team-shopify's
     scripts invoke the Shopify CLI (inbound #1183).
 
 .DESCRIPTION
@@ -151,14 +151,14 @@ foreach ($rel in @('scripts\task\sync-main.ps1', 'scripts\task\push-preview.ps1'
     Assert-True ($text -notmatch 'Test-Path[^\n]*shopify-cli-lib') "and unguarded, so $leaf fails at load without it"
 }
 
-# THE LIB TRAVELS IN team-shopify's OWN PAYLOAD. Without the registry entry the mirrored scripts
+# THE LIB TRAVELS IN dkj-team-shopify's OWN PAYLOAD. Without the registry entry the mirrored scripts
 # dot-source a file that is not in the mirror, and both fail at load in every consumer that installed
-# team-shopify. build-shared-scripts -Check cannot catch that: it compares the pairs the registry
+# dkj-team-shopify. build-shared-scripts -Check cannot catch that: it compares the pairs the registry
 # declares, so a missing entry is a pair it never looks at.
 . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
 $pair = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
-    Where-Object { $_.Plugin -eq 'team-shopify' -and $_.SourceRel -eq 'scripts\lib\shopify-cli-lib.ps1' })
-Assert-Equal 1 $pair.Count 'the registry mirrors the wrapper into team-shopify'
+    Where-Object { $_.Plugin -eq 'dkj-team-shopify' -and $_.SourceRel -eq 'scripts\lib\shopify-cli-lib.ps1' })
+Assert-Equal 1 $pair.Count 'the registry mirrors the wrapper into dkj-team-shopify'
 Assert-True ($pair.Count -eq 1 -and (Test-Path -LiteralPath $pair[0].MirrorPath -PathType Leaf)) 'and that mirror is present beside the mirrored scripts'
 
 Write-Host ""

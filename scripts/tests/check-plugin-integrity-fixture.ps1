@@ -171,8 +171,8 @@ function New-IntegrityFixture {
     # check 10 fixture: two canonical skills (skill-alpha, skill-beta) plus a DEPTH DECOY -- a
     # SKILL.md one level deeper (skills/<name>/references/SKILL.md) that must NOT be picked up as a
     # third canonical skill, exercising the exact-depth binding of check 10's canonical-skillset scan.
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\references') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-beta') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\skills\skill-alpha\references') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\skills\skill-beta') -Force | Out-Null
 
     # The marketplace: what makes those directories PLUGINS rather than just directories. EVERY plugin
     # the shared-scripts registry names is declared here, each with a manifest, so checks 1 and 2 pass
@@ -190,27 +190,27 @@ function New-IntegrityFixture {
     # Get-DefaultChangelogPath, so its changelog resolves to dkj-policy/CHANGELOG.md like
     # every other repo's. The three suites that write a changelog into this fixture write it there.
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'dkj-policy') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\teams\team-shopify\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\.claude-plugin') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\dkj-teams\dkj-team-shopify\.claude-plugin') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'plugins\dkj-policy\.claude-plugin') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude-plugin\marketplace.json'), (@'
 {
   "name": "fixture-marketplace",
   "plugins": [
-    { "name": "team-alpha",         "source": "./plugins/teams/team-alpha" },
-    { "name": "team-shopify",       "source": "./plugins/teams/team-shopify" },
+    { "name": "dkj-team-alpha",         "source": "./plugins/dkj-teams/dkj-team-alpha" },
+    { "name": "dkj-team-shopify",       "source": "./plugins/dkj-teams/dkj-team-shopify" },
     { "name": "dkj-policy", "source": "./plugins/dkj-policy" }
   ]
 }
 '@), $Utf8NoBom)
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\.claude-plugin\plugin.json'),
-        "{ `"name`": `"team-alpha`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
-    # team-shopify joined the registry on August 20, 2026 with adopt-shopify-floor and its copy of the
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\.claude-plugin\plugin.json'),
+        "{ `"name`": `"dkj-team-alpha`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    # dkj-team-shopify joined the registry on August 20, 2026 with adopt-shopify-floor and its copy of the
     # source-repo guard lib. It is here for exactly the reason the paragraph above gives, and it cost
     # 22 unrelated failures across this suite's siblings before the list grew with it -- the second
     # measured instance of that same failure, after workflow-default.
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-shopify\.claude-plugin\plugin.json'),
-        "{ `"name`": `"team-shopify`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\dkj-teams\dkj-team-shopify\.claude-plugin\plugin.json'),
+        "{ `"name`": `"dkj-team-shopify`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\dkj-policy\.claude-plugin\plugin.json'),
         "{ `"name`": `"dkj-policy`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
 
@@ -234,18 +234,18 @@ function New-IntegrityFixture {
         (((Get-PrTemplateReference) -join "`n") + "`n"), $Utf8NoBom)
 
     $skillAlphaMd = "---`nname: skill-alpha`ndescription: Fixture skill alpha.`n---`n`n# Skill Alpha`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\skills\skill-alpha\SKILL.md'), $skillAlphaMd, $Utf8NoBom)
     # SKILL-BETA IS THE BARRED ONE (check 30), and skill-alpha above deliberately is not. That pair is
     # the whole fixture check 30 needs: the same sentence about the two must come out differently, which
     # is what makes the rule frontmatter-driven rather than a phrasing convention. Adding the line here
     # rather than in a fifth fixture skill keeps the canonical set at two, which check 10's scenarios
     # count on.
     $skillBetaMd = "---`nname: skill-beta`ndescription: Fixture skill beta.`ndisable-model-invocation: true`n---`n`n# Skill Beta`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\skills\skill-beta\SKILL.md'), $skillBetaMd, $Utf8NoBom)
     # The depth decoy claims its own name (skill-deep-decoy) in frontmatter -- if check 10 ever
     # regressed to a looser depth match, that name would silently become a 3rd canonical skill.
     $skillDeepDecoyMd = "---`nname: skill-deep-decoy`ndescription: Depth decoy -- must not count as a canonical skill.`n---`n`n# Skill Deep Decoy`n"
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-alpha\skills\skill-alpha\references\SKILL.md'), $skillDeepDecoyMd, $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\skills\skill-alpha\references\SKILL.md'), $skillDeepDecoyMd, $Utf8NoBom)
 }
 
 # The closing summary, identical in all four suites: one place, so four files cannot drift on how
