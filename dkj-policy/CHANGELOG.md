@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1479-wrangler-toml-silent-write · 20260905-233824
+
+`build-release-notes-page.ps1 -Worker` no longer writes a fresh `wrangler.toml` in silence. That file
+shares the gitignored page directory with the path token and is lost by the same mechanisms, so an
+absent one is as likely to mean the directory was rebuilt from nothing as it is to mean a first run --
+and the generated replacement carries none of what a consumer had edited in (an account id, a custom
+domain, a route). The write now says so, in the same reported-not-refused shape as the `-InitToken`
+note, because a first-ever deploy looks identical from there. The one run that finds the file already
+present stays silent, so the note belongs to the write rather than to every build.
+
+The condition the report proposed -- gate the note on a non-empty `Get-ReleasePageWorkerName` -- is
+deliberately not there: `-Worker` already refuses an empty worker name above this line, so reaching the
+write is itself that evidence, and the comment says so to stop the no-op being added back as a
+tightening.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the reader of a release note is not the person running `-Worker` in their own checkout; this
+reaches whoever hosts the page, which is a maintainer.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report the fresh wrangler.toml write instead of passing it off as routine
+
+Plugins: dkj-policy
+
+[PR #1482](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1482)
+
+---
+
 ### DEPLOY: docs/1477-retired-adopt-skill-names · 20260905-232622
 
 Five live pages still told a reader to invoke `adopt-config` or `adopt-workflow-folder` -- the two skills
