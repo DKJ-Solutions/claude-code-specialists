@@ -259,7 +259,7 @@ newest name first, and every seam default is composed from its answer — so a r
 its release history and its branch documents exactly where they are.
 
 What that costs is one thing worth knowing before you decide: **the scaffolder writes the new name.** Run
-`adopt-dkj-policy`'s Part 1 in a repo that still has the old folder and you get a second folder beside the one
+the `adopt-dkj-policy` skill's Part 1 in a repo that still has the old folder and you get a second folder beside the one
 holding your history. So either rename yours in one commit —
 
 ```powershell

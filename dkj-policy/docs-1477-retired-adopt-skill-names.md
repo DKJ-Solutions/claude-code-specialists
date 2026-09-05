@@ -33,17 +33,18 @@
 
 ### PLAN
 
-Six live sites name the two merged-away skills; the registry bullet in #1477 was verified and does NOT stand.
+Seven live lines across five pages name the two merged-away skills; the registry bullet in #1477 was verified and does NOT stand.
 
 ### CREATE
 
-- [x] `plugins/dkj-policy/README.md` -- the seam section names `adopt-dkj-policy`'s Part 2, so the page
+- [x] `plugins/dkj-policy/README.md` -- the seam section names the `adopt-dkj-policy` skill's Part 2, so the page
       stops contradicting its own skill table two screens up
 - [x] `INSTALL.md` -- step 4's list of adopt skills, and the folder-rename warning further down
 - [x] `plugins/dkj-policy/CONTRIBUTING-portable.md` -- the paragraph on what places the CI gate's six lines
 - [x] `scripts/README.md` -- the entry-point table's Skill cell for `task/adopt-config.ps1`
-- [x] `plugins/teams/team-shopify/skills/adopt-shopify-floor/SKILL.md` -- cites `adopt-config.ps1`, the
-      script that still exists, rather than the page that was deleted
+- [x] `plugins/teams/team-shopify/skills/adopt-shopify-floor/SKILL.md` -- both lines cite the `.ps1`
+      scripts that still exist rather than the pages that were deleted. The second, in the `-Apply` row
+      nineteen lines above the first, was Edith's find on the copy edit
 - [~] `scripts/lib/shared-scripts-lib.ps1` -- dropped: the bullet was read against the code and does not
       stand. `Name` is the script's own filename (`scripts\task\adopt-config.ps1`, which exists) and the
       field that resolves a documenting page, `Skill`, already reads `adopt-dkj-policy`. #1477 marked this
@@ -60,10 +61,10 @@ Six live sites name the two merged-away skills; the registry bullet in #1477 was
 Five live pages still told a reader to invoke `adopt-config` or `adopt-workflow-folder` -- the two skills
 [#1471](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1471) merged into `adopt-dkj-policy`,
 deleting both `SKILL.md` pages. They now name the surviving skill and the part of it that does the work.
-Three of the five were beyond what [#1477](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1477)
+Four of the seven lines were beyond what [#1477](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1477)
 listed, which said so in as many words: the class is wider than the lines it had measured.
 
-The sixth site the issue named, the registry entry in `scripts/lib/shared-scripts-lib.ps1`, is deliberately
+The third site the issue named, the registry entry in `scripts/lib/shared-scripts-lib.ps1`, is deliberately
 untouched. It was filed as inferred rather than measured, and reading the code collapses it: `Name` is the
 script's own filename and the field a gate resolves a documenting page from is `Skill`, which has read
 `adopt-dkj-policy` since the merge.
@@ -81,4 +82,4 @@ a support round rather than a shrug.
 
 #### Pull Request
 
-the retired adopt-config and adopt-workflow-folder names off the live pages
+the live pages name adopt-dkj-policy, not the two skills it replaced
