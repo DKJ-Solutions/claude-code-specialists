@@ -63,22 +63,48 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # continue-on-error is deliberate: check-unfolded-entry.ps1 exits non-zero on a genuine
+      # find, which is the case this job exists to act on, not a step failure. BUT that leaves
+      # a real crash in the detector (a git call misbehaving, an unhandled exception) exiting
+      # non-zero too, indistinguishable from "found" at the process boundary -- and the fold
+      # step below refuses to treat those the same, rather than folding blind on an outcome it
+      # cannot explain (Victor #19, pre-merge review of this branch).
       - name: Is there an unfolded changelog entry on the trunk?
         id: check
         shell: powershell
         continue-on-error: true
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-unfolded-entry.ps1 -Branch main
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-unfolded-entry.ps1 -Branch main *>&1 | Tee-Object -FilePath check-output.txt
           exit $LASTEXITCODE
 
       - name: Fold it (fold-all mode -- every leftover this push may carry)
-        if: steps.check.outcome == 'failure'
+        if: ${{ steps.check.outcome == 'failure' }}
         shell: powershell
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          # The check step's own known-good signature (its [ERROR] line, verified against the
+          # live script) is what tells "a leftover was found" apart from "the script crashed for
+          # some other reason" -- both exit non-zero, and only one of them is safe to act on.
+          $checkOutput = Get-Content check-output.txt -Raw
+          if ($checkOutput -notmatch '\[ERROR\] the trunk carries') {
+            Write-Error "check-unfolded-entry.ps1 exited non-zero for a reason other than a reported leftover -- refusing to fold blind. Its output:`n$checkOutput"
+            exit 1
+          }
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/fold-changelog-entry.ps1 -Commit -Push
-          exit $LASTEXITCODE
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/fold-changelog-entry.ps1 -Commit -Push *>&1 | Tee-Object -FilePath fold-output.txt
+          $foldExitCode = $LASTEXITCODE
+
+          # The two scripts read the same trunk a moment apart and must agree: the check found a
+          # leftover, so fold-all mode reporting nothing to fold is a real disagreement between
+          # them, not a race worth swallowing -- fail loudly rather than report the job green on
+          # a fold that fixed nothing.
+          $foldOutput = Get-Content fold-output.txt -Raw
+          if ($foldOutput -match 'No entry files found to fold') {
+            Write-Error "check-unfolded-entry.ps1 reported a leftover but fold-changelog-entry.ps1 found nothing to fold -- the two disagree, which should not happen. Its output:`n$foldOutput"
+            exit 1
+          }
+          exit $foldExitCode
