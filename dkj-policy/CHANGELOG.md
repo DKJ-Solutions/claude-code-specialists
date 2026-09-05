@@ -32,6 +32,60 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1446-tip-utf8-decode · 20260905-183608
+
+`new-branch.ps1` reads the remote tip's subject with **`-Utf8`**, so the control-and-format strip added in
+[#1439](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1439) sees the characters it exists
+to remove. Until now it did not, on any Windows console whose code page is not UTF-8 -- which is the
+default.
+
+**The guard was green in the one environment that did not need it.** Windows PowerShell 5.1 decodes a
+native child's stdout with `[Console]::OutputEncoding`. On a cp850 console the three UTF-8 bytes of an RTL
+override (`e2 80 ae`) arrive as the three ordinary printable characters cp850 maps them to -- and
+`\p{Cf}` does not match an ordinary printable character, so nothing was stripped. Encoding those same three
+characters back out is byte-identical, so the payload was reconstituted intact the moment anything
+downstream decoded as UTF-8. The ESC half of the guard always worked, because `0x1B` is ASCII and every
+candidate code page agrees below `0x80` -- which is exactly the property
+[`language-layers.md`](../.claude/rules/language-layers.md) already names as the reason to hold the wire to
+ASCII and decode it yourself.
+
+**The mechanism was already built, documented and unused at this call site.**
+`Invoke-NativeCapture -Utf8` exists for precisely this
+([#907](https://github.com/DKJ-Solutions/claude-code-specialists/issues/907)), and its docstring says *pass
+it wherever the output is DATA rather than progress*. A commit subject that a matcher then inspects
+character by character is the strongest form of that case, and the flag was simply not passed.
+
+**And the suite could not have caught it.** Its premise assert -- *"the commit on origin really carries the
+RTL override"*, written so the asserts below it are not vacuous -- read the subject back through `& git`,
+the same console-code-page decode the product code used. So on a non-UTF-8 console it reported the fixture
+as broken while the fixture was intact, and on a UTF-8 console everything passed. It now reads through the
+same explicit decode, which is what makes it independent.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer runs `new-branch.ps1` from the plugin mirror, on their own machine, and the guard this
+repairs is about **somebody else's text**: the tip subject is written by whoever pushed to the shared
+branch. A consumer on a default Windows console had the strip in their copy of the script and not in
+effect -- and the output it protects is read by an agent session as well as by a person, where a crafted
+subject wearing this script's own `WARNING` prefix is an injection surface rather than a display bug.
+
+Nothing about how the script is used changes, and no flag is added for them to know about. The line they
+already see is now the line the script promised.
+
+**Score:** 4
+
+#### Pull Request
+
+the remote-tip read decodes as UTF-8, so the sanitiser sees the characters it strips
+
+Plugins: dkj-policy
+
+[PR #1451](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1451)
+
+---
+
 ### DEPLOY: fix/1445-reminder-install-route · 20260905-181831
 
 `cut-release`'s closing self-consumption reminder no longer prints a command that cannot run in the repo it
