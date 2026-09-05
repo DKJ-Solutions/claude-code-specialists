@@ -33,19 +33,41 @@
 
 ### PLAN
 
+Fix inbound #1396: `README.md`:195 and `plugins/workflows/README.md`:17 still describe `bwj-codex`
+as carrying one rule, made false by PR #1392 (the sync-log chapter). The wording model to follow is
+`.claude-plugin/marketplace.json`'s own `bwj-codex` description, already updated by that PR.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Rewrite both table cells to name two chapters (ticket handling + the sync log) and to say
+      what closing the GitHub issue actually does
+- [x] Fix the same stale "extends only the ticket-work step" claim found alongside each table, in
+      the surrounding prose of both files -- same root cause (#1382/#1392), same files, left
+      unfixed it would have stood right next to the corrected table row contradicting it
 
 ### TEST
 
+- [x] `scripts/lint/check-plugin-integrity.ps1` -- 0 errors
+- [x] Confirmed the exact phrases quoted in #1396 ("resolve the Asana task", "resolves itself") no
+      longer exist anywhere in the tree -- that half of the report had already been fixed by
+      `4120e969`; only the "one rule" / chapter-count half remained
+
 ### DEPLOY: docs/1396-bwj-codex-two-chapters
 
-**Score:**
+Fixes #1396. The root `README.md` and `plugins/workflows/README.md` overview tables described
+`bwj-codex` as carrying one rule; PR #1392 gave it a second chapter (the sync log) without updating
+these two rows, and a second passage in each file repeated the same stale "ticket-work step only"
+scope. All four spots now name both chapters, matching the wording already landed in
+`.claude-plugin/marketplace.json`. Doc-only; no behaviour, script or manifest changes.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- a documentation accuracy fix describing an already-shipped, already-released chapter; no
+change to what any consuming repo experiences.
+
+**Score:** N/A
 
 #### Pull Request
 

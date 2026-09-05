@@ -14,7 +14,7 @@ splitting them is in the root README under
 | Folder | What it is |
 |---|---|
 | [`contributing-davekjohn/`](contributing-davekjohn/) | **DaveKJohn's own branch-and-entry model, packaged so a repo can choose it.** The branch, PR, changelog and release skills, the shared scripts behind them, the session hooks that belong to running this across several repos, and a config blueprint holding the source's own answers to the repo-owned seam. It has [its own README](contributing-davekjohn/README.md). |
-| [`bwj-codex/`](bwj-codex/) | **BWJ's codex — the binding rules its two Shopify store repos (smartwatchbanden, xoxowildhearts) operate under.** Today one rule, for handling Asana tickets: file on GitHub first, mirror to Asana as a colleague-friendly variant; closing the GitHub issue only makes a CI template post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself. Two skills, no specialists, no hooks. **Additive to `contributing-davekjohn`** — it extends only the ticket-work step and contradicts nothing that workflow decides. It has [its own README](bwj-codex/README.md). |
+| [`bwj-codex/`](bwj-codex/) | **BWJ's codex — the binding rules its two Shopify store repos (smartwatchbanden, xoxowildhearts) operate under.** Two chapters: **ticket handling** — file on GitHub first, mirror to Asana as a colleague-friendly variant; closing the GitHub issue only makes a CI template post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `bwj-codex/SYNC-LOG.md` instead. Two skills, no specialists, no hooks. **Additive to `contributing-davekjohn`** — it extends only the ticket-work step and what a sync branch owes, and contradicts nothing that workflow decides. It has [its own README](bwj-codex/README.md). |
 
 **`contributing-davekjohn` carries an owner's name because it is *his* branch discipline and not a
 standard**, which is exactly why a repo has to choose it rather than receive it. `bwj-codex` sits
@@ -53,7 +53,9 @@ answering this question again, deliberately, rather than discovering that the ch
 **`bwj-codex` is that second workflow, added August 31, 2026, and the question was answered on the
 merits.** It does **not** disagree with `contributing-davekjohn` about anything: it extends only the
 *ticket-work* step (how a discovered issue is filed and mirrored to Asana in BWJ's two store repos)
-and decides nothing about branch naming, the pre-PR bar, or releases. Two workflows collide when they
+and, since [#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382), what a `sync/`
+branch owes instead of a changelog entry. It decides nothing about branch naming, the pre-PR bar, or
+releases. Two workflows collide when they
 answer one question two ways; these answer different questions, so both stay enabled. The retired
 guard's reasoning is still the test for any *further* workflow — and it would fail for one that
 overlapped either of these.
