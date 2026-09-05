@@ -38,19 +38,18 @@ land here, because a script travels to whichever plugin owns the surface that ca
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) removed that plugin on
 August 26, 2026.*
 
-**The table below is NOT the complete set for this plugin**, and that is stated rather than left to be
-discovered. It is hand-maintained beside a registry that can be asked, which is the shape that goes stale:
-three rows were missing when the count was last checked (August 15, 2026 — `adopt-workflow-folder`,
-`session-status` and `source-repo-guard-lib`, each registered but never listed), and re-measuring on
-August 26 found the header, the destination split and the row list all wrong at once, the split not even
-naming `team-shopify` as a destination. `session-status` has since gone the other way: it was removed
-along with `/lock` and `/handover`
-([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), so its row went with it.
-The numbers are gone from this page for that reason; the missing rows are tracked in
-[#1486](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1486) — **21 of them**, measured
-against the registry on September 6, 2026 — because writing each one needs a description and a Skill
-answer rather than a figure. That sentence said *"tracked separately"* with nothing behind it until
-#1486 was filed, which is the same staleness this paragraph is about, one level up.
+**The table below is hand-maintained beside a registry that can be asked, which is the shape that goes
+stale** — three times over, so far. Three rows were missing when the count was last checked (August 15,
+2026 — `adopt-workflow-folder`, `session-status` and `source-repo-guard-lib`, each registered but never
+listed), re-measuring on August 26 found the header, the destination split and the row list all wrong at
+once, the split not even naming `team-shopify` as a destination, and a third re-measurement
+([#1486](https://github.com/DaveKJohn/claude-code-specialists/issues/1486), September 6, 2026) found 21
+more rows absent — every row from `task/claim-issue.ps1` down through `lib/claim-issue-lib.ps1` in the
+table above, now added. `session-status` has since gone the other way: it was removed along with `/lock`
+and `/handover` ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), so its
+row went with it. The table is complete against the registry as of that third measurement; nothing here
+guards against a fourth, because writing a new row still needs a description and a Skill answer rather
+than a figure a check could produce on its own.
 
 Not every script here is reached through a skill, and the **Skill** cell says so rather than linking one, so
 an absent link is a fact rather than an oversight.
@@ -61,6 +60,11 @@ an absent link is a fact rather than an oversight.
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-dkj-policy`](../skills/adopt-dkj-policy/SKILL.md) (Part 2) |
 | `task/adopt-workflow-folder.ps1` | scaffolds `dkj-policy/` — the folder docs, the releases root and the branch dossier | [`adopt-dkj-policy`](../skills/adopt-dkj-policy/SKILL.md) (Part 1) |
+| `task/claim-issue.ps1` | claims a GitHub issue for this checkout by the account its commits will name, not `@me` — refuses on a closed issue or one already held by someone else | [`claim-issue`](../skills/claim-issue/SKILL.md) |
+| `task/worktree-lane.ps1` | opens a branch in its own git worktree — a "lane" — so one branch can be built while another ships, and hands a lane's branch back to the primary checkout when it is ready | [`worktree-lane`](../skills/worktree-lane/SKILL.md) |
+| `task/park-cycle.ps1` | the automatic half of parking: pushes the branch's development document to origin, unless a PR has already published it | documented on the [`park`](../skills/park/SKILL.md) page; run only by the `cycle-autopark` Stop hook, never by hand |
+| `task/prune-merged.ps1` | fast-forwards the trunk and deletes local branches that are provably merged; a branch without that proof is left alone | [`prune-merged`](../skills/prune-merged/SKILL.md) |
+| `task/check-policy-drift.ps1` | lists every law-bearing document in rank order — the installed plugins' portable pages against this repo's own — so a session can read the two against each other; locates and hands over, decides nothing | [`check-policy-drift`](../skills/check-policy-drift/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
 | `release/verify-resolved-issues.ps1` | checks that a merged PR closed what it declared | [`ship-pr`](../skills/ship-pr/SKILL.md) |
@@ -69,7 +73,13 @@ an absent link is a fact rather than an oversight.
 | `release/new-internal-note.ps1` | the tier-1 note's skeleton, which needs the development notes as input | [`cut-release`](../skills/cut-release/SKILL.md) |
 | `release/build-release-notes-page.ps1` | builds the hand-written notes into one browsable page, and with `-Worker` the Cloudflare Worker that serves it — it publishes nothing | [`release-notes-page`](../skills/release-notes-page/SKILL.md) |
 | `release/release-notes-page-template.html` | the page that script fills in — the one shared file here that is not a script, mirrored for the same reason a lib is: its script reads it as a sibling | none — read by the script above |
+| `lint/check-branch-entry.ps1` | gate: does this branch carry a written changelog entry? | [`check-branch-entry`](../skills/check-branch-entry/SKILL.md) |
+| `lint/check-unfolded-entry.ps1` | gate: does the trunk carry an unfolded changelog entry — a per-branch development document a merge left behind because its fold never ran? | none — invoked by the `unfolded-entry-sessioncheck` SessionStart hook and by CI on every push to `main` |
+| `lint/check-consumer-prose.ps1` | gate: does this consumer's own law-bearing prose contradict the plugin? | none — invoked by the `consumer-prose-sessioncheck` SessionStart hook |
+| `lint/check-git-identity.ps1` | gate: does this checkout commit as the same account it acts as on the tracker? | none — invoked by the `git-identity-sessioncheck` SessionStart hook |
 | `maintenance/fix-mojibake.ps1` | repairs encoding damage in the markdown the repo names | [`fix-mojibake`](../skills/fix-mojibake/SKILL.md) |
+| `maintenance/measure-skill.ps1` | what a skill costs: token cost per skill and the wall-clock of the script it drives | [`measure-skill`](../skills/measure-skill/SKILL.md) |
+| `maintenance/measure-always-on.ps1` | what the always-on document path costs — `CLAUDE.md` plus everything it `@`-imports — per document and per section | [`measure-skill`](../skills/measure-skill/SKILL.md) |
 | `sync/check-script-contract.ps1` | read-only script-contract drift check | none — invoked by the `script-contract-sessioncheck` SessionStart hook |
 | `lib/release-lib.ps1` | the pure release logic: version bump, changelog transformation, notes construction, `Test-ReleaseBumpEarned` | none — dot-sourced lib |
 | `lib/entry-scaffold-lib.ps1` | the one definition of the entry format, read by the script that writes it and the gates that refuse it | none — dot-sourced lib |
@@ -81,6 +91,16 @@ an absent link is a fact rather than an oversight.
 | `lib/source-repo-guard-lib.ps1` | `Assert-OwnCopy` — refuses a released copy running in the repo that maintains it | none — dot-sourced lib |
 | `lib/native-capture-lib.ps1` | `Invoke-NativeCapture`, the stderr-safe native-command wrapper | none — dot-sourced lib |
 | `lib/check-report-lib.ps1` | the `[OK]`/`[INFO]`/`[ERROR]` report helper | none — dot-sourced lib |
+| `lib/measure-skill-lib.ps1` | the parsing/formatting half of `measure-skill.ps1`: turns `claude plugin details` output into figures, with no I/O of its own | none — dot-sourced lib |
+| `lib/measure-context-lib.ps1` | the shared helpers for measuring the always-on document path: the `@`-import walk, the byte-exact section split, and the calibrated chars-per-token factor | none — dot-sourced lib |
+| `lib/consumer-check-lib.ps1` | the two things every consumer-facing lint check opens with: which tree it is operating on, and which always-on documents it may read | none — dot-sourced lib |
+| `lib/merged-pr-lib.ps1` | the merged-PR proof, as one source: was this ref merged, or only a branch that once wore its name? | none — dot-sourced lib |
+| `lib/seam-lib.ps1` | `Get-SeamValue` — reads an optional repo-config seam, falling back to a default when the repo does not define one | none — dot-sourced lib |
+| `lib/gate-lib.ps1` | records what the gates proved, against which exact working state, and notices when that state moved while they ran | none — dot-sourced lib |
+| `lib/remote-ahead-lib.ps1` | composes the "behind the remote" sentence a caller prints when a local ref has fallen behind its own remote-tracking ref | none — dot-sourced lib |
+| `lib/worktree-lib.ps1` | reads `git worktree list --porcelain`: who holds which branch, and which tree is the primary one | none — dot-sourced lib |
+| `lib/git-identity-lib.ps1` | the identity a checkout acts as on the tracker and the identity it commits as, read once for every caller that needs either | none — dot-sourced lib |
+| `lib/claim-issue-lib.ps1` | the two decisions `claim-issue.ps1` makes: which account this checkout claims under, and whether the issue in front of it may be claimed at all | none — dot-sourced lib |
 
 ## How the mirror works
 
