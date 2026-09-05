@@ -32,6 +32,31 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1396-bwj-codex-two-chapters · 20260905-104626
+
+Fixes #1396. The root `README.md` and `plugins/workflows/README.md` overview tables described
+`bwj-codex` as carrying one rule; PR #1392 gave it a second chapter (the sync log) without updating
+these two rows, and a second passage in each file repeated the same stale "ticket-work step only"
+scope. All four spots now name both chapters, matching the wording already landed in
+`.claude-plugin/marketplace.json`. Doc-only; no behaviour, script or manifest changes.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a documentation accuracy fix describing an already-shipped, already-released chapter; no
+change to what any consuming repo experiences.
+
+**Score:** N/A
+
+#### Pull Request
+
+README overview tables say bwj-codex has one rule; it now has two chapters
+
+[PR #1435](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1435)
+
+---
+
 ### DEPLOY: fix/1409-already-done-check-in-new-branch · 20260905-103229
 
 `new-branch.ps1` takes an optional `-Resolves "<n[,n...]>"` and runs the same already-done check
