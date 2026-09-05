@@ -47,9 +47,8 @@ The report was held against the tree first rather than taken at its word -- the 
 - **Symptom** -- reproduced verbatim on `main` at `f8ac7598`: one `[INFO]`, block skipped.
 - **Reason** -- `.claude/settings.json` enables `dkj-policy@claude-code-specialists`, and
   `installed_plugins.json` holds a project-scope record for **this** checkout under that id
-  (`4.30.0`, commit `ba889a81`) and **none** under the retired one. On this machine the old id's
-  only surviving record belongs to `xoxowildhearts`. So the register was behind the consumer, which
-  is exactly the "CAUGHT UP" moment the register's own doctrine describes.
+  (`4.30.0`, commit `ba889a81`) and **none** under the retired one. So the register was
+  behind the consumer, which is exactly the "CAUGHT UP" moment the register's own doctrine describes.
 - **Repair** -- the empty `extensions` array is the measured answer and not an unfilled one:
   `plugins/workflows/dkj-policy/` ships no `agents/`.
 - **Size** -- only this repo's entry is out of step. The other five manifests naming
