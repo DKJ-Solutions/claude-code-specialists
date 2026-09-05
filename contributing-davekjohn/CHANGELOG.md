@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1432-source-test-census · 20260905-102625
+
+`Test-IsWorkflowSourceRepo`'s docstring no longer opens its inline-site list with a count. The figure
+said six while both the census and the bullets stood at five -- wrong on the day it was written, the
+intended sixth being `adopt-workflow-folder.ps1`, which the same docstring already describes as
+having *stopped* being an inline site. It then drifted to seven as the two consumer-prose checks
+arrived and back to five when #1422 pointed them at the function: three values in nine days, while
+the bullets stayed correct throughout.
+
+That list exists to arbitrate which question a new site should ask -- the broad "does this repo
+publish plugins" or this function's "is this repo the source of this workflow" -- and #1422 had
+already added the paragraph telling the reader to take it as evidence of a distinction rather than as
+a current inventory. A count is an inventory claim, so it is gone rather than corrected to five,
+which is why the figure cannot go stale a fourth time. A note in its place records the three values
+and points at `grep` as the inventory that is always current.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. The docstring travels to consumers in the plugin mirror, but it documents how *this* repo's own
+call sites are written and no consumer adds one; nothing a consumer runs changes behaviour.
+
+**Score:** N/A
+
+#### Pull Request
+
+The source test's inline-site census drops a count that contradicts its own closing paragraph
+
+Plugins: contributing-davekjohn
+
+[PR #1433](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1433)
+
+---
+
 ### DEPLOY: fix/1399-backing-gate-local-trunk-ref · 20260905-101346
 
 `open-pr`'s backing gate (issue #1026) is meant to refuse a push whose plan reads as finished with no
