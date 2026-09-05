@@ -55,7 +55,12 @@ holding once scaffolding becomes an unconditional part of adoption rather than a
       checks all read the touched skill/doc pages)
 - [x] Confirmed no other file in the tree repeats the retired "nothing scaffolds it, deliberately" or
       "no adopt step of its own" wording (`grep` over the repo)
-- [ ] Lint + tests green, then PR + merge + fold
+- [x] Parallel review -- Victor (code review), Edith (copy edit), Sebastian (security, since a skill
+      changed): Sebastian found nothing; Victor and Edith both independently caught the same leftover
+      contradictory sentence in `bwj-codex/README.md` (the retired ambiguity argument sitting right
+      next to the new behaviour it contradicts) -- fixed; Victor also flagged a tangled conditional in
+      step 7 and an overstated "mirrors step 1" claim in this dossier -- both fixed
+- [x] Lint + tests green, then PR + merge + fold
 
 ### DEPLOY: feat/bwj-codex-scaffold-sync-log
 
