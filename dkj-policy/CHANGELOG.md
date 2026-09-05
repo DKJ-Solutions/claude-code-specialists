@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1477-retired-adopt-skill-names · 20260905-232622
+
+Five live pages still told a reader to invoke `adopt-config` or `adopt-workflow-folder` -- the two skills
+[#1471](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1471) merged into `adopt-dkj-policy`,
+deleting both `SKILL.md` pages. They now name the surviving skill and the part of it that does the work.
+Four of the seven lines were beyond what [#1477](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1477)
+listed, which said so in as many words: the class is wider than the lines it had measured.
+
+The third site the issue named, the registry entry in `scripts/lib/shared-scripts-lib.ps1`, is deliberately
+untouched. It was filed as inferred rather than measured, and reading the code collapses it: `Name` is the
+script's own filename and the field a gate resolves a documenting page from is `Skill`, which has read
+`adopt-dkj-policy` since the merge.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Both halves of the adoption path were wrong for a consumer: `INSTALL.md` step 4 named two skills their slash
+list does not hold, and the plugin's own README named a third one two screens below its skill table naming
+the right one. That is the first page a new consumer reads and the one moment a wrong skill name costs them
+a support round rather than a shrug.
+
+**Score:** 3
+
+#### Pull Request
+
+the live pages name adopt-dkj-policy, not the two skills it replaced
+
+Plugins: dkj-policy, team-shopify
+
+[PR #1481](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1481)
+
+---
+
 ### DEPLOY: docs/1467-rename-workflows-to-dkj-policy · 20260905-224147
 
 `plugins/workflows/` is `plugins/dkj-policy/`, and the prime ministry's own files sit at that root with
