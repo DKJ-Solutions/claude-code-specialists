@@ -865,10 +865,17 @@ writing, and no gate could flag it, because no gate reads a contributing page or
 **So the complete order, on the matters this plugin actually legislates, is three ranks and not two:**
 
 ```
-the plugin's portable pages + skills        (the shared law)
-        >  dkj-policy/CONTRIBUTING.md   (this repo's answers to its seams)
-        >  the floor                        (root CONTRIBUTING.md, or CLAUDE.md where the repo keeps its floor there)
+the plugin's portable pages + skills   (the shared law)
+        >  dkj-policy/CONTRIBUTING.md  (this repo's answers to its seams)
+        >  the floor                   (root CONTRIBUTING.md, or CLAUDE.md where the repo keeps its floor there)
 ```
+
+**The names say the order, since September 5, 2026 (#1437).** This plugin was called
+`contributing-davekjohn` until that day, which named one of the things it does rather than what it is. It
+is `dkj-policy` now -- the top rung, the shared law -- and a companion is `dkj-policy-<who>`, a ministry
+under it holding one narrower brief. Nothing in the ranking changed with the names; what changed is that
+the ranking is now legible from the plugin list alone, without reading this page first. A repo installing
+`dkj-policy-bwj` can see it sits under `dkj-policy` before it has read a word of either.
 
 **The top rung has an order of its own as soon as a second workflow plugin is installed, and it is still
 one rank rather than a fourth.** `dkj-policy` legislates the cycle itself — the branch, the

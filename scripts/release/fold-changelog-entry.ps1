@@ -296,7 +296,8 @@ function Test-IsChangelogEntryFile {
     return $false
 }
 
-# THE ENTRY ARRIVES IN contributing-davekjohn/, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026).
+# THE ENTRY ARRIVES IN THE WORKFLOW FOLDER, AND THE ROOT FORM IS STILL FOLDED (Dave, August 6, 2026 --
+# the folder is 'dkj-policy/' since #1437, September 5, 2026, and carried 'contributing-davekjohn/' and 'workflow-davekjohn/' before that).
 # new-branch.ps1 writes the branch's development document; every branch created before the branch/ split -- here and in
 # every consumer, who get these scripts through a plugin update rather than by choosing to -- carries a root
 # <branch-name>.md instead. Recognising only the new path would leave those entries sitting unfolded in the
