@@ -212,7 +212,27 @@ try {
     $fetchLiteral = '''fetch'', ''origin'''
     $gateCallLiteral = 'Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context ''the PR'''
     $orderPattern = [regex]::Escape($fetchLiteral) + '(?s).*?' + [regex]::Escape($gateCallLiteral)
-    Assert-True ([regex]::IsMatch($openPrText, $orderPattern)) 'both landmarks are found, and the single-branch fetch runs before the PR-path gate call'
+    $orderMatch = [regex]::IsMatch($openPrText, $orderPattern)
+    # TEMPORARY DIAGNOSTIC (issue #1450) -- four CI runs in a row failed this one check under three
+    # different implementations (backtick-escaped IndexOf, single-quoted IndexOf, this regex), all
+    # while passing reliably in every local configuration tried against byte-identical, git-verified
+    # content. Unconditional so the NEXT run's log answers the question directly instead of guessing
+    # again: the file's length as CI sees it, whether each landmark is found AT ALL (via the simplest
+    # possible check, .Contains()), and -- if the second one is missing -- what text actually sits
+    # where it is expected. Remove this block once the cause is known and the real assert is trusted.
+    Write-Host "  [DIAG] openPrText.Length=$($openPrText.Length)" -ForegroundColor DarkGray
+    Write-Host "  [DIAG] contains fetch literal: $($openPrText.Contains($fetchLiteral))" -ForegroundColor DarkGray
+    Write-Host "  [DIAG] contains gate-call literal: $($openPrText.Contains($gateCallLiteral))" -ForegroundColor DarkGray
+    if (-not $orderMatch) {
+        $anchors = @([regex]::Matches($openPrText, [regex]::Escape('-Context ')))
+        Write-Host "  [DIAG] '-Context ' occurs $($anchors.Count) time(s), at: $(($anchors | ForEach-Object { $_.Index }) -join ', ')" -ForegroundColor DarkGray
+        foreach ($a in $anchors) {
+            $sliceStart = [Math]::Max(0, $a.Index - 120)
+            $sliceLen = [Math]::Min(260, $openPrText.Length - $sliceStart)
+            Write-Host "  [DIAG] around $($a.Index): $($openPrText.Substring($sliceStart, $sliceLen) -replace '[\r\n]', '<NL>')" -ForegroundColor DarkGray
+        }
+    }
+    Assert-True $orderMatch 'both landmarks are found, and the single-branch fetch runs before the PR-path gate call'
     $remoteAheadGateBlock = [regex]::Match($openPrText, "(?s)# --- Remote-ahead gate.*?\n\n# THE GATES BELOW").Value
     Assert-True ([bool]$remoteAheadGateBlock) 'the remote-ahead gate block is found as a single section'
     Assert-True ($remoteAheadGateBlock -match 'exit 1') 'a real divergence exits rather than only warning'
