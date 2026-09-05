@@ -3604,6 +3604,35 @@ function Get-FoldedEntryForBranch {
     return $null
 }
 
+function Get-EntryBlocksForBranch {
+    <#
+        Every entry block in a changelog whose heading names $Branch, in document order -- an empty array
+        when none does.
+
+        WHY IT SITS BESIDE Get-FoldedEntryForBranch RATHER THAN INSIDE IT. That function answers "does
+        this branch already have an entry", and it stops at the FIRST hit deliberately: the list is
+        newest-first, so the first is the one a reader would be told about. Two questions need more than
+        the first, and both are asked by the fold at the one moment it can no longer assume anything --
+        when its push is rejected (inbound #1405). HOW MANY entries name the branch, because a duplicate
+        proves itself by appearing twice and a single upstream entry proves the opposite. And WHAT each
+        one says, because "the work is already upstream" is only safe to state once the upstream text has
+        been compared to the local one.
+
+        IT DEFINES NEITHER RULE ITSELF, which is the whole point of the shape. The entry BOUNDARY comes
+        from Get-ChangelogEntryBlocks and the NAME MATCH from Get-FoldedEntryForBranch, applied one block
+        at a time -- so the fence skipping, the backtick/bare delimiting and the whole-name test stay in
+        exactly one place each, and what this reports can never drift from what the gate enforces.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$ChangelogText,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Branch
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ChangelogText) -or [string]::IsNullOrWhiteSpace($Branch)) { return @() }
+    return @(Get-ChangelogEntryBlocks -Content $ChangelogText |
+        Where-Object { $null -ne (Get-FoldedEntryForBranch -ChangelogText $_ -Branch $Branch) })
+}
+
 function Get-EntryBlockHeadingLevel {
     <#
         Pure: the level of the heading an entry block OPENS with -- 2 for a block written in the flat
@@ -5201,6 +5230,106 @@ function Get-BranchTrunkName {
     return 'main'
 }
 
+function Get-TrunkGap {
+    <#
+        How far the tree at $RepoRoot is BEHIND the trunk on origin -- the one measurement, with the
+        consequence left to the caller.
+
+        WHY IT IS SHARED RATHER THAN INLINE. Two scripts meet the same hazard and owe two different
+        answers to it: new-branch.ps1 WARNS that a base is behind (inbound #1046), while the fold
+        REFUSES, because its commit lands directly on the trunk under a named exception and a stale
+        trunk turns that commit into a duplicate the operator cannot cheaply undo (inbound #1405). Same
+        diagnosis, different thing about to go wrong -- which is the shape Get-PreFlatChangelogRefusal
+        already uses in this file, where the measurement is shared and the consequence is the caller's.
+
+        THE LOCAL QUESTION GATES THE NETWORK ONE, which is what keeps this usable offline and inside a
+        test fixture. refs/remotes/origin/<trunk> is read FIRST: no such ref means no origin, or a clone
+        that has never fetched, and then there is nothing to compare against -- so no fetch is attempted
+        and Measured comes back $false. A caller MUST NOT read "could not measure" as "behind": every
+        fixture repo in this repo's own suite has no remote, and a caller that conflated the two would
+        refuse every fold in it.
+
+        HEAD..origin/<trunk> RATHER THAN A TRUNK-VS-ORIGIN COMPARISON, deliberately, and for the same
+        reason new-branch.ps1 chose it: it answers "what is my checkout missing", which is the question,
+        and it stays correct when HEAD is NOT the trunk. The fold runs detached at origin/<trunk> from a
+        ship-pr lane, and there this reads 0 instead of complaining about a local trunk ref the worktree
+        does not carry.
+
+        FRESH SAYS WHICH REF THE COUNT CAME FROM, and it means "this call refreshed the ref" -- so it is
+        $false under -NoFetch too, where the caller has already fetched and knows it. "3 behind the
+        origin/main you last saw" is a different sentence from "3 behind origin/main", and a reader who
+        is offline has to be told which one they got.
+
+        THE FETCH IS NARROWED TO THE TRUNK, AND -FetchAllRefs WIDENS IT FOR THE ONE CALLER THAT NEEDS
+        THE REST (issue #1416). The fold wants the smallest network call that answers the question and
+        nothing more. new-branch.ps1 wants the same answer AND reads refs/remotes/origin/<branch> moments
+        later, to tell a resume of a branch parked from another device from a fresh cut (#1139) -- and a
+        fetch narrowed to the trunk never brings that ref into existence, so the parked branch stays
+        invisible and a second, unrelated branch of the same name is cut at the current base. That is
+        exactly the bug #1139 closed, and it would come back silently. So the scope is the caller's to
+        state rather than this function's to guess: narrowed by default, widened by the caller that
+        knows it is reading more than the trunk off this fetch.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # Defaults to the repo's own trunk name, so a consumer on 'master' measures against theirs.
+        [string]$Trunk,
+        # Measure against the ref already on disk. For a caller that has just fetched itself and only
+        # wants the count -- the fold's push-rejection path, which fetches once and then asks twice.
+        [switch]$NoFetch,
+        # Fetch EVERY ref from origin rather than only <trunk>. For a caller that reads ANOTHER
+        # remote-tracking ref off the back of this same fetch -- see the header.
+        [switch]$FetchAllRefs,
+        # 0 leaves Invoke-NativeCapture on its own default; the fold passes the same network bound it
+        # already puts on its push, so a hung fetch cannot turn a refusal into a stall.
+        [int]$TimeoutSeconds = 0
+    )
+
+    if (-not $Trunk) { $Trunk = Get-BranchTrunkName }
+    $ref = "refs/remotes/origin/$Trunk"
+    $result = [pscustomobject]@{
+        Measured = $false
+        Fresh    = $false
+        Behind   = 0
+        Trunk    = $Trunk
+        Ref      = $ref
+        Output   = @()
+    }
+
+    $has = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', $ref) -DiscardStderr
+    if ($has.ExitCode -ne 0) { return $result }
+
+    if (-not $NoFetch) {
+        # GIT'S OWN WORDS ARE KEPT HERE, not discarded. Issue #1313 measured that a failing fetch does not
+        # leak a credential -- transport_anonymize_url strips userinfo from every "unable to access" line
+        # -- and on that measurement DECLINED adding -DiscardStderr to three other fetches, for removing
+        # the only diagnosis a reader gets. A caller of this function is about to refuse a fold, to
+        # explain a rejected push or to warn about a stale base, so git's reason is precisely what the
+        # operator needs -- whether it prints the lines or keeps them is then its own call.
+        $fetchArgs = if ($FetchAllRefs) {
+            @('-C', $RepoRoot, 'fetch', 'origin', '--quiet')
+        } else {
+            @('-C', $RepoRoot, 'fetch', 'origin', $Trunk, '--quiet')
+        }
+        $fetch = if ($TimeoutSeconds -gt 0) {
+            Invoke-NativeCapture -FilePath 'git' -Arguments $fetchArgs -TimeoutSeconds $TimeoutSeconds
+        } else {
+            Invoke-NativeCapture -FilePath 'git' -Arguments $fetchArgs
+        }
+        $result.Fresh = ($fetch.ExitCode -eq 0)
+        $result.Output = @($fetch.Output | Where-Object { $_ -and "$_".Trim() })
+    }
+
+    $count = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-list', '--count', "HEAD..$ref") -DiscardStderr
+    if ($count.ExitCode -ne 0) { return $result }
+    $n = 0
+    if ([int]::TryParse((($count.Output -join '').Trim()), [ref]$n)) {
+        $result.Measured = $true
+        $result.Behind = $n
+    }
+    return $result
+}
+
 function Get-BranchFilePaths {
     <#
         The branch's own working document, its repo-relative path and the directory holding it, as ONE
@@ -6726,4 +6855,496 @@ function Get-UnfoldedTrunkEntry {
         }) | Out-Null
     }
     return $findings.ToArray()
+}
+
+function Get-RetiredBranchDocNames {
+    <#
+        The RETIRED names of the branch's working document, as literal strings a prose page can carry --
+        one row per name this layout has abandoned, plus the folder it abandoned. Issue #1389.
+
+        WHY A CONSUMER'S PROSE NEEDS THIS AT ALL. The document has been renamed seven times, twice on
+        September 3, 2026 alone, and the tooling was deliberately made rename-proof for it: every reader
+        goes through Resolve-BranchFilePath, and the fold's bound in the source repo's constitution is
+        named by that resolver rather than spelled out. THE PROSE DESCRIBING IT TO CONSUMERS WAS NOT.
+        Nothing reads a consumer's CLAUDE.md, check-script-contract.ps1 covers functions rather than
+        conventions, and #1273 caught the plugin's own pages while nobody was positioned to notice that
+        both live consumers had the same defect. Measured: both BWJ consumers still restated the retired
+        single 'development.md' in their always-on documents, one day and six days after the rename.
+
+        IT IS DERIVED, NOT A LIST. The names come from Get-BranchFileLegacyNames, which is already the one
+        ordered source the resolver and new-branch's writer share -- so the next rename adds this token by
+        the same row it always adds, and there is no second list to leave at seven names. Both Kinds are
+        unioned because the split-file era named the two halves differently and a prose page may carry
+        either.
+
+        LITERAL, AND THAT IS THE WHOLE LICENCE THIS CHECK HAS. The prose-contract framework (#1380) was
+        measured at 12.5% precision and DECLINED (Dave, September 4, 2026); the decline recorded this as
+        the alternative that is proportionate, in the source repo's system-administration lens: "one
+        [grep] for the literal string 'development.md' outside the changelog and history paths". A
+        filename is an exact string with a mechanical answer, which is the same distinction that
+        separates this repo's accepted dead-link check (17 findings, 17 real) from its declined
+        stale-path check (124 findings, none real). Anything fuzzier than a filename does not belong
+        here.
+
+        SO THE PER-BRANCH PREDECESSOR IS DELIBERATELY ABSENT, and it is a stated gap rather than an
+        oversight. 'development-<slug>.md' (pre-#1335) has no literal form: a prose page names the SHAPE,
+        'development-<branch>.md', and matching that needs a wildcard -- the exact step toward fuzzy that
+        the decline above rules out. What survives of that era is 'development-cycle.md', a real literal
+        and present below. A consumer restating only the shape is missed, and that is the price of the
+        precision.
+
+        THE FOLDER IS A NAME TOO (#886, 'workflow-davekjohn/' -> 'contributing-davekjohn/'). It is taken
+        from the first segment of the pre-rename paths rather than written out, for the reason above.
+
+        Each row carries the literal Name and a Since line naming what replaced it, because a finding
+        whose remedy the reader has to derive is a finding they will work around.
+
+        LONGEST FIRST, and the order is behaviour rather than presentation: Get-RetiredDocNameMention
+        claims a span per line, so 'development-cycle.md' has to be tried before 'development.md' could
+        be looked for inside it.
+    #>
+    $paths = Get-BranchFilePaths
+    $current = $paths.Directory
+
+    $names = New-Object System.Collections.Generic.List[object]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+
+    # The retired FOLDER, read off the first segment of the pre-#886 paths rather than written out.
+    foreach ($rel in @([string]$paths.PriorFolderFile)) {
+        if (-not $rel) { continue }
+        $folder = ($rel -split '/')[0]
+        if ($folder -and $folder -ne $current -and $seen.Add($folder)) {
+            $names.Add([pscustomobject]@{
+                Name  = $folder
+                Kind  = 'folder'
+                Since = "the folder is '$current/' since August 26, 2026 (#886)"
+            }) | Out-Null
+        }
+    }
+
+    # The retired FILENAMES, both Kinds unioned. Basenames only: a prose page names the file far more
+    # often than the whole path, and every path form contains the basename anyway.
+    $currentFile = [System.IO.Path]::GetFileName(((Get-BranchFilePaths -Branch 'x').File -replace '/', '\'))
+    foreach ($rel in (@(Get-BranchFileLegacyNames -Kind File) + @(Get-BranchFileLegacyNames -Kind Deployment))) {
+        if (-not $rel) { continue }
+        $leaf = [System.IO.Path]::GetFileName(($rel -replace '/', '\'))
+        if (-not $leaf) { continue }
+        # A belt-and-braces guard, not a live case: today's name is '<slug>.md' and no legacy row can
+        # produce it. It costs one comparison, and it is what stops a future rename from shipping a check
+        # that reports the name it has just introduced.
+        if ($leaf -ieq $currentFile) { continue }
+        if (-not $seen.Add($leaf)) { continue }
+        $names.Add([pscustomobject]@{
+            Name  = $leaf
+            Kind  = 'file'
+            Since = "the document is named after its branch, '$current/<branch>.md', since September 3, 2026 (#1255, #1335)"
+        }) | Out-Null
+    }
+
+    return @($names | Sort-Object -Property @{ Expression = { $_.Name.Length }; Descending = $true }, Name)
+}
+
+function Get-ConsumerProseDocuments {
+    <#
+        The repo-relative paths of a CONSUMER's own law-bearing prose -- the #1380 corpus, as an
+        INCLUSION list. One definition, shared by every check that asks "does this repo's own prose
+        contradict the plugin": Get-RetiredDocNameMention (#1389) and Get-SupremacyDeclaration (#1415).
+
+        IT IS SHARED BECAUSE THE CORPUS IS THE HALF THAT IS EASY TO GET SUBTLY WRONG. The detectors
+        differ -- one looks for a filename, the other for a direction -- but which documents they are
+        allowed to look in is one question with one answer, and the exclusions below are each load-bearing
+        for a measured reason. Two copies of this would drift on the day a third exclusion is found, and
+        the copy that missed it would report a document the other correctly ignores.
+
+        Two kinds of page:
+
+          1. the always-on closure -- CLAUDE.md and everything it '@'-imports -- passed in as -Documents,
+             because that walk belongs to measure-context-lib.ps1 and a second walk here would be a second
+             definition of the always-on path;
+          2. the workflow folder's own permanent pages, MINUS its changelog.
+
+        THE CHANGELOG EXCLUSION IS NOT OPTIONAL. A folded entry correctly names the file, and states the
+        rule, that was current on the day it landed, so a check that read the changelog would be born red
+        on its own past -- which this repo already names as a smell in itself, and which is the recorded
+        reason #1380's declaration-based candidate was set aside at 88/88. releases/ is out by the same
+        logic and needs no rule of its own: it is neither always-on nor a reserved page, so it never
+        enters the set. Excluded by NAME out of ReservedNames rather than through Get-ChangelogPath, on
+        that property's own reasoning -- a seam may point anywhere, and a lib that went looking for a repo
+        root to resolve it is a lib that can find the wrong tree.
+
+        PLUGIN-SHIPPED PAYLOAD IS EXCLUDED (Source -ne 'tree'). The orchestrator's persona is '@'-imported
+        from the marketplace clone by every repo, so it is one file rather than one finding per consumer --
+        and it is the plugin's own text, which is the thing a consumer is supposed to be pointing AT.
+        Without this exclusion #1380's own corpus counted it three times.
+
+        A PER-BRANCH DOCUMENT IS NOT IN THE SET EITHER, and it falls out for free: it is transient working
+        prose, it is not always-on, and it is not a reserved page. A branch whose own plan discusses a
+        rename or a supremacy rule would otherwise report itself.
+
+        IT RETURNS PATHS, NOT CONTENT, and it does not check that they exist. The caller joins them to its
+        own RepoRoot and skips what is missing -- which is what lets the same list describe a consumer that
+        carries the workflow folder and one that does not.
+    #>
+    param(
+        # The always-on rows from Get-AlwaysOnDocuments. Optional: a caller with no walk available still
+        # gets the folder's own pages judged, which is where one of #1389's two measured instances sat.
+        [object[]]$Documents = @()
+    )
+
+    $paths = Get-BranchFilePaths
+    $rels = New-Object System.Collections.Generic.List[string]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($doc in $Documents) {
+        if (-not $doc) { continue }
+        if (-not $doc.Exists) { continue }
+        if ($doc.Source -ne 'tree') { continue }
+        $rel = [string]$doc.Display
+        if ($rel -and $seen.Add($rel)) { $rels.Add($rel) | Out-Null }
+    }
+
+    foreach ($reserved in @($paths.ReservedNames)) {
+        if (-not $reserved) { continue }
+        if ($reserved -ieq 'CHANGELOG.md') { continue }
+        $rel = "$($paths.Directory)/$reserved"
+        if ($seen.Add($rel)) { $rels.Add($rel) | Out-Null }
+    }
+
+    return $rels.ToArray()
+}
+
+function Get-RetiredDocNameMention {
+    <#
+        Every line in a CONSUMER's own law-bearing prose that carries a retired name from
+        Get-RetiredBranchDocNames -- i.e. a document restating a convention the plugin has moved on
+        from. Issue #1389.
+
+        THE DOCUMENT SET IS THE #1380 CORPUS, and stating it as an INCLUSION list is the load-bearing
+        half. Two kinds of page:
+
+          1. the always-on closure -- CLAUDE.md and everything it '@'-imports -- passed in as
+             -Documents, because that walk belongs to measure-context-lib.ps1 and a second walk here
+             would be a second definition of the always-on path;
+          2. the workflow folder's own permanent pages, MINUS its changelog.
+
+        THE CHANGELOG EXCLUSION IS NOT OPTIONAL. A folded entry correctly names the file that was current
+        on the day it landed, so a check that read the changelog would be born red on its own past --
+        which this repo already names as a smell in itself, and which is the recorded reason #1380's
+        declaration-based candidate was set aside at 88/88. releases/ is out by the same logic and needs
+        no rule of its own: it is neither always-on nor a reserved page, so it never enters the set.
+        Excluded by NAME out of ReservedNames rather than through Get-ChangelogPath, on that property's
+        own reasoning -- a seam may point anywhere, and a lib that went looking for a repo root to
+        resolve it is a lib that can find the wrong tree.
+
+        PLUGIN-SHIPPED PAYLOAD IS EXCLUDED (Source -ne 'tree'). The orchestrator's persona is
+        '@'-imported from the marketplace clone by every repo, so it is one file rather than one finding
+        per consumer -- and it is the plugin's own text, which is the thing a consumer is supposed to be
+        pointing AT. Without this exclusion #1380's own corpus counted it three times.
+
+        A PER-BRANCH DOCUMENT IS NOT IN THE SET EITHER, and it falls out for free: it is transient
+        working prose, it is not always-on, and it is not a reserved page. A branch whose own plan
+        discusses the rename would otherwise report itself.
+
+        WHAT IT DOES NOT DO is decide whether the restatement AGREES with the plugin. It cannot, and that
+        is the whole finding of #1380: a test that reads nearby text for the source and calls that
+        deference is structurally blind to cites-then-contradicts, measured there at 1 in 4. Here the
+        question never arises -- a retired filename is wrong whether the sentence around it agrees or not.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # The always-on rows from Get-AlwaysOnDocuments. Optional: a caller with no walk available still
+        # gets the folder's own pages judged, which is where one of the two measured instances sat.
+        [object[]]$Documents = @()
+    )
+
+    $retired = @(Get-RetiredBranchDocNames)
+    if ($retired.Count -eq 0) { return @() }
+
+    $rels = @(Get-ConsumerProseDocuments -Documents $Documents)
+
+    $findings = New-Object System.Collections.Generic.List[object]
+    foreach ($rel in $rels) {
+        $full = Join-Path $RepoRoot ($rel -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
+        $text = [System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8)
+        $lines = $text -split "(?:\r\n|\n|\r)"
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = [string]$lines[$i]
+            if (-not $line) { continue }
+            # SPANS, NOT TOKENS, and this one is anticipatory rather than measured: NO pair in today's
+            # set overlaps, so nothing here double-reports right now. It is kept because the set is
+            # DERIVED and gains a row on every rename -- the day a new name contains an older one, a
+            # single line of prose would be reported twice for one thing to repair, and the claim above
+            # is what stops it. Cheap, and the alternative is discovering it from a doubled finding.
+            $claimed = New-Object System.Collections.Generic.List[object]
+            foreach ($name in $retired) {
+                $at = $line.IndexOf($name.Name, [System.StringComparison]::OrdinalIgnoreCase)
+                while ($at -ge 0) {
+                    $end = $at + $name.Name.Length
+                    $overlaps = $false
+                    foreach ($c in $claimed) { if ($at -lt $c.End -and $c.Start -lt $end) { $overlaps = $true; break } }
+                    if (-not $overlaps) {
+                        $claimed.Add([pscustomobject]@{ Start = $at; End = $end }) | Out-Null
+                        $findings.Add([pscustomobject]@{
+                            Rel   = $rel
+                            Line  = $i + 1
+                            Name  = $name.Name
+                            Kind  = $name.Kind
+                            Since = $name.Since
+                            Text  = $line.Trim()
+                        }) | Out-Null
+                    }
+                    if ($end -ge $line.Length) { break }
+                    $at = $line.IndexOf($name.Name, $end, [System.StringComparison]::OrdinalIgnoreCase)
+                }
+            }
+        }
+    }
+
+    return @($findings | Sort-Object -Property Rel, Line, Name)
+}
+
+function Get-ProseParagraphUnits {
+    <#
+        A document's lines regrouped into the units a READER sees: one entry per blank-line-separated
+        paragraph, blockquote markers stripped, hard-wrapped continuation lines joined with a single
+        space -- each carrying a map back to the source line every piece came from. Issue #1415.
+
+        WHY THIS EXISTS, AND IT IS A MEASURED DEFECT RATHER THAN A REFINEMENT. Get-SupremacyDeclaration
+        first matched per PHYSICAL line, and this repo's prose convention hard-wraps paragraphs at about
+        100 columns -- so an ordinary sentence puts 'CLAUDE.md' at the end of one line and 'wins' at the
+        start of the next, and an adjacency test that never sees the two together reports nothing. Found
+        by review and reproduced before it was repaired, in both forms:
+
+            On any real conflict between the two, `CLAUDE.md`
+            wins, and the contributing page is simply wrong.        -> 0 findings
+
+            > Bij tegenspraak wint
+            > `CLAUDE.md`.                                          -> 0 findings
+
+        THE BLOCKQUOTE HALF IS THE ONE THAT MATTERS MOST, because the single real instance this whole
+        check exists for lives in a blockquote. It happens to sit on one physical line today, so the
+        check found it -- one editor re-wrapping that paragraph would have silently emptied the gate
+        while every test still passed.
+
+        THE SAME SHAPE IS ALREADY SETTLED ONE FILE UP. Get-EntryCodeSpans runs '(?s)' over the whole
+        joined text, with the reason written beside it -- "because a span may legitimately wrap a line in
+        prose". This is that reasoning applied to the same file's newest reader.
+
+        NOT A WHOLE-DOCUMENT JOIN, DELIBERATELY. Matching over the entire text would let a bounded gap
+        bridge two unrelated paragraphs, and -- worse -- would let one unbalanced quotation mark swallow
+        the rest of the document into a single "quoted" span and suppress every real finding after it.
+        The paragraph is the largest unit where both a sentence and its quotation marks reliably close.
+
+        The map is kept as one row per appended segment (its offset in the joined text, and the source
+        line it came from) rather than per character: a caller resolves a match to its line by taking the
+        last row at or before the match offset, which is what lets a finding still name a real line
+        number in the file somebody has to go and edit.
+    #>
+    # AllowEmptyString/AllowEmptyCollection are load-bearing, not defensive: the blank lines that
+    # SEPARATE the paragraphs are the input, and a Mandatory [string[]] validates every element -- so
+    # without these the function refuses exactly the documents it exists to read.
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [AllowEmptyCollection()]
+        [string[]]$Lines
+    )
+
+    $units = New-Object System.Collections.Generic.List[object]
+    $buffer = New-Object System.Text.StringBuilder
+    $segments = New-Object System.Collections.Generic.List[object]
+
+    function Add-Unit {
+        if ($buffer.Length -gt 0) {
+            $units.Add([pscustomobject]@{ Text = $buffer.ToString(); Segments = $segments.ToArray() }) | Out-Null
+        }
+        $buffer.Clear() | Out-Null
+        $segments.Clear()
+    }
+
+    for ($i = 0; $i -le $Lines.Count; $i++) {
+        # One pass past the end, so a document whose last paragraph runs to EOF is still emitted.
+        $raw = if ($i -lt $Lines.Count) { [string]$Lines[$i] } else { '' }
+
+        # Blockquote markers are stripped, not treated as text: '>' is punctuation the reader does not
+        # see, and leaving it in would break the adjacency it sits between on a wrapped quote.
+        $stripped = ($raw -replace '^\s*>+\s?', '')
+
+        if ($stripped.Trim() -eq '') { Add-Unit; continue }
+
+        # A LIST ITEM STARTS A NEW UNIT, and this is a measured regression rather than a nicety. Tight
+        # lists are written with no blank line between the items, so without this the join runs two
+        # unrelated bullets together -- and '*' is BOTH a bullet marker and the bold/italic decoration
+        # the gap class has to allow, so a '*'-bulleted pair bridges into a match that exists in neither
+        # item:
+        #
+        #     * Read the constitution in `CLAUDE.md`
+        #     * wins arguments only when they cite the correct rank order.
+        #
+        # matched '`CLAUDE.md` * wins' -- a declaration in no line of the document. Found by review of
+        # the wrap repair itself, which is what introduced it: the per-line detector never attempted
+        # cross-line adjacency, so it could not have this defect.
+        #
+        # EVERY marker shape breaks the unit, not only '*'. Today '-', '+' and '1.' cannot bridge anyway
+        # because they are outside the gap class -- which is exactly why they are included here: the day
+        # somebody widens that class for a new decoration, the bound should already hold rather than
+        # produce this same defect a second time in a shape nobody is looking for.
+        $isListItem = $stripped -match '^\s*(?:[\*\-\+]|\d+[\.\)])\s+\S'
+        if ($isListItem) {
+            Add-Unit
+            # The marker itself is dropped for the reason the blockquote marker is: it is punctuation
+            # structuring the page, not a word in the sentence the reader is judging.
+            $stripped = $stripped -replace '^\s*(?:[\*\-\+]|\d+[\.\)])\s+', ''
+        }
+
+        if ($buffer.Length -gt 0) { $buffer.Append(' ') | Out-Null }
+        $segments.Add([pscustomobject]@{ Start = $buffer.Length; Line = $i + 1 }) | Out-Null
+        $buffer.Append($stripped) | Out-Null
+    }
+
+    return $units.ToArray()
+}
+
+function Resolve-ProseUnitLine {
+    <#
+        The source line a match at $Offset inside one Get-ProseParagraphUnits unit came from: the last
+        segment starting at or before that offset. Issue #1415.
+
+        THE MATCH ITSELF MAY SPAN TWO LINES -- that is the entire point of joining them -- so this
+        answers with the line the match BEGINS on, which is the line a reader opens to repair it.
+    #>
+    param(
+        [Parameter(Mandatory)][object]$Unit,
+        [Parameter(Mandatory)][int]$Offset
+    )
+
+    $line = 1
+    foreach ($seg in @($Unit.Segments)) {
+        if ($seg.Start -le $Offset) { $line = $seg.Line } else { break }
+    }
+    return $line
+}
+
+function Get-SupremacyDeclaration {
+    <#
+        Every line in a CONSUMER's own law-bearing prose that declares its OWN 'CLAUDE.md' the winner
+        over the workflow's contributing page -- i.e. a repo inverting LAW-THIRD-RANK-ORDER, which puts
+        the plugin's portable pages above 'contributing-davekjohn/CONTRIBUTING.md' and that above the
+        floor. Issue #1415.
+
+        THE HOLE THIS CLOSES. #1380's whole finding was that a pointer test is STRUCTURALLY blind to
+        cites-then-contradicts: a flagged finding is by construction a section carrying no citation, so a
+        section that names its source and then overrides it can only ever appear among the SUPPRESSED
+        findings. The census there was 4 suppressed sections -- 1 contradiction, 3 correct deferrals --
+        and the one is the defect below. Nothing in the tree could see it, which is why the decline
+        recorded a narrow literal grep for it instead of reviving the framework.
+
+        WHAT THE RECORDED GREP SAID, AND WHY THIS IS NOT IT. The decline recorded the alternative as
+        "'wins'/'wint' plus 'CLAUDE.md' plus the contributing page's own filename, all three in the same
+        sentence". #1415 asked for that shape to be MEASURED before it shipped, because it had never been
+        run, and the measurement overturned it. Over the same 8-document corpus:
+
+            scope         raw   true   precision   recall (of the standing instances)
+            line            0      0      --           0 of 2
+            sentence        0      0      --           0 of 2      <- the recorded shape
+            paragraph       1      0      0%           0 of 2
+
+        Zero, at the scope the decline actually named, on the one defect it was named to catch. The
+        reason is exact and worth keeping: the real clause (smartwatchbanden/CLAUDE.md:22) carries
+        'wint' beside `CLAUDE.md` and names the contributing page by a Dutch PROSE NOUN,
+        'de contributor-pagina', not by its filename. The third term is
+        precisely the term that is absent. Loosening the scope to a paragraph does find something, and
+        what it finds is a false positive; loosening the third term to catch prose nouns is the step into
+        fuzzy matching that #1380 already declined.
+
+        WHAT IS SHIPPED INSTEAD: ADJACENCY, WHICH ENCODES DIRECTION. 'CLAUDE.md' and 'wins'/'wint' must
+        sit NEXT TO each other, in either order, with nothing between them but whitespace and markdown
+        markup. That is still a purely literal character test -- it never reads what a sentence means --
+        but it answers the one question co-occurrence cannot: WHICH page is being declared the winner.
+        Direction is the whole defect. 'this page wins' over CLAUDE.md is the law stated CORRECTLY, and a
+        term list holding both words scores it identically to the inversion; adjacency separates them,
+        because the subject of the verb is the token beside it. Measured on the same corpus:
+        3 raw / 2 reported / 2 true / 100% precision, and it finds BOTH standing instances -- one more
+        than #1380's census knew about.
+
+        THE ONE SUPPRESSION, AND ITS ONE INSTANCE. A hit sitting wholly inside a '"..."' span is skipped.
+        The instance is xoxowildhearts quoting the closing line of a page it RETIRED, in order to explain
+        why it removed it -- somebody else's words, reported, not this document's own claim. That is the
+        same class as the changelog exclusion in Get-ConsumerProseDocuments and it is literal in the same
+        way: a character-span test, not a reading. STATED PLAINLY, IT RESTS ON A SINGLE INSTANCE -- one
+        false positive is a thin basis for a rule, and it is kept because without it precision is 67% and
+        with it 100%, against a bar this repo sets by its accepted dead-link check (17 findings, 17 real)
+        and its declined stale-path check (124 findings, none real).
+
+        WHAT IT DOES NOT DO is decide whether a repo is ALLOWED to invert the order. It is not: the third
+        rank is the plugin's, and a consumer that wants its own constitution to lead states that as a seam
+        answer rather than by overriding the page in prose. But the check reports rather than adjudicates,
+        and its message says which line to repair rather than what the repo should have meant.
+
+        THE TWO STANDING INSTANCES, both in BWJ-ecommerce/smartwatchbanden, measured September 4, 2026:
+        'CLAUDE.md:22' (the preamble inversion, the one #1380 could not see) and
+        'contributing-davekjohn/CONTRIBUTING.md:306' (the SAME inversion stated from the other side, which
+        the #1380 census never counted at all).
+
+        BOTH ARE CITED BY REPO, FILE AND LINE, AND THE EXCERPT STOPS AT THE ADJACENCY. That consumer is
+        private and this repository is public, so a measurement taken there quotes only what the finding
+        reads -- 'wint'/'wins' beside `CLAUDE.md`, which is this check's own pattern rather than anybody's
+        prose -- and the governance sentence around it stays in the consumer's tree. The rule is in
+        CLAUDE.md's public-repo bullet (Dave, September 5, 2026, issue #1420) and it binds the fixtures in
+        supremacy-declaration-gate.tests.ps1 too: a matcher reads structure, so a fixture needs the shape
+        and not the remaining words. Nothing about the verbatim-citation convention itself is weakened --
+        a bounded quote plus file:line is still re-verifiable, which a paraphrase is not.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # The always-on rows from Get-AlwaysOnDocuments -- passed straight through to the shared corpus.
+        [object[]]$Documents = @()
+    )
+
+    $rels = @(Get-ConsumerProseDocuments -Documents $Documents)
+
+    # ADJACENT, EITHER ORDER. The gap class holds whitespace and the markdown that decorates a term --
+    # backticks, bold/italic markers, link brackets -- and nothing else. A comma or a word in between
+    # ends the adjacency, which is the point: 'CLAUDE.md, which the contributing page wins over' is a
+    # different claim and must not match. The cap keeps a long decorated run from bridging two clauses.
+    # Dutch 'wint' sits beside English 'wins' because a consumer's constitution may be in either -- the
+    # two live consumers are one of each, which is how the Dutch instance was found.
+    $gap = '[\s`\*_\[\]\(\)]{0,12}'
+    $pattern = "(?i)(?:``?CLAUDE\.md``?$gap\b(?:wins|wint)\b|\b(?:wins|wint)\b$gap``?CLAUDE\.md``?)"
+
+    $findings = New-Object System.Collections.Generic.List[object]
+    foreach ($rel in $rels) {
+        $full = Join-Path $RepoRoot ($rel -replace '/', '\')
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
+        $text = [System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8)
+        $lines = $text -split "(?:\r\n|\n|\r)"
+
+        # PARAGRAPHS, NOT PHYSICAL LINES -- see Get-ProseParagraphUnits for the two reproduced false
+        # negatives that forced this. Both the adjacency match and the quotation suppression run on the
+        # joined unit, because a wrapped sentence and a wrapped quotation are the same problem.
+        foreach ($unit in @(Get-ProseParagraphUnits -Lines $lines)) {
+            $quotes = @([regex]::Matches($unit.Text, '"[^"]*"'))
+            foreach ($m in ([regex]::Matches($unit.Text, $pattern))) {
+                $quoted = $false
+                foreach ($q in $quotes) {
+                    if ($m.Index -ge $q.Index -and ($m.Index + $m.Length) -le ($q.Index + $q.Length)) { $quoted = $true; break }
+                }
+                if ($quoted) { continue }
+
+                $lineNo = Resolve-ProseUnitLine -Unit $unit -Offset $m.Index
+                $findings.Add([pscustomobject]@{
+                    Rel   = $rel
+                    Line  = $lineNo
+                    # The match is reported from the JOINED text, so a declaration that wrapped reads as
+                    # one phrase here even though the file breaks it in two -- which is the thing the
+                    # reader needs to recognise. Text stays the physical line they will open.
+                    Match = ($m.Value -replace '\s+', ' ').Trim()
+                    Text  = ([string]$lines[$lineNo - 1]).Trim()
+                }) | Out-Null
+            }
+        }
+    }
+
+    return @($findings | Sort-Object -Property Rel, Line)
 }

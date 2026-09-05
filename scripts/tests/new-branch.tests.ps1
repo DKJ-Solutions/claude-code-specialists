@@ -109,7 +109,17 @@ function Test-Phrase {
        stripping in every pattern, and the one that forgets is the one that fails at some window width
        nobody is looking at. #>
     param([string]$Text, [string]$Phrase)
-    return $Text.Contains(($Phrase -replace '\s', ''))
+    return $Text.Contains((Get-Squeezed $Phrase))
+}
+
+function Get-Squeezed {
+    <# The stripping itself, named once (#1417). Test-Phrase answers "is it in there"; an assert that
+       COUNTS occurrences cannot use it and has to flatten the needle by hand, against the same rule
+       Get-FlatOutput used on the haystack. Two hand-written copies of one rule is how a counting assert
+       ends up silently matching zero times and reading as "the line is missing" -- so the rule is a
+       function and both readers call it. #>
+    param([string]$Text)
+    return ($Text -replace '\s', '')
 }
 
 function Invoke-CapturedChild {
@@ -366,7 +376,11 @@ function Invoke-NewBranch {
         [string]$Title,
         [string]$Intent,
         [switch]$Park,
-        [switch]$NoPush
+        [switch]$NoPush,
+        # The valve on the stale-base refusal (#1417). Only the fixtures that DELIBERATELY cut from a
+        # base behind origin pass it -- every other fixture here has no origin/main to be behind, so the
+        # question is never asked and the switch would assert nothing.
+        [switch]$SkipStaleBase
     )
     $scriptPath = Join-Path $Dir 'scripts\task\new-branch.ps1'
     $callArgs = @('-Name', $Name)
@@ -374,6 +388,7 @@ function Invoke-NewBranch {
     if ($PSBoundParameters.ContainsKey('Intent')) { $callArgs += @('-Intent', $Intent) }
     if ($Park)   { $callArgs += '-Park' }
     if ($NoPush) { $callArgs += '-NoPush' }
+    if ($SkipStaleBase) { $callArgs += '-SkipStaleBase' }
 
     $prevPd  = $env:CLAUDE_PROJECT_DIR
     $prevEap = $ErrorActionPreference
@@ -1180,13 +1195,17 @@ Write-Output `$t.Type
     Assert-True (Test-Phrase -Text $rR.Out -Phrase 'the switch is accepted and changes nothing') '-Park: says out loud that it is the default now'
     Assert-True (Test-BranchOnRemote -Bare $bareR -Ref 'refs/heads/feat/park-is-default-v1') '-Park: and the push happened -- same outcome as (o), which is the point'
 
-    # --- (s) THE BASE IS BEHIND ORIGIN: warned, with the count, and warned AGAIN at the end (#1046) --
+    # --- (s) THE BASE IS BEHIND ORIGIN: REFUSED, with the count and the way out (#1046, #1417) --------
     # THE CASE THE REPORT WAS FILED ON. In a consumer with two sessions on one board, new-branch cut from
     # a trunk 17 commits behind origin/main to fix an issue the other session had closed by a merged PR
-    # four minutes earlier -- a complete duplicate, every gate green on both. worktree-lane refuses this
-    # hazard by name; this script said nothing. Three asserts, because the warning has three jobs: name
-    # the count, name the way out, and still be on screen when the run ends.
-    Write-Host "new-branch.ps1 -- a base behind origin is warned about, with the count (#1046)" -ForegroundColor Cyan
+    # four minutes earlier -- a complete duplicate, every gate green on both. #1046 answered that with a
+    # warning as its own first step; #1417 read the reason it stopped there against the code and refused.
+    #
+    # THE ASSERTS SPLIT IN TWO, AND THE SECOND HALF IS THE POINT. Naming the count and the way out is what
+    # the warning always had to do and is unchanged. What is new is that NOTHING HAPPENED: no branch, no
+    # document, no commit. A refusal that leaves half a branch behind would be worse than the warning it
+    # replaced, because the operator now has to unpick it -- so it is asserted rather than assumed.
+    Write-Host "new-branch.ps1 -- a base behind origin is REFUSED, with the count (#1046, #1417)" -ForegroundColor Cyan
     # NAMED $fixStale AND NOT $fixtureS, WHICH IS NOT A STYLE CHOICE. PowerShell variable names are
     # case-INSENSITIVE, so `$fixtureS` and the teardown accumulator `$script:fixtures` are the SAME
     # variable at script scope -- and since the fixture path lands in it as a string first, every later
@@ -1199,25 +1218,60 @@ Write-Output `$t.Type
     Add-OriginCommits -Bare $bareStale -Label 's' -Count 3
 
     $rS = Invoke-NewBranch -Dir $fixStale -Name 'feat/cut-from-stale-v1' -Title 'Cut from stale'
-    # A WARNING AND NOT A REFUSAL, which is the whole shape of the first step: the branch still exists.
-    Assert-Equal 0 $rS.Code 'stale base: new-branch exit 0 -- this warns, it does not refuse'
+    # A REFUSAL SINCE #1417, where this used to assert exit 0 and a created branch.
+    Assert-Equal 1 $rS.Code 'stale base: new-branch exit 1 -- this refuses, it no longer merely warns'
+    # AND IT REFUSED BEFORE TOUCHING ANYTHING, which is the property that makes refusing cheaper than
+    # warning here. Three separate reads, because a refusal that left any one of them behind would hand
+    # the operator something to unpick: no branch, no document, and HEAD still where it started.
     $branchesS = ((& git -C $fixStale branch --list 'feat/cut-from-stale-v1') -join '').Trim()
-    Assert-True ([bool]$branchesS) 'stale base: and the branch really is created'
+    Assert-True (-not [bool]$branchesS) 'stale base: and NO branch was created -- the refusal is before the checkout'
+    $docS = Join-Path $fixStale (Join-Path 'contributing-davekjohn' 'feat-cut-from-stale-v1.md')
+    Assert-True (-not (Test-Path -LiteralPath $docS)) 'stale base: and no branch document was scaffolded either'
+    $headS = ((& git -C $fixStale rev-parse --abbrev-ref HEAD) -join '').Trim()
+    Assert-Equal 'main' $headS 'stale base: and HEAD is left exactly where the operator was standing'
     # THE COUNT ITSELF, asserted as the literal number rather than on the word 'behind'. A check that
     # fires without a figure is the thing worktree-lane's message already beat.
     Assert-True (Test-Phrase -Text $rS.Out -Phrase '3 behind origin/main') 'stale base: names how far behind the base is, as a number'
     Assert-True (Test-Phrase -Text $rS.Out -Phrase 'feat/cut-from-stale-v1') 'stale base: and names the branch it applies to, version suffix included'
-    # THE WAY OUT, both halves -- the local fix and the route that never has this problem.
+    # THE WAY OUT, now three halves -- the local fix, the route that never has this problem, and the valve.
+    # The valve is asserted BY NAME: a refusal whose escape the operator has to find in the source is the
+    # hand-typed `git checkout -b` that #1417 set out not to force on anybody.
     Assert-True (Test-Phrase -Text $rS.Out -Phrase 'git pull --ff-only') 'stale base: names the local remedy'
     Assert-True (Test-Phrase -Text $rS.Out -Phrase 'worktree-lane.ps1') 'stale base: and the lane route, which bases itself on origin by design'
-    # THE REPEAT, which is the half that actually gets read: the scaffold, the tier rubric, the commit and
-    # the push all print between the first copy and the end of the run. Counted rather than matched, so a
-    # single surviving copy fails here even though every assert above would still pass.
-    # Counted against Get-FlatOutput's own normalization, phrase stripped the same way Test-Phrase strips
-    # it -- a raw phrase would match zero times in whitespace-free text and read as "the repeat is missing".
+    Assert-True (Test-Phrase -Text $rS.Out -Phrase '-SkipStaleBase') 'stale base: and names the valve, so the escape is not a source dive'
+    # NOT REPEATED, and this is the assert that used to demand the opposite. The repeat existed because
+    # the scaffold, the tier rubric, the commit and the push all printed between the warning and the end
+    # of the run and buried it. A refusal ends the run there, so the count is the one it prints; a second
+    # copy would now be noise two lines below the first.
     $flatStale = Get-FlatOutput $rS.Out
-    $behindHits = @([regex]::Matches($flatStale, [regex]::Escape(('3 behind origin/main' -replace '\s', '')))).Count
-    Assert-Equal 2 $behindHits 'stale base: said twice -- once before the checkout, once as the last line'
+    $behindHits = @([regex]::Matches($flatStale, [regex]::Escape((Get-Squeezed '3 behind origin/main')))).Count
+    Assert-Equal 1 $behindHits 'stale base: said ONCE -- a refusal ends the run, so nothing buries it'
+
+    # --- (s2) THE VALVE: -SkipStaleBase cuts anyway, and the warning goes back to twice (#1417) -------
+    # THE OTHER HALF OF THE DECISION. #1046's objection -- this file reaches consumers by plugin update
+    # rather than by choice -- survives as the valve rather than as the answer, so the valve is asserted
+    # to give back EXACTLY the old behaviour: the branch, the document, and the warning at both ends.
+    # A fresh fixture rather than a re-run of $fixStale: that one refused before writing anything, but
+    # asserting the old shape on a tree a previous run had already touched would prove less.
+    Write-Host "new-branch.ps1 -- -SkipStaleBase cuts from a stale base anyway (#1417)" -ForegroundColor Cyan
+    $fixValve = New-Fixture -Label 's2'
+    $bareValve = New-BareOrigin -Dir $fixValve -Label 's2'
+    Publish-FixtureTrunk -Dir $fixValve
+    Add-OriginCommits -Bare $bareValve -Label 's2' -Count 3
+
+    $rS2 = Invoke-NewBranch -Dir $fixValve -Name 'feat/cut-from-stale-v1' -Title 'Cut from stale' -SkipStaleBase
+    Assert-Equal 0 $rS2.Code '-SkipStaleBase: exit 0 -- the valve really is an escape'
+    $branchesS2 = ((& git -C $fixValve branch --list 'feat/cut-from-stale-v1') -join '').Trim()
+    Assert-True ([bool]$branchesS2) '-SkipStaleBase: and the branch really is created'
+    Assert-True (Test-Phrase -Text $rS2.Out -Phrase '3 behind origin/main') '-SkipStaleBase: the count is still named -- the valve silences the refusal, not the warning'
+    Assert-True (Test-Phrase -Text $rS2.Out -Phrase 'cutting from that base anyway') '-SkipStaleBase: and the run says the valve was used'
+    # THE REPEAT, which matters MORE under the valve than it ever did: this is the only run that still
+    # reaches the end of the script carrying a stale base, and everything the scaffold prints buries the
+    # first copy. Counted against Get-FlatOutput's own normalization, phrase squeezed the same way
+    # Test-Phrase squeezes it -- a raw phrase would match zero times in whitespace-free text.
+    $flatValve = Get-FlatOutput $rS2.Out
+    $valveHits = @([regex]::Matches($flatValve, [regex]::Escape((Get-Squeezed '3 behind origin/main')))).Count
+    Assert-Equal 2 $valveHits '-SkipStaleBase: said twice -- once before the checkout, once as the last line'
 
     # --- (t) THE BASE IS CURRENT: nothing to warn about -----------------------------------------------
     # The negative half, and it is what keeps the check from becoming noise on every run. Same fixture
@@ -1311,8 +1365,11 @@ Write-Output `$t.Type
     Add-OriginCommits -Bare $bareResume -Label 'w' -Count 2
 
     # Run one: a genuine cut, which SHOULD be warned -- the positive control for the assert below.
-    $rW1 = Invoke-NewBranch -Dir $fixResume -Name 'feat/resume-me-v1' -Title 'Resume me'
-    Assert-Equal 0 $rW1.Code 'local resume: the first run (a real cut) exits 0'
+    # -SkipStaleBase because this run is the FIXTURE and not the subject: since #1417 a cut from a base
+    # two behind refuses, and (s) is where that is asserted. What this block is about is the run AFTER it,
+    # so the valve is what gets the branch onto disk without restating a check that has its own case.
+    $rW1 = Invoke-NewBranch -Dir $fixResume -Name 'feat/resume-me-v1' -Title 'Resume me' -SkipStaleBase
+    Assert-Equal 0 $rW1.Code 'local resume: the first run (a real cut, valved) exits 0'
     Assert-True (Test-Phrase -Text $rW1.Out -Phrase '2 behind origin/main') 'local resume: the cut IS warned -- #1046 still holds where a base is being chosen'
 
     # Back to the trunk, which is where a resume is typed from.
@@ -1322,8 +1379,14 @@ Write-Output `$t.Type
         & git -C $fixResume checkout -q main 2>$null | Out-Null
     } finally { $ErrorActionPreference = $prevEap }
 
+    # NO VALVE ON THIS ONE, DELIBERATELY, and it is the assert #1417 rests on. The trunk under this run
+    # is still two behind, so if the refusal could reach a resume it would fire here and this exits 1.
+    # That is exactly the fear #1046 recorded as its reason for warning instead -- a refusal landing on
+    # the script consumers are told to re-run to resume a parked branch -- and the reason it does not
+    # hold is structural rather than a promise: the whole base block is gated on `-not $resuming`. So
+    # the guarantee is asserted where it can actually fail, on a stale trunk and without the escape.
     $rW2 = Invoke-NewBranch -Dir $fixResume -Name 'feat/resume-me-v1' -Title 'Resume me'
-    Assert-Equal 0 $rW2.Code 'local resume: exit 0'
+    Assert-Equal 0 $rW2.Code 'local resume: exit 0 -- a resume is never refused, stale trunk and no valve'
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'already existed -- checked out') 'local resume: reports the resume'
     Assert-True (-not (Test-Phrase -Text $rW2.Out -Phrase 'behind origin/main')) 'local resume: and is NOT handed the trunk gap under the branch name'
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'Base not compared') 'local resume: says why the base was not compared'

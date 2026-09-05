@@ -34,15 +34,36 @@
         open-pr later to the 'question' label. Validation is deliberately delegated to the consumer's
         table, so extended prefixes (Shopify's style/, liquid/, ...) simply work.
 
-    THE BASE IS MEASURED AND REPORTED, NOT CHOSEN (inbound #1046, August 28, 2026). worktree-lane.ps1
-    refuses a stale trunk in so many words -- "a lane must not be based on a stale trunk" -- while this
-    script cut from whatever HEAD held and never asked. It now counts how far the base is behind
-    origin/<trunk> and WARNS with that count, twice: before the checkout, and as the last line of the
-    run, because everything this script prints in between buries the first copy. It still creates the
-    branch: refusing matches the lane and stays open as a follow-up, but this file reaches consumers by
-    plugin update rather than by choice. A repo with no origin/<trunk> ref is not asked and not warned,
-    which is what keeps the script usable offline. It is measured only where a base is actually being
-    CHOSEN -- see the resume rule below, which settles that question first.
+    THE BASE IS MEASURED, AND A STALE ONE IS REFUSED (inbound #1046, August 28, 2026; issue #1417,
+    September 4, 2026). This script cut from whatever HEAD held and never asked. It counts how far the
+    base is behind origin/<trunk> and, where a base is actually being CHOSEN, REFUSES rather than cuts
+    -- with -SkipStaleBase as the one-flag valve, exactly as the fold carries -SkipTrunkCheck. Where the
+    valve is used the count is still WARNED with, twice: before the checkout, and as the last line of the
+    run, because everything this script prints in between buries the first copy. A repo with no
+    origin/<trunk> ref is not asked, not warned and not refused, which is what keeps the script usable
+    offline. It is measured only where a base is being chosen -- see the resume rule below, which settles
+    that question first.
+
+    WHY THIS REFUSES NOW, WHERE #1046 DELIBERATELY DID NOT. That report warned as its own first step and
+    named the stronger option, holding back because this file reaches consumers by plugin UPDATE rather
+    than by choice -- a refusal nobody asked for, on the script they are told to re-run to RESUME a
+    parked branch. #1417 read that against the code and the second half does not hold: the whole base
+    block is gated on `-not $resuming`, so the resume route never reaches this question and a refusal
+    here cannot land on it. What is left is the operator cutting a NEW branch from a base they happened
+    to be standing on -- and there the refusal costs nothing, because it fires BEFORE the checkout: no
+    branch, no scaffold, no commit, nothing to unwind, and one `git pull --ff-only` resumes it. That is
+    the same "a refusal costs nothing" property the fold cites (#1405), reached by a different route.
+
+    AND THE LANE IS NOT THE PRECEDENT IT WAS READ AS. worktree-lane.ps1 does not refuse a stale base; it
+    refuses a failed FETCH and then bases its worktree at origin/<trunk> outright, so it has no stale
+    base to refuse. Its answer is to remove the choice, which this script cannot copy: it does not move
+    HEAD for the operator. So the three scripts were never two answers to one hazard -- the hazard has a
+    different shape in each -- and the lane passes -SkipStaleBase when it delegates here, because it has
+    already chosen the base itself moments earlier.
+
+    NO THRESHOLD, deliberately. Refusing only above N commits was considered and declined: the incident
+    #1046 measured was a duplicate of a PR merged FOUR MINUTES earlier, which is a base one commit
+    behind. A threshold reinstates exactly the failure it would be added to soften.
 
     IT RESUMES A BRANCH THAT EXISTS ONLY ON ORIGIN (issue #1139, August 30, 2026). "Already exists" used
     to mean refs/heads/<name> and nothing else, so on a machine that had not fetched a parked branch into
@@ -84,6 +105,15 @@
     standing in. Used by worktree-lane.ps1 to open a branch inside a lane worktree. Omitted (the
     normal case): unchanged behaviour -- CLAUDE_PROJECT_DIR, else the git root.
 
+.PARAMETER SkipStaleBase
+    (Optional switch) cut the branch anyway from a base that is behind origin/<trunk>, printing the
+    warning instead of refusing. The one-flag valve for the refusal above, and the counterpart of the
+    fold's -SkipTrunkCheck. Named for this script's own noun rather than for the fold's: everything here
+    already says "base" (Base is current, Base not compared, the stale-base warning), and the two
+    scripts are asking about different things -- the fold about the trunk it is standing on, this one
+    about the base a new branch is being cut from. worktree-lane.ps1 passes it when it delegates here,
+    because it has already based its worktree at origin/<trunk> itself.
+
 .PARAMETER NoPush
     (Optional switch) leave the branch purely local: nothing committed, nothing on origin. The escape
     valve for the rare branch that must not be visible yet -- since #900 the creation push is what
@@ -118,6 +148,11 @@ param(
     # env var answers "which repo is the session working on"; this parameter answers "which tree does
     # this one call write to", and they are not the same question.
     [string]$RepoRoot,
+    # The valve on the stale-base refusal (issue #1417). Deliberately NOT named -SkipTrunkCheck after the
+    # fold's: that script asks about the trunk it is standing on, this one about the base a new branch is
+    # cut from, and every other line in this file calls that thing the base. A shared name would make two
+    # different questions look like one switch.
+    [switch]$SkipStaleBase,
     # The escape valve, and its inverse used to be the switch (see .PARAMETER NoPush / Park). Named for
     # what it PREVENTS rather than as -Local or -Offline: the one thing it turns off is the push, and a
     # reader who wants the branch off the remote is looking for that word.
@@ -256,62 +291,51 @@ if ($Name -eq $trunk) {
 # claim step does not catch this and it looks like it should: `gh issue edit <n> --add-assignee @me`
 # succeeds silently on a CLOSED issue.
 #
-# IT WARNS AND DOES NOT REFUSE, which is the report's own first step rather than the stronger option it
-# names. Refusing matches the lane script and stays open as a follow-up, but this file is mirrored into
-# every consumer's plugin cache and arrives by plugin UPDATE rather than by choice -- the same reasoning
-# the version-suffix block above gives for keeping its rule out of Test-BranchName. So the first step
-# measures the fact the lane already refuses on, and says it out loud.
+# THE MEASUREMENT IS Get-TrunkGap's AND IS NOT REPEATED HERE (issue #1416). The ref probe, the fetch, the
+# HEAD..origin/<trunk> count and the fresh-versus-last-seen distinction all live in entry-scaffold-lib.ps1,
+# where the fold's refusal reads them too -- and the reason for each of those four choices lives there with
+# them rather than being restated at every call site. This block WAS that function's first draft: the
+# #1405 repair lifted the shape out of here and cited it, which left two copies of one measurement
+# standing side by side until this call replaced the inline one. What stays here is the half that is
+# genuinely this script's -- what it does with the number.
 #
-# AND IT SAYS IT TWICE -- here, and as the LAST line of the run. That repeat is the whole difference
-# between a warning that works in this script and one that does not: the scaffold, the commit and the
-# push all print AFTER this point, so a single line at this depth is off-screen by the time the run
-# ends. The bottom copy is the one a reader actually sees.
+# IT REFUSES SINCE #1417, AND THE REFUSAL IS BELOW rather than here, because what it needs -- whether a
+# base is being CHOSEN at all -- is not settled until the resume probe has run. #1046 warned instead and
+# named the stronger option; what kept it a warning was that this file is mirrored into every consumer's
+# plugin cache and arrives by plugin UPDATE rather than by choice, the same reasoning the version-suffix
+# block above gives for keeping its rule out of Test-BranchName. That argument survives as the VALVE
+# (-SkipStaleBase) and not as the answer: the sentence it rested on -- "the script they are told to re-run
+# to resume" -- is about a route the refusal cannot reach.
 #
-# THE LOCAL QUESTION GATES THE NETWORK ONE, which is what keeps this usable offline. refs/remotes/origin/
-# <trunk> is read FIRST: no such ref means no origin, or a clone that has never fetched, and then there is
-# nothing to compare against -- so no fetch is attempted and nothing is claimed. Where the ref does exist
-# the fetch is attempted to freshen it, and the count is reported either way, NAMING which of the two it
-# came from: "17 behind the origin/main you last saw" is a different sentence from "17 behind origin/main",
-# and a reader who is offline needs to be told which one they got.
+# AND THE WARNING STILL SAYS IT TWICE where the valve is used -- there, and as the LAST line of the run.
+# That repeat is the whole difference between a warning that works in this script and one that does not:
+# the scaffold, the commit and the push all print AFTER this point, so a single line at this depth is
+# off-screen by the time the run ends. The bottom copy is the one a reader actually sees. Without the
+# valve there is no run to bury it, which is the other half of why refusing is the better answer here.
 #
-# THE FETCH IS THE ONE COST ADDED TO A ROUTINE RUN. worktree-lane already pays it on every lane, and it is
-# gated above on a ref that only exists in a repo with a reachable remote in its history, so the repos that
-# cannot answer the question pay nothing.
+# -FetchAllRefs IS LOAD-BEARING HERE, not thoroughness. Get-TrunkGap narrows its fetch to the trunk by
+# default, which is right for the fold and wrong for this script: the resume question below reads
+# refs/remotes/origin/$Name off the back of THIS fetch, and a narrowed fetch never brings that ref into
+# existence -- so a branch parked from another device would go unseen and #1139 would reopen silently, in
+# a run where both halves look correct. The suite's parked-branch fixture is what holds this switch here.
 #
-# HEAD..origin/<trunk> RATHER THAN A TRUNK-VS-ORIGIN COMPARISON, deliberately: it answers "what is my base
-# missing", which is the question, and it stays correct when HEAD is NOT the trunk -- a branch deliberately
-# stacked on another branch gets the gap it actually carries instead of a reading about a trunk it was
-# never cut from. In a lane worktree (detached at origin/<trunk> by worktree-lane) it reads 0, so the
-# route that already handles this hazard is never warned about.
+# THE FETCH IS THE ONE COST ADDED TO A ROUTINE RUN. worktree-lane already pays it on every lane, and
+# Get-TrunkGap gates it on a ref that only exists in a repo with a reachable remote in its history, so the
+# repos that cannot answer the question pay nothing.
+#
+# GIT'S FETCH OUTPUT IS CAPTURED AND DELIBERATELY NOT PRINTED. Get-TrunkGap keeps stderr rather than
+# discarding it -- issue #1313 measured that a failing fetch leaks no credential, and its callers need
+# git's own diagnosis -- and hands it back in .Output. This caller does not read it: nothing here shows
+# git's progress, and the warning below already says the fetch failed and that the real gap may be larger,
+# which is everything a reader can act on.
 $staleBaseNote = ''
-$trackedTrunk  = "refs/remotes/origin/$trunk"
-# Through Invoke-NativeCapture rather than a hand-written EAP dance: that dance is exactly what this lib
-# centralizes, and the lib is loaded by the time we get here.
-$tracked = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', $trackedTrunk) -DiscardStderr
-$fresh   = $false
-if ($tracked.ExitCode -ne 0) {
-    Write-Host "Base not compared: this repo has no $trackedTrunk (no origin, or never fetched)." -ForegroundColor DarkGray
-} else {
-    # -DiscardStderr ON THE FETCH. This comment used to give a security reason -- "a failing git fetch
-    # echoes the remote URL, which in a repo cloned over HTTPS with a credential in the URL is a secret"
-    # -- and that reason is WRONG, measured on git 2.55.0.windows.5 (issue #1313). git puts the URL in
-    # every "unable to access" / "Authentication failed" line through transport_anonymize_url, which
-    # strips userinfo, so `https://<user>:<token>@host/o/r.git` comes back as `https://host/o/r.git`.
-    # Three shapes were tried -- user:token@, token@, and an unresolvable host -- and none leaked.
-    #
-    # THE FLAG STAYS, on the first reason and only that one: nothing here reads git's progress, the
-    # message below is complete without it, and a fetch writes all of it to stderr. So this line costs
-    # nothing. WHAT IT MUST NOT BECOME IS A PRECEDENT: #1313 was filed because this comment reads as a
-    # rule, and three other call sites were about to drop stderr on the strength of it -- including
-    # ship-pr.ps1's fold-step fetch, where git's own reason is the only thing a reader has at the one
-    # step where the PR is already merged. Where git's diagnosis IS the message, keep it. The place a
-    # credential genuinely does reach the screen is where WE print a URL rather than git: see
-    # Format-UrlForDisplay in scripts/release/publish-to-business.ps1.
-    #
-    # The message below says the fetch failed and that the gap may be larger, which is everything a
-    # reader can act on.
-    $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', 'origin', '--quiet') -DiscardStderr
-    $fresh = ($fetch.ExitCode -eq 0)
+$gap = Get-TrunkGap -RepoRoot $repoRoot -Trunk $trunk -FetchAllRefs
+# .Measured IS THE GATE FROM HERE ON, where this block used to carry its own rev-parse exit code. It is
+# $false for a missing refs/remotes/origin/<trunk> -- the reachable case, and the one this line names --
+# and also for the exotic one where that ref exists and `rev-list HEAD..` still cannot answer, on an
+# unborn HEAD. Both leave the question unasked, which is what the sentence reports.
+if (-not $gap.Measured) {
+    Write-Host "Base not compared: this repo has no $($gap.Ref) (no origin, or never fetched)." -ForegroundColor DarkGray
 }
 
 # --- RESUME OR CUT? ASKED BEFORE ANYTHING IS SAID ABOUT A BASE (issue #1139) -----------------------
@@ -343,49 +367,78 @@ if ($tracked.ExitCode -ne 0) {
 # readable, so the lines below say which of the three things happened and what to type if the operator
 # meant a new branch instead.
 #
-# THE LOCAL QUESTION GATES THE NETWORK ONE, exactly as the base check above does: refs/remotes/origin/
+# THE LOCAL QUESTION GATES THE NETWORK ONE, exactly as Get-TrunkGap does above: refs/remotes/origin/
 # $Name is a remote-TRACKING ref, read from disk and never fetched for on its own account. It is fresh
-# here because the base check has just fetched wherever there was an origin to fetch from; where there
-# was not, this reads whatever the last fetch left and the script stays usable offline.
+# here because the base measurement above has just fetched wherever there was an origin to fetch from --
+# and fetched EVERY ref, which is what -FetchAllRefs is for and the whole reason this line can trust what
+# it reads; where there was no origin, this reads whatever the last fetch left and the script stays
+# usable offline.
 $localRef  = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', "refs/heads/$Name") -DiscardStderr
 $remoteRef = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', "refs/remotes/origin/$Name") -DiscardStderr
 $branchExists   = ($localRef.ExitCode -eq 0)
 $branchOnOrigin = ((-not $branchExists) -and ($remoteRef.ExitCode -eq 0))
 $resuming       = ($branchExists -or $branchOnOrigin)
 
-# --- HOW FAR BEHIND IS THE BASE? MEASURED ONLY WHEN THERE IS A BASE TO CHOOSE ----------------------
+# --- HOW FAR BEHIND IS THE BASE? REPORTED ONLY WHEN THERE IS A BASE TO CHOOSE ----------------------
 #
-# SPLIT FROM THE FETCH ABOVE, AND THE ORDER IS THE POINT. The question this block answers is "what is
-# the branch I am about to CUT missing", and it is unanswerable -- worse, it is false -- for a branch
-# that already exists: the count is HEAD..origin/<trunk>, and on a resume HEAD is whatever the operator
-# happened to be standing on, usually the trunk. Attributing the trunk's gap to a branch that was cut
-# somewhere else entirely is a sentence nobody can act on. So the resume question is settled first and
-# this block is skipped when the answer is yes.
+# SPLIT FROM THE MEASUREMENT ABOVE, AND THE ORDER IS THE POINT. Get-TrunkGap answered "what is this
+# checkout missing" up there, before the resume probe read the refs its fetch had just refreshed; what is
+# settled HERE is whether that number is worth saying. It is unanswerable -- worse, it is false -- for a
+# branch that already exists: the count is HEAD..origin/<trunk>, and on a resume HEAD is whatever the
+# operator happened to be standing on, usually the trunk. Attributing the trunk's gap to a branch that was
+# cut somewhere else entirely is a sentence nobody can act on. So the resume question is settled first and
+# nothing is reported when the answer is yes.
 #
-# HEAD..origin/<trunk> RATHER THAN A TRUNK-VS-ORIGIN COMPARISON, deliberately: it answers "what is my base
-# missing", which is the question, and it stays correct when HEAD is NOT the trunk -- a branch deliberately
-# stacked on another branch gets the gap it actually carries instead of a reading about a trunk it was
-# never cut from. In a lane worktree (detached at origin/<trunk> by worktree-lane) it reads 0, so the
-# route that already handles this hazard is never warned about.
-if ($tracked.ExitCode -eq 0 -and -not $resuming) {
-    $rev     = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-list', '--count', "HEAD..origin/$trunk") -DiscardStderr
-    $revText = (($rev.Output | Out-String).Trim())
-    $behind  = 0
-    if ($rev.ExitCode -eq 0 -and $revText -match '^\d+$') { $behind = [int]$revText }
-    if ($behind -gt 0) {
-        $against = if ($fresh) { "origin/$trunk" } else { "the origin/$trunk this repo last fetched (git fetch failed -- the real gap may be larger)" }
-        $staleBaseNote = "'$Name' is based on a commit $behind behind $against."
+# THE GAP IS NOW MEASURED ON A RESUME TOO, and that is the only thing the move to Get-TrunkGap changed
+# here. The count is a local rev-list against a ref already on disk, so taking it and then not printing it
+# costs one process and buys one definition of the measurement. Nothing a reader sees moves, which is what
+# the wording asserts in new-branch.tests.ps1 hold.
+if ($gap.Measured -and -not $resuming) {
+    if ($gap.Behind -gt 0) {
+        $against = if ($gap.Fresh) { "origin/$trunk" } else { "the origin/$trunk this repo last fetched (git fetch failed -- the real gap may be larger)" }
+        $staleBaseNote = "'$Name' is based on a commit $($gap.Behind) behind $against."
         Write-Warning $staleBaseNote
         Write-Host "  new-branch does not move HEAD for you, so this branch carries that gap -- work already merged upstream is" -ForegroundColor Yellow
         Write-Host "  invisible from here, including an issue somebody else has just closed. Bring the base up to date first" -ForegroundColor Yellow
         Write-Host "  (git pull --ff-only), or open the work as a lane, which bases it on origin/$trunk itself:" -ForegroundColor Yellow
         Write-Host "  scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor Yellow
-    } elseif ($fresh) {
+
+        # --- AND IT REFUSES (issue #1417, September 4, 2026) -------------------------------------
+        #
+        # THE POSITION IS THE ARGUMENT. This sits before the checkout, so a refusal here leaves the tree
+        # exactly as it found it: no branch, no scaffold, no commit, no push, nothing to unwind -- and
+        # one `git pull --ff-only` resumes the same command. That is the property #1405 named as what
+        # makes the fold's refusal safe rather than merely strict, and it holds here for its own reason
+        # rather than by analogy.
+        #
+        # WHY #1046 HELD BACK, AND WHICH HALF OF THAT EXPIRED. Its objection was that this file arrives
+        # in a consumer by plugin UPDATE rather than by choice, and lands on the script they are told to
+        # re-run to RESUME a parked branch. The first half still stands and is why the valve is one flag
+        # rather than a hand-typed `git checkout -b`. The second half does not: this whole block is
+        # gated on `-not $resuming` a few lines up, so the resume route never reaches the question and
+        # a refusal here cannot land on it. What is refused is only an operator cutting a NEW branch
+        # from the base they happened to be standing on -- which is the case #1046 measured.
+        #
+        # NOT GATED ON .Fresh, exactly as the fold is not. A failed fetch counts against the
+        # origin/<trunk> last seen, and a HEAD behind THAT is behind whatever origin holds now as well;
+        # the warning above already says the real gap may be larger. A repo with no origin/<trunk> ref
+        # never gets here at all, so an offline clone is untouched.
+        #
+        # NO THRESHOLD. Refusing only above N was the third shape #1417 listed and it is declined: the
+        # duplicate #1046 measured was of a PR merged four minutes earlier, so the dangerous gap can be
+        # one commit. A threshold would let exactly that case through.
+        if (-not $SkipStaleBase) {
+            Write-Host "Refused: nothing was created, and this checkout is unchanged." -ForegroundColor Red
+            Write-Host "  Bring the base up to date and run this command again, or pass -SkipStaleBase to cut from it anyway." -ForegroundColor DarkGray
+            exit 1
+        }
+        Write-Host "  -SkipStaleBase given -- cutting from that base anyway." -ForegroundColor DarkGray
+    } elseif ($gap.Fresh) {
         Write-Host "Base is current with origin/$trunk." -ForegroundColor DarkGray
     }
-} elseif ($resuming -and $tracked.ExitCode -eq 0) {
-    # GATED ON THE TRUNK REF AS WELL, so this cannot print a SECOND 'Base not compared' underneath the one
-    # the missing-origin branch above already wrote. Both sentences would be true and neither would be
+} elseif ($resuming -and $gap.Measured) {
+    # GATED ON THE MEASUREMENT AS WELL, so this cannot print a SECOND 'Base not compared' underneath the
+    # one the unmeasurable branch above already wrote. Both sentences would be true and neither would be
     # wrong; two of them in a row just read as a script that has lost track of what it is answering.
     Write-Host "Base not compared: '$Name' already exists, so nothing is being cut from a base." -ForegroundColor DarkGray
 }
@@ -741,6 +794,11 @@ if ($NoPush) {
 # the block above the checkout for the measurement; this exists because everything between there and here
 # -- the scaffold, its tier rubric, the commit, the push -- prints in between, so the warning that fired
 # before HEAD moved is well off-screen by now. Last line of the run, or nothing at all.
+#
+# REACHABLE ONLY UNDER -SkipStaleBase SINCE #1417: a stale base now refuses up there, so the only run that
+# gets this far with a note to repeat is one that was told to cut anyway. That makes the repeat MORE
+# load-bearing rather than less -- it is the whole record that the valve was used, on a run that otherwise
+# ends on a green 'created and checked out'.
 if ($staleBaseNote) {
     Write-Warning "$staleBaseNote Bring the base up to date (git pull --ff-only) or reopen this as a lane before you build on it."
 }

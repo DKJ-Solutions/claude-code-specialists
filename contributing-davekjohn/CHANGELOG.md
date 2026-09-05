@@ -32,6 +32,592 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1422-shared-check-preamble · 20260905-011053
+
+Five consumer-facing lint checks opened with the same ~30-line preamble, and it had already drifted:
+four resolved the repo root on one line and crashed outside a git checkout, while the fifth carried a
+tolerant variant nobody had reconciled. The dual-context root resolution and the always-on prose walk
+now have one definition in `scripts/lib/consumer-check-lib.ps1`, and each check keeps its own verdict
+on what that definition cannot decide -- a session check has nothing to judge outside a checkout, a
+CI gate must refuse there.
+
+The same pass closed a hole the duplication was hiding. Both prose checks skipped *"a repo that
+publishes plugins"* by testing `marketplace.json` inline, where the question they mean is *"is this
+repo the source of this workflow"* -- the distinction #998 already exists for. A repo publishing
+another product while consuming this workflow was silently exempted from both checks; it is now
+judged, with an assert in each suite pinning it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the subject is this repo's own lint layer and the shared scripts a consumer runs. No
+subscriber of a service notices a preamble having one definition instead of five. The behaviour that
+did change reaches a consuming repo that also publishes a marketplace of its own, which no current
+consumer is.
+
+**Score:** N/A
+
+#### Pull Request
+
+One definition for the lint checks' shared preamble
+
+Plugins: contributing-davekjohn
+
+[PR #1431](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1431)
+
+---
+
+### DEPLOY: fix/1424-superseded-entry-note · 20260905-003549
+
+The release note stops contradicting itself. Three entries pending in one `## [Unreleased]` block will
+ship together, and two of them tell the reader that `new-branch.ps1` warns on a stale base while the third
+is the branch that made it refuse. The `fix/1417-new-branch-refuse-stale-base` entry now names the two it
+overtakes, quotes the claim it supersedes, and says which sentence describes the version you installed.
+
+**The two superseded entries are byte-identical, and that is the decision rather than an omission.** They
+were true on the day each branch merged, and an entry is the only durable record of *why* a branch held
+back -- #1416 declined to settle the warn-versus-refuse asymmetry and filed #1417 for it, which is exactly
+the reasoning the next reader needs. Amending them would write a decision into history that was never
+taken there. This is the published-record rule stated one stage earlier: a line true when written goes
+stale rather than false, and the correction travels with the newer document.
+
+So the general half ships too, in `DEVELOPMENT-portable.md` beside the rest of the DEPLOY form -- because
+the shape recurs by construction. A question filed out of one branch and answered in another lands in the
+same block whenever both merge between two cuts, the changelog has no notion of one entry superseding
+another, and nothing detects it. The rule is a habit at the moment DEPLOY is written, not a gate: before
+writing that a behaviour changed, grep `[Unreleased]` for what it used to be. A gate would have to read
+prose for contradiction, which this repo declined at 12.5% precision.
+
+Reason: the contradiction is invisible to every gate the block passes through, and it only becomes
+legible at the cut -- when the note is generated and nobody is reading the three entries side by side any
+more.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer reads the generated release note and nothing else; this repo's own maintainers can always fall
+back to the issue numbers. So the entry that gets repaired here is the one that reaches them, and the
+convention that keeps it repaired arrives at their next plugin update as one more paragraph in the DEPLOY
+form -- the page an author of theirs is already reading when the mistake is available to make.
+
+**Score:** 2
+
+#### Pull Request
+
+The superseding changelog entry names the pending entries it overtakes
+
+Plugins: contributing-davekjohn
+
+[PR #1429](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1429)
+
+---
+
+### DEPLOY: docs/1420-private-consumer-quote-bound · 20260905-001543
+
+A measurement taken in a private consumer now quotes only the fragment the finding reads. The repo, file
+and line are published as before and carry the provenance; the sentence around the match stays in the
+consumer's tree. `CLAUDE.md`'s `public` bullet states it, and the three sites that had gone further --
+the #15 lens, `entry-scaffold-lib.ps1` with its plugin mirror, and the supremacy-declaration fixtures --
+are brought back to that bound. The verbatim-citation convention itself is untouched and said so
+explicitly: a bounded quote plus `file:line` is still re-verifiable, which is the property a paraphrase
+loses. Test fixtures are named as in scope, because a matcher reads structure and the consumer's
+remaining words buy no coverage while a public repository keeps them forever.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes plugins, not a subscribed service, and nothing here reaches a subscriber. The
+reader is a maintainer of this tree or of a consuming one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Bound a verbatim quote from a private consumer to the fragment the finding needs
+
+Plugins: contributing-davekjohn
+
+[PR #1427](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1427)
+
+---
+
+### DEPLOY: fix/1419-prose-echo-sanitize · 20260905-001011
+
+Both consumer-prose session checks echo a line out of a consumer's own markdown so the reader can
+recognise what to repair, and both printed it raw -- into a report the SessionStart hook forwards into
+session context and filters by matching `[ERROR]` over it. Untrusted text therefore chose how loudly it
+was reported, and could repaint a terminal or reverse the reading order of the text around it on the way
+past. In `check-retired-doc-name.ps1` the path and the line now go through `check-report-lib.ps1` while
+the plugin's own strings stay raw; in `check-supremacy-declaration.ps1` all three reported values are the
+consumer's, so none of them stays raw. A third sanitizer, `Format-SafeProseToken`, was needed because a
+sentence is not a token: the id form eats its punctuation and the path form eats the brackets that in
+prose are a markdown link. So brackets are substituted rather than deleted, and each check's footer says
+so. Building it surfaced a real defect in the neighbouring `Format-SuspectToken`: its "say when the
+display differs" check used PowerShell's culture-sensitive `-ne`, which treats Unicode format characters
+as ignorable, so a suspect id carrying a zero-width or bidi character had been reported as clean since
+#309. Both now compare ordinally.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Every repo with the workflow plugin runs these two checks at session start, which is where a consumer's
+own prose enters a session's context. Nothing is known to have gone wrong, and the named failure is
+concrete: a line in a consumer's own documentation -- and a repo whose pages discuss check output is
+exactly the kind that has such a line -- carrying a bracketed marker or an ANSI escape, and thereby
+shaping the report about itself.
+
+**Score:** 2
+
+#### Pull Request
+
+Both consumer-prose session checks sanitize the line they echo into session context
+
+Plugins: contributing-davekjohn, team-alpha
+
+[PR #1426](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1426)
+
+---
+
+### DEPLOY: fix/1417-new-branch-refuse-stale-base · 20260905-000004
+
+`new-branch.ps1` now **refuses** to cut a branch from a base behind `origin/<trunk>`, where it previously
+warned twice and cut anyway. `-SkipStaleBase` cuts from it regardless, and restores the old run exactly --
+branch, document, and the warning at both ends.
+
+The refusal costs nothing, which is the argument for it: the check sits before the checkout, so a refused
+run leaves no branch, no document, no commit and no push -- nothing to unpick, and one `git pull --ff-only`
+resumes the same command. That is the property #1405 named for the fold's own refusal, reached here by a
+different route.
+
+It cannot reach a resume. #1046 warned instead of refusing because this file arrives in a consumer by
+plugin **update** rather than by choice, landing on the script you are told to re-run to resume a parked
+branch. The first half of that stands and is why the escape is one flag; the second does not, because the
+base block is gated on *"not resuming"*. The suite now asserts that where it could actually fail -- a
+resume on a trunk two commits behind, no valve, exit 0.
+
+`worktree-lane.ps1` passes the valve when it delegates, so lanes behave exactly as before: it fetched and
+based the worktree at `origin/<trunk>` seconds earlier, so there is no operator choice to gate, and the
+refusal's own remedy (`git pull --ff-only`) is not the remedy for a detached worktree.
+
+**It overtakes two entries pending in this same block, and they are left as written.**
+`fix/1416-trunk-gap-one-definition` states that the scaffolder *"still warns and does not refuse"*, and
+`fix/fold-cross-device-duplicate-gate` that it *"deliberately only warns"*. Each was true on the day its
+branch merged, and an entry is the only durable record of why a branch held back -- so correcting them
+would destroy that record to repair a rendering. **This entry is the current one:** from this release
+`new-branch.ps1` refuses, and `-SkipStaleBase` is how you cut from a stale base anyway.
+
+Reason: it closes the hazard #1046 measured -- a complete duplicate of already-merged work, branch, commit,
+PR and every gate green on both, from a base 17 commits behind. Anyone who cuts a branch this way notices
+the day it first refuses.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It settles a question two issues deliberately left open, by reading the code instead of the reports: the
+reason `new-branch` held back named a route the refusal provably cannot reach, and the precedent it was
+measured against turns out not to refuse the thing it was cited for. Both corrections are written down
+where the next reader meets them rather than only in the issue.
+
+**Score:** 2
+
+#### Pull Request
+
+new-branch refuses a stale base, with -SkipStaleBase as the valve
+
+Plugins: contributing-davekjohn
+
+[PR #1425](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1425)
+
+---
+
+### DEPLOY: feat/1415-supremacy-declaration-check · 20260904-235353
+
+A consumer is now told, at session start, when its own always-on prose declares its `CLAUDE.md` the
+winner over the workflow's contributing page -- inverting the rank order the plugin legislates. This is
+the one contradiction the declined prose-contract framework (#1380) proved was *structurally* invisible:
+a pointer test only ever flags sections that cite nothing, so a page that names its source and then
+overrides it four lines later can live nowhere but among the findings such a test suppresses.
+
+The recorded design for it did not survive being measured, which is the more useful half of this change.
+The three-term same-sentence grep the decline wrote down scored **0 findings and 0 recall** on the single
+defect it was named to catch -- the real sentence names the contributing page by a prose noun rather than
+by its filename. What ships instead is **adjacency**: `CLAUDE.md` and `wins`/`wint` beside each other,
+which is just as literal but reads *direction*, and direction is the whole defect -- *"this page wins"*
+is the same rank order stated correctly. On the same 8-document corpus: 3 raw / 2 reported / 2 true /
+**100% precision**, against a bar this repo sets with an accepted check at 17/17 and a declined one at
+124/0. It also found one standing inversion more than the original census knew about.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own maintainers and the repos consuming the plugin. The change reaches
+a consuming repo at its next plugin update, as one more read-only session-start line that stays silent
+unless that repo has the defect; it reaches no subscriber of a service, because there is none.
+
+**Score:** N/A
+
+#### Pull Request
+
+A consumer-side check for an inverted supremacy declaration
+
+Plugins: contributing-davekjohn
+
+[PR #1423](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1423)
+
+---
+
+### DEPLOY: fix/1416-trunk-gap-one-definition · 20260904-232313
+
+`new-branch.ps1` no longer measures the trunk gap itself. The ref probe, the fetch, the
+`HEAD..origin/<trunk>` count and the fresh-versus-last-seen distinction are `Get-TrunkGap`'s, which is
+where #1405 put them, and the scaffolder now calls it instead of carrying a second copy.
+
+The two copies existed for one merge. `Get-TrunkGap` was written *because* `new-branch.ps1` had already
+established the shape -- the function's header cites that block for the ref-gating, the `HEAD..` choice and
+the fresh/stale wording -- and moving the scaffolder onto it was deliberately scoped out of a fix for the
+fold. Nothing was broken; the cost was the ordinary one, that two copies of a measurement drift when only
+one of them is corrected.
+
+`Get-TrunkGap` gains one switch, `-FetchAllRefs`, and it is load-bearing rather than thoroughness. The
+default fetch is narrowed to the trunk, which is right for the fold and wrong for the scaffolder: the
+resume probe reads `refs/remotes/origin/<branch>` off the back of that same fetch, and that ref is the only
+thing that tells a branch parked from another device from a fresh cut (#1139). A narrowed fetch never
+brings it into existence, so the swap without the switch would have reopened #1139 -- silently, in a run
+where the scaffold, the commit and the push all look correct and only the branch's *work* is missing. So
+the scope is the caller's to state, and the suite's parked-branch fixture is what holds it in place.
+
+**What did not change, deliberately.** `new-branch.ps1` still warns and does not refuse. The issue names
+that as a separate question and it is not this branch's: the fold refuses because its next act is a commit
+directly on the trunk, while a stale base under a branch is recoverable with an ordinary pull, and the
+scaffolder is mirrored into every consumer's plugin cache and arrives by plugin update rather than by
+choice. That asymmetry may well be correct and permanent, and it is nobody's to settle inside a dedup:
+it is filed as #1417, with the three shapes it could take and the reason each one costs something.
+
+Every sentence the script prints is byte-identical, which is what the wording asserts in
+`new-branch.tests.ps1` hold. One measurement did move: the gap is now taken on a resume too, since the
+count is a local `rev-list` against a ref already on disk. It is not printed there, for the reason it never
+was -- on a resume `HEAD` is wherever the operator was standing, so the trunk's gap is not that branch's.
+
+Reason: nothing observable changes for anyone running this script. What it prevents has not happened yet
+-- one of the two copies being corrected and the other left behind, which is how the next reader gets two
+answers to "how far behind is this checkout" and no way to tell which one their script took.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A. A consumer running the mirrored `new-branch.ps1` sees exactly the run they saw before -- same
+warning, same count, same two places it is printed, same silence where the question cannot be asked.
+
+**Score:** N/A
+
+#### Pull Request
+
+new-branch reads the trunk gap from Get-TrunkGap instead of measuring it again
+
+Plugins: contributing-davekjohn
+
+[PR #1418](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1418)
+
+---
+
+### DEPLOY: feat/1389-retired-doc-name-check · 20260904-230550
+
+A renamed convention now reaches a consumer through something. This workflow's branch document has been
+renamed seven times, twice inside one day, and the tooling around it was deliberately built rename-proof
+-- every reader goes through `Resolve-BranchFilePath`, and the fold's bound is named by that resolver
+rather than spelled out. The prose describing the convention to consumers was not: no gate reads a
+consumer's `CLAUDE.md`, and `check-script-contract.ps1` covers *functions*, so a renamed file convention
+sat outside it by construction. Measured -- both live consumers were still stating the retired single
+`development.md` as current, one day and six days after the rename, and no mechanism existed by which
+either could have found out.
+
+`check-retired-doc-name.ps1` closes it, driven by a new `retired-doc-name-sessioncheck` SessionStart
+hook, which is the whole delivery -- there is no CI half, because in the one repo whose CI this repo
+controls the check skips itself. It greps the always-on document closure plus the workflow folder's own
+permanent pages for every name the branch document has been renamed *away from*, and names the document,
+the line and the retired name.
+
+**The design question was not open, and staying inside its bounds is the point.** The prose-contract
+framework was measured at 12.5% precision and declined the same day; that decline recorded two narrow
+literal greps as the proportionate alternative, and this is the first of them, held to the three
+constraints the decline imposed. The names are **derived** from `Get-BranchFileLegacyNames`, so the next
+rename adds this token by the same row it always adds. The corpus is an **inclusion** list with the
+changelog and `releases/` out, because a folded entry correctly names the file of its own day and a check
+that read it would be born red on its own past. And it **skips the publishing repo**, on the source-repo
+guard's own condition 2, for the reason that measurement found the hard way: this repo narrates the
+rename history on purpose, so without the skip the source reads as consumer drift. One gap is stated
+rather than left to be rediscovered -- `development-<branch>.md` is a shape, not a literal, and matching
+a shape is the step toward fuzzy the decline rules out.
+
+Along the way the hook enumerations were retired instead of extended. Four documents named the
+SessionStart set by hand as "two" or "three"; each had already gone stale twice inside two days, and this
+change would have made all four wronger. They now point at each plugin's `hooks/hooks.json`, the one
+place that cannot go stale.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This is the only thing that will ever tell a consuming repo that a shared convention moved under its own
+documentation. The failure it ends is silent by construction: a restatement is correct on the day it is
+written and becomes a lie on the day the plugin's answer changes, and until now the plugin had no way of
+saying so -- noticing required reading a repo the source never reads. Measured at 365 ms through the
+hook, which makes it the cheapest of the session checks rather than a sixth tax, and it never blocks
+anything.
+
+`CONTRIBUTING-portable.md` gains the paragraph that tells you what the hook means when it fires and what
+the repair is, beside the corollary it enforces: a consumer document may point at a shared law, answer a
+seam the law names, or say nothing.
+
+**Score:** 3
+
+#### Pull Request
+
+A consumer-side check for retired branch-document names
+
+Plugins: contributing-davekjohn
+
+[PR #1414](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1414)
+
+---
+
+### DEPLOY: fix/fold-cross-device-duplicate-gate · 20260904-225721
+
+The fold's duplicate gate now reads a trunk it has actually checked, and a refused push says what
+happened instead of handing back git's exit code.
+
+`fold-changelog-entry.ps1`'s `ONE BRANCH, ONE ENTRY` gate reads `CHANGELOG.md` from the **working
+copy**, and that was the only trunk state it ever saw. On one machine that is the whole truth. Dave
+works one repo from more than one device at the same time, deliberately and permanently, so here it was
+a snapshot of whatever that checkout last pulled -- and the other device may already have folded the
+same branch.
+
+Three things changed, and the third is the one that matters:
+
+1. **The fold fetches before the gate reads.** A new `Get-TrunkGap` in `entry-scaffold-lib.ps1` freshens
+   `refs/remotes/origin/<trunk>` and counts `HEAD..origin/<trunk>`.
+2. **A trunk behind its upstream is refused**, with the count in the refusal and `-SkipTrunkCheck` as the
+   valve. This is where #1046's follow-up lands: `new-branch.ps1` deliberately only *warns*, because a
+   stale base under a branch is recoverable with a pull. The fold's next act is a commit **directly on
+   the trunk** under a named exception, so the same argument the duplicate gate already makes applies --
+   a fold that does not happen leaves the entry exactly where it was, and one pull resumes it.
+3. **A rejected push is diagnosed against the fetched remote.** This is the half a pre-pass structurally
+   cannot cover: the measured failure was a **race**, not a stale checkout. The trunk was current when
+   the gate read it, and the other device folded the same branch inside the window before the push. The
+   step used to report `git push exited 1` plus git's generic "the remote contains work that you do not
+   have locally" -- the same sentence a plain divergence gives, at the one moment the two situations need
+   **opposite** actions. Separating them took five commands typed by a person: a fetch, a log of
+   `HEAD..origin/main`, a grep of the remote changelog, a count, and a diff of the two entry bodies. All
+   five are derivable at that point, so all five now run.
+
+The verdict is inverted where it has to be: when every entry the commit carries is already upstream, the
+advice is **"Do NOT push this commit by hand"** rather than the old *"Push by hand"*, which in the
+measured incident would have produced exactly the two-entries-one-branch state #1082 was closed for. The
+**bodies** are compared rather than the blocks, because both devices stamp the heading at their own fold
+time and a whole-block comparison would report every genuine duplicate as a difference.
+
+It **diagnoses and stops, repairing nothing**, which is the report's own boundary. The fold commit is on
+the trunk by then, and every route off a trunk -- a reset, a rebase, a merge commit -- is a history
+operation the consumer's safety rules reserve to the operator. That is the expensive half of the measured
+incident: a denied rebase, a denied soft reset, an aborted mid-conflict merge on the trunk, and two
+commands finally hand-typed by Dave.
+
+Neither new gate can fire on a question it did not answer: `Get-TrunkGap` reports "could not measure" for
+a repo with no `origin/<trunk>` ref, and a caller must never read that as "behind" -- every fixture in
+this repo's own suite is such a repo.
+
+Inbound #1405, reported from `BWJ-ecommerce/smartwatchbanden` on September 4, 2026.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+This is the one that reaches them. Every consumer runs the mirrored fold, and the reporting repo hit a
+state its own constitution forbade every route out of -- the tooling put a correct-looking commit on the
+trunk and then left the operator unable to resolve it unaided. A consumer working one repo from two
+devices now gets told, at the moment the push is refused, whether the work is already upstream and the
+local commit redundant, or whether it is real work that has to be integrated. That answer used to cost
+five hand-typed commands and, on the day it was measured, did not get made at all.
+
+**Score:** 4
+
+#### Pull Request
+
+the fold reads the trunk across devices, and a refused push says why
+
+Plugins: contributing-davekjohn
+
+[PR #1413](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1413)
+
+---
+
+### DEPLOY: docs/1408-closeout-ceiling-order · 20260904-224649
+
+Fixed [#1408](https://github.com/DaveKJohn/claude-code-specialists/issues/1408): the length ceiling
+[#1406](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1406) put into Chris's close-out
+stood beside the archived August 27, 2026 reasoning that had **refused a word budget**, with nothing on
+either page saying how the two fit -- so the next session to read the archive found a recorded argument
+against the guardrail it was standing under. The paragraph said *"the ceiling holds regardless"*, which is
+the one reading under which the objection lands.
+
+The repair is the order, because the objection was aimed at a ceiling applied *instead of* the duplication
+test and not *after* it. The persona now states both in sequence -- duplication filters first, so the
+sentence only the session can give is never what the ceiling meets; the ceiling then caps what survives,
+because *"not a duplicate"* is always satisfiable -- and says why that is not a budget: over the ceiling a
+surplus is **rehoused** into the branch document or an issue the receipt cites, not cut. And the figure the
+archive recorded as the observed consequence, *"two or three lines"*, becomes the stated rule in place of
+*"a handful of lines"*, which is the cruder form #1402 asked for.
+
+The archive is deliberately left as written. It is the record of a decision, its argument is true of the
+budget it was aimed at, and the live rule is where a rule is repaired.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Every consumer's orchestrator gets a number where it had *"a handful"*, and stops carrying a rule its own
+shipped history argues against -- a contradiction a consumer can only ever find at the moment it costs
+them, mid-close-out, with the archive quotable in defence of the length the ceiling exists to stop.
+Line-count neutral but one: the ordering and the figure are paid for by dropping the restatement of what
+the receipt contains, which the paragraph above it already names.
+
+**Score:** 2
+
+#### Pull Request
+
+state the order between the close-out's duplication test and its length ceiling
+
+Plugins: team-alpha
+
+[PR #1412](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1412)
+
+---
+
+### DEPLOY: fix/1401-duration-ceiling-load-sensitive · 20260904-223712
+
+The test gate's own suite no longer refuses a push because the machine was busy. Scenario 4b in
+[`../scripts/tests/test-suite-gate.tests.ps1`](../scripts/tests/test-suite-gate.tests.ps1) proves that
+the per-suite table prints a *runtime* and not a *finish time*, and it proved it with a hard-coded
+`-lt 4` second ceiling. That is the exact shape the same file forbids forty lines higher up: a timing
+FLOOR is guaranteed by `Start-Sleep`, a timing CEILING is guaranteed by nothing, because nothing bounds
+how slow a shared machine can be. Under a 65-suite gate run one of the fixture's 1.2s sleeps came in at
+5.1s, the assert failed, and `Invoke-WorkflowGates` refused to push a branch that had touched nothing
+the suite reads -- the same shape as #1232, one file over.
+
+The ceiling is now a comparison against the queue the fixture itself builds: `$maxDuration -lt
+$maxOffset`. Serially the last lane opens only after the five suites before it have run, so the largest
+offset is the SUM of five runtimes while a true duration is ONE of them -- and a duration column holding
+finish times reads `offset + runtime` for that same row, which exceeds the offset by construction,
+whatever the machine was doing. Contention scales both sides together, so the discriminator survives a
+loaded box in a way no second-count can. Measured on this branch: 1.7s against +8.2s, a 4.8x margin
+where the old ceiling had 2.4x and tripped at 5.1s.
+
+Widening the ceiling to 6-7s was the issue's own first suggestion, and it is declined in the comment
+rather than silently: it keeps the fragile shape and discriminates *worse* the more load there is,
+because contention inflates the defect's reading too -- and 6-7s lands within noise of the ~7.2s a
+finish-time column reports at rest, which is the one figure the assert must stay below. The retry
+mechanism #1232 landed on does not carry over either, for the reason in CREATE above.
+
+The assert still fails for the defect it exists to catch, and that is proved by mutation rather than by
+argument: re-introducing the #1358 defect in the duration column makes it read 10s against +8.3s and
+refuse. Closes [#1401](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1401).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the suite is source-repo-only. `native-capture-lib.ps1` is mirrored into the plugins and is
+unchanged by this branch; `scripts/tests/test-suite-gate.tests.ps1` is not payload, so no consumer of
+this marketplace runs it or notices this.
+
+**Score:** N/A
+
+#### Pull Request
+
+The test gate's duration assert compares against the queue instead of a fixed second-count
+
+[PR #1410](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1410)
+
+---
+
+### DEPLOY: docs/fix-1394-per-project-test-in-adopt-bwj-asana · 20260904-222833
+
+Fixed [#1394](https://github.com/DaveKJohn/claude-code-specialists/issues/1394): `adopt-bwj-asana/SKILL.md`
+still stated the one-workspace test for whether `Prio-Score` reaches a task, in a paragraph that cited
+step 5 of `WORKFLOW-portable.md` as its authority -- a test that step 5 stopped making once
+[#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386) replaced it with the
+per-project test (`custom_field_settings`), so the citation pointed a reader at the opposite claim. The
+same superseded workspace-only reasoning was also present, unflagged by the issue but found via its own
+suggested `grep -rn "one-workspace|does not cross" plugins/`, in the "propose one value" paragraph
+earlier in the same file, in `README.md`'s `Get-AsanaProjectGid` entry, and in `asana-mirror.ps1`'s
+`Get-PrioScoreFromTask` docstring -- all three corrected the same way, to the per-project test.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+Corrects a citation that pointed maintainers preparing a board for `Prio-Score`/`Github Issue`/`Github
+Type` at the wrong test, but only in reference material read before configuring the seam -- nothing in
+the shipped script behaviour changed.
+
+**Score:** N/A
+
+#### Pull Request
+
+correct adopt-bwj-asana's stale one-workspace citation to match step 5's per-project test
+
+Plugins: bwj-codex
+
+[PR #1400](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1400)
+
+---
+
+### DEPLOY: docs/closeout-receipt-length-bound · 20260904-222307
+
+Chris's close-out had three permitted shapes and a receipt-not-report rule, and still grew back into a
+report. Two seams are tightened in his persona body. The instruction to "name what it filed, with
+numbers" is now bounded by length — the number and at most a short clause, never a sentence of finding —
+because that instruction was the one doing the expanding: a close-out that obeys the filing rule and then
+writes a paragraph per issue asks the reader to read everything twice. And "the test is duplication, not
+length" now has a cruder rule beside it, since a session can always find something non-duplicative to
+add.
+
+The second seam was a missing home rather than a missing bound. A finding that cannot be filed from the
+current checkout — one belonging on another repo, where filing needs the owner's word — had no shape, so
+it arrived as a fourth one, the *"this waits on you"* the page explicitly forbids. It is now filed
+inward, into the nearest issue this session can already file, and cited like any other number.
+
+Line-count neutral: the two clauses are paid for by cutting restatement, because this text loads on
+every turn in every consuming repo.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer's orchestrator gets the same bound, which matters because the failure it fixes is one a
+consumer cannot see: a close-out that reads as thorough is exactly the one that costs its reader the
+session. A repo adopting the specialists inherits the tightened rule rather than the wording that kept
+giving way.
+
+**Score:** 2
+
+#### Pull Request
+
+Chris's close-out receipt gets a length bound and a home for an unfileable finding
+
+Plugins: team-alpha
+
+[PR #1406](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1406)
+
+---
+
 ### DEPLOY: fix/1395-empty-label-on-create · 20260904-221518
 
 `open-pr.ps1` sends no `--label` at all when the branch-prefix seam answers no label for a prefix it

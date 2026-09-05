@@ -165,6 +165,57 @@ try {
     Assert-True ((Format-SafePathToken -Value ('z' * 500)) -match '\.\.\.$') 'and a capped path ends in an ellipsis rather than looking complete'
     Assert-Equal '' (Format-SafePathToken -Value '') 'empty in, empty out -- no throw'
 
+    Write-Host "Format-SafeProseToken -- an echoed line of the CONSUMER'S OWN prose (#1419)" -ForegroundColor Cyan
+    # The reason for a THIRD sibling: each existing one destroys something a sentence needs. The id form
+    # eats the punctuation that makes prose prose, and the path form -- right for a path -- eats the
+    # square brackets that in prose are a markdown link.
+    $sentence = 'see (the guide): contributing-davekjohn/development.md'
+    Assert-Equal 'see the guide contributing-davekjohn/development.md' (Format-SafeToken -Value $sentence) 'the id-shaped sanitizer eats the punctuation -- the defect this function avoids'
+    Assert-Equal $sentence (Format-SafeProseToken -Value $sentence) 'an ordinary prose line passes through untouched'
+
+    $link = 'see [the guide](CONTRIBUTING.md) about development.md'
+    Assert-Equal 'see the guide(CONTRIBUTING.md) about development.md' (Format-SafePathToken -Value $link) 'the path-shaped sanitizer DELETES the brackets, leaving a link the reader must reconstruct'
+    Assert-Equal 'see (the guide)(CONTRIBUTING.md) about development.md' (Format-SafeProseToken -Value $link) 'the prose form SUBSTITUTES them instead, so the sentence stays readable'
+
+    # The property that actually has to hold: no marker can FORM, because the hooks match markers like
+    # '[ERROR]' over a check's whole output and would COUNT one out of a consumer's own line.
+    $forged = Format-SafeProseToken -Value 'we keep development.md here and also [ERROR] forged'
+    Assert-True (-not ($forged -match '\[')) 'no square bracket survives, so no marker of ours can be forged'
+    Assert-Equal 'we keep development.md here and also (ERROR) forged' $forged 'and the forged token is still legible as text -- substituted, not deleted'
+    Assert-True (-not ($forged -match 'shown sanitized')) 'the substitution carries NO note: it is a display convention, not a claim about this line'
+
+    # A control character IS a claim about this line, so it is stripped AND said out loud -- this line is
+    # echoed because somebody is about to edit it, and a silently altered preview sends them hunting for
+    # text that is not in the file.
+    $esc = Format-SafeProseToken -Value "good$([char]27)line about development.md"
+    Assert-True (-not $esc.Contains([char]27)) 'an ESC is stripped -- no ANSI escape reaches a terminal'
+    Assert-True ($esc -match 'shown sanitized') 'and the line says it was altered'
+    $bidi = Format-SafeProseToken -Value "start$([char]0x202E)end"
+    Assert-True (-not $bidi.Contains([char]0x202E)) 'a bidi override is stripped -- it would reverse the reading order of the text around it'
+    Assert-True ($bidi -match 'shown sanitized') 'and it is flagged too: \p{C} covers Cf, not only Cc'
+
+    # A tab is BOTH whitespace and a control character. Collapsing it is cosmetic, so it must not trip
+    # the note -- otherwise the flag fires on ordinary lines and stops meaning anything.
+    Assert-Equal 'a b' (Format-SafeProseToken -Value "a`tb") 'a tab collapses to a space'
+    Assert-True (-not ((Format-SafeProseToken -Value "a`tb") -match 'shown sanitized')) 'and collapsing it is not reported as sanitizing'
+
+    # U+2028 / U+2029 are the one line-breaking class NEITHER pattern covers: they are Zl/Zp, so '\p{C}'
+    # does not match them, and entry-scaffold-lib.ps1's line splitter does not split on them either -- a
+    # consumer line really can carry one. What closes them is the '\s+' collapse, because .NET's '\s'
+    # DOES match both. That makes the protection incidental, so it is pinned here: reorder or drop that
+    # pass and these two asserts are what fail instead of a forged line reaching somebody's session.
+    foreach ($sep in @(0x2028, 0x2029)) {
+        $ls = Format-SafeProseToken -Value "before$([char]$sep)after"
+        Assert-Equal 'before after' $ls "U+$('{0:X4}' -f $sep) is folded to a space, so it cannot break the line"
+        Assert-Equal 'before after' (Format-SafePathToken -Value "before$([char]$sep)after") "U+$('{0:X4}' -f $sep) is folded by the path form too"
+    }
+
+    Assert-Equal 200 (Format-SafeProseToken -Value ('z' * 500)).Length 'an over-long line is capped at 200 -- the locator is the file:line above it, not this preview'
+    Assert-True ((Format-SafeProseToken -Value ('z' * 500)) -match '\.\.\.$') 'and a capped line ends in an ellipsis rather than looking complete'
+    Assert-Equal '' (Format-SafeProseToken -Value '') 'empty in, empty out -- no throw'
+    $blank = Format-SafeProseToken -Value "$([char]0)$([char]1)$([char]2)"
+    Assert-True ($blank -match '<unprintable>' -and $blank -match '3 character') 'a wholly unprintable line says so with its raw length, rather than printing an empty preview'
+
     # Set-CheckScope must still behave exactly as before: it now delegates, and its label carries NO
     # explanatory suffix (that belongs only to the suspect form).
     Set-CheckScope "fixture/repo`n[ERROR] forged"
@@ -186,6 +237,13 @@ try {
     $none = Format-SuspectToken -Value "$([char]0)$([char]1)$([char]2)"
     Assert-True ($none -match '<unprintable>') 'a wholly unprintable value says so instead of showing empty quotes'
     Assert-True ($none -match '3 character') 'and it names the raw length, the only fact left about it'
+    # The comparison is ORDINAL, and it had to become so (#1419). PowerShell's '-ne' compares strings
+    # culture-sensitively and an invariant comparison treats format characters as IGNORABLE, so this
+    # value read as unchanged and went out looking like a clean id -- silent for exactly the class most
+    # worth announcing.
+    $zw = Format-SuspectToken -Value "team$([char]0x200B)alpha@m"
+    Assert-True (-not $zw.Contains([char]0x200B)) 'a zero-width space is stripped out of a suspect id'
+    Assert-True ($zw -match 'shown sanitized') 'and stripping it is REPORTED -- the culture-sensitive comparison said nothing had changed'
 
     # --- Get-SettingsChainPaths / Get-EnabledPlugins (inbound #294) -------------------------------
     #     The shared answer to "which plugins are enabled here", after three call sites each read

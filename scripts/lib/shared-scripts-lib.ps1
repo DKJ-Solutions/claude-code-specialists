@@ -269,6 +269,24 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The preamble every consumer-facing lint check opens with (issue #1422): the dual-context
+            # root resolution and the always-on prose corpus, in one definition where five entry points
+            # carried near-copies. IT HAS TO TRAVEL for the ordinary lib reason -- all five callers are
+            # mirrored, so a lib that stayed behind would leave every consumer's copy dot-sourcing a file
+            # they do not have.
+            #
+            # DEPENDENCY-FREE for Resolve-CheckRepoRoot, like plugin-tree-lib and source-repo-guard-lib:
+            # it is dot-sourced on the first line that resolves anything. Get-CheckProseCorpus loads
+            # measure-context-lib itself, guarded, from its own directory -- already mirrored here.
+            #
+            # NO CONTRACT ROW FOLLOWS: nothing in it is repo-owned. It reads an env var and asks git
+            # where it is, so there is no seam a consumer has to answer.
+            Name    = 'consumer-check-lib'
+            Source  = 'scripts\lib\consumer-check-lib.ps1'
+            Plugin  = 'contributing-davekjohn'
+            LibOnly = $true
+        },
+        @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
             Plugin  = 'team-alpha'
@@ -652,6 +670,61 @@ function Get-SharedScriptPairs {
             # A fixture root, so the suite (and the hook) can judge a tree other than the checkout.
             SkillParamsExempt = @('RootOverride')
             # Timeable with no arguments: reads contributing-davekjohn/ and reports, no write of any kind.
+            MeasureArgs = @()
+        },
+        @{
+            # The retired-name check (issue #1389). A renamed convention reached a consumer through
+            # nothing: no gate reads a consumer's CLAUDE.md, and check-script-contract covers FUNCTIONS,
+            # so a renamed file convention was outside it by construction. Measured -- both BWJ consumers
+            # still restated the retired single 'development.md' in their always-on documents, one day
+            # and six days after the rename, while the tooling around it had been made rename-proof on
+            # purpose.
+            #
+            # ITS ONLY CALLER IS THE HOOK, and there is no CI leg on purpose: a consumer's CI is not this
+            # repo's to add, and in the publishing repo the check skips itself (its own pages narrate the
+            # rename history correctly). So unlike check-unfolded-entry, which has a CI half, the
+            # SessionStart hook retired-doc-name-sessioncheck.ps1 IS the route rather than a convenience
+            # on top of one.
+            #
+            # NO SKILL, on the same reasoning check-unfolded-entry and check-git-identity give: the
+            # caller is automatic and nobody invokes it as a procedure. One command in its .SYNOPSIS
+            # answers it early.
+            Name   = 'check-retired-doc-name'
+            Source = 'scripts\lint\check-retired-doc-name.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = ''
+            # A fixture root, plus an always-on root the suite can point at a scratch document tree.
+            # A consumer never types either.
+            SkillParamsExempt = @('RootOverride', 'RootDocument')
+            # Timeable with no arguments: reads the always-on closure and reports, no write of any kind.
+            MeasureArgs = @()
+        },
+        @{
+            # The supremacy-declaration check (issue #1415). The SECOND of the two narrow greps the
+            # prose-contract decline (#1380) recorded as proportionate; the first is check-retired-doc-name
+            # above, and this one had no tracker entry at all until #1415 -- only a sentence in a lens,
+            # which is how a recorded alternative quietly becomes a recorded alternative nobody builds.
+            #
+            # IT IS THE ONE DEFECT #1380 CALLED STRUCTURALLY INVISIBLE. A pointer test flags sections
+            # carrying no citation, so cites-then-contradicts can only appear among the SUPPRESSED
+            # findings -- correct deference and restatement-with-override look identical to it. Measured
+            # in smartwatchbanden: two standing inversions of LAW-THIRD-RANK-ORDER, one of which #1380's
+            # own census never counted.
+            #
+            # THE RECORDED SHAPE WAS MEASURED AND REPLACED. Three terms in one sentence scored 0 findings
+            # and 0 recall on its own target; adjacency of 'CLAUDE.md' and 'wins'/'wint' scores
+            # 3 raw / 2 reported / 2 true / 100%. The full table is in Get-SupremacyDeclaration.
+            #
+            # ITS ONLY CALLER IS THE HOOK, no CI leg, no skill -- the same three answers, for the same
+            # three reasons, that check-retired-doc-name gives directly above.
+            Name   = 'check-supremacy-declaration'
+            Source = 'scripts\lint\check-supremacy-declaration.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = ''
+            # A fixture root, plus an always-on root the suite can point at a scratch document tree.
+            # A consumer never types either.
+            SkillParamsExempt = @('RootOverride', 'RootDocument')
+            # Timeable with no arguments: reads the always-on closure and reports, no write of any kind.
             MeasureArgs = @()
         },
         @{

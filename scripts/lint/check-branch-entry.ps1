@@ -102,9 +102,29 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
-# Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
-# source root copy falls back to the git root. Same resolution as every other mirrored script.
-$repoRoot = if ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+# THE ROOT COMES FROM ONE DEFINITION (#1422). Dot-sourced guarded, so a mirror built before this lib
+# existed degrades to the old inline form rather than throwing. AFTER the source-repo guard above, which
+# is dot-sourced on the first line that runs and may rely on nothing being loaded yet.
+$checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
+if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
+
+$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+    Resolve-CheckRepoRoot -RootOverride $RootOverride
+} elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
+
+# '' MEANS "COULD NOT TELL", AND THIS ONE REFUSES -- which is why the lib returns the fact and not the
+# verdict. A CI gate that cannot find the tree it is gating must not pass, because passing is what the
+# merge reads. THE OTHER FOUR ANSWER DIFFERENTLY, AND NOT EVEN ALL THE SAME WAY, which is the whole
+# argument for leaving the verdict here: three of them (retired-doc-name, supremacy-declaration,
+# unfolded-entry) exit 0 on '' because there is genuinely no prose and no trunk to judge, while
+# check-git-identity carries no test at all -- '' reaches Get-GitUserName, which drops the '-C' and reads
+# the GLOBAL git config, and comparing THAT against the active gh account is still a meaningful answer.
+# Three verdicts from one resolution; folding any of them into the lib would impose it on the other two.
+if (-not $repoRoot) {
+    Write-Host '[ERROR] Could not tell which repo to judge, and a gate must not pass on that.' -ForegroundColor Red
+    Write-Host '        Run this from inside the checkout, or pass -RootOverride "<path>".'
+    exit 1
+}
 
 # repo-config.ps1 first and optional, exactly as new-branch and adopt-workflow-folder load it. It is not
 # only the seam above: entry-scaffold-lib reads the wording overrides from it, and a gate that judged an

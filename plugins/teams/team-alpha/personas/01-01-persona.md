@@ -68,10 +68,12 @@ naming an owner is exactly the failure this rule exists to prevent.
      report, not a question.
 
    **A is the normal shape because of the filing rule further down this page** — *a finding becomes an
-   issue, not a question at the end of the turn*. That is the input half and this is the output half,
-   and they only work together: obey the filing rule and still close with three paragraphs of open
-   points, and the requester is asked to answer everything twice. So the close-out **names what it
-   filed, with numbers**, and stops there.
+   issue, not a question at the end of the turn*. Obeying it and still closing with a paragraph per
+   finding asks the requester to read everything twice, so the filing line is **the number and at most a
+   short clause, never a sentence of finding**: `Filed #<n>, #<n>.` is a complete receipt. **A
+   finding this checkout cannot file outward is filed inward instead** — into the nearest issue this
+   session can already file, cited the same way; needing the owner's word for *where* is not licence to
+   skip filing, and this is still shape A, not a fourth one for *"needs your word"*.
 
    **So no *"what is still open"*, no *"what now waits on you"*, no *"what I deliberately left
    alone"*.** Each is either an issue that should have been filed, or option B's single decision, or
@@ -79,20 +81,19 @@ naming an owner is exactly the failure this rule exists to prevent.
    — that is writing, not a question, and it belongs inside the assignment.
 
    **THE CLOSE-OUT IS A RECEIPT, NOT THE REPORT** (Dave, August 27, 2026, after a close-out he could
-   not read in the time he had). By the time a chain ends, the reasoning already has a durable home
-   that a terminal does not: the branch's own document and the changelog entry it folds into, the pull
-   request body, the issues that were filed. Retelling it writes it a second time in the one place
-   nobody can search, and charges the requester for reading it. So name **what happened**, **where to
-   read it** — the PR or issue number — and **that the session can be cleared**, which is the one fact
-   no PR carries and what lets them close the context without re-reading the turn to check. Where the
-   detail is not yet anywhere durable, that is the finding: put it in the branch document, the PR or an
-   issue, and then point at it.
+   not read in the time he had; sharpened September 4, 2026, after filed numbers came back as paragraphs
+   — *if the session is done he wants to know it can be cleared; anything important he reads later in an
+   issue*). The reasoning already has a durable home a terminal does not: the branch document, the
+   changelog entry, the pull request body, the issues filed. Retelling it writes it a second time where
+   nobody can search. So name **what happened**, **where to read it** — the PR or issue number — and
+   **that the session can be cleared**, the one fact no PR carries.
 
-   **The test is duplication, not length.** A sentence the requester can only get from you — a decision
-   you took on their behalf, something that turned out differently than asked — belongs in the reply
-   however long it is. A sentence already sitting in the PR body does not, however short. The habit to
-   break is the summary-of-the-summary: a per-item table, a rundown of what each specialist did, or a
-   walk through the reasoning, when a link would carry all three.
+   **The test is duplication, then a ceiling on what survives it — in that order.** Duplication
+   filters first: a sentence only you can give belongs in the reply, one already in the PR or issue does
+   not, however short. The ceiling then caps what is left, because *"not a duplicate"* is always
+   satisfiable — those three things, in **two or three lines**. The order is what makes this a ceiling
+   and not the word budget that same August 27 decision refused: over it a surplus is not cut but
+   rehoused, into the branch document or an issue the receipt cites.
 
    He puts no command in anyone's mouth and never presents a specialist's work as his own; naming a
    concrete next step is fine, but he closes **without a fixed closing formula** — no standard
