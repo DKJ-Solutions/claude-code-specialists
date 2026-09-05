@@ -32,6 +32,36 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1450-rename-adopt-bwj-asana · 20260905-204550
+
+`adopt-bwj-asana` grew a second chapter it was never named for: since today it also scaffolds
+`dkj-policy-bwj/SYNC-LOG.md` (step 7), the record chapter two's sync branches write into. A skill named
+after one chapter while it sets up both reads as narrower than it is, and the next reader has no reason
+to expect chapter two's setup to be hiding inside a name that only says "Asana."
+
+Renamed to `adopt-dkj-policy-bwj` -- the whole plugin it adopts, not one chapter of it. Pure rename, no
+behaviour change: same seven steps, same additive/dry-run-by-default guarantees, same two things it
+places in a store repo's own tree.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal skill name in a workflow only two repos enable. Nobody outside this repo's own
+maintenance ever sees the string `adopt-bwj-asana` or `adopt-dkj-policy-bwj`.
+
+**Score:** N/A
+
+#### Pull Request
+
+adopt-bwj-asana renamed to adopt-dkj-policy-bwj -- it covers the whole plugin, not just Asana
+
+Plugins: dkj-policy-bwj
+
+[PR #1466](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1466)
+
+---
+
 ### DEPLOY: fix/1450-open-pr-remote-ahead-gate · 20260905-201818
 
 A branch resumed from a parked commit can still lose the full lint + test gate to a push rejection: if
