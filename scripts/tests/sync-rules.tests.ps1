@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/lib/sync-rules.ps1 -- the queries team-shopify's pre-task sync is built
+    Regression tests for scripts/lib/sync-rules.ps1 -- the queries dkj-team-shopify's pre-task sync is built
     on (inbound #787, extended with the merged-sync-branch case from #801 and the content rule from #807).
 
 .DESCRIPTION

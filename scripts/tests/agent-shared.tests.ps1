@@ -164,7 +164,7 @@ try {
         if ($text -notmatch 'BEGIN shared:repo-way-of-working') { $missing += $f.Name }
     }
     Assert-Equal '' ($missing -join ', ') 'no agent def or persona is missing the block'
-    $srcBlock = Join-Path $RepoRoot 'plugins\teams\agent-shared\repo-way-of-working.md'
+    $srcBlock = Join-Path $RepoRoot 'plugins\dkj-teams\agent-shared\repo-way-of-working.md'
     Assert-True (Test-Path -LiteralPath $srcBlock) 'the canonical source file exists'
 
     # --- lens-optional: every agent def, no persona, and the pointer it answers (#669 C1) ----------
@@ -189,7 +189,7 @@ try {
     Assert-Equal '' ($lensMissing -join ', ') 'no agent def is missing lens-optional'
     Assert-Equal '' ($lensStray -join ', ') 'and no persona carries it -- the scope is a decision, not a default'
     Assert-Equal '' ($pointerUnqualified -join ', ') 'every lens pointer says the repo has one only "if it has one"'
-    Assert-True (Test-Path -LiteralPath (Join-Path $RepoRoot 'plugins\teams\agent-shared\lens-optional.md')) 'the canonical source file exists'
+    Assert-True (Test-Path -LiteralPath (Join-Path $RepoRoot 'plugins\dkj-teams\agent-shared\lens-optional.md')) 'the canonical source file exists'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

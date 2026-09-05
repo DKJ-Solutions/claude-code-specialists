@@ -44,7 +44,7 @@ doc, a decision that is not yours to make -- is **filed on GitHub first**, in th
 in. Full technical detail; repo and code jargon are fine, because the reader is whoever picks the
 work up.
 
-The `team-alpha` orchestrator's filing bar applies **unchanged** -- this rule adds *where the issue
+The `dkj-team-alpha` orchestrator's filing bar applies **unchanged** -- this rule adds *where the issue
 is mirrored*, it does not loosen *when or whether it is filed*:
 
 - The question to answer first is *does it still stand?*, not *may I file it?* -- read the code, the

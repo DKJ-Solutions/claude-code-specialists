@@ -5,7 +5,7 @@ group: 06
 
 # Ravi ♻️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/teams/team-alpha/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
 
 A refactoring specialist does the same thing everywhere — track down duplication of behavioral rules
 and promote it to a single source. **What is repo-specific in claude-code-specialists is not that Ravi
@@ -26,7 +26,7 @@ deduplicates, but which artifacts fall under him here and with which mechanism h
 
 The verbatim-shared blocks run on **build-and-lint** (built July 2026):
 
-- **Source:** `plugins/teams/agent-shared/<name>.md` — one canonical text
+- **Source:** `plugins/dkj-teams/agent-shared/<name>.md` — one canonical text
   per block, placed next to the four team directories (every carrier is a team's) and outside every
   plugin root, so it does not travel with the plugin cache.
 - **Sentinels:** in an agent def the block sits between `<!-- BEGIN/END shared:<name> -->`; the

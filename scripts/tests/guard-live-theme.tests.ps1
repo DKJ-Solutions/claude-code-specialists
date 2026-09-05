@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Tests for plugins/teams/team-shopify/hooks/guard-live-theme.ps1 -- the PreToolUse hook that holds
+    Tests for plugins/dkj-teams/dkj-team-shopify/hooks/guard-live-theme.ps1 -- the PreToolUse hook that holds
     the live Shopify theme -- and for the session check that says when it is only half armed.
 
 .DESCRIPTION
     THE GUARD IS THE ONE FILE IN THIS PLUGIN WHERE BEING WRONG IS EXPENSIVE IN BOTH DIRECTIONS: too
     loose and a stray command reaches a revenue-serving theme, too tight and the deliberate live push a
-    consumer's own rules describe cannot be executed at all. Everything else team-shopify ships is
+    consumer's own rules describe cannot be executed at all. Everything else dkj-team-shopify ships is
     instruction text, which no test can hold.
 
     Each case feeds a realistic hook payload to the guard on stdin and asserts the exit code
@@ -58,8 +58,8 @@
 $ErrorActionPreference = 'Continue'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Guard    = Join-Path $RepoRoot 'plugins\teams\team-shopify\hooks\guard-live-theme.ps1'
-$Check    = Join-Path $RepoRoot 'plugins\teams\team-shopify\hooks\shopify-floor-sessioncheck.ps1'
+$Guard    = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-shopify\hooks\guard-live-theme.ps1'
+$Check    = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-shopify\hooks\shopify-floor-sessioncheck.ps1'
 # Fixture paths carry $PID: the test gate is a throttled PARALLEL scheduler, so two runs at one fixed
 # temp path tear down each other's tree mid-assert.
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "guard-live-theme-fixture-$PID"

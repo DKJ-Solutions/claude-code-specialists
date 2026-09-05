@@ -4,34 +4,34 @@
   "owner": { "name": "Dave (DaveKJohn)" },
   "plugins": [
     {
-      "name": "team-alpha",
-      "source": "./plugins/teams/team-alpha",
+      "name": "dkj-team-alpha",
+      "source": "./plugins/dkj-teams/dkj-team-alpha",
       "description": "The core team — the shared, repo-neutral specialists who work the same way in every repo. Every consuming repo enables this. Governance (CLAUDE.md + the repo lenses) stays at repo level."
     },
     {
-      "name": "team-lifehub",
-      "source": "./plugins/teams/team-lifehub",
+      "name": "dkj-team-lifehub",
+      "source": "./plugins/dkj-teams/dkj-team-lifehub",
       "description": "Add-on team for life-hub-style repos (a personal information hub / brain-based knowledge repo): Astrid, Fiona, Hugo, Ian, Onyx. Only a life-hub-style repo enables this."
     },
     {
-      "name": "team-shopify",
-      "source": "./plugins/teams/team-shopify",
+      "name": "dkj-team-shopify",
+      "source": "./plugins/dkj-teams/dkj-team-shopify",
       "description": "Add-on team for Shopify store repos (e.g. smartwatchbanden): Liam, Sandra, Steven, plus the domain skill start-task. Only a Shopify repo enables this."
     },
     {
-      "name": "team-ecomm",
-      "source": "./plugins/teams/team-ecomm",
-      "description": "Add-on team for commercial webshop repos (any platform): Sergio (SEO), Craig (CRO), Sean (performance/SEA), with room to grow into the wider e-commerce craft (lifecycle/email, analytics). Complementary to a platform team like team-shopify — a commercial webshop repo can enable both. Teams stack."
+      "name": "dkj-team-ecomm",
+      "source": "./plugins/dkj-teams/dkj-team-ecomm",
+      "description": "Add-on team for commercial webshop repos (any platform): Sergio (SEO), Craig (CRO), Sean (performance/SEA), with room to grow into the wider e-commerce craft (lifecycle/email, analytics). Complementary to a platform team like dkj-team-shopify — a commercial webshop repo can enable both. Teams stack."
     },
     {
       "name": "dkj-policy",
       "source": "./plugins/dkj-policy",
-      "description": "DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. A workflow is not a team but a method, and the name says whose it is: DKJ's policy, the top rung of the order, not a baseline every consumer inherits. Enable this only if you want THIS one. Requires team-alpha."
+      "description": "DaveKJohn's own way of working, packaged as an opt-in: the branch-and-entry model, the tier ladder, the fold, the release cut, and the gates that hold them, as skills plus their shared scripts. A workflow is not a team but a method, and the name says whose it is: DKJ's policy, the top rung of the order, not a baseline every consumer inherits. Enable this only if you want THIS one. Requires dkj-team-alpha."
     },
     {
       "name": "dkj-policy-bwj",
       "source": "./plugins/dkj-policy/dkj-policy-bwj",
-      "description": "BWJ's codex — the binding rules the working environment of BWJ's two Shopify store repos (smartwatchbanden and xoxowildhearts) operates under, so both run one identical procedure and cannot drift. An ADDITIVE add-on to dkj-policy — it extends the ticket-work layer before a branch and what a sync branch owes, and contradicts nothing that workflow decides. Two chapters. TICKET HANDLING: a discovered issue is filed on GitHub first, then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue makes a CI workflow the plugin ships as a template post an update saying the work is ready to test and move the card — it never ticks the task off. THE SYNC LOG: a sync branch mirrors what a third party changed on the live theme and is exempt from the changelog by design, so it owes a sync-log entry instead — dkj-policy-bwj/SYNC-LOG.md, newest first, written and committed by team-shopify's sync-main.ps1 in the same breath as the branch, never folded and never released. Carries no specialists. Requires team-alpha and dkj-policy; the sync chapter also expects team-shopify. Enable this only in BWJ's two store repos."
+      "description": "BWJ's codex — the binding rules the working environment of BWJ's two Shopify store repos (smartwatchbanden and xoxowildhearts) operates under, so both run one identical procedure and cannot drift. An ADDITIVE add-on to dkj-policy — it extends the ticket-work layer before a branch and what a sync branch owes, and contradicts nothing that workflow decides. Two chapters. TICKET HANDLING: a discovered issue is filed on GitHub first, then mirrored to Asana as a colleague-friendly variant, cross-linked both ways; closing the GitHub issue makes a CI workflow the plugin ships as a template post an update saying the work is ready to test and move the card — it never ticks the task off. THE SYNC LOG: a sync branch mirrors what a third party changed on the live theme and is exempt from the changelog by design, so it owes a sync-log entry instead — dkj-policy-bwj/SYNC-LOG.md, newest first, written and committed by dkj-team-shopify's sync-main.ps1 in the same breath as the branch, never folded and never released. Carries no specialists. Requires dkj-team-alpha and dkj-policy; the sync chapter also expects dkj-team-shopify. Enable this only in BWJ's two store repos."
     }
   ]
 }

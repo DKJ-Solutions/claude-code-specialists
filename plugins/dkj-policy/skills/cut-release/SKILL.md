@@ -135,7 +135,7 @@ else here records. Measured instance (August 11, 2026): a whole improvement cycl
 question *"why does a release take about thirty minutes"*, it demonstrably improved things, and the result
 was reported as **43% fewer words** — because words were what somebody had counted. The release itself was
 never timed, before or after, so the question that started the work has no answer in its own unit. That is
-the [performance engineer's own rule](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/teams/team-alpha/manuals/06-25-manual.md) broken by the
+the [performance engineer's own rule](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-teams/dkj-team-alpha/manuals/06-25-manual.md) broken by the
 person who wrote it: *report in the unit the question was asked in; a proxy is not the measurement.*
 
 Two things worth splitting while you have the clock running, because they behave differently and a single
@@ -611,7 +611,7 @@ of a law the plugin states somewhere; this block deliberately states none, and a
 `CLAUDE.md` to carry the only answer that will ever exist. See that page's "A fourth move exists"
 paragraph (inbound #1388) if the two ever read as disagreeing again.
 
-**This is not new to the tree, which is what settled it.** `team-shopify`'s webshop-manager manual
+**This is not new to the tree, which is what settled it.** `dkj-team-shopify`'s webshop-manager manual
 already documented push-then-cut for exactly this case — *"only when the user decides to push; the
 release is then cut by the release manager"* — so the two pages shipped from one repo contradicting each
 other, and #1378 found it from the outside.

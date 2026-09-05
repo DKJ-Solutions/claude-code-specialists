@@ -72,7 +72,7 @@ function New-Fixture {
     }
 
     # --- the roster, in both shapes -------------------------------------------------
-    Write-Fixture 'plugins\teams\team-test\agents\09-91-agent.md' @(
+    Write-Fixture 'plugins\dkj-teams\team-test\agents\09-91-agent.md' @(
         '---',
         'name: zephyr',
         'id: 91',
@@ -81,7 +81,7 @@ function New-Fixture {
         '',
         '# Zephyr -- the Test Specialist'
     )
-    Write-Fixture 'plugins\teams\team-test\personas\09-92-persona.md' @(
+    Write-Fixture 'plugins\dkj-teams\team-test\personas\09-92-persona.md' @(
         '---',
         'id: 92',
         'group: 09',
@@ -95,7 +95,7 @@ function New-Fixture {
         '# Fixture',
         '',
         'Zephyr owns the manuals.',                                   # prose
-        'See [Zephyr #91](plugins/teams/team-test/agents/09-91-agent.md) for detail.',  # link text
+        'See [Zephyr #91](plugins/dkj-teams/team-test/agents/09-91-agent.md) for detail.',  # link text
         'Quill routes the work.',                                     # prose, persona name
         # THE REGRESSION LINE. Two occurrences of one name on a single line: one inside a link's text,
         # one in prose after it. The line-based version of Find-Mentions reported this as ONE hit and

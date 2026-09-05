@@ -48,7 +48,7 @@ function Get-RepoBlobUrl {
 #
 # The published repo keeps the marketplace NAME 'claude-code-specialists' even though it is called
 # claude-plugins-bwj: the name is the key in every consumer's enabledPlugins
-# ('team-alpha@claude-code-specialists'), so aligning it with the repo name would break that line in
+# ('dkj-team-alpha@claude-code-specialists'), so aligning it with the repo name would break that line in
 # every consuming repo. Decision by Dave, August 14, 2026.
 $script:BusinessMarketplaceRepo = 'BWJ-ecommerce/claude-plugins-bwj'
 
@@ -74,7 +74,7 @@ function Get-BusinessMarketplaceRepo {
 # because it is not there -- the mechanism this repo already has, and the one that cannot be
 # misconfigured into offering the thing anyway.
 #
-# THE UNIT IS THE PLUGIN, NOT THE ITEM, AND THAT IS DELIBERATE. team-alpha ships three PowerShell
+# THE UNIT IS THE PLUGIN, NOT THE ITEM, AND THAT IS DELIBERATE. dkj-team-alpha ships three PowerShell
 # skills (specialists-init, specialists-teardown, sync-roster) and one SessionStart hook that a Claude
 # App user cannot run either. They travel anyway: the plugin published here has to be byte-identical to
 # the plugin released here, or its version number stops meaning one thing. Those four items are already
@@ -87,10 +87,10 @@ function Get-BusinessMarketplaceRepo {
 # manifest", which is what the script did before this function existed -- so a consumer that has never
 # heard of it publishes exactly as it did.
 $script:BusinessMarketplacePlugins = @(
-    'team-alpha'
-    'team-lifehub'
-    'team-shopify'
-    'team-ecomm'
+    'dkj-team-alpha'
+    'dkj-team-lifehub'
+    'dkj-team-shopify'
+    'dkj-team-ecomm'
 )
 
 function Get-BusinessMarketplacePlugins {

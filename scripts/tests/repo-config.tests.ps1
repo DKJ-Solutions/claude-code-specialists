@@ -66,7 +66,7 @@ Assert-True ($business -ne (Get-RepoName)) 'Get-BusinessMarketplaceRepo is not t
 # workflow to it is a one-word edit that nothing else would notice, and the failure it causes is a
 # Claude App user being handed a command that can only fail at its last step.
 #
-# Held against the manifest rather than a hardcoded roster: a plugin added to plugins/teams/ should
+# Held against the manifest rather than a hardcoded roster: a plugin added to plugins/dkj-teams/ should
 # reach the App marketplace by default, and a name the manifest does not know is refused by the script
 # itself -- so what stays worth asserting here is that the list is non-empty (an empty one publishes
 # EVERYTHING, silently reinstating the workflows) and that no workflow is in it.

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/lib/merged-pr-lib.ps1 -- the merged-PR proof both team-shopify's
+    Regression tests for scripts/lib/merged-pr-lib.ps1 -- the merged-PR proof both dkj-team-shopify's
     sync-main.ps1 and the workflow plugin's prune-merged.ps1 call (inbound #1190 and #1191, promoted to
     one source by issue #1194).
 

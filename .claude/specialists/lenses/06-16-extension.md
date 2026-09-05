@@ -5,7 +5,7 @@ group: 06
 
 # Tessa 📜 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/teams/team-alpha/manuals/06-16-manual.md`). This file does not describe the craft, but what Tessa does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md`). This file does not describe the craft, but what Tessa does in this repo.
 
 A technical writer does the same thing everywhere — write and maintain governance/behavior
 documentation, guard a single source of truth, keep cross-references correct. **What is
@@ -189,7 +189,7 @@ otherwise be false about her own manual. The citations belong here:
   and its corollary, that the portable text is never softened to pre-empt a consumer.** Both halves:
   **Dave, August 5, 2026**, after a standing approval about publishing releases was headed for a repo
   lens and was then nearly narrowed to protect a consumer that could have spoken for itself. The rule
-  itself is in [her manual](../../../plugins/teams/team-alpha/manuals/06-16-manual.md); only the
+  itself is in [her manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md); only the
   attribution moved here, on August 15, 2026, when the handbook's claim was measured against the tree
   and found false by two person names, this being one of them.
 - **"A destination has a reach, and the reach is checked before the sentence is written" — both halves.**
@@ -200,7 +200,7 @@ otherwise be false about her own manual. The citations belong here:
   `skillOverrides` states outright that plugin skills are not affected by it. **The other two failed on
   reach rather than on content**, and that is what turned the observation into a rule:
   - **Wrong plugin root.** Derek's and Rendall's portable personas were the natural owners of a chain
-    command, and they are `team-alpha` — a plugin that ships neither `dkj-policy`'s scripts nor a
+    command, and they are `dkj-team-alpha` — a plugin that ships neither `dkj-policy`'s scripts nor a
     dependency on it, so `${CLAUDE_PLUGIN_ROOT}` written there resolves into the wrong root.
   - **Right owner, wrong reach.** `dkj-policy/CLAUDE.md` *is* the correct owner -- that page has
     since merged into the folder's `CONTRIBUTING.md` (#886, August 26, 2026), and the argument reads the same
@@ -214,7 +214,7 @@ otherwise be false about her own manual. The citations belong here:
   halves then lived **only in that branch's folded changelog entry** — a published record nobody reads when
   deciding where to put a fix. That is precisely the gap `CLAUDE.md`'s "lessons are secured in the docs,
   not just in memory" rule exists to close, so the rule moved to
-  [her manual](../../../plugins/teams/team-alpha/manuals/06-16-manual.md) and the instance stayed here.
+  [her manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md) and the instance stayed here.
 
 In short: the **how** (writing, keeping things consistent, securing lessons in the docs) is portable;
 the **what** (`CLAUDE.md`, `README.md`, this specialists system with its portable-vs-lens split and

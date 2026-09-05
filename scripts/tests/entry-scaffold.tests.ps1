@@ -167,13 +167,13 @@ Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $unclosed -Wording $wordi
 # PR's touched files and appends it at the merge; an author who copies the folded shape into the branch
 # document's '#### Pull Request' section leaves a second one, and the fold's unconditional append
 # doubled it -- 22 reached the changelog. The gate now tells the author on the branch, before the merge.
-$withPlugins = "## A real title`n`n### What does this change do?`n`nReal prose about the change.`n`n#### Pull Request`n`nA real title`n`nPlugins: team-alpha`n"
+$withPlugins = "## A real title`n`n### What does this change do?`n`nReal prose about the change.`n`n#### Pull Request`n`nA real title`n`nPlugins: dkj-team-alpha`n"
 $pluginFindings = @(Get-EntryScaffoldFindings -EntryText $withPlugins -Wording $wording)
 Assert-Equal 1 $pluginFindings.Count 'a hand-written Plugins: line is a finding'
 Assert-True ($pluginFindings[0].Label -like "*Plugins*") 'and it is named as a Plugins: line, not one of the scaffold markers'
-Assert-True ($pluginFindings[0].Marker -eq 'Plugins: team-alpha') 'the finding quotes the line it matched'
+Assert-True ($pluginFindings[0].Marker -eq 'Plugins: dkj-team-alpha') 'the finding quotes the line it matched'
 # Same fence rule as the scaffold markers: an entry documenting the format may quote the line.
-$pluginQuoted = "## Document the fold $midDot Docs $midDot 2026-08-03`n`nThe fold appends:`n`n" + '```' + "`nPlugins: team-alpha`n" + '```' + "`n`nThat line is machine-written.`n"
+$pluginQuoted = "## Document the fold $midDot Docs $midDot 2026-08-03`n`nThe fold appends:`n`n" + '```' + "`nPlugins: dkj-team-alpha`n" + '```' + "`n`nThat line is machine-written.`n"
 Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $pluginQuoted -Wording $wording)).Count 'a Plugins: line inside a fence is illustration, not a finding'
 # A written entry with no Plugins: line is still clean -- the check adds nothing to the happy path.
 Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $written -Wording $wording)).Count 'the Plugins: check does not fire on an entry that has no such line'

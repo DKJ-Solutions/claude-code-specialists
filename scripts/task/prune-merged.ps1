@@ -197,7 +197,7 @@ if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
 # For naming the worktree that holds the trunk when the fast-forward is refused (issue #1069). Same
 # plugin-payload sibling, same reasoning as native-capture-lib above.
 . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
-# THE MERGED-PR PROOF, SHARED WITH team-shopify's sync-main.ps1 (issue #1194). This script's proof (b)
+# THE MERGED-PR PROOF, SHARED WITH dkj-team-shopify's sync-main.ps1 (issue #1194). This script's proof (b)
 # was repaired as inbound #1191 on the same day the identical mechanism was repaired in that script as
 # #1190 -- neither branch knew about the other, and by the evening the mechanism existed twice and the
 # copies had already diverged: the map here was a bare '@{}', whose comparer is case-insensitive, where

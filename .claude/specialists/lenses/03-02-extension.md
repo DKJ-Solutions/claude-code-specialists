@@ -5,7 +5,7 @@ group: 03
 
 # 03-02 · repo-lens (VUL-IN)
 
-> Repo-lens for the portable manual of specialist 03-02 in the `team-alpha` plugin. This file was put
+> Repo-lens for the portable manual of specialist 03-02 in the `dkj-team-alpha` plugin. This file was put
 > in place by `sync-roster` as an empty template; the agent-def reads it along automatically.
 > Fill in below the repo-specific tasks and context specialist 03-02 needs in this repo.
 

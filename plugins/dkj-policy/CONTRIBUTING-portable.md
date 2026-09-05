@@ -110,7 +110,7 @@ rest of the bar is short: search the tracker so you add to the existing thread r
 duplicate, one subject per issue, and say what you **measured** and what you only **inferred**.
 
 **Those rules are stated here and owned elsewhere.** They are an orchestrator's, and they ship with the
-`team-alpha` plugin — which this workflow does not depend on, so a repo can run this cycle with none of
+`dkj-team-alpha` plugin — which this workflow does not depend on, so a repo can run this cycle with none of
 them in context. Where this section and that persona body disagree, the body is the source and this is the
 bug. They are written out anyway because a contributor reading this page has no guarantee of having that
 plugin, and **a route with a step that is only legible to an agent is not a route**.
