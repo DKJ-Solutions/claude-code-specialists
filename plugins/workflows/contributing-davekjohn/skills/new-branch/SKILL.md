@@ -54,6 +54,9 @@ The script:
      the remote tip**, carrying the parked work, and the run says in so many words that this is a resume
      rather than a new branch (issue #1139 -- see below);
    - neither -> `git checkout -b <name>` from the current base.
+   Where it exists in **both** places and `origin` is **ahead**, the run warns with the count and the
+   remote tip's author and subject -- another session's work on the branch you are about to build on
+   (issue #1439 -- see below).
 6. Immediately writes that branch's **`contributing-davekjohn/<branch>.md`** -- so the branch and its
    document come into existence in a single step. Idempotent: a document that already belongs to this
    branch is left exactly as it is, and one belonging to somebody else is replaced with its owner named,
@@ -187,6 +190,74 @@ was already taken and what to type (`-v2`) if you meant a new branch instead.
 ref, read from disk; nothing is fetched on its account. It is fresh because the base check above has just
 fetched wherever there was an `origin` to fetch from, and where there was not, this reads whatever the
 last fetch left -- so the script stays usable offline.
+
+## The branch you resume has moved on `origin` (issue #1439)
+
+#1139 above is about the branch with **no** local ref. The mirror case is the branch that exists in
+*both* places, with the local one pointing at an **older** tip -- and until September 5, 2026 that was
+read as a plain `already existed -- checked out`.
+
+**What it cost, measured in the source repo.** Two sessions built `feat/plugin-policy-precedence` end to
+end from the same parked commit -- the same three deliverables, a 508-line script, a new test suite, the
+full lint gate and all 69 suites on each side -- and neither learned of the other until `git push`:
+
+```text
+ ! [rejected]          feat/plugin-policy-precedence -> feat/plugin-policy-precedence (fetch first)
+```
+
+**Every other guard in this workflow looks somewhere else**, which is why this one is worth its own
+line rather than being a case of an existing check:
+
+| guard | why it misses this |
+|---|---|
+| the claim rule (`gh issue edit --add-assignee`) | needs an issue number, and most branches have none |
+| the branch check (`git status` + `git branch`) | both are local; with no fetch, `## <branch>...origin/<branch>` is the same line for "in sync" and for "never looked" |
+| `prune-merged -IncludeRemote` | it is for branches you are **not** standing on -- this is the one case it cannot help with |
+| `cycle-autopark` | makes it **more** likely, not less: it is what puts the other session's work on the shared ref |
+
+So the local-ref route now counts `refs/heads/<name>..refs/remotes/origin/<name>` and, where `origin` is
+ahead, names the count **and the remote tip's author and subject**:
+
+```text
+WARNING: 'feat/x' is 1 commit(s) behind origin/feat/x, whose tip is:
+         952e676e Other Session: park: feat/x (all outstanding work).
+         Another session or another device has pushed work to this branch that this checkout does not
+         have -- read it before you build on top of it.
+```
+
+**The author and the subject are the point, not the count.** `park: ... (all outstanding work)` under an
+identity that is not yours is the line that separates a collision from a fast-forward of your own
+autopark; "1 commit behind" reads identically in both.
+
+**The tip line is stripped before it is printed, and capped.** It is the one piece of text this script
+emits that somebody else wrote: `%an` and `%s` are free text chosen by whoever pushed that commit.
+Control and format characters go -- an ANSI or OSC escape in a commit subject repaints the terminal it
+lands in, and an RTL override or a zero-width run makes the printed line read as something other than
+what it says, deceiving the reader by the very line that exists to tell them whose work this is. The
+words stay, because the subject only has to be *recognisable*; quoting would keep the payload and add
+noise. A subject over 120 characters is truncated, so the half of the sentence that says what to **do**
+is never pushed off the screen.
+
+**The neighbouring case points the other way, deliberately.** `new-branch` already takes adversarial free
+text -- a malicious `-Title` -- and its rule there is the opposite: land *fully and unchanged*, asserted
+on an exact compare. That text goes into a **file**, where truncation is the damage. A console is not a
+file, and this is the only place this workflow prints externally-authored text to one.
+
+**It costs no network call.** The base measurement above already fetches *every* ref (that is what
+`-FetchAllRefs` is for, and #1139 is why), so the remote-tracking ref is on disk and as fresh as this run
+can make it. Where the fetch failed, the sentence says which ref the count came from -- the same
+distinction the stale-base warning draws.
+
+**It warns and never refuses, and that is not a position waiting to be hardened** the way #1046's was.
+The legitimate divergence sits on the intended happy path: your own autopark from another device, which
+you then fast-forward. A refusal would land on the route this script exists to serve.
+
+**Said twice, and the second copy comes out of whichever end the run reaches.** On a divergent branch the
+creation push *cannot* succeed -- it is a non-fast-forward, which is the incident's own ending -- so the
+note is printed from the failed-push branch as well as from the foot of a run that completes. There it is
+not a repeat but the diagnosis: git says the push was rejected, and this says whose work is on the other
+side of it. This script's own suite is what found that; a repeat placed only at the end would have been
+dead code in exactly the case it was written for.
 
 ## The rest of the chain — the commands, written here because they are readable here
 
