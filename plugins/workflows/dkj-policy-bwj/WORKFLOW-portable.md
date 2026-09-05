@@ -544,7 +544,7 @@ can read the org's projects to turn staging on.
 - **Setup, once per repo:** the repo secrets `ASANA_PAT` and `GH_PROJECT_TOKEN`, the variable
   `ASANA_PROJECT_GID`, the four prio labels of step 5 plus the `needs-info` label of step 6, and
   copying the two `templates/` files into `.github/`. The
-  [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) skill walks this.
+  [`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) skill walks this.
 - **Naming the project board's three statuses, and where the submitter's name sits.** `Get-AsanaStageMap`
   says which Asana section each stage is; `Get-GithubStatusMap` says which GitHub status each of the
   three middle stages is, and carries `SubmitterPattern`. Leave that pattern out and stage 6 is never

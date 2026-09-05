@@ -1,20 +1,21 @@
 ---
-name: adopt-bwj-asana
+name: adopt-dkj-policy-bwj
 description: >-
-  One-time setup of dkj-policy-bwj in a BWJ store repo (smartwatchbanden or xoxowildhearts): copy the
-  asana-mirror CI mechanism into .github/, propose the Asana config seam for scripts/repo-config.ps1,
-  print the repo secret and variables the CI needs, check that the classification labels exist, report
-  whether the board's sections are numbered so the stage model can read them, and scaffold chapter
-  two's dkj-policy-bwj/SYNC-LOG.md with its masthead, ready for the first sync branch. Strictly additive and
-  dry-run by default; it never overwrites an existing file, and it renames nothing on the board. Run
-  this right after enabling the plugin, or when report-issue reports the Asana config seam missing.
+  One-time setup of dkj-policy-bwj in a BWJ store repo (smartwatchbanden or xoxowildhearts), both
+  chapters: copy the asana-mirror CI mechanism into .github/, propose the Asana config seam for
+  scripts/repo-config.ps1, print the repo secret and variables the CI needs, check that the
+  classification labels exist, report whether the board's sections are numbered so the stage model can
+  read them, and scaffold chapter two's dkj-policy-bwj/SYNC-LOG.md with its masthead, ready for the
+  first sync branch. Strictly additive and dry-run by default; it never overwrites an existing file,
+  and it renames nothing on the board. Run this right after enabling the plugin, or when report-issue
+  reports the Asana config seam missing.
 ---
 
-# adopt-bwj-asana -- place the CI mechanism and the config seam
+# adopt-dkj-policy-bwj -- place both chapters' mechanism and config seam
 
-An install writes nothing into your repo. This command places the two things `dkj-policy-bwj` needs on
-your side: the CI workflow that resolves Asana tasks, and the config functions the skill and the CI
-both read.
+An install writes nothing into your repo. This command places what `dkj-policy-bwj` needs on your
+side, across both chapters: the CI workflow that resolves Asana tasks, the config functions the skill
+and the CI both read, and chapter two's `SYNC-LOG.md` scaffold (step 7).
 
 ## 1 -- copy the CI mechanism into `.github/`
 

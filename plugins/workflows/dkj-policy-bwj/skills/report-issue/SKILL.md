@@ -25,7 +25,7 @@ colleague-facing translation is a judgement call, not a transform. The full rule
   `BWJ-ecommerce/xoxowildhearts`). This procedure applies nowhere else.
 - Confirm `gh auth status` is clean.
 - Read `Get-AsanaWorkspaceGid` and `Get-AsanaProjectGid` from the repo's `scripts/repo-config.ps1`.
-  If either is missing, run [`adopt-bwj-asana`](../adopt-bwj-asana/SKILL.md) first.
+  If either is missing, run [`adopt-dkj-policy-bwj`](../adopt-dkj-policy-bwj/SKILL.md) first.
 - Read `Get-AsanaIssueFieldGid` and `Get-AsanaTypeFieldGid` from the same file. Both are optional and
   default to `$null` -- a board carrying neither the `Github Issue` nor the `Github Type` custom
   field leaves them unset, and step 2 skips whichever one is missing.

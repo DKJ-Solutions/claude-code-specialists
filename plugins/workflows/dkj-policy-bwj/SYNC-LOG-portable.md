@@ -80,7 +80,7 @@ One entry per `sync/` branch, newest at the top. Written and committed by `sync-
 folded into `CHANGELOG.md`, never read by a release.
 ```
 
-`adopt-bwj-asana`'s own step for this creates the file the moment the plugin is adopted; the first
+`adopt-dkj-policy-bwj`'s own step for this creates the file the moment the plugin is adopted; the first
 sync's run then prepends its entry underneath, exactly as `Add-SyncLogEntry` already does for any file
 carrying a masthead above its first `## ` line.
 
@@ -194,7 +194,7 @@ function Get-ShopifySyncLogPath { return 'dkj-policy-bwj/SYNC-LOG.md' }
 ```
 
 There is no template to copy and no CI to wire. **There is now a file to scaffold**, and it is
-[`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md)'s step, not a separate skill of its own: once the
+[`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md)'s step, not a separate skill of its own: once the
 seam above is answered, that step creates `dkj-policy-bwj/SYNC-LOG.md` with its masthead and nothing else,
 ready for the first sync to prepend under.
 

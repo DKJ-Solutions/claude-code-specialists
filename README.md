@@ -194,7 +194,7 @@ and an unclassifiable name switches the check off for itself.
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
 | [`dkj-policy/`](plugins/workflows/dkj-policy/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
-| [`dkj-policy-bwj/`](plugins/workflows/dkj-policy-bwj/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead, written by `team-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-bwj-asana`), no specialists, no hooks. Extends only the ticket-work step of `dkj-policy` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `dkj-policy` — the sync chapter also expects `team-shopify`. |
+| [`dkj-policy-bwj/`](plugins/workflows/dkj-policy-bwj/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead, written by `team-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-dkj-policy-bwj`), no specialists, no hooks. Extends only the ticket-work step of `dkj-policy` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `dkj-policy` — the sync chapter also expects `team-shopify`. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
 `team-lifehub` and `team-shopify` describe what *kind* of repo it is, so a repo
@@ -640,7 +640,7 @@ function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session
 `cut-release`, `adopt-config`, `adopt-workflow-folder`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
 `prune-merged`,
-`measure-skill`, `worktree-lane`, `report-issue`, `adopt-bwj-asana`, `orchestrator`)<!-- /skills:all -->
+`measure-skill`, `worktree-lane`, `report-issue`, `adopt-dkj-policy-bwj`, `orchestrator`)<!-- /skills:all -->
 remain available there.
 
 **`orchestrator` is on that list for a reason worth reading twice.** Everything else there is a
@@ -731,7 +731,7 @@ repo's own conventions, placing an add-on team's operational floor, pushing a br
 theme, the reading copy of the release notes, laying the repo's law-bearing documents out in rank order
 so a session can read them against each other, reaping the local branches a merge left behind, pricing
 what a skill costs the sessions that carry it, and giving a branch its own worktree so another one can
-ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-bwj-asana`<!-- /skills:all --> are the
+ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-dkj-policy-bwj`<!-- /skills:all --> are the
 deliberate exceptions: a checklist with no script of its own (see below); a skill that must not have
 one — `orchestrator` reads a persona file into the conversation, and the environment it exists for is
 precisely the one where `powershell` is absent; and the two `dkj-policy-bwj` procedures, which run over

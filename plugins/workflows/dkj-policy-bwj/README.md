@@ -133,7 +133,7 @@ The hooks and blueprint a workflow carries "only where it needs them" -- this on
 | skill | when |
 |---|---|
 | [`report-issue`](skills/report-issue/SKILL.md) | a real issue has been found in a BWJ store repo -- files it on GitHub with its type and reach label, mirrors it to Asana as the colleague-facing variant, and writes the cross-links |
-| [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) | one-time setup in a store repo -- copies the CI mechanism into `.github/`, proposes the Asana config seam, and prints the secret/variable setup |
+| [`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) | one-time setup in a store repo -- copies the CI mechanism into `.github/`, proposes the Asana config seam, and prints the secret/variable setup |
 
 <!-- /skills:plugin -->
 
@@ -183,7 +183,7 @@ the project:
   skips whichever is unset without saying anything. Where a board does carry one, leaving it unset is
   the state that costs something, because the field is then filled by hand or not at all.
 
-`adopt-bwj-asana` **proposes** these, it never places them: they state what your repo *is*, and the
+`adopt-dkj-policy-bwj` **proposes** these, it never places them: they state what your repo *is*, and the
 project may differ per brand. The CI half reads the project from the repo variable
 `ASANA_PROJECT_GID` and its token from the secret `ASANA_PAT` -- it addresses every task by GID, so
 it needs no workspace of its own.
@@ -191,11 +191,11 @@ it needs no workspace of its own.
 ## Enabling it
 
 An ordinary plugin change: enable `dkj-policy-bwj` in `.claude/settings.json` alongside `team-alpha`
-and `dkj-policy`, then run [`adopt-bwj-asana`](skills/adopt-bwj-asana/SKILL.md) once for
+and `dkj-policy`, then run [`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) once for
 chapter one, and answer `Get-ShopifySyncLogPath` for chapter two.
 
 **Chapter two needs no skill of its own** -- its one adopt step, scaffolding `dkj-policy-bwj/SYNC-LOG.md`
-with its masthead, rides along inside `adopt-bwj-asana`'s run rather than getting a second skill for a
+with its masthead, rides along inside `adopt-dkj-policy-bwj`'s run rather than getting a second skill for a
 single file. There is still no CI to wire: the folder and the file exist from that run on, and every
 sync after it prepends. See [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md#where-the-record-lives) for
 why scaffolding it unconditionally at adopt time is what removes the old ambiguity rather than
