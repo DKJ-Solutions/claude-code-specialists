@@ -42,7 +42,8 @@ holding once scaffolding becomes an unconditional part of adoption rather than a
 ### CREATE
 
 - [x] Add a step to `adopt-bwj-asana/SKILL.md` that creates `bwj-codex/SYNC-LOG.md` with a masthead
-      (no entries), leaving an existing file untouched -- mirrors step 1's "stop, do not overwrite" rule
+      (no entries), leaving an existing file untouched -- the same non-destructive spirit as step 1's
+      "stop and diff" rule, though a masthead-only file needs no diff, just "leave it alone"
 - [x] Update `SYNC-LOG-portable.md` ("Where the record lives", "Adopting it in a repo") to state the
       new behaviour and why the reversal is safe rather than a re-introduction of the old ambiguity
 - [x] Update `bwj-codex/README.md`'s "Enabling it" section, which claimed chapter two needed no adopt

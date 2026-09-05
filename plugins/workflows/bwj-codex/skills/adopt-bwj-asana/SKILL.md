@@ -283,9 +283,9 @@ so a session reads the BWJ ticket rule the same way it reads the other portable 
 ## 7 -- scaffold the sync-log folder (chapter two)
 
 Chapter two's record needs somewhere to land before the first `sync/` branch ever runs. If
-`Get-ShopifySyncLogPath` is answered (propose it alongside the Asana seams in step 2, in the same
-`scripts/repo-config.ps1`, if it is not already) -- `'bwj-codex/SYNC-LOG.md'` in both store repos --
-create the file it names, with nothing in it but a masthead:
+`Get-ShopifySyncLogPath` is not yet answered, propose it alongside the Asana seams in step 2, in the
+same `scripts/repo-config.ps1` -- `'bwj-codex/SYNC-LOG.md'` in both store repos. Either way, once it is
+answered, create the file it names, with nothing in it but a masthead:
 
 ```markdown
 # Sync log
