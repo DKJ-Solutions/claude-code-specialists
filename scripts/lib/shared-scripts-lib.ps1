@@ -150,6 +150,38 @@ function Get-SharedScriptPairs {
             Skill  = 'prune-merged'
         },
         @{
+            # THE POLICY-DRIFT REPORT. The corollary in CONTRIBUTING-portable.md's "A third rank sits
+            # above both" -- a consumer document may point at a shared law or answer a seam it names,
+            # never restate it -- had two narrow deliveries (check-retired-doc-name, a filename;
+            # check-supremacy-declaration, an adjacency) and nothing that covered the rule as a whole.
+            #
+            # IT IS NOT THE CHECK #1380 DECLINED, and the row says so here because the decline is the
+            # first thing a reader will reach for. That decline is about a SCRIPT deciding what a
+            # sentence means, and it stands: this one never reads a sentence. It resolves WHICH
+            # documents sit at which rank on this machine, echoes the two gated slices, and hands the
+            # judgement to the session -- which is the half #1380 said only a reader can do.
+            #
+            # ON-DEMAND AND REPORT-ONLY, so unlike the two prose checks it HAS a skill and has no hook
+            # and no CI leg. It always exits 0 once it can answer; an exit code would be a verdict it
+            # has not earned, and a gate here would be the declined check wearing a different hat.
+            #
+            # IT INVENTS NO SECOND ANSWER TO "WHICH PLUGINS ARE HERE". The enable comes from
+            # Get-EnabledPlugins and the install record from Get-InstallRecord / Test-PluginInstalledHere
+            # -- the same lib, and the same two questions, check-roster-sync and check-script-contract
+            # already read. What it does not reuse is Resolve-PluginDir, and its own docstring says why:
+            # that function requires an agents/ dir at every return path, so on a WORKFLOW plugin it
+            # answers $null on every machine, always.
+            Name   = 'check-policy-drift'
+            Source = 'scripts\task\check-policy-drift.ps1'
+            Plugin = 'contributing-davekjohn'
+            Skill  = 'check-policy-drift'
+            # A fixture root, plus an always-on root the suite can point at a scratch document tree.
+            # A consumer never types either.
+            SkillParamsExempt = @('RootOverride', 'RootDocument')
+            # Timeable with no arguments: it reads files and prints, and writes nothing anywhere.
+            MeasureArgs = @()
+        },
+        @{
             # Issue #411. Was excluded as "workshop-only" on the reasoning that merge policy and the CI
             # check name are repo-specific. Only the first half held: the check NAME never entered the
             # logic (step 3 watches whatever checks exist and reads the exit code), and the merge METHOD
