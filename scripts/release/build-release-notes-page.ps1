@@ -697,6 +697,38 @@ function Format-ReleaseIndexRows {
     return ($rows -join "`n")
 }
 
+function Find-StrayPathToken {
+    <#
+        Every worker-path-token.txt in this tree that is NOT the one this run expects.
+
+        WHY IT LOOKS AT ALL. The page directory is derived from the note root and gitignored -- two
+        good decisions that combine into one hazard. Rename or repoint the folder holding the release
+        documents and every tracked file moves with it, while the token stays behind in a folder
+        nothing points at any more: git mv cannot see an ignored sibling by construction, so the miss
+        is silent on the day it happens. In a public repo that file is the only copy of the live page's
+        path and nothing in git remembers the URL, so the orphan reads as rename debris -- and deleting
+        it 404s every link already sent (issue #1444, September 5, 2026, after this repo's own
+        contributing-davekjohn/ -> dkj-policy/ rename left exactly that folder behind).
+
+        AND IT IS WHAT MAKES -InitToken's REFUSAL MEAN WHAT IT SAYS. That guard reads the expected path
+        and nothing else, so after a move it finds no token and mints a second one happily -- the one
+        act the whole design exists to prevent. "Is there a token SOMEWHERE" is the question worth
+        asking; "is there a token HERE" was only ever a cheap approximation of it.
+
+        Cheap enough to sit on the two failure paths because that is the only place it runs. .git is
+        skipped: nothing writes a token there, and walking it is the expensive half of the search.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string]$ExpectedPath
+    )
+
+    if (-not (Test-Path -LiteralPath $Root)) { return @() }
+    $hits = Get-ChildItem -LiteralPath $Root -Recurse -File -Filter 'worker-path-token.txt' -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -ne $ExpectedPath -and $_.FullName -notlike '*\.git\*' }
+    return @($hits | ForEach-Object { $_.FullName })
+}
+
 # THE TWO PAGE-WIDE ANSWERS, DERIVED ONCE FROM THE LIST RATHER THAN PER ROW: whether the bump type
 # carries information here at all, and whether every version on this page ends in '.0'. Both are
 # properties of the SET, so neither can be decided inside the row loop -- and both are read off the data
@@ -751,6 +783,19 @@ if ($InitToken) {
                "carrying it has been sent, so a new token means every existing link 404s. Delete the " +
                "file deliberately if that is genuinely what you want.")
     }
+    # AND A COPY ANYWHERE ELSE IN THE TREE IS AN EXISTING TOKEN TOO (issue #1444). The refusal above
+    # asks whether one is HERE, which stops meaning what it says the moment the page directory moves --
+    # see Find-StrayPathToken for why that move is silent by construction.
+    # @( ) at the call site, not in the function: PowerShell unrolls a returned empty array to $null,
+    # and Set-StrictMode -Version Latest then refuses .Count on it.
+    $strays = @(Find-StrayPathToken -Root $repoRoot -ExpectedPath $tokenPath)
+    if ($strays.Count -gt 0) {
+        throw ("There is no token at $tokenPath, but this tree already holds one: $($strays -join ', '). " +
+               "That is what a renamed or repointed release folder leaves behind -- the page directory " +
+               "is gitignored, so it stayed where it was while everything tracked moved. MOVE that " +
+               "folder here instead of creating a second token, which 404s every link already sent. " +
+               "Delete the copy deliberately if it is genuinely dead.")
+    }
     $newToken = [guid]::NewGuid().ToString('N')
     [System.IO.File]::WriteAllText($tokenPath, $newToken, $Utf8NoBom)
     Write-Host ""
@@ -767,10 +812,21 @@ if (-not $config.WorkerName) {
            "means this repo does not host the page and the page half above still runs on its own.")
 }
 if (-not (Test-Path -LiteralPath $tokenPath -PathType Leaf)) {
-    throw ("The path token is missing: $tokenPath. This script does NOT invent one -- the path is the " +
-           "only lock on a public page, so a fresh token means the reader's link 404s while the build " +
-           "and the deploy both report success. Restore the 32 hex characters from the URL you have, " +
-           "or run this script with -InitToken to create the first one.")
+    # The missing token is worth ONE search before the refusal is printed, because the likeliest
+    # reason it is missing here is that it is somewhere else -- see Find-StrayPathToken.
+    $strays = @(Find-StrayPathToken -Root $repoRoot -ExpectedPath $tokenPath)
+    $lead = if ($strays.Count -gt 0) {
+        "This tree already holds one, at $($strays -join ', '). A page directory is gitignored, so it " +
+        "did not travel with a renamed or repointed release folder: MOVE that folder here rather than " +
+        "creating a second token. "
+    } else {
+        "If this repo's release folder was renamed or repointed, the only copy is still sitting in the " +
+        "old one -- it is gitignored, so nothing moved it and nothing reported that. "
+    }
+    throw ("The path token is missing: $tokenPath. " + $lead + "This script does NOT invent one -- the " +
+           "path is the only lock on a public page, so a fresh token means the reader's link 404s while " +
+           "the build and the deploy both report success. Restore the 32 hex characters from the URL " +
+           "you have, or run this script with -InitToken to create the first one.")
 }
 $token = ([System.IO.File]::ReadAllText($tokenPath, [System.Text.Encoding]::UTF8)).Trim()
 if ($token -notmatch '^[0-9a-f]{32}$') {

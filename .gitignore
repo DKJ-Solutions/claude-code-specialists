@@ -52,4 +52,10 @@ $RECYCLE.BIN/
 # URL, so whoever creates it records it outside the repo -- the file itself is the only copy on this
 # machine. A consumer whose repository is PRIVATE should commit theirs instead, where a tracked token
 # is what survives a lost machine.
+#
+# AND NOTHING MOVES IT FOR YOU. This pattern names a path, and an ignored file is invisible to `git mv`
+# by construction -- so renaming the folder above it leaves the token behind in a directory nothing
+# points at any more, which is exactly what became of contributing-davekjohn/releases/page/ on
+# September 5, 2026 (#1444). build-release-notes-page.ps1 searches the tree before it refuses or mints
+# one, so an orphan is named instead of silently replaced; moving the folder is still yours to do.
 dkj-policy/releases/page/

@@ -32,6 +32,98 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1443-gate-lane-knob · 20260905-185207
+
+`open-pr.ps1`, `ship-pr.ps1` and `cut-release.ps1` now take **`-MaxParallel <n>`** and hand it down to the
+test gate, so a gate that will not *finish* can be run **smaller** instead of not at all. `0` -- the
+default -- resolves exactly where it always did, inside `Invoke-TestSuiteGate`, so an ordinary run is
+unchanged.
+
+The parameter has existed at the bottom of the chain since the gate was written, and `ci.yml` passes it.
+What was missing was every hop above it: `Invoke-WorkflowGates` sat between the two PR scripts and the gate
+without carrying it, and `cut-release` calls the gate directly and never declared it. So on a developer's
+machine the only route past a gate that dies was `-SkipTests` -- and that is strictly worse than a smaller
+run, because it is the switch that says *this run did not measure*. Afterwards a branch pushed past a
+memory limit reads exactly like one that skipped its suites for a bad reason.
+
+**`cut-release` is the caller #1443 did not name and the one where it costs most.** The other two open a
+PR, and a PR that does not open costs a retry; this one commits and tags on the trunk, where `-SkipTests`
+means a release can be cut with a suite red.
+
+Measured on the machine that filed [#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443)
+-- 18 cores, so 16 lanes, same 68 suites, same function: the default passed once at 716s and was then
+**killed twice by the harness for running out of memory**, where `-MaxParallel 4` passed in 888s. 24%
+slower, and it finishes. Intermittent rather than a ceiling -- 16 lanes fits when the machine is quiet --
+which is why this is a knob and not a new default. Worth knowing beside it: a starved run can also go
+**false red**, and the killed run's log carried two `[FAIL]` lines in a suite that is 108/108 green run
+alone.
+
+**The default lane formula is deliberately untouched.** The reservation reasons about cores; what ran out
+was memory, and one machine is not a measurement of a formula. This adds the way past, not a new policy.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer reaches all three scripts through the plugin mirror, and their machines are the ones this
+repo cannot measure -- more cores, more suites, or a laptop already running something else. Until now their
+only answer to a gate that would not finish was the escape valve that erases the evidence, on the one run
+whose whole job is to produce it. `cut-release` is the sharp end of that for them exactly as it is here.
+
+The flag is documented where a session actually reads it: the `open-pr` skill page carries the numbers and
+the *reach for this before `-SkipTests`* rule, and the `ship-pr` and `cut-release` pages an entry each
+that forwards to it.
+
+**Score:** 3
+
+#### Pull Request
+
+open-pr, ship-pr and cut-release carry the test gate's lane knob through
+
+Plugins: dkj-policy
+
+[PR #1455](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1455)
+
+---
+
+### DEPLOY: fix/1444-stranded-page-token · 20260905-184311
+
+The release page's path token is the one file in this system that cannot be rebuilt: it is the only
+lock on a public page, it is deliberately uncommitted in a public repo, and nothing in git remembers
+the URL it forms. It lives in a directory derived from the note root and ignored by git -- two good
+decisions that meet badly, because renaming the folder above it moves every tracked file and leaves the
+token where it was. `git mv` cannot see an ignored sibling by construction, so the miss is silent on
+the day it happens, and what is left over reads like rename debris.
+
+`build-release-notes-page.ps1` now asks whether a token exists **anywhere in the tree** rather than
+whether one exists at the derived path. A copy found elsewhere is named and never adopted: `-Worker`
+points at the folder to move, and `-InitToken` -- whose refusal was the design's whole safety property
+and which read the derived path alone -- refuses on it too. Where no copy is found, the refusal still
+names the move that hides one, because the operator who has just renamed a folder is the reader most
+likely to be looking at it.
+
+Measured on this repo: #1437's rename left exactly that orphan (#1444), and the token is gone from this
+machine with it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- the person who reads a release page never sees any of this. It is a guard between the operator
+and one irreversible mistake.
+
+**Score:** N/A
+
+#### Pull Request
+
+The missing-token refusal points at the copy a folder move left behind
+
+Plugins: dkj-policy
+
+[PR #1452](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1452)
+
+---
+
 ### DEPLOY: fix/1446-tip-utf8-decode · 20260905-183608
 
 `new-branch.ps1` reads the remote tip's subject with **`-Utf8`**, so the control-and-format strip added in

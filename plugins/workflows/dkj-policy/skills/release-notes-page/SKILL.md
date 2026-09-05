@@ -159,6 +159,23 @@ So a missing token is an error with a recovery instruction: restore the 32 hex c
 you have. `-InitToken` is the separate, explicit way to create the **first** one, and it refuses to
 replace an existing token.
 
+**And the way you actually lose it is a folder move.** The page directory is derived from your note
+root and gitignored, which is two good decisions that meet badly: rename or repoint the folder holding
+your release documents and every *tracked* file travels with it, while the token stays behind in a
+directory nothing points at any more. `git mv` cannot see an ignored sibling by construction, so
+nothing reports the miss — and what is left reads like rename debris, one `Remove-Item` away from
+404ing every link you have sent.
+
+So **both refusals ask whether a token exists anywhere in the tree, never whether one exists here**
+(source repo issue #1444, September 5, 2026, after its own `contributing-davekjohn/` → `dkj-policy/`
+rename left exactly that orphan). A copy found elsewhere is **named and never adopted** — the script
+tells you which folder to move, because a token silently read from a path nobody configured would be a
+second kind of surprise. `-InitToken` refuses on it too: its guard used to read the expected path
+alone, which answers *"no token here"* on precisely the day that answer is wrong.
+
+**Move that folder rather than rebuilding it.** Everything else in it regenerates in a second; the
+token is the one file that cannot.
+
 ## Publishing, and how to tell whether it worked
 
 The script **deploys nothing**. It writes the bundle and names the command:
