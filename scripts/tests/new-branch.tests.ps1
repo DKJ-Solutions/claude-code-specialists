@@ -58,6 +58,11 @@ $PrIssuesLibSrc   = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
 # Same reasoning for the park scopes: the -Park asserts read the commit-subject phrases from Get-GitParkScopes
 # rather than repeating them, so rewording a scope cannot leave a test matching text nobody writes any more.
 . $ParkLibSrc
+# And Invoke-NativeCapture for THIS suite's own use, not only for the fixtures it copies the lib into
+# (issue #1446): the adversarial-tip case has to read a commit subject back from git as DATA, and `& git`
+# decodes it with the console code page. Dot-sourced here so the read is the same mechanism the script
+# under test uses -- a fixture copy would not be in this process's scope.
+. $NativeCaptureSrc
 
 $script:pass = 0
 $script:fail = 0
@@ -1592,13 +1597,17 @@ Write-Output `$t.Type
     # applies to its parked branch. Without this the three "no ESC in the output" asserts below pass
     # just as happily against a helper that quietly dropped the characters on the way in, which is the
     # shape of a security test that proves nothing.
-    $prevEap = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        $evilOnRemote = ((& git -C $bareEvil log -1 --format=%s 'refs/heads/feat/evil-tip-1439-v1' 2>$null) | Out-String)
-    } finally { $ErrorActionPreference = $prevEap }
+    # READ BACK WITH AN EXPLICIT UTF-8 DECODE, NOT WITH `& git` (issue #1446, September 5, 2026). This
+    # block asks "does the fixture really carry the payload", and until that date it asked through the
+    # same mangling it was meant to be independent of: `& git` is decoded with [Console]::OutputEncoding,
+    # so on a cp850 console the RTL override came back as the three printable characters e2/80/ae map to
+    # there and this assert read FALSE against a commit that was perfectly intact. A premise assert that
+    # can be defeated by the console it runs on cannot vouch for anything below it -- and the three
+    # characters it is checking for are precisely the ones no non-UTF-8 code page can represent.
+    $evilOnRemote = ((Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $bareEvil, 'log', '-1', '--format=%s', 'refs/heads/feat/evil-tip-1439-v1') -DiscardStderr -Utf8).Output -join "`n")
     Assert-True ($evilOnRemote.Contains($esc)) 'adversarial tip: the commit on origin really carries the ESC -- so the asserts below are not vacuous'
     Assert-True ($evilOnRemote.Contains([char]0x202E)) 'adversarial tip: and the RTL override'
+    Assert-True ($evilOnRemote.Contains([char]0x200D)) 'adversarial tip: and the zero-width joiner -- all three asserted, because all three are stripped below'
 
     # ASSERTED ON THE FLATTENED CAPTURE AND THAT IS SAFE HERE, unlike for a whitespace-shaped payload:
     # Get-FlatOutput strips '\s', and none of these three characters is whitespace to .NET -- ESC, the
