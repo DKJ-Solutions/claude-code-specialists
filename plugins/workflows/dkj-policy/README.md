@@ -59,7 +59,7 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`skills/`](skills/) | the skills a specialist invokes — this is where most of the workflow lives |
 | [`scripts/`](scripts/) | the scripts and libs those skills run, mirrored from the source repo's own `scripts/`. **Never edit a file there** — see [its README](scripts/README.md) |
 | [`hooks/`](hooks/) | read-only SessionStart checks that never block, all belonging to running this across several repos — among them `connector-sessioncheck`, `script-contract-sessioncheck`, `consumer-prose-sessioncheck` (your own always-on prose contradicting this workflow — two detectors over one corpus read once, since #1421: a convention this workflow has renamed, still stated as current, #1389, and your own `CLAUDE.md` declared the winner over this workflow's contributing layer, inverting the rank order, #1415) — plus one **Stop** hook that acts rather than reports: `cycle-autopark` pushes the branch's `<branch>.md` to `origin` after every turn, until a PR publishes it (#900). **The set is deliberately not counted here**: this cell said "two" and went stale twice inside two days, and [`hooks/hooks.json`](hooks/hooks.json) is the one place that cannot |
-| [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-config` skill |
+| [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-dkj-policy` skill's Part 2 |
 | [`templates/`](templates/) | the one file in this cycle that has to be **copied** rather than imported: `pull_request_template.md`. GitHub reads a PR template only from `.github/` in your own repo, so what ships here is the reference to copy and to diff against — see the [`open-pr` skill](skills/open-pr/SKILL.md) for the one promise it makes: the placeholder line |
 
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
@@ -112,8 +112,7 @@ below changes for you, and nothing here asks you to run anything.
 
 | skill | when |
 |---|---|
-| [`adopt-workflow-folder`](skills/adopt-workflow-folder/SKILL.md) | right after installing — scaffolds `dkj-policy/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo) |
-| [`adopt-config`](skills/adopt-config/SKILL.md) | first-time setup — reads the blueprint, places what states the shared way of working, proposes the rest |
+| [`adopt-dkj-policy`](skills/adopt-dkj-policy/SKILL.md) | right after installing, in either order — **Part 1** scaffolds `dkj-policy/`, the one folder in your root where everything portable gathers (an install alone writes nothing into your repo); **Part 2** reads the blueprint, places what states the shared way of working, proposes the rest |
 | [`claim-issue`](skills/claim-issue/SKILL.md) | an issue number has been named as the work — puts your account on it first, and refuses a closed one or one somebody else holds. Before the branch, because the tracker is the only thing two sessions share |
 | [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `dkj-policy/<branch>.md` in one move |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |

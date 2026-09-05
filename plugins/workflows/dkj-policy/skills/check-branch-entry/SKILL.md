@@ -24,7 +24,7 @@ the GitHub UI meets neither. The convention was enforced by whoever remembered t
 convention that enforces nothing rots quietly: the entry is the first thing to fall away once it gets
 busy, and six months later the changelog does not mention half the work.
 
-So this is the same answer as a script, callable from CI. `adopt-workflow-folder` places the workflow that
+So this is the same answer as a script, callable from CI. `adopt-dkj-policy`'s Part 1 places the workflow that
 calls it (`.github/workflows/branch-entry.yml`), and this skill is for asking the question yourself.
 
 **It adds no rule of its own**, and that is the design rather than modesty. It calls

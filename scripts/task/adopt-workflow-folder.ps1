@@ -212,7 +212,7 @@ $folderReadme = @(
     # them here regardless is how a scaffolded page ends up describing a tree the repo does not have.
     ('| [`releases/`](releases/) | this repo''s release answers, the release LIST' + $(if ($noteRootRelPath.StartsWith("$workflowFolder/")) { ' and the published audience notes' } else { ' (the hand-written notes are at `' + $noteRootRelPath + '/`, outside this folder)' }) + ' |'),
     '',
-    'Scaffolded by the `adopt-workflow-folder` skill; strictly additive, so everything here past the',
+    'Scaffolded by the `adopt-dkj-policy` skill (Part 1); strictly additive, so everything here past the',
     'VUL-IN markers is this repo''s own writing.'
 )
 

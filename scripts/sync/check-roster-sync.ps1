@@ -1015,7 +1015,7 @@ if ($suppressedForBootstrap -gt 0) {
     # that string appeared in no shipped file in either plugin, so a model that correctly gave up had to
     # reconstruct the command it was handing over.
     #
-    # The 'adopt-workflow-folder' line in the contract check stays a bare imperative on purpose: that
+    # The 'adopt-dkj-policy' line in the contract check stays a bare imperative on purpose: that
     # skill has no such flag, so its reader CAN comply. The rule is not a phrasing convention -- it is
     # that a message must not name a skill barred to the reader it addresses.
     Write-Host "  [BOOTSTRAP] the specialists plugin is enabled here but this repo has not been set up yet: no repo lenses and no roster rows exist, so all $suppressedForBootstrap specialist(s) would each be reported missing twice over. Nothing is broken -- the subagents work; what is missing is the orchestrator and the repo-specific setup. Run /team-alpha:specialists-init to put them in place -- that command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. It is additive and never overwrites anything you have written." -ForegroundColor Yellow

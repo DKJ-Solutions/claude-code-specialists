@@ -172,7 +172,7 @@ just advice.
   URLs preserves a ~4,000-word hand-maintained mirror of a process half that no longer exists upstream —
   the exact cost #646 was filed to end — and it would drift again at the next rename. The remedy is to
   replace everything above the rule with a pointer to the plugin's page, which is what
-  `adopt-workflow-folder` scaffolds. **What separates this from the first pattern:** #469 was repaired
+  `adopt-dkj-policy`'s Part 1 scaffolds. **What separates this from the first pattern:** #469 was repaired
   here, so verifying it *closed* it. Here nothing was repaired away — the defect is live, it is simply
   not ours, and the closure's whole value is telling the reporter which file to open and what to do that
   is not what they asked for.
