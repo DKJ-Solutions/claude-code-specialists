@@ -174,9 +174,12 @@ exactly the product it maintains. One consequence to be aware of: a session read
 **local marketplace clone**, and that clone advances on a `claude plugin marketplace update` — **not on
 a push**. So an agent def you modify on a branch takes effect after merge, push *and* that refresh, and
 between two releases **no version check can tell you the clone is behind**. A second: being a consumer,
-this repo carries an install record keyed on its **folder path**, so renaming or moving this checkout
-unlinks the plugin without any error. Both measured instances, and why detection is deliberately left
-alone, are in
+whichever machine has actually run `claude plugin install ... --scope project` for this checkout
+carries an install record keyed on its **folder path** there, and renaming or moving the checkout on
+that machine unlinks the plugin without any error. A machine that has never run that install carries no
+such record and has nothing to unlink — the record is per-machine state, not a fixed property of the
+repo (inbound [#1449](https://github.com/DaveKJohn/claude-code-specialists/issues/1449)). Both measured
+instances, and why detection is deliberately left alone, are in
 [the system-administration lens](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
 
 ### Language
