@@ -32,6 +32,35 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1486-dkj-policy-scripts-readme-rows · 20260906-003910
+
+`plugins/dkj-policy/scripts/README.md`'s table now lists all 21 scripts and libs the registry already
+held for `dkj-policy` that its own page never named -- `task/claim-issue.ps1` through
+`lib/claim-issue-lib.ps1` -- closing the gap the page's own "the missing rows are tracked separately"
+sentence claimed was tracked when nothing was (#1486). The caveat paragraph above the table now records
+this as a third re-measurement (August 15, August 26, September 6) instead of leaving the second one's
+numbers standing as if still current.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer reading this page to see what the plugin mirror carries now finds the ten `lib/*` files and
+the four `lint/*` gates described alongside the scripts that already had rows -- nothing new to run,
+just nothing missing any more.
+
+**Score:** 2
+
+#### Pull Request
+
+Fill in the 21 rows plugins/dkj-policy/scripts/README.md's table was missing
+
+Plugins: dkj-policy
+
+[PR #1490](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1490)
+
+---
+
 ### DEPLOY: fix/1485-claim-issue-continuation · 20260906-003143
 
 `claim-issue` now says what follows a successful claim, so a session that obeys the page carries
