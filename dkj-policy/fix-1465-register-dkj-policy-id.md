@@ -33,21 +33,81 @@
 
 ### PLAN
 
+Issue #1465: `connectors/claude-code-specialists.json` still registered the workflow plugin under
+`contributing-davekjohn@`, an id retired by the #1437 rename (commit `17149edb`) -- while this repo,
+as a consumer, had already migrated. `check-connectors` therefore printed an `[INFO]` whose factual
+claim ("this consumer has not migrated to the current names yet") was the opposite of the truth, and
+then **skipped the whole plugin block**, so nothing about the workflow plugin was version-checked in
+the register of the repo that owns the check.
+
+#### The verification, before the repair
+
+The report was held against the tree first rather than taken at its word -- the six-way pickup check:
+
+- **Symptom** -- reproduced verbatim on `main` at `f8ac7598`: one `[INFO]`, block skipped.
+- **Reason** -- `.claude/settings.json` enables `dkj-policy@claude-code-specialists`, and
+  `installed_plugins.json` holds a project-scope record for **this** checkout under that id
+  (`4.30.0`, commit `ba889a81`) and **none** under the retired one. On this machine the old id's
+  only surviving record belongs to `xoxowildhearts`. So the register was behind the consumer, which
+  is exactly the "CAUGHT UP" moment the register's own doctrine describes.
+- **Repair** -- the empty `extensions` array is the measured answer and not an unfilled one:
+  `plugins/workflows/dkj-policy/` ships no `agents/`.
+- **Size** -- only this repo's entry is out of step. The other five manifests naming
+  `contributing-davekjohn@` are correct per doctrine and are left standing.
+- **Subject** and **repo** -- both this repo's own file.
+
+#### One adjacent stale count, fixed inside the assignment rather than filed
+
+The `notes` field's opening sentence said the workflow plugin ships "two session hooks"; it ships
+five SessionStart hooks and one Stop hook. It sits in the field being rewritten anyway, so it is
+corrected here rather than left standing as a known-false sentence -- and it is corrected by
+**dropping** the count, not by restating it. That is the rule `SPECIALISTS.md` already reached: the
+same count went stale twice inside two days there, which is why that page stopped listing the set at
+all, and each plugin's own `hooks/hooks.json` is the one place that cannot go stale.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Repoint `connectors/claude-code-specialists.json` from `contributing-davekjohn@` to
+      `dkj-policy@claude-code-specialists`, keeping the empty `extensions` array.
+- [x] Append a dated `CAUGHT UP 2026-09-05 (#1465)` paragraph to `notes` in the house style --
+      what was measured, where, and what the retired name cost -- without rewriting any older dated
+      measurement (#952).
+- [x] Drop the stale hook count from the opening sentence of `notes` without replacing it with a
+      new number.
 
 ### TEST
 
+- [x] `check-connectors.ps1` before: one `[INFO]`, plugin block skipped.
+      After: `[OK] plugin is enabled in .claude/settings.json`, `[OK] all 0 registered extensions
+      present`, `[OK] machine record is on the source version (v4.30.0)` -- the blind spot is closed.
+- [x] The manifest parses as JSON (`ConvertFrom-Json`).
+- [x] Lint gate + all suites, via `open-pr.ps1`.
+
 ### DEPLOY: fix/1465-register-dkj-policy-id
 
-**Score:**
+`connectors/claude-code-specialists.json` now registers the workflow plugin under its current id,
+`dkj-policy@claude-code-specialists`. It had held `contributing-davekjohn@` since the #1437 rename
+while this repo -- as a consumer of its own product -- had already migrated, so `check-connectors`
+stated the opposite of the truth and skipped the whole plugin block: for this repo's own entry the
+workflow plugin was not version-checked at all. Three `[OK]` lines now stand where one skipped
+`[INFO]` did. The `[INFO]` itself is deliberately unchanged, because a consumer catching up is the
+repair and making it an error re-opens the four false alarms of August 9, 2026 -- and the five other
+manifests still naming the retired id are correct as they stand, since the register records what a
+consumer HAS. This is the same blind spot `connectors/xoxowildhearts.json` recorded for the #886
+rename, re-opened by #1437 through the identical route: the class was never emptied, only its
+instance was. The `notes` field also loses a stale count -- it claimed two session hooks where the
+plugin ships five, beside a Stop hook -- dropped rather than renumbered, for the reason
+`SPECIALISTS.md` gives for no longer listing that set anywhere.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- `connectors/` is workshop administration and deliberately does not travel with the plugin
+caches, so nothing a consumer installs or reads changes here.
+
+**Score:** N/A
 
 #### Pull Request
 
 Register this repo's own workflow plugin under dkj-policy@, so check-connectors stops skipping the block
-
