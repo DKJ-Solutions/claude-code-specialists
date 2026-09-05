@@ -32,6 +32,29 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/claude-md-install-record-claim · 20260905-190509
+
+`CLAUDE.md` no longer states that this repo carries an install record as a settled fact. Inbound #1449
+measured the opposite on one machine and cited a precedent (#1371) that, on inspection, measured the
+opposite of what it was cited for too — the record's presence is real but per-machine, and the paragraph
+now says so, rather than asserting either "always present" or "always absent".
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A — internal documentation accuracy, no subscriber of the service is affected.
+
+**Score:** N/A
+
+#### Pull Request
+
+CLAUDE.md states an install record's presence as a fixed repo fact, not a per-machine one
+
+[PR #1459](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1459)
+
+---
+
 ### DEPLOY: feat/1443-gate-lane-knob · 20260905-185207
 
 `open-pr.ps1`, `ship-pr.ps1` and `cut-release.ps1` now take **`-MaxParallel <n>`** and hand it down to the
