@@ -435,6 +435,15 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # The remote-ahead note composer (issue #1450), extracted out of new-branch.ps1 the day
+            # open-pr.ps1 became a second reader of the same question. Mirrored because both callers
+            # are: a consumer running the mirror would otherwise dot-source a file it does not have.
+            Name    = 'remote-ahead-lib'
+            Source  = 'scripts\lib\remote-ahead-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
             Plugin = 'dkj-policy'

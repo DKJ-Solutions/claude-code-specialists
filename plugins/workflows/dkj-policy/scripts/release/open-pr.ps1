@@ -375,6 +375,10 @@ $repo = Get-RepoName
 # not-repo-owned, travels-with-the-payload reasoning as the three libs above.
 . (Join-Path $PSScriptRoot '..\lib\gate-lib.ps1')
 
+# THE REMOTE-AHEAD NOTE COMPOSER (issue #1450), shared with new-branch.ps1 -- see that lib's own header
+# for why this is one definition rather than a second hand-typed copy of it.
+. (Join-Path $PSScriptRoot '..\lib\remote-ahead-lib.ps1')
+
 # WHAT IS BEHIND THE PLAN (issue #1026). park-cycle already takes this measurement, on the device holding
 # the work, and writes it into a commit body -- where the reader who could act on it never looks. open-pr
 # is that reader, and it had no way to ask the question. Same not-repo-owned, travels-with-the-payload
@@ -1269,6 +1273,60 @@ Commit it yourself and run again:
     }
     if ($docCommit.Committed) {
         Write-Host "document commit: committed $($docRels -join ', ') - the PR body, the branch and the CI check now read the same file." -ForegroundColor Green
+    }
+}
+
+# --- Remote-ahead gate: has this branch's own remote head moved since we last saw it? (issue #1450) -
+#
+# THE FOURTH MEASURED INSTANCE OF THE #1439 CLASS, arriving through the one door #1439's own repair
+# cannot reach. That check fires when a session commits to an EXISTING branch, in new-branch.ps1's
+# resume path, and it is asked exactly once, there. A second session can push into the SAME branch
+# afterwards, in the window between that resume and THIS script's own push -- which is precisely what
+# happened on fix/1446-tip-utf8-decode on September 5, 2026: both sessions built the identical repair
+# from the same parked commit, the lint + test gate passed IN FULL on both (68 suites, 136s), and only
+# the git push at the foot of this script told either of them, with `! [rejected] ... (fetch first)`.
+#
+# SO THIS ASKS THE SAME QUESTION AT THE ONE OTHER DOOR: right before the gate that is about to spend
+# minutes proving a tree a non-fast-forward push is going to refuse anyway. open-pr never ran a `git
+# fetch` before this (measured: zero matches in the file) -- its only remote reads before the push are
+# the gh issue/PR lookups above, none of which touch this branch's OWN ref. A single-branch fetch plus
+# one local rev-list answers it in about a second.
+#
+# REUSES new-branch.ps1's OWN WARNING COMPOSITION (Get-RemoteAheadNote, remote-ahead-lib.ps1) rather
+# than a second copy of it -- see that lib's header for why a fork of this particular text is worth
+# refusing on sight.
+#
+# BLOCKS RATHER THAN WARNS, unlike new-branch's use of the same note. new-branch's warning fires at a
+# legitimate fork in the road -- fast-forwarding your OWN autopark from another device is the intended
+# happy path there. Here there is no such path: a push into a branch whose remote head has moved is a
+# non-fast-forward regardless of what this script does next, so running the gate first buys nothing,
+# and fetching first is not optional -- it is what `git push` itself would demand two minutes later, at
+# the most expensive possible point to hear it. Not -Force-able, for the same reason the link and
+# label gates are not: there is no legitimate way to push past a real divergence, only a `git pull`.
+#
+# A FETCH THAT FAILS IS NOT AN ANSWER, the same rule as every other network read in this script: it
+# warns and lets the run continue rather than blocking on a network hiccup the branch itself did not
+# cause. A genuine divergence is still caught at the push below, after the gates -- exactly today's
+# behaviour -- so a failed fetch here costs nothing this script did not already risk.
+$remoteAheadFetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', 'origin', ('+refs/heads/' + $branch + ':refs/remotes/origin/' + $branch)) -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+if ($remoteAheadFetch.ExitCode -ne 0) {
+    Write-Warning "could not fetch origin/$branch before the gates (exit $($remoteAheadFetch.ExitCode)) -- the remote-ahead gate is skipped; a genuine divergence is still caught at the push below, after the gates have already run."
+} else {
+    $remoteAheadNote = Get-RemoteAheadNote -RepoRoot $repoRoot -LocalRef 'HEAD' -RemoteRef "refs/remotes/origin/$branch" -BranchLabel $branch -FreshLabel "origin/$branch" -StaleLabel "origin/$branch" -Fresh $true
+    if ($remoteAheadNote) {
+        Write-Error @"
+remote-ahead gate: $remoteAheadNote
+
+Another session or another device has pushed work to this branch that this checkout does not have --
+nothing pushed, no PR opened, and the gates below did NOT run. Building on top of it would only be
+rejected at the push anyway, after the full lint + test gate had already run and been discarded (the
+fourth measured instance of this, issue #1450).
+
+Fast-forward it and read what is there before trying again:
+
+  git pull --ff-only
+"@
+        exit 1
     }
 }
 

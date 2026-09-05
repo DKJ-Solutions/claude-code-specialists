@@ -243,6 +243,10 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 # it: the lib's own header (the #96/#97/#107 stderr-under-EAP=Stop lesson).
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
+# THE REMOTE-AHEAD NOTE COMPOSER (issue #1450), shared with open-pr.ps1 -- see that lib's own header for
+# why this moved out of here rather than being copied a second time.
+. (Join-Path $PSScriptRoot '..\lib\remote-ahead-lib.ps1')
+
 # The repo-owned fallback type (#410) -- OPTIONAL, unlike branch-info.ps1 above. repo-config.ps1 may
 # be absent (a repo that never needed it) or may fail to load (a syntax error in someone's edit);
 # neither is a reason to stop, because every string it supplies has a working default. So: Test-Path,
@@ -473,57 +477,16 @@ function Write-RemoteAheadRepeat {
 }
 $remoteAheadNote = ''
 if ($branchExists -and $remoteRef.ExitCode -eq 0) {
-    $aheadProbe = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-list', '--count', "refs/heads/$Name..refs/remotes/origin/$Name") -DiscardStderr
-    $ahead = 0
-    if ($aheadProbe.ExitCode -eq 0 -and [int]::TryParse((($aheadProbe.Output -join '').Trim()), [ref]$ahead) -and $ahead -gt 0) {
-        # THE SUBJECT AND THE AUTHOR ARE THE POINT, not the count. 'park: <branch> (all outstanding work)'
-        # by an identity that is not yours says "another session has already built this" in a way that "1
-        # commit behind" never does -- and it is the one line that tells a fast-forward of your own
-        # autopark apart from a collision. Read off the remote-tracking ref, so still no network call.
-        # -Utf8 IS LOAD-BEARING HERE, AND THE STRIP BELOW IS WHY (issue #1446, September 5, 2026).
-        # Without it Windows PowerShell 5.1 decodes git's stdout with [Console]::OutputEncoding, so on a
-        # cp850 console the three UTF-8 bytes of an RTL override (e2 80 ae) arrive as the three ORDINARY
-        # PRINTABLE characters they map to there -- and \p{Cf} does not match an ordinary printable
-        # character, so the sanitiser passes them straight through. The round trip is byte-identical, so
-        # the payload is reconstituted the moment anything downstream decodes as UTF-8: the guard was
-        # green in CI (a UTF-8 console) and silently absent on every default Windows console, which is
-        # the only place it was written for. The output of THIS call is data a matcher inspects
-        # character by character, which is exactly the case Invoke-NativeCapture's docstring reserves
-        # the flag for.
-        $tip = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'log', '-1', '--format=%h %an: %s', "refs/remotes/origin/$Name") -DiscardStderr -Utf8
-        $tipLine = if ($tip.ExitCode -eq 0) { (($tip.Output -join ' ').Trim()) } else { '' }
-        # AND IT IS STRIPPED BEFORE IT IS PRINTED, because it is the one piece of text this script emits
-        # that SOMEBODY ELSE WROTE. %an and %s are free text chosen by whoever pushed that commit.
-        #
-        # THIS IS NEW GROUND HERE AND THE NEIGHBOURING CASE POINTS THE OTHER WAY, which is why it is
-        # argued rather than assumed. new-branch already takes adversarial free text -- a malicious
-        # -Title -- and its rule there is the exact opposite: land FULLY AND UNCHANGED, asserted on an
-        # exact compare, because that text goes into a FILE where truncation is the damage. A console is
-        # not a file. Nothing else in this repo prints externally-authored text to one.
-        #
-        # WHAT GOES, AND WHY NOT QUOTING. Control and format characters: an ANSI or OSC escape in a
-        # commit subject rewrites the terminal it lands in, and an RTL override or a zero-width run can
-        # make the printed line read as something other than what it says -- so the reader is deceived
-        # by the very line that exists to tell them who is on the other side of their branch. This
-        # script's output is also read by an agent session, where a crafted subject wearing this
-        # script's own WARNING prefix is an injection surface rather than a display bug. Quoting would
-        # keep the payload and add noise; the subject only has to be RECOGNISABLE here, so the
-        # characters that carry the attack simply go and the words stay.
-        #
-        # AND IT IS CAPPED. A subject has no length limit, and an unbounded one pushes the half of the
-        # sentence that says what to DO off the screen -- the same failure the repeat below exists to
-        # prevent, arriving from the other direction.
-        $tipLine = (($tipLine -replace '[\p{Cc}\p{Cf}]', ' ') -replace ' {2,}', ' ').Trim()
-        if ($tipLine.Length -gt 120) { $tipLine = $tipLine.Substring(0, 120).TrimEnd() + '...' }
-        # .Fresh SAYS WHICH REF THE COUNT CAME FROM, the same distinction Get-TrunkGap draws for the trunk
-        # and for the same reason: "behind the origin/<branch> this repo last fetched" is a different
-        # sentence from "behind origin/<branch>", and a reader who is offline has to be told which one
-        # they got. Here it is doubly worth saying, because a failed fetch is the one case where this
-        # check can read 0 on a branch that has genuinely moved.
-        $seenRef = if ($gap.Fresh) { "origin/$Name" } else { "the origin/$Name this repo last fetched (git fetch failed -- the real gap may be larger)" }
-        $remoteAheadNote = "'$Name' is $ahead commit(s) behind $seenRef"
-        if ($tipLine) { $remoteAheadNote += ", whose tip is: $tipLine" }
-        $remoteAheadNote += '.'
+    # .Fresh SAYS WHICH REF THE COUNT CAME FROM, the same distinction Get-TrunkGap draws for the trunk and
+    # for the same reason: "behind the origin/<branch> this repo last fetched" is a different sentence from
+    # "behind origin/<branch>", and a reader who is offline has to be told which one they got. Here it is
+    # doubly worth saying, because a failed fetch is the one case where this check can read 0 on a branch
+    # that has genuinely moved. The composition itself -- the rev-list count, the tip's subject and author,
+    # sanitised and capped -- is Get-RemoteAheadNote's (remote-ahead-lib.ps1), shared with open-pr.ps1's own
+    # remote-ahead gate rather than duplicated a second time (issue #1450).
+    $staleRemoteLabel = "the origin/$Name this repo last fetched (git fetch failed -- the real gap may be larger)"
+    $remoteAheadNote = Get-RemoteAheadNote -RepoRoot $repoRoot -LocalRef "refs/heads/$Name" -RemoteRef "refs/remotes/origin/$Name" -BranchLabel $Name -FreshLabel "origin/$Name" -StaleLabel $staleRemoteLabel -Fresh $gap.Fresh
+    if ($remoteAheadNote) {
         Write-Warning "$remoteAheadNote Another session or another device has pushed work to this branch that this checkout does not have -- read it before you build on top of it."
     }
 }
