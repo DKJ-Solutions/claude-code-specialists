@@ -94,12 +94,24 @@ pre-existing instance of the same defect was found and repaired -- see TEST.
 - [x] `check-plugin-integrity.ps1` -- 0 errors. It found the whole dead-link set for me: 34 of them, all
       inside the release archive, which is what established that #886 had repointed archive LINK TARGETS
       while leaving archive PROSE alone. Same treatment applied here.
-- [x] the 35 suites this rename can reach, run first because the full set is ~59 minutes serially and
-      `open-pr`'s own gate runs all 68 immediately after -- measuring the same thing twice is the one thing
-      that buys nothing. Five failed and all five were the same shape, an assertion the sweep had moved
-      under a rule it was not covered by: `branch-document-path`, `entry-scaffold`, `config-blueprint`,
-      `teardown` and `bootstrap-drift`, each green again and the first two carrying new asserts for the
-      `ContribFolder*` generation.
+- [x] the 35 suites this rename can reach, run first because the full set is ~59 minutes serially.
+      Five failed and all five were the same shape, an assertion the sweep had moved under a rule it was
+      not covered by: `branch-document-path`, `entry-scaffold`, `config-blueprint`, `teardown` and
+      `bootstrap-drift`, each green again and the first two carrying new asserts for the `ContribFolder*`
+      generation.
+- [x] then all 68, twice. The first pass went through `open-pr`'s own gate and passed in 716s on 16 lanes.
+      A second branch merged to `main` in the meantime, so the PR went CONFLICTING -- and a conflicting PR
+      gets no check suite at all, which `ship-pr` diagnosed itself and refused on. `origin/main` merged in,
+      one conflict resolved in `new-branch/SKILL.md` (#1439's new paragraph against this branch's rename on
+      the line below it, both kept).
+- [x] the re-run after that merge, and it is worth naming HOW it ran because the escape valve is on the
+      push: `open-pr`'s gate was killed twice by the machine running out of memory, at its default
+      `ProcessorCount - 2` = 16 lanes. `Invoke-TestSuiteGate -MaxParallel 4` is the same function `open-pr`
+      calls, on the same 68 suites -- **all 68 passed in 888s (4 lanes), 0 failures** -- and the push then
+      ran `open-pr -SkipTests`. Nothing was skipped except the second measurement of what had just been
+      measured. Filed as [#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443):
+      `open-pr` exposes no knob for this while the function under it does, so the only route past an OOM is
+      the switch that skips the measurement rather than the one that shrinks it.
 - [x] a pre-existing instance of the #952 defect, found because this branch walked over it:
       `INSTALL.md`'s retired-id table said `specialists-contributing-davekjohn@claude-code-specialists`.
       No such id ever existed -- #886 swept the historical `specialists-workflow-davekjohn` when it
