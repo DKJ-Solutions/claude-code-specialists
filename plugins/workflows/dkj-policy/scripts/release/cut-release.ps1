@@ -166,6 +166,19 @@
     other. The suites run BEFORE anything is written, so skipping them means a release can be committed and
     tagged on main while a suite is red.
 
+.PARAMETER MaxParallel
+    How many test suites the gate above runs at once. 0 (the default) leaves the resolution to
+    Invoke-TestSuiteGate exactly as before, so passing nothing is byte-identical to the behaviour this
+    parameter was added to.
+
+    IT MATTERS MOST HERE, of the three callers that got it in issue #1443 (September 5, 2026). The other
+    two open a PR, and a PR that does not open costs a retry. This one commits and tags on main -- and the
+    sentence directly above is the reason the alternative is unacceptable: -SkipTests means a release can
+    be cut while a suite is red. So a gate that will not FINISH must not be answered by skipping it. Run
+    it smaller: measured on an 18-core machine, the default's 16 lanes were killed twice for running out
+    of memory where -MaxParallel 4 passed the same 68 suites in 888s against 716s. open-pr.ps1's own
+    .PARAMETER MaxParallel carries the rest of the numbers.
+
 .PARAMETER SkipSignificanceGate
     Cut even though a pending tier-1-or-higher entry has not declared how much it weighs (issue #467).
     The score orders the release documents, so without it an entry cannot be placed; the gate refuses
@@ -229,7 +242,9 @@ param(
     [switch]$SkipLint,
     [switch]$SkipTests,
     [switch]$SkipTierGate,
-    [switch]$SkipSignificanceGate
+    [switch]$SkipSignificanceGate,
+    # Lanes for the test gate; 0 keeps Invoke-TestSuiteGate's own default. See .PARAMETER MaxParallel.
+    [int]$MaxParallel = 0
 )
 $ErrorActionPreference = 'Stop'
 
@@ -907,7 +922,7 @@ if (-not $SkipLint) {
 # Shares Invoke-TestSuiteGate with open-pr.ps1 rather than repeating its loop -- one owner, so the two
 # gates cannot drift into checking different things.
 if (-not $SkipTests) {
-    if (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the release')) {
+    if (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $repoRoot 'scripts\tests') -Context 'the release' -MaxParallel $MaxParallel)) {
         Write-Error "test gate found failing suites -- release aborted, nothing written. Fix the tests, or run with -SkipTests to cut without them."
         exit 1
     }
