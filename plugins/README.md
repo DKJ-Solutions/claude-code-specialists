@@ -16,8 +16,8 @@ each of the four teams the same `dkj-` prefix. The distinction this page is orga
 What changed is who the directory says the plugins belong to — and that is not decoration: a plugin
 published from **anybody else's** marketplace can now be called `team-*` or `workflow-*` without colliding
 with a name this repo has claimed, which is exactly why the
-[`[plugin-kind]` check](../scripts/lint/check-plugin-integrity.ps1) holds only the `dkj-`-prefixed shapes to
-a directory and lets the bare ones through on name alone.
+[`[plugin-kind]` check](../scripts/lint/check-plugin-integrity.ps1) holds `dkj-team-*` and the policy
+shapes to a directory and lets a bare `team-*` or `workflow-*` through on its name alone.
 
 ## The difference, side by side
 
@@ -65,8 +65,10 @@ first, and nobody reads both pages in one sitting.
 ## The two rules that guard the split, and where they are checked
 
 - **A plugin's name says which kind it is, and where a name claims a directory it must sit there.** Two
-  shapes claim one: `team-*` claims `plugins/dkj-teams/`, and `*-policy` / `*-policy-*` claim
-  `plugins/dkj-policy/`. Lint
+  shapes claim one: `dkj-team-*` claims `plugins/dkj-teams/`, and `*-policy` / `*-policy-*` claim
+  `plugins/dkj-policy/`. Bare `team-*`, `workflow-*`, `contributing-*` and `*-codex` are recognised as
+  names and claim no directory — they are what a plugin from **outside** this family is called, and
+  sending one into this family's tree is worse than saying nothing about it. Lint
   check 23 (`[plugin-kind]`) in
   [`../scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) holds
   every published plugin to both halves. The naming half is the load-bearing one, and since

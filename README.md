@@ -182,19 +182,26 @@ these — nothing counts them, so adding one means making this call again on the
 **The naming rule outlived the count that justified it, on a reason of its own.** Lint check 23
 (`[plugin-kind]`) in [`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds every
 published plugin to being a team or a way of working **by name**, and holds two of those name shapes to a
-directory as well: `team-*` under `plugins/dkj-teams/`, and `*-policy` / `*-policy-*` under
+directory as well: `dkj-team-*` under `plugins/dkj-teams/`, and `*-policy` / `*-policy-*` under
 `plugins/dkj-policy/`. It used to say the hook counted a workflow by
 the `workflow-` prefix and nothing else; now the teeth are internal — **the directory half is derived
 from the name**, so a plugin matching none of those shapes has its location held against nothing at all,
 and an unclassifiable name switches the check off for itself.
 
-**Since [#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) the remaining three
+**Since [#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) the remaining
 shapes — `workflow-*`, `contributing-*`, `*-codex` — are accepted by name and held to no location, and
 that is a real narrowing.** `plugins/workflows/` used to name the *kind*; it is `plugins/dkj-policy/` now
 and names the **government**, so there is no directory left to send a stranger's `workflow-*` plugin to.
 Ordering one into this government would be worse than saying nothing, and refusing the name outright
 would make this family's renames somebody else's problem — so the shapes stay recognised and lose only
 their directory half.
+
+**[#1480](https://github.com/DaveKJohn/claude-code-specialists/issues/1480) applied that same reading to
+the team side, where it had not reached.** Bare `team-*` joined the name-only group when this family's own
+teams took the `dkj-` prefix: a prefixless `team-*` is now precisely what *somebody else's* team is called,
+and `dkj-team-*` carries the directory rule in its place. The alternative — keeping `team-*` pointed at
+`plugins/dkj-teams/` and adding `dkj-team-*` beside it — costs nothing until the day a stranger publishes
+a plugin named `team-something`, which is the one case the rule is there for.
 
 | Plugin | What it is | Who it's for |
 |---|---|---|
