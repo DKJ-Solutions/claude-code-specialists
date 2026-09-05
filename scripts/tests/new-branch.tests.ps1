@@ -43,6 +43,10 @@ $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # The changelog seam, which new-branch reads since inbound #967 to state the right link base in the guidance
 # it writes. It arrives with the plugin in a real consumer; a hand-built fixture has to be handed it.
 $SeamLibSrc       = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
+# The already-done check's pure half (#1409) -- ConvertTo-IssueNumberList and Get-TargetIssueWarnings,
+# which -Resolves below runs against. Without it in the fixture, every -Resolves case here dies on a
+# raw path-not-found instead of testing anything, exactly like the entry-scaffold lib above.
+$PrIssuesLibSrc   = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
 # Direct Test-BranchName calls (separate from the CLI) for the empty/whitespace-only case --
 # PowerShell's mandatory-param binding catches an empty -Name via the CLI with a generic error, so
 # the exact Reason text can only be tested directly.
@@ -199,6 +203,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')               -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')      -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')                -Force
+    Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')           -Force
 
     $prevEap = $ErrorActionPreference
     try {
@@ -241,6 +246,22 @@ function New-BareOrigin {
         & git -C $Dir remote add origin $bare 2>$null | Out-Null
     } finally { $ErrorActionPreference = $prevEap }
     return $bare
+}
+
+function Add-FixtureRepoConfig {
+    <#
+        Writes scripts\repo-config.ps1 into $Dir with a fixed Get-RepoName -- the seam the already-done
+        check (#1409) reads before it asks gh anything. Every other fixture in this file has no such
+        file, which is deliberate: it is what exercises the SKIP path (no Get-RepoName, so the check
+        never calls gh at all). Only the cases that need the check to actually run call this first.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Dir,
+        [Parameter(Mandatory = $true)][string]$RepoName
+    )
+    New-Item -ItemType Directory -Path (Join-Path $Dir 'scripts') -Force | Out-Null
+    $body = "function Get-RepoName { '$RepoName' }`n"
+    [System.IO.File]::WriteAllText((Join-Path $Dir 'scripts\repo-config.ps1'), $body, (New-Object System.Text.UTF8Encoding $false))
 }
 
 function Publish-FixtureTrunk {
@@ -380,7 +401,10 @@ function Invoke-NewBranch {
         # The valve on the stale-base refusal (#1417). Only the fixtures that DELIBERATELY cut from a
         # base behind origin pass it -- every other fixture here has no origin/main to be behind, so the
         # question is never asked and the switch would assert nothing.
-        [switch]$SkipStaleBase
+        [switch]$SkipStaleBase,
+        # The already-done check's own input (#1409). Only the (x) fixtures below pass it -- every
+        # other fixture here is exercising something else and would have nothing to assert about it.
+        [string]$Resolves
     )
     $scriptPath = Join-Path $Dir 'scripts\task\new-branch.ps1'
     $callArgs = @('-Name', $Name)
@@ -389,6 +413,7 @@ function Invoke-NewBranch {
     if ($Park)   { $callArgs += '-Park' }
     if ($NoPush) { $callArgs += '-NoPush' }
     if ($SkipStaleBase) { $callArgs += '-SkipStaleBase' }
+    if ($PSBoundParameters.ContainsKey('Resolves')) { $callArgs += @('-Resolves', $Resolves) }
 
     $prevPd  = $env:CLAUDE_PROJECT_DIR
     $prevEap = $ErrorActionPreference
@@ -1390,6 +1415,165 @@ Write-Output `$t.Type
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'already existed -- checked out') 'local resume: reports the resume'
     Assert-True (-not (Test-Phrase -Text $rW2.Out -Phrase 'behind origin/main')) 'local resume: and is NOT handed the trunk gap under the branch name'
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'Base not compared') 'local resume: says why the base was not compared'
+
+    # --- (x) THE ALREADY-DONE CHECK: -RESOLVES WARNS BEFORE THE CHECKOUT, NEVER REFUSES (#1409) --------
+    # SAME SHAPE AS (s)/(s2)/(t) ABOVE, ONE LAYER IN: a base gone stale and an issue already resolved are
+    # both "work already happened somewhere this checkout cannot see", and #1409 is #1046's own report
+    # filed against the OTHER half of that sentence. Positive cases assert the warning fires and is said
+    # TWICE (the same repeat convention as (s2)); the negative cases (x1, x3, x7, x8) assert silence, so
+    # the check cannot become noise on the overwhelming majority of runs that never pass -Resolves at all.
+    #
+    # A FAKE gh ON PATH, not the pr-issues-lib unit tests' fixture -- this suite exists to prove the
+    # WIRING in new-branch.ps1 (which JSON it asks gh for, under which repo name, before which line),
+    # not to re-derive Get-TargetIssueWarnings' own logic, which scripts/tests/pr-issues.tests.ps1 already
+    # owns. Same fake-gh-on-PATH shape as verify-resolved-issues.tests.ps1, scoped to just this section
+    # with its own try/finally so a PATH/env mutation here cannot leak into any fixture above or below it.
+    Write-Host "new-branch.ps1 -- -Resolves warns before the checkout when the target issue is already done (#1409)" -ForegroundColor Cyan
+
+    $xBin     = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-test-$PID-x-bin"
+    $xCallLog = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-test-$PID-x-calls.log"
+    $prevPathX = $env:PATH
+    try {
+        New-Item -ItemType Directory -Path $xBin -Force | Out-Null
+        # Records every call (one line per invocation) and answers:
+        #   issue list -> a JSON array of {"number":N} for each id in GH_OPEN_ISSUES (or fails under
+        #                 GH_FAIL_ISSUE_LIST)
+        #   pr list    -> the raw JSON in GH_PR_LIST_JSON, '[]' by default (or fails under GH_FAIL_PR_LIST)
+        $xGhImpl = @'
+if ($env:GH_CALL_LOG) { Add-Content -Path $env:GH_CALL_LOG -Value ($args -join ' ') }
+if ($args -contains 'issue' -and $args -contains 'list') {
+    if ($env:GH_FAIL_ISSUE_LIST) { [Console]::Error.WriteLine('fake gh: issue list failed'); exit 1 }
+    $nums = @()
+    if ($env:GH_OPEN_ISSUES) { $nums = $env:GH_OPEN_ISSUES -split ',' }
+    $items = @($nums | Where-Object { $_ } | ForEach-Object { "{`"number`":$_}" }) -join ','
+    Write-Output "[$items]"
+    exit 0
+}
+if ($args -contains 'pr' -and $args -contains 'list') {
+    if ($env:GH_FAIL_PR_LIST) { [Console]::Error.WriteLine('fake gh: pr list failed'); exit 1 }
+    if ($env:GH_PR_LIST_JSON) { Write-Output $env:GH_PR_LIST_JSON } else { Write-Output '[]' }
+    exit 0
+}
+exit 1
+'@
+        $xUtf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText((Join-Path $xBin 'gh-impl.ps1'), $xGhImpl, $xUtf8NoBom)
+        $xGhCmd = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0gh-impl.ps1`" %*`r`nexit /b %ERRORLEVEL%`r`n"
+        [System.IO.File]::WriteAllText((Join-Path $xBin 'gh.cmd'), $xGhCmd, $xUtf8NoBom)
+        $env:PATH = "$xBin;$env:PATH"
+
+        function Invoke-NewBranchX {
+            <# Invoke-NewBranch plus a fresh call log and the env vars the fake gh above reads, reset
+               before every case so one case's gh answers cannot leak into the next. #>
+            param(
+                [Parameter(Mandatory = $true)][string]$Dir,
+                [Parameter(Mandatory = $true)][string]$Name,
+                [Parameter(Mandatory = $true)][string]$Resolves,
+                [string]$OpenIssues = '',
+                [string]$PrListJson = '',
+                [switch]$FailIssueList,
+                [switch]$FailPrList
+            )
+            Remove-Item -Path $xCallLog -Force -ErrorAction SilentlyContinue
+            $env:GH_CALL_LOG = $xCallLog
+            $env:GH_OPEN_ISSUES = $OpenIssues
+            $env:GH_PR_LIST_JSON = $PrListJson
+            if ($FailIssueList) { $env:GH_FAIL_ISSUE_LIST = '1' } else { Remove-Item Env:\GH_FAIL_ISSUE_LIST -ErrorAction SilentlyContinue }
+            if ($FailPrList) { $env:GH_FAIL_PR_LIST = '1' } else { Remove-Item Env:\GH_FAIL_PR_LIST -ErrorAction SilentlyContinue }
+            $r = Invoke-NewBranch -Dir $Dir -Name $Name -Title 'Fix something' -Resolves $Resolves
+            $log = if (Test-Path -LiteralPath $xCallLog) { Get-Content -Path $xCallLog } else { @() }
+            return [pscustomobject]@{ Code = $r.Code; Out = $r.Out; Log = @($log) }
+        }
+
+        # (x1) -Resolves OMITTED ENTIRELY: the ordinary run, which is the overwhelming majority of calls.
+        # No repo-config.ps1 in this fixture either, so a stray call would hard-fail rather than pass
+        # silently -- this asserts the check does not even try.
+        $fixX1 = New-Fixture -Label 'x1'
+        $rX1 = Invoke-NewBranch -Dir $fixX1 -Name 'feat/plain-cut'
+        Assert-Equal 0 $rX1.Code '-Resolves omitted: exits 0'
+        Assert-True (-not (Test-Phrase -Text $rX1.Out -Phrase 'already-done check')) '-Resolves omitted: the check never runs at all'
+
+        # (x2) -Resolves GIVEN, NO Get-RepoName (no scripts\repo-config.ps1 in this fixture, same as
+        # every fixture above it) -- the offline/no-seam skip path, gh never on PATH for it either.
+        $fixX2 = New-Fixture -Label 'x2'
+        $prevPathX2 = $env:PATH
+        try {
+            $env:PATH = $prevPathX  # no fake gh: a call here would be a real bug, not a stubbed answer
+            $rX2 = Invoke-NewBranch -Dir $fixX2 -Name 'fix/1409-something' -Resolves '1409'
+        } finally { $env:PATH = $prevPathX2 }
+        Assert-Equal 0 $rX2.Code '-Resolves, no Get-RepoName: exits 0 -- the missing seam never blocks'
+        Assert-True (Test-Phrase -Text $rX2.Out -Phrase 'Get-RepoName') '-Resolves, no Get-RepoName: names the missing seam'
+        Assert-True (Test-Phrase -Text $rX2.Out -Phrase 'the check for #1409 is skipped') '-Resolves, no Get-RepoName: and says the check is skipped'
+        $branchesX2 = ((& git -C $fixX2 branch --list 'fix/1409-something') -join '').Trim()
+        Assert-True ([bool]$branchesX2) '-Resolves, no Get-RepoName: the branch is still created -- the missing seam is not a refusal'
+
+        # (x3) THE NEGATIVE CONTROL: Get-RepoName answers, gh answers, the target issue is genuinely open
+        # and unclaimed -- silence, exactly like (t)'s current-base case. Without this, (x4)-(x6) below
+        # would only prove the check can say something, never that it stays quiet when there is nothing to say.
+        $fixX3 = New-Fixture -Label 'x3'
+        Add-FixtureRepoConfig -Dir $fixX3 -RepoName 'fake/repo'
+        $rX3 = Invoke-NewBranchX -Dir $fixX3 -Name 'fix/1409-something' -Resolves '1409' -OpenIssues '1409'
+        Assert-Equal 0 $rX3.Code 'open and unclaimed: exits 0'
+        Assert-True (-not (Test-Phrase -Text $rX3.Out -Phrase 'already-done check:')) 'open and unclaimed: nothing to warn about'
+        Assert-True (($rX3.Log | Where-Object { $_ -match [regex]::Escape('issue list --repo fake/repo --state open --limit 1000') }).Count -eq 1) 'open and unclaimed: asked gh under the configured repo name, once'
+        Assert-True (($rX3.Log | Where-Object { $_ -match [regex]::Escape('pr list --repo fake/repo') -and $_ -match [regex]::Escape('--search 1409 in:body') }).Count -eq 1) 'open and unclaimed: and searched PR bodies for the exact issue number'
+
+        # (x4) THE ISSUE IS ALREADY CLOSED -- warned, twice, and NOT refused (#1282's own call: a shared
+        # number or a reopened issue must not wedge a real branch).
+        $fixX4 = New-Fixture -Label 'x4'
+        Add-FixtureRepoConfig -Dir $fixX4 -RepoName 'fake/repo'
+        $rX4 = Invoke-NewBranchX -Dir $fixX4 -Name 'fix/1409-something' -Resolves '1409' -OpenIssues '9999'
+        Assert-Equal 0 $rX4.Code 'issue already closed: exits 0 -- warned, never refused'
+        Assert-True (Test-Phrase -Text $rX4.Out -Phrase 'already-done check: issue #1409 is already CLOSED') 'issue already closed: names the issue and the state'
+        $flatX4 = Get-FlatOutput $rX4.Out
+        $hitsX4 = @([regex]::Matches($flatX4, [regex]::Escape((Get-Squeezed 'issue #1409 is already CLOSED')))).Count
+        Assert-Equal 2 $hitsX4 'issue already closed: said twice -- once before the checkout, once as the last line'
+        $branchesX4 = ((& git -C $fixX4 branch --list 'fix/1409-something') -join '').Trim()
+        Assert-True ([bool]$branchesX4) 'issue already closed: the branch is still created'
+
+        # (x5) THE ISSUE IS STILL OPEN, BUT ANOTHER PR ALREADY CLOSES IT -- #1282's own scenario, caught
+        # here instead of at open-pr time.
+        $fixX5 = New-Fixture -Label 'x5'
+        Add-FixtureRepoConfig -Dir $fixX5 -RepoName 'fake/repo'
+        $prJsonX5 = '[{"number":1406,"state":"MERGED","headRefName":"fix/1402-something","body":"Closes #1409"}]'
+        $rX5 = Invoke-NewBranchX -Dir $fixX5 -Name 'fix/1409-something-else' -Resolves '1409' -OpenIssues '1409' -PrListJson $prJsonX5
+        Assert-Equal 0 $rX5.Code 'issue claimed by a rival PR: exits 0'
+        Assert-True (Test-Phrase -Text $rX5.Out -Phrase 'already-done check: issue #1409 is already resolved by PR #1406 (merged)') 'issue claimed by a rival PR: names the PR and its state'
+
+        # (x6) TWO ISSUES, ONLY ONE OF THEM DONE -- ConvertTo-IssueNumberList's own parsing (comma list),
+        # and proof the still-open one is not swept along into the same sentence.
+        $fixX6 = New-Fixture -Label 'x6'
+        Add-FixtureRepoConfig -Dir $fixX6 -RepoName 'fake/repo'
+        $rX6 = Invoke-NewBranchX -Dir $fixX6 -Name 'fix/1409-and-1410' -Resolves '1409,1410' -OpenIssues '1410'
+        Assert-True (Test-Phrase -Text $rX6.Out -Phrase 'issue #1409 is already CLOSED') 'two issues, one done: names the closed one'
+        Assert-True (-not (Test-Phrase -Text $rX6.Out -Phrase '#1410 is already')) 'two issues, one done: and says nothing about the still-open one'
+        Assert-True (($rX6.Log | Where-Object { $_ -match [regex]::Escape('--search 1409 OR 1410 in:body') }).Count -eq 1) 'two issues, one done: both numbers went into one PR search'
+
+        # (x7) gh CANNOT SAY WHICH ISSUES ARE OPEN -- warns about the blind spot and does not block. The
+        # PR search still runs and (with no claim in it) the run stays silent beyond that one warning.
+        $fixX7 = New-Fixture -Label 'x7'
+        Add-FixtureRepoConfig -Dir $fixX7 -RepoName 'fake/repo'
+        $rX7 = Invoke-NewBranchX -Dir $fixX7 -Name 'fix/1409-blind' -Resolves '1409' -FailIssueList
+        Assert-Equal 0 $rX7.Code 'gh issue list unreadable: exits 0 -- a merged-elsewhere check must not read as failed'
+        Assert-True (Test-Phrase -Text $rX7.Out -Phrase 'could not ask gh which issues are open') 'gh issue list unreadable: warns about the blind spot'
+        Assert-True (-not (Test-Phrase -Text $rX7.Out -Phrase 'already-done check:')) 'gh issue list unreadable: and reports nothing it could not actually determine'
+
+        # (x8) THE MIRROR CASE: the PR search itself is unreadable -- the check still runs on issue
+        # state alone rather than failing outright.
+        $fixX8 = New-Fixture -Label 'x8'
+        Add-FixtureRepoConfig -Dir $fixX8 -RepoName 'fake/repo'
+        $rX8 = Invoke-NewBranchX -Dir $fixX8 -Name 'fix/1409-blind-pr' -Resolves '1409' -OpenIssues '9999' -FailPrList
+        Assert-Equal 0 $rX8.Code 'gh pr list unreadable: exits 0'
+        Assert-True (Test-Phrase -Text $rX8.Out -Phrase 'could not ask gh whether another PR already resolves') 'gh pr list unreadable: warns about the blind spot'
+        Assert-True (Test-Phrase -Text $rX8.Out -Phrase 'issue #1409 is already CLOSED') 'gh pr list unreadable: and still reports what issue state alone could determine'
+    } finally {
+        $env:PATH = $prevPathX
+        'GH_CALL_LOG', 'GH_OPEN_ISSUES', 'GH_PR_LIST_JSON', 'GH_FAIL_ISSUE_LIST', 'GH_FAIL_PR_LIST' | ForEach-Object {
+            Remove-Item "Env:\$_" -ErrorAction SilentlyContinue
+        }
+        Remove-Item -Path $xBin -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $xCallLog -Force -ErrorAction SilentlyContinue
+    }
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

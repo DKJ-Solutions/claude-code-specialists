@@ -114,6 +114,44 @@ the remote-tracking ref is read first, which is what keeps the script usable off
 a repo that cannot answer. In a lane worktree (detached at `origin/<trunk>`) it reads 0, so the route that
 already handles this hazard is never warned about.
 
+## The already-done check (issue #1409)
+
+`open-pr` already warns when the issue a PR declares turns out to be closed, or claimed by a rival PR
+(`Get-TargetIssueWarnings`, from #1282) -- but that is the LAST step of a branch's life, after the
+checkout, the commits, the reviews and the test runs. #1409 measured what that costs: a branch was cut
+to fix an issue claimed correctly (open, unassigned, claimed by name), and only `open-pr` -- after two
+commits, a full development document, two subagent reviews and 65 test suites -- reported that a rival
+PR had already closed it seven minutes after the claim. The claim step cannot catch this either: the
+other session never assigned itself, so the issue read as untouched rather than as someone else's live
+work.
+
+**`-Resolves "<n[,n...]>"`** runs the same check here, before the checkout, so the same duplicate is
+caught before any of that cost is paid:
+
+| what it reads | what it does |
+|---|---|
+| the target issue is CLOSED, or another open/merged PR already carries a closing keyword for it | **warns**, naming the issue and what it found -- twice, once before the checkout and once as the last line of the run |
+| the target issue is open and unclaimed | nothing -- silence, same as the base check above when there is nothing to say |
+| `scripts/repo-config.ps1` supplies no `Get-RepoName` | one line saying the check is skipped -- `gh` is never called |
+
+**It warns and never refuses**, for the same reason #1282 chose that shape at `open-pr`: a shared
+number, a reopened issue, or a rival PR abandoned mid-flight must not wedge a real branch.
+
+**It narrows the window rather than closing it.** It only ever sees what `-Resolves` is given here --
+an issue decided later, or only named in `-Intent` text, is invisible to it, because there is no PR
+body yet to scan. This is a **separate declaration** from `open-pr`'s own `-Resolves`: that gate
+answers a different question (does the PR body declare what it closes) at a different time (once the
+PR exists) -- passing one here says nothing to the other, and both are typed independently.
+
+**`gh` is optional, and this is the only place on this page that asks for it.** It is asked for only
+once `-Resolves` is given -- the ordinary run, with no issue number, asks nothing of `gh` and stays
+exactly as usable offline as the rest of this script.
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/new-branch.ps1" `
+  -Name "fix/1402-something" -Title "Fix something" -Resolves 1402
+```
+
 ## Resuming a branch that exists only on `origin` (issue #1139)
 
 **A parked branch IS this workflow's cross-device handoff**, which is what makes this more than an

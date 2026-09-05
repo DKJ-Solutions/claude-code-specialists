@@ -42,6 +42,10 @@ $SeamLibSrc      = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 $OpenPrSrc       = Join-Path $RepoRoot 'scripts\release\open-pr.ps1'
+# THE ALREADY-DONE CHECK'S PURE HALF (#1409). new-branch.ps1 dot-sources this unconditionally now, same
+# as the two above -- a fixture missing it dies before the document is written, exactly as it did for
+# native-capture-lib.ps1 above until #1046 caught it.
+$PrIssuesLibSrc  = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -186,6 +190,7 @@ Copy-Item -LiteralPath $LibSrc -Destination (Join-Path $fixture 'scripts\lib\ent
 Copy-Item -LiteralPath $SeamLibSrc -Destination (Join-Path $fixture 'scripts\lib\seam-lib.ps1') -Force
 Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $fixture 'scripts\lib\native-capture-lib.ps1') -Force
 Copy-Item -LiteralPath $ParkLibSrc -Destination (Join-Path $fixture 'scripts\lib\park-lib.ps1') -Force
+Copy-Item -LiteralPath $PrIssuesLibSrc -Destination (Join-Path $fixture 'scripts\lib\pr-issues-lib.ps1') -Force
 $prevEap = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'
