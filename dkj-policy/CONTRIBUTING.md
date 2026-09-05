@@ -340,6 +340,15 @@ Dave's word, and for why the default is that they do not.
 On an error or a failing suite **nothing is pushed and no PR is opened** — `-SkipLint` / `-SkipTests` are the
 escape valves, and using one is a decision rather than a convenience.
 
+**A gate that will not *finish* is a third case, and `-SkipTests` is the wrong answer to it**
+([#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443), September 5, 2026). The test
+gate runs the suites in parallel and works the lane count out from the core count; on this machine that is 16
+lanes, and the harness killed two runs of it for running out of memory. `-MaxParallel <n>` — on `open-pr.ps1`
+and forwarded by `ship-pr.ps1` — runs them **smaller** instead of not at all, so the branch still carries a
+measurement. `-MaxParallel 4` passed the same 68 suites in 888s against the default's 716s: 24% slower, and
+it finishes. The numbers, and why the default was deliberately left alone, are on the
+[`open-pr` skill page](../plugins/workflows/dkj-policy/skills/open-pr/SKILL.md#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
+
 Its own number because the three gates below fire *here*, at the push, and because what it publishes is fixed
 at this moment: 3.2 is what it puts in the body, and 3.2.4 locks that body against later edits to the
 document.

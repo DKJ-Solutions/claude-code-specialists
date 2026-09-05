@@ -2,7 +2,7 @@
 
 Releases in this repo are cut by the shared release workflow: the tier model, what a release must earn,
 the release documents, and how one is cut. **That process is not this repo's own** — it is what the
-`contributing-davekjohn` plugin does, in every repo that enables it, and it is described once, with the plugin:
+`dkj-policy` plugin does, in every repo that enables it, and it is described once, with the plugin:
 
 📄 **[Releases — the portable half](../../plugins/workflows/dkj-policy/RELEASES-portable.md)**
 
@@ -48,12 +48,12 @@ measurement lives.
 > is none any more. The process ships with the plugin as
 > [`RELEASES-portable.md`](../../plugins/workflows/dkj-policy/RELEASES-portable.md) and stays current
 > through plugin updates, which is exactly what a hand-maintained mirror cannot do (two consumers measured
-> that cost before this split — inbound #646). Your own `contributing-davekjohn/releases/README.md` (the
+> that cost before this split — inbound #646). Your own `dkj-policy/releases/README.md` (the
 > `adopt-workflow-folder` skill scaffolds it) holds only what this section holds: a pointer to the
 > portable page, your seam values and your local decisions.
 >
 > **Your release list does not go on this page — it goes beside it**, in
-> `contributing-davekjohn/releases/history.md`, which is where `Get-ReleaseHistoryPath` already points if you
+> `dkj-policy/releases/history.md`, which is where `Get-ReleaseHistoryPath` already points if you
 > leave it alone (issue #885). The two are separate documents at the same address, which is exactly why the
 > list is not called `README.md`. If you have been cutting releases into a `releases/README.md` at your repo
 > root, that is a **layout rather than a mistake** — repoint the seam at it and keep one list, or leave the

@@ -32,6 +32,118 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1454-releases-readme-folder-name · 20260905-191304
+
+`releases/README.md` told an agent setting this workflow up in another repo that the plugin is called
+`contributing-davekjohn`, that the `adopt-workflow-folder` skill scaffolds a
+`contributing-davekjohn/releases/README.md`, and that `Get-ReleaseHistoryPath` points at a
+`contributing-davekjohn/releases/history.md` if left alone. All three are false, and false in the same
+direction: a fresh consumer has none of the three folder names on disk, so every script hands them
+`dkj-policy` while this page addressed them in the second person about a folder they do not have.
+
+#1437 renamed the folder and #1447 covers the two `releases/page/` statements it left behind. These
+three were scoped out of that branch because #1447 states its own bound -- and one of them is not a
+folder-rename miss at all: line 5 names the **plugin**, which was never called `contributing-davekjohn`.
+
+Three sentences rewritten. The dated sentences around them keep the name they were written with, and
+lines 137 and 143 are left for #1447.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The section these three sit in is `### How to build your own version of this page` -- the one document
+that exists to answer *"what does this look like in my repo"*, addressed in the second person to a
+consumer adopting the workflow. That is the worst place in the tree for a stale name, because the
+reader has nothing of their own to check it against yet.
+
+**Score:** 3
+
+#### Pull Request
+
+Correct three present-tense contributing-davekjohn references in the releases README
+
+[PR #1458](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1458)
+
+---
+
+### DEPLOY: fix/claude-md-install-record-claim · 20260905-190509
+
+`CLAUDE.md` no longer states that this repo carries an install record as a settled fact. Inbound #1449
+measured the opposite on one machine and cited a precedent (#1371) that, on inspection, measured the
+opposite of what it was cited for too — the record's presence is real but per-machine, and the paragraph
+now says so, rather than asserting either "always present" or "always absent".
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A — internal documentation accuracy, no subscriber of the service is affected.
+
+**Score:** N/A
+
+#### Pull Request
+
+CLAUDE.md states an install record's presence as a fixed repo fact, not a per-machine one
+
+[PR #1459](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1459)
+
+---
+
+### DEPLOY: feat/1443-gate-lane-knob · 20260905-185207
+
+`open-pr.ps1`, `ship-pr.ps1` and `cut-release.ps1` now take **`-MaxParallel <n>`** and hand it down to the
+test gate, so a gate that will not *finish* can be run **smaller** instead of not at all. `0` -- the
+default -- resolves exactly where it always did, inside `Invoke-TestSuiteGate`, so an ordinary run is
+unchanged.
+
+The parameter has existed at the bottom of the chain since the gate was written, and `ci.yml` passes it.
+What was missing was every hop above it: `Invoke-WorkflowGates` sat between the two PR scripts and the gate
+without carrying it, and `cut-release` calls the gate directly and never declared it. So on a developer's
+machine the only route past a gate that dies was `-SkipTests` -- and that is strictly worse than a smaller
+run, because it is the switch that says *this run did not measure*. Afterwards a branch pushed past a
+memory limit reads exactly like one that skipped its suites for a bad reason.
+
+**`cut-release` is the caller #1443 did not name and the one where it costs most.** The other two open a
+PR, and a PR that does not open costs a retry; this one commits and tags on the trunk, where `-SkipTests`
+means a release can be cut with a suite red.
+
+Measured on the machine that filed [#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443)
+-- 18 cores, so 16 lanes, same 68 suites, same function: the default passed once at 716s and was then
+**killed twice by the harness for running out of memory**, where `-MaxParallel 4` passed in 888s. 24%
+slower, and it finishes. Intermittent rather than a ceiling -- 16 lanes fits when the machine is quiet --
+which is why this is a knob and not a new default. Worth knowing beside it: a starved run can also go
+**false red**, and the killed run's log carried two `[FAIL]` lines in a suite that is 108/108 green run
+alone.
+
+**The default lane formula is deliberately untouched.** The reservation reasons about cores; what ran out
+was memory, and one machine is not a measurement of a formula. This adds the way past, not a new policy.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer reaches all three scripts through the plugin mirror, and their machines are the ones this
+repo cannot measure -- more cores, more suites, or a laptop already running something else. Until now their
+only answer to a gate that would not finish was the escape valve that erases the evidence, on the one run
+whose whole job is to produce it. `cut-release` is the sharp end of that for them exactly as it is here.
+
+The flag is documented where a session actually reads it: the `open-pr` skill page carries the numbers and
+the *reach for this before `-SkipTests`* rule, and the `ship-pr` and `cut-release` pages an entry each
+that forwards to it.
+
+**Score:** 3
+
+#### Pull Request
+
+open-pr, ship-pr and cut-release carry the test gate's lane knob through
+
+Plugins: dkj-policy
+
+[PR #1455](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1455)
+
+---
+
 ### DEPLOY: fix/1444-stranded-page-token · 20260905-184311
 
 The release page's path token is the one file in this system that cannot be rebuilt: it is the only

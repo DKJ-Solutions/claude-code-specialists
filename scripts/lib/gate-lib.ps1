@@ -513,6 +513,18 @@ function Invoke-WorkflowGates {
         where in the chain it fired. At the PR nothing is pushed; on a -GatesOnly run nothing else was
         going to happen anyway. The rest of both sentences is fixed here so the two callers cannot drift
         into describing the same gate differently.
+
+        -MaxParallel IS A PASSTHROUGH AND NOTHING ELSE (issue #1443, September 5, 2026). This function
+        adds no lane policy of its own: it forwards the number to Invoke-TestSuiteGate, whose own
+        `-le 0` branch resolves the default. That is what makes 0 -- the default here -- byte-identical
+        to not passing it at all, which is the property the whole chain from ship-pr down rests on.
+
+        WHY THE HOP EXISTS. Invoke-TestSuiteGate has taken -MaxParallel since it was written, and
+        ci.yml passes it; the two callers that run a developer's machine could not, because this
+        function sat between them and it did not carry the parameter. The only route past a gate that
+        will not finish was therefore -SkipTests -- the switch that says "this run did not measure" --
+        so a memory limit and a deliberate skip left the same trace. A lane count leaves the
+        measurement inside the run that is supposed to make it, and the run says how many lanes it used.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -521,7 +533,9 @@ function Invoke-WorkflowGates {
         # What Invoke-TestSuiteGate calls the thing being gated in its own output ('the PR', 'the gate run').
         [string]$Context = 'the gate',
         # What a failure costs at THIS point in the chain, e.g. 'branch not pushed, no PR opened'.
-        [string]$FailureConsequence = 'nothing further ran'
+        [string]$FailureConsequence = 'nothing further ran',
+        # Lanes for the test gate. 0 = let Invoke-TestSuiteGate resolve its own default; see the header.
+        [int]$MaxParallel = 0
     )
 
     # The fingerprint is computed ONCE for both gates -- it hashes HEAD plus every dirty and untracked
@@ -637,7 +651,7 @@ function Invoke-WorkflowGates {
     if (-not $SkipTests) {
         if (Test-GateEvidence -RepoRoot $RepoRoot -Gate 'tests' -Fingerprint $gateFingerprint) {
             Write-Host "test gate: all suites already proved against this exact tree -- skipped." -ForegroundColor DarkGray
-        } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $RepoRoot 'scripts\tests') -Context $Context)) {
+        } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $RepoRoot 'scripts\tests') -Context $Context -MaxParallel $MaxParallel)) {
             # THIS IS THE GATE THE MOVEMENT CHECK WAS MEASURED ON (issue #1145). One suite of 55 went red
             # inside a backgrounded ship while prune-merged.ps1 held the trunk in the same checkout, and
             # green standalone on the same commit seconds later. That script no longer takes the checkout

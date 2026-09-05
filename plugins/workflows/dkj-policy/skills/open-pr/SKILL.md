@@ -72,7 +72,9 @@ The script:
    See [The document commit](#the-document-commit-what-the-pr-says-is-what-the-branch-carries) below.
 5. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
    test suites** (`scripts/tests/*.tests.ps1`) -- exactly like CI. An error blocks: nothing is
-   pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves.
+   pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves, and
+   `-MaxParallel <n>` runs the suites *smaller* rather than not at all — see
+   [When the test gate will not finish](#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
 6. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
    branch prefix and a pre-filled PR body from `.github/pull_request_template.md` +
    the changelog entry file. If the branch already had an open PR, the push **is** the update and
@@ -110,6 +112,39 @@ different verdict about the same tree.
 **A green run records gate evidence like any other**, so a later `open-pr` on the identical tree skips what
 this already proved. And it is placed *after* both pre-flights and *before* the branch check, deliberately:
 everything below that check is about a branch, a push or a PR, and none of it applies here.
+
+## When the test gate will not finish: `-MaxParallel`, not `-SkipTests`
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1" -MaxParallel 4
+```
+
+The test gate runs the suites in parallel, and by default it works the lane count out for itself:
+`ProcessorCount - 2`, floor 2. `-MaxParallel <n>` overrides that for this run; `0` — the default —
+leaves the resolution exactly where it was, so passing nothing behaves as it always did. The gate
+prints the number it used, so the run says how it was measured.
+
+**It exists because the default can fail to *finish***
+([#1443](https://github.com/DaveKJohn/claude-code-specialists/issues/1443), September 5, 2026). Each
+lane spawns a `powershell` child that spawns children of its own, and the reservation formula reasons
+about **cores**, not memory. Measured on an 18-core machine, same 68 suites, same function: **16 lanes**
+passed once in 716s and was then **killed twice** — *"the system is running low on memory"* — while
+**`-MaxParallel 4`** passed in 888s. 24% slower, and it finishes. Intermittent rather than a ceiling:
+16 lanes fits when the machine is otherwise quiet.
+
+**Reach for it before `-SkipTests`, because the two are not near-equivalents.** `-SkipTests` is the
+switch that says *this run did not measure* — use it to get past a memory limit and the branch is
+afterwards indistinguishable from one that skipped its suites for a bad reason. A lane count keeps the
+measurement inside the run that is supposed to make it.
+
+**And a starved run can go false red, not only die.** The killed run's log above carried two `[FAIL]`
+lines in a suite that is 108/108 green run alone — so a killed run's *failures* are no more trustworthy
+than its verdict. Same class of untrustworthy red as the gate's own "the tree moved while this ran"
+warning, reached by a different cause.
+
+`ship-pr` takes the same flag and forwards it. **The default is deliberately unchanged**: whether the
+formula should account for memory as well as cores is a separate question, on one machine's worth of
+evidence, and #1443 did not measure it.
 
 ## A branch whose PR is already MERGED stops the run, and that is good news
 
