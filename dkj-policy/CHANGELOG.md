@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1485-claim-issue-continuation · 20260906-003143
+
+`claim-issue` now says what follows a successful claim, so a session that obeys the page carries
+straight on into the work instead of stopping to ask. Three surfaces changed: the skill page gains a
+forward-pointing section beside its `## What this skill is NOT` fence (and a description that ends on
+the arrow rather than the boundary), the script's fresh-claim verdict hands over the way its
+`already-yours` verdict always has, and Chris's persona body states out loud that a claim is what
+establishes the chain.
+
+The defect was never a missing rule -- it was a boundary with no arrow on the far side of it. Every
+framing of the step said what it is NOT, so stopping after a clean `[OK]` read as obedience rather
+than as the failure it is.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer running this workflow meets the same stall on every issue pickup: their session claims
+correctly and then hands the turn back with *"say the word"*. The repair travels with the plugin, and
+it costs them no adoption step -- the page, the script and the persona all arrive on the next update.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue says what follows a successful claim, so the work continues in the same turn
+
+Plugins: dkj-policy, team-alpha
+
+[PR #1489](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1489)
+
+---
+
 ### DEPLOY: docs/1483-scripts-readme-entry-points · 20260906-002625
 
 `scripts/README.md`'s entry-point table was **10 rows short** and carried no warning that it might be,
