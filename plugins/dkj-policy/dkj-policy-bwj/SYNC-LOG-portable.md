@@ -16,12 +16,12 @@ own record.
 
 ## Why this is policy and not mechanism
 
-`team-shopify` ships the **mechanism** -- `sync-main.ps1`, `Get-SyncFileVerdict`, the live-theme
+`dkj-team-shopify` ships the **mechanism** -- `sync-main.ps1`, `Get-SyncFileVerdict`, the live-theme
 guard. That is generic: any repo serving a Shopify theme has third-party drift, and every one of them
 gets the machinery through a plugin update whether or not it ever reads this page.
 
 This page is the **policy** -- *what a sync owes, where that record lands, and what it must stay out
-of*. That is BWJ's house rule for two repos, not a Shopify fact. Keeping mechanism in `team-shopify`
+of*. That is BWJ's house rule for two repos, not a Shopify fact. Keeping mechanism in `dkj-team-shopify`
 and policy here is the same seam split the two repos already run everywhere else.
 
 **The practical consequence:** the machinery is silent until a repo asks for it. A repo that has not
@@ -156,7 +156,7 @@ in one particular direction: the day a new verdict class is added, one of them l
 the other keeps producing a complete-*looking* record with a class missing from it. Nothing in the
 output says so.
 
-**So a change to how a row reads in words is made once**, in `team-shopify`'s `sync-rules.ps1`, and
+**So a change to how a row reads in words is made once**, in `dkj-team-shopify`'s `sync-rules.ps1`, and
 both the PR body and the log entry change with it.
 
 ## How it lands -- write-at-creation, not a gate
@@ -185,7 +185,7 @@ which is where the operator already is.
 ## Adopting it in a repo
 
 One line in your repo-owned `scripts/repo-config.ps1` -- the same file
-[`adopt-shopify-floor`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/teams/team-shopify/skills/adopt-shopify-floor/SKILL.md)
+[`adopt-shopify-floor`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-teams/dkj-team-shopify/skills/adopt-shopify-floor/SKILL.md)
 already writes the other Shopify seams into, and which lists this one in its commented block of
 optional answers:
 

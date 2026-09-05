@@ -56,9 +56,9 @@ try {
 
     # --- 2. Get-LensDirCandidates: the seam is the most canonical, legacy still follows -------------
     Write-Host "Get-LensDirCandidates -- order and back-compat" -ForegroundColor Cyan
-    $cands = @(Get-LensDirCandidates -RepoRoot $Fixture -PluginName 'team-alpha')
+    $cands = @(Get-LensDirCandidates -RepoRoot $Fixture -PluginName 'dkj-team-alpha')
     Assert-Equal $seam.LensDir $cands[0] 'the seam is candidate 0 -- the most canonical'
-    Assert-True ($cands -contains (Join-Path $Fixture '.claude\plugins\claude-specialists\team-alpha')) 'the pre-seam plugin path is still read'
+    Assert-True ($cands -contains (Join-Path $Fixture '.claude\plugins\claude-specialists\dkj-team-alpha')) 'the pre-seam plugin path is still read'
     Assert-Equal (Join-Path $Fixture '.claude\extensions') $cands[-1] 'the legacy pre-plugin-path location is still read, and stays last'
 
     # --- 3. Get-LensWriteDir: THE PROMISE -- never relocate an existing tree ------------------------
@@ -66,23 +66,23 @@ try {
     #     because writing seam lenses beside a legacy tree would split the surface in two and leave the
     #     teardown reasoning about both at once.
     Write-Host "Get-LensWriteDir -- fresh gets the seam, an adopted consumer is left alone" -ForegroundColor Cyan
-    Assert-Equal $seam.LensDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'team-alpha') 'fresh consumer: writes to the seam'
+    Assert-Equal $seam.LensDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'dkj-team-alpha') 'fresh consumer: writes to the seam'
 
-    $legacyDir = Join-Path $Fixture '.claude\plugins\claude-specialists\team-alpha'
+    $legacyDir = Join-Path $Fixture '.claude\plugins\claude-specialists\dkj-team-alpha'
     New-Item -ItemType Directory -Path $legacyDir -Force | Out-Null
     $legacyLens = Join-Path $legacyDir '06-16-extension.md'
     [System.IO.File]::WriteAllText($legacyLens, "# 06-16 repo lens`n")
-    Assert-Equal $legacyDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'team-alpha') 'adopted consumer: keeps writing to its existing tree, not the seam'
+    Assert-Equal $legacyDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'dkj-team-alpha') 'adopted consumer: keeps writing to its existing tree, not the seam'
 
     # An EMPTY legacy directory is not an adopted consumer -- only an actual lens counts, so a stray
     # leftover folder does not pin a fresh repo to the old layout.
     Remove-Item -LiteralPath $legacyLens -Force
-    Assert-Equal $seam.LensDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'team-alpha') 'an empty legacy directory does not count as adopted'
+    Assert-Equal $seam.LensDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'dkj-team-alpha') 'an empty legacy directory does not count as adopted'
 
     # And once the owner migrates by hand, the writer follows them without being told.
     New-Item -ItemType Directory -Path $seam.LensDir -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $seam.LensDir '06-16-extension.md'), "# 06-16 repo lens`n")
-    Assert-Equal $seam.LensDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'team-alpha') 'after a hand migration the writer follows to the seam automatically'
+    Assert-Equal $seam.LensDir (Get-LensWriteDir -RepoRoot $Fixture -PluginName 'dkj-team-alpha') 'after a hand migration the writer follows to the seam automatically'
 
     # --- 4. Write-Coverage: a verdict never travels without its coverage (issue #221) ----------------
     #     The line exists so an empty category cannot pass in silence, so the assertions are about
@@ -116,8 +116,8 @@ try {
     #     been applied to exactly one value, and #302 added markers that print ids.
     Write-Host "Format-SafeToken -- untrusted values that get PRINTED" -ForegroundColor Cyan
     # A legitimate id must survive completely untouched, or this guard would corrupt every normal report.
-    Assert-Equal 'team-alpha@claude-code-specialists' (Format-SafeToken -Value 'team-alpha@claude-code-specialists') 'a real plugin id passes through unchanged'
-    Assert-Equal 'team-lifehub@claude-code-specialists' (Format-SafeToken -Value 'team-lifehub@claude-code-specialists') 'hyphens and @ survive'
+    Assert-Equal 'dkj-team-alpha@claude-code-specialists' (Format-SafeToken -Value 'dkj-team-alpha@claude-code-specialists') 'a real plugin id passes through unchanged'
+    Assert-Equal 'dkj-team-lifehub@claude-code-specialists' (Format-SafeToken -Value 'dkj-team-lifehub@claude-code-specialists') 'hyphens and @ survive'
     Assert-Equal '06-16' (Format-SafeToken -Value '06-16') 'a specialist id survives'
     Assert-Equal 'a.b_c/d' (Format-SafeToken -Value 'a.b_c/d') 'dot, underscore and slash are in the charset'
 
@@ -282,16 +282,16 @@ try {
 
     # THE #294 CASE: the enable lives only in settings.local.json, the file the plugin's own settings
     # proposal points the reader at and all three call sites used to ignore.
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-Equal 'team-alpha@claude-code-specialists' ($e.Ids -join ',') 'local-only: the enable is seen'
-    Assert-Equal '.claude/settings.local.json' $e.LayerById['team-alpha@claude-code-specialists'] 'local-only: the deciding layer is reported'
+    Assert-Equal 'dkj-team-alpha@claude-code-specialists' ($e.Ids -join ',') 'local-only: the enable is seen'
+    Assert-Equal '.claude/settings.local.json' $e.LayerById['dkj-team-alpha@claude-code-specialists'] 'local-only: the deciding layer is reported'
     Assert-True $e.AnyKeyFound 'local-only: AnyKeyFound is true'
 
     # Per-key precedence, the deliberate choice documented on the helper: a local 'false' switches off a
     # project 'true' rather than the layers replacing one another wholesale.
-    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true } }')
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "team-alpha@claude-code-specialists": false } }')
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": false } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
     Assert-Equal 0 $e.Ids.Count 'precedence: a local false overrides a project true'
     Assert-True $e.AnyKeyFound 'precedence: the key WAS found -- "enables nothing", not "never configured"'
@@ -300,9 +300,9 @@ try {
     # Per-key merge, the other half: a project enable and a local enable of a DIFFERENT plugin both count.
     # Wholesale replacement would drop the project one, which is the failure direction this helper must
     # never take -- losing an enable is how the false green happened.
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "team-lifehub@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "dkj-team-lifehub@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-Equal 'team-alpha@claude-code-specialists,team-lifehub@claude-code-specialists' ($e.Ids -join ',') 'merge: layers combine per plugin id, they do not replace each other'
+    Assert-Equal 'dkj-team-alpha@claude-code-specialists,dkj-team-lifehub@claude-code-specialists' ($e.Ids -join ',') 'merge: layers combine per plugin id, they do not replace each other'
 
     # --- RepoEnabledIds: which enables are THIS REPO's (issue #1138) ------------------------------
     #     The gate behind check-roster-sync's [RECORD-SHAPE] count. It rests on a measurement against
@@ -311,8 +311,8 @@ try {
     #     no register record -- so the write is a precondition of the record, not a side effect of it.
     #     Asserted here rather than only through the check, because "which enables are the repo's" is a
     #     question about this helper and every consumer of it inherits the answer.
-    #     Both repo layers still carry an enable at this point (project: team-alpha, local: team-lifehub).
-    Assert-Equal 'team-alpha@claude-code-specialists,team-lifehub@claude-code-specialists' ($e.RepoEnabledIds -join ',') 'repo-enabled: both REPO layers count -- settings.local.json is the repo''s too, not the machine''s'
+    #     Both repo layers still carry an enable at this point (project: dkj-team-alpha, local: dkj-team-lifehub).
+    Assert-Equal 'dkj-team-alpha@claude-code-specialists,dkj-team-lifehub@claude-code-specialists' ($e.RepoEnabledIds -join ',') 'repo-enabled: both REPO layers count -- settings.local.json is the repo''s too, not the machine''s'
 
     # The case the gate exists for: the enable lives ONLY in the user layer. It is still enabled -- the
     # session really does load that plugin -- but it is not something this repo asked for or can fix from
@@ -325,30 +325,30 @@ try {
     # Precedence carries through: a repo layer outranks the user layer, so an id enabled in both decides in
     # the repo's and counts. Getting this backwards would suppress a repo enable that also happens to exist
     # machine-wide -- a false silence rather than a false alarm, which is the direction that must not fail.
-    [System.IO.File]::WriteAllText($userFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($userFile,  '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-True ($e.RepoEnabledIds -contains 'team-alpha@claude-code-specialists') 'enabled in both: the repo layer decides, so it counts as the repo''s'
+    Assert-True ($e.RepoEnabledIds -contains 'dkj-team-alpha@claude-code-specialists') 'enabled in both: the repo layer decides, so it counts as the repo''s'
 
     # And it is never larger than Ids: an id switched OFF in a repo layer is not enabled at all, so it must
     # appear in neither list. The predicate may narrow the set; it may not invent a member.
-    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": false } }')
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": false } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-True (-not ($e.Ids -contains 'team-alpha@claude-code-specialists')) 'repo false: not enabled'
-    Assert-True (-not ($e.RepoEnabledIds -contains 'team-alpha@claude-code-specialists')) 'repo false: and therefore not repo-enabled either'
+    Assert-True (-not ($e.Ids -contains 'dkj-team-alpha@claude-code-specialists')) 'repo false: not enabled'
+    Assert-True (-not ($e.RepoEnabledIds -contains 'dkj-team-alpha@claude-code-specialists')) 'repo false: and therefore not repo-enabled either'
     Assert-Equal 0 (@($e.RepoEnabledIds | Where-Object { $e.Ids -notcontains $_ }).Count) 'repo-enabled is always a SUBSET of Ids'
 
     # Restore the state the cases below inherit.
     [System.IO.File]::WriteAllText($userFile,  '{ }')
-    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true } }')
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "team-lifehub@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "dkj-team-lifehub@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
 
     # THE ORDINAL SORT, ON A PAIR THAT ACTUALLY DISCRIMINATES. The helper sorts ordinally rather than by
-    # culture, and the measurement behind that choice was taken on 'team-alpha@m' vs
+    # culture, and the measurement behind that choice was taken on 'dkj-team-alpha@m' vs
     # 'specialists-lifehub@m' -- a prefix pair with punctuation between, where the two collations
     # disagree ('-' is 0x2D, '@' is 0x40, so ordinal puts the hyphen first while en-US does not).
     #
-    # Renaming those plugins to team-alpha/team-lifehub took that discrimination away without touching a
+    # Renaming those plugins to dkj-team-alpha/dkj-team-lifehub took that discrimination away without touching a
     # line of the sort: for the new pair both collations agree, so the assert above would now pass with
     # the ordinal comparison removed. This one is written on a synthetic pair for that reason -- the
     # property must not depend on what the real plugins happen to be called this month.
@@ -359,23 +359,23 @@ try {
     # Put the chain back the way this block found it: the scenarios below build on the project layer
     # holding the core team's enable, and a synthetic pair left standing here would fail one of them
     # several screens away from the line that caused it.
-    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true } }')
-    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "team-lifehub@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($projFile,  '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { "dkj-team-lifehub@claude-code-specialists": true } }')
 
     # The user layer counts, and is overridable per key by the repo -- a plugin enabled machine-wide IS
     # loaded in every session, so excluding this layer would rebuild the same false green one level up.
     Remove-Item -LiteralPath $localFile -Force
-    [System.IO.File]::WriteAllText($userFile, '{ "enabledPlugins": { "team-shopify@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText($userFile, '{ "enabledPlugins": { "dkj-team-shopify@claude-code-specialists": true } }')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
-    Assert-True ($e.Ids -contains 'team-shopify@claude-code-specialists') 'user layer: a machine-wide enable counts'
-    Assert-Equal 'user ~/.claude/settings.json' $e.LayerById['team-shopify@claude-code-specialists'] 'user layer: named as the deciding layer'
+    Assert-True ($e.Ids -contains 'dkj-team-shopify@claude-code-specialists') 'user layer: a machine-wide enable counts'
+    Assert-Equal 'user ~/.claude/settings.json' $e.LayerById['dkj-team-shopify@claude-code-specialists'] 'user layer: named as the deciding layer'
 
     # A layer that does not parse is REPORTED, never thrown, and never silently turns the answer into
     # "nothing enabled" -- the rest of the chain still counts.
     [System.IO.File]::WriteAllText($localFile, '{ "enabledPlugins": { oops')
     $e = Get-EnabledPlugins -RepoRoot $chainRoot -UserHomeOverride $userHome
     Assert-Equal '.claude/settings.local.json' ($e.Unreadable -join ',') 'unparseable layer: reported by label, not thrown'
-    Assert-True ($e.Ids -contains 'team-alpha@claude-code-specialists') 'unparseable layer: the readable layers still counted'
+    Assert-True ($e.Ids -contains 'dkj-team-alpha@claude-code-specialists') 'unparseable layer: the readable layers still counted'
 
     # --- Shapes that are VALID but easy to crash on -----------------------------------------------
     #     Found live, not by reasoning: a settings.json holding exactly '{ }' was reported as "does not
@@ -467,7 +467,7 @@ try {
     $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
     Assert-True (-not $r.Exists) 'no administration: Exists is false'
     Assert-True (-not $r.AnyRecord) 'no administration: AnyRecord is false'
-    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'team-alpha@m') 'no administration: the predicate does NOT claim "not installed"'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'dkj-team-alpha@m') 'no administration: the predicate does NOT claim "not installed"'
 
     # A record for THIS path, and one for another path. Only the first counts as installed here -- this is
     # the whole measurement behind #302 and #301.
@@ -475,7 +475,7 @@ try {
 {
   "version": 2,
   "plugins": {
-    "team-alpha@m": [
+    "dkj-team-alpha@m": [
       { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "3.0.6" }
     ],
     "other@m": [
@@ -488,30 +488,30 @@ try {
     $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
     Assert-True $r.Exists 'administration present: Exists is true'
     Assert-True $r.Readable 'administration present: Readable is true'
-    Assert-Equal 'team-alpha@m' ($r.Ids -join ',') 'path match: only the plugin recorded for THIS path'
-    Assert-Equal '3.0.6' $r.RecordsById['team-alpha@m'][0].Version 'path match: the record is projected onto a fixed shape'
-    Assert-Equal 'project' $r.RecordsById['team-alpha@m'][0].Scope 'path match: Scope travels along'
-    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'team-alpha@m') 'path match: installed here'
+    Assert-Equal 'dkj-team-alpha@m' ($r.Ids -join ',') 'path match: only the plugin recorded for THIS path'
+    Assert-Equal '3.0.6' $r.RecordsById['dkj-team-alpha@m'][0].Version 'path match: the record is projected onto a fixed shape'
+    Assert-Equal 'project' $r.RecordsById['dkj-team-alpha@m'][0].Scope 'path match: Scope travels along'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'dkj-team-alpha@m') 'path match: installed here'
     Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'other@m')) 'THE #302 CASE: a record for another path is NOT installed here'
     Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'absent@m')) 'no record at all: not installed here'
     Assert-True $r.AnyRecord 'AnyRecord distinguishes "no installs administered" from "none for this repo"'
 
     # Case- and trailing-separator-insensitive: two spellings of one directory are not two answers (#240).
     $r = Get-InstallRecord -RepoRoot ($repoA.ToUpper() + '\') -UserHomeOverride $adminHome
-    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'team-alpha@m') 'a different spelling of the same path still matches'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'dkj-team-alpha@m') 'a different spelling of the same path still matches'
 
     # EVERY matching record, never just the first (#240): several disagreeing records is its own answer,
     # and the caller can only report that honestly if it receives all of them.
     $dupJson = @"
-{ "plugins": { "team-alpha@m": [
+{ "plugins": { "dkj-team-alpha@m": [
     { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "3.0.6" },
     { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "2.11.0" }
 ] } }
 "@
     [System.IO.File]::WriteAllText($adminFile, $dupJson)
     $r = Get-InstallRecord -RepoRoot $repoA -UserHomeOverride $adminHome
-    Assert-Equal 2 @($r.RecordsById['team-alpha@m']).Count 'duplicate records: BOTH returned, not the first one'
-    Assert-Equal '2.11.0,3.0.6' ((@($r.RecordsById['team-alpha@m']) | ForEach-Object { $_.Version } | Sort-Object) -join ',') 'duplicate records: the disagreement is visible to the caller'
+    Assert-Equal 2 @($r.RecordsById['dkj-team-alpha@m']).Count 'duplicate records: BOTH returned, not the first one'
+    Assert-Equal '2.11.0,3.0.6' ((@($r.RecordsById['dkj-team-alpha@m']) | ForEach-Object { $_.Version } | Sort-Object) -join ',') 'duplicate records: the disagreement is visible to the caller'
 
     # A PATHLESS record covers every repo, so it must never produce a "not installed here" claim. Erring
     # this way can only suppress a warning, never invent one.
@@ -535,7 +535,7 @@ try {
     Assert-True $r.Exists 'unparseable administration: Exists is true'
     Assert-True (-not $r.Readable) 'unparseable administration: Readable is false'
     Assert-True ($r.Error -ne '') 'unparseable administration: the reason is carried, not swallowed'
-    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'team-alpha@m') 'unparseable administration: the predicate does not claim "not installed"'
+    Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'dkj-team-alpha@m') 'unparseable administration: the predicate does not claim "not installed"'
 
     # Shapes that are valid but easy to crash on, same class as the settings-chain block above.
     foreach ($shape in @('{ }', '{ "plugins": { } }', '{ "plugins": null }', '{ "plugins": { "p@m": [] } }')) {
@@ -649,13 +649,13 @@ try {
     New-Item -ItemType Directory -Path $rpRepo -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $rpHome '.claude\plugins') -Force | Out-Null
     foreach ($v in @('1.9.0', '1.10.0')) {
-        New-Item -ItemType Directory -Path (Join-Path $rpCache "m\team-alpha\$v\agents") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $rpCache "m\dkj-team-alpha\$v\agents") -Force | Out-Null
     }
     # A version with NO agents/ dir, to prove the scan's existing filter still applies underneath.
-    New-Item -ItemType Directory -Path (Join-Path $rpCache 'm\team-alpha\2.0.0') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $rpCache 'm\dkj-team-alpha\2.0.0') -Force | Out-Null
     $rpAdmin = Join-Path $rpHome '.claude\plugins\installed_plugins.json'
     $rpRepoJson = (Resolve-Path -LiteralPath $rpRepo).Path.Replace('\', '\\')
-    $pinnedPath = (Join-Path $rpCache 'm\team-alpha\1.9.0')
+    $pinnedPath = (Join-Path $rpCache 'm\dkj-team-alpha\1.9.0')
     $pinnedJson = $pinnedPath.Replace('\', '\\')
 
     $savedProfile = $env:USERPROFILE
@@ -663,34 +663,34 @@ try {
         $env:USERPROFILE = $rpHome
 
         # 1. No -RepoRoot: unchanged behaviour, and 2.0.0 is skipped for lacking agents/.
-        $d = Resolve-PluginDir -Name 'team-alpha' -Marketplace 'm' -CacheRoot $rpCache
+        $d = Resolve-PluginDir -Name 'dkj-team-alpha' -Marketplace 'm' -CacheRoot $rpCache
         Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'no RepoRoot: the semantically highest version with agents/ (1.10.0 over 1.9.0, 2.0.0 skipped)'
 
         # 2. A record pinning the OLDER version wins over the higher one in the cache.
-        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"team-alpha@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$pinnedJson`", `"version`": `"1.9.0`" } ] } }")
-        $d = Resolve-PluginDir -Name 'team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"dkj-team-alpha@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$pinnedJson`", `"version`": `"1.9.0`" } ] } }")
+        $d = Resolve-PluginDir -Name 'dkj-team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
         Assert-Equal '1.9.0' (Split-Path $d -Leaf) 'record pins 1.9.0: the record wins over the higher version in the cache'
 
         # 3. A record for ANOTHER repo must not steer this one.
-        $d = Resolve-PluginDir -Name 'team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $repoB
+        $d = Resolve-PluginDir -Name 'dkj-team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $repoB
         Assert-Equal '1.10.0' (Split-Path $d -Leaf) "another repo's record does not apply -- back to the cache scan"
 
         # 4. A record whose installPath is GONE falls through rather than blinding the check.
-        $goneJson = (Join-Path $rpCache 'm\team-alpha\9.9.9').Replace('\', '\\')
-        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"team-alpha@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$goneJson`", `"version`": `"9.9.9`" } ] } }")
-        $d = Resolve-PluginDir -Name 'team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        $goneJson = (Join-Path $rpCache 'm\dkj-team-alpha\9.9.9').Replace('\', '\\')
+        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"dkj-team-alpha@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$goneJson`", `"version`": `"9.9.9`" } ] } }")
+        $d = Resolve-PluginDir -Name 'dkj-team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
         Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'stale record (installPath gone): falls back to the cache scan instead of returning nothing'
 
         # 5. A recorded path that exists but has no agents/ dir is not a plugin dir either.
-        $noAgentsJson = (Join-Path $rpCache 'm\team-alpha\2.0.0').Replace('\', '\\')
-        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"team-alpha@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$noAgentsJson`", `"version`": `"2.0.0`" } ] } }")
-        $d = Resolve-PluginDir -Name 'team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        $noAgentsJson = (Join-Path $rpCache 'm\dkj-team-alpha\2.0.0').Replace('\', '\\')
+        [System.IO.File]::WriteAllText($rpAdmin, "{ `"plugins`": { `"dkj-team-alpha@m`": [ { `"scope`": `"project`", `"projectPath`": `"$rpRepoJson`", `"installPath`": `"$noAgentsJson`", `"version`": `"2.0.0`" } ] } }")
+        $d = Resolve-PluginDir -Name 'dkj-team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
         Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'recorded path without agents/: falls through, same rule the cache scan applies'
 
         # 6. An unreadable administration must not break resolution -- Get-InstallRecord reports, and the
         #    scan still answers. This is what makes step 2 a refinement rather than a gate.
         [System.IO.File]::WriteAllText($rpAdmin, '{ "plugins": { oops')
-        $d = Resolve-PluginDir -Name 'team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
+        $d = Resolve-PluginDir -Name 'dkj-team-alpha' -Marketplace 'm' -CacheRoot $rpCache -RepoRoot $rpRepo
         Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'unreadable administration: the cache scan still answers, no throw'
     }
     finally {

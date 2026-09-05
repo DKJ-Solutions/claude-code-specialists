@@ -19,7 +19,7 @@ questions for different readers, and the second one was added later, on inbound
 pages is the established form here -- `dkj-policy` carries three.
 
 **Both chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
-elsewhere (`.github/` in each repo, and `team-shopify` respectively); what this plugin states is what
+elsewhere (`.github/` in each repo, and `dkj-team-shopify` respectively); what this plugin states is what
 the two repos *owe*, which is Dave's house rule for them rather than a fact about Asana or Shopify.
 
 ## It is an add-on, not a replacement
@@ -38,14 +38,14 @@ and the root README after
 safe here **because it is additive and non-overlapping**, not because the old guard was wrong.
 
 **It carries no specialists.** A workflow changes how the existing ones work, not who they are.
-Enabling this without `team-alpha` gives you a skill with nobody to invoke it; it also expects
+Enabling this without `dkj-team-alpha` gives you a skill with nobody to invoke it; it also expects
 `dkj-policy` to be enabled, because its rule begins where that workflow's ticket-work
 step begins.
 
 ## Chapter one -- ticket handling, in one paragraph
 
 A discovered issue is **created on GitHub first** -- GitHub is the source of truth, full technical
-detail, the normal `team-alpha` filing bar unchanged. It is **classified in the same breath**: an issue
+detail, the normal `dkj-team-alpha` filing bar unchanged. It is **classified in the same breath**: an issue
 type (Bug / Feature / Task), plus the `tier-1` label where management and the commissioner would notice
 it, both set at creation so nobody has to classify a tracker by hand a second time. It is then
 **mirrored to Asana** as a colleague-friendly variant: plain language, outcome-framed, no code or
@@ -109,7 +109,7 @@ for review. So a sync now owes a **sync-log entry** where an ordinary branch owe
 and committed by `sync-main.ps1` in the same breath as the branch itself. It is never folded, never
 cut, and never reaches a release note.
 
-The mechanism is `team-shopify`'s and reaches every Shopify consumer; the **policy** is this
+The mechanism is `dkj-team-shopify`'s and reaches every Shopify consumer; the **policy** is this
 plugin's, and it is silent until a repo answers one seam -- `Get-ShopifySyncLogPath`. The whole rule,
 the entry's shape, and why there is no gate are in
 [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md).
@@ -146,7 +146,7 @@ Both chapters answer themselves out of your repo-owned `scripts/repo-config.ps1`
 
 - `Get-ShopifySyncLogPath` -- where the log lives, repo-root-relative. Answer it `'dkj-policy-bwj/SYNC-LOG.md'`
   in **both** repos. Leave it out and no log is written at all, which is the default every other
-  Shopify consumer gets. The machinery is `team-shopify`'s, so it is already present; this answer is
+  Shopify consumer gets. The machinery is `dkj-team-shopify`'s, so it is already present; this answer is
   what asks it to run. `adopt-shopify-floor` lists it among the optional Shopify seams it writes into
   that file as commented guidance.
 
@@ -190,7 +190,7 @@ it needs no workspace of its own.
 
 ## Enabling it
 
-An ordinary plugin change: enable `dkj-policy-bwj` in `.claude/settings.json` alongside `team-alpha`
+An ordinary plugin change: enable `dkj-policy-bwj` in `.claude/settings.json` alongside `dkj-team-alpha`
 and `dkj-policy`, then run [`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) once for
 chapter one, and answer `Get-ShopifySyncLogPath` for chapter two.
 

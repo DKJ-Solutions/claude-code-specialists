@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Regression tests for the roster-sync RECOVERY (LAYER 3):
-    plugins/teams/team-alpha/skills/sync-roster/sync-roster.ps1.
+    plugins/dkj-teams/dkj-team-alpha/skills/sync-roster/sync-roster.ps1.
 
 .DESCRIPTION
     Dependency-free: no Pester, plain PowerShell. Integration-style -- runs the real sync-roster.ps1
@@ -34,11 +34,11 @@ $ErrorActionPreference = 'Stop'
 $env:CLAUDE_PLUGIN_ROOT = $null
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Script   = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\sync-roster\sync-roster.ps1'
+$Script   = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\skills\sync-roster\sync-roster.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "sync-roster-test-fixture-$PID"
 
 $Marketplace = 'claude-code-specialists'
-$PluginName  = 'team-alpha'
+$PluginName  = 'dkj-team-alpha'
 $PluginId    = "$PluginName@$Marketplace"
 
 $script:pass = 0

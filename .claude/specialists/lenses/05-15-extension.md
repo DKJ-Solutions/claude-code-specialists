@@ -5,7 +5,7 @@ group: 05
 
 # Sylvester ⚙️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/teams/team-alpha/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
 
 A system administrator does the same thing everywhere — manage the harness and the tooling the team
 works in: scripts, config, the safety guards. **What is repo-specific in claude-code-specialists is not
@@ -70,7 +70,7 @@ infrastructure.
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
   runs before a release. **Check 23, `[plugin-kind]`, added August 9, 2026, and its reason was replaced on
   August 26, 2026 rather than left standing:** every published plugin must be `team-*` under
-  `plugins/teams/` or a way of working by name, and a name carrying neither shape is an
+  `plugins/dkj-teams/` or a way of working by name, and a name carrying neither shape is an
   error rather than a style note. Since
   [#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) only `*-policy` /
   `*-policy-*` still carry a directory rule on the workflow side — `plugins/dkj-policy/`, the government,
@@ -109,7 +109,7 @@ infrastructure.
   gated at all.** The block used to key one group on `github.ref`, i.e. one group for the whole trunk,
   and leaned on `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` to keep the fold commit
   from cancelling the merge commit's run. It did not, and could not — the portable half of why is a hard
-  rule in [Sylvester's manual](../../../plugins/teams/team-alpha/manuals/05-15-manual.md#sylvesters-hard-rules):
+  rule in [Sylvester's manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/05-15-manual.md#sylvesters-hard-rules):
   the field governs the *in-progress* run, while a group also drops a **pending** one when a third
   arrives. **What made it bite here is this repo's own trunk rhythm**, which is the repo-specific half:
   `ship-pr` pushes twice per branch 6s apart, a run takes ~15 minutes, and `windows-latest` queues for
@@ -799,14 +799,14 @@ infrastructure.
   [Rendall #06](05-06-extension.md)'s domain; Sylvester guards the script mechanics underneath.
 - **`scripts/agents/build-agent-defs.ps1` + `scripts/lib/agent-shared-lib.ps1`** — the generator
   that fills the verbatim-shared bullets from
-  `plugins/teams/agent-shared/<name>.md` into all agent defs (between
+  `plugins/dkj-teams/agent-shared/<name>.md` into all agent defs (between
   `<!-- BEGIN/END shared:… -->` sentinels). Change a shared block →
   run `build-agent-defs.ps1` → all agent defs updated; `-Check` (and the lint gate, check 7) fails
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
   it in isolation — mirroring the `release-lib` setup. **Never edit between the sentinels by hand.**
 - **`.claude/settings.json`** — this repo's harness config: the `extraKnownMarketplaces` (the
   `github` source `DKJ-Solutions/claude-code-specialists`) and `enabledPlugins` with which the repo enables
-  its own `team-alpha` plugin (the core team).
+  its own `dkj-team-alpha` plugin (the core team).
 - **The manifests** `.claude-plugin/marketplace.json` and every `<plugin>/.claude-plugin/plugin.json`
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with
   [Tessa #16](06-16-extension.md).
@@ -816,7 +816,7 @@ infrastructure.
 The **`simplify`** skill applies quality fixes — reuse, simplification, efficiency — and applying is the
 **author's** act, never the reviewer's: [Victor #19](06-19-extension.md) may report those same findings
 and is forbidden from applying them, which is why the portable layer gives the skill to
-[Cody #13](../../../plugins/teams/team-alpha/manuals/04-13-manual.md) rather than to a reviewer. Here
+[Cody #13](../../../plugins/dkj-teams/dkj-team-alpha/manuals/04-13-manual.md) rather than to a reviewer. Here
 the code is `scripts/**` and **those are Sylvester's**, so here he is that author: he runs the tidy pass
 over what he changed before the diff goes to review, and never over somebody else's change.
 
@@ -851,7 +851,7 @@ authorship for him in consumers that never granted it.
     caught the loud half within minutes.
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
-  `plugins/teams/team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
+  `plugins/dkj-teams/dkj-team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
   `plugins/dkj-policy/` (everything branch- and release-shaped). Three things to
   know before touching it:
   - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
@@ -954,7 +954,7 @@ authorship for him in consumers that never granted it.
   test suite"* now states no number under its August 7 stamp. It read `26` there for five days — wrong on the
   day it was written, since there were 27, and wronger every suite since. **And a bare `26` is still correct
   in two other senses**: the lint's own checks (`CHANGELOG.md`) and the agent-def count
-  ([`README.md`](../../../README.md), [`agent-shared`](../../../plugins/teams/agent-shared/README.md)). Establish
+  ([`README.md`](../../../README.md), [`agent-shared`](../../../plugins/dkj-teams/agent-shared/README.md)). Establish
   which noun a `26` governs before touching it; a find-and-replace here breaks correct statements to repair
   one.
 - **Renaming or moving this checkout unlinks its own plugin install — plan the re-install into the same
@@ -966,7 +966,7 @@ authorship for him in consumers that never granted it.
   [`check-roster-sync.ps1`](../../../scripts/sync/check-roster-sync.ps1) reporting
   `[NOT-INSTALLED-HERE]` — the session-start hook cannot report it, because that hook ships in the
   plugin that did not load. The repair is `claude plugin marketplace update claude-code-specialists`
-  followed by `claude plugin install team-alpha@claude-code-specialists --scope project` from the new
+  followed by `claude plugin install dkj-team-alpha@claude-code-specialists --scope project` from the new
   root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
   family's [INSTALL.md](../../../INSTALL.md#staying-up-to-date);
@@ -1190,7 +1190,7 @@ authorship for him in consumers that never granted it.
   the content was *written* in, not which file it ends up in.
 - **A check that scans a file for a token can be satisfied by a *path* containing that token.**
   `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap wrote
-  `@.claude/plugins/claude-specialists/team-alpha/01-01-extension.md` into `CLAUDE.md` (the pre-seam
+  `@.claude/plugins/claude-specialists/dkj-team-alpha/01-01-extension.md` into `CLAUDE.md` (the pre-seam
   lens path of the time; since #253 it writes the one seam line instead). That import
   line contains `01-01`, so Chris counts as rostered without a roster row ever existing — measured
   July 29, 2026: 18 ids reported missing after a bootstrap, not 19, with `01-01` the one silently
@@ -1273,7 +1273,7 @@ instance means adopting a rule born with 349.
 **The reason is structural, and it is about what this repo is.** Being a plugin source, most paths it
 names correctly describe *somebody else's* repo: `.claude/extensions/…` is the legacy lens location this
 family deliberately still documents for unmigrated consumers, `config/settings_data.json` is a Shopify
-store's file named in `team-shopify`'s manual, `PRETTY/[Emotie]/README.md` is a life-hub folder. All three
+store's file named in `dkj-team-shopify`'s manual, `PRETTY/[Emotie]/README.md` is a life-hub folder. All three
 answer "no such file here", exactly as the stale title does — and **the difference is whose repo the line
 is about, which the line never says**. An existence check reads "describes a consumer" as "stale", and no
 regex recovers that distinction. Do not revive it behind an exemption list: that is the shape this repo has
@@ -1367,12 +1367,12 @@ plugin is read.
 proposed the rule as *"must resolve to a target also under `plugins/`, because that is the subtree the
 plugin cache contains."* The cache contains no such subtree, and the weaker rule passes the one link that
 had **already shipped dead** — `cut-release/SKILL.md:123` pointing at
-`../../../../teams/team-alpha/manuals/06-25-manual.md`, verified against the installed v4.22.0 copy. So
+`../../../../teams/dkj-team-alpha/manuals/06-25-manual.md`, verified against the installed v4.22.0 copy. So
 the boundary is the **plugin root**, not `plugins/`, and scenario 37 of
 `check-plugin-integrity-links.tests.ps1` exists to pin exactly that difference. The report also argued
 from an expected count of **zero** (*"which is itself the reason not to build it yet"*) and stated that
 nothing had shipped; the real count was **17 escapes in 5 files**, every one passing check 4, and
-resolved inside the installed copies (`team-alpha` 4.21.0, `dkj-policy` 4.22.0) **all 17 are
+resolved inside the installed copies (`dkj-team-alpha` 4.21.0, `dkj-policy` 4.22.0) **all 17 are
 dead**. That inverted its conclusion rather than qualifying it: the repo's name-a-risk-and-leave-it rule
 holds until something bites, and this had bitten seventeen times in released payload.
 

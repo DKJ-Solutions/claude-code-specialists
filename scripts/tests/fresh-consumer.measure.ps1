@@ -52,7 +52,7 @@ $ErrorActionPreference = 'Stop'
 # Repo root -- same dual-context resolution the shared scripts use.
 $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 if (-not $PluginRoot) {
-    $PluginRoot = Join-Path $repoRoot 'plugins\teams\team-alpha'
+    $PluginRoot = Join-Path $repoRoot 'plugins\dkj-teams\dkj-team-alpha'
 }
 $hooks = Join-Path $PluginRoot 'hooks'
 
@@ -74,7 +74,7 @@ New-Item -ItemType Directory -Path (Join-Path $FixtureRoot '.claude') -Force | O
       "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" }
     }
   },
-  "enabledPlugins": { "team-alpha@claude-code-specialists": true }
+  "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true }
 }
 '@ | Set-Content -LiteralPath (Join-Path $FixtureRoot '.claude\settings.json') -Encoding utf8
 

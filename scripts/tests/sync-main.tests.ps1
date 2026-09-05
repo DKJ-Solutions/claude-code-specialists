@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/task/sync-main.ps1 -- team-shopify's pre-task sync (inbound #787,
+    Regression tests for scripts/task/sync-main.ps1 -- dkj-team-shopify's pre-task sync (inbound #787,
     rewritten for the content rule on inbound #807).
 
 .DESCRIPTION
@@ -759,14 +759,14 @@ try {
     $eap = @([regex]::Matches($src, [regex]::Escape('$prevEap = $ErrorActionPreference'))).Count
     Assert-True ($eap -eq 0) "net: no hand-rolled EAP bracket left -- the lib owns that dance (found $eap)"
 
-    # THE LIB TRAVELS IN team-shopify's OWN PAYLOAD. Without this entry the mirrored script dot-sources a
-    # file that is not in the mirror, and it fails at load in a consumer that installed team-shopify
+    # THE LIB TRAVELS IN dkj-team-shopify's OWN PAYLOAD. Without this entry the mirrored script dot-sources a
+    # file that is not in the mirror, and it fails at load in a consumer that installed dkj-team-shopify
     # without dkj-policy -- which is most of them. build-shared-scripts -Check cannot catch
     # that: it compares the pairs the registry declares, so a missing entry is a pair it never looks at.
     . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
     $shopLib = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
-        Where-Object { $_.Plugin -eq 'team-shopify' -and $_.SourceRel -eq 'scripts\lib\native-capture-lib.ps1' })
-    Assert-True ($shopLib.Count -eq 1) 'net: the registry mirrors the lib into team-shopify'
+        Where-Object { $_.Plugin -eq 'dkj-team-shopify' -and $_.SourceRel -eq 'scripts\lib\native-capture-lib.ps1' })
+    Assert-True ($shopLib.Count -eq 1) 'net: the registry mirrors the lib into dkj-team-shopify'
     Assert-True ($shopLib.Count -eq 1 -and (Test-Path -LiteralPath $shopLib[0].MirrorPath -PathType Leaf)) `
         'net: and that mirror is present beside the mirrored sync-main.ps1'
 

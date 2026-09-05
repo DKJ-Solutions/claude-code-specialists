@@ -105,7 +105,7 @@ a test, reached by one of these rather than run directly.
 | [`sync/check-connectors.ps1`](sync/check-connectors.ps1) | the two-way registry check across every connected repo | — |
 | [`sync/find-specialist-mentions.ps1`](sync/find-specialist-mentions.ps1) | every live mention of a specialist's **name**, grouped by layer — the tool you run *at* a rename | — |
 | [`sync/build-shared-scripts.ps1`](sync/build-shared-scripts.ps1) | regenerates the plugin mirrors from this directory | — |
-| [`agents/build-agent-defs.ps1`](agents/build-agent-defs.ps1) | writes the shared blocks from `plugins/teams/agent-shared/` into the agent defs and personas | — |
+| [`agents/build-agent-defs.ps1`](agents/build-agent-defs.ps1) | writes the shared blocks from `plugins/dkj-teams/agent-shared/` into the agent defs and personas | — |
 | [`maintenance/fix-mojibake.ps1`](maintenance/fix-mojibake.ps1) | repairs encoding damage in the markdown this repo names | `fix-mojibake` |
 | [`maintenance/measure-skill.ps1`](maintenance/measure-skill.ps1) | what a skill costs — always-on and on-invoke tokens against a stored baseline, and the wall-clock of the script behind it | `measure-skill` |
 | [`maintenance/measure-always-on.ps1`](maintenance/measure-always-on.ps1) | what the always-on **document** path costs — `CLAUDE.md` plus everything it `@`-imports, per document and per section | `measure-skill` |

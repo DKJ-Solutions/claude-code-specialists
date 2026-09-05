@@ -34,7 +34,7 @@ colleague-facing translation is a judgement call, not a transform. The full rule
 
 ## Step 1 -- the GitHub issue (always)
 
-Apply the `team-alpha` filing bar in full: verify the finding still stands by reading the code, doc
+Apply the `dkj-team-alpha` filing bar in full: verify the finding still stands by reading the code, doc
 or output behind it; search the tracker for a duplicate; one subject per issue; state what you
 measured versus inferred. Then file it **classified** -- the type and the labels are set at creation,
 never left for a later pass:

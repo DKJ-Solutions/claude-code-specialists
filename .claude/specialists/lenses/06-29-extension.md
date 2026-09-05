@@ -5,7 +5,7 @@ group: 06
 
 # Marlowe 🕵️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/teams/team-alpha/manuals/06-29-manual.md`). This file does not describe the craft, but which conclusions Marlowe red-teams in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/06-29-manual.md`). This file does not describe the craft, but which conclusions Marlowe red-teams in this repo.
 
 An investigative journalist does the same thing everywhere — try to prove a recommendation wrong
 before anyone acts on it: the fine print, the load-bearing assumption, the marketing-versus-reality

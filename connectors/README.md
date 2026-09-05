@@ -58,7 +58,7 @@ accepted degree of transparency (security review, July 16, 2026).
   "localCheckout": "../life-hub",
   "plugins": [
     {
-      "id": "team-alpha@claude-code-specialists",
+      "id": "dkj-team-alpha@claude-code-specialists",
       "extensions": ["01-01", "05-05"]
     }
   ],

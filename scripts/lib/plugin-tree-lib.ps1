@@ -59,7 +59,7 @@ function Get-PluginRoots {
         repo root; output is one object per plugin with
 
             Name          the plugin's name, as the marketplace declares it
-            Source        the source string exactly as written (e.g. './plugins/teams/team-alpha')
+            Source        the source string exactly as written (e.g. './plugins/dkj-teams/dkj-team-alpha')
             RelativeRoot  the plugin root relative to the repo, backslash-separated, no leading '.\'
             Root          the plugin root as a full path
             ManifestPath  <Root>\.claude-plugin\plugin.json, as a full path
@@ -152,14 +152,14 @@ function Get-PluginNameForPath {
         This replaces the depth-and-name regex it was extracted from, and it answers a question that
         regex could only approximate. Two things fall out rather than needing to be written:
 
-          * plugins/teams/agent-shared/ is not a plugin, so it is not matched -- no name has to be
+          * plugins/dkj-teams/agent-shared/ is not a plugin, so it is not matched -- no name has to be
             excluded by hand. Under the previous shape the excluded sibling had to be rewritten every
             time the layout moved (it named connectors/ until August 3, 2026, by which point
             connectors/ had left plugins/ entirely and the real sibling went uncounted). That sibling
-            moved AGAIN on August 17, 2026, from plugins/ down into plugins/teams/ beside the only
+            moved AGAIN on August 17, 2026, from plugins/ down into plugins/dkj-teams/ beside the only
             plugins that consume it, and this function needed no edit for it -- which is the property
             it was extracted to have;
-          * a plugin root at any depth matches, so plugins/teams/team-alpha/ works without this
+          * a plugin root at any depth matches, so plugins/dkj-teams/dkj-team-alpha/ works without this
             function knowing that 'teams' exists.
 
         Accepts either separator in $Path, since callers hand it both: gh supplies forward slashes and
@@ -200,7 +200,7 @@ function Get-TouchedPlugins {
         mode of encoding a layout in a pattern. Reading the roots removes both halves at once:
         agent-shared/ is not in the marketplace so it cannot match, and a plugin at any depth does.
         Both halves were exercised on August 17, 2026, when agent-shared/ moved to
-        plugins/teams/agent-shared/ -- a path the old regex would have captured as the plugin 'teams'.
+        plugins/dkj-teams/agent-shared/ -- a path the old regex would have captured as the plugin 'teams'.
 
         LIVED IN release-lib.ps1 UNTIL AUGUST 9, 2026, where a note now points here. It reads plugin
         roots, so it belongs beside them -- and the fold script, which is its one caller, can now reach

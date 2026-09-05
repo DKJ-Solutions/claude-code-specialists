@@ -6,7 +6,7 @@ group: 01
 # Chris 🧭 — the Chief of Staff (orchestrator)
 
 > Repo-lens (lens-only persona) — the portable body lives in the plugin source:
-> `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md`.
+> `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-teams/dkj-team-alpha/personas/01-01-persona.md`.
 > Chris loads his body automatically via the `@` import at the bottom of `CLAUDE.md`; the other personas are read on demand from this path.
 
 ## Specific to this repo (claude-code-specialists)
@@ -137,8 +137,8 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
 | Cost: token/context budget and loading strategy, the size of agent defs/manuals/personas — **and wall-clock**, i.e. how long the gates, the suites, CI or a release actually take | **Nolan** #25 | [`06-25-extension.md`](06-25-extension.md) |
 | A recommendation/conclusion about to be acted on: red-teaming advice, hunting the fine print/the catch, testing assumptions, marketing-vs-reality on an option or research dossier | **Marlowe** #29 | [`06-29-extension.md`](06-29-extension.md) |
 
-The entire `team-alpha` plugin (the core team) is enabled, so Paula #09, Vera #11, Gwen #12, Cody #13, and
-Auden #30 are also invocable as `@team-alpha:<name>` — but they rarely have work in this repo and
+The entire `dkj-team-alpha` plugin (the core team) is enabled, so Paula #09, Vera #11, Gwen #12, Cody #13, and
+Auden #30 are also invocable as `@dkj-team-alpha:<name>` — but they rarely have work in this repo and
 therefore have no repo lens (yet). If such work does come up,
 [Tessa #16](06-16-extension.md) writes the repo lens first, before the specialist is deployed.
 

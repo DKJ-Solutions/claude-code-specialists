@@ -31,8 +31,8 @@ land here, because a script travels to whichever plugin owns the surface that ca
 | where the mirror lands | why there |
 |---|---|
 | `dkj-policy` (this folder) | the branch/PR/release way of working, which is what this plugin *is* |
-| `team-shopify` | the store-facing scripts, whose surface belongs to the platform team |
-| `team-alpha` | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
+| `dkj-team-shopify` | the store-facing scripts, whose surface belongs to the platform team |
+| `dkj-team-alpha` | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
 
 *A fourth destination, `workflow-default`, held one pair — `lib/check-report-lib.ps1` again — until
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) removed that plugin on
@@ -43,7 +43,7 @@ discovered. It is hand-maintained beside a registry that can be asked, which is 
 three rows were missing when the count was last checked (August 15, 2026 — `adopt-workflow-folder`,
 `session-status` and `source-repo-guard-lib`, each registered but never listed), and re-measuring on
 August 26 found the header, the destination split and the row list all wrong at once, the split not even
-naming `team-shopify` as a destination. `session-status` has since gone the other way: it was removed
+naming `dkj-team-shopify` as a destination. `session-status` has since gone the other way: it was removed
 along with `/lock` and `/handover`
 ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), so its row went with it.
 The numbers are gone from this page for that reason; the missing rows are tracked separately, because

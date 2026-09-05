@@ -2,16 +2,22 @@
 
 **Every plugin in this repo is one of two things, and this directory is organised around that
 distinction.** A plugin answers either *who are the specialists in this repo* — then it is a **team**,
-under [`teams/`](teams/) — or *how does work move through this repo* — then it is a **workflow**, and the
+under [`dkj-teams/`](dkj-teams/) — or *how does work move through this repo* — then it is a **workflow**, and the
 one family of those this repo publishes lives under [`dkj-policy/`](dkj-policy/). Nothing published here
 is both, and nothing is neither.
 
-**Only one of those two directories still names a kind.** `teams/` does; `dkj-policy/` names the
-**government** — the prime ministry `dkj-policy` at its root and each ministry a level inside it — since
-[#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) renamed `workflows/` and lifted
-the prime ministry's files up into it. The distinction this page is organised around is unchanged; what
-changed is that it is now carried by the **names** on the workflow side, and by name *and* directory on
-the team side.
+**Neither directory names a kind and nothing else any more — both now say whose kind it is.**
+`dkj-teams/` holds the teams *of this family*, and `dkj-policy/` names the **government** — the prime
+ministry `dkj-policy` at its root and each ministry a level inside it. The workflow side got there first,
+when [#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) renamed `workflows/` and
+lifted the prime ministry's files up into it; the team side followed with
+[#1480](https://github.com/DaveKJohn/claude-code-specialists/issues/1480), which renamed `teams/` and gave
+each of the four teams the same `dkj-` prefix. The distinction this page is organised around is unchanged.
+What changed is who the directory says the plugins belong to — and that is not decoration: a plugin
+published from **anybody else's** marketplace can now be called `team-*` or `workflow-*` without colliding
+with a name this repo has claimed, which is exactly why the
+[`[plugin-kind]` check](../scripts/lint/check-plugin-integrity.ps1) holds only the `dkj-`-prefixed shapes to
+a directory and lets the bare ones through on name alone.
 
 ## The difference, side by side
 
@@ -20,7 +26,7 @@ the team side.
 | **Answers** | who the specialists are | how work moves through the repo |
 | **Ships** | `agents/` + `manuals/` — one subagent definition and one portable playbook per specialist | `skills/`, and the scripts and hooks behind them — no specialists at all |
 | **Stacks?** | **Yes.** Enable the core team plus as many add-on teams as the repo's domain calls for; each one adds colleagues. | **In practice, no** — there is one, and it is opt-in. Two would answer the same question differently, but nothing checks it any more; see below. |
-| **Named** | `team-<name>`, under `plugins/teams/` | `<owner>-policy` and `<owner>-policy-<ministry>`, under `plugins/dkj-policy/`; `workflow-*`, `contributing-*` and `*-codex` are still accepted names but sit nowhere in particular |
+| **Named** | `team-<name>`, under `plugins/dkj-teams/` | `<owner>-policy` and `<owner>-policy-<ministry>`, under `plugins/dkj-policy/`; `workflow-*`, `contributing-*` and `*-codex` are still accepted names but sit nowhere in particular |
 | **Enable none, and** | the repo has no specialists | the specialists use plain git/gh |
 
 **The stacking row is the one that matters most**, and it is not a style preference. Two enabled
@@ -59,7 +65,7 @@ first, and nobody reads both pages in one sitting.
 ## The two rules that guard the split, and where they are checked
 
 - **A plugin's name says which kind it is, and where a name claims a directory it must sit there.** Two
-  shapes claim one: `team-*` claims `plugins/teams/`, and `*-policy` / `*-policy-*` claim
+  shapes claim one: `team-*` claims `plugins/dkj-teams/`, and `*-policy` / `*-policy-*` claim
   `plugins/dkj-policy/`. Lint
   check 23 (`[plugin-kind]`) in
   [`../scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) holds
@@ -73,15 +79,15 @@ first, and nobody reads both pages in one sitting.
   reachable. Recorded rather than deleted, because the question comes back the day a second workflow
   does.
 
-Both are stated in full where they apply: [`teams/README.md`](teams/README.md) and
+Both are stated in full where they apply: [`dkj-teams/README.md`](dkj-teams/README.md) and
 [`dkj-policy/README.md`](dkj-policy/README.md) — the second of which is now the **plugin's own** page
 rather than a page about the kind, because #1467 merged the two into it.
 
 **Not everything under a kind directory is a plugin.** The canonical source of the boundary blocks that
 appear verbatim in many agent defs is
-[`teams/agent-shared/`](teams/agent-shared/) — a generator writes those blocks *into* the team folders,
-and it has [its own README](teams/agent-shared/README.md) for the
-never-edit-between-the-sentinels rule and how to add a block. It sits inside `teams/` because every file
+[`dkj-teams/agent-shared/`](dkj-teams/agent-shared/) — a generator writes those blocks *into* the team folders,
+and it has [its own README](dkj-teams/agent-shared/README.md) for the
+never-edit-between-the-sentinels rule and how to add a block. It sits inside `dkj-teams/` because every file
 carrying such a block is a team's, and it is held to none of the rules above because it is in no
 marketplace. See
 [Shared agent-def blocks](../README.md#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries).
