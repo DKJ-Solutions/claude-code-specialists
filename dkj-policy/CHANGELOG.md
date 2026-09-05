@@ -32,6 +32,41 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1456-capped-listing-measurement · 20260905-194439
+
+A fifth measured instance under the `triage-inbound` skill's fifth pattern, plus the mechanism behind
+it. #1456 reported an absence that does not exist -- `DaveKJohn` is in fact the most-assigned identity
+here, 88 of 221 assigned issues -- and all three of its figures reproduce exactly from a single `gh`
+listing capped at `--limit 200`/`300`. The headline `67` was that account's own assignee count inside
+the window, reported as the count that excluded it.
+
+The four instances already recorded are reports that were real and mis-sized. This one is the variant
+where the mis-measurement is the whole finding, so the pattern's intro now says so rather than leaving
+its name to carry it.
+
+**Score:** 2 -- a skill only a pickup reads, and it changes no gate. It earns more than cosmetic because
+the mechanism is reproducible and silent: `gh issue list`/`gh pr list` return the newest `--limit` rows
+and say nothing about what they left out, so a windowed figure is indistinguishable from a full-history
+one in the report that quotes it.
+
+#### What makes this deploy extra special
+
+One capped window produced **three** mutually consistent figures, all three wrong. That is the part
+worth carrying: a report whose numbers agree with each other is not thereby corroborated -- they can
+share a single bad window. The report also carried its own counterexample, citing #1450 as claimed by
+the filing session while #1450 is assigned to `DaveKJohn`, one of the 88 it argued do not exist.
+
+**Score:** N/A -- internal triage evidence for this repo's own pickups; no subscriber of a service
+reads it.
+
+#### Pull Request
+
+Record the capped-listing measurement failure in triage-inbound
+
+[PR #1462](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1462)
+
+---
+
 ### DEPLOY: fix/1447-release-page-path · 20260905-192056
 
 Two path statements in `dkj-policy/releases/README.md` repaired after the #1437 folder rename. The
