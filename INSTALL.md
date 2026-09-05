@@ -139,7 +139,7 @@ belongs to, and why**, before doing it. Look for that invariant, not for a fixed
 
 An install writes **nothing** into your repo — it is a clone into the plugin cache — and Step 2 answers
 only what `team-alpha` needs. Every other plugin that owns repo state ships its own `adopt-*` skill:
-`adopt-config` and `adopt-workflow-folder` (`dkj-policy`), `adopt-shopify-floor`
+`adopt-dkj-policy` (`dkj-policy`), `adopt-shopify-floor`
 (`team-shopify`). Your slash list holds exactly the ones your enabled plugins ship, namespaced as
 `<plugin>:adopt-*`, and each is additive and a dry run until you add `-Apply`. Skip this and a session
 check reports what is missing at every session start — which is how a consumer ends up discovering the
@@ -259,7 +259,7 @@ newest name first, and every seam default is composed from its answer — so a r
 its release history and its branch documents exactly where they are.
 
 What that costs is one thing worth knowing before you decide: **the scaffolder writes the new name.** Run
-`adopt-workflow-folder` in a repo that still has the old folder and you get a second folder beside the one
+`adopt-dkj-policy`'s Part 1 in a repo that still has the old folder and you get a second folder beside the one
 holding your history. So either rename yours in one commit —
 
 ```powershell

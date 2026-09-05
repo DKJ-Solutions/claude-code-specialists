@@ -153,7 +153,7 @@ answered by the repo rather than baked into the plugin:
   grouping, and the rest.
 - **`scripts/lib/branch-info.ps1`** — your branch taxonomy: which prefixes exist and what each one means.
 
-`specialists-init` (from `team-alpha`) scaffolds both, and **`adopt-config` fills them in**: it *places*
+`specialists-init` (from `team-alpha`) scaffolds both, and **`adopt-dkj-policy`'s Part 2 fills them in**: it *places*
 the answers that state a shared way of working and *proposes* — never places — the answers that state what
 your repo **is**. A `decide` answer is deliberately never written as a stub, because a stub returning a
 placeholder overrides a documented fallback that is usually right; absent beats wrong.

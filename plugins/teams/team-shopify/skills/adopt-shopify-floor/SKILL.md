@@ -63,7 +63,7 @@ what is configurable.
 This is the one thing in here that looks like an oversight and is not. A stub returning `VUL-IN` would
 be **worse than no function at all**: the session check reads a non-empty answer as *answered*, so the
 stub would silence the report while the id half of rule 3 stayed exactly as inert as before -- a hole
-with a comment on it. `adopt-config` settled the same question the same way for the values only a repo
+with a comment on it. `adopt-config.ps1` settled the same question the same way for the values only a repo
 can decide, and for the same reason.
 
 So without `-LiveThemeId` the block lands as a paste-ready comment in the right file, with the command
