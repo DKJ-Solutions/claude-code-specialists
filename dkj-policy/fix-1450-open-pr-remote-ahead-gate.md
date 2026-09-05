@@ -59,33 +59,45 @@ Add a single-branch fetch + rev-list ahead-check to open-pr.ps1, run before Invo
       neither carries a second copy of the sanitiser regex), that open-pr's gate sits before the
       PR-path `Invoke-WorkflowGates` call and refuses rather than warns, and that the lib is registered
       and mirrored.
-- [x] Rewrote the one landmark-ordering check in that suite from two raw `.IndexOf()` calls to a
-      single `[regex]::IsMatch` in dotall mode, after three CI runs in a row (windows-latest) read
-      plain `.IndexOf()` as -1 for one of the two landmarks against a file independently verified
-      byte-identical to the commit CI tested, and reproducible neither locally (four full local gate
-      runs, an isolated repro against the exact committed bytes, the exact CI shard grouping and lane
-      count) nor by changing the string's own quoting (backtick-escaped and single-quoted forms both
-      failed identically). The cause was never pinned down; regex is the mechanism every neighbouring
-      check in the same test case already used reliably, on CI, throughout.
 - [x] Fixed three existing test fixtures that build a throwaway copy of `new-branch.ps1` and its dot-sourced
       libs by hand (`new-branch.tests.ps1`, `entry-scaffold.tests.ps1`, `worktree-lane.tests.ps1`): each
       was missing the new lib, which failed every case that actually runs `new-branch.ps1` with a raw
       path-not-found rather than testing anything -- caught by running the full local test gate, not by
       the targeted suite alone.
+- [x] Case 9's landmark-ordering check failed on CI four times running, under three unrelated
+      implementations (backtick-escaped `.IndexOf()`, single-quoted `.IndexOf()`, a `[regex]::IsMatch`),
+      every one passing reliably off CI -- including against the exact committed bytes, fetched from
+      GitHub, in the exact CI shard grouping and lane count. **The real cause, found only once a
+      diagnostic build printed what CI actually saw**: GitHub tests the PULL-REQUEST MERGE REF, not
+      this branch's own tip, and between this branch's creation and each push `main` had already gained
+      a `-MaxParallel` parameter on `Invoke-WorkflowGates` (issue #1443) that this branch had not yet
+      merged -- so the full call-signature literal this case asserted against was stale in the merge CI
+      built, while every offline check (git show, the GitHub Contents API pinned to this branch) read
+      the unmerged tip and saw the old, still-matching text. Repaired in two parts: the branch is merged
+      with `main`, and the landmark itself now names only `-Context 'the PR'` -- the one thing this
+      branch's own gate owns and the part that tells it apart from `-GatesOnly`'s `-Context 'the gate
+      run'` -- rather than the other call's full parameter list, which is `main`'s to extend and not
+      this test's to pin.
 
 ### TEST
 
-- Lint gate (`scripts\lint\check-plugin-integrity.ps1`): 0 errors.
-- Full local test gate (`Invoke-TestSuiteGate`, all 69 suites, 32 lanes): **all 69 suites passed in 133s**.
-  First full run caught the two fixtures above missing the new lib (`entry-scaffold.tests.ps1`,
+- Lint gate (`scripts\lint\check-plugin-integrity.ps1`): 0 errors, before and after merging `main`.
+- Full local test gate (`Invoke-TestSuiteGate`), pre-merge: **all 69 suites passed in 133s**. First run
+  caught the two fixtures above missing the new lib (`entry-scaffold.tests.ps1`,
   `worktree-lane.tests.ps1`) -- both green after the fix.
-- `remote-ahead-lib.tests.ps1` on its own: 36/36 pass, locally and on CI (after the regex rewrite above).
+- After merging `main` (which had gained a suite of its own, `claim-issue.tests.ps1`): **all 70 suites
+  passed in 134s**.
+- `remote-ahead-lib.tests.ps1` on its own: 36/36 pass locally, both before and after the merge.
 - `new-branch.tests.ps1` on its own: all 255 asserts pass (unchanged output -- the extraction did not
   move a single printed word, which is what the pre-existing "remote ahead"/"adversarial tip" cases in
   that suite actually pin).
 - `shared-scripts.tests.ps1`: all 527 asserts pass (registration + mirror parity for the new lib).
-- `gate-lib.tests.ps1`: 115/115 pass (unaffected -- the new gate sits above `Invoke-WorkflowGates`,
-  never inside it).
+- `gate-lib.tests.ps1`: pass (unaffected -- the new gate sits above `Invoke-WorkflowGates`, never
+  inside it); its own asserts grew when `main`'s `-MaxParallel` addition merged in.
+- FOUR CI runs on PR #1460 read `remote-ahead-lib.tests.ps1`'s case 9 as failed, none of them a defect
+  in the assertion mechanism -- see the CREATE step above for the actual cause (the branch was stale
+  against `main`) and its two-part repair. A fifth CI run, after the merge, is what this PR actually
+  ships on.
 
 ### DEPLOY: fix/1450-open-pr-remote-ahead-gate
 
