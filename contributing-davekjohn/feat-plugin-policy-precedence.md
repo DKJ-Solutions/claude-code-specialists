@@ -86,8 +86,8 @@ plugin now installed beside it, the top rung has an internal order and the diagr
 ### TEST
 
 - [x] `check-plugin-integrity.ps1` -- **0 errors**. It caught three real omissions on the first run
-      (`check-policy-drift` missing from both `<!-- skills:all -->` spans in `README.md` and from the
-      `<!-- skills:plugin -->` table in the plugin `README.md`); all three added, then green.
+      (`check-policy-drift` missing from both `skills:all` spans in `README.md` and from the
+      `skills:plugin` table in the plugin `README.md`); all three added, then green.
 - [x] New suite `scripts/tests/policy-drift-report.tests.ps1` -- **22 asserts, all passing**. It pins the
       three things that are actually decisions rather than the prose: that the script **never refuses**
       (exit 0 on an empty tree and on a tree with findings), the **rank-1 order** (a fixture where the
