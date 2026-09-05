@@ -52,13 +52,21 @@ Add a single-branch fetch + rev-list ahead-check to open-pr.ps1, run before Invo
       risk (the divergence is still caught at the push, exactly today's behaviour).
 - [x] Registered `remote-ahead-lib` in `scripts\lib\shared-scripts-lib.ps1` (both callers are mirrored)
       and regenerated the plugin mirrors via `scripts\sync\build-shared-scripts.ps1`.
-- [x] Added `scripts\tests\remote-ahead-lib.tests.ps1` (37 asserts): the function against real
+- [x] Added `scripts\tests\remote-ahead-lib.tests.ps1` (36 asserts): the function against real
       bare+clone git fixtures (level, diverged, multi-commit, fresh/stale label selection, the
       adversarial-tip and length-cap cases new-branch.tests.ps1 already covers end-to-end, an
       unanswerable ref), plus structural asserts that both callers reach the shared function (and that
       neither carries a second copy of the sanitiser regex), that open-pr's gate sits before the
       PR-path `Invoke-WorkflowGates` call and refuses rather than warns, and that the lib is registered
       and mirrored.
+- [x] Rewrote the one landmark-ordering check in that suite from two raw `.IndexOf()` calls to a
+      single `[regex]::IsMatch` in dotall mode, after three CI runs in a row (windows-latest) read
+      plain `.IndexOf()` as -1 for one of the two landmarks against a file independently verified
+      byte-identical to the commit CI tested, and reproducible neither locally (four full local gate
+      runs, an isolated repro against the exact committed bytes, the exact CI shard grouping and lane
+      count) nor by changing the string's own quoting (backtick-escaped and single-quoted forms both
+      failed identically). The cause was never pinned down; regex is the mechanism every neighbouring
+      check in the same test case already used reliably, on CI, throughout.
 - [x] Fixed three existing test fixtures that build a throwaway copy of `new-branch.ps1` and its dot-sourced
       libs by hand (`new-branch.tests.ps1`, `entry-scaffold.tests.ps1`, `worktree-lane.tests.ps1`): each
       was missing the new lib, which failed every case that actually runs `new-branch.ps1` with a raw
@@ -71,7 +79,7 @@ Add a single-branch fetch + rev-list ahead-check to open-pr.ps1, run before Invo
 - Full local test gate (`Invoke-TestSuiteGate`, all 69 suites, 32 lanes): **all 69 suites passed in 133s**.
   First full run caught the two fixtures above missing the new lib (`entry-scaffold.tests.ps1`,
   `worktree-lane.tests.ps1`) -- both green after the fix.
-- `remote-ahead-lib.tests.ps1` on its own: 37/37 pass.
+- `remote-ahead-lib.tests.ps1` on its own: 36/36 pass, locally and on CI (after the regex rewrite above).
 - `new-branch.tests.ps1` on its own: all 255 asserts pass (unchanged output -- the extraction did not
   move a single printed word, which is what the pre-existing "remote ahead"/"adversarial tip" cases in
   that suite actually pin).

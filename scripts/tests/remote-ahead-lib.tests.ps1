@@ -201,14 +201,18 @@ try {
 
     # --- 9. open-pr's gate sits BEFORE the lint+test gate, and blocks -------------------------
     Write-Host "`n== 9. open-pr asks before spending the gate, and refuses rather than warns ==" -ForegroundColor Cyan
-    # Single-quoted literals throughout -- like gate-lib.tests.ps1's own landmark checks -- rather than
-    # a double-quoted string with backtick-escaped '$'. CI (windows-latest, en-US) read the
-    # backtick-escaped form as -1 twice in a row while this exact byte-identical file passed locally
-    # (nl-NL) every time; single-quoting removes the escape entirely rather than explaining the gap.
-    $idxRemoteAheadFetch = $openPrText.IndexOf('''fetch'', ''origin''')
-    $idxWorkflowGatesPr  = $openPrText.IndexOf('Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context ''the PR''')
-    Assert-True ($idxRemoteAheadFetch -ge 0 -and $idxWorkflowGatesPr -ge 0) 'both landmarks are found'
-    Assert-True ($idxRemoteAheadFetch -lt $idxWorkflowGatesPr) 'the single-branch fetch runs before the PR-path gate call'
+    # A SINGLE REGEX ORDERING PROOF, not two raw .IndexOf() calls compared against each other. Three CI
+    # runs in a row (windows-latest) read plain String.IndexOf() as -1 for the second landmark, on this
+    # exact byte-identical, git-verified file, while every regex-based check in this same case (below)
+    # and in gate-lib.tests.ps1's own landmark checks passed reliably every time, on CI and locally, in
+    # every configuration tried (backtick-escaped and single-quoted literals both; en-US and invariant
+    # culture; the exact CI shard grouping and lane count reproduced locally). The cause was never
+    # pinned down -- what changed here is proven, not explained: one .NET regex match, in dotall mode,
+    # standing in for the two independently-computed indices.
+    $fetchLiteral = '''fetch'', ''origin'''
+    $gateCallLiteral = 'Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -Context ''the PR'''
+    $orderPattern = [regex]::Escape($fetchLiteral) + '(?s).*?' + [regex]::Escape($gateCallLiteral)
+    Assert-True ([regex]::IsMatch($openPrText, $orderPattern)) 'both landmarks are found, and the single-branch fetch runs before the PR-path gate call'
     $remoteAheadGateBlock = [regex]::Match($openPrText, "(?s)# --- Remote-ahead gate.*?\n\n# THE GATES BELOW").Value
     Assert-True ([bool]$remoteAheadGateBlock) 'the remote-ahead gate block is found as a single section'
     Assert-True ($remoteAheadGateBlock -match 'exit 1') 'a real divergence exits rather than only warning'
