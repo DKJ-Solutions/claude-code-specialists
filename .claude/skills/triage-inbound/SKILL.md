@@ -86,7 +86,9 @@ just advice.
   real and its SIZE is wrong.** Written August 15, 2026, after a team-wide review filed 22 issues and
   **three of them turned out to be mis-measured on pickup** — all three mine, all three found only
   because the repair began with a recount. **A fourth followed the next day**, from the same review and
-  the same team, and it is added below rather than folded into the count so the growth stays visible:
+  the same team, and it is added below rather than folded into the count so the growth stays visible.
+  **A fifth, three weeks later, came from outside that review** and is the reason the pattern's name is
+  not the whole of it: there the mis-measurement was not the finding's size but the finding itself.
   - **[#697](https://github.com/DaveKJohn/claude-code-specialists/issues/697)** counted **32** uses of
     the retired name "the workshop repo". The subject — the word *workshop* as a live term — is
     **342**. Repairing to the report was still right, but the remaining 310 are a separate decision,
@@ -109,12 +111,38 @@ just advice.
     count was wrong in the same direction as the three above — "234 asserts" is what that one suite prints
     for itself, against **4,206** across all forty. The measurement and the corrected direction are in
     [Nolan #25](../../specialists/lenses/06-25-extension.md#the-gates-wall-clock-is-one-suite--re-measured-n5-august-16-2026).
+  - **[#1456](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1456)**, picked up
+    September 5, 2026, is the variant where the mis-measurement is not the finding's size but the
+    **whole finding**. It reported *"0 of 67 currently-assigned issues carry `DaveKJohn` as assignee"*,
+    with **132** PRs and **83** authored issues beside it as the contrast. Measured over the full
+    history: **88** of 221 assigned issues carry `DaveKJohn` — *more than either other identity* — and
+    the authorship figures are **285** PRs and **220** issues. Nothing was mis-sized; the reported
+    absence never existed.
+    **All three figures reproduce exactly, from one mechanism.** `gh issue list --state all --limit 200`
+    returns **67** `DaveKJohn` assignees and **83** `DaveKJohn`-authored issues; `gh pr list --limit 300`
+    returns **134**. So the headline was not a differently-chosen search in the sense of the three above:
+    **67 was `DaveKJohn`'s own count inside a 200-issue window, reported as the count that excluded
+    them** — a truncated window read, and then read inverted. Its identity bullet failed independently:
+    it stated that `gh auth status` and `git config user.name` both read `DaveKJohn` on this machine,
+    where both read **`davekokbwj`** (they do agree, which is what the session hook reports — just not on
+    that name).
+    **And the report carried its own counterexample**, which is the part worth recognising next time: it
+    closed by citing #1450 as claimed by the filing session, and #1450 is assigned to **`DaveKJohn`** —
+    filed by that account, one of the 88, inside the paragraph arguing the 88 do not exist.
   **What generalises:** a count in a report is whatever the search matched, and the search is chosen by
   whoever noticed the symptom. Here the reporter and the repairer were the same team an hour apart, and
   it still went wrong **four times out of 22** — which is the argument for recounting even when the report
   is your own, and especially then. **And a timing is a count too**: #714's headline was a stopwatch
   reading taken while the machine ran a team-wide review, which is why the re-measure states the machine
   state and the n beside every figure.
+  **And a CAP is a measurement too** — the fifth bullet is not from that review, and it is here because
+  it fails one step earlier than the other four. `gh issue list` and `gh pr list` return the newest
+  `--limit` rows and say nothing about what they left out, so a figure taken inside a window is
+  indistinguishable, in the report that quotes it, from a figure taken over the history. In #1456 one
+  capped window produced **three** such figures at once, each internally consistent and all three wrong,
+  which is why a report whose numbers agree with each other is not thereby corroborated: they can share a
+  single bad window. Where a report states a count over *"this repo's history"*, re-run it with the cap
+  above the total and compare the two numbers before believing either.
 - **The sixth pattern: the symptom is real, it is live right now, and it is in the REPORTER's tree.**
   [#954](https://github.com/DaveKJohn/claude-code-specialists/issues/954), closed August 27, 2026. It
   reported two dead GitHub blob URLs — `plugins/workflows/workflow-davekjohn/skills/cut-release/SKILL.md`,
