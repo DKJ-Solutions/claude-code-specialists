@@ -273,6 +273,11 @@ try {
 
     $w2 = Invoke-Build -Root $r7 -ScriptArgs @('-Worker', '-InitToken')
     Assert-Equal 0 $w2.Code 'token: -InitToken creates one and the worker builds'
+    # A configured worker name means this repo has hosted the page before, so a fresh token may be
+    # about to orphan a live one. Reported rather than refused: a first-ever token looks identical
+    # from here, and -InitToken is explicit (issue #1453).
+    Assert-Match 'a page may already be live' $w2.Out 'token: -InitToken warns when a worker is named'
+    Assert-Match 'code view' $w2.Out 'token: and says where the old token is still readable'
     $token = ([System.IO.File]::ReadAllText((Join-Path $pageDir7 'worker-path-token.txt'), [System.Text.Encoding]::UTF8)).Trim()
     Assert-Match '^[0-9a-f]{32}$' $token 'token: 32 hex characters'
 
@@ -288,6 +293,14 @@ try {
     # A copy the operator still HAS, in a folder nothing points at any more, is the likeliest reason
     # this one is missing -- so the refusal names that move even when it finds no copy (issue #1444).
     Assert-Match 'renamed or repointed' $w1.Out 'token: with no copy anywhere, the refusal still names the move that hides one'
+
+    # AND THE DEPLOYMENT IS A COPY TOO (issue #1453). "No token on any machine here" was read as "the
+    # URL is unrecoverable", which does not follow while the worker is up: the bundle carries its route
+    # as a literal, so Cloudflare holds the token. The refusal has to name that BEFORE -InitToken,
+    # because -InitToken is the step that makes the loss real.
+    Assert-Match 'THREE WAYS BACK' $w1.Out 'token: the refusal enumerates the routes rather than naming two of three'
+    Assert-Match 'read them off the DEPLOYMENT' $w1.Out 'token: and names the deployment as a copy of the token'
+    Assert-True ($w1.Out.IndexOf('DEPLOYMENT') -lt $w1.Out.IndexOf('-InitToken for a fresh path')) 'token: the recoverable route is named before the destructive one'
 
     # --- 7b. A token left behind by a folder move -------------------------------------------------
     # THE CASE THIS EXISTS FOR: the page directory is derived from the note root and gitignored, so
@@ -310,6 +323,16 @@ try {
     Assert-Equal 1 $s2.Code 'stray: -InitToken refuses too -- its guard asks whether a token exists ANYWHERE'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $r7b 'releases\page\worker-path-token.txt'))) 'stray: and no second token was minted'
     Assert-Equal ('a' * 32) ([System.IO.File]::ReadAllText($strayToken, [System.Text.Encoding]::UTF8)).Trim() 'stray: the copy it found is left exactly as it was'
+
+    # --- 7c. The -InitToken warning is about a LIVE page, so an unhosted repo never sees it --------
+    # Most consumers build the page and host it nowhere. Warning them about orphaning a deployment
+    # they do not have is the noise that teaches people to skim the yellow block (issue #1453).
+    Write-Host "worker -- the -InitToken warning stays silent where nothing is hosted" -ForegroundColor Cyan
+    $r7c = New-FixtureRepo -Label 'inittoken-unhosted'
+    $i1  = Invoke-Build -Root $r7c -ScriptArgs @('-InitToken')
+    Assert-Equal 0 $i1.Code 'unhosted: -InitToken alone still succeeds without a worker name'
+    Assert-Match '^[0-9a-f]{32}$' ([System.IO.File]::ReadAllText((Join-Path $r7c 'releases\page\worker-path-token.txt'), [System.Text.Encoding]::UTF8)).Trim() 'unhosted: and writes a real token'
+    Assert-True (-not ($i1.Out -match 'a page may already be live')) 'unhosted: but says nothing about a deployment this repo does not have'
 
     # --- 8. -Worker without the seam --------------------------------------------------------------
     Write-Host "worker -- hosting needs the worker name" -ForegroundColor Cyan
