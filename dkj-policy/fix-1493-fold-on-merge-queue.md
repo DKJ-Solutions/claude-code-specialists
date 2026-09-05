@@ -37,17 +37,61 @@ Adds .github/workflows/fold-on-merge.yml: on push to main, runs check-unfolded-e
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add `.github/workflows/fold-on-merge.yml`: on push to `main`, run
+      `check-unfolded-entry.ps1 -Branch main`; if it reports a leftover, run
+      `fold-changelog-entry.ps1 -Commit -Push` (fold-all mode -- it already resolves each unfolded
+      document's own PR via its own `gh pr list` lookup, so no branch has to be derived from the push
+      event or the merge-commit message). Job permissions: `contents: write` + `pull-requests: read`
+      (the second is required -- the fold step's own `gh pr list` needs it, and declaring any
+      `permissions:` block sets every unlisted scope to `none`).
+- [x] Manually cleared the one live instance already on the trunk when this branch was cut
+      (`dkj-policy/feat-1480-rename-teams-to-dkj-teams.md`, from the `feat/1480` queue merge) via
+      `fold-changelog-entry.ps1 -Branch feat/1480-rename-teams-to-dkj-teams -Commit -Push` -- unrelated
+      to this branch's diff, done directly on `main` under the existing fold exception, so the workflow
+      being added here starts from a clean trunk.
 
 ### TEST
 
+No PowerShell changed, so no suite needed updating. What was verified instead:
+
+- Read `check-unfolded-entry.ps1` and `fold-changelog-entry.ps1` end to end to confirm fold-all mode's
+  branch/PR resolution needs no input from the push event.
+- Confirmed live, via `gh api`, that `main-ci-gate`'s `bypass_actors` does not yet include the GitHub
+  Actions app (`integration_id 15368`) -- so this workflow's fold step will fail its own `git push`
+  with a ruleset rejection until that bypass is added. That is Dave's action, tracked on #1493, not
+  this branch's.
+- **Test gap, said out loud rather than faked**: this workflow's actual behaviour (a real queue merge,
+  the bypass in place, the fold landing) cannot be exercised outside a live merge queue on this repo's
+  own `main`. The honest verification is a real queue merge once the bypass exists -- see the PR body.
+
 ### DEPLOY: fix/1493-fold-on-merge-queue
 
-**Score:**
+Adds `.github/workflows/fold-on-merge.yml`: after every push to `main`, it checks for a changelog
+entry left unfolded by a merge the shipping session never saw -- the `main-ci-gate` merge queue (#1492)
+merges a PR itself, so `ship-pr.ps1`'s own post-merge fold step never runs for a queue-merged PR, and
+the branch's `dkj-policy/<branch>.md` dossier was otherwise left sitting on the trunk with nobody to
+fold it but a human doing it by hand. The workflow adds no new detection logic and no new fold logic --
+it runs the two scripts this repo already has (`check-unfolded-entry.ps1`, then
+`fold-changelog-entry.ps1 -Commit -Push` in its existing fold-all mode) from the one place that always
+sees a queue merge: a push to `main`.
+
+**Code-complete, and inert until one more thing lands that is not part of this PR.** `main-ci-gate`'s
+`required_status_checks` rule blocks any push to `main` -- including this job's -- unless the pushing
+actor is a listed bypass actor. The default `GITHUB_TOKEN` a workflow run carries pushes as the GitHub
+Actions app, which is not on that list today. Adding it is a repo-settings/ruleset change, so it is
+Dave's action to take, not this branch's -- see #1493 for the exact API payload already prepared for
+him. Until he applies it, this workflow's fold step will visibly fail its own `git push` with a
+ruleset rejection whenever it finds something to fold, which is the correct failure mode for code that
+is finished but waiting on a permission it cannot grant itself.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- this workflow lives in `.github/workflows/`, not under `plugins/`, so it never ships to a
+consumer via the plugin mechanism. It is specific to how this source repo's own `main` is guarded.
+
+**Score:** N/A
 
 #### Pull Request
 
