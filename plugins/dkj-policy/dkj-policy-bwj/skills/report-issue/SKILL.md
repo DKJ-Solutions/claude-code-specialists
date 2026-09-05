@@ -113,7 +113,7 @@ Where it is `$null` -- the default -- skip it silently, exactly as for `Github I
 section **number** that stage is (leave it unset and the default is `3`), then read the project's
 sections and take the one whose name starts with that number. The words after the number are the
 team's and tell you nothing, so match on the **number** only.
-[Step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy-bwj/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
+[Step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
 has the whole stage model. **If the project has no numbered sections, place nothing and say so** --
 that board is not a pipeline, and the daily sweep will not move this card either.
 

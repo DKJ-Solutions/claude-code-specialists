@@ -11,7 +11,7 @@ tally of a machine-held list is wrong when typed and wrong again after the next 
 lesson the root [`CLAUDE.md`](../CLAUDE.md) records about counting a name inside the document that
 carries it. Ask the registry. The mirror's own page, written for the
 consumer who only has the copy, is
-[`plugins/workflows/dkj-policy/scripts/README.md`](../plugins/workflows/dkj-policy/scripts/README.md).
+[`plugins/dkj-policy/scripts/README.md`](../plugins/dkj-policy/scripts/README.md).
 
 Three consequences worth knowing before you touch anything:
 
@@ -41,7 +41,7 @@ Three consequences worth knowing before you touch anything:
   mirror as drift.
 - **CI runs these from a bare checkout, with no plugin cache.** Anything the lint gate or a test suite
   reaches has to be resolvable from this directory alone — which is why a few files
-  [deliberately cannot move](../plugins/workflows/dkj-policy/scripts/README.md#what-deliberately-stays-in-the-consumers-root-cannot-move-here)
+  [deliberately cannot move](../plugins/dkj-policy/scripts/README.md#what-deliberately-stays-in-the-consumers-root-cannot-move-here)
   into a plugin.
 
 **Why the first of those needs saying, measured on August 12, 2026 against mirror `4.5.0`.** Every skill

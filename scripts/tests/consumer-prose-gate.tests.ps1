@@ -65,7 +65,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\lint\check-consumer-prose.ps1'
-$Hook     = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\hooks\consumer-prose-sessioncheck.ps1'
+$Hook     = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\consumer-prose-sessioncheck.ps1'
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\measure-context-lib.ps1')
 

@@ -139,16 +139,18 @@
          of its commands pointing at the author's own plugin cache, pinned to a version. The subject is
          the '-File' argument rather than paths in general, because a tree-wide rule would be born
          accusing three correct comments that quote a user path to explain a path-mangling bug.
-     23. a plugin's name says which kind it is, and it must sit where that says: 'team-*' under
-         plugins/teams/, and a way of working ('workflow-*', 'contributing-*' or '*-codex') under
-         plugins/workflows/, and every plugin one or the other. The directory rule is DERIVED from the
+     23. a plugin's name says which kind it is, and where that name claims a directory it must sit
+         there: 'team-*' under plugins/teams/, and '*-policy' / '*-policy-*' under plugins/dkj-policy/.
+         'workflow-*', 'contributing-*' and '*-codex' are accepted names held to no directory since
+         #1467, because plugins/workflows/ -- which used to name their kind -- is gone. Every plugin is
+         still one or the other BY NAME. The directory rule is DERIVED from the
          name, so a plugin matching none of those has its location held against nothing -- an
          unclassifiable name switches the check off for itself rather than merely reading untidily.
          (Until #886 the reason was the core's workflow-sessioncheck counting by the 'workflow-'
          prefix; that hook was retired with workflow-default and the argument above is the one that
          survives it.)
      24. the PR template keeps the two promises open-pr makes about it: the shipped reference under
-         plugins/workflows/dkj-policy/templates/ byte for byte against Get-PrTemplateReference,
+         plugins/dkj-policy/templates/ byte for byte against Get-PrTemplateReference,
          and THIS repo's own .github/pull_request_template.md only to the contract (one placeholder line
          the matcher recognises). Deliberately weaker for the second, which is genuinely repo-owned: a
          byte rule would refuse a correct change the day it grows a section. A heading is no longer part
@@ -627,7 +629,8 @@ $linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
 # agent defs, skills, manuals, personas and the plugin CHANGELOGs, and false of anything else. A markdown
 # file at PLUGIN level matched no rule at all, which is where a plugin's own README.md sits: the first page
 # a consumer reads, its links never once validated. Measured on the day this was widened: six such files,
-# five of them already in the tree (plugins\teams\README.md, plugins\workflows\README.md, both workflow
+# five of them already in the tree (plugins\teams\README.md, plugins\workflows\README.md -- the latter
+# merged into the plugin's own page by #1467 -- both workflow
 # plugin READMEs, and dkj-policy\scripts\README.md) and the sixth the portable contribution guide
 # added by that same change -- a consumer-facing page whose whole purpose is to be copied, and whose dead
 # links would therefore be copied with it. All six were clean, so this arrives green; the point is that
@@ -2571,22 +2574,35 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # 'every directory under plugins/teams/ is named team-*' is a DIFFERENT check from this one, and it
 # would be false the moment it was written.
 
-# SEVERAL NAME SHAPES MAP TO THE SAME KIND SINCE AUGUST 26, 2026 (#886), AND THAT IS DELIBERATE. The
-# directory plugins/workflows/ holds the KIND -- a way of working -- and the rest of the name says
-# WHOSE it is. 'contributing-davekjohn' was renamed from 'workflow-davekjohn' because that is what it
-# does: it serves one owner's contributing rules, not a workflow among several. Dave kept the directory
-# name (decision A on that issue), so a 'contributing-*' plugin living under plugins/workflows/ is the
-# intended shape rather than a mismatch nobody noticed. '*-codex' joined the same way on September 1,
-# 2026, when 'workflow-bwj' was renamed 'bwj-codex' -- a codex is a body of law, i.e. a way of working,
-# and the leading word names whose. 'workflow-*' is still accepted: it is what a plugin from anybody
-# else would be called, and refusing it would make this family's renames somebody else's problem.
+# SEVERAL NAME SHAPES MAP TO THE SAME KIND SINCE AUGUST 26, 2026 (#886), AND THAT IS DELIBERATE.
+# 'contributing-davekjohn' was renamed from 'workflow-davekjohn' because that is what it does: it serves
+# one owner's contributing rules, not a workflow among several. '*-codex' joined the same way on
+# September 1, 2026, when 'workflow-bwj' was renamed 'bwj-codex' -- a codex is a body of law, i.e. a way
+# of working, and the leading word names whose. '*-policy' / '*-policy-*' joined on September 5, 2026
+# (#1437), when 'contributing-davekjohn' became 'dkj-policy' and 'bwj-codex' became 'dkj-policy-bwj':
+# a policy IS a way of working, the leading word says whose, and the trailing one -- where there is one --
+# says which ministry under it. THE RETIRED SHAPES STAY ACCEPTED rather than being swapped out, which is
+# this repo's standing answer to a rename (#952): a consumer who has not migrated still resolves a
+# 'contributing-*' plugin, and a check that recognised only today's spelling would report their working
+# install as unclassifiable.
 #
-# AND '*-policy' / '*-policy-*' JOINED ON SEPTEMBER 5, 2026 (#1437), when 'contributing-davekjohn' became
-# 'dkj-policy' and 'dkj-policy-bwj' became 'dkj-policy-bwj'. Same shape, same reason: a policy IS a way of
-# working, the leading word says whose, and the trailing one -- where there is one -- says which ministry
-# under it. THE RETIRED SHAPES STAY ACCEPTED rather than being swapped out, which is this repo's standing
-# answer to a rename (#952): a consumer who has not migrated still resolves a 'contributing-*' plugin, and
-# a check that recognised only today's spelling would report their working install as unclassifiable.
+# THE DIRECTORY NO LONGER NAMES THE KIND, AND ONLY THE POLICY FAMILY HAS A DIRECTORY RULE LEFT
+# (#1467, September 5, 2026). plugins/workflows/ used to hold the KIND -- a way of working -- with the
+# rest of the name saying whose it is, and Dave kept that directory name through #886 (decision A on that
+# issue). #1467 renamed it to plugins/dkj-policy/ and lifted the prime ministry's own files to its root,
+# so the directory now names the GOVERNMENT: 'dkj-policy' at plugins\dkj-policy, and every other ministry
+# one level inside it ('dkj-policy-bwj' at plugins\dkj-policy\dkj-policy-bwj). That is what the anchored
+# '^plugins\\dkj-policy($|\\)' below says, and the '($|\\)' is load-bearing rather than tidy: a bare
+# prefix would also accept a sibling directory merely beginning with the same characters, which is a
+# different plugin family and not a ministry.
+#
+# AND THE OTHER THREE SHAPES KEEP THE NAMING HALF ONLY, because there is no directory left to hold them
+# to. 'workflow-*' is what a plugin from anybody else would be called, and refusing it would make this
+# family's renames somebody else's problem -- but pointing it at plugins/dkj-policy/ would be worse than
+# saying nothing: it would order a stranger's workflow into this government. So they fall through with no
+# location check, DELIBERATELY, which is a real narrowing of this check and is recorded as one. The
+# else-branch below is untouched: a name matching none of the five shapes is still an error, because the
+# failure it guards -- a plugin silently held to nothing at all -- is the one that has actually happened.
 $kindChecked = 0
 foreach ($p in $publishedPlugins) {
     $kindChecked++
@@ -2595,16 +2611,18 @@ foreach ($p in $publishedPlugins) {
         if ($rel -notmatch '^plugins\\teams\\') {
             Add-Error "[plugin-kind] '$($p.Name)' is a team by its name but its source is '$rel' -- a team belongs under plugins/teams/."
         }
-    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*' -or $p.Name -like '*-codex' -or $p.Name -like '*-policy' -or $p.Name -like '*-policy-*') {
-        if ($rel -notmatch '^plugins\\workflows\\') {
-            Add-Error "[plugin-kind] '$($p.Name)' is a way of working by its name but its source is '$rel' -- 'workflow-*', 'contributing-*', '*-codex', '*-policy' and '*-policy-*' all belong under plugins/workflows/."
+    } elseif ($p.Name -like '*-policy' -or $p.Name -like '*-policy-*') {
+        if ($rel -notmatch '^plugins\\dkj-policy($|\\)') {
+            Add-Error "[plugin-kind] '$($p.Name)' is a ministry of the policy by its name but its source is '$rel' -- '*-policy' and '*-policy-*' belong under plugins/dkj-policy/, the prime ministry at its root and every other ministry one level inside it."
         }
+    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*' -or $p.Name -like '*-codex') {
+        # Accepted by name, held to no location: see the retired-shapes note above.
     } else {
         Add-Error "[plugin-kind] '$($p.Name)' is none of 'team-*', 'workflow-*', 'contributing-*', '*-codex', '*-policy' or '*-policy-*'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the name, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
     }
 }
 Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
-    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name, and sits in the directory its name claims -- 'workflow-*', 'contributing-*', '*-codex', '*-policy' and '*-policy-*' all map to plugins/workflows/, the directory naming the KIND while the rest of the name says whose it is. The naming half is the one that cannot be seen by reading the tree: the directory rule is derived from the name, so an unclassifiable plugin is silently held to nothing" })
+    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name. Two name shapes still carry a directory rule: 'team-*' maps to plugins/teams/, and '*-policy' / '*-policy-*' map to plugins/dkj-policy/ -- the government, with the prime ministry at its root and every other ministry one level inside it. 'workflow-*', 'contributing-*' and '*-codex' are accepted by name and held to no location since #1467, because the directory that used to name their kind is gone. The naming half is the one that cannot be seen by reading the tree: a directory rule is derived from the name, so an unclassifiable plugin is silently held to nothing" })
 
 # --- 24. the PR template keeps the two promises open-pr makes about it ------------------------------------
 # WHAT THIS IS FOR, measured at a consumer rather than imagined (#573). open-pr fills the PR body's
@@ -2638,7 +2656,7 @@ Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
 # repo that does not define it is correct, exactly the shape recorded for Get-BranchTypes.
 $prtChecked = 0
 $prtNote = ''
-$prtRefRel = 'plugins\workflows\dkj-policy\templates\pull_request_template.md'
+$prtRefRel = 'plugins\dkj-policy\templates\pull_request_template.md'
 $prtRefPath = Join-Path $RepoRoot $prtRefRel
 $prtExpected = ((Get-PrTemplateReference) -join "`n").TrimEnd()
 if (-not (Test-Path -LiteralPath $prtRefPath)) {
@@ -2786,7 +2804,7 @@ Write-Coverage -Category 'consumer-tier' -Checked $ctrChecked `
 # findable by neither reading nor this gate, and the first three bytes are the only vantage point from which
 # it exists at all.
 #
-# A REPAIR, NOT A PRECAUTION. plugins/workflows/dkj-policy/skills/adopt-config/SKILL.md shipped with
+# A REPAIR, NOT A PRECAUTION. plugins/dkj-policy/skills/adopt-config/SKILL.md shipped with
 # EF BB BF in 4.1.0 -- the only one of the eleven skills across the two shipped plugins to carry it, and the
 # only model-invocable one absent from the agent's skill listing. A frontmatter parser that wants '---' at
 # offset 0 sees a BOM in front of it and reads the file as having no frontmatter, so the skill has no name
@@ -3005,7 +3023,7 @@ Write-Coverage -Category 'import' -Checked $importScanFiles.Count `
 # wrong instrument for a document that claims to list every skill of ONE plugin:
 #
 #   * its canonical set is repo-wide -- built from Get-PluginSubdirs over every published plugin -- so a
-#     span in plugins/workflows/dkj-policy/README.md, which enumerates the 16 that plugin
+#     span in plugins/dkj-policy/README.md, which enumerates the 16 that plugin
 #     ships, would report the team plugins' skills as 'missing';
 #   * every backtick-quoted token inside its span is a claimed name, which is why its own author
 #     condition is 'wrap tightly'. That table is two columns and three of its rows carry a backticked

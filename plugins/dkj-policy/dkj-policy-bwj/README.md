@@ -32,7 +32,7 @@ release is -- those are still `dkj-policy`'s answers, unchanged. So the two do n
 the specialists two contradicting answers to the same question; they answer different questions.
 
 That is the deliberate reading of the "second workflow" note left in
-[the workflows README](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/README.md)
+[the `dkj-policy` README](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/README.md)
 and the root README after
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886): a second workflow plugin is
 safe here **because it is additive and non-overlapping**, not because the old guard was wrong.

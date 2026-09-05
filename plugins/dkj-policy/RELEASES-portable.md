@@ -239,7 +239,7 @@ release-notes body has a hard **125,000-character** limit, which a full notes fi
 documents — an internal note for the organisation and a consumer document — and at all twelve releases
 since the internal tier existed, **both were written, about the same changes**. Measured before merging
 them: one release's internal note (962 words) held against test 2 of the writing norm in the
-[cut-release skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy/skills/cut-release/SKILL.md)
+[cut-release skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/skills/cut-release/SKILL.md)
 (*does this describe our effort or their outcome*) gave:
 
 | | words | |
@@ -432,7 +432,7 @@ In one motion, on a clean `main`:
 **Closing step, after the script and after the hand-written note has merged, where the bump wrote one:
 publish a GitHub Release.** Not run by `cut-release.ps1` and not automated; the release manager walks
 through the
-[`cut-release` skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy/skills/cut-release/SKILL.md)'s
+[`cut-release` skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/skills/cut-release/SKILL.md)'s
 checklist: `gh release create`
 with the **generated body** (`--notes-file` pointing at the `releases/github/<dir>/<X.Y.Z>.md` the cut already
 wrote — nothing to edit), then `gh release upload` with the full development notes **and the hand-written note,
@@ -471,7 +471,7 @@ without one simply has no such step. **Which plugins travel is repo data too**
 did before the seam existed) — the source repo excludes both workflow plugins from its own target,
 because that target serves Claude App users who have no repository, and a workflow is a method for
 moving work through one. The mechanics are Block 3 of the
-[`cut-release` skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/dkj-policy/skills/cut-release/SKILL.md)'s
+[`cut-release` skill](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/skills/cut-release/SKILL.md)'s
 checklist.
 
 Guardrails: a clean `main`, no unfolded entry files, **[the bump earned by the pending

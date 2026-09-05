@@ -24,7 +24,7 @@ happened to produce it.
 is the record working rather than a defect — so links may be repointed when a target moves, and prose
 is not rewritten. The one line that may be corrected is one that was *false when it was written*; the
 rule and how to mark such a correction are in
-[`RELEASES-portable.md`](../../plugins/workflows/dkj-policy/RELEASES-portable.md#once-it-has-landed-it-is-a-published-record--and-that-protects-only-what-was-true).
+[`RELEASES-portable.md`](../../plugins/dkj-policy/RELEASES-portable.md#once-it-has-landed-it-is-a-published-record--and-that-protects-only-what-was-true).
 That rule is exactly what the move obeyed: all 134 relative links in the notes were repointed one level
 deeper, and no note's prose was touched — so several of them still describe their own path as
 `releases/development/`, which is where they were written.
@@ -49,7 +49,7 @@ is. Everything a release *produces* belongs to the workflow and is one layer up,
 - **How a release is cut**, and this repo's answers to it — the seam values, the local decisions —
   are in
   [`contributing-davekjohn/releases/README.md`](README.md) over
-  [`RELEASES-portable.md`](../../plugins/workflows/dkj-policy/RELEASES-portable.md), which states
+  [`RELEASES-portable.md`](../../plugins/dkj-policy/RELEASES-portable.md), which states
   what it covers rather than being summarised here twice.
 
 That is the layering this repo uses throughout: the root holds what is true regardless, and the

@@ -2,8 +2,16 @@
 
 **Every plugin in this repo is one of two things, and this directory is organised around that
 distinction.** A plugin answers either *who are the specialists in this repo* — then it is a **team**,
-under [`teams/`](teams/) — or *how does work move through this repo* — then it is a **workflow**, under
-[`workflows/`](workflows/). Nothing published here is both, and nothing is neither.
+under [`teams/`](teams/) — or *how does work move through this repo* — then it is a **workflow**, and the
+one family of those this repo publishes lives under [`dkj-policy/`](dkj-policy/). Nothing published here
+is both, and nothing is neither.
+
+**Only one of those two directories still names a kind.** `teams/` does; `dkj-policy/` names the
+**government** — the prime ministry `dkj-policy` at its root and each ministry a level inside it — since
+[#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) renamed `workflows/` and lifted
+the prime ministry's files up into it. The distinction this page is organised around is unchanged; what
+changed is that it is now carried by the **names** on the workflow side, and by name *and* directory on
+the team side.
 
 ## The difference, side by side
 
@@ -12,7 +20,7 @@ under [`teams/`](teams/) — or *how does work move through this repo* — then 
 | **Answers** | who the specialists are | how work moves through the repo |
 | **Ships** | `agents/` + `manuals/` — one subagent definition and one portable playbook per specialist | `skills/`, and the scripts and hooks behind them — no specialists at all |
 | **Stacks?** | **Yes.** Enable the core team plus as many add-on teams as the repo's domain calls for; each one adds colleagues. | **In practice, no** — there is one, and it is opt-in. Two would answer the same question differently, but nothing checks it any more; see below. |
-| **Named** | `team-<name>`, under `plugins/teams/` | `workflow-<name>`, under `plugins/workflows/` |
+| **Named** | `team-<name>`, under `plugins/teams/` | `<owner>-policy` and `<owner>-policy-<ministry>`, under `plugins/dkj-policy/`; `workflow-*`, `contributing-*` and `*-codex` are still accepted names but sit nowhere in particular |
 | **Enable none, and** | the repo has no specialists | the specialists use plain git/gh |
 
 **The stacking row is the one that matters most**, and it is not a style preference. Two enabled
@@ -50,7 +58,9 @@ first, and nobody reads both pages in one sitting.
 
 ## The two rules that guard the split, and where they are checked
 
-- **A plugin's name says which kind it is, and it must sit in the directory that name claims.** Lint
+- **A plugin's name says which kind it is, and where a name claims a directory it must sit there.** Two
+  shapes claim one: `team-*` claims `plugins/teams/`, and `*-policy` / `*-policy-*` claim
+  `plugins/dkj-policy/`. Lint
   check 23 (`[plugin-kind]`) in
   [`../scripts/lint/check-plugin-integrity.ps1`](../scripts/lint/check-plugin-integrity.ps1) holds
   every published plugin to both halves. The naming half is the load-bearing one, and since
@@ -64,7 +74,8 @@ first, and nobody reads both pages in one sitting.
   does.
 
 Both are stated in full where they apply: [`teams/README.md`](teams/README.md) and
-[`workflows/README.md`](workflows/README.md).
+[`dkj-policy/README.md`](dkj-policy/README.md) — the second of which is now the **plugin's own** page
+rather than a page about the kind, because #1467 merged the two into it.
 
 **Not everything under a kind directory is a plugin.** The canonical source of the boundary blocks that
 appear verbatim in many agent defs is

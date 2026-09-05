@@ -2,7 +2,7 @@
 .SYNOPSIS
     Regression tests for the script-contract check (scripts/sync/check-script-contract.ps1, issue
     #147) and its SessionStart hook
-    (plugins/workflows/dkj-policy/hooks/script-contract-sessioncheck.ps1).
+    (plugins/dkj-policy/hooks/script-contract-sessioncheck.ps1).
 
 .DESCRIPTION
     Dependency-free: no Pester, plain PowerShell. Integration-style -- runs the REAL check script (and
@@ -45,7 +45,7 @@ $Script        = Join-Path $RepoRoot 'scripts\sync\check-script-contract.ps1'
 # blueprint generator. The scenarios below still run the real CHECK; the asserts about how records are
 # DECLARED read the lib, which is where they are now.
 $ContractLib   = Join-Path $RepoRoot 'scripts\lib\script-contract-lib.ps1'
-$Hook          = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\hooks\script-contract-sessioncheck.ps1'
+$Hook          = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\script-contract-sessioncheck.ps1'
 $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $RepoConfigSrc = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $Fixture       = Join-Path ([System.IO.Path]::GetTempPath()) "script-contract-test-fixture-$PID"
@@ -674,7 +674,7 @@ function Get-RosterIgnoredIds { return @() }
     $liveStagePattern = 'Lib\s*=\s*''scripts\\repo-config\.ps1'';\s*Function\s*=\s*''Get-LiveStage'';\s*Scripts\s*=\s*@\(''cut-release skill''\);(?:(?!Lib\s*=)[\s\S])*?Optional\s*=\s*\$true;\s*Default\s*=\s*'''''
     Assert-True ([regex]::IsMatch($contractSrc, $liveStagePattern)) "contract: record for 'Get-LiveStage' still declared, attributed to scripts\repo-config.ps1 / 'cut-release skill', Optional with an empty-string Default"
 
-    $cutReleaseSkillPath = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\skills\cut-release\SKILL.md'
+    $cutReleaseSkillPath = Join-Path $RepoRoot 'plugins\dkj-policy\skills\cut-release\SKILL.md'
     Assert-True (Test-Path -LiteralPath $cutReleaseSkillPath) 'contract: cut-release SKILL.md exists at the path the Get-LiveStage record is attributed to'
     if (Test-Path -LiteralPath $cutReleaseSkillPath) {
         $skillText = [System.IO.File]::ReadAllText($cutReleaseSkillPath)

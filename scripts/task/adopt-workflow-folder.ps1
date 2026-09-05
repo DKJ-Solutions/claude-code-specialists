@@ -355,7 +355,7 @@ $entryGateWorkflow = @(
     '        env:',
     '          CLAUDE_PROJECT_DIR: ${{ github.workspace }}',
     '        run: |',
-    '          powershell -NoProfile -ExecutionPolicy Bypass -File .workflow-scripts/plugins/workflows/dkj-policy/scripts/lint/check-branch-entry.ps1 -Branch "${{ github.head_ref }}"',
+    '          powershell -NoProfile -ExecutionPolicy Bypass -File .workflow-scripts/plugins/dkj-policy/scripts/lint/check-branch-entry.ps1 -Branch "${{ github.head_ref }}"',
     '          exit $LASTEXITCODE'
 )
 

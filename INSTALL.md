@@ -437,8 +437,13 @@ in the table above.
 moved twice under the old plugin ids, and which of the two your import names depends only on when you last
 updated — a fact your file does not state. The reliable test needs no version at all:
 
-> **Any import whose path does not contain `plugins/teams/<team>/` or `plugins/workflows/<workflow>/`
+> **Any import whose path does not contain `plugins/teams/<team>/` or `plugins/dkj-policy/`
 > is stale, whatever it contains instead.**
+
+The second half of that test moved on September 5, 2026
+([#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467)): `plugins/workflows/` became
+`plugins/dkj-policy/`. It costs a reader nothing in practice — a workflow ships no personas and no
+manuals, so nothing imports out of one — and the shape test names it only so the rule stays complete.
 
 Every layout this family has shipped, measured against this repo's own tags — the first two are what you
 might find, the third is what you are moving to:

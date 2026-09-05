@@ -992,7 +992,7 @@ than one machine's ordinary noise.
 meets this on day one — so neither stayed in this lens. The measurement discipline is a hard rule in
 Nolan's own manual (*"a gate figure names what it included and which machine produced it"*, the scope-and-machine
 sibling of the unit, sample, factor and copy rules), and the DEPLOY-section half is
-[`DEVELOPMENT-portable.md`](../../../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md)
+[`DEVELOPMENT-portable.md`](../../../plugins/dkj-policy/DEVELOPMENT-portable.md)
 rule 8, because a figure written there folds into `CHANGELOG.md` and then into a release document. This
 section is the evidence they cite, which is this repo's convention for where a measurement lives.
 

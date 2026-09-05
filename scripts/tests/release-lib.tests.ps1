@@ -1374,12 +1374,12 @@ Write-Host "Get-TouchedPlugins -- a nested plugin tree" -ForegroundColor Cyan
 $nestedRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
 {"plugins": [
   {"name": "team-alpha",         "source": "./plugins/teams/team-alpha"},
-  {"name": "dkj-policy", "source": "./plugins/workflows/dkj-policy"}
+  {"name": "dkj-policy", "source": "./plugins/dkj-policy"}
 ]}
 '@))
 $nestedTouched = @(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @(
     'plugins/teams/team-alpha/agents/06-16-agent.md',
-    'plugins/workflows/dkj-policy/skills/open-pr/SKILL.md',
+    'plugins/dkj-policy/skills/open-pr/SKILL.md',
     'plugins/teams/agent-shared/inbound-behaviour.md',
     'README.md'
 ))
@@ -1403,7 +1403,7 @@ Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins"
 Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins": [{"name": "x", "source": "C:\\elsewhere"}]}' } 'absolute source throws (containment)'
 
 Write-Host "Get-PluginRootByName" -ForegroundColor Cyan
-Assert-Equal 'plugins\workflows\dkj-policy' (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'dkj-policy').RelativeRoot 'resolves a name to its root'
+Assert-Equal 'plugins\dkj-policy' (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'dkj-policy').RelativeRoot 'resolves a name to its root'
 Assert-Equal $null (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'workflow-nobody') 'an unknown name resolves to $null rather than a guessed path'
 Assert-Equal $null (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'Team-Alpha') 'the lookup is case-sensitive -- a name is a path segment and an install id'
 Assert-Equal $null (Get-PluginRootByName -PluginRoots @() -Name 'team-alpha') 'an empty set resolves to $null, it does not throw'

@@ -346,7 +346,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   remote delete stays Dave's manual act per the bullet above.
 - **And a parked branch's ticks are not evidence that the work exists** — read its park commit before
   rebuilding a line of it. The mechanism is portable and lives in
-  [`DEVELOPMENT-portable.md`](../../../plugins/workflows/dkj-policy/DEVELOPMENT-portable.md):
+  [`DEVELOPMENT-portable.md`](../../../plugins/dkj-policy/DEVELOPMENT-portable.md):
   every automatic park stamps a `Backing:` line saying how many steps are resolved, how much is committed
   on the branch besides the document, and how much is uncommitted in the working copy the park came from
   -- plus an explicit alarm where the plan reads as finished with nothing behind it. Repo-specific half:
@@ -395,7 +395,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   `worktree-lane.ps1` (`-Name` to open, `-HandBack` to release the branch again) does both ends and
   never touches the primary's HEAD when opening; the portable half, the measurement, and the declined
   one-line alternative to `ship-pr.ps1` are in the
-  [`worktree-lane` skill](../../../plugins/workflows/dkj-policy/skills/worktree-lane/SKILL.md).
+  [`worktree-lane` skill](../../../plugins/dkj-policy/skills/worktree-lane/SKILL.md).
   Two things learned building it that are easy to rediscover the expensive way: pointing
   `CLAUDE_PROJECT_DIR` at another tree **breaks the source-repo guard**, correctly — that variable says
   which repo the session is on, and the tree one call writes to is `-RepoRoot`'s job (the #101
@@ -409,7 +409,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   lane with a foreground ship saves nothing. The script now prints both at the moment it begins to wait,
   and the rule with its measurements is in
   [`dkj-policy/CONTRIBUTING.md`](../../../dkj-policy/CONTRIBUTING.md#34-merge-the-pr)
-  and the [`ship-pr` skill](../../../plugins/workflows/dkj-policy/skills/ship-pr/SKILL.md#the-wait-runs-in-the-background-and-that-is-the-default).
+  and the [`ship-pr` skill](../../../plugins/dkj-policy/skills/ship-pr/SKILL.md#the-wait-runs-in-the-background-and-that-is-the-default).
   Two bigger shapes were named and declined there rather than overlooked; #985 stays open as their home.
 - **`main` moves under a long branch, and the green gate you ran proves nothing about the merged
   result.** The bullet above is about the *fold* and about two machines; this is the same collision

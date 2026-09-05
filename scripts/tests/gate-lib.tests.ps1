@@ -551,8 +551,8 @@ try {
 
     # --- 16. the mirror carries Invoke-WorkflowGates too ------------------------------------------
     Write-Host "`n== 16. the function travels to the plugin mirror ==" -ForegroundColor Cyan
-    $mirrorLibPath    = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\scripts\lib\gate-lib.ps1'
-    $mirrorOpenPrPath = Join-Path $RepoRoot 'plugins\workflows\dkj-policy\scripts\release\open-pr.ps1'
+    $mirrorLibPath    = Join-Path $RepoRoot 'plugins\dkj-policy\scripts\lib\gate-lib.ps1'
+    $mirrorOpenPrPath = Join-Path $RepoRoot 'plugins\dkj-policy\scripts\release\open-pr.ps1'
     Assert-True (Test-Path -LiteralPath $mirrorLibPath) 'the mirrored gate-lib.ps1 exists'
     Assert-True (Test-Path -LiteralPath $mirrorOpenPrPath) 'the mirrored open-pr.ps1 exists'
     if ((Test-Path -LiteralPath $mirrorLibPath) -and (Test-Path -LiteralPath $mirrorOpenPrPath)) {
