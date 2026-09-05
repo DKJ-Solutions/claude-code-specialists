@@ -65,12 +65,15 @@ function New-FakeSuite {
 # measured around the CHILD, so it includes one powershell start-up (~0.2s) on top of the gate itself --
 # irrelevant against the multi-second margins the timing cases work with.
 function Invoke-Gate {
-    param([string]$TestsDir, [int]$MaxParallel = 0, [string]$WorkDir = '', [string]$CommandsFile = '')
+    param([string]$TestsDir, [int]$MaxParallel = 0, [string]$WorkDir = '', [string]$CommandsFile = '', [int]$ResidentCount = -1)
     # NOT $args: that is an automatic variable holding a function's unbound arguments, and splatting it
     # after assignment is the kind of collision this repo already documents for $script:-owned names.
     $psArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script:Driver, '-TestsDir', $TestsDir, '-MaxParallel', "$MaxParallel")
     if ($WorkDir) { $psArgs += @('-WorkDir', $WorkDir) }
     if ($CommandsFile) { $psArgs += @('-CommandsFile', $CommandsFile) }
+    # -1 (the default) means "let the real Get-Process answer" -- OS-wide process state is not
+    # something this suite controls, so a case that cares about the count stubs it explicitly instead.
+    if ($ResidentCount -ge 0) { $psArgs += @('-ResidentCount', "$ResidentCount") }
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $out = & powershell @psArgs 2>&1
     $sw.Stop()
@@ -149,7 +152,7 @@ try {
     # this suite noticing, which is the whole failure mode it exists to catch.
     $script:Driver = Join-Path $Fixture 'drive-gate.ps1'
     $driverBody = @"
-param([string]`$TestsDir, [int]`$MaxParallel = 0, [string]`$WorkDir = '', [string]`$CommandsFile = '')
+param([string]`$TestsDir, [int]`$MaxParallel = 0, [string]`$WorkDir = '', [string]`$CommandsFile = '', [int]`$ResidentCount = -1)
 `$ErrorActionPreference = 'Stop'
 . '$LibPath'
 if (`$WorkDir) { Set-Location -LiteralPath `$WorkDir }
@@ -158,6 +161,12 @@ if (`$WorkDir) { Set-Location -LiteralPath `$WorkDir }
 if (`$CommandsFile) {
     `$script:GateCommands = @(Get-Content -LiteralPath `$CommandsFile)
     function Get-TestCommands { return `$script:GateCommands }
+}
+# Shadows the real OS query (issue #1464): redefining the function AFTER the dot-source above wins,
+# because a fixture cannot control how many powershell.exe processes are actually on this machine.
+if (`$ResidentCount -ge 0) {
+    `$script:GateResidentCount = `$ResidentCount
+    function Get-ResidentPowerShellCount { return `$script:GateResidentCount }
 }
 `$r = Invoke-TestSuiteGate -TestsDir `$TestsDir -Context 'the fixture' -MaxParallel `$MaxParallel
 Write-Host "GATE-RESULT: `$r"
@@ -412,6 +421,29 @@ Write-Host "GATE-RESULT: `$r"
     $r = Invoke-Gate -TestsDir $ok -CommandsFile $cmdNoParse
     Assert-True ($r.Text -match 'GATE-RESULT: False') 'a command that does not parse is refused, not run truncated'
     Assert-True ($r.Text -match 'FAILED \(does not parse') 'and the header says why'
+
+    # --- 7. The resident-powershell warning (issue #1464) -------------------------------------------
+    #
+    # A killed run's Start-Process children outlive it, and this suite cannot reproduce that without
+    # actually killing a gate mid-run -- so what is asserted is the SIGNAL this function derives from a
+    # resident count, not the orphaning itself. The real Get-Process is shadowed (see the driver above)
+    # because OS-wide process state is not a fixture's to set, and this is advisory-only: it must never
+    # change GATE-RESULT, whichever way the count points.
+    Write-Host "the resident-powershell warning -- advisory, and only when the count looks anomalous" -ForegroundColor Cyan
+    $r = Invoke-Gate -TestsDir $ok -ResidentCount 3
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'a low resident count: the gate still passes'
+    Assert-True ($r.Flat -notmatch 'powershell processes already resident') 'and stays silent about it'
+
+    $r = Invoke-Gate -TestsDir $ok -ResidentCount 25
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'a high resident count: still just a warning -- the gate still passes'
+    Assert-True ($r.Flat -match '25 powershell processes already resident') 'and names the count'
+    Assert-True ($r.Flat -match '-MaxParallel') 'and suggests the same knob the report asked for'
+
+    # The real (unshadowed) path: whatever this machine's own Get-Process says, it must not be able to
+    # fail the gate. -ResidentCount is omitted entirely here (Invoke-Gate's -1 default), so the driver
+    # never defines the shadow and Get-ResidentPowerShellCount runs its real Get-Process body.
+    $r = Invoke-Gate -TestsDir $ok
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'the real, unshadowed resident-count path still passes suites'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

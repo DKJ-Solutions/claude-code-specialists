@@ -15,7 +15,7 @@ into the cycle page as its first step — the layer this repo has no work in, an
 
 In this repo the portable pages resolve as relative links because this is the plugin's **source**; in a
 consumer they live in the plugin install instead, which is why the consumer version of this page (the
-`adopt-workflow-folder` skill scaffolds it) names them in code rather than linking them.
+`adopt-dkj-policy` skill's Part 1 scaffolds it) names them in code rather than linking them.
 
 One thing a consumer's folder has that this one deliberately does not: this page itself is hand-written
 rather than scaffolded — the scaffold refuses a repo that publishes plugins. The generated

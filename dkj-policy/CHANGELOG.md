@@ -32,6 +32,76 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/merge-adopt-config-workflow-folder · 20260905-212108
+
+`adopt-config` and `adopt-workflow-folder` were two separately-named skills for the same plugin,
+`dkj-policy` -- one placing the config seam, one scaffolding the workflow folder. Renaming
+`adopt-bwj-asana` to `adopt-dkj-policy-bwj` earlier the same day, for a sibling plugin that had grown a
+second chapter under a name naming only the first, raised the same question here from the other
+direction: two *separate* skills for one plugin, neither named after it.
+
+Merged into one skill, `adopt-dkj-policy`, in two independent parts that can run in either order or
+alone -- no behaviour change to either underlying script, only the page that documents them. A reader
+enabling `dkj-policy` now finds one name to ask for, covering everything the plugin needs placed in
+their repo, rather than having to already know there are two.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal skill name in this repo's own workflow plugin. No consumer-facing behaviour changed;
+the two scripts a consumer actually runs are byte-for-byte what they were.
+
+**Score:** N/A
+
+#### Pull Request
+
+adopt-config and adopt-workflow-folder merged into one skill, adopt-dkj-policy
+
+Plugins: dkj-policy, team-alpha
+
+[PR #1471](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1471)
+
+---
+
+### DEPLOY: fix/1464-gate-orphan-warning · 20260905-210737
+
+Fixes #1464. `Invoke-TestSuiteGate` starts each suite with `Start-Process` but never tracked those
+children beyond its own in-memory queue, so a harness-killed gate run left its `powershell.exe`
+children running -- invisible and unreachable to the session that killed it. An immediate retry could
+then be OOM-killed too, even with `-MaxParallel` set correctly, because the retry's own memory budget
+assumed room the dead run's orphans were still holding: measured on one machine as 5 processes at
+rest, 28 orphaned after a kill, and a second `-MaxParallel 4` attempt dying from 1.7 GB free before a
+third, serial attempt finally passed.
+
+This ships the cheapest repair the issue asked for, not the two heavier ones it named (PID
+tracking/reaping, or a Windows job object) -- both are real changes to the spawn model and neither is
+part of this fix. `Get-ResidentPowerShellCount` counts resident `powershell.exe` processes before the
+gate starts its own pool, and `Invoke-TestSuiteGate` prints one `Write-Warning` line when that count
+is above 20 (comfortably over this file's own documented 16-18-lane ceiling for a legitimately busy
+run, and comfortably under the 28+ orphans measured in #1464). It is advisory only -- it never fails
+the gate -- so a silent kill now has a chance to read as "something is still draining" instead of "the
+machine got slower".
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this is a diagnostic line inside the shared test-suite gate; no subscriber of any consuming
+repo's service ever sees it.
+
+**Score:** N/A
+
+#### Pull Request
+
+The gate warns when resident powershell processes look like leftover orphans
+
+Plugins: dkj-policy, team-shopify
+
+[PR #1468](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1468)
+
+---
+
 ### DEPLOY: docs/1450-rename-adopt-bwj-asana · 20260905-204550
 
 `adopt-bwj-asana` grew a second chapter it was never named for: since today it also scaffolds

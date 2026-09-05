@@ -685,7 +685,7 @@ the tier-2 entries in its own history — while the audience says which tiers a 
 **an unstated seam means ask about all of them**, exactly as before the knob existed: reading absence as
 "no audience enabled" would switch the tier off in every consumer the moment they took the plugin update,
 with nothing erroring and a release document going out empty. The loud channel is the contract, where
-this is a `decide` record that `adopt-config` scaffolds rather than copies.
+this is a `decide` record that `adopt-dkj-policy` (Part 2) scaffolds rather than copies.
 
 **THE GATE NARROWED WHAT IT ASKS WITHOUT NARROWING WHAT IT ACCEPTS**, which is the half that would
 otherwise have cost real work: the entries pending when this landed each carried all three tiers, and a

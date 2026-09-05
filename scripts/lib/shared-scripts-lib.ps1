@@ -532,10 +532,18 @@ function Get-SharedScriptPairs {
             # THE GENERATOR IS NOT REGISTERED, deliberately: scripts/sync/build-config-blueprint.ps1 reads
             # THIS repo's libs to produce the artefact, so it is the source's own tool. A consumer running
             # it would generate a blueprint of itself and overwrite the one it adopts from.
+            # SKILL-LEVEL MERGE, SEPTEMBER 5, 2026: this script and adopt-workflow-folder below now
+            # share ONE skill page, 'adopt-dkj-policy' -- Part 2 of it. The two scripts themselves are
+            # untouched (different files, different tests, different behaviour); only the documenting
+            # page merged, for the same reason adopt-bwj-asana was renamed to adopt-dkj-policy-bwj
+            # earlier the same day: a name naming one plugin should not leave a sibling operation for
+            # that plugin looking unrelated. check-plugin-integrity's skill-param check (18) already
+            # supports several scripts sharing one Skill -- see verify-resolved-issues below, which has
+            # shared ship-pr's page since before this merge.
             Name   = 'adopt-config'
             Source = 'scripts\task\adopt-config.ps1'
             Plugin = 'dkj-policy'
-            Skill  = 'adopt-config'
+            Skill  = 'adopt-dkj-policy'
             # A test points the command at a fixture blueprint instead of the shipped one. A consumer
             # never types it, and documenting it would invite someone to.
             SkillParamsExempt = @('BlueprintPath')
@@ -545,11 +553,11 @@ function Get-SharedScriptPairs {
             # into a consumer's repo, so the folder that gathers everything portable arrives through
             # this command -- and check-script-contract reports at session start while it is missing.
             # Additive-only sibling of adopt-config: that one fills the seam libs, this one puts the
-            # folder down.
+            # folder down. Documented as Part 1 of 'adopt-dkj-policy' -- see the merge note above.
             Name   = 'adopt-workflow-folder'
             Source = 'scripts\task\adopt-workflow-folder.ps1'
             Plugin = 'dkj-policy'
-            Skill  = 'adopt-workflow-folder'
+            Skill  = 'adopt-dkj-policy'
         },
         @{
             # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the

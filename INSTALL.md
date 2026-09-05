@@ -252,7 +252,7 @@ claude plugin install dkj-policy-bwj@claude-code-specialists --scope project
 ### Your folder, and what happens if you do not rename it
 
 The workflow's own root folder is named after the plugin, so its current name is **`dkj-policy/`** and the
-`adopt-workflow-folder` skill scaffolds that name from now on. **Renaming your existing folder is optional
+`adopt-dkj-policy` skill's Part 1 scaffolds that name from now on. **Renaming your existing folder is optional
 and nothing breaks if you leave it**: `Get-WorkflowFolderName` prefers whichever folder is actually there,
 newest name first, and every seam default is composed from its answer — so a repo still holding
 `contributing-davekjohn/` (or `workflow-davekjohn/`, from the rename before this one) keeps its changelog,

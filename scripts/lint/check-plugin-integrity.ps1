@@ -191,7 +191,7 @@
          the page from the model's context entirely, so a session cannot follow the instruction -- and the
          reader who CAN, the person at the keyboard, is never told the line is theirs to type. The correct
          form names the slash-command and the actor, or names the script. FRONTMATTER-DRIVEN, not a
-         phrasing rule: check-script-contract names the UNFLAGGED 'adopt-workflow-folder' with the same
+         phrasing rule: check-script-contract names the UNFLAGGED 'adopt-dkj-policy' with the same
          bare imperative and is correct to, so a grep for the wording would be born with a false finding.
          The discriminator is the word 'skill' after the name, measured: without it 8 unique sites of which
          4 are wrong (three name the SCRIPT, one is prose offering a choice); with it 11 hits over 7 sites,
@@ -3330,7 +3330,7 @@ Write-Coverage -Category 'plugin-link' -Checked $pluginLinkChecked `
 # a class rather than a risk.
 #
 # IT IS FRONTMATTER-DRIVEN, NOT A PHRASING RULE, and that is what keeps it honest. check-script-contract
-# names 'adopt-workflow-folder' with exactly this bare imperative and is CORRECT to: that skill carries
+# names 'adopt-dkj-policy' with exactly this bare imperative and is CORRECT to: that skill carries
 # no flag, so its page is in context and a session can invoke it. A grep for "run the '...' skill" would
 # have been born with that false finding. Only the barred set below is a subject.
 #
@@ -3457,7 +3457,7 @@ Write-Coverage -Category 'barred-skill' -Checked $barredChecked `
     -Note $(if ($barredSkills.Count -eq 0) {
         'no shipped skill carries disable-model-invocation: true, so there is no barred name a printed instruction could misuse -- nothing about printed routes is being asserted'
     } else {
-        "script file(s) and markdown file(s) held against the $($barredSkills.Count) skill(s) whose frontmatter bars model invocation -- $barredFindings printed instruction(s) naming one with a bare imperative. Frontmatter-driven rather than a phrasing rule: the same wording about an UNFLAGGED skill (check-script-contract's 'adopt-workflow-folder') is correct and passes"
+        "script file(s) and markdown file(s) held against the $($barredSkills.Count) skill(s) whose frontmatter bars model invocation -- $barredFindings printed instruction(s) naming one with a bare imperative. Frontmatter-driven rather than a phrasing rule: the same wording about an UNFLAGGED skill (check-script-contract's 'adopt-dkj-policy') is correct and passes"
     })
 
 

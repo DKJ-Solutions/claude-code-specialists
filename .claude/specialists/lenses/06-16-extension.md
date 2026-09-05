@@ -205,7 +205,7 @@ otherwise be false about her own manual. The citations belong here:
   - **Right owner, wrong reach.** `dkj-policy/CLAUDE.md` *is* the correct owner -- that page has
     since merged into the folder's `CONTRIBUTING.md` (#886, August 26, 2026), and the argument reads the same
     against its successor -- and
-    `adopt-workflow-folder` never overwrites — so the sentence would have reached new adopters only, while
+    `adopt-dkj-policy`'s Part 1 never overwrites — so the sentence would have reached new adopters only, while
     the reporter, who already had the folder, would never have seen it. The fix landed in
     `new-branch/SKILL.md` instead: plugin payload, replaced by an update, and the one skill in that chain
     deliberately left model-invocable.

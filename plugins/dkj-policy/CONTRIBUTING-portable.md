@@ -818,7 +818,7 @@ A repo running this workflow carries **two layers**, deliberately (Dave, August 
 - a **floor** — what holds before any plugin is consulted, and what stays meaningful the day the plugin
   is absent: a fresh checkout, a teardown, a contributor who installed nothing. Normally that is your
   root `CONTRIBUTING.md`;
-- `dkj-policy/CONTRIBUTING.md` (the `adopt-workflow-folder` skill scaffolds it) is the
+- `dkj-policy/CONTRIBUTING.md` (the `adopt-dkj-policy` skill's Part 1 scaffolds it) is the
   **workflow's layer**: everything this plugin owns, plus your repo's answers to its seams. **Where the
   two disagree, the workflow's page wins.**
 

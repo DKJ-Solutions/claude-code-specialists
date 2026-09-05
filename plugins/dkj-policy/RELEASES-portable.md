@@ -46,7 +46,7 @@ a product. `new-branch.ps1` then scaffolds tier 0 plus that tier alone, and `ope
 
 **A repo that has stated nothing is asked about all three**, exactly as before the knob existed — an
 unstated seam means unchanged, never "switch the audience tier off". The loud channel is the script
-contract, where this is a `decide` record that `adopt-config` puts to the repo rather than answering for it.
+contract, where this is a `decide` record that `adopt-dkj-policy` (Part 2) puts to the repo rather than answering for it.
 
 **The tier a repo no longer asks about is still read.** `Get-EntryTierMax` stays 2 and every validator keeps
 using it: the maximum says which tier numbers are valid to *parse* — 97 entries in this repo's record were

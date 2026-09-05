@@ -232,7 +232,7 @@ try {
     $r = Invoke-Ps @('-ConsumerPathOverride', $c)
     Assert-Equal 1 $r.Code 'missing workflow folder: exit-code 1'
     Assert-Match "\[ERROR\].*'dkj-policy/' does not exist" $r.Out 'missing workflow folder: the ERROR names the folder'
-    Assert-Match 'adopt-workflow-folder' $r.Out 'missing workflow folder: the finding names the skill that scaffolds it'
+    Assert-Match 'adopt-dkj-policy' $r.Out 'missing workflow folder: the finding names the skill that scaffolds it'
     $errCountWf = @([regex]::Matches($r.Out, '\[ERROR\]')).Count
     Assert-Equal 1 $errCountWf 'missing workflow folder: exactly one error -- every contract record is still satisfied'
 
