@@ -87,20 +87,31 @@ file existing.
 
 ## The entry points
 
-The scripts a person or a specialist actually invokes. Everything not listed here is a lib, a generator or
-a test, reached by one of these rather than run directly.
+The scripts a person or a specialist actually invokes. Everything not listed here is either a lib, a
+generator or a test — reached by one of these rather than run directly — or one of the hook-invoked
+scripts named below the table, which nothing in this table reaches at all.
 
 | script | what it does | skill |
 |---|---|---|
+| [`task/claim-issue.ps1`](task/claim-issue.ps1) | assigns an issue to the account this checkout **commits** as, and refuses one that is closed or already somebody else's — the step before the branch | `claim-issue` |
 | [`task/new-branch.ps1`](task/new-branch.ps1) | creates the branch **and** its `dkj-policy/<branch>.md`, in one move — a branch is never entry-less | `new-branch` |
+| [`task/worktree-lane.ps1`](task/worktree-lane.ps1) | opens a branch in its own git worktree — a "lane" — so one branch can be built while another ships, and hands a lane back when it is ready | `worktree-lane` |
 | [`task/park-branch.ps1`](task/park-branch.ps1) | commits outstanding work and pushes, with no PR — for handing a branch to another machine | `park` |
+| [`task/prune-merged.ps1`](task/prune-merged.ps1) | fast-forwards the trunk and deletes the local branches that are **provably** merged; one without that proof is left alone | `prune-merged` |
 | [`task/adopt-config.ps1`](task/adopt-config.ps1) | reads the config blueprint and places or proposes each seam answer | `adopt-dkj-policy` (Part 2) |
+| [`task/adopt-workflow-folder.ps1`](task/adopt-workflow-folder.ps1) | scaffolds `dkj-policy/` in a consumer — the folder docs, the releases root and the branch dossier | `adopt-dkj-policy` (Part 1) |
+| [`task/adopt-shopify-floor.ps1`](task/adopt-shopify-floor.ps1) | places team-shopify's floor in a consumer: the live-theme guard's seams, a starter theme-check config and the CI workflow that runs it | `adopt-shopify-floor` |
+| [`task/check-policy-drift.ps1`](task/check-policy-drift.ps1) | lays out every document that legislates here — the plugins' portable pages against this repo's own prose — so the two can be read against each other; it decides nothing | `check-policy-drift` |
+| [`task/push-preview.ps1`](task/push-preview.ps1) | pushes the branch to its own **unpublished** preview theme, creating that theme on the first push rather than at branch creation | `push-preview` |
+| [`task/sync-main.ps1`](task/sync-main.ps1) | mirrors the live Shopify theme into the trunk without letting live overwrite the trunk's own work | `sync-main` |
 | [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
 | [`release/ship-pr.ps1`](release/ship-pr.ps1) | open → wait for CI → merge → fold, in one motion | `ship-pr` |
+| [`release/verify-resolved-issues.ps1`](release/verify-resolved-issues.ps1) | checks that a merged PR closed the issues it declared, and closes any it did not — `ship-pr.ps1` runs it as its own process after the merge | `ship-pr` |
 | [`release/fold-changelog-entry.ps1`](release/fold-changelog-entry.ps1) | folds the entry into `CHANGELOG.md` at its ranked position and removes the branch document | `fold-changelog` |
 | [`release/cut-release.ps1`](release/cut-release.ps1) | the lockstep version bump, the release notes and the tag — **only on Dave's explicit request** | `cut-release` |
 | [`release/new-internal-note.ps1`](release/new-internal-note.ps1) | the tier-1 note's skeleton; needs the development notes, so it runs *after* the cut | `cut-release` |
 | [`release/build-release-notes-page.ps1`](release/build-release-notes-page.ps1) | builds the hand-written notes into one browsable page, and with `-Worker` the Cloudflare Worker that serves it — it publishes nothing | `release-notes-page` |
+| [`release/publish-to-business.ps1`](release/publish-to-business.ps1) | publishes the marketplace subset to the business repo Claude Enterprise syncs from — a separate, deliberate step after a cut | `cut-release` (Block 3) |
 | [`lint/check-plugin-integrity.ps1`](lint/check-plugin-integrity.ps1) | the lint gate — the manifests, the frontmatter, dead links, and the two dozen checks named in its own docstring | — |
 | [`sync/check-connectors.ps1`](sync/check-connectors.ps1) | the two-way registry check across every connected repo | — |
 | [`sync/find-specialist-mentions.ps1`](sync/find-specialist-mentions.ps1) | every live mention of a specialist's **name**, grouped by layer — the tool you run *at* a rename | — |
@@ -110,11 +121,16 @@ a test, reached by one of these rather than run directly.
 | [`maintenance/measure-skill.ps1`](maintenance/measure-skill.ps1) | what a skill costs — always-on and on-invoke tokens against a stored baseline, and the wall-clock of the script behind it | `measure-skill` |
 | [`maintenance/measure-always-on.ps1`](maintenance/measure-always-on.ps1) | what the always-on **document** path costs — `CLAUDE.md` plus everything it `@`-imports, per document and per section | `measure-skill` |
 
-Four scripts here are **read-only checks a SessionStart hook invokes** rather than something anyone runs by
-hand: `sync/check-roster-sync.ps1`, `sync/check-script-contract.ps1`, `sync/build-config-blueprint.ps1`
-(run by the lint's blueprint check) and `lint/check-consumer-drift.ps1` (run per consumer by
-`check-connectors.ps1`). Their absence from the table above is a fact about how they are reached, not an
-omission.
+**Five scripts here are invoked by something other than a person**, and their absence from the table above
+is a fact about how they are reached, not an omission.
+
+Four are **read-only checks a SessionStart hook runs**: `sync/check-roster-sync.ps1`,
+`sync/check-script-contract.ps1`, `sync/build-config-blueprint.ps1` (run by the lint's blueprint check) and
+`lint/check-consumer-drift.ps1` (run per consumer by `check-connectors.ps1`).
+
+The fifth **acts rather than reports**: `task/park-cycle.ps1` pushes the branch's development document to
+origin until a PR publishes it, and the `cycle-autopark` **Stop** hook is what runs it. It is the automatic
+half of parking — `task/park-branch.ps1` in the table above is the half a person invokes.
 
 ## The gates, and what each one refuses
 
