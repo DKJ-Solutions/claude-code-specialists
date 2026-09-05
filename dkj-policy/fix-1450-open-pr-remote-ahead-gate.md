@@ -37,19 +37,77 @@ Add a single-branch fetch + rev-list ahead-check to open-pr.ps1, run before Invo
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Extracted `Get-RemoteAheadNote` out of `new-branch.ps1`'s inline resume-warning composition into a
+      new shared lib, `scripts\lib\remote-ahead-lib.ps1` -- the rev-list count, the `-Utf8` tip read
+      (issue #1446), the control/format strip and the length cap, unchanged in behaviour.
+- [x] `new-branch.ps1` calls the shared function instead of the inline block; the surrounding narrative
+      comments (why this fires, why it warns rather than refuses) are untouched.
+- [x] `open-pr.ps1` dot-sources the same lib and adds a new gate immediately before `Invoke-WorkflowGates`
+      (both the PR path and `-GatesOnly` are unaffected -- the new block sits above the PR-path call
+      only): a single-branch `git fetch` refspec'd straight into `refs/remotes/origin/<branch>`, then
+      `Get-RemoteAheadNote` against `HEAD..refs/remotes/origin/<branch>`. A real divergence is a hard
+      refusal (`exit 1`), not a warning -- unlike new-branch's own use of the same note, there is no
+      legitimate fork in the road here: a non-fast-forward push is coming regardless. A failed fetch
+      warns and lets the run continue, so a network hiccup costs nothing this script did not already
+      risk (the divergence is still caught at the push, exactly today's behaviour).
+- [x] Registered `remote-ahead-lib` in `scripts\lib\shared-scripts-lib.ps1` (both callers are mirrored)
+      and regenerated the plugin mirrors via `scripts\sync\build-shared-scripts.ps1`.
+- [x] Added `scripts\tests\remote-ahead-lib.tests.ps1` (37 asserts): the function against real
+      bare+clone git fixtures (level, diverged, multi-commit, fresh/stale label selection, the
+      adversarial-tip and length-cap cases new-branch.tests.ps1 already covers end-to-end, an
+      unanswerable ref), plus structural asserts that both callers reach the shared function (and that
+      neither carries a second copy of the sanitiser regex), that open-pr's gate sits before the
+      PR-path `Invoke-WorkflowGates` call and refuses rather than warns, and that the lib is registered
+      and mirrored.
+- [x] Fixed three existing test fixtures that build a throwaway copy of `new-branch.ps1` and its dot-sourced
+      libs by hand (`new-branch.tests.ps1`, `entry-scaffold.tests.ps1`, `worktree-lane.tests.ps1`): each
+      was missing the new lib, which failed every case that actually runs `new-branch.ps1` with a raw
+      path-not-found rather than testing anything -- caught by running the full local test gate, not by
+      the targeted suite alone.
 
 ### TEST
 
+- Lint gate (`scripts\lint\check-plugin-integrity.ps1`): 0 errors.
+- Full local test gate (`Invoke-TestSuiteGate`, all 69 suites, 32 lanes): **all 69 suites passed in 133s**.
+  First full run caught the two fixtures above missing the new lib (`entry-scaffold.tests.ps1`,
+  `worktree-lane.tests.ps1`) -- both green after the fix.
+- `remote-ahead-lib.tests.ps1` on its own: 37/37 pass.
+- `new-branch.tests.ps1` on its own: all 255 asserts pass (unchanged output -- the extraction did not
+  move a single printed word, which is what the pre-existing "remote ahead"/"adversarial tip" cases in
+  that suite actually pin).
+- `shared-scripts.tests.ps1`: all 527 asserts pass (registration + mirror parity for the new lib).
+- `gate-lib.tests.ps1`: 115/115 pass (unaffected -- the new gate sits above `Invoke-WorkflowGates`,
+  never inside it).
+
 ### DEPLOY: fix/1450-open-pr-remote-ahead-gate
 
-**Score:**
+A branch resumed from a parked commit can still lose the full lint + test gate to a push rejection: if
+another session pushes to the same branch after this checkout last looked, `open-pr.ps1` never re-checked
+before spending two minutes proving a tree the push then refuses anyway (`! [rejected] ... fetch first`).
+Measured on `fix/1446-tip-utf8-decode` on September 5, 2026 -- the fourth instance of this class (after
+#1282, #1409, #1439), and the one #1439's own repair cannot reach: that check fires once, when a session
+first resumes the branch, not at the one other door where a second session's push can still land unseen.
+
+`open-pr.ps1` now fetches that one branch and compares `HEAD` against it immediately before the gate runs.
+A real divergence is refused outright, with the fast-forward instruction, instead of discovered two minutes
+and one discarded gate run later. The warning text itself -- the diverging commit's subject and author,
+sanitised against control/format characters and capped -- is not a second copy: it is the same function
+`new-branch.ps1`'s own resume warning already used, now shared so the day's other fix to that text (#1446)
+cannot exist in one copy and not the other.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- this is entirely mechanism between a session and its own push; nothing about it is visible to
+anyone outside this repo's own contributors.
+
+**Score:** N/A
 
 #### Pull Request
 
 open-pr checks for a diverged remote head before spending the lint+test gate
+
+Reuses new-branch.ps1's own tip-warning composition (issue #1446's UTF-8 fix) via a new shared lib,
+`scripts/lib/remote-ahead-lib.ps1`, rather than a second hand-typed copy of it. Resolves #1450.
 

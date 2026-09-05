@@ -41,6 +41,9 @@ $SeamLibSrc        = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 # And the already-done check's pure half (#1409), which new-branch.ps1 now dot-sources unconditionally --
 # same reasoning as the lib above, this fixture runs new-branch and has to carry it too.
 $PrIssuesLibSrc    = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
+# The remote-ahead note composer (issue #1450), which new-branch.ps1 now dot-sources unconditionally
+# too -- same reasoning as the lib above, this fixture runs new-branch and has to carry it too.
+$RemoteAheadLibSrc = Join-Path $RepoRoot 'scripts\lib\remote-ahead-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -110,6 +113,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')            -Force
     Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')       -Force
+    Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')   -Force
 
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
