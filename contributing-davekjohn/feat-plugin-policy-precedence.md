@@ -33,9 +33,36 @@
 
 ### PLAN
 
+#### Why this branch exists
+
+Dave: a consuming repo's root `CLAUDE.md` must never contradict the policy shipped by an installed
+plugin. Fixed precedence when both are installed: `contributing-davekjohn` outranks `bwj-codex`, which
+outranks the consumer's own root `CLAUDE.md`. A consumer's only choice is to install and follow, or not
+install and run its own policy -- never a blend. A new on-demand, report-only skill (pattern:
+`adopt-config`/`check-branch-entry`, not a SessionStart gate) scans a consumer repo for contradictions
+against the installed plugins' portable policy and states which side wins; it never edits the
+consumer's file itself.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] Tessa: state the precedence rule itself in `contributing-davekjohn/CONTRIBUTING-portable.md`
+      (a new section, positioned so it reads before the cycle steps) -- `contributing-davekjohn`'s
+      policy outranks a consumer's root `CLAUDE.md`; the consumer's real choice is full adoption or no
+      install, never a blend.
+- [ ] Tessa: a one-line cross-reference in `bwj-codex/WORKFLOW-portable.md` naming its own second
+      place in that order (behind `contributing-davekjohn`, ahead of the consumer's root `CLAUDE.md`)
+      -- pointing at the canonical statement above rather than restating it (single source, Ravi's
+      convention).
+- [ ] Sylvester: a new on-demand, report-only skill in `contributing-davekjohn/skills/check-policy-drift/`
+      (`SKILL.md` + script under `scripts/task/`) that reads a consumer's root `CLAUDE.md` against the
+      installed plugins' portable policy (`CONTRIBUTING-portable.md` always; `WORKFLOW-portable.md` too
+      when `bwj-codex` is installed) and reports every contradiction found, naming which side wins per
+      the rule above. No auto-fix; the actual edit to the consumer's `CLAUDE.md` is a separate,
+      ordinary branch+PR in that consumer's own repo. Semantic comparison is a judgement call (like
+      `report-issue`), so the script's job is locating and handing over the right documents, not parsing
+      prose.
+- [ ] Roster/lint sanity: run `check-plugin-integrity.ps1` and the full suite locally before requesting
+      review.
 
 ### TEST
 
