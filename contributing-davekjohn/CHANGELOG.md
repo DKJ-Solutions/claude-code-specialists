@@ -32,6 +32,55 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1421-merge-consumer-prose-checks · 20260905-112316
+
+The two consumer-prose session checks are one check, one hook and one suite. They already shared their
+corpus (`Get-ConsumerProseDocuments`) and nothing else, so the pair still paid two process launches, two
+nested `powershell -File` spawns, two dot-sources of `entry-scaffold-lib.ps1` and `measure-context-lib.ps1`,
+and two walks of the same ~8-document always-on closure -- at every session start, in every consumer.
+`check-consumer-prose.ps1` walks it once and hands the same rows to both detectors, which stay two
+functions with their own measurements and their own report blocks.
+
+Measured on a consumer fixture carrying both defects, three passes each: **990 ms for the pair against
+533 ms merged, a saving of ~457 ms of every session start** -- slightly above the ~350-450 ms the issue
+inferred, which is worth recording because it was honest that no merged version had been built. For
+scale, all 7 SessionStart hooks come to ~6.8 s on this machine, of which `connector-sessioncheck` alone
+is ~4.9 s.
+
+The rename the issue deferred over cost nothing: neither hook had ever been released, so
+`consumer-prose-sessioncheck` is the first name a consumer ever sees.
+
+**It overtakes three entries pending in this same block, and they are left exactly as they are.**
+`feat/1389-retired-doc-name-check` announces *"`check-retired-doc-name.ps1` closes it, driven by a new
+`retired-doc-name-sessioncheck` SessionStart hook"*, and `feat/1415-supremacy-declaration-check`
+announces its own sibling beside it. `feat/1422-shared-check-preamble` counts *"five consumer-facing lint
+checks"* sharing one preamble and pins its skip repair with *"an assert in each suite"* -- four checks and
+one suite since this branch. All three were true on the day each merged, and all three name files this
+branch removed a day later. **The current statement is this one**: one script,
+`check-consumer-prose.ps1`, and one hook, `consumer-prose-sessioncheck`, carrying both detectors, over
+#1422's shared preamble. Nothing any of those entries says about *what* is detected, or about why the
+preamble has one definition, has changed -- only the count of scripts, hooks and suites doing it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer gets ~457 ms of every session start back and one hook where there were two, with nothing to
+migrate -- the names being merged never shipped. The report is unchanged in substance: one block per
+defect actually present, both when both are, and a run never stops at the first thing it finds.
+
+**Score:** 3
+
+#### Pull Request
+
+One consumer-prose session check instead of two, walking the corpus once
+
+Plugins: contributing-davekjohn
+
+[PR #1430](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1430)
+
+---
+
 ### DEPLOY: feat/bwj-codex-scaffold-sync-log · 20260905-110435
 
 `bwj-codex`'s `adopt-bwj-asana` skill now scaffolds `bwj-codex/SYNC-LOG.md` (masthead only, no
