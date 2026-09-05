@@ -32,6 +32,45 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/claim-issue-skill · 20260905-195949
+
+The claim rule, performed. A `claim-issue` skill and script put an issue on the account **this
+checkout commits as** before any work on it begins -- and refuse the three states the documented
+one-liner cannot see: a **closed** issue, which `gh issue edit --add-assignee` claims silently; one
+**somebody else holds**, which it joins; and a **split identity**, where `@me` writes the tracker
+account while every commit lands under another name. The claim is **read back** afterwards, because
+`--add-assignee` reports success for a login GitHub drops. Two supporting libs, one of them extracted
+from `check-git-identity.ps1` so the identity reads have a single source, a 27-assert suite, and the
+three documents that state the rule now name the step that performs it.
+
+**Score:** 4 -- it changes what happens at the start of every piece of issue work, and it does so
+without being asked: the skill is model-invocable, so *"fix issue 1234"* now claims before it fixes. A
+consumer notices the first time a session refuses to start on a closed issue.
+
+#### What makes this deploy extra special
+
+It closes a rule that had been enforced by memory alone, and the measurement is unusually blunt about
+what that was worth: **0 of 67** assigned issues in this repo carried the identity with **132** merged
+PRs and **83** authored issues
+([#1456](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1456), filed the day before
+this branch, whose own corrective action was *behavioural*). The rule was not unclear, unknown or
+disputed -- it was simply never the thing anybody remembered to type. This repo's standing answer to
+that is a gate rather than a firmer sentence, and the same measurement is why the skill is
+model-invocable rather than reserved for an explicit `/claim-issue`: a step nobody may take until it is
+typed has exactly the failure mode being repaired.
+
+**Score:** N/A -- workflow tooling between a repo and its tracker; no subscriber of a service reads it.
+
+#### Pull Request
+
+the claim-issue skill
+
+Plugins: dkj-policy, team-alpha
+
+[PR #1463](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1463)
+
+---
+
 ### DEPLOY: docs/1456-capped-listing-measurement · 20260905-194439
 
 A fifth measured instance under the `triage-inbound` skill's fifth pattern, plus the mechanism behind
