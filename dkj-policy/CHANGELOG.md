@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1493-fold-on-merge-queue · 20260906-015631
+
+Adds `.github/workflows/fold-on-merge.yml`: after every push to `main`, it checks for a changelog
+entry left unfolded by a merge the shipping session never saw -- the `main-ci-gate` merge queue (#1492)
+merges a PR itself, so `ship-pr.ps1`'s own post-merge fold step never runs for a queue-merged PR, and
+the branch's `dkj-policy/<branch>.md` dossier was otherwise left sitting on the trunk with nobody to
+fold it but a human doing it by hand. The workflow adds no new detection logic and no new fold logic --
+it runs the two scripts this repo already has (`check-unfolded-entry.ps1`, then
+`fold-changelog-entry.ps1 -Commit -Push` in its existing fold-all mode) from the one place that always
+sees a queue merge: a push to `main`.
+
+**Code-complete, and inert until one more thing lands that is not part of this PR.** `main-ci-gate`'s
+`required_status_checks` rule blocks any push to `main` -- including this job's -- unless the pushing
+actor is a listed bypass actor. The default `GITHUB_TOKEN` a workflow run carries pushes as the GitHub
+Actions app, which is not on that list today. Adding it is a repo-settings/ruleset change, so it is
+Dave's action to take, not this branch's -- see #1493 for the exact API payload already prepared for
+him. Until he applies it, this workflow's fold step will visibly fail its own `git push` with a
+ruleset rejection whenever it finds something to fold, which is the correct failure mode for code that
+is finished but waiting on a permission it cannot grant itself.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this workflow lives in `.github/workflows/`, not under `plugins/`, so it never ships to a
+consumer via the plugin mechanism. It is specific to how this source repo's own `main` is guarded.
+
+**Score:** N/A
+
+#### Pull Request
+
+Fold the changelog entry automatically after a queue merge
+
+[PR #1496](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1496)
+
+---
+
 ### DEPLOY: feat/1480-rename-teams-to-dkj-teams · 20260906-011211
 
 `plugins/teams/` is `plugins/dkj-teams/`, and the four teams are `dkj-team-alpha`,
