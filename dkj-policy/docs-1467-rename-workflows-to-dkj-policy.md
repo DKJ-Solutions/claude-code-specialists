@@ -54,7 +54,9 @@ The government IS the container: the prime ministry's own files move up to the r
 ### TEST
 
 - [x] `check-plugin-integrity.ps1` -- 0 errors; `[plugin-kind]` checked 6, `[link]` clean
-- [ ] every suite in `scripts/tests/`
+- [x] every suite in `scripts/tests/` -- `policy-drift-report` was red on the first pass: its fixture
+      helper wrote the OLD layout while the manifest above it declared the new one, so the manifest named
+      a source absent from the tree. The helper now takes the same path the manifest states
 
 ### DEPLOY: docs/1467-rename-workflows-to-dkj-policy
 

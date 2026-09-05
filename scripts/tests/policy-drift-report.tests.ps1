@@ -76,13 +76,22 @@ function Set-Text {
 function Add-FixturePlugin {
     # A plugin the way the report has to recognise one: a directory carrying .claude-plugin/plugin.json,
     # declared by the tree's own marketplace, with a portable page beside it.
+    #
+    # -Root IS THE PATH THE FIXTURE'S OWN marketplace.json DECLARES, and it is a parameter rather than a
+    # literal here because the two silently drifted apart once. This helper wrote 'plugins/workflows/<name>/'
+    # while the manifest above it was repointed to the new layout by #1467, so the manifest named a source
+    # that did not exist in the tree -- the report then found no plugin, and the failure surfaced three
+    # asserts later as "each plugin's own portable page is named", which is not what broke. Passing the
+    # same string to both is what keeps a layout change from having to be made twice.
     param(
         [Parameter(Mandatory = $true)][string]$Dir,
+        [Parameter(Mandatory = $true)][string]$Root,
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Page
     )
-    Set-Text -Dir $Dir -Rel "plugins/workflows/$Name/.claude-plugin/plugin.json" -Text "{ `"name`": `"$Name`", `"version`": `"1.0.0`" }"
-    Set-Text -Dir $Dir -Rel "plugins/workflows/$Name/$Page" -Text "# $Name portable page"
+    $rel = $Root.TrimStart('.', '/')
+    Set-Text -Dir $Dir -Rel "$rel/.claude-plugin/plugin.json" -Text "{ `"name`": `"$Name`", `"version`": `"1.0.0`" }"
+    Set-Text -Dir $Dir -Rel "$rel/$Page" -Text "# $Name portable page"
 }
 
 function Invoke-Report {
@@ -154,8 +163,8 @@ try {
   ]
 }
 '@
-    Add-FixturePlugin -Dir $source -Name 'dkj-policy' -Page 'CONTRIBUTING-portable.md'
-    Add-FixturePlugin -Dir $source -Name 'dkj-policy-bwj' -Page 'WORKFLOW-portable.md'
+    Add-FixturePlugin -Dir $source -Root './plugins/dkj-policy' -Name 'dkj-policy' -Page 'CONTRIBUTING-portable.md'
+    Add-FixturePlugin -Dir $source -Root './plugins/dkj-policy/dkj-policy-bwj' -Name 'dkj-policy-bwj' -Page 'WORKFLOW-portable.md'
     Set-Text -Dir $source -Rel '.claude/settings.json' -Text @'
 {
   "enabledPlugins": {
