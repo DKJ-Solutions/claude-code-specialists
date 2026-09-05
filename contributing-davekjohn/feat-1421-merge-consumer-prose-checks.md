@@ -69,8 +69,30 @@ on the issue's own framing.
       supremacy one is the consumer's end to end.
 - [x] Lint gate green (`check-plugin-integrity.ps1`, 0 errors), script contract green, all 66 suites
       green in 102 s.
+- [x] Re-run after taking `main` in: lint gate **0 errors**, **67 suites, 0 failures** -- 67 rather than
+      66 because #1422 landed `consumer-check-lib.tests.ps1` in the meantime. The wall-clock is not
+      comparable to the 102 s above and is not reported as a regression: that figure is `open-pr`'s
+      in-process run, this one spawned a `powershell` per suite.
 - [x] After-measurement, same fixture, same three-pass shape as the baseline: **541 / 527 / 530 ms**
       against **990 / 986 / 995 ms**, both blocks still reported.
+
+#### The merge with `main` was a real resolution, not a fast-forward
+
+#1422 landed while this branch was parked and rewrote the preamble of the two scripts this branch
+deletes, so every one of them conflicted. Both sides wanted the same thing and the deletions stand;
+`check-consumer-prose.ps1` adopts #1422's preamble rather than keeping its own copy -- `Resolve-CheckRepoRoot`,
+the empty-root `exit 0` an advisory session check needs, `Test-IsWorkflowSourceRepo` in place of the inline
+`marketplace.json` test, and `Get-CheckProseCorpus` for the walk. The suite keeps this branch's sanitizer
+asserts and folds in #1422's both-direction skip asserts, sharpened to this branch's subject: a repo
+publishing ANOTHER product must still produce **both** blocks, not one.
+
+Three docstrings #1422 wrote then named files this branch had removed -- `consumer-check-lib.ps1`'s
+five-entry-point census, `seam-lib.ps1`'s "AND SO DID THE TWO PROSE CHECKS", and `entry-scaffold-lib.ps1`'s
+citation of `supremacy-declaration-gate.tests.ps1`. All three repaired in source and mirror, because leaving
+them is exactly the drift #1422 exists to prevent. `consumer-check-lib.ps1`'s count is deliberately left at
+five with a paragraph beneath it saying it is four today: the census is the MEASUREMENT that produced the
+lib, and rewriting it would make the drift it documents unfindable -- the same reading `seam-lib.ps1` already
+asks for its own census.
 
 ### DEPLOY: feat/1421-merge-consumer-prose-checks
 
@@ -90,14 +112,16 @@ is ~4.9 s.
 The rename the issue deferred over cost nothing: neither hook had ever been released, so
 `consumer-prose-sessioncheck` is the first name a consumer ever sees.
 
-**It overtakes two entries pending in this same block, and they are left exactly as they are.**
+**It overtakes three entries pending in this same block, and they are left exactly as they are.**
 `feat/1389-retired-doc-name-check` announces *"`check-retired-doc-name.ps1` closes it, driven by a new
 `retired-doc-name-sessioncheck` SessionStart hook"*, and `feat/1415-supremacy-declaration-check`
-announces its own sibling beside it. Both were true on the day each branch merged, and both name files
-this branch removed a day later. **The current statement is this one**: one script,
-`check-consumer-prose.ps1`, and one hook, `consumer-prose-sessioncheck`, carrying both detectors. Nothing
-either of those entries says about *what* is detected has changed -- only the count of scripts, hooks and
-suites doing it.
+announces its own sibling beside it. `feat/1422-shared-check-preamble` counts *"five consumer-facing lint
+checks"* sharing one preamble and pins its skip repair with *"an assert in each suite"* -- four checks and
+one suite since this branch. All three were true on the day each merged, and all three name files this
+branch removed a day later. **The current statement is this one**: one script,
+`check-consumer-prose.ps1`, and one hook, `consumer-prose-sessioncheck`, carrying both detectors, over
+#1422's shared preamble. Nothing any of those entries says about *what* is detected, or about why the
+preamble has one definition, has changed -- only the count of scripts, hooks and suites doing it.
 
 **Score:** 3
 
