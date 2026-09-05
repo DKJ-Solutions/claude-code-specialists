@@ -65,15 +65,15 @@ Skill-level merge only (Dave's explicit scope decision): one new SKILL.md, adopt
       barred-skill check's design rationale) -- updated to cite the new name, since the OLD name no
       longer appears anywhere in the tree as that example.
 - [x] Doc cross-references updated across the active tree: `dkj-policy/README.md`,
-      `plugins/workflows/dkj-policy/README.md` (three spots, including merging two `<!-- skills:plugin
-      -->` table rows into one), `plugins/workflows/dkj-policy/scripts/README.md` (two script rows, one
+      `plugins/workflows/dkj-policy/README.md` (three spots, including merging two `skills:plugin
+      marker` table rows into one), `plugins/workflows/dkj-policy/scripts/README.md` (two script rows, one
       shared skill link, each annotated "(Part 1)"/"(Part 2)"), `plugins/workflows/dkj-policy/
       CONTRIBUTING-portable.md`, `plugins/workflows/dkj-policy/RELEASES-portable.md`,
       `plugins/workflows/dkj-policy/skills/check-branch-entry/SKILL.md`, `plugins/workflows/README.md`,
       `plugins/ADOPTION.md` (merged the two table rows into one, fixed the "two of the three append to
       repo-config.ps1" sentence -- both remaining items append, so the count no longer parsed after the
-      merge either way), `INSTALL.md`, root `README.md` (four spots, including both `<!-- skills:all
-      -->` marker spans), `.claude/skills/triage-inbound/SKILL.md`, and two specialist lenses
+      merge either way), `INSTALL.md`, root `README.md` (four spots, including both `skills:all
+      marker` spans), `.claude/skills/triage-inbound/SKILL.md`, and two specialist lenses
       (`05-06-extension.md`, `06-16-extension.md`).
 - [x] `scripts/tests/script-contract.tests.ps1` asserted the literal OLD skill name in the printed
       finding's text (`Assert-Match 'adopt-workflow-folder' $r.Out ...`) -- this would have failed the
