@@ -32,6 +32,44 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1450-open-pr-remote-ahead-gate · 20260905-201818
+
+A branch resumed from a parked commit can still lose the full lint + test gate to a push rejection: if
+another session pushes to the same branch after this checkout last looked, `open-pr.ps1` never re-checked
+before spending two minutes proving a tree the push then refuses anyway (`! [rejected] ... fetch first`).
+Measured on `fix/1446-tip-utf8-decode` on September 5, 2026 -- the fourth instance of this class (after
+#1282, #1409, #1439), and the one #1439's own repair cannot reach: that check fires once, when a session
+first resumes the branch, not at the one other door where a second session's push can still land unseen.
+
+`open-pr.ps1` now fetches that one branch and compares `HEAD` against it immediately before the gate runs.
+A real divergence is refused outright, with the fast-forward instruction, instead of discovered two minutes
+and one discarded gate run later. The warning text itself -- the diverging commit's subject and author,
+sanitised against control/format characters and capped -- is not a second copy: it is the same function
+`new-branch.ps1`'s own resume warning already used, now shared so the day's other fix to that text (#1446)
+cannot exist in one copy and not the other.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this is entirely mechanism between a session and its own push; nothing about it is visible to
+anyone outside this repo's own contributors.
+
+**Score:** N/A
+
+#### Pull Request
+
+open-pr checks for a diverged remote head before spending the lint+test gate
+
+Reuses new-branch.ps1's own tip-warning composition (issue #1446's UTF-8 fix) via a new shared lib,
+`scripts/lib/remote-ahead-lib.ps1`, rather than a second hand-typed copy of it. Resolves #1450.
+
+Plugins: dkj-policy
+
+[PR #1460](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1460)
+
+---
+
 ### DEPLOY: fix/1453-token-recovery-from-worker · 20260905-201057
 
 The release page's path token is the one file in this system that cannot be rebuilt, and both of its
