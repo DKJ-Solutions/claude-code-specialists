@@ -94,7 +94,12 @@ pre-existing instance of the same defect was found and repaired -- see TEST.
 - [x] `check-plugin-integrity.ps1` -- 0 errors. It found the whole dead-link set for me: 34 of them, all
       inside the release archive, which is what established that #886 had repointed archive LINK TARGETS
       while leaving archive PROSE alone. Same treatment applied here.
-- [x] all suites under `scripts/tests/*.tests.ps1`
+- [x] the 35 suites this rename can reach, run first because the full set is ~59 minutes serially and
+      `open-pr`'s own gate runs all 68 immediately after -- measuring the same thing twice is the one thing
+      that buys nothing. Five failed and all five were the same shape, an assertion the sweep had moved
+      under a rule it was not covered by: `branch-document-path`, `entry-scaffold`, `config-blueprint`,
+      `teardown` and `bootstrap-drift`, each green again and the first two carrying new asserts for the
+      `ContribFolder*` generation.
 - [x] a pre-existing instance of the #952 defect, found because this branch walked over it:
       `INSTALL.md`'s retired-id table said `specialists-contributing-davekjohn@claude-code-specialists`.
       No such id ever existed -- #886 swept the historical `specialists-workflow-davekjohn` when it
