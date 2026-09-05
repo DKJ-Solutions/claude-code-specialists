@@ -32,6 +32,39 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1465-register-dkj-policy-id · 20260905-221616
+
+`connectors/claude-code-specialists.json` now registers the workflow plugin under its current id,
+`dkj-policy@claude-code-specialists`. It had held `contributing-davekjohn@` since the #1437 rename
+while this repo -- as a consumer of its own product -- had already migrated, so `check-connectors`
+stated the opposite of the truth and skipped the whole plugin block: for this repo's own entry the
+workflow plugin was not version-checked at all. Three `[OK]` lines now stand where one skipped
+`[INFO]` did. The `[INFO]` itself is deliberately unchanged, because a consumer catching up is the
+repair and making it an error re-opens the four false alarms of August 9, 2026 -- and the five other
+manifests still naming the retired id are correct as they stand, since the register records what a
+consumer HAS. This is the same blind spot `connectors/xoxowildhearts.json` recorded for the #886
+rename, re-opened by #1437 through the identical route: the class was never emptied, only its
+instance was. The `notes` field also loses a stale count -- it claimed two session hooks where the
+plugin ships five, beside a Stop hook -- dropped rather than renumbered, for the reason
+`SPECIALISTS.md` gives for no longer listing that set anywhere.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `connectors/` is workshop administration and deliberately does not travel with the plugin
+caches, so nothing a consumer installs or reads changes here.
+
+**Score:** N/A
+
+#### Pull Request
+
+Register this repo's own workflow plugin under dkj-policy@, so check-connectors stops skipping the block
+
+[PR #1475](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1475)
+
+---
+
 ### DEPLOY: docs/1470-sessionstart-hooks-sentence · 20260905-220048
 
 One sentence in the `specialists-init` skill page named its own evidence in a way that did not parse:
