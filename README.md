@@ -128,8 +128,8 @@ enforcement out fixed the repo that works differently; it left the repo that wor
 re-deriving twenty values by hand, because the checker only ever named the **fallback** a shared script
 uses — never what this repo chose, or why. The pack therefore ships a **config blueprint**: each seam
 function with the source's own text, comments and reasoning included, and a marker saying whether that
-answer is safe to take. The [`adopt-config`](plugins/workflows/dkj-policy/skills/adopt-config/SKILL.md)
-skill reads it, **places** what states the shared way of working, and **proposes** — never places — what
+answer is safe to take. The [`adopt-dkj-policy`](plugins/workflows/dkj-policy/skills/adopt-dkj-policy/SKILL.md)
+skill's Part 2 reads it, **places** what states the shared way of working, and **proposes** — never places — what
 states what a repo *is*, in a document a person works through.
 
 The two markers are a second, independent axis from the roster/workflow split, and
@@ -193,7 +193,7 @@ and an unclassifiable name switches the check off for itself.
 | [`team-lifehub/`](plugins/teams/team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
 | [`team-shopify/`](plugins/teams/team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`team-ecomm/`](plugins/teams/team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `team-shopify`. |
-| [`dkj-policy/`](plugins/workflows/dkj-policy/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-config` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-config` places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
+| [`dkj-policy/`](plugins/workflows/dkj-policy/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-dkj-policy` and the rest — the plugin's own README carries the full list), their shared scripts, the two session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-dkj-policy`'s Part 2 places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
 | [`dkj-policy-bwj/`](plugins/workflows/dkj-policy-bwj/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead, written by `team-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-dkj-policy-bwj`), no specialists, no hooks. Extends only the ticket-work step of `dkj-policy` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `team-alpha` **and** `dkj-policy` — the sync chapter also expects `team-shopify`. |
 
 In short: **`team-alpha` is the foundation; everything else is optional, along two different axes.**
@@ -637,7 +637,7 @@ hand-written list here was named as three and went stale twice inside two days) 
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `claim-issue`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
-`cut-release`, `adopt-config`, `adopt-workflow-folder`,
+`cut-release`, `adopt-dkj-policy`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
 `prune-merged`,
 `measure-skill`, `worktree-lane`, `report-issue`, `adopt-dkj-policy-bwj`, `orchestrator`)<!-- /skills:all -->
@@ -722,7 +722,7 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `claim-issue`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`,
-`sync-roster`, `start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`,
+`sync-roster`, `start-task`, `adopt-dkj-policy`, `adopt-shopify-floor`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
 `prune-merged`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
 **mechanism** (branch, claiming an issue on the tracker before the work on it starts, PR, ship, fold,

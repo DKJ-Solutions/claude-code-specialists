@@ -96,7 +96,7 @@ answering the question the other directory owns.
 Its shared scripts dot-source two **repo-owned** files — `scripts/repo-config.ps1` and
 `scripts/lib/branch-info.ps1` — so the parts that legitimately differ per repo are answered by the
 repo rather than baked into the plugin. The `specialists-init` bootstrap scaffolds both, and the
-`adopt-config` skill reads the config blueprint this plugin ships: it **places** the answers that
+`adopt-dkj-policy` skill's Part 2 reads the config blueprint this plugin ships: it **places** the answers that
 state a shared way of working and **proposes** — never places — the answers that state what a repo
 *is*. The reasoning behind that split, and why a `decide` answer is never written as a stub, is in the
 root README under

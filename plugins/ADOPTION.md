@@ -190,8 +190,7 @@ The set as of this release:
 
 | skill | shipped by | what your repo lacks without it | what reports it |
 |---|---|---|---|
-| `adopt-config` | `dkj-policy` | the seam values that state the shared way of working — step 1 *scaffolds* `scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`, this answers them | `script-contract-sessioncheck` |
-| `adopt-workflow-folder` | `dkj-policy` | `dkj-policy/` itself — the only location the shared scripts read the branch dossier and the release documents from | `script-contract-sessioncheck` |
+| `adopt-dkj-policy` | `dkj-policy` | two independent things, either order: **Part 1** — `dkj-policy/` itself, the only location the shared scripts read the branch dossier and the release documents from; **Part 2** — the seam values that state the shared way of working, answering what step 1 only *scaffolded* (`scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`) | `script-contract-sessioncheck` |
 | `adopt-shopify-floor` | `team-shopify` | the live-theme guard's id half, a starter `.theme-check.yml`, and the CI gate that runs it | `shopify-floor-sessioncheck` |
 
 **Enumerate it from your own slash list rather than from this table.** A plugin added after this release
@@ -203,9 +202,10 @@ exception that shows the shape: its adopt skill **is** `specialists-init`, which
 
 **All of them are additive and a dry run by default** — each prints exactly what it would do and writes
 nothing until you add `-Apply`, so reading the plan first costs you nothing and none of them can
-overwrite work of yours. Two of the three **append to `scripts/repo-config.ps1` and need it to exist**,
-which is what step 1 placed. And this step is yours whichever channel the plugins arrived on: an adopt
-skill writes into *your repo*, not onto the machine, so a centrally published install does not cover it.
+overwrite work of yours. `adopt-dkj-policy`'s Part 2 and `adopt-shopify-floor` both **append to
+`scripts/repo-config.ps1` and need it to exist**, which is what step 1 placed. And this step is yours
+whichever channel the plugins arrived on: an adopt skill writes into *your repo*, not onto the machine,
+so a centrally published install does not cover it.
 
 **It is minutes, and it deliberately sits before the largest step.** Doing it now clears the session
 checks that would otherwise sit red through the whole of step 4 — and a reader who cannot tell a standing
@@ -243,7 +243,7 @@ diagnose them: a `.gitignore` that excludes `.claude/` and therefore the whole s
 before you write anything, because every gate stays green while your lenses are untracked — and a
 `scripts/repo-config.ps1` older than the current script contract (`Get-RosterPath`,
 `Get-RosterIgnoredIds`), which `scripts/sync/check-script-contract.ps1` reports for you and step 3's
-`adopt-config` is what answers.
+`adopt-dkj-policy` (Part 2) is what answers.
 
 The worker specialists can be invoked directly as `@team-alpha:<name>` from the moment Step 2 is
 done — with an empty lens they simply answer out of their portable playbook.

@@ -289,7 +289,7 @@ if ($contractLibs.Count -gt 0 -and $presentLibs.Count -eq 0) {
     # hooks that told a fresh consumer's model to "run that skill" while disable-model-invocation
     # forbids exactly that. Full reasoning at the twin site in check-roster-sync.ps1's [BOOTSTRAP]
     # marker; the short of it is that the refused model's next move is the absolute path into the
-    # plugin cache, and this line is where that temptation is created. The 'adopt-workflow-folder'
+    # plugin cache, and this line is where that temptation is created. The 'adopt-dkj-policy'
     # imperative further down is NOT the same case and stays as it is: that skill carries no flag.
     Write-Host ("  [BOOTSTRAP] this repo has none of the libs the shared workflow scripts expect (" + ($contractLibs -join ', ') + ") -- it has not been set up yet. Nothing is broken: those files are what /team-alpha:specialists-init puts down as scaffolds for you to fill in. That command must be TYPED by the repo owner, because the skill is reserved for explicit user invocation and an agent cannot start it. Until then this check reports nothing further, because every required function would otherwise be listed against a file that does not exist yet.") -ForegroundColor Yellow
     Write-CheckSummary
@@ -323,7 +323,7 @@ $foundWorkflowFolder = $workflowFolderNames | Where-Object {
 if (-not $foundWorkflowFolder) {
     Write-Failure ("the workflow folder 'dkj-policy/' does not exist in this repo -- since " +
         "August 14, 2026 the branch dossier, the folder docs and the audience releases live there, and " +
-        "the shared scripts read only that location. Run the 'adopt-workflow-folder' skill to scaffold " +
+        "the shared scripts read only that location. Run the 'adopt-dkj-policy' skill to scaffold " +
         "it (dry-run by default, additive, never overwrites). A leftover root branch/ from before the " +
         "move is yours to remove by hand.")
 } elseif ($foundWorkflowFolder -ne $workflowFolderNames[0]) {

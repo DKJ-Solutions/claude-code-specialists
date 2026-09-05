@@ -378,7 +378,7 @@ try {
 
     # --- Scenario 43: the SAME sentence about an UNFLAGGED skill passes ------------------------------
     #     The scenario that keeps this from being a phrasing rule. check-script-contract.ps1 names
-    #     'adopt-workflow-folder' with exactly this wording in the real tree and is correct to; a check
+    #     'adopt-dkj-policy' with exactly this wording in the real tree and is correct to; a check
     #     built as a grep for the phrasing would be born with that false finding.
     Write-Host "check 30 -- the same wording about an UNFLAGGED skill passes" -ForegroundColor Cyan
     $s43Lines = @(
