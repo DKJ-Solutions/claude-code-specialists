@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1473-readme-hook-count · 20260905-222228
+
+The README's plugin table no longer tells a reader how many session hooks `dkj-policy` ships. It
+says the plugin ships *the session hooks that belong to running this across several repos* -- the
+mechanism, not a count -- which is the wording `plugins/workflows/README.md` already carries for
+the same set. The number that was there said **two** while `hooks.json` lists **five**.
+
+That is the same answer `.claude/specialists/SPECIALISTS.md` reached after its own hook count went
+stale twice inside two days: each plugin's `hooks/hooks.json` is the one place that cannot drift,
+so the prose points at it instead of racing it. The **Stop** hook keeps its number, exactly as
+SPECIALISTS.md keeps it -- *one* is not a running total there but the distinction the sentence is
+making, between hooks that report and the one that acts.
+
+`README.md:115` says *the two session hooks* as well and is deliberately untouched. It is the
+account of what moved out of `team-alpha` on August 8, 2026, bracketed by that date at both ends,
+and two is what there were that day; a dated measurement keeps the wording it was written with.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The plugin table is what a prospective consumer reads to decide whether to enable `dkj-policy` at
+all, so the one stale number in it was the one sizing figure they had. Nothing broke on the old
+wording -- the failure it prevents is a consumer budgeting for two session hooks and adopting
+five.
+
+**Score:** 1
+
+#### Pull Request
+
+README's workflow-plugin row no longer states a session-hook count that goes stale
+
+[PR #1478](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1478)
+
+---
+
 ### DEPLOY: fix/1465-register-dkj-policy-id · 20260905-221616
 
 `connectors/claude-code-specialists.json` now registers the workflow plugin under its current id,
