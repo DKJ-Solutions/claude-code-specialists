@@ -197,8 +197,9 @@ chapter one, and answer `Get-ShopifySyncLogPath` for chapter two.
 **Chapter two needs no skill of its own** -- its one adopt step, scaffolding `bwj-codex/SYNC-LOG.md`
 with its masthead, rides along inside `adopt-bwj-asana`'s run rather than getting a second skill for a
 single file. There is still no CI to wire: the folder and the file exist from that run on, and every
-sync after it prepends. An empty log scaffolded on adoption day would read as "no syncs have happened" and "nobody
-ran the adopt step" in exactly the same way, and one of those is a fault.
+sync after it prepends. See [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md#where-the-record-lives) for
+why scaffolding it unconditionally at adopt time is what removes the old ambiguity rather than
+reintroducing it.
 
 Disabling the plugin removes nothing it already wrote to your repo -- the CI workflow, the config and
 the sync log stay; the skills and the pages that explain them stop.
