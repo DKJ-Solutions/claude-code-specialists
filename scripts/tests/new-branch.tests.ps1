@@ -320,7 +320,6 @@ function Add-OriginCommits {
     } finally { $ErrorActionPreference = $prevEap }
 }
 
-
 function Add-OriginBranch {
     <#
         A branch that exists ONLY on the bare origin, carrying a file nothing else has -- the other
@@ -355,6 +354,49 @@ function Add-OriginBranch {
         [System.IO.File]::WriteAllText((Join-Path $clone $MarkerFile), "parked elsewhere`n", (New-Object System.Text.UTF8Encoding $false))
         & git -C $clone add -A 2>$null | Out-Null
         & git -C $clone commit -q -m "work parked on the other device" 2>$null | Out-Null
+        & git -C $clone push -q origin $Branch 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+}
+function Add-OriginBranchCommits {
+    <#
+        Advance a branch that ALREADY exists on the bare origin, from a throwaway clone -- the other
+        session finishing its work and parking it, reproduced (#1439). The distinction from
+        Add-OriginBranch matters and is the whole of this suite's new case: that helper builds a branch
+        with no local ref at all (#1139), while here $Dir holds a local ref pointing at the OLDER tip.
+        That is the state `git status` cannot tell from "in sync".
+
+        $Author and $Subject are parameters rather than constants because they are what the check under
+        test PRINTS. The count alone cannot separate a collision from a fast-forward of your own
+        autopark; 'park: ... (all outstanding work)' under an identity that is not yours can.
+
+        $Dir is never touched, so its remote-tracking ref is left STALE on purpose -- the check's own
+        fetch is what has to discover this.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Bare,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$Branch,
+        [Parameter(Mandatory = $true)][string]$MarkerFile,
+        [Parameter(Mandatory = $true)][string]$Author,
+        [Parameter(Mandatory = $true)][string]$Subject
+    )
+    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-ahead.git")
+    if (Test-Path -LiteralPath $clone) { Remove-Item -Recurse -Force -LiteralPath $clone }
+    $script:fixtures += $clone
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        # --branch $Branch, not 'main': this clone exists to extend THAT branch, and the reasoning in
+        # Add-OriginCommits about a bare repo's HEAD applies just as much -- a plain clone would land on
+        # an unborn 'master' and the push below would fail into a green-looking helper that proves nothing.
+        & git clone -q --branch $Branch $Bare $clone 2>$null | Out-Null
+        & git -C $clone config user.email 'other-session@local.invalid' 2>$null | Out-Null
+        & git -C $clone config user.name $Author 2>$null | Out-Null
+        # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
+        & git -C $clone config commit.gpgsign false 2>$null | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $clone $MarkerFile), "built by the other session`n", (New-Object System.Text.UTF8Encoding $false))
+        & git -C $clone add -A 2>$null | Out-Null
+        & git -C $clone commit -q -m $Subject 2>$null | Out-Null
         & git -C $clone push -q origin $Branch 2>$null | Out-Null
     } finally { $ErrorActionPreference = $prevEap }
 }
@@ -1415,6 +1457,184 @@ Write-Output `$t.Type
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'already existed -- checked out') 'local resume: reports the resume'
     Assert-True (-not (Test-Phrase -Text $rW2.Out -Phrase 'behind origin/main')) 'local resume: and is NOT handed the trunk gap under the branch name'
     Assert-True (Test-Phrase -Text $rW2.Out -Phrase 'Base not compared') 'local resume: says why the base was not compared'
+
+    # --- (y1) THE BRANCH YOU RESUME IS BEHIND ITS OWN REMOTE HEAD -- warned, twice, never refused (#1439) -
+    # THE THIRD MEASURED DUPLICATE, AND THE FIRST ONE NO TRACKER COULD HAVE CAUGHT. #1282 and #1409 are
+    # both about an ISSUE worked twice and both need an issue number; #1409 closed by naming exactly this
+    # gap -- "that leaves the case where no issue number is passed, which is most branches". Two sessions
+    # then built feat/plugin-policy-precedence end to end from one parked commit, each running the lint
+    # gate and all 69 suites, and met at `git push`.
+    #
+    # THE FIXTURE IS THE REPORTED STATE AND NOT THE #1139 ONE. There, no local ref existed. Here run one
+    # creates the branch locally AND pushes it (the #900 default), and only then does the other session
+    # advance origin -- so this checkout holds a local ref at the older tip, which is precisely the state
+    # `git status` prints with no ahead/behind marker, indistinguishable from "in sync".
+    Write-Host "new-branch.ps1 -- a resume of a branch whose remote head has moved is warned (#1439)" -ForegroundColor Cyan
+    $fixAhead  = New-Fixture -Label 'y1'
+    $bareAhead = New-BareOrigin -Dir $fixAhead -Label 'y1'
+    Publish-FixtureTrunk -Dir $fixAhead
+
+    $rY1a = Invoke-NewBranch -Dir $fixAhead -Name 'feat/dup-1439-v1' -Title 'Duplicated branch'
+    Assert-Equal 0 $rY1a.Code 'remote ahead: the first run (the cut, which also pushes) exits 0'
+    Assert-True (Test-BranchOnRemote -Bare $bareAhead -Ref 'refs/heads/feat/dup-1439-v1') 'remote ahead: and the branch really is on origin -- the shared ref the other session will move'
+
+    # The other session, in the words the operator has to read. 'park: ... (all outstanding work)' is the
+    # verbatim subject from the measured incident, and 'Other Session' stands in for the second git
+    # identity that made it legible there.
+    Add-OriginBranchCommits -Bare $bareAhead -Label 'y1' -Branch 'feat/dup-1439-v1' -MarkerFile 'their-work.txt' -Author 'Other Session' -Subject 'park: feat/dup-1439-v1 (all outstanding work)'
+
+    # Back to the trunk, which is where a resume is typed from -- and the checkout that follows is what
+    # would otherwise land silently on the older tip.
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixAhead checkout -q main 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+
+    $rY1b = Invoke-NewBranch -Dir $fixAhead -Name 'feat/dup-1439-v1' -Title 'Duplicated branch'
+    # EXIT 1, AND IT IS THE PUSH RATHER THAN A REFUSAL BY THIS CHECK -- the distinction the two asserts
+    # below draw, because an exit code alone cannot. A resume of a branch whose remote head has moved
+    # CANNOT push: the creation push is a non-fast-forward, which is the measured incident's own ending.
+    # This suite is what found that, and it is why the repeat is a function called from both ends of the
+    # run instead of a block above exit 0 that this case never reaches.
+    Assert-Equal 1 $rY1b.Code 'remote ahead: exit 1 -- from the rejected push, which is the symptom itself'
+    Assert-Equal 'feat/dup-1439-v1' ((& git -C $fixAhead rev-parse --abbrev-ref HEAD) | Out-String).Trim() 'remote ahead: and the checkout still happened -- this check warns, it does not refuse'
+    Assert-True (Test-Phrase -Text $rY1b.Out -Phrase 'already existed -- checked out') 'remote ahead: still the local resume route, unchanged'
+    # THE ASSERT THAT COULD NOT HAVE PASSED BEFORE. Everything else about this run was already correct.
+    Assert-True (Test-Phrase -Text $rY1b.Out -Phrase "'feat/dup-1439-v1' is 1 commit(s) behind origin/feat/dup-1439-v1") 'remote ahead: names the branch and the count'
+    # THE SUBJECT AND THE AUTHOR, which are what separate a collision from a fast-forward of your own
+    # autopark. A count alone reads the same in both cases.
+    Assert-True (Test-Phrase -Text $rY1b.Out -Phrase 'Other Session: park: feat/dup-1439-v1 (all outstanding work)') 'remote ahead: and names the remote tip -- who wrote it and what they called it'
+    Assert-True (Test-Phrase -Text $rY1b.Out -Phrase 'Another session or another device has pushed work to this branch') 'remote ahead: says what it means in words an operator can act on'
+    # THE REPEAT, on the same argument as (s2)'s and load-bearing for a stronger reason: this check never
+    # refuses, so these two copies are the ENTIRE record. Between them print the checkout, the scaffold,
+    # the tier rubric, the commit and the push.
+    $flatAhead = Get-FlatOutput $rY1b.Out
+    $aheadHits = @([regex]::Matches($flatAhead, [regex]::Escape((Get-Squeezed 'is 1 commit(s) behind origin/feat/dup-1439-v1')))).Count
+    Assert-Equal 2 $aheadHits 'remote ahead: said twice -- once before the checkout, once out of the rejected push'
+    Assert-True (Test-Phrase -Text $rY1b.Out -Phrase 'git pull --ff-only') 'remote ahead: the last copy carries the remedy'
+    # NOT MOVED FOR YOU, which is the other half of "it warns". The work is still only on origin.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $fixAhead 'their-work.txt'))) 'remote ahead: and the checkout is NOT fast-forwarded behind your back -- this script does not move HEAD'
+
+    # --- (y2) THE OTHER END OF THE RUN, reached with -NoPush (#1439) ---------------------------------
+    # THE REPEAT HAS TWO CALL SITES AND (y) ONLY EXERCISES ONE. There, the push is rejected and the
+    # second copy comes out of the failed-push branch; a repeat that existed ONLY above `exit 0` would
+    # therefore have passed nothing in (y) and been dead code in the case it was written for. -NoPush is
+    # what reaches the tail: same divergent fixture, no push to reject, so the run ends on exit 0 with
+    # the note as its last line -- which is the shape the other two repeats in this script have.
+    Write-Host "new-branch.ps1 -- the divergence note is the last line of a run that completes (#1439)" -ForegroundColor Cyan
+    $rY2a = Invoke-NewBranch -Dir $fixAhead -Name 'feat/dup-1439-v1' -Title 'Duplicated branch' -NoPush
+    Assert-Equal 0 $rY2a.Code '-NoPush resume: exit 0 -- nothing to reject, so the run completes'
+    $flatY2a = Get-FlatOutput $rY2a.Out
+    $y2aHits = @([regex]::Matches($flatY2a, [regex]::Escape((Get-Squeezed 'is 1 commit(s) behind origin/feat/dup-1439-v1')))).Count
+    Assert-Equal 2 $y2aHits '-NoPush resume: still said twice -- once before the checkout, once as the last line'
+
+    # --- (y3) THE REMOTE IS LEVEL: nothing to warn about ----------------------------------------------
+    # The negative half, and it is what keeps this from becoming noise on the routine resume -- which is
+    # every second run of an idempotent script. Same fixture shape, same route, origin simply never moved.
+    Write-Host "new-branch.ps1 -- a resume whose remote head has NOT moved says nothing (#1439)" -ForegroundColor Cyan
+    $fixLevel  = New-Fixture -Label 'y3'
+    $bareLevel = New-BareOrigin -Dir $fixLevel -Label 'y3'
+    Publish-FixtureTrunk -Dir $fixLevel
+    $rY3a = Invoke-NewBranch -Dir $fixLevel -Name 'feat/level-1439-v1' -Title 'Level with origin'
+    Assert-Equal 0 $rY3a.Code 'remote level: the cut exits 0'
+    Assert-True (Test-BranchOnRemote -Bare $bareLevel -Ref 'refs/heads/feat/level-1439-v1') 'remote level: the cut pushed, so there IS a remote head to compare against'
+    $rY3b = Invoke-NewBranch -Dir $fixLevel -Name 'feat/level-1439-v1' -Title 'Level with origin'
+    Assert-Equal 0 $rY3b.Code 'remote level: the resume exits 0'
+    Assert-True (Test-Phrase -Text $rY3b.Out -Phrase 'already existed -- checked out') 'remote level: it is the resume route'
+    Assert-True (-not (Test-Phrase -Text $rY3b.Out -Phrase 'commit(s) behind origin/feat/level-1439-v1')) 'remote level: and nothing is said about a gap that does not exist'
+
+    # --- (y4) A BRANCH RESUMED FROM ORIGIN ALONE IS NOT WARNED EITHER (#1439 x #1139) -----------------
+    # THE ROUTE THIS CHECK DELIBERATELY DOES NOT REACH, asserted rather than left to the reading of one
+    # `if`. $branchOnOrigin creates the branch AT the remote tip, so its gap is 0 by construction -- and a
+    # warning there would be the #1139 mirror of what (w) rules out: a number about a ref the run has
+    # just aligned itself with, printed as if the operator were missing something.
+    Write-Host "new-branch.ps1 -- a resume from origin alone is never told it is behind (#1439)" -ForegroundColor Cyan
+    $fixOnly  = New-Fixture -Label 'y4'
+    $bareOnly = New-BareOrigin -Dir $fixOnly -Label 'y4'
+    Publish-FixtureTrunk -Dir $fixOnly
+    Add-OriginBranch -Bare $bareOnly -Label 'y4' -Branch 'fix/origin-only-1439-v1' -MarkerFile 'only-there.txt'
+    $rY4a = Invoke-NewBranch -Dir $fixOnly -Name 'fix/origin-only-1439-v1' -Title 'Origin only'
+    Assert-Equal 0 $rY4a.Code 'origin-only resume: exit 0'
+    Assert-True (Test-Phrase -Text $rY4a.Out -Phrase 'existed ONLY on origin') 'origin-only resume: it is the #1139 route'
+    Assert-True (-not (Test-Phrase -Text $rY4a.Out -Phrase 'commit(s) behind origin/fix/origin-only-1439-v1')) 'origin-only resume: and carries no gap, because it was created at the remote tip'
+
+    # --- (y5) THE REMOTE TIP IS SOMEBODY ELSE'S TEXT, so it is stripped before it is printed (#1439) --
+    # THE ONE PIECE OF TEXT THIS SCRIPT EMITS THAT IT DID NOT WRITE. %an and %s are chosen by whoever
+    # pushed the commit, and the check under test prints them to a console -- which nothing else in this
+    # repo does with externally-authored text. The neighbouring adversarial case (a malicious -Title,
+    # section (f) above) asserts the OPPOSITE and is not a precedent: that payload goes into a FILE,
+    # where landing fully and unchanged is the correctness property and truncation is the damage.
+    #
+    # THE PAYLOAD IS THE ATTACK AND NOT A GENERIC "WEIRD STRING": an ANSI colour escape and a cursor
+    # move (what repaints a terminal), an RTL override and a zero-width joiner (what makes a printed
+    # line read as something other than what it says). A reader deceived by the very line that exists to
+    # tell them whose work is on the other side of their branch is the failure worth a section.
+    Write-Host "new-branch.ps1 -- an adversarial remote tip is stripped, not printed raw (#1439)" -ForegroundColor Cyan
+    $fixEvil  = New-Fixture -Label 'y5'
+    $bareEvil = New-BareOrigin -Dir $fixEvil -Label 'y5'
+    Publish-FixtureTrunk -Dir $fixEvil
+    $rY5a = Invoke-NewBranch -Dir $fixEvil -Name 'feat/evil-tip-1439-v1' -Title 'Evil tip'
+    Assert-Equal 0 $rY5a.Code 'adversarial tip: the cut exits 0'
+
+    $esc = [char]27
+    $evilSubject = "park:${esc}[31m${esc}[2K harmless-looking$([char]0x202E)$([char]0x200D) subject"
+    Add-OriginBranchCommits -Bare $bareEvil -Label 'y5' -Branch 'feat/evil-tip-1439-v1' -MarkerFile 'evil.txt' -Author 'Other Session' -Subject $evilSubject
+
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixEvil checkout -q main 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+
+    $rY5b = Invoke-NewBranch -Dir $fixEvil -Name 'feat/evil-tip-1439-v1' -Title 'Evil tip'
+    # THE FIXTURE REALLY CARRIES THE PAYLOAD, asserted rather than assumed -- the same discipline (y4)
+    # applies to its parked branch. Without this the three "no ESC in the output" asserts below pass
+    # just as happily against a helper that quietly dropped the characters on the way in, which is the
+    # shape of a security test that proves nothing.
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $evilOnRemote = ((& git -C $bareEvil log -1 --format=%s 'refs/heads/feat/evil-tip-1439-v1' 2>$null) | Out-String)
+    } finally { $ErrorActionPreference = $prevEap }
+    Assert-True ($evilOnRemote.Contains($esc)) 'adversarial tip: the commit on origin really carries the ESC -- so the asserts below are not vacuous'
+    Assert-True ($evilOnRemote.Contains([char]0x202E)) 'adversarial tip: and the RTL override'
+
+    # ASSERTED ON THE FLATTENED CAPTURE AND THAT IS SAFE HERE, unlike for a whitespace-shaped payload:
+    # Get-FlatOutput strips '\s', and none of these three characters is whitespace to .NET -- ESC, the
+    # RTL override and the ZWJ all survive it. So a raw one would be visible to these asserts.
+    Assert-True (-not $rY5b.Out.Contains($esc)) 'adversarial tip: no ESC reaches the output -- the terminal cannot be repainted from a commit subject'
+    Assert-True (-not $rY5b.Out.Contains([char]0x202E)) 'adversarial tip: nor an RTL override, which would reverse how the line reads'
+    Assert-True (-not $rY5b.Out.Contains([char]0x200D)) 'adversarial tip: nor a zero-width joiner'
+    # AND THE STRIPPING IS NOT SILENCE. The point of the line is that the reader recognises the commit,
+    # so the words have to survive what the escapes did not.
+    Assert-True (Test-Phrase -Text $rY5b.Out -Phrase 'harmless-looking') 'adversarial tip: the readable words survive -- stripping the attack is not dropping the subject'
+    Assert-True (Test-Phrase -Text $rY5b.Out -Phrase 'Other Session') 'adversarial tip: and the author still identifies who pushed it'
+    Assert-True (Test-Phrase -Text $rY5b.Out -Phrase "is 1 commit(s) behind origin/feat/evil-tip-1439-v1") 'adversarial tip: the warning still fires -- the strip is not a refusal to report'
+
+    # --- (y6) THE CAP: an unbounded remote tip subject does not reach the output whole (#1439) -------
+    # A subject has no length limit, and an unbounded one pushes the half of the sentence that says what
+    # to DO off the screen -- the same failure the repeat exists to prevent, arriving from the other
+    # direction. The cap is asserted in both directions: enough survives to recognise the commit, and
+    # not so much that the remedy is pushed off the end.
+    Write-Host "new-branch.ps1 -- an unbounded remote tip subject is capped (#1439)" -ForegroundColor Cyan
+    $fixLong  = New-Fixture -Label 'y6'
+    $bareLong = New-BareOrigin -Dir $fixLong -Label 'y6'
+    Publish-FixtureTrunk -Dir $fixLong
+    $rY6a = Invoke-NewBranch -Dir $fixLong -Name 'feat/long-tip-1439-v1' -Title 'Long tip'
+    Assert-Equal 0 $rY6a.Code 'capped tip: the cut exits 0'
+    $longSubject = 'park: ' + ('x' * 400)
+    Add-OriginBranchCommits -Bare $bareLong -Label 'y6' -Branch 'feat/long-tip-1439-v1' -MarkerFile 'long.txt' -Author 'Other Session' -Subject $longSubject
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixLong checkout -q main 2>$null | Out-Null
+    } finally { $ErrorActionPreference = $prevEap }
+    $rY6b = Invoke-NewBranch -Dir $fixLong -Name 'feat/long-tip-1439-v1' -Title 'Long tip'
+    Assert-True (-not (Test-Phrase -Text $rY6b.Out -Phrase ('x' * 200))) 'capped tip: the 400-character subject does not reach the output whole'
+    Assert-True (Test-Phrase -Text $rY6b.Out -Phrase ('x' * 80)) 'capped tip: but enough of it does to recognise the commit'
+    # THE HALF THAT MATTERS IS STILL THERE, which is the whole reason for the cap.
+    Assert-True (Test-Phrase -Text $rY6b.Out -Phrase 'git pull --ff-only') 'capped tip: and the remedy is not pushed off the end by it'
 
     # --- (x) THE ALREADY-DONE CHECK: -RESOLVES WARNS BEFORE THE CHECKOUT, NEVER REFUSES (#1409) --------
     # SAME SHAPE AS (s)/(s2)/(t) ABOVE, ONE LAYER IN: a base gone stale and an issue already resolved are
