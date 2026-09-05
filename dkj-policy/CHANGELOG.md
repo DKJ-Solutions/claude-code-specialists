@@ -32,6 +32,50 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1437-dkj-policy-rename · 20260905-150707
+
+The workflow plugin is now **`dkj-policy`** and its companion **`dkj-policy-bwj`**, and the workflow's own
+root folder is **`dkj-policy/`**. The old names said what the plugin was *called after*; the new ones say
+what it *is* -- the top rung of the order, the page that outranks a consumer's root `CLAUDE.md` on every
+subject it addresses, with one ministry under it narrowed to the two repos it binds. Nothing about the
+precedence rule itself changed, and no plugin gained or lost a skill, script, gate or seam.
+
+Inside this repo the rename is complete: manifests, seams, gates, tests, the shared-script mirrors and the
+generated config blueprint. Everything that reads a folder or plugin name by list grew an entry instead of
+being substituted, so a repo still on `contributing-davekjohn/` -- or `workflow-davekjohn/`, from the rename
+before this one -- keeps its changelog, its release history and its branch documents exactly where they are.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+**Consumers must act.** The plugin ids they enable no longer resolve: `contributing-davekjohn@` and
+`bwj-codex@` are gone from the marketplace, and a `.claude/settings.json` naming one resolves to nothing --
+silently, which is the shape this family has met twice before. `INSTALL.md` carries the procedure as its own
+section: uninstall, refresh, install `dkj-policy@` (and `dkj-policy-bwj@` in BWJ's two store repos), restart.
+
+Renaming the FOLDER is optional and nothing breaks if it is left alone -- but re-running
+`adopt-workflow-folder` in a repo that has not renamed it writes a second folder beside the one holding its
+history, so the half-way state is the one to avoid. A repo that STATED `Get-ChangelogPath` or a release-note
+root in its own `repo-config.ps1` repoints that answer in the same commit as the `git mv`; a repo on the
+computed default is carried across for free.
+
+One accepted cost, named because the register already documents the class: `check-connectors` resolves each
+registered plugin id against `marketplace.json`, reports one the marketplace no longer declares as `[INFO]`,
+and then SKIPS that plugin's block. So until each consumer migrates and `connectors/` catches up, their
+workflow plugin cannot be reported as version-drifted. That is exactly what #978 recorded after #886, and it
+is left as an `[INFO]` for the same reason it was then: making it an error re-opens four false alarms.
+
+**Score:** 5
+
+#### Pull Request
+
+rename contributing-davekjohn to dkj-policy, and bwj-codex to dkj-policy-bwj
+
+[PR #1442](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1442)
+
+---
+
 ### DEPLOY: fix/1439-parked-branch-remote-head · 20260905-135922
 
 `new-branch.ps1` now compares the branch you are resuming against its own remote head, and warns when
