@@ -76,6 +76,19 @@
     in so many words that this is a resume of parked work rather than a new branch. The remote-tracking
     ref is read from disk and never fetched for on its own account, so this stays usable offline.
 
+    AND A BRANCH THAT EXISTS IN BOTH PLACES IS COMPARED (issue #1439, September 5, 2026). #1139 covered
+    the branch that exists ONLY on origin; the local ref pointing at an OLDER tip than origin's was still
+    read as a plain "already existed -- checked out". Two sessions then built the same branch end to end
+    from the same parked commit, each running the full gate, and found out at `git push`. Nothing else
+    in the workflow reads that ref: the claim rule needs an issue, `git status` is local and prints the
+    same line for "in sync" as for "never fetched", and prune-merged -IncludeRemote is for branches you
+    are not standing on. So the local route now counts refs/heads/<name>..refs/remotes/origin/<name> off
+    the fetch the base measurement has already done, and where origin is ahead it names the count and the
+    remote tip's author and subject -- 'park: ... (all outstanding work)' by somebody else being the line
+    that separates a collision from a fast-forward of your own autopark. It WARNS, twice like the others,
+    and that is not a position waiting to be hardened the way #1046's was: the legitimate divergence sits
+    on the intended happy path, so a refusal would land on the route this script exists to serve.
+
 .PARAMETER Name
     The branch name, form <prefix>/<short-name> (e.g. feat/new-plugin).
 
@@ -268,7 +281,6 @@ if (Test-Path -LiteralPath $configPath) {
     }
 }
 
-
 # Validation via the shared SSOT helper -- no inline repetition of the hard-reject rules. It runs on the
 # name AS GIVEN: this script does not complete or rewrite the name (see the version-suffix note below), so
 # what Test-BranchName sees is exactly what the branch will be called.
@@ -414,6 +426,97 @@ $remoteRef = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 
 $branchExists   = ($localRef.ExitCode -eq 0)
 $branchOnOrigin = ((-not $branchExists) -and ($remoteRef.ExitCode -eq 0))
 $resuming       = ($branchExists -or $branchOnOrigin)
+
+# --- AND IS THE BRANCH YOU ARE RESUMING BEHIND ITS OWN REMOTE HEAD? (issue #1439) ------------------
+#
+# THE DUPLICATE SIGNAL NOTHING READ. Two sessions built feat/plugin-policy-precedence in full -- both
+# from the same parked commit, both running the lint gate and all 69 suites, both committing -- and
+# neither learned of the other until `git push` was rejected at the very end. The first session had
+# parked its finished work on origin ('park: ... (all outstanding work)', under a different git
+# identity); the second stood on a local ref still pointing at the older tip they had both started from.
+#
+# EVERY EXISTING GUARD LOOKS SOMEWHERE ELSE. The claim rule needs an issue to claim and there was none.
+# The branch check at the start of an assignment reads `git status`, which is local: with no fetch it
+# printed '## <branch>...origin/<branch>' with no ahead/behind marker, which is the same line as "in
+# sync". prune-merged -IncludeRemote, which the orchestrator lens names as the way to find parked
+# branches, is for branches you are NOT on. And cycle-autopark makes this MORE likely rather than less,
+# because it is the thing that puts the other session's work on the shared ref without anybody asking.
+#
+# THE MEASUREMENT COSTS NO NETWORK CALL HERE, which is why this is the place rather than the one the
+# report inferred. Get-TrunkGap ran with -FetchAllRefs a few lines up -- load-bearing already, for the
+# resume probe -- so refs/remotes/origin/$Name is on disk and as fresh as this run can make it. All that
+# is added is a rev-list against a ref that has just been refreshed.
+#
+# ONLY ON THE LOCAL-REF ROUTE. $branchOnOrigin creates the branch AT the remote tip, so its gap is 0 by
+# construction, and a fresh cut has no remote head to be behind at all.
+#
+# IT WARNS RATHER THAN REFUSING, and unlike the stale-base check above that is not a position waiting to
+# be hardened: a legitimate divergence exists on the intended happy path -- your OWN autopark from
+# another device, which you then fast-forward. This script is the documented resume tool for exactly
+# that handoff, so refusing would put a hand-typed `git pull` in the middle of the route it exists to be.
+function Write-RemoteAheadRepeat {
+    <#
+        The second copy of the divergence warning, as a function rather than as a repeated `if`, because
+        the run has TWO ends and only one of them was reachable in the case this check exists for.
+
+        THE SUITE IS WHAT FOUND THIS. A resume of a branch whose remote head has moved cannot push: the
+        creation push at the foot of this script is a non-fast-forward, Invoke-GitPark returns false and
+        the script exits 1 -- which is the measured incident's own ending, `! [rejected] ... (fetch
+        first)`. So a repeat sitting only above `exit 0` printed exactly zero times on the one run it was
+        written for, and the first copy was buried under the scaffold as designed. Called from both ends
+        now, and from the failed-push branch it is not merely a repeat but the DIAGNOSIS: git says the
+        push was rejected, and this says why and whose work is on the other side of it.
+    #>
+    if ($script:remoteAheadNote) {
+        Write-Warning "$script:remoteAheadNote Fast-forward it (git pull --ff-only) and read what is there before you build on this branch."
+    }
+}
+$remoteAheadNote = ''
+if ($branchExists -and $remoteRef.ExitCode -eq 0) {
+    $aheadProbe = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-list', '--count', "refs/heads/$Name..refs/remotes/origin/$Name") -DiscardStderr
+    $ahead = 0
+    if ($aheadProbe.ExitCode -eq 0 -and [int]::TryParse((($aheadProbe.Output -join '').Trim()), [ref]$ahead) -and $ahead -gt 0) {
+        # THE SUBJECT AND THE AUTHOR ARE THE POINT, not the count. 'park: <branch> (all outstanding work)'
+        # by an identity that is not yours says "another session has already built this" in a way that "1
+        # commit behind" never does -- and it is the one line that tells a fast-forward of your own
+        # autopark apart from a collision. Read off the remote-tracking ref, so still no network call.
+        $tip = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'log', '-1', '--format=%h %an: %s', "refs/remotes/origin/$Name") -DiscardStderr
+        $tipLine = if ($tip.ExitCode -eq 0) { (($tip.Output -join ' ').Trim()) } else { '' }
+        # AND IT IS STRIPPED BEFORE IT IS PRINTED, because it is the one piece of text this script emits
+        # that SOMEBODY ELSE WROTE. %an and %s are free text chosen by whoever pushed that commit.
+        #
+        # THIS IS NEW GROUND HERE AND THE NEIGHBOURING CASE POINTS THE OTHER WAY, which is why it is
+        # argued rather than assumed. new-branch already takes adversarial free text -- a malicious
+        # -Title -- and its rule there is the exact opposite: land FULLY AND UNCHANGED, asserted on an
+        # exact compare, because that text goes into a FILE where truncation is the damage. A console is
+        # not a file. Nothing else in this repo prints externally-authored text to one.
+        #
+        # WHAT GOES, AND WHY NOT QUOTING. Control and format characters: an ANSI or OSC escape in a
+        # commit subject rewrites the terminal it lands in, and an RTL override or a zero-width run can
+        # make the printed line read as something other than what it says -- so the reader is deceived
+        # by the very line that exists to tell them who is on the other side of their branch. This
+        # script's output is also read by an agent session, where a crafted subject wearing this
+        # script's own WARNING prefix is an injection surface rather than a display bug. Quoting would
+        # keep the payload and add noise; the subject only has to be RECOGNISABLE here, so the
+        # characters that carry the attack simply go and the words stay.
+        #
+        # AND IT IS CAPPED. A subject has no length limit, and an unbounded one pushes the half of the
+        # sentence that says what to DO off the screen -- the same failure the repeat below exists to
+        # prevent, arriving from the other direction.
+        $tipLine = (($tipLine -replace '[\p{Cc}\p{Cf}]', ' ') -replace ' {2,}', ' ').Trim()
+        if ($tipLine.Length -gt 120) { $tipLine = $tipLine.Substring(0, 120).TrimEnd() + '...' }
+        # .Fresh SAYS WHICH REF THE COUNT CAME FROM, the same distinction Get-TrunkGap draws for the trunk
+        # and for the same reason: "behind the origin/<branch> this repo last fetched" is a different
+        # sentence from "behind origin/<branch>", and a reader who is offline has to be told which one
+        # they got. Here it is doubly worth saying, because a failed fetch is the one case where this
+        # check can read 0 on a branch that has genuinely moved.
+        $seenRef = if ($gap.Fresh) { "origin/$Name" } else { "the origin/$Name this repo last fetched (git fetch failed -- the real gap may be larger)" }
+        $remoteAheadNote = "'$Name' is $ahead commit(s) behind $seenRef"
+        if ($tipLine) { $remoteAheadNote += ", whose tip is: $tipLine" }
+        $remoteAheadNote += '.'
+        Write-Warning "$remoteAheadNote Another session or another device has pushed work to this branch that this checkout does not have -- read it before you build on top of it."
+    }
+}
 
 # --- HOW FAR BEHIND IS THE BASE? REPORTED ONLY WHEN THERE IS A BASE TO CHOOSE ----------------------
 #
@@ -900,7 +1003,13 @@ if ($NoPush) {
     # branch, but the pathspec discipline is the same everywhere.
         $ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $Name -Scope 'BranchFiles' `
             -Paths @($cycleRel)
-        if (-not $ok) { exit 1 }
+        if (-not $ok) {
+            # THE PUSH REJECTION IS THIS CHECK'S OWN SYMPTOM (#1439), so the note is emitted here rather
+            # than left to the tail of a run that never reaches it. git has just printed its own
+            # "! [rejected] ... (fetch first)"; this says which session is on the other side of it.
+            Write-RemoteAheadRepeat
+            exit 1
+        }
     }
 }
 
@@ -923,5 +1032,13 @@ if ($staleBaseNote) {
 if ($alreadyDoneNote) {
     Write-Warning $alreadyDoneNote
 }
+
+# THE REPEAT, same reason and same shape as the two above (issue #1439), and DELIBERATELY THE LAST OF
+# THE THREE. The other two are backed by something else -- the stale-base note is only reachable when a
+# refusal was overridden on purpose, and the already-done note names an issue somebody can go and read.
+# This one never refuses and has no issue behind it, so these two lines are the entire record that the
+# branch under your feet carries work you have not seen. Everything since the first copy -- the
+# checkout, the scaffold, the tier rubric, the commit, the push -- prints in between and buries it.
+Write-RemoteAheadRepeat
 
 exit 0

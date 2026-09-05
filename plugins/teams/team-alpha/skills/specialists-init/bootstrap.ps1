@@ -537,7 +537,7 @@ function Get-RosterIgnoredIds {
 $repoConfigWorkflowPart = @'
 # --- The workflow plugin's half -------------------------------------------------------------------
 # These are read by the branch/release scripts (open-pr, fold-changelog, ship-pr, cut-release). They
-# are here because this repo enabled contributing-davekjohn; without that plugin nothing
+# are here because this repo enabled dkj-policy; without that plugin nothing
 # reads them. Fill in the VUL-IN values below and remove the VUL-IN markers.
 
 # VUL-IN: GitHub repo hosting this repository (owner/name), e.g. 'DaveKJohn/my-repo'.
@@ -1024,7 +1024,7 @@ $allowJsonc
     @'
     // Empty on purpose: no workflow plugin is enabled here, so there is no scripted entry point to
     // permit -- this repo keeps the way of working it already had, and its commands are its own.
-    // The 'deny' half below still applies. Enable 'contributing-davekjohn' and re-run
+    // The 'deny' half below still applies. Enable 'dkj-policy' and re-run
     // specialists-init, and this half is filled in with that workflow's entry points.
     "allow": [],
 '@
