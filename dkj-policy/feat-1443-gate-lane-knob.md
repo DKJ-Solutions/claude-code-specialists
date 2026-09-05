@@ -102,6 +102,3 @@ that forwards to it.
 #### Pull Request
 
 open-pr, ship-pr and cut-release carry the test gate's lane knob through
-
-Plugins: dkj-policy
-
