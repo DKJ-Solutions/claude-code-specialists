@@ -71,6 +71,15 @@ door — and the consequence is that nothing in git remembers your URL, so whoev
 elsewhere. In a **private** repo, commit it: a tracked token is what survives a lost machine, and it is
 already inside a repository only your people can read.
 
+**`wrangler.toml` is gitignored too, and unlike the page and the worker beside it, nothing can rebuild
+what you put in it.** The script writes it only when it is absent and never again, precisely so an
+account id, a custom domain or a route you added survives — but that promise cannot cover the write
+itself, because there was nothing there to overwrite. Lose the page directory and the next `-Worker`
+run hands you a freshly generated file carrying none of it. So the run **says so** whenever it writes
+one, and the note is not evidence that anything went wrong: a first-ever deploy looks identical from
+there, which is why it reports rather than refuses. Read it against what you had before you deploy.
+Measured on issue #1479.
+
 ## Making it yours: four seam values, and one of them has a consequence outside your repo
 
 All four live in your own `scripts/repo-config.ps1`, all four optional:
