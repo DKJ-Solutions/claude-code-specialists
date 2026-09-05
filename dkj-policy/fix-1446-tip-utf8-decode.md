@@ -113,6 +113,3 @@ already see is now the line the script promised.
 #### Pull Request
 
 the remote-tip read decodes as UTF-8, so the sanitiser sees the characters it strips
-
-Plugins: dkj-policy
-
