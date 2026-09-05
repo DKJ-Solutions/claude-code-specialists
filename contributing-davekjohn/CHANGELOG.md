@@ -32,6 +32,47 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/plugin-policy-precedence · 20260905-124229
+
+`contributing-davekjohn` gains **`check-policy-drift`**, an on-demand, report-only skill that lays every
+document legislating in a repo out in rank order -- the installed plugins' portable pages, then
+`contributing-davekjohn/`, then the always-on `CLAUDE.md` closure -- so a session can read them against
+each other and report contradictions. It decides nothing and edits nothing: the judgement is handed over,
+which is exactly the half [#1380](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1380)
+declined to give a script. Alongside it, `CONTRIBUTING-portable.md` gains a new
+**"Precedence -- full adoption, or none"** section ahead of the cycle -- installing this plugin is not a
+customisation laid beside a repo's own `CLAUDE.md`, it is a policy that outranks it, and the choice is
+binary -- plus, in the rank-order section further down, the **top rung's own internal order** now that a
+second workflow plugin exists. `bwj-codex/WORKFLOW-portable.md` names its rung and links both.
+
+**Score:** 2 -- one new skill plus its script, mirror and 22-assert suite, and two sections of shared
+prose. Nothing existing changes behaviour and no gate moves; the rank order it reports was already the
+rule, and the new section states in one place what the detail further down already worked out.
+
+#### What makes this deploy extra special
+
+A repo running this workflow can now ask, in one command, whether its own `CLAUDE.md` has quietly
+started restating rules the plugin owns -- the failure mode behind
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378), where a consumer's
+constitution documented push-then-cut while `cut-release` fixed cut-then-push, and the disagreement read
+as a constitution exercising supremacy rather than as drift. Until now two narrow greps covered a
+filename and one inverted sentence; everything else was invisible from both ends, since a repo reads its
+own page and follows it while the source never reads that page at all. Report-only by design: the repair
+stays an ordinary branch + PR in the repo that owns the file.
+
+**Score:** 2 -- opt-in and additive. A consumer that never invokes the skill sees no change, and the
+script writes nothing, needs no token and reaches no network.
+
+#### Pull Request
+
+Plugin policy outranks a consumer's root CLAUDE.md
+
+Plugins: bwj-codex, contributing-davekjohn
+
+[PR #1440](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1440)
+
+---
+
 ### DEPLOY: fix/1428-ship-invitation-honest · 20260905-115322
 
 `ship-pr` told you *"nothing here needs the session"* before it backgrounded the CI wait, and the session
