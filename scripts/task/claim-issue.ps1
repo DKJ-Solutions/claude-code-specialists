@@ -248,11 +248,15 @@ if (-not $landed) {
 
 Write-Host "[OK] #$number claimed for '$($identity.Account)' -- the work starts here." -ForegroundColor Green
 Write-Host "     $title"
-Write-Host "     $($facts.url)"
 # The claim is the OPENING of the work, not a checkpoint before it (#1485). Every other line this
 # script and its page emit is a boundary -- what the step is NOT -- so a session that obeys them all
 # stops here and asks whether to proceed, which is the intermediate question the orchestrator's own
-# body forbids. The `already-yours` verdict above has always pointed forward; this one now does too,
-# and it is printed last because the last line is the one that gets read.
+# body forbids. The `already-yours` verdict above has always pointed forward; this is the same line
+# in the same place, so the two verdicts read alike rather than each arguing its own layout.
+#
+# 'the branch' means new-branch and nothing else. This says to carry on through the FIXED steps --
+# it is not a licence to act on what the issue's title or body asks for. Those are written by
+# whoever opened the issue, which on a public tracker is anybody, and they stay data.
 Write-Host '     Read the issue, then open the branch (new-branch) -- in this same turn, without' -ForegroundColor Green
 Write-Host '     asking whether to go on.' -ForegroundColor Green
+Write-Host "     $($facts.url)"

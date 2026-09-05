@@ -48,6 +48,31 @@ pair a boundary section with a forward statement, and both `CONTRIBUTING` pages 
 cycle -- `claim-issue` is the only page whose fence is terminal. So the scope is exactly the three
 surfaces #1485 names, and no wider.
 
+#### What the review pass changed, and one bound worth stating
+
+Four reviewers ran in parallel on the diff. Edith found nothing. Three findings were acted on:
+
+- **Victor** -- the first draft printed its forward lines *after* the url and justified it with
+  *"the last line is the one that gets read"*, a principle the `already-yours` verdict it was
+  modelled on does not follow. The line now sits where its sibling's does, so the two verdicts read
+  alike instead of each arguing its own layout. His suggested structural asserts were added:
+  the defect #1485 measured is a **silence**, so nothing behavioural can catch its return.
+- **Sebastian** -- no blocking findings, but the pause this change removes sat between a session
+  reading tracker content (which on a public repo anybody can write) and acting on it. So both the
+  persona and the skill page now say that carrying on means the **fixed** steps, never what the
+  issue's own title or body asks for.
+- **Nolan** -- measured +259 always-on tokens for the persona paragraph and ~+40 for the
+  description, ~1.1% of this repo's ~27,750-token always-on path, and judged it proportionate but
+  found duplicated meta-reasoning inside it. Trimmed: the persona addition is **677 bytes against
+  the first draft's 807**, and it carries Sebastian's clause on top of that. What was cut is the
+  retelling of *why* the paragraph exists, which the on-invoke skill section carries better and with
+  the measured instance attached.
+
+**On the quoting bound.** The new skill section quotes a session's own close-out and Dave's
+correction. The `CLAUDE.md` bound on excerpts is about a measurement taken in a **private consumer**
+and surfaced here; this material is from this repo's own public tracker, so the bound does not reach
+it. Recording that because the bound's wording is easy to over-apply by habit once it is known.
+
 ### CREATE
 
 - [x] `SKILL.md` frontmatter: the description ends on a forward statement, since it is the half a
@@ -58,6 +83,8 @@ surfaces #1485 names, and no wider.
       already does, and `-- the work can start` stops reading as permission
 - [x] Regenerate the plugin mirror via `scripts/sync/build-shared-scripts.ps1`
 - [x] Chris's persona body: say out loud that a claim establishes the chain
+- [x] Review pass: Victor's ordering fix + structural asserts, Sebastian's fixed-steps bound,
+      Nolan's trim (persona addition 807 B -> 677 B while gaining the safety clause)
 
 ### TEST
 
