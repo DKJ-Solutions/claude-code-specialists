@@ -115,7 +115,42 @@ $v = Get-ClaimVerdict -Account 'maikel-bwj' -State 'OPEN' -Assignees @('DaveKJoh
 Assert-True ($v.Others -is [array]) 'Others is always an array -- a single other assignee must not arrive as a bare string'
 
 Write-Host ''
-Write-Host 'claim-issue.ps1 -- the two properties a suite can hold' -ForegroundColor Cyan
+Write-Host 'Get-AssigneeLogins -- reading gh JSON without trusting its shape' -ForegroundColor Cyan
+
+Assert-True ((Get-AssigneeLogins -Json '{"assignees":[{"login":"maikel-bwj"}]}') -contains 'maikel-bwj') 'the ordinary payload -- one assignee'
+
+$l = Get-AssigneeLogins -Json '{"assignees":[{"login":"a"},{"login":"b"}]}'
+Assert-True ($l.Count -eq 2 -and $l[0] -eq 'a' -and $l[1] -eq 'b') 'two assignees, in order'
+
+Assert-True ((Get-AssigneeLogins -Json '{"assignees":[]}').Count -eq 0) 'an unassigned issue is an empty array'
+Assert-True ((Get-AssigneeLogins -Json '{"number":7}').Count -eq 0) 'a payload with no assignees field at all -- empty, not a throw'
+Assert-True ((Get-AssigneeLogins -Json 'not json').Count -eq 0) 'unparseable JSON is empty rather than an exception'
+Assert-True ((Get-AssigneeLogins -Json '').Count -eq 0) 'empty input is empty'
+
+# Victor's finding: under Set-StrictMode -Version Latest a dot-read of an ABSENT property throws, and
+# the previous inline loop did exactly that. This is the assert that keeps it out.
+Assert-True ((Get-AssigneeLogins -Json '{"assignees":[{"id":"X"},{"login":"maikel-bwj"}]}') -contains 'maikel-bwj') 'an assignee record with no login is skipped, not fatal -- the rest is still read'
+
+Assert-True ((Get-AssigneeLogins -Json '{"assignees":[{"login":"a"},{"login":"a"}]}').Count -eq 1) 'a repeated login is counted once'
+Assert-True ((Get-AssigneeLogins -Json '{"assignees":[{"login":"  a  "}]}')[0] -eq 'a') 'logins are trimmed'
+
+Write-Host ''
+Write-Host 'Format-ForConsole -- tracker text is written by strangers' -ForegroundColor Cyan
+
+$t = Format-ForConsole -Text ("Fix the thing" + [char]27 + "[2K" + [char]27 + "[A")
+Assert-True ($t -notmatch [char]27) 'an ANSI escape in an issue title never reaches the terminal'
+Assert-True ($t -like 'Fix the thing*') 'the printable half of the title survives verbatim'
+
+$t = Format-ForConsole -Text ("one" + [char]10 + "two")
+Assert-True ($t -eq 'one two') 'a newline becomes a space -- a title cannot forge a second output line'
+
+$t = Format-ForConsole -Text ("a" + [char]0 + "b")
+Assert-True ($t -eq 'a b') 'a control character becomes a space rather than vanishing -- two words cannot be glued into one'
+
+Assert-True ((Format-ForConsole -Text '') -eq '') 'an empty title is an empty string, not a crash'
+
+Write-Host ''
+Write-Host 'claim-issue.ps1 -- the properties a suite can hold' -ForegroundColor Cyan
 
 $body = Get-Content -LiteralPath $Script -Raw
 
@@ -129,6 +164,9 @@ Assert-True ($body -notmatch "--add-assignee'\s*,\s*'@me'") "the script never se
 # The write is not the proof: gh reports success for a login GitHub silently drops. Two issue views
 # is what a read-back looks like from here -- the facts before, the assignees after.
 Assert-True ((([regex]::Matches($body, "'issue',\s*'view'")).Count) -ge 2) 'the claim is read back after the write, not assumed from the exit code'
+
+# The title is the one field on the issue that a stranger writes, and this script prints it twice.
+Assert-True ($body -notmatch '\$\(\$facts\.title\)') 'the issue title is never printed straight from the tracker'
 
 foreach ($path in @($Script, $Lib, $IdLib)) {
     $errors = $null

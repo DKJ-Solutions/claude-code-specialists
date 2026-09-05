@@ -149,20 +149,23 @@ if (-not $view -or $view.ExitCode -ne 0) {
     exit 1
 }
 
+$viewJson = (@($view.Output) -join "`n")
 $facts = $null
 try {
-    $facts = (@($view.Output) -join "`n") | ConvertFrom-Json
+    $facts = $viewJson | ConvertFrom-Json
 } catch {
     Write-Host "[ERROR] gh returned something that is not JSON for issue #$number -- nothing was claimed." -ForegroundColor Red
     exit 1
 }
 
-$assignees = @()
-if ($facts.PSObject.Properties.Name -contains 'assignees' -and $facts.assignees) {
-    $assignees = @($facts.assignees | ForEach-Object { [string]$_.login })
-}
+# The logins come out of the JSON TEXT rather than off $facts, because the reading is where the 5.1
+# traps are and a lib function is the half a suite can hold. gh's exit code was checked above, so an
+# empty list here means unassigned rather than unanswered.
+$assignees = @(Get-AssigneeLogins -Json $viewJson)
 
-Write-Host "  #$($facts.number)  $($facts.state)  $($facts.title)"
+$title = Format-ForConsole -Text ([string]$facts.title)
+
+Write-Host "  #$($facts.number)  $($facts.state)  $title"
 if ($assignees.Count -gt 0) { Write-Host "  assignees: $($assignees -join ', ')" }
 
 # --- MAY IT BE CLAIMED ----------------------------------------------------------------------------
@@ -232,14 +235,7 @@ if (-not $edit -or $edit.ExitCode -ne 0) {
 $after = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'view', $number) + $repoArgs + @('--json', 'assignees')) -Utf8 -DiscardStderr
 $landed = $false
 if ($after -and $after.ExitCode -eq 0) {
-    try {
-        $post = (@($after.Output) -join "`n") | ConvertFrom-Json
-        if ($post.assignees) {
-            $landed = @($post.assignees | ForEach-Object { [string]$_.login }) -contains $identity.Account
-        }
-    } catch {
-        $landed = $false
-    }
+    $landed = (Get-AssigneeLogins -Json (@($after.Output) -join "`n")) -contains $identity.Account
 }
 
 if (-not $landed) {
@@ -251,5 +247,5 @@ if (-not $landed) {
 }
 
 Write-Host "[OK] #$number claimed for '$($identity.Account)' -- the work can start." -ForegroundColor Green
-Write-Host "     $($facts.title)"
+Write-Host "     $title"
 Write-Host "     $($facts.url)"

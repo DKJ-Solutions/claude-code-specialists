@@ -21,6 +21,75 @@
     Pure ASCII, per this repo's script-layer convention.
 #>
 
+function Format-ForConsole {
+    <#
+        .SYNOPSIS
+            Strip control characters out of tracker-supplied text before it is printed.
+
+        .DESCRIPTION
+            An issue title is written by whoever opened the issue, and on a public tracker that is
+            anybody. Echoed verbatim it reaches the terminal as control characters -- an ANSI escape
+            run can move the cursor, repaint what is already on screen, or hide the lines around it,
+            which in THIS script would be repainting a refusal. Display only, never execution, and the
+            operator has to point the run at that exact number; the reason to strip anyway is that the
+            output of this step is what a session then decides on.
+
+            C0 (00-1F) and DEL (7F) go, tab included -- a tab in a title is a layout accident rather
+            than content. Everything printable stays exactly as written, because a title is quoted
+            evidence and a mangled one is worse than a blunt one. Each character becomes a space
+            rather than vanishing, so a title cannot be made to read as a different sentence by
+            deleting the separator between two words.
+
+            IT IS IN THIS LIB RATHER THAN IN THE SCRIPT so that it can be tested at all: a lib is
+            dot-sourceable and claim-issue.ps1 is not. Same reasoning as the two decisions below.
+    #>
+    param([string]$Text)
+    if (-not $Text) { return '' }
+    return ([regex]::Replace($Text, '[\x00-\x1F\x7F]', ' '))
+}
+
+function Get-AssigneeLogins {
+    <#
+        .SYNOPSIS
+            The logins in a `gh issue view --json assignees` payload, as a string array. An EMPTY array
+            for empty input, unparseable JSON, or a payload carrying no readable login.
+
+        .DESCRIPTION
+            THE SAME MOVE AND THE SAME REASONING AS Get-LabelNames in pr-issues-lib.ps1, whose docstring
+            names both 5.1 parse traps this hits. The caller drives a live remote and cannot be covered
+            by a suite; parsing the answer is a pure function of the JSON text and can be, so it lives
+            here.
+
+            A FIELD gh WAS NEVER ASKED FOR IS ABSENT RATHER THAN EMPTY, and under
+            Set-StrictMode -Version Latest a dot-read of an absent property THROWS. So every record is
+            probed for 'login' before it is read -- an assignee record without one (schema drift, a
+            ghost account, a future gh) is skipped rather than crashing the run mid-way, which in this
+            script would mean an unhandled exception where a clean refusal belongs.
+
+            EMPTY IS "COULD NOT BE ASKED" AND NOT "UNASSIGNED", which is why the caller checks gh's
+            exit code BEFORE it reaches this function. Read the other way round, a failed query would
+            present as a free issue and this whole step would hand out claims on other people's work.
+
+            The payload here is an OBJECT with an 'assignees' array, not the bare array Get-LabelNames
+            reads -- `gh issue view --json assignees` wraps it -- so the wrapper is unwrapped first and
+            probed for exactly the same reason each record is.
+    #>
+    param([string]$Json)
+
+    if (-not $Json -or -not $Json.Trim()) { return @() }
+    try { $parsed = $Json | ConvertFrom-Json } catch { return @() }
+    if ($null -eq $parsed) { return @() }
+    if (-not $parsed.PSObject.Properties['assignees']) { return @() }
+
+    $logins = New-Object System.Collections.Generic.List[string]
+    foreach ($record in @(@($parsed.assignees) | Where-Object { $_ })) {
+        if (-not $record.PSObject.Properties['login']) { continue }
+        $login = ([string]$record.login).Trim()
+        if ($login -and -not $logins.Contains($login)) { $logins.Add($login) | Out-Null }
+    }
+    return @($logins)
+}
+
 function Resolve-ClaimAccount {
     <#
         .SYNOPSIS

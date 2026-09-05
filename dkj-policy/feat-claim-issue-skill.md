@@ -70,9 +70,11 @@ Each is a refusal in the script, and none of them is reachable by writing the ru
       dot-sources them. The claim needs the same three reads and cannot dot-source that script, which
       runs its comparison and exits on load; the alternative was a second copy of the multi-account
       `gh auth status` parse.
-- [x] `scripts/lib/claim-issue-lib.ps1` -- the two pure decisions. `Resolve-ClaimAccount` (which
-      account, never `@me`) and `Get-ClaimVerdict` (claim / skip / refuse, with the four codes). Pure
-      so that every refusal is testable without a tracker.
+- [x] `scripts/lib/claim-issue-lib.ps1` -- the pure half, so that every refusal is testable without a
+      tracker. `Resolve-ClaimAccount` (which account, never `@me`), `Get-ClaimVerdict` (claim / skip /
+      refuse, five codes), `Get-AssigneeLogins` (reading gh's JSON without trusting its shape) and
+      `Format-ForConsole` (tracker text is written by strangers). The last two arrived from the review
+      round below rather than from the first draft.
 - [x] `scripts/task/claim-issue.ps1` -- the entry point: resolve the account, read the issue, judge it,
       write one assignee, **read the claim back**. Accepts `1234`, `#1234` or the issue URL; `-DryRun`
       judges and writes nothing.
@@ -88,13 +90,14 @@ Each is a refusal in the script, and none of them is reachable by writing the ru
 
 ### TEST
 
-- [x] `scripts/tests/claim-issue.tests.ps1` -- **27 asserts, all green.** Ten on
+- [x] `scripts/tests/claim-issue.tests.ps1` -- **42 asserts, all green.** Ten on
       `Resolve-ClaimAccount` (the measured #1315 split, case-insensitive logins, a display name, the
       39/40-character login-shape boundary at both edges, a logged-out gh, trimming); eleven on
-      `Get-ClaimVerdict` (all four verdicts, a null assignee list, case-insensitive state, closed
-      beating already-yours, a co-assignment, `Others` always an array); and six structural, of which
-      the load-bearing one asserts the script **never sends `@me`** -- a later "simplification" back to
-      the one-liner would pass every behavioural assert and reintroduce #1315 in one line.
+      `Get-ClaimVerdict` (all five verdicts, a null assignee list, case-insensitive state, closed
+      beating already-yours, a co-assignment, `Others` always an array); nine on `Get-AssigneeLogins`
+      and five on `Format-ForConsole`; and seven structural, of which the load-bearing one asserts the
+      script **never sends `@me`** -- a later "simplification" back to the one-liner would pass every
+      behavioural assert and reintroduce #1315 in one line.
 - [x] The lint gate: `check-plugin-integrity.ps1`, **0 errors**, including the skill-parameter check
       (both documented parameters), the shared-script mirror check, and the three skill listings.
 - [x] The four verdicts exercised against the **live** tracker: #1454 (closed) refused, #1450 (held by
@@ -103,6 +106,31 @@ Each is a refusal in the script, and none of them is reachable by writing the ru
 - [x] The **write** path exercised for real: #1453 was unassigned by hand, claimed by the script, read
       back, and ended in exactly the state it started in. There was no unassigned open issue in the
       repo to use, so this was the only route that touched nobody else's work.
+
+#### What the review round changed
+
+Victor, Edith and Sebastian read the same diff in parallel. Nothing they found blocked the merge, and
+three things landed as a result:
+
+- **Sebastian (advisory):** an issue title is written by whoever opened the issue, and on a public
+  tracker that is anybody -- echoed verbatim, an ANSI escape run can repaint the very refusal above it.
+  `Format-ForConsole` now strips C0 and DEL, each to a space so two words cannot be glued into one.
+- **Victor (correctness + reuse, one repair):** under `Set-StrictMode -Version Latest` a dot-read of an
+  absent property THROWS, and the inline `$_.login` loop -- written twice -- would have crashed the run
+  on an assignee record without one instead of refusing cleanly. `Get-AssigneeLogins` follows
+  `Get-LabelNames`'s probe idiom in `pr-issues-lib.ps1`, which already names both 5.1 traps, and removes
+  the duplication in the same move.
+- **Edith (content drift):** the skill page's verdict table listed four rows while the text beneath it
+  claimed three refusals out of four, and the table had quietly dropped `no-account` in favour of the
+  happy path -- so a reader following it alone never learned what happens with `gh` logged out. Five
+  rows now, three of them refusals. Her two smaller ones went with it: the Dutch trigger examples in the
+  frontmatter (repo content is English) and one `#1315` citation under the pre-rename org name.
+
+**One reported nit was declined**, and it is worth recording as a decision rather than an oversight:
+Victor read the `Plugin = 'dkj-policy'` lines in the two new `LibOnly` registry entries as breaking the
+column alignment of their neighbours. Measured across the existing `LibOnly` entries, 18 write it
+exactly as these do and 9 align it -- so the new entries follow the majority form and there is no
+convention here to have broken.
 
 #### The named test gap
 

@@ -3,20 +3,20 @@ name: claim-issue
 description: >-
   Claim a GitHub issue on the tracker before any work on it begins -- assign it to the account THIS
   checkout commits as, and refuse when the issue is closed, missing, or already somebody else's. Use
-  it the moment an issue number is named as the thing to work on ("fix issue 1234", "pak #87 op",
-  "los deze issue op"), and again when resuming one, BEFORE reading the code or opening a branch.
-  It writes one assignee and nothing else -- no branch, no commit, no comment -- so it is the step
-  that runs first, not a replacement for new-branch.
+  it the moment an issue number is named as the work -- "fix issue 1234", "pick up #87", "take this
+  one", in whatever language the request arrives -- and again when resuming one, BEFORE reading the
+  code or opening a branch. It writes one assignee and nothing else -- no branch, no commit, no
+  comment -- so it is the step that runs first, not a replacement for new-branch.
 ---
 
 # claim-issue -- the claim rule, performed
 
-The rule has been written down for as long as this workflow has existed. Chris's persona body
-("Picking up an issue -- claim it before you work it") and
-[`CONTRIBUTING-portable.md`](../../CONTRIBUTING-portable.md) both prescribe
-`gh issue edit <n> --add-assignee @me`, and **both leave it to a session to remember, to type, and to
-read the result of.** This skill is that step, so that *"fix issue 1234"* cannot begin before the
-tracker says who is on it.
+The rule has been written down for as long as this workflow has existed:
+[`CONTRIBUTING-portable.md`](../../CONTRIBUTING-portable.md) states it
+("**Claim an issue before working it**, and read the claim as well as write it"), and Chris's persona
+body states it with the command -- `gh issue edit <n> --add-assignee @me`. **Both leave it to a
+session to remember, to type, and to read the result of.** This skill is that step, so that
+*"fix issue 1234"* cannot begin before the tracker says who is on it.
 
 **Why the tracker and not a branch.** It is the only thing two sessions share. The same owner may be
 running a second machine and a colleague may be working the same board; neither session sees the
@@ -41,7 +41,7 @@ The script:
 1. Resolves **which account** this checkout claims under -- see the next section. It never sends
    `@me`.
 2. Reads the issue (`gh issue view --json number,title,state,url,assignees`).
-3. **Judges it**, and refuses on three of the four outcomes (below).
+3. **Judges it** -- five verdicts, three of them refusals (below).
 4. Writes the assignee, then **reads the claim back** and fails if it did not land.
 
 ## Two parameters
@@ -62,7 +62,7 @@ name while every commit lands under the other. Nothing errors, no gate fails, an
 the wrong question.
 
 Measured, September 3, 2026
-([#1315](https://github.com/DaveKJohn/claude-code-specialists/issues/1315)): `gh` authenticated as
+([#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315)): `gh` authenticated as
 `DaveKJohn` on a checkout committing as `davekokbwj`, so claiming #1314 with the documented idiom put
 the wrong account on it and it had to be corrected by hand.
 
@@ -73,7 +73,7 @@ commits, because the commits are the half nothing can rewrite afterwards. A `git
 holding a display name ("Ada Lovelace") is not an account at all and is no evidence of a split, so a
 normal repo never sees this.
 
-## The four verdicts
+## The five verdicts
 
 | Verdict | What happens |
 |---|---|
@@ -81,6 +81,7 @@ normal repo never sees this.
 | **already yours** | Nothing to write -- this is a resume. Read the branch and its document before carrying the work. |
 | **closed** | **Refused.** |
 | **held by somebody else** | **Refused.** |
+| **no account** | **Refused** -- `gh` is absent or logged out, so there is nobody to claim as. A step whose whole job is to say who is working cannot proceed anonymously. |
 
 **The closed refusal is the one this step was built for.** `gh issue edit <n> --add-assignee`
 **succeeds silently on a closed issue**, so the documented one-liner gives a session every signal of
@@ -92,7 +93,7 @@ Nothing downstream catches it, because every gate reads the branch and the branc
 If a closed issue is still broken, **reopen it first**. The reopening is the record that the earlier
 repair did not hold, and this step is not the place to make that record silently.
 
-**There is deliberately no flag past the third verdict.** An assignee that is not this checkout's own
+**There is deliberately no flag past that fourth verdict.** An assignee that is not this checkout's own
 account stops the work; the way through is asking whoever holds it, and a switch cannot have a
 conversation. A **co-assignment stops it too**, including one this account is part of: two people on
 one issue is the duplicate-work hazard itself, and being one of the two is no evidence about what the
