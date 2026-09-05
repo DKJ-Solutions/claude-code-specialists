@@ -53,6 +53,36 @@ briefing is a pointer and the repo is the answer. So step 1 was **not** rewritte
 is the one thing that section genuinely did not answer, and could not have: with a **second** workflow
 plugin now installed beside it, the top rung has an internal order and the diagram was silent on it.
 
+#### Two sessions built this branch, and the merge is a reconciliation
+
+A second session (git identity `DaveKJohn`, a different Windows profile) built the same three
+deliverables independently and parked them at 11:32 as `952e676e`, *"all outstanding work"*. Neither
+session knew: the branch was already parked when both started, `git status` shows no divergence before a
+fetch, and there is no issue to have claimed. It surfaced at `git push`, after both had run the full
+gates. Filed as
+[#1439](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1439) -- the remote head of a
+parked branch is a duplicate signal nothing reads, and it is the case
+[#1409](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1409) closed with *"nothing here
+addresses that, and it may not be addressable."*
+
+**Dave's call: reconcile, not discard.** So this branch carries both, and the merge commit is where the
+choice per file is recorded:
+
+| | kept | from |
+|---|---|---|
+| `## Precedence -- full adoption, or none` | the whole section | the other session -- it is the PLAN's literal ask and says something genuinely new: the choice is binary, one ship one captain |
+| the top rung's internal order | the two paragraphs under the rank diagram | this session |
+| `WORKFLOW-portable.md` | one paragraph naming its rung and linking **both** anchors | merged from the two |
+| `check-policy-drift.ps1` | this session's, plus the other's install-record resolution and its `Test-PluginInstalledHere` report | both |
+| the registry entry, the skill page, the suite | this session's | this session |
+
+The one substantive thing taken from the other implementation is its **resolver**, and it is the better
+answer: `Resolve-PluginDir` cannot be reused here because it requires an `agents/` directory at every
+return path, so on a workflow plugin it returns `$null` on every machine, always. The other session
+restated its three steps with the marker file as a parameter; this branch does the same, keeps its own
+two extra probes either side, and adds the enable-versus-install-record distinction (#302) that this
+session's version did not have at all.
+
 ### CREATE
 
 - [x] Tessa: the precedence rule in `contributing-davekjohn/CONTRIBUTING-portable.md`. **Already stated**
@@ -108,13 +138,15 @@ document legislating in a repo out in rank order -- the installed plugins' porta
 `contributing-davekjohn/`, then the always-on `CLAUDE.md` closure -- so a session can read them against
 each other and report contradictions. It decides nothing and edits nothing: the judgement is handed over,
 which is exactly the half [#1380](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1380)
-declined to give a script. Alongside it, `CONTRIBUTING-portable.md`'s rank-order section gains the
-**top rung's own internal order** now that a second workflow plugin exists, and
-`bwj-codex/WORKFLOW-portable.md` names its rung and points back at that one statement.
+declined to give a script. Alongside it, `CONTRIBUTING-portable.md` gains a new
+**"Precedence -- full adoption, or none"** section ahead of the cycle -- installing this plugin is not a
+customisation laid beside a repo's own `CLAUDE.md`, it is a policy that outranks it, and the choice is
+binary -- plus, in the rank-order section further down, the **top rung's own internal order** now that a
+second workflow plugin exists. `bwj-codex/WORKFLOW-portable.md` names its rung and links both.
 
-**Score:** 2 -- one new skill plus its script, mirror and 22-assert suite, and two paragraphs in the
-shared prose. Nothing existing changes behaviour, and no gate moves; the rank order it reports was
-already the rule.
+**Score:** 2 -- one new skill plus its script, mirror and 22-assert suite, and two sections of shared
+prose. Nothing existing changes behaviour and no gate moves; the rank order it reports was already the
+rule, and the new section states in one place what the detail further down already worked out.
 
 #### What makes this deploy extra special
 

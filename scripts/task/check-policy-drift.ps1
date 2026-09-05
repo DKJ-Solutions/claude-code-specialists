@@ -44,6 +44,13 @@
     first because the top rung has an internal order -- see that same section: where two plugin pages
     speak to the same question, its page wins and a companion's is an extension, never an override.
 
+    AND THE ENABLE IS ONLY HALF OF "INSTALLED" (inbound #302), so the other half is REPORTED. Claude
+    Code loads a plugin only when the settings chain enables it AND an install record exists for this
+    project path; a plugin with just the first legislates nothing in a session here. Test-PluginInstalledHere
+    answers it, and the answer is printed under the listing rather than used to exclude anything -- the
+    pages are on disk either way and still worth reading against, and a missing record is a fact about
+    the machine rather than about the prose.
+
     WHAT IT DOES NOT DO, deliberately:
       * it never edits a consumer's CLAUDE.md. Repairing a contradiction is an ordinary branch + PR in
         the repo that owns the file, and a script that rewrote always-on prose on its own would be
@@ -134,22 +141,36 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 function Get-PortablePageDir {
     <#
         WHERE A PLUGIN'S OWN PAGES SIT, asked of a plugin NAME and answered by probing rather than by
-        assuming a layout, because there are three and this script runs under all of them:
+        assuming a layout, because there are four and this script runs under all of them:
 
           1. the SOURCE REPO, where the pages are a working tree the marketplace declares. Asked FIRST
              and on purpose: in the repo that publishes the plugin, the tree is the law and the cached
              copy is last release's answer to it, so a probe that found the cache first would report a
              contradiction against a page the author is in the middle of changing.
-          2. the MARKETPLACE CLONE, where every plugin is a sibling directory of this one.
-          3. the PLUGIN CACHE, where a plugin is a versioned directory:
-             ~/.claude/plugins/cache/<marketplace>/<name>/<version>/ . Newest version first, which is
-             Get-CachedPluginDirs' own order and its [version] sort rather than a string one.
+          2. $env:CLAUDE_PLUGIN_ROOT, honoured only when it names THIS plugin -- the hook/skill context,
+             and the strongest answer there is: it is the copy the session is actually running.
+          3. THE INSTALL RECORD for this repo, which is the authority on which cached version a session
+             HERE loads. Consulted before the version scan, and for Resolve-PluginDir's own measured
+             reason: a cache holding several versions is the normal state on a machine with more than
+             one consumer, and "the newest version present" is a different question from "the version
+             this repo loads".
+          4. the MARKETPLACE CLONE (every plugin a sibling directory of this one), then the PLUGIN
+             CACHE, newest version first -- Get-CachedPluginDirs' own [version] order rather than a
+             string sort.
 
-        A candidate is accepted on '.claude-plugin/plugin.json', which is what makes a directory a
-        plugin -- NOT on carrying a portable page. Those are two different answers and the caller needs
-        both: a plugin located and shipping no pages is a TEAM plugin doing exactly what it should, and
-        saying nothing about it is correct; a plugin that could not be located at all is a stale cache
-        and worth a line. Returns '' only for the second.
+        STEPS 2 TO 4 ARE Resolve-PluginDir's THREE, AND THEY ARE RESTATED HERE RATHER THAN CALLED for
+        one reason: that function requires an `agents/` directory at every return path. It was built for
+        a roster check, and a WORKFLOW plugin ships `skills/` and no agents -- so calling it here would
+        answer $null on every machine, for every workflow plugin, always. That is a question it was
+        never built to answer rather than a corner case it misses.
+
+        THE PROBE RUNS TWICE, and that is what lets one function answer two questions the caller needs
+        apart. The first pass accepts only a candidate carrying a '*-portable.md' page, so a cached
+        version that PREDATES the page is stepped over rather than reported as the plugin's answer. The
+        second accepts any directory carrying '.claude-plugin/plugin.json', which is what makes a
+        directory a plugin at all: a plugin located and shipping no page is a TEAM plugin doing exactly
+        what it should, and saying nothing about it is correct. Returns '' only when neither pass found
+        anything -- which is a stale cache or a dropped install, and worth a line.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -167,16 +188,38 @@ function Get-PortablePageDir {
             if ($declared) { $candidates.Add([string]$declared.Root) | Out-Null }
         } catch {
             # A marketplace.json this repo cannot parse is somebody else's finding -- check-plugin-integrity
-            # reports it. Here it only means candidate 1 has no answer, and 2 and 3 still do.
+            # reports it. Here it only means candidate 1 has no answer, and the rest still do.
         }
     }
 
-    # 2. Sibling of this script's own plugin folder. $PSScriptRoot is '<plugin>/scripts/task' in the
-    #    mirror, so its grandparent's parent is the folder that holds the other plugins.
+    # 2. The running copy, when the harness named it and it is this plugin's.
+    if ($env:CLAUDE_PLUGIN_ROOT) {
+        $cpr = $env:CLAUDE_PLUGIN_ROOT
+        if ((Test-Path -LiteralPath $cpr -PathType Container) -and
+            ((Split-Path (Split-Path $cpr -Parent) -Leaf) -eq $Name)) {
+            $candidates.Add($cpr) | Out-Null
+        }
+    }
+
+    # 3. The install administration's answer for THIS repo. Best-effort and never a gate in front of the
+    #    scan below: Get-InstallRecord reports rather than throws, so an unreadable or absent
+    #    administration leaves the remaining candidates answering exactly as they did before.
+    try {
+        $record = Get-InstallRecord -RepoRoot $RepoRoot
+        $recId = "$Name@$Marketplace"
+        if ($record.RecordsById.ContainsKey($recId)) {
+            foreach ($rec in @($record.RecordsById[$recId])) {
+                if ($rec.InstallPath) { $candidates.Add([string]$rec.InstallPath) | Out-Null }
+            }
+        }
+    } catch { }
+
+    # 4a. Sibling of this script's own plugin folder. $PSScriptRoot is '<plugin>/scripts/task' in the
+    #     mirror, so its grandparent's parent is the folder that holds the other plugins.
     $ownRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
     $candidates.Add((Join-Path (Split-Path $ownRoot -Parent) $Name)) | Out-Null
 
-    # 3. The plugin cache. Get-CachedPluginDirs owns the path shape, so it is not rebuilt here.
+    # 4b. The plugin cache. Get-CachedPluginDirs owns the path shape, so it is not rebuilt here.
     $userHome = Get-UserClaudeHome
     if ($userHome) {
         $cacheRoot = Join-Path $userHome '.claude\plugins\cache'
@@ -187,11 +230,18 @@ function Get-PortablePageDir {
         }
     }
 
-    foreach ($dir in $candidates) {
-        if (-not $dir) { continue }
-        if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
-        if (-not (Test-Path -LiteralPath (Join-Path $dir '.claude-plugin\plugin.json') -PathType Leaf)) { continue }
-        return (Resolve-Path -LiteralPath $dir).Path
+    # Pass one: a candidate that actually carries a page. Pass two: any plugin directory at all.
+    foreach ($wantPage in @($true, $false)) {
+        foreach ($dir in $candidates) {
+            if (-not $dir) { continue }
+            if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
+            if ($wantPage) {
+                if (@(Get-ChildItem -LiteralPath $dir -Filter '*-portable.md' -File -ErrorAction SilentlyContinue).Count -eq 0) { continue }
+            } elseif (-not (Test-Path -LiteralPath (Join-Path $dir '.claude-plugin\plugin.json') -PathType Leaf)) {
+                continue
+            }
+            return (Resolve-Path -LiteralPath $dir).Path
+        }
     }
     return ''
 }
@@ -245,6 +295,16 @@ $ordered = @($ids | Where-Object { $_ -like 'contributing-davekjohn@*' }) +
 
 $rank1 = New-Object System.Collections.Generic.List[object]
 $unlocated = New-Object System.Collections.Generic.List[string]
+$notInstalledHere = New-Object System.Collections.Generic.List[string]
+
+# THE ENABLE IS HALF THE ANSWER, AND THE OTHER HALF IS REPORTED RATHER THAN ENFORCED (inbound #302).
+# Claude Code needs two things before a session loads a plugin: an enable in the settings chain and an
+# install record for THIS project path. A plugin with only the first legislates nothing in a session
+# here, so a report that listed its pages beside the rest would describe a law the session never reads.
+# It stays in the listing -- its pages are on disk and worth comparing against -- and the missing record
+# is said out loud beneath it, because that is a fact about the machine rather than about the prose.
+$installRecord = $null
+try { $installRecord = Get-InstallRecord -RepoRoot $repoRoot } catch { }
 
 foreach ($id in $ordered) {
     if (-not $id) { continue }
@@ -260,7 +320,13 @@ foreach ($id in $ordered) {
     $dir = Get-PortablePageDir -Name $name -Marketplace $marketplace -RepoRoot $repoRoot
     if (-not $dir) { $unlocated.Add($id) | Out-Null; continue }
 
-    foreach ($page in (Get-ChildItem -LiteralPath $dir -Filter '*-portable.md' -File | Sort-Object Name)) {
+    $pages = @(Get-ChildItem -LiteralPath $dir -Filter '*-portable.md' -File | Sort-Object Name)
+    if ($pages.Count -eq 0) { continue }
+
+    if ($installRecord -and -not (Test-PluginInstalledHere -InstallRecord $installRecord -PluginId $id)) {
+        $notInstalledHere.Add($id) | Out-Null
+    }
+    foreach ($page in $pages) {
         $rank1.Add([pscustomobject]@{ Plugin = $name; Path = $page.FullName }) | Out-Null
     }
 }
@@ -279,6 +345,12 @@ if ($rank1.Count -eq 0) {
         Write-Host "      $(Format-SafePathToken -Value $row.Path)"
     }
     Write-Host '    ...and the skills beside them, which carry the mechanics these pages describe.' -ForegroundColor DarkGray
+}
+foreach ($id in $notInstalledHere) {
+    Write-Host "    [no install record] $(Format-SafeToken -Value $id) -- enabled in" -ForegroundColor DarkYellow
+    Write-Host "                  $(Format-SafeToken -Value ([string]$enabled.LayerById[$id])), but with no install record for THIS repo a session here" -ForegroundColor DarkYellow
+    Write-Host '                  does not load it. Its pages are listed above because they are on disk and still' -ForegroundColor DarkYellow
+    Write-Host "                  worth reading against; fix with 'claude plugin install <id> --scope project'." -ForegroundColor DarkYellow
 }
 foreach ($id in $unlocated) {
     Write-Host "    [not located] $(Format-SafeToken -Value $id) -- enabled here, but no plugin directory for" -ForegroundColor DarkYellow

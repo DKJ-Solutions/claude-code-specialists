@@ -164,6 +164,13 @@ function Get-SharedScriptPairs {
             # ON-DEMAND AND REPORT-ONLY, so unlike the two prose checks it HAS a skill and has no hook
             # and no CI leg. It always exits 0 once it can answer; an exit code would be a verdict it
             # has not earned, and a gate here would be the declined check wearing a different hat.
+            #
+            # IT INVENTS NO SECOND ANSWER TO "WHICH PLUGINS ARE HERE". The enable comes from
+            # Get-EnabledPlugins and the install record from Get-InstallRecord / Test-PluginInstalledHere
+            # -- the same lib, and the same two questions, check-roster-sync and check-script-contract
+            # already read. What it does not reuse is Resolve-PluginDir, and its own docstring says why:
+            # that function requires an agents/ dir at every return path, so on a WORKFLOW plugin it
+            # answers $null on every machine, always.
             Name   = 'check-policy-drift'
             Source = 'scripts\task\check-policy-drift.ps1'
             Plugin = 'contributing-davekjohn'

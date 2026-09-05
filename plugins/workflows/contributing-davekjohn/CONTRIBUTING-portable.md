@@ -38,6 +38,44 @@ belongs on a branch (inbound
 
 ---
 
+## Precedence — full adoption, or none
+
+Enabling `contributing-davekjohn` is not a customisation layered beside a consumer's own root
+`CLAUDE.md` — it is a policy that outranks it, deliberately (Dave, September 5, 2026). From the moment
+the plugin is installed, this page and the sibling portable pages it ships with stand above whatever the
+consumer's root `CLAUDE.md` says on the same subject, full stop.
+[Further down](#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379) that ranking is
+worked out in detail, for the branch/PR/release mechanics this plugin actually legislates. What belongs
+here, ahead of the cycle itself, is the choice that sits above even that detail.
+
+**The choice is binary, and there is no third position.** A consumer either installs this plugin and
+runs the cycle below in full, or it does not install it and keeps its root `CLAUDE.md` as its own,
+entire, unchallenged policy. There is no blend, no partial adoption, no keeping the scripts while
+overriding the rule that governs them. One ship, one captain: a repo that installs the crew does not
+also get to steer from the passenger deck.
+
+**Where the two disagree on a subject this plugin actually addresses, the plugin is the one that is
+right.** A root `CLAUDE.md` clause that contradicts what this page or a sibling portable page says is
+not a customisation somebody chose — it is a standing error nobody has corrected yet, because nothing
+reads the two documents together and only one of them can be true once the plugin is installed. Fixing
+it is ordinary work in the consumer's own repo: an edit to that `CLAUDE.md`, on that repo's own branch +
+PR route, made by that repo's own contributor — never something a plugin update reaches into a
+downstream repo to rewrite silently. **Finding those places is the `check-policy-drift` skill's job**,
+and it is deliberately a separate act from this page: it lays every legislating document out in rank
+order and hands the reading to the session, because telling a restatement from a pointer is a judgement
+about prose. This page states the target the correction moves toward; that skill finds where a repo
+stands relative to it, and neither of them edits anything.
+
+**A second plugin that extends this workflow does not settle its own place in the order — it points at
+the one stated here.** The whole ranking, including where a companion plugin sits inside the top rung,
+belongs to [the section further down](#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379),
+which is the corollary above applied one layer up: a copy of a rank order in a sibling plugin fails the
+same way a consumer's copy does, on the day this page moves and the copy does not. What a companion's
+page carries is a sentence naming its own rung and a link back — `bwj-codex`'s
+`WORKFLOW-portable.md` is the built instance.
+
+---
+
 ## The cycle
 
 ### 1. New issue or task — where the work comes from
