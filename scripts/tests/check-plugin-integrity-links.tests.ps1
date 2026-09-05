@@ -1079,13 +1079,26 @@ try {
     New-Item -ItemType Directory -Path (Split-Path -Parent $mirrorReadme) -Force | Out-Null
 
     # What the registry says lands in that folder, resolved against the FIXTURE, exactly as the check
-    # resolves it. Sorted so the table below is stable run to run.
+    # resolves it -- GetFullPath on BOTH sides included, for the reason the check's own comment gives:
+    # $Fixture is whatever [System.IO.Path]::GetTempPath() handed back, and on a GitHub Windows runner
+    # that is the 8.3 SHORT form ('C:\Users\RUNNER~1\...'). A plain string compare between a short-form
+    # prefix and a long-form path matches nothing, which is how this block first reached CI: every
+    # scenario below red, the derived set empty, and the check under test reporting a clean pass because
+    # empty compared against empty has nothing to say. Sorted so the table below is stable run to run.
     . (Join-Path $PSScriptRoot '..\lib\shared-scripts-lib.ps1')
-    $mirrorDocDir = (Split-Path -Parent $mirrorReadme).TrimEnd('\') + '\'
+    $mirrorDocDir = [System.IO.Path]::GetFullPath((Split-Path -Parent $mirrorReadme)).TrimEnd('\') + '\'
+    $mirrorAllPairs = @(Get-SharedScriptPairs -RepoRoot $Fixture -PluginRoots @(Get-RepoPluginRoots -RepoRoot $Fixture))
     $mirrorExpected = @(
-        Get-SharedScriptPairs -RepoRoot $Fixture -PluginRoots @(Get-RepoPluginRoots -RepoRoot $Fixture) |
-            Where-Object { $_.MirrorPath.StartsWith($mirrorDocDir, [System.StringComparison]::OrdinalIgnoreCase) } |
-            ForEach-Object { $_.MirrorPath.Substring($mirrorDocDir.Length) -replace '\\', '/' } | Sort-Object)
+        $mirrorAllPairs |
+            Where-Object { [System.IO.Path]::GetFullPath($_.MirrorPath).StartsWith($mirrorDocDir, [System.StringComparison]::OrdinalIgnoreCase) } |
+            ForEach-Object { [System.IO.Path]::GetFullPath($_.MirrorPath).Substring($mirrorDocDir.Length) -replace '\\', '/' } | Sort-Object)
+    # PRINTED EVERY RUN, not only on failure: when this block went red in CI and green on three local
+    # runs, the one thing the log could not tell me was which two paths had failed to match. A derived
+    # set is an input to every scenario below, so it is reported like one.
+    Write-Host "  [derived] docDir=$mirrorDocDir pairs=$($mirrorAllPairs.Count) matched=$($mirrorExpected.Count)" -ForegroundColor DarkGray
+    if ($mirrorExpected.Count -eq 0 -and $mirrorAllPairs.Count -gt 0) {
+        Write-Host "  [derived] sample MirrorPath=$($mirrorAllPairs[0].MirrorPath)" -ForegroundColor DarkGray
+    }
 
     function New-MirrorTable {
         # Builds the table body the way the real page writes it: a backticked path in the first cell,

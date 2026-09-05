@@ -3597,7 +3597,18 @@ foreach ($lf in $linkFiles) {
     $maskedContent = Get-FenceMaskedText -Text $content
     $rel = $lf.Replace($RepoRoot, '.')
     $ownerName = Get-PluginNameForPath -PluginRoots $publishedPlugins -Path $lf.Substring($RepoRoot.Length)
-    $docDir = (Split-Path -Parent $lf).TrimEnd('\') + '\'
+    # BOTH SIDES OF THE PREFIX TEST GO THROUGH GetFullPath, and this is not defensive garnish -- it is the
+    # only thing that makes two differently-EXPRESSED paths to the same directory comparable. The two sides
+    # arrive by different routes: $lf comes from a Get-ChildItem walk, which returns the filesystem's
+    # canonical long form, while a pair's MirrorPath is composed as Join-Path <the root as the caller
+    # WROTE it> <relative>. Those agree in this repo and stop agreeing the moment a caller names the root
+    # any other way -- an 8.3 short name is the case that actually occurs, and GetFullPath expands one
+    # ('...\RUNNER~1\...' -> '...\runneradmin\...'), which a plain string compare never will. Get an
+    # ordinary StartsWith here and the canonical set comes back EMPTY, which is not a visible failure: it
+    # is compared against a claim set and reports nothing, exactly the silent-green shape this check's own
+    # coverage line exists to expose. Check 29 is immune by accident rather than by care -- both of its
+    # sides happen to be GetFullPath'd already.
+    $docDir = [System.IO.Path]::GetFullPath((Split-Path -Parent $lf)).TrimEnd('\') + '\'
     Invoke-MarkedSpanWalk -MaskedText $maskedContent -RawText $content -Marker 'shared-scripts:mirror' `
         -Category 'shared-script-list' -Rel $rel -OnSpan {
         param($span)
@@ -3613,8 +3624,10 @@ foreach ($lf in $linkFiles) {
         # second call would have to re-derive outside that check's guarded try/catch.
         $canonical = New-Object System.Collections.Generic.HashSet[string]
         foreach ($pair in $sharedPairs) {
-            if (-not $pair.MirrorPath.StartsWith($docDir, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
-            [void]$canonical.Add(($pair.MirrorPath.Substring($docDir.Length) -replace '\\', '/'))
+            $mirrorFull = $null
+            try { $mirrorFull = [System.IO.Path]::GetFullPath($pair.MirrorPath) } catch { continue }
+            if (-not $mirrorFull.StartsWith($docDir, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+            [void]$canonical.Add(($mirrorFull.Substring($docDir.Length) -replace '\\', '/'))
         }
         # Read from the MASK: a fenced example of a table row inside the span must not be read as a claim,
         # for the same reason check 10 reads the mask. The offsets address both texts identically.
