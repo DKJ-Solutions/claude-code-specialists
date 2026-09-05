@@ -158,11 +158,21 @@ report and is wrong, which is worse than the original defect because it now carr
 measurement behind each is in the
 [`triage-inbound` skill](../.claude/skills/triage-inbound/SKILL.md).
 
-**Claim an issue before working it** — `gh issue edit <n> --add-assignee @me` — and read the claim as well as
-write it: an issue that already carries an assignee is somebody's. The tracker is the only thing two sessions
-share, so an unassigned issue is indistinguishable from an untouched one, which is how the same repair gets
-built twice and discovered at the merge. A claim with no branch and no recent activity is a question for
-Dave rather than a locked door.
+**Claim an issue before working it** — and read the claim as well as write it: an issue that already carries
+an assignee is somebody's. The tracker is the only thing two sessions share, so an unassigned issue is
+indistinguishable from an untouched one, which is how the same repair gets built twice and discovered at the
+merge. A claim with no branch and no recent activity is a question for Dave rather than a locked door.
+
+**The step that performs it is [`claim-issue`](../plugins/workflows/dkj-policy/skills/claim-issue/SKILL.md)**, and it exists because this
+rule was written down for as long as the workflow has and enforced by nothing — `gh issue edit <n>
+--add-assignee @me`, left to a session to remember, to type, and to read the result of. Measured here on
+September 5, 2026 ([#1456](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1456)): **0 of 67**
+assigned issues carried `DaveKJohn`, an identity holding 132 merged PRs and 83 authored issues in the same
+repo. That report's own corrective action was *behavioural*; the skill is what makes it mechanical, and it
+does the three things the one-liner cannot — it never sends `@me` (see below), it **refuses on a closed
+issue**, which `--add-assignee` claims silently, and it **refuses one somebody else holds**, which
+`--add-assignee` joins. It writes one assignee and nothing else: the branch stays
+[`new-branch`](../plugins/workflows/dkj-policy/skills/new-branch/SKILL.md)'s, one step later.
 
 **`@me` writes whichever account `gh` holds, which is not always the one your commits will name.** It
 resolves through the GitHub API, while the branch a second session correlates the claim with carries the
@@ -172,7 +182,8 @@ and nothing reports it. Measured September 3, 2026 ([#1315](https://github.com/D
 account on #1314 and it had to be corrected by hand. Since then
 [`check-git-identity.ps1`](../scripts/lint/check-git-identity.ps1) reports the split from a SessionStart hook
 in every repo that has this plugin, so a session is told before it claims anything. Where it fires, **claim by
-name** until the two agree.
+name** until the two agree — which is what `claim-issue` does for you: it reads both identities and writes the
+**git** one, because the commits are the half nothing can rewrite afterwards.
 
 **These rules are Chris's, stated here rather than owned here.** The filing bar, the six inbound checks and
 the claim live in the orchestrator's persona body, which ships with `team-alpha` — so where this paragraph
