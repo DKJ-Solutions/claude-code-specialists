@@ -33,21 +33,80 @@
 
 ### PLAN
 
-Repair the sentence at specialists-init/SKILL.md:50 so the list of places that name the command and the actor parses: two SessionStart hooks plus adopt-config.ps1 plus orchestrator/SKILL.md.
+Repair the sentence at `plugins/teams/team-alpha/skills/specialists-init/SKILL.md:50`, reported as
+issue #1470: *"The two SessionStart hooks, `adopt-config.ps1` and `orchestrator/SKILL.md` name the
+command and the actor for that reason."*
+
+**It is a punctuation defect, not a factual one, and the tree proves the intent.** Read as written the
+list is an appositive -- it claims `adopt-config.ps1` and `orchestrator/SKILL.md` ARE the two
+SessionStart hooks, which neither is. The comment directly above one of the lines it cites says
+otherwise: `adopt-config.ps1:176-178` reads *"NAMES THE COMMAND AND WHO TYPES IT (inbound #1093 /
+#1096 / #1104). Not a SessionStart hook like the roster check, but the same trap"*. So the sentence
+was a list of FOUR, and it lost the conjunction that made it one.
+
+**All four verified as still naming the command and the actor:**
+
+| Place | Where it prints | Reader it saves |
+|---|---|---|
+| `roster-sessioncheck.ps1` -> `check-roster-sync.ps1:1021` | `[BOOTSTRAP]` | an unbootstrapped repo's session start |
+| `script-contract-sessioncheck.ps1` -> `check-script-contract.ps1:294` | `[BOOTSTRAP]` | the same, from the workflow plugin |
+| `adopt-config.ps1:179-182` | `[STOP]` | a model that ran the adopt command too early |
+| `plugins/teams/team-alpha/skills/orchestrator/SKILL.md:64-72` | the page itself | a model in a repo that was never adopted |
+
+Each says `/team-alpha:specialists-init` in full and then says the repo owner has to type it -- which
+is exactly what the paragraph above claims of them, so nothing but the sentence's own grammar was
+wrong.
+
+#### Out of scope, deliberately
+
+`plugins/teams/team-shopify/scripts/task/adopt-shopify-floor.ps1:361` does the same thing and is a
+fifth such place. It is not added to the count: this page is `team-alpha`'s and the sentence is about
+the reservation team-alpha's own surfaces honour, so pulling a second plugin's message into the list
+would make the number stale the next time any plugin gains one. The four named are the four the
+sentence always meant.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Rewrite the sentence at `specialists-init/SKILL.md:50` as an explicit list of four, naming each
+      hook by its own file and the script or page behind it, so no reader has to guess which two the
+      "two SessionStart hooks" were.
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` -- the paragraph gained four inline code spans and no links, so the
+      dead-link scan and the install-flag scan have nothing new to read; run for the frontmatter and
+      manifest checks regardless.
+- [x] All suites under `scripts/tests/`, exactly as CI runs them.
+- [x] Re-read each of the four cited places against the claim -- the table in PLAN is that reading.
+      This is the check the report itself could not complete, because it needed the intent first.
+
 ### DEPLOY: docs/1470-sessionstart-hooks-sentence
 
-**Score:**
+One sentence in the `specialists-init` skill page named its own evidence in a way that did not parse:
+it introduced *"the two SessionStart hooks"* and then apposed two files that are not hooks. The
+paragraph's claim was always true -- four places do name `/team-alpha:specialists-init` in full and
+say the repo owner has to type it -- but the sentence carrying it could not be checked by a reader,
+which is the only thing that makes such a citation worth writing. It now names all four, each with
+the hook file and the script behind it.
+
+The page carries `disable-model-invocation`, so a model never reads it; the reader here is the repo
+owner adopting the family for the first time, and they are exactly the reader who has no other way to
+verify that the no-bare-imperative rule is honoured anywhere. A citation they cannot follow is worse
+than none, because it looks like evidence.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+Nothing structural -- one paragraph, no mechanism, no script. What is worth keeping is the method: the
+intent the report said it could not determine was recoverable from the tree, in a comment sitting
+directly above one of the lines the sentence cites. `adopt-config.ps1` says of itself *"Not a
+SessionStart hook like the roster check, but the same trap"*, which settles both that the sentence
+meant a list of four and that its author knew the distinction. Reading the cited code before guessing
+at the wording is what turned "needs someone who remembers" into a mechanical repair.
+
+**Score:** 1 -- cosmetic on the page itself; the failure it prevents is a reader checking a citation,
+finding it names the wrong kind of thing, and discounting the paragraph's claim along with it.
 
 #### Pull Request
 

@@ -47,8 +47,11 @@ dropping the flag, which would have put this skill's description in every sessio
 forever, for something that happens once per repo. **The price of keeping it is that no message may
 name this skill with a bare imperative** — the reader those messages address is usually the model, and
 an instruction it is structurally forbidden to follow leaves it with the plugin cache and an absolute
-path as the only remaining move. The two SessionStart hooks, `adopt-config.ps1` and
-`orchestrator/SKILL.md` name the command and the actor for that reason.
+path as the only remaining move. Four places name the command **and the actor** for that reason: the
+two SessionStart hooks — `roster-sessioncheck.ps1` (through `check-roster-sync.ps1`'s `[BOOTSTRAP]`
+line) and `script-contract-sessioncheck.ps1` (through `check-script-contract.ps1`'s) — plus
+`adopt-config.ps1`'s `[STOP]` and the `orchestrator` skill page. Each of them says
+`/team-alpha:specialists-init` in full and then says the repo owner has to type it.
 
 > **A runbook that describes itself as executable end to end by a session is wrong about this step**, and
 > that is worth stating once rather than rediscovering it in every testrun: adoption stops here until the
