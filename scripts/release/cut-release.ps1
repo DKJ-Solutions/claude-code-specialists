@@ -276,6 +276,13 @@ if ($absent.Count -gt 0) {
 # Get-SeamValue (issue #885, group A): this used to be a private copy defined below; it is now the one
 # definition every seam reader in this workflow shares. See seam-lib.ps1's synopsis for why.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+# Get-InstallRecord / Test-PluginInstalledHere, for the self-consumption reminder at the foot of this
+# script (#1445). It reads the install administration to decide whether a `plugin update` command is
+# runnable in THIS repo at all -- a question `.claude/settings.json` cannot answer. Dot-sourced here for
+# the same reason as the two above: a dependency a printed instruction rests on is visible at the script
+# that rests on it. The predicate is deliberately the shared one -- "one reader per call site, tightened
+# in none of them" is the sentence #294 was filed about.
+. (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
 # --- The repo's own answers, read once (#417) -----------------------------------------------------
 # Every one of these is OPTIONAL in the script contract, and every fallback is what this script did
@@ -1239,8 +1246,39 @@ function Write-SelfConsumptionReminder {
         has nothing to refresh, and telling it otherwise would be noise. And it prints rather than acts:
         a plugin update rewrites what every future session in this repo loads, which is not something a
         release script should do to you while your attention is on the tag.
+
+        WHAT IT PRINTS DEPENDS ON THE ADOPTION ROUTE, because one of the two cannot run `plugin update`
+        at all (#1445, measured here on 2026-09-05 right after the v4.30.0 cut). `enabledPlugins` is the
+        DECLARATIVE route and `plugin update` operates on an INSTALL RECORD, so a repo adopted the
+        declarative way has no record -- and this function used to read only the settings key, which made
+        the very source it consulted the one that guaranteed the command it printed could not succeed:
+
+            claude plugin update team-alpha@claude-code-specialists --scope project
+            -> Failed to update plugin "...": Plugin "team-alpha" is not installed
+
+        Both halves were measured rather than reasoned about, because the report that found this flagged
+        the second as inferred and the repair differs per answer:
+          - declarative only (`enabledPlugins`, no record): `plugin update` REFUSES. The marketplace
+            refresh alone is the whole remedy -- the clone advanced to 4.30.0 and the plugins resolve
+            from it on the next session. A restart is what applies it.
+          - `claude plugin install --scope project`: a record is written, and `plugin update` WORKS
+            (`already at the latest version (4.30.0)`).
+        And the trap that makes the detection necessary: `plugin install --scope project` writes the SAME
+        `enabledPlugins` key into `.claude/settings.json` that the declarative route uses. The two routes
+        are therefore indistinguishable from that file, which is why the answer has to come from the
+        install administration instead.
+
+        Test-PluginInstalledHere is deliberately the SHARED predicate rather than a fourth private one
+        (see check-report-lib.ps1's block above it): it is permissive when the administration is absent or
+        unreadable, which is the right default here too -- "I could not look" is not evidence of absence,
+        and erring that way can only restore the old line, never suppress a command that would have worked.
+        Its one edge, a PATHLESS record, therefore also gets an update line; that state is a broken
+        administration rather than an adoption route, and it is check-connectors' shape report to name.
     #>
     $enabled = @()
+    $marketplaceName = ''
+    $installed = @()
+    $declarative = @()
     try {
         $marketplaceName = ((Get-MarketplaceJsonText | ConvertFrom-Json).name)
         if (-not $marketplaceName) { return }
@@ -1252,17 +1290,36 @@ function Write-SelfConsumptionReminder {
         $enabled = @($props[0].Value.PSObject.Properties |
             Where-Object { $_.Value -and $_.Name -like "*@$marketplaceName" } |
             ForEach-Object { $_.Name })
+        # MOVED INSIDE THE TRY, where it used to sit just after it: there is nothing to ask the install
+        # administration about for an empty set, and every other exit above is a return, so a copy left
+        # below this block would be unreachable rather than a second guard.
+        if ($enabled.Count -eq 0) { return }
+
+        # Which of those the install administration can actually attest to for THIS repo.
+        $record = Get-InstallRecord -RepoRoot $repoRoot
+        $installed = @($enabled | Where-Object { Test-PluginInstalledHere -InstallRecord $record -PluginId $_ })
+        $declarative = @($enabled | Where-Object { $installed -notcontains $_ })
     } catch {
         # Never let a reminder break a cut that has already committed and tagged.
         return
     }
-    if ($enabled.Count -eq 0) { return }
 
     Write-Host ""
     Write-Host "This repo runs the plugins it just released, so its own install is now a version behind:" -ForegroundColor Cyan
     Write-Host "  claude plugin marketplace update $marketplaceName"
-    foreach ($id in $enabled) {
+    foreach ($id in $installed) {
         Write-Host "  claude plugin update $id --scope project"
+    }
+    if ($declarative.Count -gt 0) {
+        # The ids go on their own lines rather than into the sentence: one id read "... are enabled"
+        # otherwise, and the line ran past the width every other line here keeps to. No `@`-target in the
+        # prose either, deliberately -- it is ABOUT the command rather than an instruction to run it,
+        # which is the same discriminator lint check 11 uses to tell those two apart.
+        Write-Host "      Enabled declaratively, with no install record for this repo -- these resolve"
+        Write-Host "      straight from the marketplace clone, so the refresh above is their whole"
+        Write-Host "      remedy and a restart is what applies it. An update command would refuse"
+        Write-Host "      them as `"not installed`", which is not a failure to chase:"
+        foreach ($id in $declarative) { Write-Host "        $id" }
     }
     Write-Host "      Until then the connector check reports this repo as outdated, and any hook or agent"
     Write-Host "      def this release added is not loaded here yet."
