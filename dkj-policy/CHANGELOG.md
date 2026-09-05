@@ -32,6 +32,38 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/merge-adopt-config-workflow-folder · 20260905-212108
+
+`adopt-config` and `adopt-workflow-folder` were two separately-named skills for the same plugin,
+`dkj-policy` -- one placing the config seam, one scaffolding the workflow folder. Renaming
+`adopt-bwj-asana` to `adopt-dkj-policy-bwj` earlier the same day, for a sibling plugin that had grown a
+second chapter under a name naming only the first, raised the same question here from the other
+direction: two *separate* skills for one plugin, neither named after it.
+
+Merged into one skill, `adopt-dkj-policy`, in two independent parts that can run in either order or
+alone -- no behaviour change to either underlying script, only the page that documents them. A reader
+enabling `dkj-policy` now finds one name to ask for, covering everything the plugin needs placed in
+their repo, rather than having to already know there are two.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal skill name in this repo's own workflow plugin. No consumer-facing behaviour changed;
+the two scripts a consumer actually runs are byte-for-byte what they were.
+
+**Score:** N/A
+
+#### Pull Request
+
+adopt-config and adopt-workflow-folder merged into one skill, adopt-dkj-policy
+
+Plugins: dkj-policy, team-alpha
+
+[PR #1471](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1471)
+
+---
+
 ### DEPLOY: fix/1464-gate-orphan-warning · 20260905-210737
 
 Fixes #1464. `Invoke-TestSuiteGate` starts each suite with `Start-Process` but never tracked those
