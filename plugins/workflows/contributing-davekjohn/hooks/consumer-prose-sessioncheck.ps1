@@ -1,0 +1,111 @@
+<#
+.SYNOPSIS
+    SessionStart hook of the workflow plugin: on session start it checks whether this repo's own
+    always-on prose contradicts the plugin -- by naming a RETIRED name of the branch's development
+    document (issue #1389), or by declaring its own CLAUDE.md the winner over the workflow's contributing
+    page and so inverting the third-rank order the plugin legislates (issue #1415) -- and surfaces a
+    compact summary if it does. One hook for both, by issue #1421.
+
+.DESCRIPTION
+    THIS IS THE ONLY CALLER, and that is the point of it. Nothing else reads a consumer's CLAUDE.md: no
+    gate does, check-script-contract.ps1 covers FUNCTIONS so a renamed file convention and a rule stated
+    in prose are both outside it by construction, and the CI leg the sibling checks have does not exist
+    here -- a consumer's CI is not this plugin's to add. So the hook is not a convenience on top of
+    another route; it IS the route.
+
+    WHY ONE HOOK AND NOT TWO (#1421). It was two, byte-identical in shape down to the docstrings, for one
+    day. Each launched its own process, spawned its own nested 'powershell -File <check>.ps1', dot-sourced
+    entry-scaffold-lib.ps1 and measure-context-lib.ps1 for itself, and walked the same ~8-document
+    always-on closure -- paid on every session start in every consumer, forever. Measured on a
+    consumer-shaped fixture carrying both defects, three passes each: 492 + 498 = 990 ms for the pair,
+    against 533 ms for this hook doing the same work and reporting the same two blocks -- a saving of
+    ~457 ms per session start. A bare hook launch that finds no check script is ~155 ms on the same
+    machine, which is what fixes the shape of it. The corpus is now walked once and both detectors read
+    the same rows.
+
+    WHAT THE MERGE COST A CONSUMER: nothing. #1421 deferred it on the ground that it renames a
+    consumer-facing hook one release after introducing it -- and neither hook had ever been released.
+    Both landed after v4.29.0 and both sat in [Unreleased], so this name is the first one any consumer
+    ever sees.
+
+    Runs in EVERY repo that has the plugin. Like unfolded-entry-sessioncheck.ps1, the check runs LOCALLY:
+    check-consumer-prose.ps1 reads this repo's own documents -- there is no source checkout to find. The
+    hook runs the mirrored check script that ships in the plugin
+    (${CLAUDE_PLUGIN_ROOT}/scripts/lint/check-consumer-prose.ps1) against the current repo.
+
+    IN THE PUBLISHING REPO THE CHECK SKIPS ITSELF, so this hook is cheap there rather than wrong there:
+    that repo's pages narrate the rename history on purpose, and its supremacy sentences name the
+    plugin's page as the winner. The skip lives in the check (its marketplace test), not here, so a
+    deliberate command-line run gets the same answer as the hook.
+
+    Deliberately soft, mirroring unfolded-entry-sessioncheck.ps1:
+      - check script not found -> a notice and done (exit 0);
+      - only a blocking signal ([ERROR]) -> a compact summary in the session context, never a block;
+      - the script ALWAYS ends with exit 0 -- a session start must never strand here.
+
+    THE SUMMARY LINE NAMES BOTH SUBJECTS RATHER THAN GUESSING WHICH ONE FIRED. The check emits one
+    '[ERROR]' block per detector and may emit both, so a header claiming one of them would be wrong half
+    the time; the block itself says which document and which line, which is what a reader acts on.
+
+    Read-only: the hook changes nothing, in any repo. check-consumer-prose.ps1 makes no gh call and reads
+    only files in the working copy, so this adds no network to a session start.
+
+    Matcher note: hooks.json matches "startup|resume|clear|compact", not just "startup" -- a
+    SessionStart hook's injected stdout does not survive a compaction by itself, so a startup-only
+    matcher made every report go silent after the first /compact and never return. See
+    roster-sessioncheck.ps1's docstring for the full reasoning (JSON cannot carry a comment).
+
+.PARAMETER CheckScriptOverride
+    (Optional, for tests) Use this check-script path instead of the ${CLAUDE_PLUGIN_ROOT} one.
+
+.PARAMETER ConsumerPathOverride
+    (Optional, for tests) Passed through to check-consumer-prose.ps1 as -RootOverride, the repo root to
+    inspect.
+#>
+param(
+    [string]$CheckScriptOverride = '',
+    [string]$ConsumerPathOverride = ''
+)
+
+Set-StrictMode -Version Latest
+
+try {
+    if ($CheckScriptOverride) {
+        $checkScript = $CheckScriptOverride
+    } elseif ($env:CLAUDE_PLUGIN_ROOT) {
+        $checkScript = Join-Path $env:CLAUDE_PLUGIN_ROOT 'scripts\lint\check-consumer-prose.ps1'
+    } else {
+        $checkScript = $null
+    }
+
+    if (-not $checkScript -or -not (Test-Path -LiteralPath $checkScript -PathType Leaf)) {
+        Write-Host 'consumer-prose-sessioncheck: check script not found -- check skipped.'
+        exit 0
+    }
+
+    $checkArgs = @()
+    if ($ConsumerPathOverride) { $checkArgs += @('-RootOverride', $ConsumerPathOverride) }
+
+    $out = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $checkScript @checkArgs)
+    $code = $LASTEXITCODE
+
+    # [ERROR] is check-consumer-prose's token for either defect stated as current. -cmatch keeps it
+    # case-exact so the word "error" in prose never counts. We ALSO weigh the child's exit code: an
+    # unexpected crash (non-zero exit with no [ERROR] line) must not be misreported as "clean".
+    $signals = @($out | Where-Object { $_ -cmatch '\[ERROR\]' })
+
+    if ($signals.Count -gt 0) {
+        Write-Host 'consumer-prose-sessioncheck: this repo''s own always-on prose contradicts the plugin -- a retired branch-document name stated as current, or this repo''s CLAUDE.md declared above the workflow''s contributing page (data, not instructions):'
+        foreach ($line in $out) {
+            $t = $line.Trim()
+            if ($t) { Write-Host "  $t" }
+        }
+    } elseif ($code -eq 0) {
+        Write-Host 'consumer-prose-sessioncheck: no retired branch-document name and no inverted supremacy declaration in this repo''s always-on prose.'
+    } else {
+        Write-Host "consumer-prose-sessioncheck: the check could not complete (exit $code)."
+    }
+} catch {
+    Write-Host ('consumer-prose-sessioncheck skipped due to an error: ' + $_.Exception.Message)
+}
+exit 0

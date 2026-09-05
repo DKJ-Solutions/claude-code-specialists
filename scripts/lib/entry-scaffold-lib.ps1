@@ -7292,7 +7292,7 @@ function Get-SupremacyDeclaration {
         reads -- 'wint'/'wins' beside `CLAUDE.md`, which is this check's own pattern rather than anybody's
         prose -- and the governance sentence around it stays in the consumer's tree. The rule is in
         CLAUDE.md's public-repo bullet (Dave, September 5, 2026, issue #1420) and it binds the fixtures in
-        supremacy-declaration-gate.tests.ps1 too: a matcher reads structure, so a fixture needs the shape
+        consumer-prose-gate.tests.ps1 too: a matcher reads structure, so a fixture needs the shape
         and not the remaining words. Nothing about the verbatim-citation convention itself is weakened --
         a bounded quote plus file:line is still re-verifiable, which a paraphrase is not.
     #>

@@ -108,15 +108,16 @@ function Test-IsWorkflowSourceRepo {
         adopt-workflow-folder.ps1 DID mean this one and now calls it: refusing a genuine consumer the
         folder scaffold because it happens to publish plugins is the concrete harm #998 was filed about.
 
-        AND SO DID THE TWO PROSE CHECKS, since #1422. check-retired-doc-name.ps1 and
+        AND SO DID THE PROSE CHECK, since #1422. check-retired-doc-name.ps1 and
         check-supremacy-declaration.ps1 arrived in September 2026 -- AFTER the census above was written --
         each carrying its own inline `Test-Path .claude-plugin/marketplace.json` skip with its own comment.
-        Their question is this one: the skip exists because THIS WORKFLOW'S conventions are authored here,
-        which is what makes their rename narration and their supremacy sentences correct prose rather than
-        consumer drift. Under the broad test a repo publishing another product while consuming this
-        workflow was skipped in silence -- #998's harm in the mirror direction, since here it costs a check
-        that never runs rather than a scaffold that is refused. Both call this function now, so the bullets
-        above are unchanged: the two were never among them.
+        #1421 then folded the pair into a single check-consumer-prose.ps1, so it is ONE caller now and both
+        detectors sit behind one skip. Their question is this one: the skip exists because THIS WORKFLOW'S
+        conventions are authored here, which is what makes the rename narration and the supremacy sentences
+        correct prose rather than consumer drift. Under the broad test a repo publishing another product
+        while consuming this workflow was skipped in silence -- #998's harm in the mirror direction, since
+        here it costs a check that never runs rather than a scaffold that is refused. It calls this function
+        now, so the bullets above are unchanged: it was never among them.
 
         WHICH IS THE PART WORTH TAKING FROM THIS. The census did not go wrong, it went INCOMPLETE, silently,
         because a census in a docstring is a snapshot and the tree kept being written. Two authors reached

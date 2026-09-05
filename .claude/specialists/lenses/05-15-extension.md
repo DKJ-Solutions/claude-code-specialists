@@ -589,11 +589,38 @@ infrastructure.
   at 124 findings all false. The three accounts in this family are all login-shaped, so the measured case
   is still caught. `git-identity-gate.tests.ps1` walks both edges of that rule, and passes both identities
   in explicitly — a suite that read the machine's own would assert something different on every checkout.
-- **`scripts/lint/check-retired-doc-name.ps1`** — the retired-name check (issue
+- **`scripts/lint/check-consumer-prose.ps1`** — the consumer-prose check: **two detectors over one
+  corpus, read once**, merged from two scripts and two hooks by issue
+  [#1421](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1421) (September 5, 2026). Both
+  halves are the narrow literal greps the declined prose-contract framework recorded as the proportionate
+  alternative; each keeps its own detector function, its own measurement and its own report block, and
+  what merged is the plumbing around them — the process, the root resolution, the skip, the lib loads and
+  the always-on walk.
+
+  **What the merge cost a consumer: nothing, and that is why it happened now rather than later.** #1421
+  deferred it on the ground that it renames a consumer-facing hook one release after introducing it.
+  Checked before building, and the reason had expired: **neither hook had ever been released** — both
+  landed after the `v4.29.0` tag and both sat in `CHANGELOG.md`'s `[Unreleased]` section, so
+  `consumer-prose-sessioncheck` is the first name any consumer ever sees. **That check is the general
+  lesson here**: a deferral's reasoning is a fact about a moment, and the moment it names is the one thing
+  a standing issue cannot re-measure for itself.
+
+  **Measured, on a consumer fixture carrying both defects, three passes each** (this machine,
+  September 5, 2026): `retired-doc-name-sessioncheck` 492 / 492 / 493 ms plus
+  `supremacy-declaration-sessioncheck` 498 / 494 / 503 ms = **990 ms for the pair**, against
+  **541 / 527 / 530 ms** for the merged hook reporting the same two blocks — **~457 ms saved per session
+  start**, in every consumer, indefinitely. That is slightly *above* the ~350-450 ms #1421 inferred from
+  the component costs, which is worth recording because that issue was honest that no merged version had
+  been built to measure. A bare `powershell -NoProfile` hook launch that finds no check script is
+  **~155 ms** here, which fixes the shape of it: one of the two outer launches goes, one of the two nested
+  spawns goes, one of the two dot-source-plus-walk passes goes. **It is not the largest item on that
+  bill** — measured in the same batch as #1421, all 7 SessionStart hooks came to ~6.8 s here, of which
+  `connector-sessioncheck` alone was ~4.9 s (~72%).
+
+  **The first half — the retired-name detector** (issue
   [#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389), September 4, 2026):
   does a consumer's own always-on prose still name a *retired* name of the branch's development
-  document? It is the first of the two narrow literal greps that the declined prose-contract
-  framework recorded as the proportionate alternative
+  document? The first of the two narrow literal greps the declined prose-contract framework recorded
   ([below on this page](#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026)),
   and its whole licence is that sentence — the detector is `Get-RetiredDocNameMention` in
   `entry-scaffold-lib.ps1`, the names come from `Get-BranchFileLegacyNames`, and nothing here reads what
@@ -614,18 +641,7 @@ infrastructure.
   `development-` era is not wholly absent — but a consumer restating only the shape is missed, and that
   is what the precision costs.
 
-  **ONE CALLER, and no CI half — the strongest case of it on this page.** Where
-  `check-git-identity` has no CI half because a runner is a bot by design, this one has none because
-  there is nothing for a CI leg to check: in the only repo whose CI this repo controls, the check
-  skips. So `retired-doc-name-sessioncheck.ps1` (workflow plugin) is not a convenience on top of
-  another route — it *is* the route, which is the whole point of #1389.
-
-  **What the sixth session hook costs, measured rather than assumed** (5 runs each, median, this
-  machine, September 4, 2026): the check alone is **194 ms** here where it skips and **328 ms** against
-  a consumer fixture that has findings; through the hook that is **365 ms**, against **544 ms** for
-  `unfolded-entry-sessioncheck` beside it. So it is the *cheapest* of the session hooks rather than a
-  sixth tax, and the skip is why: in this repo it exits before the `@`-import walk runs.
-- **`scripts/lint/check-supremacy-declaration.ps1`** — the supremacy-declaration check (issue
+  **The second half — the supremacy-declaration detector** (issue
   [#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415), September 4, 2026):
   does a consumer's own always-on prose declare *its* `CLAUDE.md` the winner over
   `contributing-davekjohn/CONTRIBUTING.md`, inverting `LAW-THIRD-RANK-ORDER`? The **second** of the two
@@ -633,11 +649,13 @@ infrastructure.
   as **structurally blind** to: a pointer test flags only sections that cite nothing, so
   cites-then-contradicts can live nowhere but among the findings it suppresses.
 
-  **It shares its corpus with the first**, and that is the point of `Get-ConsumerProseDocuments` in
-  `entry-scaffold-lib.ps1`: which documents a consumer-prose check may read is one question with one
-  answer, and each of its exclusions (the changelog, `releases/`, plugin-shipped payload, a per-branch
-  document) is load-bearing for a measured reason. Two copies would drift on the day a third exclusion is
-  found, and the copy that missed it would report what the other correctly ignores.
+  **The two share their corpus, and that was true before the merge** — it is the point of
+  `Get-ConsumerProseDocuments` in `entry-scaffold-lib.ps1`: which documents a consumer-prose check may
+  read is one question with one answer, and each of its exclusions (the changelog, `releases/`,
+  plugin-shipped payload, a per-branch document) is load-bearing for a measured reason. Two copies would
+  drift on the day a third exclusion is found, and the copy that missed it would report what the other
+  correctly ignores. **Sharing the corpus is what left the runtime duplication visible**: the pair had one
+  definition of *which* documents and two of everything else, which is exactly the residue #1421 removed.
 
   **The detector is ADJACENCY, not co-occurrence, and that departs from the sentence this page
   recorded** — measured, with the numbers, [further down](#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026).
@@ -653,31 +671,46 @@ infrastructure.
   suite pins it from both sides, including that an unrelated quotation elsewhere on the line does *not*
   suppress a real finding.
 
-  **ONE CALLER, no CI half, and the publishing-repo skip** — the same three answers its sibling gives,
-  for the same reasons. With one honest difference: for the retired-name check the skip is a **repair**
-  (this repo narrates the rename history and would read as drift), while here it is only a **guard** —
-  measured at zero hits in this repo without it, because every supremacy sentence here names the
-  plugin's page as the winner.
+  **ONE CALLER, no CI half, and the publishing-repo skip** — three answers that now hold for the merged
+  script as a whole. Where `check-git-identity` has no CI half because a runner is a bot by design, this
+  one has none because there is nothing for a CI leg to check: in the only repo whose CI this repo
+  controls, the check skips. So `consumer-prose-sessioncheck.ps1` (workflow plugin) is not a convenience
+  on top of another route — it *is* the route, which is the whole point of #1389 and #1415 alike.
 
-  **What the seventh session hook costs** (5 runs each, median, this machine, September 4, 2026,
-  **measured after the paragraph repair rather than before it**): **728 ms** through the hook in this
-  repo, against **798 ms** for `retired-doc-name-sessioncheck` measured in the same run. The check alone
-  is **387 ms** here where it skips, and **1,484 ms** against a consumer that has findings — against
-  **1,312 ms** for the sibling on that same consumer in that same run, so the paragraph joining costs
-  roughly **13%** over a detector that still reads physical lines. That is the price of the false
-  negative being closed, and it is worth it.
+  **The skip means something different per detector, and one script must say so rather than inherit it.**
+  For the retired-name half it is a **repair** — this repo narrates the rename history on purpose and
+  would read as consumer drift without it. For the supremacy half it is only a **guard**: measured at zero
+  hits here on the day it was written, because every supremacy sentence this repo carries names the
+  plugin's page as the winner and adjacency reads that correctly. It is kept for sibling consistency and
+  because this is the repo where such sentences get written about consumers.
 
-  **The re-measurement is itself the lesson.** The first figures here were taken before review found the
-  wrapping defect, and the repair makes the check do strictly more work per document — so the paragraph
-  above would have shipped as a current, dated fact about code that no longer existed. Caught by the copy
-  edit, not by any gate: **a measurement taken before the last repair is stale, and nothing goes red when
-  it is.**
+  **BOTH DETECTORS ALWAYS RUN — the first finding does not short-circuit the second.** A check that
+  stopped at the first block would hand a session start the worse half of the two-hook arrangement (one
+  defect reported, the other hidden) without the saving that motivated merging them, so
+  `consumer-prose-gate.tests.ps1` pins it from three sides: a tree with only the rename produces one
+  block, a tree with only the inversion produces the other, and a tree with both produces exactly two
+  `[ERROR]` markers from one invocation.
 
-  **Compare the pair, never the figure.** These absolutes run roughly double what the sibling's own entry
-  records for itself, on the same machine, with nothing about that hook changed — the box was simply
-  busy. Same load sensitivity [#1401](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1401)
-  closed by making a duration assert compare against its queue instead of a fixed ceiling, and the reason
-  the sibling is re-measured beside it here rather than quoted.
+  **The pre-merge per-hook figures, kept because they are what the saving is measured against** (5 runs
+  each, median, this machine, September 4, 2026): `retired-doc-name-sessioncheck` **365 ms** through the
+  hook in this repo where it skips, against **544 ms** for `unfolded-entry-sessioncheck` beside it;
+  `supremacy-declaration-sessioncheck` **728 ms** through the hook here, its check alone **387 ms** where
+  it skips and **1,484 ms** against a consumer with findings — against **1,312 ms** for the sibling on
+  that same consumer in that same run, so the paragraph joining cost roughly **13%** over a detector that
+  still read physical lines. That was the price of the wrapping false negative being closed, and it was
+  worth it.
+
+  **The re-measurement is itself the lesson.** The supremacy figures were first taken before review found
+  the wrapping defect, and the repair makes the check do strictly more work per document — so the
+  paragraph would have shipped as a current, dated fact about code that no longer existed. Caught by the
+  copy edit, not by any gate: **a measurement taken before the last repair is stale, and nothing goes red
+  when it is.**
+
+  **Compare the pair, never the figure.** Every absolute on this page runs roughly double or half its
+  neighbour depending on nothing but how busy the box was — which is why the #1421 before/after above was
+  taken as six runs in one sitting on one fixture rather than by subtracting two dated numbers. Same load
+  sensitivity [#1401](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1401)
+  closed by making a duration assert compare against its queue instead of a fixed ceiling.
 - **`scripts/lint/check-consumer-drift.ps1`** — the read-only drift check against a consuming repo
   (`MISSING`/`IDENTICAL`/`DRIFTED`).
 - **`scripts/lib/plugin-tree-lib.ps1`** — the one answer to *which plugins does this repo publish, and
@@ -1433,7 +1466,8 @@ contributing page's own filename, all three in the same sentence.
 
 **The first of the two was built the same day** ([#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389),
 September 4, 2026): `check-retired-doc-name.ps1`, driven by a SessionStart hook in every consumer and
-[described above on this page](#what-sylvester-owns-here). It kept the three constraints this entry
+[described above on this page](#what-sylvester-owns-here) — both greps live in
+`check-consumer-prose.ps1` since #1421 merged them, one day later and before either had shipped. It kept the three constraints this entry
 imposes — literal names, derived rather than listed; the corpus as an inclusion list with the changelog
 out; and the publishing-repo skip — and it carries one stated gap, the shape `development-<branch>.md`,
 which has no literal form.
@@ -1477,7 +1511,9 @@ supremacy declarations at length, so without it the source reads as consumer dri
 repo's own always-on pages produce **zero** hits without the skip, because every supremacy sentence here
 names the plugin's page as the winner and adjacency reads that correctly. The skip is kept — this is
 where sentences about a consumer's rank order get written, and one future line would fire — but it is
-sibling consistency and cheap insurance, not the repair it is in `check-retired-doc-name.ps1`.
+sibling consistency and cheap insurance, not the repair it is for the retired-name grep. Since #1421 the
+two share **one** skip, so that difference is stated once, in `check-consumer-prose.ps1`, instead of
+being inherited by a copy that would not know it had changed meaning.
 
 **The manifest survives the decline** — a later revisit should not have to re-derive 11 laws from
 scratch:

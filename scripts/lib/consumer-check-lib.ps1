@@ -13,6 +13,13 @@
     is not a checkout one of the five answered and four died on `.Trim()` against $null. Nothing said
     which behaviour was intended, because both were written as though obviously right.
 
+    THE FIVE ARE FOUR SINCE #1421, AND THE COUNT IS LEFT AS IT WAS ON PURPOSE. The first two named above
+    were folded into one check-consumer-prose.ps1 days after this lib landed, so the callers today are
+    check-consumer-prose.ps1, check-branch-entry.ps1, check-git-identity.ps1 and check-unfolded-entry.ps1.
+    The paragraph above is the MEASUREMENT that produced this lib and it is true of the tree it was taken
+    in -- rewriting it to four would make the drift it documents unfindable. Read it as evidence, and
+    read this paragraph for the current inventory, exactly as seam-lib.ps1 asks its own census to be read.
+
     THE ROOT RESOLUTION IS A SEMANTIC DECISION -- which tree does this script judge -- and this repo
     already has the rule for those: the pair that must not drift gets one source (#309, and
     Get-SeamPaths / Get-OrchestratorNote / Format-SafeToken all exist under it). Five copies of a
