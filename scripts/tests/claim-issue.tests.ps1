@@ -168,6 +168,12 @@ Assert-True ((([regex]::Matches($body, "'issue',\s*'view'")).Count) -ge 2) 'the 
 # The title is the one field on the issue that a stranger writes, and this script prints it twice.
 Assert-True ($body -notmatch '\$\(\$facts\.title\)') 'the issue title is never printed straight from the tracker'
 
+# The defect #1485 measured is a SILENCE, so nothing behavioural can catch its return: a fresh claim
+# that prints only its verdict passes every test above, and the session that reads it stops and asks.
+# Both sibling verdicts point forward; a later edit trimming either one is what this holds.
+Assert-True ($body -match 'open the branch \(new-branch\)') 'the fresh-claim verdict says what follows a successful claim'
+Assert-True ($body -match 'read the branch and its document') 'the already-yours verdict still says what follows a resume'
+
 foreach ($path in @($Script, $Lib, $IdLib)) {
     $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$errors)

@@ -32,6 +32,79 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1485-claim-issue-continuation · 20260906-003143
+
+`claim-issue` now says what follows a successful claim, so a session that obeys the page carries
+straight on into the work instead of stopping to ask. Three surfaces changed: the skill page gains a
+forward-pointing section beside its `## What this skill is NOT` fence (and a description that ends on
+the arrow rather than the boundary), the script's fresh-claim verdict hands over the way its
+`already-yours` verdict always has, and Chris's persona body states out loud that a claim is what
+establishes the chain.
+
+The defect was never a missing rule -- it was a boundary with no arrow on the far side of it. Every
+framing of the step said what it is NOT, so stopping after a clean `[OK]` read as obedience rather
+than as the failure it is.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer running this workflow meets the same stall on every issue pickup: their session claims
+correctly and then hands the turn back with *"say the word"*. The repair travels with the plugin, and
+it costs them no adoption step -- the page, the script and the persona all arrive on the next update.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue says what follows a successful claim, so the work continues in the same turn
+
+Plugins: dkj-policy, team-alpha
+
+[PR #1489](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1489)
+
+---
+
+### DEPLOY: docs/1483-scripts-readme-entry-points · 20260906-002625
+
+`scripts/README.md`'s entry-point table was **10 rows short** and carried no warning that it might be,
+so a reader took it as the complete set of what a person or a specialist invokes here. Absent from it
+were `claim-issue`, `worktree-lane`, `prune-merged`, `adopt-workflow-folder`, `adopt-shopify-floor`,
+`check-policy-drift`, `push-preview`, `sync-main`, `verify-resolved-issues` and `publish-to-business`
+— several of them with a skill page of their own, and one of them the step the workflow says runs
+before anything else. Each Skill cell was answered by `Get-SharedScriptPairs` rather than derived by
+hand, which is the shape the page's own sibling names as the one that goes stale.
+
+The paragraph under the table said **four** scripts are reached by a hook and described them all as
+read-only SessionStart checks. `task/park-cycle.ps1` is a fifth, and it is the one that writes: the
+`cycle-autopark` Stop hook runs it to push the branch's development document to origin. It is now
+named there as the automatic half of parking, opposite `task/park-branch.ps1` in the table as the half
+a person invokes — which is why it is not a table row. The table's intro sentence was repaired in the
+same pass: it claimed everything unlisted is a lib, a generator or a test, which the paragraph
+immediately below it contradicted.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The sibling page in the plugin — the one a consumer receives — said its own missing rows were "tracked
+separately" with nothing behind the claim. Measured against the registry it is **21 rows short**, so
+the sentence now names [#1486](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1486)
+and the count. A consumer reading that page gets a number and a thread instead of a promise; the 21
+rows themselves are that issue's work, not this branch's.
+
+**Score:** 1
+
+#### Pull Request
+
+scripts/README.md's entry-point table names every script a person invokes
+
+Plugins: dkj-policy
+
+[PR #1488](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1488)
+
+---
+
 ### DEPLOY: fix/1479-wrangler-toml-silent-write · 20260905-233824
 
 `build-release-notes-page.ps1 -Worker` no longer writes a fresh `wrangler.toml` in silence. That file

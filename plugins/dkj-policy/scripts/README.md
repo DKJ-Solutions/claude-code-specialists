@@ -46,8 +46,11 @@ August 26 found the header, the destination split and the row list all wrong at 
 naming `dkj-team-shopify` as a destination. `session-status` has since gone the other way: it was removed
 along with `/lock` and `/handover`
 ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave), so its row went with it.
-The numbers are gone from this page for that reason; the missing rows are tracked separately, because
-writing each one needs a description and a Skill answer rather than a figure.
+The numbers are gone from this page for that reason; the missing rows are tracked in
+[#1486](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1486) — **21 of them**, measured
+against the registry on September 6, 2026 — because writing each one needs a description and a Skill
+answer rather than a figure. That sentence said *"tracked separately"* with nothing behind it until
+#1486 was filed, which is the same staleness this paragraph is about, one level up.
 
 Not every script here is reached through a skill, and the **Skill** cell says so rather than linking one, so
 an absent link is a fact rather than an oversight.
