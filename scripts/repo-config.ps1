@@ -887,6 +887,13 @@ function Get-ReleasePageTitle {
 # therefore remembers the URL: whoever creates it records it outside the repo. A consumer whose repo
 # is PRIVATE has the opposite answer available and should take it, since a tracked token survives a
 # lost machine.
+#
+# BUT "NOT IN GIT" IS NOT "NOWHERE" (issue #1453). The deployed worker carries its route as a literal,
+# so while the worker named below is up, Cloudflare holds a copy of the token that no machine here has
+# -- readable from that worker's code view in the dashboard, or from the Workers script API. Losing
+# every local copy is therefore recoverable, and only a worker that is ALSO gone makes the URL
+# unrecoverable. Check the deployment before reaching for -InitToken, which mints a fresh path and
+# 404s every link already sent.
 $script:ReleasePageWorkerName = 'ccs-release-notes'
 
 function Get-ReleasePageWorkerName {

@@ -384,6 +384,12 @@ tag, since an unguessable link is worth nothing once a crawler has published it.
 - **Whether the token belongs in git depends on your repository.** Private: commit it, because a tracked
   token is what survives a lost machine. Public: keep it out, and accept the consequence — nothing in git
   then remembers your URL, so whoever creates it records it elsewhere.
+- **A lost token is not a lost URL, while the worker is still up.** The bundle carries its route as a
+  literal, so a live deployment is itself a copy of the token — readable from the worker's code view in
+  the Cloudflare dashboard or from the Workers script API. That is the route to exhaust before minting a
+  fresh path, and it is why the refusal names three in order: the URL you have, then the deployment, then
+  `-InitToken`. Written down after a repo with no local copy concluded its links were unrecoverable, with
+  its worker still serving them.
 
 **Publishing is `npx wrangler deploy`, run by hand.** The script writes the bundle and stops there, because
 publishing is outward-facing. **Verify a redeploy against the bytes the URL serves**, never against the

@@ -176,6 +176,19 @@ alone, which answers *"no token here"* on precisely the day that answer is wrong
 **Move that folder rather than rebuilding it.** Everything else in it regenerates in a second; the
 token is the one file that cannot.
 
+**And when there is no copy anywhere in the tree, the deployment is still one** — the step worth taking
+before you conclude the URL is gone. The script writes the route into the bundle as a **literal**
+(`const ROUTE = "/notes/<token>"`), so a worker that is still up *is* a copy of its own token, held by
+Cloudflare rather than by any machine of yours: read it off the worker's code view in the dashboard, or
+from the Workers script API, both of which return the deployed source. So the refusal names three ways
+back, in the order worth trying — the URL you have, then the deployment, and only then `-InitToken` for
+a fresh path.
+
+That ordering was learned the expensive way (source repo issue #1453, September 5, 2026): a token that
+was genuinely absent from every local path was read as *"every link already sent is unrecoverable"*,
+which does not follow while the worker is up. **"The token is lost" and "the URL is lost" are different
+findings**, and only the first one is answered by looking at your own disk.
+
 ## Publishing, and how to tell whether it worked
 
 The script **deploys nothing**. It writes the bundle and names the command:

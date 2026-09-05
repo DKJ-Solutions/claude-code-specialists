@@ -53,6 +53,15 @@
     error with a recovery instruction, and -InitToken is the separate, explicit way to create the
     first one.
 
+    AND A LOST TOKEN IS NOT THE SAME AS A LOST URL, which is the half both refusals below used to
+    leave out. This script writes the route into the bundle as a LITERAL -- const ROUTE =
+    "/notes/<token>" -- so a worker that is still deployed is itself a copy of the token, held by
+    Cloudflare rather than by any machine here. That is the recovery route to try before concluding
+    the URL is gone: read it off the deployment (the worker's code view in the Cloudflare dashboard,
+    or the Workers script API, both of which return the deployed source). Measured on issue #1453,
+    where the local token was genuinely absent everywhere and the conclusion drawn from that was
+    "every link already sent is unrecoverable" -- which does not follow while the worker is up.
+
     IT DEPLOYS NOTHING. `npx wrangler deploy` is the deploy, run by hand, because publishing is
     outward-facing. Verify a redeploy against the BYTES the URL serves, never against the deploy
     command's own output: the consumer this came from measured that once wrangler has created a
@@ -802,6 +811,18 @@ if ($InitToken) {
     Write-Host "  A path token was created: $tokenPath" -ForegroundColor Yellow
     Write-Host "  IT IS THE ONLY LOCK ON THE PAGE. Record the finished URL somewhere you will find it" -ForegroundColor Yellow
     Write-Host "  again -- in a public repo this file is not committed, so nothing else remembers it." -ForegroundColor Yellow
+    # A CONFIGURED WORKER NAME MEANS THIS REPO HAS HOSTED THE PAGE BEFORE, so "there is no token here"
+    # is not evidence that there is no LIVE page -- the deployment holds its own copy of the old one.
+    # Reported rather than refused: -InitToken is explicit, and a first-ever token is the legitimate
+    # case that looks identical from here. See the token note in the header (issue #1453).
+    if ($config.WorkerName) {
+        Write-Host ""
+        Write-Host "  NOTE: this repo names a worker ('$($config.WorkerName)'), so a page may already be live" -ForegroundColor Yellow
+        Write-Host "  on the OLD token -- and deploying this one 404s every link already sent. The deployed" -ForegroundColor Yellow
+        Write-Host "  bundle carries its route as a literal, so the old token is still readable from" -ForegroundColor Yellow
+        Write-Host "  Cloudflare (the worker's code view, or the Workers script API). Check there before you" -ForegroundColor Yellow
+        Write-Host "  deploy: if the old token comes back, delete this file and restore that one instead." -ForegroundColor Yellow
+    }
 }
 
 if (-not $Worker) { exit 0 }
@@ -825,8 +846,12 @@ if (-not (Test-Path -LiteralPath $tokenPath -PathType Leaf)) {
     }
     throw ("The path token is missing: $tokenPath. " + $lead + "This script does NOT invent one -- the " +
            "path is the only lock on a public page, so a fresh token means the reader's link 404s while " +
-           "the build and the deploy both report success. Restore the 32 hex characters from the URL " +
-           "you have, or run this script with -InitToken to create the first one.")
+           "the build and the deploy both report success. THREE WAYS BACK, in the order worth trying: " +
+           "(1) restore the 32 hex characters from the URL you have; (2) if the worker is still " +
+           "deployed, read them off the DEPLOYMENT -- the bundle carries the route as a literal, so " +
+           "Cloudflare still holds the token even when no copy survives on any machine here (the " +
+           "worker's code view in the dashboard, or the Workers script API); (3) only once both of " +
+           "those are exhausted, -InitToken for a fresh path -- which 404s every link already sent.")
 }
 $token = ([System.IO.File]::ReadAllText($tokenPath, [System.Text.Encoding]::UTF8)).Trim()
 if ($token -notmatch '^[0-9a-f]{32}$') {
