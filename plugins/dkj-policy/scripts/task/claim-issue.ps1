@@ -246,6 +246,13 @@ if (-not $landed) {
     exit 1
 }
 
-Write-Host "[OK] #$number claimed for '$($identity.Account)' -- the work can start." -ForegroundColor Green
+Write-Host "[OK] #$number claimed for '$($identity.Account)' -- the work starts here." -ForegroundColor Green
 Write-Host "     $title"
 Write-Host "     $($facts.url)"
+# The claim is the OPENING of the work, not a checkpoint before it (#1485). Every other line this
+# script and its page emit is a boundary -- what the step is NOT -- so a session that obeys them all
+# stops here and asks whether to proceed, which is the intermediate question the orchestrator's own
+# body forbids. The `already-yours` verdict above has always pointed forward; this one now does too,
+# and it is printed last because the last line is the one that gets read.
+Write-Host '     Read the issue, then open the branch (new-branch) -- in this same turn, without' -ForegroundColor Green
+Write-Host '     asking whether to go on.' -ForegroundColor Green

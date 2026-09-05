@@ -33,21 +33,59 @@
 
 ### PLAN
 
+#### What is being repaired, and what is deliberately not
+
+The defect is a boundary with no arrow on the far side of it. Every framing of `claim-issue` says
+what the step is NOT -- the frontmatter's *"not a replacement for new-branch"*, the three lines under
+`## What this skill is NOT`, and a success line reading *"the work **can** start"* -- and none says
+what it is followed **by**. So a session that obeys the page stops after a clean claim and asks
+whether to proceed, which is the intermediate question Chris's persona body forbids.
+
+Verified against the tree before any edit, all three citations standing (only the report's path is
+stale by one rename, `plugins/workflows/` -> `plugins/dkj-policy/`). The report's own **Not verified**
+lead was answered rather than carried forward: `park`, `new-branch`, `open-pr` and `start-task` all
+pair a boundary section with a forward statement, and both `CONTRIBUTING` pages sit inside a numbered
+cycle -- `claim-issue` is the only page whose fence is terminal. So the scope is exactly the three
+surfaces #1485 names, and no wider.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `SKILL.md` frontmatter: the description ends on a forward statement, since it is the half a
+      session reads before opening the page
+- [x] `SKILL.md`: a positive counterpart to `## What this skill is NOT`, placed directly after it, so
+      the fence is immediately followed by the arrow
+- [x] `scripts/task/claim-issue.ps1`: the fresh-claim verdict hands over the way `already-yours`
+      already does, and `-- the work can start` stops reading as permission
+- [x] Regenerate the plugin mirror via `scripts/sync/build-shared-scripts.ps1`
+- [x] Chris's persona body: say out loud that a claim establishes the chain
 
 ### TEST
 
+- [ ] Lint gate + all suites green (`open-pr.ps1` runs both)
+
 ### DEPLOY: fix/1485-claim-issue-continuation
 
-**Score:**
+`claim-issue` now says what follows a successful claim, so a session that obeys the page carries
+straight on into the work instead of stopping to ask. Three surfaces changed: the skill page gains a
+forward-pointing section beside its `## What this skill is NOT` fence (and a description that ends on
+the arrow rather than the boundary), the script's fresh-claim verdict hands over the way its
+`already-yours` verdict always has, and Chris's persona body states out loud that a claim is what
+establishes the chain.
+
+The defect was never a missing rule -- it was a boundary with no arrow on the far side of it. Every
+framing of the step said what it is NOT, so stopping after a clean `[OK]` read as obedience rather
+than as the failure it is.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer running this workflow meets the same stall on every issue pickup: their session claims
+correctly and then hands the turn back with *"say the word"*. The repair travels with the plugin, and
+it costs them no adoption step -- the page, the script and the persona all arrive on the next update.
+
+**Score:** 3
 
 #### Pull Request
 
 claim-issue says what follows a successful claim, so the work continues in the same turn
-
