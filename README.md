@@ -633,7 +633,8 @@ function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session
 <!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
 `cut-release`, `adopt-config`, `adopt-workflow-folder`,
-`release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `prune-merged`,
+`release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
+`prune-merged`,
 `measure-skill`, `worktree-lane`, `report-issue`, `adopt-bwj-asana`, `orchestrator`)<!-- /skills:all -->
 remain available there.
 
@@ -717,11 +718,12 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
 `new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
 `start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`,
-`release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`,
+`release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
 `prune-merged`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
 **mechanism** (branch, PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
-theme, the reading copy of the release notes, reaping the local branches a merge left behind, pricing
+theme, the reading copy of the release notes, laying the repo's law-bearing documents out in rank order
+so a session can read them against each other, reaping the local branches a merge left behind, pricing
 what a skill costs the sessions that carry it, and giving a branch its own worktree so another one can
 ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-bwj-asana`<!-- /skills:all --> are the
 deliberate exceptions: a checklist with no script of its own (see below); a skill that must not have

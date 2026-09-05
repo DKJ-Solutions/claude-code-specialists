@@ -12,6 +12,16 @@ answers. Read this page after
 [`contributing-davekjohn`'s ticket-work section](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch),
 which this one sharpens rather than repeats.
 
+**And "a layer on top" is a RANK, not a figure of speech.** This page is the middle of three: the
+`contributing-davekjohn` portable pages outrank it wherever the two speak to the same question, and it
+in turn outranks a consuming repo's own always-on documents -- its root `CLAUDE.md` and everything that
+document imports. The order itself, what it is scoped to, and the corollary that actually keeps it (a
+consumer document may point at a shared law or answer a seam it names, but may not restate it) are
+stated **once**, in
+[`CONTRIBUTING-portable.md`, "A third rank sits above both"](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/workflows/contributing-davekjohn/CONTRIBUTING-portable.md#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379).
+Read the rule there rather than here: a second copy of a rank order is exactly the restatement that
+rule forbids, and this line exists only to name which rung this page sits on.
+
 **How to read this page.** It travels with the plugin, so a link that walks out of this plugin's own
 folder is written as an absolute URL -- an installed plugin is read from its own cache directory,
 where the repo tree around it does not exist. Measurements and issue numbers on this page are the

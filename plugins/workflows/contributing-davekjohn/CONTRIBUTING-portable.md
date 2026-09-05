@@ -832,6 +832,21 @@ the plugin's portable pages + skills        (the shared law)
         >  the floor                        (root CONTRIBUTING.md, or CLAUDE.md where the repo keeps its floor there)
 ```
 
+**The top rung has an order of its own as soon as a second workflow plugin is installed, and it is still
+one rank rather than a fourth.** `contributing-davekjohn` legislates the cycle itself — the branch, the
+branch document, the gates, the fold, the cut — and a companion workflow plugin extends one step of that
+cycle for a named set of repos rather than replacing any of it; `bwj-codex` is the built instance, and it
+extends the ticket-work step for two Shopify store repos. So **where two plugin pages speak to the same
+question, this plugin's page wins and the companion's is read as an extension, never as an override.**
+Where the companion legislates something these pages have no opinion on — which is the normal case and
+the whole reason it exists — the two never meet and there is nothing to rank.
+
+**A companion names its own rung on its own page and points back here rather than restating this block**,
+which is the corollary below applied to a plugin instead of to a consumer. The rank order is stated once,
+in this section; `WORKFLOW-portable.md` carries a pointer at it and the sentence *"this page is the middle
+of three"*, and nothing else. A second copy of the order in a sibling plugin would fail exactly the way a
+consumer's copy does — not on the day it is written, but on the day this block moves and the copy does not.
+
 **Scoped as narrowly as it should be.** This ranking governs only what the plugin actually legislates —
 the branch/PR/release mechanics, the gates, the tier model, the shapes described on these portable pages.
 A repo's own rules that the plugin has no opinion on — its live theme's id, its store domain, its
