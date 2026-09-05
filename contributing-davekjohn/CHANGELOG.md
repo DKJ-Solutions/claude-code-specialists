@@ -32,6 +32,50 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1439-parked-branch-remote-head · 20260905-135922
+
+`new-branch.ps1` now compares the branch you are resuming against its own remote head, and warns when
+`origin` is ahead -- naming the count and the remote tip's **author and subject**, which is what
+separates another session's collision from a fast-forward of your own autopark.
+
+Three sessions have now built the same work twice here. The first two (#1282, #1409) were about an
+**issue** worked twice and both need an issue number; #1409 closed by naming the gap this fills -- *"that
+leaves the case where no issue number is passed, which is most branches"*. The signal nothing read is the
+remote head of the branch under your feet: `git status` prints the same line for "in sync" as for "never
+fetched", `prune-merged -IncludeRemote` is for branches you are *not* on, and `cycle-autopark` makes the
+collision more likely rather than less, because it is what puts the other session's work on the shared
+ref. The last one cost two full gate runs, a 508-line script and a new test suite, all built blind.
+
+The tip line is stripped of control and format characters and capped at 120 before it is printed: it is
+the one piece of text this script emits that somebody else wrote, and an escape sequence in a commit
+subject repaints the terminal it lands in. The neighbouring adversarial case points the other way on
+purpose -- a malicious `-Title` must land fully and unchanged, because that goes into a file.
+
+It costs no network call -- the base measurement already fetches every ref -- and it warns rather than
+refusing, because the legitimate divergence (your own autopark from another device) sits on the intended
+happy path.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer runs this script from the plugin mirror, and the cross-device handoff it guards is the
+workflow's own: `new-branch` pushes by default and `cycle-autopark` keeps the branch current on `origin`,
+so a consumer working from two machines meets this exact state without doing anything unusual. They now
+learn at the checkout instead of at the push.
+
+**Score:** 3
+
+#### Pull Request
+
+new-branch warns when the branch you resume is behind its own remote head
+
+Plugins: contributing-davekjohn
+
+[PR #1441](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1441)
+
+---
+
 ### DEPLOY: feat/plugin-policy-precedence · 20260905-124229
 
 `contributing-davekjohn` gains **`check-policy-drift`**, an on-demand, report-only skill that lays every
