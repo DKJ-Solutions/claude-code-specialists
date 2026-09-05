@@ -32,6 +32,46 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1399-backing-gate-local-trunk-ref · 20260905-101346
+
+`open-pr`'s backing gate (issue #1026) is meant to refuse a push whose plan reads as finished with no
+real work committed on the branch. It measured that by diffing against a bare local trunk name
+(`main`), not the remote-tracking ref. The ordinary flow lets local `main` fall behind `origin/main`
+for the length of a branch -- `new-branch` warns but does not refuse -- and the documented way to catch
+up mid-branch is `git merge origin/main` (a rebase would need a force-push, which the safety rules
+block). That merge advances the branch's merge-base against *local* `main` to include every commit it
+just pulled in from origin, because local `main` itself never moves -- so those upstream commits were
+counted as the branch's own committed work, and the gate went silent exactly on the branch it exists to
+catch. Reproduced on PR #1398, where the gate stayed silent on a branch whose real work (two
+documentation files) sat uncommitted, and those files had to be committed by hand afterward.
+
+`Get-GitParkBacking` now prefers `refs/remotes/origin/<trunk>` when it exists (a local, no-network
+read of what the last fetch already recorded), and falls back to the bare local name only when it does
+not -- fixed inside the shared function, so neither `open-pr.ps1` nor `park-cycle.ps1` needed to change.
+Closes #1399.
+
+**Score:** 3 -- a clear improvement to the backing gate's own reliability, noticed the moment a branch
+hits the scenario the gate exists to catch (a local trunk fetched behind `origin` and caught up
+mid-branch), which is common enough to have already produced a real near-miss (PR #1398) rather than
+a hypothetical one.
+
+#### What makes this deploy extra special
+
+N/A -- this is an internal correctness fix to a git-plumbing detail of the branch-workflow gate,
+scoped to this repo's own maintainers running `open-pr`/`park-cycle`. It reaches no external audience.
+
+**Score:** N/A
+
+#### Pull Request
+
+Backing gate measures against origin/<trunk> so upstream commits merged into the branch no longer silence it
+
+Plugins: contributing-davekjohn
+
+[PR #1411](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1411)
+
+---
+
 ### DEPLOY: feat/1422-shared-check-preamble · 20260905-011053
 
 Five consumer-facing lint checks opened with the same ~30-line preamble, and it had already drifted:
