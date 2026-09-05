@@ -635,7 +635,7 @@ SessionStart hooks the enabled plugins ship (read them in each plugin's `hooks/h
 hand-written list here was named as three and went stale twice inside two days) and the Stop hook
 `cycle-autopark`
 function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session — only the skills
-<!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `park`, `fix-mojibake`,
+<!-- skills:all -->(`fold-changelog`, `open-pr`, `ship-pr`, `new-branch`, `claim-issue`, `park`, `fix-mojibake`,
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
 `cut-release`, `adopt-config`, `adopt-workflow-folder`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
@@ -721,11 +721,12 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 ## How we use skills — and what we deliberately don't
 
 <!-- skills:all -->Most skills in claude-code-specialists today (`fold-changelog`, `open-pr`, `ship-pr`,
-`new-branch`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`, `sync-roster`,
-`start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`,
+`new-branch`, `claim-issue`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`,
+`sync-roster`, `start-task`, `adopt-config`, `adopt-workflow-folder`, `adopt-shopify-floor`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
 `prune-merged`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
-**mechanism** (branch, PR, ship, fold, bootstrap, teardown, roster-sync, encoding repair, reading a
+**mechanism** (branch, claiming an issue on the tracker before the work on it starts, PR, ship, fold,
+bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
 theme, the reading copy of the release notes, laying the repo's law-bearing documents out in rank order
 so a session can read them against each other, reaping the local branches a merge left behind, pricing

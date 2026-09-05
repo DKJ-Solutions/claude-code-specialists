@@ -326,6 +326,11 @@ claim as well as write it (`gh issue view <n> --json assignees`) — an issue th
 assignee is somebody's, so pick another or ask rather than starting a second repair on the same
 defect.
 
+**Where the repo's workflow ships a claim step, run that instead of typing either command** — a rule
+enforced by nothing but memory is one that gets skipped, and the step also refuses the two states the
+one-liner cannot see: a **closed** issue, which `--add-assignee` claims silently, and one somebody else
+holds, which it joins.
+
 **`@me` is not that account on every checkout, and the difference is silent.** `@me` resolves through
 the tracker's API, so it binds to whatever the CLI is authenticated as — while the branch a second
 session correlates the claim *with* carries the **git** identity. A machine can hold both (a personal
