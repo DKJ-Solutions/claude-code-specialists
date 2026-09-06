@@ -664,6 +664,52 @@ infrastructure.
   `gh secret set FOLD_PUSH_TOKEN --repo DKJ-Solutions/claude-code-specialists`. Today that renewal is
   tribal knowledge held by whoever created the token (Dave); this paragraph is what keeps it from
   staying that way if the 366 days run out while he is not the one reading a red run.
+- **`.github/workflows/verify-resolved.yml` + `scripts/release/verify-pushed-merges.ps1`** — the
+  resolves gate's second half surviving the same merge (issue
+  [#1511](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1511), September 6, 2026), one
+  step further down `ship-pr.ps1` than the fold above. `verify-resolved-issues.ps1` is that script's
+  step 6 and ran only from the shipping session, right after its own `gh pr merge` returned; since
+  [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506) enqueues instead of
+  merging, that step never runs. **What was lost is narrower than it sounds and is worth stating
+  exactly**: GitHub honours the body's closing keywords on a queue merge like any other — measured on
+  PR #1509, where #1506 closed on the merge and a later `-ReportOnly` run reported `every declared issue
+  was already closed by the merge` — so what went missing is the *verification*, plus the repair when a
+  keyword misses. That repair is the case the script was built for: eight issues across PRs #341–#343
+  stayed open because those bodies carried plain mentions.
+
+  **It repairs rather than only reporting, and that is a decision rather than a consequence** (Dave,
+  September 6, 2026, answering the question #1511 raised in as many words). Report-only was the cheaper
+  option and does not close the gap: `verify-resolved-issues.ps1` exits 0 whatever it finds, so a
+  still-open issue would be one yellow line inside a green run, and the repair would stay the manual
+  step the enqueue arm already prints. So `issues: write` is granted — the first such grant in this
+  repo's workflows.
+
+  **It is its own workflow rather than a step in `fold-on-merge.yml`, and that is what makes the grant
+  narrow.** #1511 named that workflow as the obvious home and flagged the cost in the same breath:
+  `issues: write` beside a job that checks out with `FOLD_PUSH_TOKEN` puts a year-long standing
+  credential and issue-write in one job, and `actions/checkout`'s `persist-credentials: true` leaves
+  that PAT in the workspace for every step. Here they never meet — this job checks out with the default
+  hour-lived `GITHUB_TOKEN`, with `persist-credentials: false` because it never pushes. Widening the PAT
+  instead would have been the other way to reach a repair, and the worse one: `Contents: Read and write`
+  is where its scope stops today, and adding Issues to it would have made the standing token the one
+  that closes issues.
+
+  **The second reason for its own file is coverage, not permissions.** `fold-on-merge.yml` acts only
+  when a leftover entry is found, because an entry is what a fold needs; this check has to run for every
+  merge, including one carrying no changelog entry and one whose entry an earlier run already folded
+  away. So it resolves its PRs from the **push** — `compare/{before}...{sha}` for the commits, then
+  `commits/{sha}/pulls` for each — and reads the whole range rather than the head commit, because a
+  merge queue can land a batch of PRs in one push. Neither call needs git history, which matters: the
+  runner checks out at depth 1.
+
+  **Two defects were live on its first smoke test, both exiting 0 in a way that read as working**, and
+  `scripts/tests/verify-pushed-merges.tests.ps1` pins each by name. A `return ,@($shas)` guard combined
+  with `@()` at the call site wrapped the result in a second array, so a six-commit range printed
+  `examining 1 commit` — only the count said so. And a double-quoted jq filter does not survive the
+  native-argument round trip on Windows: `.[] | "\(.number)\t..."` reaches `gh` as three arguments and
+  it answers `accepts 1 arg(s), received 3`, with nothing about quoting in it. The bracket-plus-`@tsv`
+  form says the same thing in characters that survive, and a suite assert reads the *recorded arguments*
+  for a quote rather than the behaviour, since a fake `gh` would answer either form happily.
 - **`scripts/lint/check-git-identity.ps1`** — the split-identity check (issue
   [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026): does
   this checkout commit as the same account it acts as on the tracker? The claim rule's `@me` resolves

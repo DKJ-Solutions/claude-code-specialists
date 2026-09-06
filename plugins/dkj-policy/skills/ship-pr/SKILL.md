@@ -602,6 +602,18 @@ writes those keyword lines; this step checks the **outcome**, and closes what st
 of a brace: if it never fires, the keyword did its job. It **cannot fail the ship** — the merge has
 already happened by then, so a problem here is a warning, not a failure.
 
+**Under a merge queue this step does not run at all, and that is the one case worth arranging for.**
+`ship-pr` reads the trunk's rules before it merges; where it finds a queue it enqueues and ends, and the
+merge lands minutes later in a process the session never observes — so there is no "after the merge" for
+step 6 to be. The closing itself is unaffected: GitHub honours the body's keywords on a queue merge
+exactly as on any other. What is missing is the check that it did, and the repair above when a keyword
+missed — precisely the class this script exists for. The enqueue arm prints the standalone command so
+the step is manual rather than invisible, and a repo that would rather it were neither can run the same
+script off the **merge** instead: a push to the trunk is the one event that always sees a queue merge,
+which is the same property the fold relies on. The source repo does that in a CI workflow of its own; a
+consumer arranging it needs to decide for itself whether that runner may *close* an issue or only report,
+since closing means granting it issue-write.
+
 It is also usable on its own, which is what it was needed for on August 1, 2026, when eight findings
 repaired by three PRs had stayed open because those bodies carried plain mentions instead of keywords:
 
