@@ -83,6 +83,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.31.0](audience/4.x/4.31.0.md) | 2026-09-06 | Minor | Every plugin carries its owner in its name, and the fold survives a queue merge |
 | [4.30.0](audience/4.x/4.30.0.md) | 2026-09-05 | Minor | The workflow plugin is now dkj-policy, and consumers re-install under the new ids |
 | [4.29.0](audience/4.x/4.29.0.md) | 2026-09-04 | Minor | Per-branch development documents, a live work-tracker mirror, and a test gate packed by measured duration |
 | [4.28.0](audience/4.x/4.28.0.md) | 2026-08-31 | Minor | Add the workflow-bwj plugin, and harden the release gates and measurement tools for other locales and checkouts |
