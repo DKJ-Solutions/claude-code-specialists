@@ -21,44 +21,29 @@
 # a question this already answers from the tree itself, for one branch per run instead of the whole
 # backlog a push might be carrying.
 #
-# contents: write + pull-requests: read, AND NOTHING ELSE. pull-requests: read is not optional: the
-# fold step's own `gh pr list` needs it, and declaring any permissions block at all sets every unlisted
-# scope to none.
+# contents: read + pull-requests: read, AND NOTHING ELSE, for the default GITHUB_TOKEN. pull-requests:
+# read is not optional: the fold step's own `gh pr list` needs it, and declaring any permissions block
+# at all sets every unlisted scope to none. contents: write is deliberately NOT granted here -- the
+# actual push authenticates as FOLD_PUSH_TOKEN (see below), which the checkout step wires in directly
+# and which never touches this permissions block at all.
 #
-# THE PUSHER MUST BE A BYPASS ACTOR, AND THE GITHUB ACTIONS APP CANNOT BE ONE (issues #1493, #1506).
-# TWO of main-ci-gate's rules block any push to main, including this job's, unless the pushing actor is
-# a listed bypass actor -- required_status_checks AND merge_queue, and naming only the first is what
-# made the third failed run unreadable (issue #1499, below).
-#
-# THE OBVIOUS REMEDY WAS TRIED, AND GITHUB REFUSES IT -- measured 2026-09-06. The default GITHUB_TOKEN
-# pushes as the GitHub Actions app (integration_id 15368: the id the lint-en-tests required check
-# already reports under, confirmed against `gh api apps/github-actions`), so what this comment used to
-# record as the plan was to add that app to the ruleset's bypass list. Doing it answers:
-#
-#   PUT repos/DKJ-Solutions/claude-code-specialists/rulesets/19008062
-#   422 Validation Failed -- Actor GitHub Actions integration must be part of the ruleset source or
-#   owner organization
-#
-# An Integration bypass actor has to be an app INSTALLED on the org, and GitHub Actions is not an
-# installable app -- `gh api orgs/DKJ-Solutions/installations` lists one app, `claude` (app_id
-# 1236702). So that route does not exist. The paragraph replaced here asserted it as settled fact and
-# was never a measurement, which is the class of thing this repo repairs rather than works around.
-#
-# BYPASS IS BY ACTOR, AND BOTH BYPASSING ACTORS ARE PEOPLE -- OrganizationAdmin and RepositoryRole id
-# 5. So the only way this job pushes is with a token belonging to one of them, which is FOLD_PUSH_TOKEN
-# below: a fine-grained PAT scoped to this repository alone, contents: write (the fold's push) plus
-# pull requests: read (the fold step's own `gh pr list`). Minting it is Dave's and no script's -- a
-# credential is never created by the thing that consumes it (Dave, 2026-09-06):
-#
-#   gh secret set FOLD_PUSH_TOKEN --repo DKJ-Solutions/claude-code-specialists
-#
-# UNTIL THAT SECRET EXISTS THIS JOB IS EXACTLY WHAT IT WAS: code-complete and failing its own push,
-# loudly, which is the correct failure mode for a workflow waiting on a permission it does not grant
-# itself. What is NOT acceptable is failing for that reason while looking like something else -- an
-# unset secret is the empty string, and actions/checkout silently falls back to GITHUB_TOKEN for it, so
-# the run would land back in the 2026-09-06 rejection with nothing saying why. The fold step therefore
-# reads the secret and says which of the two is happening BEFORE it folds, because the GH013 text alone
-# cannot tell them apart.
+# PUSHES AS AN ORG ADMIN, NOT AS THE GITHUB ACTIONS APP (issue #1493). TWO of main-ci-gate's rules
+# block any push to main unless the pushing actor is a listed bypass actor -- required_status_checks
+# AND merge_queue, and naming only the first is what made a diagnosis unreadable once already (issue
+# #1499, below). The default GITHUB_TOKEN pushes as the GitHub Actions app (integration_id 15368),
+# which is not on that bypass list -- and cannot be added to it: that app is owned by `anthropics`,
+# installed on this org but not administered by it, so there is no private key for it to authenticate
+# as. The bypass list already carries `OrganizationAdmin` with `bypass_mode: always`, so this job
+# checks out with a fine-grained personal access token (secrets.FOLD_PUSH_TOKEN) belonging to an org
+# owner instead -- that identity already bypasses the ruleset today, with no ruleset change needed.
+# The token is scoped to this repository only and to `Contents: Read and write` only, and it expires
+# within the org's enforced 366-day maximum, so it needs rotating before then or this job starts
+# failing its push again with no code-level cause. THIS IS A STANDING CREDENTIAL, NOT A FIX-FOR-FIX
+# SWAP: the default GITHUB_TOKEN it replaces is job-scoped and expires in about an hour, unusable
+# outside this one run; FOLD_PUSH_TOKEN is usable from anywhere for up to a year, and because
+# actions/checkout's default `persist-credentials: true` writes it into the workspace's git config,
+# every step of this job holds it, not only the push step. Sebastian's review of #1493's PR flagged
+# this asymmetry as worth stating rather than leaving implicit in the rotation note alone.
 #
 # WHAT THAT REJECTION ACTUALLY LOOKS LIKE, because a red run here has two entirely different causes and
 # only the log tells them apart (issue #1499). Measured verbatim in run 34020828593, the push carrying
@@ -90,7 +75,7 @@
 name: Fold on merge
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 on:
@@ -105,15 +90,15 @@ jobs:
   fold-on-merge:
     runs-on: windows-latest
     steps:
-      # THE TOKEN IS THE WHOLE POINT OF THIS STEP, not boilerplate. actions/checkout persists the token
-      # it authenticates with as the origin credential, and the fold step's `git push` reuses it -- so
-      # whichever token lands HERE is the actor GitHub judges against main-ci-gate. GITHUB_TOKEN is the
-      # Actions app, which cannot be a bypass actor here (see the header); FOLD_PUSH_TOKEN is a person's.
-      # Unset, it is the empty string and checkout falls back to GITHUB_TOKEN on its own -- the guard in
-      # the fold step is what keeps that fallback from looking like anything other than what it is.
-      - uses: actions/checkout@v5
+      # token here, not the default GITHUB_TOKEN: this is what makes the fold step's later `git push`
+      # authenticate as the org-owner identity behind FOLD_PUSH_TOKEN rather than as the GitHub Actions
+      # app -- see the header comment above for why the app itself cannot be a ruleset bypass actor.
+      # Pinned to a commit SHA, matching claude.yml and claude-code-review.yml's own convention for a
+      # checkout step that handles a real credential -- a mutable tag on this line could otherwise
+      # retag its way into exfiltrating a 366-day standing write token instead of an hour-lived one.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          token: ${{ secrets.FOLD_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.FOLD_PUSH_TOKEN }}
 
       # continue-on-error is deliberate: check-unfolded-entry.ps1 exits non-zero on a genuine
       # find, which is the case this job exists to act on, not a step failure. BUT that leaves
@@ -133,14 +118,7 @@ jobs:
         if: ${{ steps.check.outcome == 'failure' }}
         shell: powershell
         env:
-          # GH_TOKEN drives the fold script's own `gh pr list`, and it is the SAME token checkout
-          # persisted as the origin credential above -- one actor for the read and the push, so a
-          # half-configured run cannot read as one identity and push as another.
-          GH_TOKEN: ${{ secrets.FOLD_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
-          # Read only to SAY whether the fold token is present. Never printed, never compared against a
-          # value: the boolean is what the diagnosis needs and the secret itself is not this step's
-          # business (a repo secret is masked in the log, and the way to keep that true is not to handle it).
-          HAS_FOLD_TOKEN: ${{ secrets.FOLD_PUSH_TOKEN != '' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           # The check step's own known-good signature (its [ERROR] line, verified against the
@@ -152,15 +130,9 @@ jobs:
             exit 1
           }
 
-          # SAID BEFORE THE FOLD, NOT AFTER THE PUSH FAILS (#1506). Without the fold token this job
-          # pushes as the GitHub Actions app, which main-ci-gate does not let bypass and cannot be made
-          # to -- so the run ends in a GH013 rejection that looks identical to a genuine ruleset problem.
-          # This does NOT refuse: the fold below still runs and still commits, and the push still fails
-          # loudly on its own terms. What it adds is the one sentence the rejection cannot carry.
-          if ($env:HAS_FOLD_TOKEN -ne 'true') {
-            Write-Host "::warning::FOLD_PUSH_TOKEN is not set, so this job pushes as the GitHub Actions app -- which main-ci-gate does not let bypass. The fold below will commit and then fail its push with GH013. Set the secret to complete this: gh secret set FOLD_PUSH_TOKEN --repo $env:GH_REPO"
-          }
-
+          # This is commit-metadata identity only -- who authored the commit -- and is independent of
+          # the push's actual credential (FOLD_PUSH_TOKEN, wired in by the checkout step above). A
+          # ruleset bypass is checked against the pushing token's identity, not the commit author.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/fold-changelog-entry.ps1 -Commit -Push *>&1 | Tee-Object -FilePath fold-output.txt

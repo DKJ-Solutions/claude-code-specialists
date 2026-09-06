@@ -186,36 +186,48 @@ Assert-True ($ship -match 'if \(-not \$queueActive -and \$foldVerdict\.Blocked\)
 Assert-True ($ship -match 'if \(-not \$queueActive -and \$foldVerdict\.Unknown\)') `
     'and so is its warning, for the same reason'
 
-Write-Host "== fold-on-merge.yml can actually push what it folds (#1506) ==" -ForegroundColor Cyan
+Write-Host "== fold-on-merge.yml can actually push what it folds (#1493) ==" -ForegroundColor Cyan
 
-# WHY THIS SECTION IS IN THIS SUITE. Handing the fold to CI is what makes the enqueue above safe, and a
-# fold that commits and cannot push is the same merged-but-unfolded state by a third route. Measured
-# 2026-09-06: the GitHub Actions app CANNOT be a main-ci-gate bypass actor (422, "must be part of the
-# ruleset source or owner organization"), so the pushing actor has to be a person's token.
+# WHY THIS SECTION SITS IN THIS SUITE. Handing the fold to CI is what makes the enqueue above safe: a
+# fold that commits and cannot push is the same merged-but-unfolded state guard 2 exists to prevent,
+# reached by a third route. The wiring itself landed in #1507 with no test of its own, which is what
+# these asserts close -- every one of them is about a property that fails SILENTLY, in a workflow whose
+# red runs already have two causes that look alike (#1499).
 $foldWf = Join-Path $repoRoot '.github\workflows\fold-on-merge.yml'
 Assert-True (Test-Path -LiteralPath $foldWf) 'fold-on-merge.yml is still where the fold runs from'
 if (Test-Path -LiteralPath $foldWf) {
     $fom = Get-Content -LiteralPath $foldWf -Raw
 
     # THE CHECKOUT TOKEN IS THE PUSH CREDENTIAL. actions/checkout persists whatever it authenticated
-    # with, and the fold's `git push` reuses it -- so this line, not the permissions block, decides
-    # which actor GitHub judges against the ruleset.
-    Assert-True ($fom -match '(?s)uses: actions/checkout@v\d+\s*\r?\n\s*with:\s*\r?\n\s*token:[^\r\n]*FOLD_PUSH_TOKEN') `
+    # with, and the fold's own `git push` reuses it -- so this line, and not the permissions block,
+    # decides which actor GitHub judges against main-ci-gate. The default GITHUB_TOKEN pushes as the
+    # GitHub Actions app, which is not on that bypass list and cannot be added to it.
+    Assert-True ($fom -match '(?s)uses: actions/checkout@[^\r\n]*\r?\n\s*with:\s*\r?\n\s*token: \$\{\{ secrets\.FOLD_PUSH_TOKEN \}\}') `
         'checkout authenticates with FOLD_PUSH_TOKEN, which is what the fold s push then reuses'
-    Assert-True ($fom -match 'GH_TOKEN:[^\r\n]*FOLD_PUSH_TOKEN') `
-        'and the fold step reads with the same token, so it cannot read as one actor and push as another'
 
-    # DEGRADE LOUDLY, NOT SILENTLY. An unset secret is the empty string and checkout falls back to
-    # GITHUB_TOKEN on its own -- which puts the run back in the measured GH013 rejection with nothing
-    # saying why. This is the one sentence that rejection cannot carry.
-    Assert-True ($fom -like '*HAS_FOLD_TOKEN*') 'the job reads whether the fold token is present at all'
-    Assert-True ($fom -match '::warning::[^\r\n]*FOLD_PUSH_TOKEN is not set') `
-        'and says so BEFORE it folds, rather than leaving a GH013 to be misread as a ruleset problem'
+    # AND IT IS PINNED TO A COMMIT SHA, which is this file's own stated reasoning rather than a general
+    # policy: a mutable tag on a step that handles a 366-day standing write token can be retagged into
+    # exfiltrating it. The assert is the SHA, not the version comment beside it.
+    Assert-True ($fom -match 'uses: actions/checkout@[0-9a-f]{40}') `
+        'and that checkout is pinned to a commit SHA -- a mutable tag here handles a standing write token'
 
-    # The correction has to travel with the wiring: the paragraph that promised the Actions-app bypass
-    # was a plan, not a measurement, and a later reader must not act on it again.
-    Assert-True ($fom -like '*422*') 'the header records the measured refusal rather than the plan that failed'
-    Assert-True ($fom -like '*#1506*') 'and cites the issue, so an inert-looking line is not swept as dead config'
+    # THE READ PATH DELIBERATELY DOES NOT GET THE PAT. The fold script's own `gh pr list` runs on the
+    # job-scoped GITHUB_TOKEN, which expires in about an hour and is useless outside this run. Handing
+    # it the standing token instead would widen the blast radius for nothing -- the push is the only
+    # thing that needs bypass, and it takes its credential from checkout above, not from here.
+    Assert-True ($fom -match 'GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}') `
+        'the fold step READS with the job-scoped GITHUB_TOKEN -- only the push needs the standing token'
+
+    # AND THE DEFAULT TOKEN NO LONGER ASKS FOR WRITE. Once the PAT does the pushing, contents: write on
+    # GITHUB_TOKEN grants a capability nothing in the job uses. A later "restore the permissions" sweep
+    # reading this as an oversight is exactly what this assert stops.
+    Assert-True ($fom -match '(?ms)^permissions:\r?\n\s+contents: read\r?\n') `
+        'and the default GITHUB_TOKEN is down to contents: read, because it is no longer the pusher'
+
+    # The reasoning has to travel with the wiring: without it the next reader tries the ruleset bypass
+    # again and spends the round trip discovering it cannot be granted.
+    Assert-True ($fom -match '(?i)cannot be added to it|cannot be a ruleset bypass actor') `
+        'the header says the Actions app cannot be a bypass actor, so nobody retries that route'
 }
 
 Write-Host "== the plugin mirror carries the same script ==" -ForegroundColor Cyan

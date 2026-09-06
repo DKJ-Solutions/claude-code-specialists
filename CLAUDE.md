@@ -306,15 +306,18 @@ The constitution above, concretely implemented here:
   consumer. **And since September 6, 2026 a second runner acts on what that detector reports**:
   [`fold-on-merge.yml`](.github/workflows/fold-on-merge.yml) runs it on every `push` to `main` and, only
   on a find, folds ([#1493](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1493)) — so
-  the fold no longer depends on the shipping session being alive. It is code-complete and **inert until
-  `FOLD_PUSH_TOKEN` is set**: its fold succeeds and its *push* is rejected, which reads as a failing job
-  rather than as a refused fold. That secret is the remedy because the obvious one does not exist —
-  adding the GitHub Actions app to `main-ci-gate`'s bypass list is refused with `422 — Actor GitHub
-  Actions integration must be part of the ruleset source or owner organization`, an Integration bypass
-  actor having to be an app installed on the org (measured September 6, 2026,
-  [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). Bypass is by **actor**
-  and both bypassing actors are people, so the pusher must carry a person's token; minting it is Dave's,
-  a credential never being created by the thing that consumes it. Both are Sylvester's; the reasoning, and
+  the fold no longer depends on the shipping session being alive. **It pushes as a person**
+  ([#1507](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1507)): `actions/checkout`
+  authenticates with the `FOLD_PUSH_TOKEN` secret — a fine-grained PAT held by an org owner, who already
+  bypasses `main-ci-gate` — and the fold's own `git push` reuses that credential. Only the push does; the
+  fold step still *reads* with the job-scoped `GITHUB_TOKEN`, which is why the workflow's own permissions
+  are down to `contents: read`. The obvious alternative does not exist: adding the GitHub Actions app to
+  the bypass list is refused with `422 — Actor GitHub Actions integration must be part of the ruleset
+  source or owner organization`, an Integration bypass actor having to be an app installed on the org
+  (measured September 6, 2026,
+  [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). Bypass is by **actor**,
+  and both bypassing actors are people — so a workflow that must write past a ruleset borrows a person's
+  token or does not write at all. Both are Sylvester's; the reasoning, and
   how to tell those two red runs apart, are in
   [his lens](.claude/specialists/lenses/05-15-extension.md#what-sylvester-owns-here).
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are

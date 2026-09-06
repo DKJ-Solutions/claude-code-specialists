@@ -49,7 +49,8 @@ Integration bypass actor must be an app installed on the org, and `gh api
 orgs/DKJ-Solutions/installations` lists only `claude`. Bypass is by ACTOR, and both bypassing actors
 are people -- so the pusher has to be a person's token. Dave's decision, 2026-09-06: a fine-grained
 PAT held as `FOLD_PUSH_TOKEN`, minted by him, since a credential is never created by the thing that
-consumes it. This branch does the wiring; the secret is his to set.
+consumes it. #1507 landed that wiring from a second session while this branch waited on CI, so what
+remains here is the ship-pr half plus the test #1507 did not ship.
 
 ### CREATE
 
@@ -73,24 +74,21 @@ consumes it. This branch does the wiring; the secret is his to set.
       was verified rather than assumed: `Invoke-NativeCapture` judges `$LASTEXITCODE` and merges stderr
       into the printed output (#96/#107), so the notice is shown and the exit code decides. Recorded in
       the step-4 header and pinned below.
-- [x] `.github/workflows/fold-on-merge.yml`: `actions/checkout` authenticates with `FOLD_PUSH_TOKEN`
-      -- the token it persists is the credential the fold's own `git push` reuses, so that line and not
-      the permissions block decides which actor GitHub judges. Same token for the fold step's
-      `gh pr list`, so a run cannot read as one actor and push as another.
-- [x] And it degrades loudly: an unset secret is the empty string and checkout falls back to
-      `GITHUB_TOKEN` silently, which puts the run back in the measured rejection with nothing saying
-      why. A `::warning::` says which of the two is happening BEFORE the fold, since the GH013 text
-      cannot tell them apart. It does not refuse -- the fold still commits and still fails its push on
-      its own terms.
-- [x] The header paragraph promising the Actions-app bypass is replaced by the measurement that refutes
-      it. It was a plan asserted as settled fact, which is the class this repo repairs rather than
-      works around.
-- [x] And the same correction where it had already spread. `CLAUDE.md` stated fold-on-merge.yml was
-      "inert while `main-ci-gate` does not bypass the GitHub Actions app" -- a pending condition, for
-      something that cannot happen -- and Sylvester's lens said a bypass "answers both in one move"
-      without naming which actor could hold it. Both now carry the 422 and the token that replaces it.
-      The lens paragraph is layered rather than rewritten: it was right about bypass being per-ruleset,
-      and what it left open is the half that turned out to be impossible.
+- [~] The workflow wiring was BUILT HERE AND THEN DROPPED, because #1507 landed the same repair from a
+      second session while this branch was in its CI wait -- same secret name, better shape. It reduces
+      `permissions:` to `contents: read` (the default token is no longer the pusher), keeps the
+      job-scoped `GITHUB_TOKEN` on the fold step's `gh pr list` so only the PUSH carries the standing
+      token, and pins the checkout to a commit SHA because that step handles a 366-day credential.
+      This branch takes main's file wholesale rather than re-litigating a change that has landed.
+- [x] What #1507 did NOT ship is a test, and that is what stayed. Six asserts in
+      `merge-queue-prereq.tests.ps1` on the properties that fail silently: the checkout token IS the
+      push credential, it is SHA-pinned, the read path deliberately does not get the PAT, `contents:
+      read` is a consequence and not an oversight, and the header still says why the Actions app cannot
+      be a bypass actor -- so nobody spends the 422 round trip again.
+- [x] And the correction where the impossible remedy had already spread. `CLAUDE.md` and Sylvester's
+      lens both stated the Actions-app bypass as a PENDING condition; both now carry the verbatim 422
+      and describe what actually pushes. The lens paragraph is layered rather than rewritten -- it was
+      right that a bypass is per-ruleset, and what it left open is the half that turned out impossible.
 
 ### TEST
 
@@ -121,9 +119,14 @@ same fold, and the same #1325 refusal for a state that has no explanation.
 
 The change is small; what took the work was refusing to build on the reason the tree already carried.
 `fold-on-merge.yml` stated as settled fact that adding the GitHub Actions app to the ruleset would make
-it live. Applying that produced a 422, and the route does not exist -- so this branch corrects the
-record with the refusal text and wires the one credential that can work instead. A repair built on the
-unverified half would have satisfied the issue and been wrong, with a citation.
+it live. Applying that produced a 422, and the route does not exist -- so the record now carries the
+refusal text rather than the plan. A repair built on the unverified half would have satisfied the issue
+and been wrong, with a citation.
+
+And the second half of that lesson arrived by collision: #1507 landed the same repair from another
+session while this branch sat in its CI wait, which is what a merge queue with two shipping sessions
+looks like. The resolution is the same rule pointed at my own work -- take what landed, drop what
+duplicates it, and keep only the part nobody built, which here was the test.
 
 **Score:** 2
 

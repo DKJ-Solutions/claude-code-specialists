@@ -199,11 +199,18 @@ infrastructure.
   installable app — `gh api orgs/DKJ-Solutions/installations` lists exactly one, `claude` (app_id
   1236702). So that route does not exist, and the plan was never a measurement. **Bypass is by actor, and
   both bypassing actors are people** (`OrganizationAdmin`, `RepositoryRole 5`), so the only way a workflow
-  pushes to this trunk is with a token belonging to one of them: `FOLD_PUSH_TOKEN`, a fine-grained PAT
-  scoped to this repository with contents: write plus pull requests: read. **Minting it is Dave's** — a
-  credential is never created by the thing that consumes it — and until it is set the job commits its fold
-  and fails its push, now saying which of the two it is before it folds rather than leaving the GH013 to
-  be misread as the ruleset problem above.
+  pushes to this trunk is with a token belonging to one of them. That is what
+  [#1507](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1507) landed, the same day and
+  from a second session: `actions/checkout` authenticates with `FOLD_PUSH_TOKEN`, an org owner's
+  fine-grained PAT, and the fold's `git push` reuses that credential.
+
+  **Read the split it makes, because it is the part worth copying.** Only the PUSH gets the standing
+  token. The fold step still reads with the job-scoped `GITHUB_TOKEN`, which expires in about an hour and
+  is useless outside its own run, and the workflow's `permissions:` are down to `contents: read` because
+  the default token is no longer the pusher. The checkout is pinned to a commit SHA rather than a tag for
+  the same reason: the step that handles a 366-day standing write token is the one where a retagged
+  action would be worth someone's while. None of that was tested when it landed; the asserts are in
+  `merge-queue-prereq.tests.ps1`, added by #1506, and each one covers a property that fails silently.
 
   **The generalisation worth keeping, because it will come up again:** a workflow that must write past a
   ruleset cannot be granted the exception itself. Either it borrows a person's token, or the rule stops
