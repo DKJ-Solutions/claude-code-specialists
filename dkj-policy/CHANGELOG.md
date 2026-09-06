@@ -31,3 +31,49 @@ a release with nobody to announce it to.
 ---
 
 ## [Unreleased]
+
+### DEPLOY: feat/1516-consumer-merge-queue · 20260906-150722
+
+The merge queue became this workflow's policy for every repo that runs it, and the only thing that
+travelled was the half `ship-pr` already carried. `adopt-merge-queue.ps1` is the rest: Part 3 of
+`adopt-dkj-policy`, it reads a repo's trunk rules and its workflow files, reports whether that repo
+would survive a queue, places the two CI runners a queue takes away from the shipping session -- the
+fold (#1493) and the resolves verification (#1511) -- and prints the ruleset command **without running
+it**. `verify-pushed-merges.ps1`, which the second of those runners calls, was registered as a shared
+mirror in the same movement; it had none, so the runner would have pointed at a path no consumer has.
+And `ship-pr`'s enqueue arm now checks for a fold runner before promising one.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**The order is the feature, and getting it wrong is an outage rather than a gap.** A merge queue is
+not a setting you switch on and then tidy up after: without a `merge_group` trigger on the workflow
+carrying your required check, that check never runs for a queue entry, never reports, and **every merge
+fails**. So the command reports the prerequisite first, the runners second, and the switch last -- and
+it refuses to pull the switch at all. A ruleset changes what every contributor's merge does,
+immediately, for everybody; that is the repo owner's act, and reading a ruleset needs a token that can
+read while writing one needs a token that can administer the repo.
+
+**Everything it guards against fails silently, which is why the report has two vocabularies.** A `[gap]`
+on a trunk with no queue is a to-do and exits 0 -- your merges are fine today. The identical gap with a
+queue **active** exits 1, because entries are already being stranded on your trunk or your merges are
+about to stop. Collapsing those two is how an honest report earns being ignored.
+
+**And a plugin install writes nothing into a repo**, which is the fact the whole feature turns on.
+Neither runner is plugin payload, so before this a consumer who flipped the setting got: an outage, or a
+trunk quietly collecting unfolded changelog entries, with `ship-pr` printing *"fold-on-merge.yml folds
+the entry off that push"* at the exact moment nothing was going to.
+
+**Score:** 4
+
+#### Pull Request
+
+The merge-queue policy travels with dkj-policy
+
+Plugins: dkj-policy
+
+[PR #1520](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1520)
+
+---
+
