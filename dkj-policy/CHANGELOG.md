@@ -40,7 +40,54 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 entries pending** -- 2 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 6 reach it. <!-- pending-tally -->
+**7 entries pending** -- 3 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 7 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1530-test-capture-decoration · 20260906-201920
+
+`verify-pushed-merges.tests.ps1` failed one assert on a tree byte-identical to `origin/main` while CI on
+`main` was green, and `open-pr.ps1` has no per-suite valve -- so on the affected checkout every branch
+was pushed with the whole test gate off, or not at all. The suite is repaired, and the cause was neither
+the fixture nor the script under test.
+
+Both suites captured their child with `& powershell ... 2>&1 | Out-String`. Under `2>&1` the parent
+re-renders the child's **first** stderr line as its own `NativeCommandError` and stamps the record
+decoration -- `At <path>:<line>`, the source echo, `CategoryInfo`, `FullyQualifiedErrorId` -- *into* that
+line at the cut. `Assert-Says` strips all whitespace, which repairs a **wrap**; it cannot repair
+**insertion**, and the docstring claiming otherwise is corrected here. The parent renders
+`<powershell.exe> : <full script path> : <message>` and cuts the whole of it at the console width, so the
+verdict is decided by the checkout's path length and the terminal width -- neither of which is a property
+of the code. Measured: green at this repo's 108-character script path, red at 45, same commit and same
+machine; the failing window at width 120 is 29 to 51 characters.
+
+Both suites now capture through `Invoke-NativeCapture -Utf8`, which starts the child with `Start-Process`
+and redirected streams, so the parent's formatter never touches the child's stderr. Each gained one assert
+that `NativeCommandError` is **absent** from the captured text: it can only appear there if a parent
+rendered the stderr as an error record, so its absence pins **which capture ran** at every width and path
+length -- where the phrase-only assert that was already there fails only where the cut happens to land
+inside its phrase, which is how this stayed green on CI.
+
+`verify-resolved-issues.tests.ps1` is changed without a failing assert to point at, deliberately: it is
+where the broken capture was copied from, and "it passes here today" is a fact about one checkout rather
+than a property of the file. The same reasoning put the lesson in Tycho's lens -- it existed only as a
+comment inside `shared-scripts.tests.ps1`, repaired in August 2026, and the suite written after that
+repair still copied the old capture from its sibling.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A. Both files are this repo's own test suites; neither is mirrored into a plugin, and no shipped script
+changes. A consumer sees nothing.
+
+**Score:** N/A
+
+#### Pull Request
+
+Test capture: a parent's error-record decoration splits asserted phrases
+
+[PR #1534](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1534)
+
+---
 
 ### DEPLOY: fix/1524-connector-localcheckout · 20260906-200252
 
