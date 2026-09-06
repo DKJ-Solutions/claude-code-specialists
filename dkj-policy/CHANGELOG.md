@@ -32,6 +32,38 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1511-verify-resolved-on-merge · 20260906-132443
+
+`ship-pr.ps1`'s step 6 -- the check that a merged PR really closed the issues its body declared, and the
+repair when a closing keyword missed -- ran from exactly one place: the shipping session, right after its
+own merge call returned. The merge queue took that call away, so on every queue-merged PR the step
+silently did not happen. `verify-resolved.yml` now runs it off the **push** instead, which is the one
+event that always sees a queue merge, and it repairs rather than only reporting.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The permission this needed is the interesting part, and the answer was to move the job rather than to
+argue for the scope. Closing an issue from CI means granting `issues: write`; the obvious home,
+`fold-on-merge.yml`, checks out with a fine-grained PAT that lives up to a year and that
+`actions/checkout` leaves in the workspace for every step -- so putting issue-write there would have
+paired a standing credential with it. A separate workflow gets the same repair from the default,
+hour-lived `GITHUB_TOKEN`, with `persist-credentials: false` because it never pushes. Widening the PAT
+would have been the other route to a repair and the worse one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Verify a queue-merged PR's declared issues on the merge itself
+
+Plugins: dkj-policy
+
+[PR #1513](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1513)
+
+---
+
 ### DEPLOY: docs/1505-fold-no-longer-ship-pr-only · 20260906-124614
 
 `CLAUDE.md` said the changelog fold runs from `ship-pr.ps1` only. It has not since September 6, 2026:
