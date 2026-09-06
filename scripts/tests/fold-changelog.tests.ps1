@@ -428,13 +428,21 @@ $rnRows = @([pscustomobject]@{ Tier = 1; Score = 4; Why = 'the real one' })
     ((Format-Development -Branch 'feat/reserved-names-v1' -Id '20260102-000000' `
         -Description 'The genuine pending change' -Type 'feat' -ImpactRows $rnRows) -join "`n") + "`n", $Utf8NoBom)
 
-$rRN = Invoke-Fold -Dir $dirRN
+# -Commit, not a dry run: the CI workflow issue #1493 adds runs this exact fold-all mode with
+# -Commit -Push, so proving the reserved files survive ON DISK is not the same proof as showing
+# they never entered the commit's own pathspec (Sebastian #23's pre-merge review of this branch).
+Initialize-FoldGitRepo -Dir $dirRN
+$rRN = Invoke-Fold -Dir $dirRN -ExtraArgs @('-Commit')
 Assert-True ($rRN.ExitCode -eq 0) 'reserved names: exits 0 -- CHANGELOG/README/CONTRIBUTING do not choke the pre-pass'
 $rnChangelogAfter = [System.IO.File]::ReadAllText((Join-Path $rnDir 'CHANGELOG.md'))
 Assert-True ($rnChangelogAfter -match 'The genuine pending change')        'reserved names: the real dossier still folds'
 Assert-True ($rnChangelogAfter -match 'Some already-folded change')        'reserved names: the pre-existing entry survives untouched'
 Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CHANGELOG.md'))     'reserved names: CHANGELOG.md itself survives -- not folded away as an entry'
 Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'README.md'))       'reserved names: README.md survives'
+$rnCommitFiles = @(Invoke-Git -Dir $dirRN -GitArgs @('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'))
+Assert-True ($rnCommitFiles -contains "$($rnPaths.Directory)/CHANGELOG.md") 'reserved names: -Commit -- CHANGELOG.md is in the commit (the real fold)'
+Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/README.md"))       'reserved names: -Commit -- README.md is NOT in the commit'
+Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/CONTRIBUTING.md")) 'reserved names: -Commit -- CONTRIBUTING.md is NOT in the commit'
 Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CONTRIBUTING.md')) 'reserved names: CONTRIBUTING.md survives'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $dirRN $rnPaths.File))) 'reserved names: the real dossier is removed after folding'
 
