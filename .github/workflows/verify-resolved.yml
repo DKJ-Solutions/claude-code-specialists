@@ -56,6 +56,12 @@
 # the earlier push carried, which is the silent skip this workflow exists to close. Two runs
 # overlapping is harmless -- the second finds every issue already closed and says so.
 #
+# IT COSTS A SECOND RUN PER SHIP, KNOWINGLY. fold-on-merge.yml pushes the fold commit as a PAT, and a
+# PAT push triggers workflows where the default GITHUB_TOKEN's would not -- so every shipped branch
+# starts this job twice: once on the merge, once on the fold. The second resolves no pull request from
+# the fold commit and exits green in seconds. Naming it rather than gating on the fold's commit message,
+# which would couple this file to a format it does not own for a saving of one short job.
+#
 # WINDOWS, like every other workflow that runs these scripts: they target Windows PowerShell 5.1, so
 # this runs under `shell: powershell` (5.1) rather than pwsh.
 name: Verify resolved issues
