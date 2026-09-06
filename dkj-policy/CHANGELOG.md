@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1499-fold-on-merge-ruleset-diagnosis · 20260906-105207
+
+A red `fold-on-merge` job now says which of its two unrelated causes fired. The workflow's header named
+`required_status_checks` as the one rule blocking its push to `main`; `main-ci-gate` has carried
+`merge_queue` alongside it since September 6, 2026, so a rejected push comes back naming two rules and a
+reader holding the old note starts hunting for a second cause. Both are named now, with the verbatim
+rejection from the run that measured them, plus the fact that matters most for reading a red run: the
+fold step failing is not evidence that the *fold* refused — in run 34020828593 the fold succeeded and the
+push was rejected underneath it. `.claude/specialists/lenses/05-15-extension.md` gains the same
+measurement as a dated row rather than a silent edit, because every other record in that lens names one
+rule and was correct when written.
+
+No change to the fold itself. [#1499](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1499)
+reported fold-all mode still misreading `CHANGELOG.md` after #1498, on three failed runs read as one
+symptom; two of them are pre-#1498 commits and the third folded cleanly before the ruleset refused its
+push. Reproduced both ways against the exact commits before concluding it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — the three files changed are this repo's own workflow, its system-administration lens and a local
+skill. None of them ships to a consumer, and the fold scripts that do ship are untouched.
+
+**Score:** N/A
+
+#### Pull Request
+
+the fold-on-merge diagnosis names both blocking rules, and #1499 is measured
+
+Resolves #1499
+
+[PR #1501](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1501)
+
+---
+
 ### DEPLOY: fix/1497-fold-all-reserved-names · 20260906-100407
 
 `fold-changelog-entry.ps1`'s fold-all mode (no `-Branch`) no longer mistakes `CHANGELOG.md`,
