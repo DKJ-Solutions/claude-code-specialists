@@ -1,6 +1,8 @@
 <#
 .SYNOPSIS
-    Ship the current branch in one command: open the PR -> wait for the CI check -> merge -> fold.
+    Ship the current branch in one command: open the PR -> wait for the CI check -> merge -> fold --
+    or, on a trunk behind a merge queue, open -> wait -> ENQUEUE, with the merge and the fold left to
+    the queue and to fold-on-merge.yml (issue #1506).
 
 .DESCRIPTION
     Orchestrates the whole PR chain that is otherwise run by hand
@@ -40,6 +42,11 @@
          push. Two gh reads decide it (the trunk's rules, then this account's bypass on the ruleset
          carrying them); it cannot be read off the merge, which the PR's own check satisfies. Asked in
          the same place and for the same reason, and an unreadable ruleset warns rather than refuses.
+         AND THE SAME PAYLOAD ANSWERS A SECOND QUESTION FOR FREE (issue #1506): whether the trunk is
+         behind a MERGE QUEUE. If it is, this run will not push the fold at all -- the queue merges the
+         PR and fold-on-merge.yml folds off that push (#1493) -- so the refusal above is skipped rather
+         than stopping every ship on a push it was never going to make. Read before Active: an
+         unreadable payload is not "no queue", and keeps the old behaviour on both questions.
       1. open-pr.ps1 [-SkipLint] [-SkipTests] [-MaxParallel <n>] -- runs the local lint + test gate,
          pushes, and opens the PR. If a gate fails, nothing is pushed and this stops here.
 
@@ -138,6 +145,17 @@
          Then: gh pr merge <pr> --<method>, from Get-PrMergeMethod ('merge' by default), with the
          merge commit's subject set to 'merge: <branch> (#NN)' so every line in the graph starts with
          a type. No --admin: the CI gate is never bypassed.
+
+         AND WITH A MERGE QUEUE ON THE TRUNK THAT CALL ENQUEUES RATHER THAN MERGES (issue #1506).
+         `gh pr merge --help`: "When targeting a branch that requires a merge queue ... the pull request
+         will be added to the merge queue." ADDED, exit 0, not merged -- and gh says so on stderr with
+         `! The merge strategy for main is set by the merge queue`, which is a NOTICE, not a failure.
+         Nothing had to change for that line: Invoke-NativeCapture judges $LASTEXITCODE and merges
+         stderr into the printed output, so the notice is shown and the exit code decides (#96/#107).
+         Whether a queue is there is read once at step 0b, off the payload that step already fetches.
+         When it is, this run ends HERE, at step 4: the PR is enqueued, and steps 5-7 belong to the
+         merge this session will never see. Step 3b (staleness) stays and becomes belt-and-braces --
+         the queue builds each entry against its real base by construction.
       5. Check out main, fast-forward, and hand the fold to fold-changelog-entry.ps1 -Push, which folds
          the entry AND makes the commit itself -- naming CHANGELOG.md and the entry file as the
          commit's pathspec.
@@ -440,8 +458,33 @@ try {
     $foldRulesJson = ''
 }
 
+# IS THE TRUNK BEHIND A MERGE QUEUE? (issue #1506) -- READ HERE, BECAUSE IT DECIDES WHO FOLDS.
+# It costs no extra gh call: the payload is the one step 0b just fetched. Under a queue `gh pr merge`
+# ENQUEUES and exits 0, GitHub merges the PR minutes later on a gh-readonly-queue/** branch, and the
+# push that merge produces is what runs fold-on-merge.yml (#1493). So this session never folds, and the
+# two questions below turn on that: step 0b must not refuse a fold this run will not push, and step 4
+# must read "not MERGED" as success rather than as the #1325 half-state.
+#
+# READABLE BEFORE ACTIVE, deliberately. An unreadable payload is not "no queue" -- collapsing the two
+# would send a run down the direct-merge path on a trunk that has one, which is exactly the fold-ahead-
+# of-its-own-merge state #1325 exists to prevent. Unreadable therefore keeps the OLD behaviour in full:
+# step 0b still asks its question and step 4 still refuses, which is the safe direction on both.
+$queueVerdict = Get-MergeQueueVerdict -BranchRulesJson $foldRulesJson
+$queueActive = ($queueVerdict.Readable -and $queueVerdict.Active)
+if ($queueActive) {
+    Write-Host "ship-pr: 'main' is behind a merge queue -- this run will ENQUEUE the PR, and the queue merges it." -ForegroundColor Cyan
+    Write-Host "  The fold is not this session's to push: fold-on-merge.yml folds off the queue's own push to main (#1493)." -ForegroundColor DarkGray
+}
+# AND UNDER A QUEUE THE FOLD-PUSH VERDICT IS NOT THIS RUN'S QUESTION (issue #1506). Step 0b asks whether
+# THIS ACCOUNT can push the fold; with a queue the pusher is the GitHub Actions app running
+# fold-on-merge.yml, whose entitlement is a different actor's and cannot be read from `gh api user`.
+# Refusing here on this account's bypass would stop a ship that was never going to make that push --
+# and it would refuse EVERY ship, since a merge_queue rule blocks direct pushes by definition. The
+# verdict is still computed rather than skipped, so it stays a pure function of the payload and the
+# tests below can read it either way; only its two consequences are gated.
+
 $foldVerdict = Get-FoldPushVerdict -BranchRulesJson $foldRulesJson -BypassByRulesetId $foldBypass -NameByRulesetId $foldNames
-if ($foldVerdict.Blocked) {
+if (-not $queueActive -and $foldVerdict.Blocked) {
     # WHOSE ACCOUNT, said out loud. The verdict knows only "this account", and the whole repair is that
     # a run from the wrong account stops here -- so naming it is what turns the refusal into an action.
     # Best-effort, like every diagnostic on a refusal path: a read that fails costs the name, not the
@@ -471,7 +514,7 @@ Two remedies, and this script takes neither:
 "@
     exit 1
 }
-if ($foldVerdict.Unknown) {
+if (-not $queueActive -and $foldVerdict.Unknown) {
     Write-Warning "could not decide whether the fold can be pushed to 'main' -- $($foldVerdict.Reason)"
 }
 
@@ -1425,8 +1468,52 @@ for ($mergeReadAttempt = 1; $mergeReadAttempt -le 3; $mergeReadAttempt++) {
     } catch {
         $mergedState = ''
     }
-    if ($mergedState -eq 'MERGED' -or $mergeReadAttempt -eq 3) { break }
+    # AND UNDER A QUEUE THERE IS NOTHING TO WAIT FOR (issue #1506). The retry's own reason, one comment
+    # up, is PROPAGATION: with no queue the merge is synchronous and the two further attempts absorb a
+    # lagging read. With a queue the expected state is not-MERGED and stays that way for minutes, so the
+    # spin buys nothing and costs 10 seconds on every ship this repo makes. One read, then out.
+    if ($mergedState -eq 'MERGED' -or $queueActive -or $mergeReadAttempt -eq 3) { break }
     Start-Sleep -Seconds 5
+}
+# UNDER A QUEUE THIS SESSION NEVER FOLDS -- WHATEVER THE STATE READS (issue #1506). The three outcomes
+# of the read above collapse to one answer here, and that is deliberate:
+#
+#   - 'OPEN'  -- the ordinary case. gh enqueued the PR and exited 0; GitHub merges it minutes later on a
+#     gh-readonly-queue/** branch, in a process this session never observes.
+#   - 'MERGED' -- the queue was empty and fast enough to land it before the read. The merge still arrived
+#     as a push to main, so fold-on-merge.yml has already been triggered by it. Folding here as well
+#     would put two runs on the same entry seconds apart, for no gain.
+#   - UNREADABLE -- and this is the one that decides the shape. Not folding is recoverable: the entry
+#     stays on the trunk and check-unfolded-entry.ps1 reports it, from a CI push check and from a
+#     SessionStart hook in every consumer (#1270). Folding a PR that has not landed is not: it writes
+#     the changelog entry onto the trunk ahead of the merge it describes, out of order, with nothing in
+#     the run saying so (#1325). So an unreadable state takes the same exit as the other two rather than
+#     falling through to step 5 on a guess.
+#
+# THE #1325 REFUSAL BELOW IS THEREFORE NOT RETIRED, ONLY NARROWED. It still fires on the case it was
+# built for -- a non-MERGED state with NO queue read on the trunk -- which is the state that has no
+# explanation and must not fold. What changed is that the explained case now has a name.
+if ($queueActive) {
+    $how = if ($mergedState -eq 'MERGED') {
+        "already MERGED -- the queue was empty and landed it immediately"
+    } elseif ($mergedState) {
+        "ENQUEUED (state reads '$mergedState')"
+    } else {
+        "ENQUEUED -- its state could not be read back, which changes nothing here"
+    }
+    Write-Host "ship-pr: PR #$pr $how." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Done: PR #$pr shipped -- opened, CI green, handed to the merge queue on 'main'." -ForegroundColor Green
+    Write-Host "  The queue merges it against its real base and pushes that merge to 'main'." -ForegroundColor DarkGray
+    Write-Host "  fold-on-merge.yml folds the entry off that push (#1493) -- not this session (#1506)." -ForegroundColor DarkGray
+    Write-Host "  Watch it land:  gh pr view $pr --repo $repo" -ForegroundColor DarkGray
+    # STEP 6 IS THE ONE THING THAT HAS NO OTHER HOME, so it is named rather than silently dropped.
+    # GitHub honours the body's closing keywords on the queue's merge exactly as on any other, so the
+    # issues do close; what is lost is the VERIFICATION that they did, plus its repair when a keyword
+    # missed. That check is its own script and runs standalone against a merged PR.
+    Write-Host "  Not run here (the PR has not merged yet) -- once it has, verify what it declared it closes:" -ForegroundColor DarkGray
+    Write-Host "    scripts\release\verify-resolved-issues.ps1 -Pr $pr" -ForegroundColor DarkGray
+    exit 0
 }
 if (-not $mergedState) {
     Write-Host "  Merge state: PR #$pr's state could not be read -- not checked (this is not a finding)." -ForegroundColor DarkGray
@@ -1437,8 +1524,13 @@ gh pr merge returned 0 but PR #$pr reads '$mergedState', not 'MERGED' -- NOT fol
 The likeliest cause is a merge queue on 'main': gh enqueues the PR and exits 0, and the merge lands
 minutes later. Folding now would put the changelog entry on the trunk ahead of the merge it describes.
 
-Let the queue land the merge, then re-run ship-pr: step 2 finds the merged PR and step 5 folds against a
-trunk that actually carries it. Nothing here needs undoing -- the PR is queued, not lost.
+No merge_queue rule was read on 'main' here, though -- so either the trunk's rules could not be read
+this run, or something other than a queue is holding the merge. If it IS a queue, ship-pr handles it
+without this refusal once the rules read (issue #1506); check with:
+  gh api repos/$repo/rules/branches/main --jq '[.[].type]'
+
+Let the merge land, then re-run ship-pr: step 2 finds the merged PR and step 5 folds against a trunk
+that actually carries it. Nothing here needs undoing -- the PR is queued, not lost.
 "@
     exit 1
 }

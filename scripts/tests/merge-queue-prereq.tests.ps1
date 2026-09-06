@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Regression tests for the two merge-queue prerequisites (issue #1325).
+    Regression tests for the merge queue on 'main': the two prerequisites that had to be true before it
+    could be switched on (issue #1325), and the enqueue path ship-pr takes now that it is (issue #1506).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Reads the workflow and the script as text and
@@ -15,11 +16,20 @@
     outside a queue). Enabling one is a repo-settings change and Dave's. What is NOT his, and what this
     suite guards, is the two things that must already be true in the tree before that switch is flipped.
 
-    THE DECISION WAS SETTLED ON SEPTEMBER 3, 2026 AND THE ANSWER IS NO (#1355) -- AND THIS SUITE STAYS.
-    A no priced against a 12.3%/~5min problem is not a never, and the reopen condition is written into
-    Sylvester's lens beside the decision. Neither guard is dead code in the meantime: guard 2 is right
-    with no queue anywhere -- "merged" had been an inference from an exit code, on the one script that
-    writes to the trunk -- and guard 1 costs nothing while inert. Do not remove either as unused.
+    THE ANSWER WAS NO ON SEPTEMBER 3, 2026 (#1355) AND YES ON SEPTEMBER 6 (#1492) -- THE QUEUE IS LIVE.
+    That "no" was priced against a 12.3%/~5min problem and was never a never; the reopen condition in
+    Sylvester's lens is what it was reopened on. So the two guards below have stopped being insurance
+    against a switch nobody had flipped and are now load-bearing on every merge this repo makes: guard 1
+    is the difference between a queue entry being certified and a TOTAL MERGE OUTAGE, and guard 2 is what
+    kept an ordinary ship from folding a PR the queue had not landed yet. Do not remove either as unused.
+
+    AND THE THIRD SECTION IS WHAT THAT "YES" COST. Guard 2 made a non-MERGED state a REFUSAL, which is
+    right with no queue and wrong with one -- the enqueue IS the outcome now. #1506 narrowed it to the
+    case that has no explanation and gave the explained case an arm of its own, which is what the
+    "#1506" sections pin: ship-pr ends successfully at step 4 with the PR enqueued, folds nothing, and
+    fold-on-merge.yml folds off the queue's own push to the trunk (#1493). The fourth section is that
+    workflow's push credential, which belongs here because a fold that commits and cannot push is the
+    same merged-but-unfolded state the guards exist to prevent, reached by a third route.
 
     BOTH FAIL SILENTLY AND BOTH FAIL BADLY, which is why they are pinned rather than commented:
 
@@ -119,6 +129,94 @@ Assert-True ($foldIdx -gt 0 -and $stateIdx -lt $foldIdx) 'and before step 5, whi
 # assert is the one that stops a later "tighten the gate" sweep from inverting it.
 Assert-True ($ship -match 'not checked \(this is not a finding\)[^\r\n]*"\s*-ForegroundColor DarkGray') `
     'an unreadable state does NOT refuse -- only a state read as non-MERGED does'
+
+Write-Host "== the queue is now the intended path, not a refusal (#1506) ==" -ForegroundColor Cyan
+
+# THE SHIFT THIS SUITE HAS TO RECORD. Guard 2 above was built when a queue did not exist here: it made
+# `gh pr merge` returning 0 on an unmerged PR a REFUSAL, so a queue could not be switched on without
+# every ship stopping at step 4. With the queue live on main-ci-gate (#1492), the enqueue is the normal
+# outcome and the refusal belongs only to the case that has no explanation. Both asserts below are
+# about that narrowing, and both would go green again if somebody widened the refusal back.
+$queueRead = [regex]::Match($ship, 'Get-MergeQueueVerdict -BranchRulesJson')
+Assert-True ($queueRead.Success) 'ship-pr asks whether the trunk is behind a merge queue (#1506)'
+
+# READ OFF THE PAYLOAD STEP 0b ALREADY FETCHED, which is what makes it free. An implementation that
+# made its own gh call would pass the assert above and cost a network round trip on every ship.
+Assert-True ($ship -match '(?s)rules/branches/main.*Get-MergeQueueVerdict') `
+    'and reads it off the trunk-rules payload step 0b already fetched, rather than making a second call'
+
+# BEFORE THE MERGE, because both consequences are decisions made before `gh pr merge` runs: whether to
+# refuse on this account's fold-push entitlement, and how to read the state afterwards.
+$idxQueue = $ship.IndexOf('Get-MergeQueueVerdict -BranchRulesJson')
+$idxMerge = $ship.IndexOf("'pr', 'merge'")
+$idxStep5 = $ship.IndexOf('--- Step 5:')
+Assert-True ($idxQueue -gt 0 -and $idxMerge -gt $idxQueue) 'and asks BEFORE the merge, which is what the answer decides'
+
+# THE ENQUEUE ARM ITSELF: it ends the run, and it ends it SUCCESSFULLY. `exit 0` is the whole assert --
+# an arm that fell through would fold a PR that has not landed, which is the #1325 state this file's
+# guard 2 exists to prevent, and an arm that exited non-zero would make every ordinary ship red.
+# TAKEN FROM AFTER THE MERGE, NOT FROM THE TOP OF THE FILE. $queueActive is read TWICE by design -- once
+# at step 0b, where it skips the fold-push refusal, and once here, where it ends the run -- so a match
+# anchored at the top of the script finds the step-0b arm and asserts the wrong block. Slicing at the
+# merge call is what names WHICH arm this section is about, without tying the assert to a variable name.
+$enqueueArm = [regex]::Match($ship.Substring($idxMerge), '(?s)if \(\$queueActive\) \{.*?\r?\n\}')
+Assert-True ($enqueueArm.Success) 'ship-pr has an arm for the queue being active'
+Assert-True ($enqueueArm.Success -and $enqueueArm.Value -match '(?m)^\s*exit 0\s*$') `
+    'and it ENDS THE RUN SUCCESSFULLY -- enqueued is a shipped branch, not a failure'
+Assert-True ($idxStep5 -gt 0 -and $ship.IndexOf('if ($queueActive) {', $idxMerge) -lt $idxStep5) `
+    'and that arm sits between the merge and step 5, so nothing folds a PR the queue has not landed'
+
+# NOT FOLDING IS THE POINT, so the arm has to say who does. Without this the operator is left with a
+# green run, an unfolded entry on the trunk and no idea that either is expected.
+Assert-True ($enqueueArm.Success -and $enqueueArm.Value -like '*fold-on-merge*') `
+    'and it names fold-on-merge.yml as what folds instead (#1493)'
+Assert-True ($enqueueArm.Success -and $enqueueArm.Value -like '*verify-resolved-issues*') `
+    'and names step 6, the one thing that has no other home, rather than dropping it silently'
+
+# UNREADABLE IS NOT "NO QUEUE" -- the property the whole narrowing rests on. $queueActive must require
+# BOTH fields; a `$queueVerdict.Active` alone would send a run down the direct-merge path on a trunk
+# whose rules simply could not be read this time.
+Assert-True ($ship -match '\$queueActive = \(\$queueVerdict\.Readable -and \$queueVerdict\.Active\)') `
+    'the queue is only "active" when the payload was actually READ -- an unreadable one keeps the old behaviour'
+
+# AND THE FOLD-PUSH REFUSAL (#1278) IS GATED ON IT. Under a queue a merge_queue rule blocks every direct
+# push by definition, so an ungated step 0b would refuse EVERY ship on a push this run never makes.
+Assert-True ($ship -match 'if \(-not \$queueActive -and \$foldVerdict\.Blocked\)') `
+    'the #1278 fold-push refusal is skipped under a queue -- the fold is not this session s push to make'
+Assert-True ($ship -match 'if \(-not \$queueActive -and \$foldVerdict\.Unknown\)') `
+    'and so is its warning, for the same reason'
+
+Write-Host "== fold-on-merge.yml can actually push what it folds (#1506) ==" -ForegroundColor Cyan
+
+# WHY THIS SECTION IS IN THIS SUITE. Handing the fold to CI is what makes the enqueue above safe, and a
+# fold that commits and cannot push is the same merged-but-unfolded state by a third route. Measured
+# 2026-09-06: the GitHub Actions app CANNOT be a main-ci-gate bypass actor (422, "must be part of the
+# ruleset source or owner organization"), so the pushing actor has to be a person's token.
+$foldWf = Join-Path $repoRoot '.github\workflows\fold-on-merge.yml'
+Assert-True (Test-Path -LiteralPath $foldWf) 'fold-on-merge.yml is still where the fold runs from'
+if (Test-Path -LiteralPath $foldWf) {
+    $fom = Get-Content -LiteralPath $foldWf -Raw
+
+    # THE CHECKOUT TOKEN IS THE PUSH CREDENTIAL. actions/checkout persists whatever it authenticated
+    # with, and the fold's `git push` reuses it -- so this line, not the permissions block, decides
+    # which actor GitHub judges against the ruleset.
+    Assert-True ($fom -match '(?s)uses: actions/checkout@v\d+\s*\r?\n\s*with:\s*\r?\n\s*token:[^\r\n]*FOLD_PUSH_TOKEN') `
+        'checkout authenticates with FOLD_PUSH_TOKEN, which is what the fold s push then reuses'
+    Assert-True ($fom -match 'GH_TOKEN:[^\r\n]*FOLD_PUSH_TOKEN') `
+        'and the fold step reads with the same token, so it cannot read as one actor and push as another'
+
+    # DEGRADE LOUDLY, NOT SILENTLY. An unset secret is the empty string and checkout falls back to
+    # GITHUB_TOKEN on its own -- which puts the run back in the measured GH013 rejection with nothing
+    # saying why. This is the one sentence that rejection cannot carry.
+    Assert-True ($fom -like '*HAS_FOLD_TOKEN*') 'the job reads whether the fold token is present at all'
+    Assert-True ($fom -match '::warning::[^\r\n]*FOLD_PUSH_TOKEN is not set') `
+        'and says so BEFORE it folds, rather than leaving a GH013 to be misread as a ruleset problem'
+
+    # The correction has to travel with the wiring: the paragraph that promised the Actions-app bypass
+    # was a plan, not a measurement, and a later reader must not act on it again.
+    Assert-True ($fom -like '*422*') 'the header records the measured refusal rather than the plan that failed'
+    Assert-True ($fom -like '*#1506*') 'and cites the issue, so an inert-looking line is not swept as dead config'
+}
 
 Write-Host "== the plugin mirror carries the same script ==" -ForegroundColor Cyan
 

@@ -1563,6 +1563,60 @@ Assert-True ($shipText -like '*orgs/$($rec.Source)/rulesets/*') 'an Organization
 Assert-True ($shipText -like '*this is the cheap place to stop*') 'the refusal says nothing was merged, which is the fact the reader needs first'
 
 
+# --- Get-MergeQueueVerdict: is the trunk behind a merge queue? (issue #1506) ----------------------
+# WHY THIS BLOCK EXISTS. Under a queue `gh pr merge` ENQUEUES and exits 0; GitHub merges the PR
+# minutes later on a gh-readonly-queue/** branch, in a process the shipping session never observes.
+# Folding on that exit code writes the changelog entry onto the trunk ahead of the merge it describes
+# (#1325), so ship-pr has to know which of the two worlds it is in BEFORE it decides to fold.
+#
+# THE PAYLOAD IS THE ONE STEP 0b ALREADY FETCHED, which is why this is a separate reader over the same
+# JSON rather than a second gh call -- and why the assert below feeds it the live shape verbatim.
+Write-Host ""
+Write-Host "Get-MergeQueueVerdict -- the trunk behind a queue (#1506)" -ForegroundColor Cyan
+
+# The live shape, transcribed from `gh api repos/DKJ-Solutions/claude-code-specialists/rules/branches/main`
+# on September 6, 2026, the day the queue went live on main-ci-gate. Trimmed to the type/ruleset_id
+# pairs this function reads; the parameters blocks are Get-DirectPushBlockingRules's business.
+$rulesQueued = '[{"type":"deletion","ruleset_id":19008062},{"type":"non_fast_forward","ruleset_id":19008062},{"type":"required_status_checks","ruleset_id":19008062,"parameters":{"required_status_checks":[{"context":"lint-en-tests"}]}},{"type":"merge_queue","ruleset_id":19008062,"parameters":{"merge_method":"MERGE"}}]'
+
+$q = Get-MergeQueueVerdict -BranchRulesJson $rulesQueued
+Assert-True $q.Readable 'the live trunk payload is readable'
+Assert-True $q.Active 'and a merge_queue rule in it reads as an active queue'
+
+# The same trunk WITHOUT the queue rule -- this repo's own shape until September 6, 2026. Readable and
+# not active is the answer that sends ship-pr down the direct-merge path, so it must be distinguishable
+# from the unreadable case below by more than the Active flag alone.
+$rulesNoQueue = '[{"type":"deletion","ruleset_id":19008062},{"type":"required_status_checks","ruleset_id":19008062}]'
+$nq = Get-MergeQueueVerdict -BranchRulesJson $rulesNoQueue
+Assert-True $nq.Readable 'a trunk with rules but no merge_queue is still readable'
+Assert-True (-not $nq.Active) 'and reads as no queue'
+
+# A trunk with NO rules at all -- the ordinary consumer. An empty JSON array parses to $null in 5.1,
+# which is the legitimate "no rules" answer and must not be mistaken for unparseable.
+$empty = Get-MergeQueueVerdict -BranchRulesJson '[]'
+Assert-True $empty.Readable 'an empty rule list is readable, not unreadable -- 5.1 parses [] to $null'
+Assert-True (-not $empty.Active) 'and reads as no queue'
+
+# UNREADABLE IS NOT "NO QUEUE", and this pair is the assert that stops a later simplification from
+# collapsing them. Both return Active = $false; only Readable tells the caller whether that $false was
+# an answer or a shrug, and ship-pr keeps its OLD behaviour on a shrug.
+Assert-True (-not (Get-MergeQueueVerdict -BranchRulesJson '').Readable) 'an empty payload is unreadable'
+Assert-True (-not (Get-MergeQueueVerdict -BranchRulesJson 'not json').Readable) 'and so is an unparseable one'
+Assert-True (-not (Get-MergeQueueVerdict -BranchRulesJson 'not json').Active) 'and an unreadable payload never claims a queue'
+
+# The type is matched case- and whitespace-insensitively, like every other type read in this file.
+Assert-True (Get-MergeQueueVerdict -BranchRulesJson '[{"type":" Merge_Queue "}]').Active `
+    'the rule type is normalised before it is compared, as the sibling readers do'
+
+# AND THE OMISSION IN Get-DirectPushBlockingRules IS DELIBERATE, so it is pinned rather than left to be
+# "fixed" by a later sweep. A merge_queue rule DOES block a direct push -- both refusals appeared in the
+# GH013 text of the fold-on-merge run carrying the #1504 merge -- but a caller reads this verdict first
+# and never reaches the fold-push question, so listing the type there too would add an unreachable
+# branch and a second answer to one question.
+$mqOnly = Get-DirectPushBlockingRules -BranchRulesJson '[{"type":"merge_queue","ruleset_id":19008062}]'
+Assert-True $mqOnly.Readable 'a merge_queue-only payload is readable'
+Assert-Equal 0 $mqOnly.Blocking.Count 'and merge_queue is NOT a fold-push blocker -- Get-MergeQueueVerdict owns that question (#1506)'
+
 # --- Get-RequiredCheckRunIds: which Actions run sits behind a named check? (issue #1292 re-anchor) ---
 # THE RE-ANCHOR: the retired Get-CertifyingRunTimestamp read a check's own startedAt directly out of
 # the checks payload -- a red-team caught that startedAt under-refuses (it can only be LATER than the

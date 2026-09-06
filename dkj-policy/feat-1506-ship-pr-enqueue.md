@@ -35,21 +35,92 @@
 
 With a merge queue active on main-ci-gate, ship-pr's merge step reaches the queue: gh pr merge enqueues and exits 0 without merging. Make that the intended path rather than a refusal, hand the fold to fold-on-merge.yml, and pin the behaviour in tests.
 
+#### The blocker was real, and it was answered by a decision rather than by code
+
+#1506 was filed blocked on #1505 -- "the fold must have a session-independent home before this
+lands". #1505 has since closed, but on documentation only: `fold-on-merge.yml` is code-complete and
+still cannot push. Measured in run `34024187136` (2026-09-06 09:16), the push carrying the #1504
+merge -- the fold SUCCEEDS and the push is rejected, naming both of main-ci-gate's blocking rules.
+
+The remedy that file recorded turns out not to exist. Adding the GitHub Actions app (integration_id
+15368, confirmed against `gh api apps/github-actions`) to the ruleset's bypass list answers `422 --
+Actor GitHub Actions integration must be part of the ruleset source or owner organization`; an
+Integration bypass actor must be an app installed on the org, and `gh api
+orgs/DKJ-Solutions/installations` lists only `claude`. Bypass is by ACTOR, and both bypassing actors
+are people -- so the pusher has to be a person's token. Dave's decision, 2026-09-06: a fine-grained
+PAT held as `FOLD_PUSH_TOKEN`, minted by him, since a credential is never created by the thing that
+consumes it. This branch does the wiring; the secret is his to set.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `Get-MergeQueueVerdict` in `scripts/lib/pr-issues-lib.ps1` -- reads a `merge_queue` rule off the
+      trunk-rules payload step 0b already fetches, so the answer costs no extra `gh` call. Returns
+      Readable and Active separately: an unreadable payload is NOT "no queue", and collapsing the two
+      would send a run down the direct-merge path on a trunk that has one.
+- [x] `Get-DirectPushBlockingRules` keeps NOT listing `merge_queue`, and now says why. It does block a
+      direct push -- both refusals appear in the measured GH013 text -- but a caller reads the queue
+      verdict first and never reaches the fold-push question, so listing it there would add a branch no
+      caller can reach.
+- [x] `ship-pr.ps1` step 0b: the #1278 fold-push refusal is skipped under a queue. Ungated it would
+      refuse EVERY ship, since a `merge_queue` rule blocks direct pushes by definition -- on a push
+      this run was never going to make.
+- [x] `ship-pr.ps1` step 4: the enqueue is now an arm of its own that ends the run at `exit 0`. All
+      three readback outcomes collapse into it -- OPEN, MERGED and UNREADABLE -- because not folding is
+      recoverable (`check-unfolded-entry.ps1` reports it) and folding a PR that has not landed is not.
+- [x] The #1325 refusal is narrowed, not retired: it still fires on a non-MERGED state with no queue
+      read on the trunk, and now names the command that tells the reader which case they are in.
+- [x] `gh`'s `! The merge strategy for main is set by the merge queue` needed NO code change, and that
+      was verified rather than assumed: `Invoke-NativeCapture` judges `$LASTEXITCODE` and merges stderr
+      into the printed output (#96/#107), so the notice is shown and the exit code decides. Recorded in
+      the step-4 header and pinned below.
+- [x] `.github/workflows/fold-on-merge.yml`: `actions/checkout` authenticates with `FOLD_PUSH_TOKEN`
+      -- the token it persists is the credential the fold's own `git push` reuses, so that line and not
+      the permissions block decides which actor GitHub judges. Same token for the fold step's
+      `gh pr list`, so a run cannot read as one actor and push as another.
+- [x] And it degrades loudly: an unset secret is the empty string and checkout falls back to
+      `GITHUB_TOKEN` silently, which puts the run back in the measured rejection with nothing saying
+      why. A `::warning::` says which of the two is happening BEFORE the fold, since the GH013 text
+      cannot tell them apart. It does not refuse -- the fold still commits and still fails its push on
+      its own terms.
+- [x] The header paragraph promising the Actions-app bypass is replaced by the measurement that refutes
+      it. It was a plan asserted as settled fact, which is the class this repo repairs rather than
+      works around.
 
 ### TEST
 
+- [x] `merge-queue-prereq.tests.ps1`: 14 asserts -> 32. The four new #1506 asserts on the enqueue arm
+      are anchored AFTER the merge call, because `$queueActive` is read twice by design and a match from
+      the top of the file finds the step-0b arm and pins the wrong block.
+- [x] `pr-issues.tests.ps1`: 12 new asserts on `Get-MergeQueueVerdict`, fed the live payload transcribed
+      from `rules/branches/main` on the day the queue went live -- plus the pair that stops a later
+      simplification from collapsing Readable into Active, and one pinning the deliberate omission in
+      `Get-DirectPushBlockingRules`.
+- [x] That suite's own header described a decision that has since been reversed ("THE ANSWER IS NO,
+      September 3") and now records both halves. Its two guards have stopped being insurance against a
+      switch nobody had flipped and are load-bearing on every merge.
+- [x] Full local gate green: `check-plugin-integrity.ps1` 0 errors, every suite in `scripts/tests/`.
+- [x] Plugin mirrors rebuilt via `build-shared-scripts.ps1` -- consumers get this by plugin update, and
+      a repo-settings change never reaches them at all.
+
 ### DEPLOY: feat/1506-ship-pr-enqueue
 
-**Score:**
+`ship-pr.ps1` no longer treats a merge queue as a failure. On a trunk behind one it opens the PR, waits
+for CI, ENQUEUES, and ends successfully at step 4 -- the queue merges the PR against its real base and
+`fold-on-merge.yml` folds off that push. On a trunk without one nothing changes: the same merge, the
+same fold, and the same #1325 refusal for a state that has no explanation.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+The change is small; what took the work was refusing to build on the reason the tree already carried.
+`fold-on-merge.yml` stated as settled fact that adding the GitHub Actions app to the ruleset would make
+it live. Applying that produced a 422, and the route does not exist -- so this branch corrects the
+record with the refusal text and wires the one credential that can work instead. A repair built on the
+unverified half would have satisfied the issue and been wrong, with a citation.
+
+**Score:** 2
 
 #### Pull Request
 
 ship-pr enqueues via the merge queue instead of direct-merging
-
