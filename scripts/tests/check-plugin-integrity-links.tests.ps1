@@ -1097,7 +1097,21 @@ try {
     # set is an input to every scenario below, so it is reported like one.
     Write-Host "  [derived] docDir=$mirrorDocDir pairs=$($mirrorAllPairs.Count) matched=$($mirrorExpected.Count)" -ForegroundColor DarkGray
     if ($mirrorExpected.Count -eq 0 -and $mirrorAllPairs.Count -gt 0) {
-        Write-Host "  [derived] sample MirrorPath=$($mirrorAllPairs[0].MirrorPath)" -ForegroundColor DarkGray
+      # Diagnostics only, and they must never be the reason a run dies: this branch exists precisely
+      # when something is already not as expected, which is the worst moment to throw a second error
+      # over the first one.
+      try {
+        foreach ($r in @(Get-RepoPluginRoots -RepoRoot $Fixture)) {
+            Write-Host "  [derived] root name=$($r.Name) rel=$($r.RelativeRoot) root=$($r.Root)" -ForegroundColor DarkGray
+        }
+        foreach ($p in @($mirrorAllPairs | Where-Object { $_.Plugin -eq 'team-alpha' })) {
+            Write-Host "  [derived] team-alpha pair=$($p.Name) MirrorPath=$($p.MirrorPath)" -ForegroundColor DarkGray
+        }
+        Write-Host "  [derived] plugins on disk: $((Get-ChildItem -Path (Join-Path $Fixture 'plugins') -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName '.claude-plugin\plugin.json') } | ForEach-Object { $_.FullName.Substring($Fixture.Length) }) -join ' | ')" -ForegroundColor DarkGray
+        Write-Host "  [derived] pairs by plugin: $((($mirrorAllPairs | Group-Object Plugin | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ' | '))" -ForegroundColor DarkGray
+      } catch {
+        Write-Host "  [derived] diagnostics threw: $($_.Exception.Message)" -ForegroundColor DarkGray
+      }
     }
 
     function New-MirrorTable {
