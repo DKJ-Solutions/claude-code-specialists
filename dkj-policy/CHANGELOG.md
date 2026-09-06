@@ -40,6 +40,54 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
+**2 entries pending** -- 0 at tier 0, 2 at tier 2. Tier 2 is this repo's audience: 2 of 2 reach it. <!-- pending-tally -->
+
+### DEPLOY: feat/1515-pending-entry-count · 20260906-151510
+
+`CHANGELOG.md` could not say how much was waiting for the next release without somebody counting the
+entries by hand. It now carries one machine-written line directly under `## [Unreleased]`: how many
+entries are pending, how they split by tier, and how many of them reach the audience tier the repo
+publishes to -- which is the number that decides whether there is a release here at all or only a
+patch. The fold rewrites it after every merge and the release cut rewrites it on the emptied
+document.
+
+It holds no state. The line is recounted from the entries in the document about to be written, using
+the same reader the cut uses and the same disjoint highest-tier grouping, so the tally cannot
+disagree with what the release is about to do -- and an entry edited in or out by hand is corrected
+by the next fold rather than left to rot. It deliberately does not name the bump the pending work
+earns: that rule lives in `Test-ReleaseBumpEarned`, in a lib the fold does not load, and a second
+copy of a release gate's arithmetic inside the document that gate reads is the shape this repo keeps
+getting bitten by.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consuming repo gets this through the plugin, and gets it without doing anything: no heading to
+add, no configuration to answer. The tally anchors on the pending heading where a repo has one and on
+the first entry where it does not -- which is the shape `adopt-workflow-folder.ps1` scaffolds, so the
+repos most likely to have been missed are the ones explicitly covered. Every word of the line is
+overridable through `Get-ChangelogPendingSummaryOverrides`, so a changelog kept in another language
+stays in it, and the count reads correctly whether a repo answered tier 1 or tier 2 as its audience.
+
+The one thing a consumer could lose is a note of their own in that space, and that is what the line's
+trailing HTML comment prevents: only a line carrying that marker is ever replaced, and a marker
+quoted in their intro -- in a fence or in inline backticks -- is read as a quotation rather than as
+the line itself. That second guard is the one a fence check cannot give, and the intro is exactly
+where somebody will write it.
+
+**Score:** 3
+
+#### Pull Request
+
+Count the pending entries under [Unreleased] in the changelog
+
+Plugins: dkj-policy
+
+[PR #1519](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1519)
+
+---
+
 ### DEPLOY: feat/1516-consumer-merge-queue · 20260906-150722
 
 The merge queue became this workflow's policy for every repo that runs it, and the only thing that
