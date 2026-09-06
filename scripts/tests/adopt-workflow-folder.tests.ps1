@@ -22,8 +22,9 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\adopt-workflow-folder.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-workflow-folder-test-fixture-$PID"
 
-# Dot-sourced for ONE constant: Get-EntryHeadingLevel, which the scaffolded CHANGELOG intro is asserted
-# against rather than against a literal '###' (inbound #1098). The lib is pure and loads no state.
+# Dot-sourced for the constants the scaffolded CHANGELOG is asserted against rather than against literals
+# (inbound #1098, issue #1518): Get-EntryHeadingLevel, Get-ChangelogUnreleasedHeading, and the shared
+# pre-flat guard the fold and the cut both read the document with. The lib is pure and loads no state.
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
 
 $script:pass = 0
@@ -188,6 +189,31 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $entryHashes = '#' * (Get-EntryHeadingLevel)
     Assert-Match ('one `' + $entryHashes + '` per change') $clText '-Apply: the changelog intro states the heading level the fold writes'
     Assert-True ($clText -notmatch 'one `#{1,2}` per change') '-Apply: and no longer states a shallower one'
+
+    # AND IT CARRIES THE PENDING HEADING (issue #1518). It did not until September 6, 2026: the intro was
+    # followed straight by the entries, the pre-August-26 flat shape, while entry-scaffold-lib called this
+    # heading "the heading every un-cut entry sits under" and DEVELOPMENT-portable.md -- which travels to
+    # every consumer -- tells them to grep '[Unreleased]' for what a behaviour used to be. In a repo
+    # scaffolded here that grep matched nothing. Nothing broke, which is why it survived: both shapes fold
+    # and cut correctly, so no gate had anything to say and only a reader following the portable page found
+    # out.
+    #
+    # ASSERTED AGAINST Get-ChangelogUnreleasedHeading, for the same reason the level above is: a repo that
+    # translated the label or repointed the entry level must get ITS heading, and a literal would pass while
+    # the sentence went stale again.
+    $unreleased = Get-ChangelogUnreleasedHeading
+    Assert-Match ([regex]::Escape($unreleased)) $clText '-Apply: the scaffolded changelog carries the pending heading'
+    Assert-Match ('sits under `' + [regex]::Escape($unreleased) + '`') $clText '-Apply: and the intro sentence points the reader at it'
+
+    # IT IS THE LAST LINE, AND THAT IS THE PLACEMENT RULE RATHER THAN TIDINESS. The first fold into an
+    # entry-less document appends at the END of the content (fold-changelog-entry's $listStart fallback), so
+    # a heading written anywhere above the intro's closing prose would collect its entries ABOVE itself --
+    # the exact mis-placement Get-PreFlatChangelogRefusal exists to refuse, arriving from the scaffold.
+    Assert-Equal $unreleased ($clText.TrimEnd() -split "`r?`n")[-1] '-Apply: the pending heading is the last line, so the first fold lands beneath it'
+
+    # AND THE WHOLE DOCUMENT PASSES THE PRE-FLAT GUARD, which is the one check that reads this shape the way
+    # the fold and the cut do. A second pending heading, or a stray at that level, is a finding here.
+    Assert-Equal '' (Get-PreFlatChangelogRefusal -Content $clText -Consequence 'x') '-Apply: and the scaffolded document is not pre-flat to the shared guard'
 
     # And the closing block names the two seams only this repo can answer.
     Assert-Match 'Get-ReleaseNoteRoot' $r2.Out '-Apply: the next-steps block names Get-ReleaseNoteRoot'
