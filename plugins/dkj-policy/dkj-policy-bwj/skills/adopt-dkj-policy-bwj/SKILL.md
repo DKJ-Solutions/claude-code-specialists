@@ -1,14 +1,14 @@
 ---
 name: adopt-dkj-policy-bwj
 description: >-
-  One-time setup of dkj-policy-bwj in a BWJ store repo (smartwatchbanden or xoxowildhearts), both
-  chapters: copy the asana-mirror CI mechanism into .github/, propose the Asana config seam for
-  scripts/repo-config.ps1, print the repo secret and variables the CI needs, check that the
-  classification labels exist, report whether the board's sections are numbered so the stage model can
-  read them, and scaffold chapter two's dkj-policy-bwj/SYNC-LOG.md with its masthead, ready for the
-  first sync branch. Strictly additive and dry-run by default; it never overwrites an existing file,
-  and it renames nothing on the board. Run this right after enabling the plugin, or when report-issue
-  reports the Asana config seam missing.
+  One-time setup of dkj-policy-bwj in a BWJ store repo (smartwatchbanden or xoxowildhearts) -- it
+  refuses to run anywhere else -- both chapters: copy the asana-mirror CI mechanism into .github/,
+  propose the Asana config seam for scripts/repo-config.ps1, print the repo secret and variables the
+  CI needs, check that the classification labels exist, report whether the board's sections are
+  numbered so the stage model can read them, and scaffold chapter two's dkj-policy-bwj/SYNC-LOG.md
+  with its masthead, ready for the first sync branch. Strictly additive and dry-run by default; it
+  never overwrites an existing file, and it renames nothing on the board. Run this right after
+  enabling the plugin, or when report-issue reports the Asana config seam missing.
 ---
 
 # adopt-dkj-policy-bwj -- place both chapters' mechanism and config seam
@@ -16,6 +16,47 @@ description: >-
 An install writes nothing into your repo. This command places what `dkj-policy-bwj` needs on your
 side, across both chapters: the CI workflow that resolves Asana tasks, the config functions the skill
 and the CI both read, and chapter two's `SYNC-LOG.md` scaffold (step 7).
+
+## 0 -- establish that this is a BWJ store repo
+
+**Refuse, not warn: nothing is written, copied or proposed until this check passes.** The two-repo
+constraint -- `BWJ-ecommerce/smartwatchbanden` or `BWJ-ecommerce/xoxowildhearts`, and nothing else --
+lived only in this file's own frontmatter until now; none of the seven steps below actually checked
+which repo the session is standing in.
+
+```bash
+git remote get-url origin
+```
+
+Match the result against the two slugs above. **Anything else stops the skill here**: report which
+repo the session is actually in and go no further -- no file copied, no config proposed, no label
+checked. There is no override flag, and there will not be one: there is no legitimate third adoption
+target, and a skill whose whole job is placing a mechanism in exactly two repos should not ship the
+means to place it in a third.
+
+**Say plainly that a wrong repo is silent, the same way step 2 says a wrong stage map is** -- this is
+that failure one level up. A wrong stage map still lands the mirror on the right repo, one column off;
+a wrong repo lands the whole mechanism -- the CI workflow, the secrets checklist, the labels --
+somewhere it was never asked to sit, and nothing about running the steps in order says so. Nothing
+fails loudly; the workflow is simply red or silent, on whatever repo it landed in.
+
+**The most likely wrong target is this skill's own source repo, and precisely because it is the
+source.** `templates/asana-mirror.yml` and `templates/asana-mirror.ps1` are copied *from* here, so a
+session reading this skill in the source repo finds every file step 1 needs already in reach and no
+signal that it is standing in the wrong tree. Step 1's own guard does not catch this either -- "if a
+file already exists at the target, stop and diff" protects a repo that has *already* adopted, and a
+repo that has never adopted has no file at either target, so that guard passes cleanly and the copy
+proceeds. The failure this step exists to catch is a clean first run in the wrong repo, which the
+idempotence guard cannot see because it is answering a different question.
+
+**Measured, not hypothetical**: this skill was invoked once with the working directory set to the
+source repo, `DKJ-Solutions/claude-code-specialists`, and nothing before step 1 stopped it -- the session
+stopped by hand, not the skill. Left to run, step 1 alone would have placed
+`.github/workflows/asana-mirror.yml` on a **public** repo, triggering on
+`issues: [closed, reopened, labeled, unlabeled]` plus a daily cron, holding `issues: write`, and
+mirroring to an Asana project GID this repo does not own -- onto the tracker that receives every
+consumer's own inbound reports
+([#1522](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1522)).
 
 ## 1 -- copy the CI mechanism into `.github/`
 
@@ -74,7 +115,7 @@ function Get-GithubStatusMap {
 # URL. Optional: $null (the default) means the board carries no such field and the step is skipped.
 function Get-AsanaIssueFieldGid { $null }
 
-# The GID of the board's 'Github Type' select custom field, so report-issue can set it at task
+# The GID of the board's 'Github Type' multi-select custom field, so report-issue can set it at task
 # creation from the issue type step 1 already chose. Optional in the same way: $null (the default)
 # means the board carries no such field. The field's OPTION GIDs are not configured -- report-issue
 # resolves Bug/Feature/Task by name from the project itself.
@@ -95,10 +136,14 @@ plainly that a wrong map is *silent*: every card lands a column early or late, o
 job is telling somebody where their request is. It is a `.ps1` in the repo, so it goes through that
 repo's ordinary branch and review route like any other change.
 
-**Propose one value and say why it is the only one: `Get-AsanaProjectGid` is the board the team
-reads.** That used to be an open BWJ decision -- one shared project or one per store -- and it is not
-any more (Dave, September 2, 2026): there is exactly one board, and two independent constraints both
-land on it.
+**Propose the value against a real board that is this store's own, never copied from the other
+store's.** This page used to say the choice was settled on exactly one board across both stores (Dave,
+September 2, 2026). Measured today the workspace holds two GitHub boards, one per store -- `GitHub -
+SWB` and `GitHub - WH` -- so whatever landed on `main` back then, the present tense above no longer
+describes the workspace; whether the decision itself was superseded since or was never carried through
+is not something this measurement can distinguish, only that it does not hold now. Two independent
+constraints decide what the GID has to name, and both are satisfied by a per-store board exactly as
+well as by a shared one:
 
 - **The prio labels.** `Prio-Score` only reaches a task once it has actually been added to that task's
   project, via the project's own `custom_field_settings` -- sitting in the same workspace as the board
@@ -110,6 +155,21 @@ land on it.
   [#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386)).
 - **The stages.** They live on that board's own sections, so a task filed anywhere else sits on no
   pipeline and never moves a column -- see step 5 below.
+
+**Both bullets argue for a real board rather than a provisional one -- they do not argue for one
+board rather than two.** The GID has to name a project that actually carries the `Prio-Score` field
+and numbered sections, and each store repo answers that seam with a board of its own: the value is
+never copied between them. **A copied value costs exactly as silently as a provisional one**: the
+second repo mirrors its issues onto the other store's board, the create call succeeds, the field
+writes, the sections still move a card -- nothing fails on the day, and the only symptom is
+colleagues on one store finding the other store's tickets sitting on theirs.
+
+`BWJ-ecommerce/smartwatchbanden` now answers `Get-AsanaProjectGid` with its own store's board, and
+added a test asserting both halves at once: that the value names smartwatchbanden's own board, and
+that xoxowildhearts' GID is never adopted in its place -- because a copied value is exactly what the
+old wording invited
+([BWJ-ecommerce/smartwatchbanden#508](https://github.com/BWJ-ecommerce/smartwatchbanden/pull/508), the
+PR; [#470](https://github.com/BWJ-ecommerce/smartwatchbanden/issues/470), the issue).
 
 **A provisional GID is where both costs land at once**, and neither says anything in a log: such a
 ticket carries no prio label and never advances a stage. So if the real project is not known yet,
@@ -133,8 +193,9 @@ without the field loses nothing by leaving it unset.
 **`Get-AsanaTypeFieldGid` carries every one of those properties and is not restated here** -- same
 reason for a GID rather than a name, same silent-skip default, same constraint on where the field has
 to live. **What differs is one level of indirection, and it is the whole reason this seam is only
-half a seam.** A text field takes the value you send it; a select field takes the GID of one of its
-own **options**, so writing `Task` means finding out what `Task` is called in GIDs first.
+half a seam.** A text field takes the value you send it; a multi-select field takes an array of GIDs
+drawn from its own **options**, so writing `Task` means finding out what `Task` is called in GIDs
+first.
 
 **Those option GIDs are deliberately not configured.** Three more values per repo, each pinning a
 name somebody can rename or rebuild in the Asana UI without anything failing -- and unlike the field
