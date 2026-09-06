@@ -391,7 +391,7 @@ $entryHashes = '#' * (Get-EntryHeadingLevel)
 #
 # WHAT FORCED IT IS THE PORTABLE PAGE, NOT THE COMMENT. DEVELOPMENT-portable.md travels to every consumer
 # with the plugin and instructs them unconditionally: "before you write that a behaviour changed, grep
-# `[Unreleased]` for what it used to be." In a repo scaffolded here that grep matched nothing at all. A page
+# `[Unreleased]` for what it used to be." In a repo scaffolded here, that grep matched nothing at all. A page
 # that reaches a consumer cannot name a heading only the source repo has -- which is what ruled out the two
 # other readings on that issue (that the heading is this repo's own, or the consumer's choice) rather than a
 # preference between them. The seam beneath it says the same thing from the other side: the label is
