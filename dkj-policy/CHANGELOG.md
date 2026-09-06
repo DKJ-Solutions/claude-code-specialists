@@ -32,6 +32,43 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1512-width-proof-resolved-issues-suite · 20260906-135104
+
+`verify-resolved-issues.tests.ps1` normalized its captured child output and stated, in as many words,
+that this made it impossible for any assert in the file to be width-fragile. Collapsing runs of
+whitespace repairs a wrap **between** words and does nothing for one **inside** a word, which is what
+PowerShell's formatter produces -- it breaks at whatever character sits at the buffer column. The
+comment was load-bearing: it is the reason no assert in four suites was ever written defensively.
+The comparison now strips all whitespace, in the 47 places that read prose out of a child.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The defect was a *comment*, and that is the whole of why it was worth an issue. Nothing was failing
+when it was filed and nothing needed to: which asserts straddle a break is decided by the console
+width, so every one of these suites was one checkout path or one terminal away from a red run that
+looked like a bug in the script under test. A green suite was being read as evidence of safety by a
+sentence that had promised it, and the promise was the only thing holding.
+
+Two things the report got wrong were caught before they were built on, per this repo's own rule that a
+finding's *reason* is verified and not just its symptom. Its proposed repair -- reuse `Assert-Says`
+from `verify-pushed-merges.tests.ps1` -- names a helper and a file that exist nowhere; it was written
+from a working copy that was never committed. And one suite it lists as needing the same read,
+`park-cycle`, turned out to fail the *opposite* way: `Get-FlatOutput` deletes newlines rather than
+collapsing them, so it survives a mid-word break and loses the space where the wrap consumed one. No
+single substitution survives both, which is the argument for fixing this at the comparison instead.
+
+**Score:** N/A
+
+#### Pull Request
+
+Width-proof the prose asserts, and drop a comment that promised an immunity
+
+[PR #1514](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1514)
+
+---
+
 ### DEPLOY: feat/1511-verify-resolved-on-merge · 20260906-132443
 
 `ship-pr.ps1`'s step 6 -- the check that a merged PR really closed the issues its body declared, and the
