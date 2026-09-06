@@ -294,7 +294,10 @@ The constitution above, concretely implemented here:
   shipping session's own step once its own merge call returns — so a merge that session never observes
   never folds: a PR merged from the GitHub UI, or, since the merge queue went live on `main-ci-gate`
   ([#1492](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1492)), one merged by the
-  queue. The entry then stays trapped in the development document on
+  queue. **Under a queue `ship-pr.ps1` no longer even tries** ([#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)):
+  it reads the trunk's rules before it merges, and where it finds a queue it enqueues, ends
+  successfully, and folds nothing — because folding on `gh pr merge`'s exit code would write the entry
+  onto the trunk ahead of the merge it describes. The entry then stays in the development document on
   `main`, with nothing saying so ([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270),
   the residual [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244) left). Since
   September 3, 2026 `check-unfolded-entry.ps1` reports a per-branch `dkj-policy/<branch>.md` sitting
@@ -303,9 +306,18 @@ The constitution above, concretely implemented here:
   consumer. **And since September 6, 2026 a second runner acts on what that detector reports**:
   [`fold-on-merge.yml`](.github/workflows/fold-on-merge.yml) runs it on every `push` to `main` and, only
   on a find, folds ([#1493](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1493)) — so
-  the fold no longer depends on the shipping session being alive. It is code-complete and **inert while
-  `main-ci-gate` does not bypass the GitHub Actions app**: its fold succeeds and its *push* is rejected,
-  which reads as a failing job rather than as a refused fold. Both are Sylvester's; the reasoning, and
+  the fold no longer depends on the shipping session being alive. **It pushes as a person**
+  ([#1507](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1507)): `actions/checkout`
+  authenticates with the `FOLD_PUSH_TOKEN` secret — a fine-grained PAT held by an org owner, who already
+  bypasses `main-ci-gate` — and the fold's own `git push` reuses that credential. Only the push does; the
+  fold step still *reads* with the job-scoped `GITHUB_TOKEN`, which is why the workflow's own permissions
+  are down to `contents: read`. The obvious alternative does not exist: adding the GitHub Actions app to
+  the bypass list is refused with `422 — Actor GitHub Actions integration must be part of the ruleset
+  source or owner organization`, an Integration bypass actor having to be an app installed on the org
+  (measured September 6, 2026,
+  [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). Bypass is by **actor**,
+  and both bypassing actors are people — so a workflow that must write past a ruleset borrows a person's
+  token or does not write at all. Both are Sylvester's; the reasoning, and
   how to tell those two red runs apart, are in
   [his lens](.claude/specialists/lenses/05-15-extension.md#what-sylvester-owns-here).
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are

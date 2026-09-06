@@ -1962,6 +1962,14 @@ function Get-DirectPushBlockingRules {
         commit on top of the trunk satisfies) or is satisfiable by the pusher rather than by bypass
         (`required_signatures`, the message patterns) -- so none of them is grounds to refuse a ship.
 
+        `merge_queue` IS THE ONE OMISSION THAT IS NOT ABOUT THE RULE'S OWN BEHAVIOUR (issue #1506). It
+        does block a direct push, so on the face of it it belongs in the list -- but a trunk behind a
+        queue is one whose fold is not the shipping session's push to make at all: the queue merges the
+        PR itself and `fold-on-merge.yml` folds off the resulting push (#1493). Its caller therefore
+        asks Get-MergeQueueVerdict FIRST and never reaches this question. Listing the type here as well
+        would add a branch no caller can reach, and a second answer to a question one function already
+        owns. See that function for the measured GH013 text naming both refusals.
+
     .PARAMETER BranchRulesJson
         `gh api repos/<repo>/rules/branches/<trunk>` output. An unreadable or unparseable payload
         returns Readable = $false, and the caller warns rather than refusing -- see Get-FoldPushVerdict.
@@ -2143,4 +2151,61 @@ function Get-FoldPushVerdict {
         Reason    = 'this account can bypass every trunk rule a direct push cannot satisfy'
         BlockedBy = @()
     }
+}
+
+function Get-MergeQueueVerdict {
+    <#
+    .SYNOPSIS
+        Whether the trunk is behind a GITHUB MERGE QUEUE -- read from the same
+        `gh api repos/<repo>/rules/branches/<trunk>` payload the two functions above already take.
+        Returns Readable / Active.
+
+    .DESCRIPTION
+        ISSUE #1506, AND IT DECIDES WHO FOLDS. Under a queue `gh pr merge` does not merge: gh's own
+        help says "When targeting a branch that requires a merge queue ... If required checks have
+        passed, the pull request will be added to the merge queue." ADDED, exit 0, not merged. GitHub
+        then merges it minutes later on a `gh-readonly-queue/**` branch, in a process the shipping
+        session never observes -- so ship-pr's step 5 has nothing to fold onto and must not try. The
+        fold is `fold-on-merge.yml`'s from that moment on (#1493), triggered by the push to the trunk
+        that the queue's own merge produces.
+
+        SO THIS IS NOT A DUPLICATE OF Get-DirectPushBlockingRules, WHICH DELIBERATELY OMITS
+        `merge_queue` FROM ITS BLOCKING TYPES. A queue does block a direct push -- measured verbatim in
+        the fold-on-merge run carrying the #1504 merge, where the rejection named BOTH rules:
+
+            remote: - Required status check "lint-en-tests" is expected.
+            remote: - Changes must be made through the merge queue
+
+        -- but a caller that reads this verdict first never reaches the fold-push question at all,
+        because under a queue the fold is not that session's push to make. Adding the type there as
+        well would put a second answer to one question in the tree, and the branch it created would be
+        unreachable from the only caller either function has. Named here so the omission reads as a
+        decision rather than as the oversight #1499 was filed on.
+
+        UNREADABLE IS NOT "NO QUEUE", and the caller must not collapse the two. Active = $false with
+        Readable = $false means the question was not answered; treating that as "no queue" would send
+        a run back down the direct-merge path on a trunk that has one, which is the #1325 half-state
+        (a fold commit written for a PR that has not landed). Read Readable before Active.
+
+    .PARAMETER BranchRulesJson
+        `gh api repos/<repo>/rules/branches/<trunk>` output. Empty or unparseable -> Readable = $false.
+
+    .OUTPUTS
+        [pscustomobject] Readable (bool) and Active (bool).
+    #>
+    param([string]$BranchRulesJson)
+
+    $unreadable = [pscustomobject]@{ Readable = $false; Active = $false }
+    if (-not $BranchRulesJson -or -not $BranchRulesJson.Trim()) { return $unreadable }
+    try { $parsed = $BranchRulesJson | ConvertFrom-Json } catch { return $unreadable }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object. An empty
+    # array parses to $null, which is the legitimate "this trunk has no rules" answer and NOT unreadable.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.PSObject.Properties['type'] })
+
+    $active = $false
+    foreach ($r in $records) {
+        if ((([string]$r.type).Trim().ToLowerInvariant()) -eq 'merge_queue') { $active = $true; break }
+    }
+    return [pscustomobject]@{ Readable = $true; Active = $active }
 }

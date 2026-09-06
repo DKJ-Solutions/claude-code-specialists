@@ -181,6 +181,42 @@ infrastructure.
   ruleset rather than a rule, so nothing about the remedy changes. What changes is the diagnosis, and that
   is the half a session actually reads a red run with.
 
+  **AND THE BYPASS THAT ANSWERS BOTH CANNOT BE GRANTED TO THE ACTOR THAT NEEDS IT** (September 6, 2026,
+  [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). The paragraph above is
+  right that a bypass actor bypasses the *ruleset* rather than a rule, so one grant would answer both
+  refusals. What it leaves open — and what `fold-on-merge.yml`'s own header then recorded as a plan — is
+  *which* actor. The workflow pushes with the default `GITHUB_TOKEN`, i.e. as the GitHub Actions app
+  (`integration_id` 15368, the id `lint-en-tests` already reports under, confirmed against
+  `gh api apps/github-actions`). Adding it:
+
+  ```
+  PUT repos/DKJ-Solutions/claude-code-specialists/rulesets/19008062
+  422 Validation Failed
+  Actor GitHub Actions integration must be part of the ruleset source or owner organization
+  ```
+
+  An `Integration` bypass actor has to be an app **installed on the org**, and GitHub Actions is not an
+  installable app — `gh api orgs/DKJ-Solutions/installations` lists exactly one, `claude` (app_id
+  1236702). So that route does not exist, and the plan was never a measurement. **Bypass is by actor, and
+  both bypassing actors are people** (`OrganizationAdmin`, `RepositoryRole 5`), so the only way a workflow
+  pushes to this trunk is with a token belonging to one of them. That is what
+  [#1507](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1507) landed, the same day and
+  from a second session: `actions/checkout` authenticates with `FOLD_PUSH_TOKEN`, an org owner's
+  fine-grained PAT, and the fold's `git push` reuses that credential.
+
+  **Read the split it makes, because it is the part worth copying.** Only the PUSH gets the standing
+  token. The fold step still reads with the job-scoped `GITHUB_TOKEN`, which expires in about an hour and
+  is useless outside its own run, and the workflow's `permissions:` are down to `contents: read` because
+  the default token is no longer the pusher. The checkout is pinned to a commit SHA rather than a tag for
+  the same reason: the step that handles a 366-day standing write token is the one where a retagged
+  action would be worth someone's while. None of that was tested when it landed; the asserts are in
+  `merge-queue-prereq.tests.ps1`, added by #1506, and each one covers a property that fails silently.
+
+  **The generalisation worth keeping, because it will come up again:** a workflow that must write past a
+  ruleset cannot be granted the exception itself. Either it borrows a person's token, or the rule stops
+  applying to the branch it writes to. There is no third door, and reaching for one costs a round trip
+  through a 422 every time.
+
   **Inferred, not measured: why the roles changed** — an elevation, or the transfer's own member mapping.
   `orgs/DKJ-Solutions/audit-log` needs `admin:org` and answers 404 from a session, so the cause is not
   readable here. The roles themselves are, and nothing above depends on the cause.
