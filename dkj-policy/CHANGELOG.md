@@ -40,7 +40,41 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**4 entries pending** -- 0 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 4 reach it. <!-- pending-tally -->
+**5 entries pending** -- 1 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 5 reach it. <!-- pending-tally -->
+
+### DEPLOY: docs/1517-unreleased-label-not-a-seam · 20260906-194830
+
+The comment over `$script:ChangelogUnreleasedLabel` said the `[Unreleased]` label was a seam a consumer
+may translate. It never was: `Get-ChangelogUnreleasedLabel` returns the bare constant, with no
+`Get-Command` probe, no `-OverrideCommand`, and no line in the script contract. It now says what the code
+does -- a single constant, deliberately not repo-owned -- and gives the reason: nothing migrates the
+document the pattern is pointed at, so an override would move writer and reader together, off the
+`## [Unreleased]` already committed in every changelog, and take the fold's insertion point with it.
+
+The hazard was the next repair rather than today's behaviour. Writer and reader agree because both derive
+from the same constant, so nothing is failing; but a maintainer trusting the comment would most cheaply
+have added the override to `Get-ChangelogUnreleasedPattern` -- the reader's half of a seam with no writer's
+half -- and the pattern would then have stopped matching the heading, silently.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. A comment in a shared script: nobody outside this repo's maintainers reads it, and no behaviour
+changes for a consumer. The mirror copy is updated in the same commit, so the plugin ships the corrected
+text at the next release.
+
+**Score:** N/A
+
+#### Pull Request
+
+The pending heading's label is a constant, not a seam
+
+Plugins: dkj-policy
+
+[PR #1529](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1529)
+
+---
 
 ### DEPLOY: fix/1525-register-dkj-team-alpha · 20260906-193300
 
