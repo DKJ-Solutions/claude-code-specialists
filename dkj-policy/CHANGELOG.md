@@ -40,7 +40,52 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 entries pending** -- 0 at tier 0, 2 at tier 2. Tier 2 is this repo's audience: 2 of 2 reach it. <!-- pending-tally -->
+**3 entries pending** -- 0 at tier 0, 3 at tier 2. Tier 2 is this repo's audience: 3 of 3 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1522-adopt-bwj-scope-and-board · 20260906-191058
+
+`adopt-dkj-policy-bwj` refuses a checkout that is not one of the two BWJ store repos, in a new step 0
+ahead of anything it writes. The constraint had lived only in the skill's frontmatter `description:` --
+a grep for the two store slugs over the whole skill directory returned exactly one hit, that line -- so
+none of the seven steps ever established which repo the session was standing in. Step 1's existing
+"stop and diff" guard does not cover it, and reads as though it does: that guard protects a repo which
+has *already* adopted, while a first run in the wrong repo finds no file at either target, so it passes
+cleanly and the copy proceeds. Measured here on September 6, 2026 -- the skill was invoked in this
+source repo, which is where its own templates are copied *from*, so every file step 1 wants is already
+in reach and nothing about running the steps in order says otherwise. A person stopped it; the skill did
+not. Left alone, step 1 would have placed an Asana mirror workflow -- `issues: write`, a daily cron, and
+a project GID this repo does not own -- on the public tracker that receives every consumer's inbound
+reports. The step is numbered 0 so steps 1-7 keep their numbers and every cross-reference still
+resolves, and it ships with no override flag, there being no legitimate third adoption target.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The same page stops telling both stores to use one shared Asana board. It did not merely permit that
+answer, it argued for it, and the two constraints it cited are what made the argument persuasive: both
+are true, and both are satisfied by a per-store board exactly as well as by a shared one, so they argue
+for a *real* board rather than a *provisional* one -- never for one board rather than two. Measured over
+the workspace on September 6, 2026: there are two GitHub boards, one per store. Both bullets are kept
+verbatim and only the conclusion changes -- each store repo answers `Get-AsanaProjectGid` with a board
+of its own, and the value is never copied between them. What a copied value costs is nothing visible,
+which is the reason this is worth a release note: the create call succeeds, the fields write, the
+sections still move a card, and the only symptom is colleagues on one store finding the other store's
+tickets sitting on theirs. **A store that adopted under the old wording should check which board its
+GID actually names.** Same page, wording only: `Github Type` is a multi-select and takes an array of
+option GIDs, not a plain select -- `report-issue` already sent the array, so no behaviour moves.
+
+**Score:** 4
+
+#### Pull Request
+
+adopt-dkj-policy-bwj establishes the target repo before it writes, and stops prescribing one shared board
+
+Plugins: dkj-policy-bwj
+
+[PR #1527](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1527)
+
+---
 
 ### DEPLOY: feat/1515-pending-entry-count · 20260906-151510
 
