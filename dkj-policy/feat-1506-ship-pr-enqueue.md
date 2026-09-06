@@ -85,6 +85,12 @@ consumes it. This branch does the wiring; the secret is his to set.
 - [x] The header paragraph promising the Actions-app bypass is replaced by the measurement that refutes
       it. It was a plan asserted as settled fact, which is the class this repo repairs rather than
       works around.
+- [x] And the same correction where it had already spread. `CLAUDE.md` stated fold-on-merge.yml was
+      "inert while `main-ci-gate` does not bypass the GitHub Actions app" -- a pending condition, for
+      something that cannot happen -- and Sylvester's lens said a bypass "answers both in one move"
+      without naming which actor could hold it. Both now carry the 422 and the token that replaces it.
+      The lens paragraph is layered rather than rewritten: it was right about bypass being per-ruleset,
+      and what it left open is the half that turned out to be impossible.
 
 ### TEST
 
