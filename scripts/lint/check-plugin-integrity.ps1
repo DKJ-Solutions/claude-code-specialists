@@ -770,7 +770,7 @@ Write-Coverage -Category 'link-scan/lenses' -Checked $lensLinkFiles.Count `
 
 # WHERE THIS REPO'S CHANGELOG ACTUALLY LIVES, resolved once for the four checks that need to name it: the
 # entry's LINK BASE in check 4 just below, the lifecycle-command exclusion (check 11), the entry-heading
-# pass (check 19) and the shape-claim pass (check 20b). All of them said the literal 'CHANGELOG.md' until
+# pass (check 13) and the shape-claim pass (check 20). All of them said the literal 'CHANGELOG.md' until
 # August 27, 2026, when the file moved into contributing-davekjohn/ and this repo answered
 # Get-ChangelogPath to say so. A gate that keeps naming the old path does not fail loudly -- it silently
 # judges a file that is not there, which is the quietest way for a check to stop checking.
@@ -1479,7 +1479,7 @@ $lcScopeUninstallRegex = [regex]'--scope\s+(?:project|local)'
 $lcRefreshRegex = [regex]'claude\s+plugin\s+marketplace\s+update|staying-up-to-date'
 
 # The changelog's path and the directory an entry's links resolve from are BOTH resolved above the link
-# scan (check 4 needs the second one), so this check, check 19 and check 20b read $changelogRel,
+# scan (check 4 needs the second one), so this check, check 13 and check 20 read $changelogRel,
 # $changelogRelWin and $changelogFull from there. See that block for why the seam is read rather than the
 # literal.
 
