@@ -1,0 +1,113 @@
+# The resolves gate's second half, running from the merge instead of from the shipping session
+# (issue #1511).
+#
+# WHAT THIS CLOSES. verify-resolved-issues.ps1 is ship-pr.ps1's step 6: it reads a merged PR's body
+# back out and checks that every issue declared there with a closing keyword is actually CLOSED,
+# closing the ones that are not. It ran from exactly one place -- the shipping session, right after
+# its own `gh pr merge` returned. The merge queue took that call away. Since #1506 ship-pr enqueues
+# and exits 0, and the merge lands minutes later in a process that session never observes -- so there
+# is no "after the merge" for step 6 to be, and it never runs. The enqueue arm prints the standalone
+# command, which makes it a manual step rather than an invisible one; this workflow makes it neither.
+#
+# THE CLOSING ITSELF WAS NEVER AT RISK, and saying so is what keeps the scope honest. GitHub honours
+# the body's keywords on a queue merge exactly as on any other -- measured on PR #1509, the first
+# through the new path: #1506 was closed by the merge, and verify-resolved-issues.ps1 -Pr 1509
+# -ReportOnly afterwards reported `every declared issue was already closed by the merge`. What was
+# lost is the VERIFICATION that it happened and the REPAIR when a keyword misses, which is the case
+# the script was built for: eight issues repaired by PRs #341-#343 stayed open because those bodies
+# carried plain mentions. Under a queue nothing checked, so that class returned silently.
+#
+# IT REPAIRS, IT DOES NOT ONLY REPORT -- A STATED DECISION (Dave, September 6, 2026), because #1511
+# asked for it to be one rather than a side effect of the permissions block this happened to need.
+# Report-only was the cheaper option and it does not close the gap: verify-resolved-issues.ps1 exits 0
+# whatever it finds, so a still-open issue would be one yellow line in a green run's log, and the
+# repair the script exists for would stay a human's -- i.e. exactly the manual step the enqueue arm
+# already prints. So `issues: write` is granted, deliberately, and the paragraph below is why that is
+# a narrower widening than it looks.
+#
+# ITS OWN WORKFLOW, NOT A STEP IN fold-on-merge.yml, AND THAT IS THE SECURITY ARGUMENT.
+# #1511 named fold-on-merge.yml as the obvious home and flagged the cost in the same breath: that job
+# checks out with FOLD_PUSH_TOKEN, a fine-grained PAT that is usable from anywhere for up to a year
+# and that actions/checkout writes into the workspace git config, so every step of that job holds it.
+# Adding `issues: write` there would put a standing credential and issue-write in one job. Here they
+# never meet: this workflow checks out with the default job-scoped GITHUB_TOKEN, which expires in
+# about an hour and is unusable outside this run, and it touches FOLD_PUSH_TOKEN nowhere.
+# `persist-credentials: false` on the checkout, because this job never pushes -- there is no reason
+# for even that hour-lived token to be left in the workspace where a script could read it.
+#
+# THE SECOND REASON FOR ITS OWN FILE IS COVERAGE, not only permissions. fold-on-merge.yml acts only
+# when check-unfolded-entry.ps1 finds a leftover on the trunk, because an entry is what a fold needs.
+# This check has to run for EVERY merge -- including one carrying no changelog entry at all, and one
+# whose entry an earlier run already folded away -- so it resolves its PRs from the push itself. See
+# verify-pushed-merges.ps1's header for how, and for why the pushed RANGE is read rather than just its
+# head commit (a merge queue can land a batch, one merge commit per PR, in one push).
+#
+# WHY `push` AND NOT `pull_request`, the same answer unfolded-entry.yml gives: the question is about a
+# merge that has happened, and only the trunk has those. And it runs on `push` regardless of who
+# merged or how, which is the property that makes it independent of ship-pr being alive -- the same
+# reasoning behind fold-on-merge.yml.
+#
+# NOT IN THE main RULESET, deliberately, like branch-entry.yml and unfolded-entry.yml. Making a check
+# required is a repo-settings change and therefore Dave's -- and a required status check cannot gate a
+# `push` anyway, since it would have to be green before the push it is triggered by is accepted.
+#
+# NO CONCURRENCY CANCELLATION, for fold-on-merge.yml's reason rather than unfolded-entry.yml's: this
+# job ACTS. Letting a later push supersede an in-flight run would drop the verification of whatever
+# the earlier push carried, which is the silent skip this workflow exists to close. Two runs
+# overlapping is harmless -- the second finds every issue already closed and says so.
+#
+# WINDOWS, like every other workflow that runs these scripts: they target Windows PowerShell 5.1, so
+# this runs under `shell: powershell` (5.1) rather than pwsh.
+name: Verify resolved issues
+
+permissions:
+  contents: read
+  pull-requests: read
+  # THE ONE WIDENING, and the whole of it. verify-resolved-issues.ps1 comments on and closes an issue
+  # whose closing keyword missed; without this scope that repair is a 403 and the job is a reporter.
+  # It is granted on the job-scoped GITHUB_TOKEN only -- see the header for why that is the narrow
+  # choice and adding Issues to FOLD_PUSH_TOKEN would not have been.
+  issues: write
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: verify-resolved-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify-resolved:
+    runs-on: windows-latest
+    steps:
+      # persist-credentials: false -- this job reads the tree and calls the API, and never pushes.
+      # Nothing here needs a git credential left in the workspace.
+      #
+      # PINNED TO A COMMIT SHA, following fold-on-merge.yml rather than unfolded-entry.yml's bare @v5,
+      # and the dividing line is what the job's token can DO. unfolded-entry.yml holds `contents: read`
+      # and nothing else, so a retagged action there reads a public repository. This job holds
+      # `issues: write`: a mutable tag could retag its way into commenting on and closing issues as the
+      # repo. The token is hour-lived, which is why this is the smaller of the two cases -- not why it
+      # would be none.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      # THE EVENT'S VALUES ARRIVE THROUGH `env:`, NOT THROUGH `${{ }}` INSIDE `run:`. Interpolating an
+      # expression into a shell body substitutes it as TEXT before the shell ever parses the line, which
+      # is the standard Actions script-injection shape. These three are SHAs and a repository name that
+      # GitHub itself computes, so there is nothing to inject here today -- the point is that the file
+      # should not have to be re-argued if a future edit reaches for a branch name or a PR title, which
+      # are attacker-controlled. Same cost, one fewer class.
+      - name: Verify the issues this push's pull requests declared they close
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-pushed-merges.ps1 `
+            -Before $env:PUSH_BEFORE -Sha $env:PUSH_SHA -Trunk main -Repo $env:GH_REPO
+          exit $LASTEXITCODE

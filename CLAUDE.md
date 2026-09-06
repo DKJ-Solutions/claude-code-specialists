@@ -317,7 +317,13 @@ The constitution above, concretely implemented here:
   (measured September 6, 2026,
   [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). Bypass is by **actor**,
   and both bypassing actors are people — so a workflow that must write past a ruleset borrows a person's
-  token or does not write at all. Both are Sylvester's; the reasoning, and
+  token or does not write at all. **A second runner joined it the same day, one step further down the
+  same script**: `verify-resolved.yml` resolves the pull requests a push to `main` carried and runs
+  `verify-resolved-issues.ps1` — ship-pr's step 6 — against each, since a queue merge is one no session
+  sees ([#1511](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1511)). **It repairs, by
+  a stated decision rather than by a side effect**: it holds `issues: write`, the first such grant here,
+  and it is its own workflow precisely so that scope never sits in the same job as the standing
+  `FOLD_PUSH_TOKEN`. All three are Sylvester's; the reasoning, that decision, and
   how to tell those two red runs apart, are in
   [his lens](.claude/specialists/lenses/05-15-extension.md#what-sylvester-owns-here).
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are

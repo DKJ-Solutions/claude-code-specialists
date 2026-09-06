@@ -1507,11 +1507,21 @@ if ($queueActive) {
     Write-Host "  The queue merges it against its real base and pushes that merge to 'main'." -ForegroundColor DarkGray
     Write-Host "  fold-on-merge.yml folds the entry off that push (#1493) -- not this session (#1506)." -ForegroundColor DarkGray
     Write-Host "  Watch it land:  gh pr view $pr --repo $repo" -ForegroundColor DarkGray
-    # STEP 6 IS THE ONE THING THAT HAS NO OTHER HOME, so it is named rather than silently dropped.
-    # GitHub honours the body's closing keywords on the queue's merge exactly as on any other, so the
-    # issues do close; what is lost is the VERIFICATION that they did, plus its repair when a keyword
-    # missed. That check is its own script and runs standalone against a merged PR.
-    Write-Host "  Not run here (the PR has not merged yet) -- once it has, verify what it declared it closes:" -ForegroundColor DarkGray
+    # STEP 6 HAS NO HOME IN THIS SCRIPT ONCE THE MERGE IS THE QUEUE'S, so it is named rather than
+    # silently dropped. GitHub honours the body's closing keywords on the queue's merge exactly as on
+    # any other, so the issues do close; what is lost is the VERIFICATION that they did, plus its
+    # repair when a keyword missed. That check is its own script and runs standalone against a merged
+    # PR.
+    #
+    # IT NEED NOT BE A MANUAL STEP, and this line stops short of saying it is (issue #1511). A repo
+    # can run the same check off the MERGE instead of off the shipping session -- a push to the trunk
+    # is the one event that always sees a queue merge, the same property fold-on-merge.yml relies on
+    # -- and where that is in place nobody types anything here. The source repo does exactly that in
+    # .github/workflows/verify-resolved.yml; a consuming repo may not, which is why the command below
+    # stays printed. Running it after the workflow already has is harmless: it re-reads the same body
+    # and reports every declared issue already closed.
+    Write-Host "  Not run here (the PR has not merged yet). Unless this repo verifies on the merge itself," -ForegroundColor DarkGray
+    Write-Host "  check what it declared it closes once it has landed:" -ForegroundColor DarkGray
     Write-Host "    scripts\release\verify-resolved-issues.ps1 -Pr $pr" -ForegroundColor DarkGray
     exit 0
 }

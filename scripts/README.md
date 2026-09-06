@@ -107,6 +107,7 @@ scripts named below the table, which nothing in this table reaches at all.
 | [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
 | [`release/ship-pr.ps1`](release/ship-pr.ps1) | open → wait for CI → merge → fold, in one motion | `ship-pr` |
 | [`release/verify-resolved-issues.ps1`](release/verify-resolved-issues.ps1) | checks that a merged PR closed the issues it declared, and closes any it did not — `ship-pr.ps1` runs it as its own process after the merge | `ship-pr` |
+| [`release/verify-pushed-merges.ps1`](release/verify-pushed-merges.ps1) | resolves the pull requests a push to the trunk carried and runs the check above against each — the same step, off the merge instead of off the shipping session, since a queue merge is one no session sees | — (CI: `verify-resolved.yml`) |
 | [`release/fold-changelog-entry.ps1`](release/fold-changelog-entry.ps1) | folds the entry into `CHANGELOG.md` at its ranked position and removes the branch document | `fold-changelog` |
 | [`release/cut-release.ps1`](release/cut-release.ps1) | the lockstep version bump, the release notes and the tag — **only on Dave's explicit request** | `cut-release` |
 | [`release/new-internal-note.ps1`](release/new-internal-note.ps1) | the tier-1 note's skeleton; needs the development notes, so it runs *after* the cut | `cut-release` |
