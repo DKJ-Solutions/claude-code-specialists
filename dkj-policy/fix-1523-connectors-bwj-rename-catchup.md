@@ -68,20 +68,20 @@ Verified against each consumer's own `origin/main` after a fresh fetch (not a lo
 ### TEST
 
 - [x] Both manifests parse as JSON.
-- [x] `check-connectors.ps1 -SkipDrift`: BWJ `[INFO]` count 8 -> 0 for smartwatchbanden (fully
-  `[OK]`), and xoxowildhearts now version-checks -- 19 + 3 + 3 extensions present, all machine
-  records on `v4.31.0`. One residual `[INFO]` on xoxowildhearts: `dkj-team-shopify@` has no machine
-  install record for that checkout path -- a consumer-side, other-machine state that was invisible
-  while the whole block was being skipped, now surfaced where the doctrine wants it (the consumer's
-  own move, not this repo's).
+- [x] `check-connectors.ps1 -SkipDrift`: the two BWJ manifests together dropped from 8 `[INFO]`
+  (four retired ids each) to 1 -- smartwatchbanden fully `[OK]`; xoxowildhearts now version-checks
+  (19 + 3 + 3 extensions present, all machine records on `v4.31.0`). The one residual `[INFO]` is on
+  xoxowildhearts: `dkj-team-shopify@` has no machine install record for that checkout path -- a
+  consumer-side, other-machine state that was invisible while the whole block was being skipped, now
+  surfaced where the doctrine wants it (the consumer's own move, not this repo's).
 - [x] Full lint gate (`check-plugin-integrity.ps1` + suites) green -- run before the PR.
 
 ### DEPLOY: fix/1523-connectors-bwj-rename-catchup
 
 The `connectors/` register now records the plugin ids the two BWJ consumers actually enable, so
-`check-connectors` resolves and version-checks their plugin blocks instead of skipping all five.
-Both manifests carry a dated `CAUGHT UP` note; no extension inventory or version bookkeeping was
-otherwise changed.
+`check-connectors` resolves and version-checks all five of each consumer's plugin blocks -- where
+before it skipped the four it could not resolve and never saw the fifth. Both manifests carry a
+dated `CAUGHT UP` note; no extension inventory or version bookkeeping was otherwise changed.
 
 **Score:** 3
 
