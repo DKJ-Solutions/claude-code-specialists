@@ -33,19 +33,64 @@
 
 ### PLAN
 
+#### The finding (#1523), and what re-measuring it showed
+
+`connectors/smartwatchbanden.json` and `connectors/xoxowildhearts.json` named the pre-4.31.0 plugin
+ids -- `team-alpha@`, `team-shopify@`, `team-ecomm@`, `contributing-davekjohn@` -- none of which the
+marketplace declares any more, so `check-connectors` reported an `[INFO]` per id and **skipped every
+plugin block** for both consumers: the two repos furthest ahead were the ones the register could say
+least about.
+
+Verified against each consumer's own `origin/main` after a fresh fetch (not a local working copy):
+
+- **smartwatchbanden** `fcd54c4` (2026-09-06, unchanged since #1523 was filed) --
+  `.claude/settings.json` enables `dkj-team-alpha@`, `dkj-team-shopify@`, `dkj-team-ecomm@`,
+  `dkj-policy@`, `dkj-policy-bwj@`. Fully migrated; the manifest was not.
+- **xoxowildhearts** `0aafe90` (2026-09-06) -- **the same five**, identical to smartwatchbanden.
+  #1523 measured this consumer at `92facf1` (2026-09-01), before commit `aba1905`
+  ("tooling: migrate to the 4.31.0 plugin renames", 2026-09-06 18:27Z) landed, so the issue's
+  "`bwj-codex@` unregistered" is now understated: the live gap is the whole rename plus the fifth
+  plugin, `bwj-codex@` having itself been renamed to `dkj-policy-bwj@`.
+- Lens inventories on both consumers' `origin/main` match what the manifests record (19 + 3 + 3), so
+  only the plugin `id` fields drifted.
+
+`dkj-policy@` and `dkj-policy-bwj@` both ship no `agents/`, so both take `extensions: []`.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `connectors/smartwatchbanden.json`: rename the four ids to their `dkj-` forms, add
+  `dkj-policy-bwj@` with `extensions: []`, append a dated `CAUGHT UP 2026-09-06 (#1523)` note that
+  keeps every earlier sentence as written (per #952).
+- [x] `connectors/xoxowildhearts.json`: same four renames, same added plugin, same style of note --
+  recording that the issue's snapshot predated the consumer's own migration commit.
+- [x] Extension arrays left as measured; no other bookkeeping (machine version, cache drift) touched.
 
 ### TEST
 
+- [x] Both manifests parse as JSON.
+- [x] `check-connectors.ps1 -SkipDrift`: BWJ `[INFO]` count 8 -> 0 for smartwatchbanden (fully
+  `[OK]`), and xoxowildhearts now version-checks -- 19 + 3 + 3 extensions present, all machine
+  records on `v4.31.0`. One residual `[INFO]` on xoxowildhearts: `dkj-team-shopify@` has no machine
+  install record for that checkout path -- a consumer-side, other-machine state that was invisible
+  while the whole block was being skipped, now surfaced where the doctrine wants it (the consumer's
+  own move, not this repo's).
+- [x] Full lint gate (`check-plugin-integrity.ps1` + suites) green -- run before the PR.
+
 ### DEPLOY: fix/1523-connectors-bwj-rename-catchup
 
-**Score:**
+The `connectors/` register now records the plugin ids the two BWJ consumers actually enable, so
+`check-connectors` resolves and version-checks their plugin blocks instead of skipping all five.
+Both manifests carry a dated `CAUGHT UP` note; no extension inventory or version bookkeeping was
+otherwise changed.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A. `connectors/` is workshop administration -- it does not travel to consumers' plugin caches and
+a subscriber of the specialists service notices nothing.
+
+**Score:** N/A
 
 #### Pull Request
 
