@@ -40,7 +40,33 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 entries pending** -- 0 at tier 0, 3 at tier 2. Tier 2 is this repo's audience: 3 of 3 reach it. <!-- pending-tally -->
+**4 entries pending** -- 0 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 4 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1525-register-dkj-team-alpha · 20260906-193300
+
+The register of the repo that **owns** the connector check was itself unchecked: its core-team block
+had been skipped since the `dkj-team-alpha` rename, so the 19 lenses, the enablement and the machine
+version were verified by nothing. Worse, the check reported that state as *"correct as it stands"*.
+Both are gone -- the block is read again, and the entry says what this repo actually has.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The same class closed for a third time, and this time inside the commit that declared it closed:
+`#1465` wrote *"The class was never emptied, only its instance was"* while repairing one of the two
+stale ids in this file and leaving the other. The note now records the rule that would have caught
+it -- check a rename against every id in the manifest, not against the one the report names.
+
+**Score:** 2
+
+#### Pull Request
+
+register this repo's own core team under dkj-team-alpha@
+
+[PR #1528](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1528)
+
+---
 
 ### DEPLOY: fix/1522-adopt-bwj-scope-and-board · 20260906-191058
 
