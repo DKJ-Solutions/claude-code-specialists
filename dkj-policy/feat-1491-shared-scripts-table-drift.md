@@ -68,6 +68,13 @@ and folded before this branch was created; the table was then measured at 45 can
       report a `0`-against-`0` pass in the same words as a `45`-against-`45` one. Raised in review as
       the one way the new check could still fail the way check 29 just had, where the suite's guard
       does not reach.
+- [x] CI red, green locally, three times over -- and the guard above is what refused to let it ship: it
+      reported `matched=0` rather than a quiet pass. The cause was NOT the path-form mismatch first
+      proposed (the runner printed the long form, refuting it); it was that CI tests the PR's MERGE
+      commit and #1480 renamed `plugins/teams/team-alpha` to `plugins/dkj-teams/dkj-team-alpha` on the
+      trunk while this branch was open, so the test's hardcoded folder no longer existed. The scenarios
+      now DERIVE their folder from the registry, which is the same lesson check 32 itself enforces.
+      `origin/main` merged in; the `GetFullPath` normalisation kept as an unfired guard, labelled as one.
 - [x] The gate run whole against this repo, and every coverage figure compared against the pre-change
       baseline rather than merely read. That comparison is what caught the one real defect on this
       branch: a splice had eaten the doubled backslashes in two of check 29's regex literals, so its

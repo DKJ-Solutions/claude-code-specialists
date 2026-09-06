@@ -3608,17 +3608,21 @@ foreach ($lf in $linkFiles) {
     $maskedContent = Get-FenceMaskedText -Text $content
     $rel = $lf.Replace($RepoRoot, '.')
     $ownerName = Get-PluginNameForPath -PluginRoots $publishedPlugins -Path $lf.Substring($RepoRoot.Length)
-    # BOTH SIDES OF THE PREFIX TEST GO THROUGH GetFullPath, and this is not defensive garnish -- it is the
-    # only thing that makes two differently-EXPRESSED paths to the same directory comparable. The two sides
-    # arrive by different routes: $lf comes from a Get-ChildItem walk, which returns the filesystem's
-    # canonical long form, while a pair's MirrorPath is composed as Join-Path <the root as the caller
-    # WROTE it> <relative>. Those agree in this repo and stop agreeing the moment a caller names the root
-    # any other way -- an 8.3 short name is the case that actually occurs, and GetFullPath expands one
-    # ('...\RUNNER~1\...' -> '...\runneradmin\...'), which a plain string compare never will. Get an
-    # ordinary StartsWith here and the canonical set comes back EMPTY, which is not a visible failure: it
-    # is compared against a claim set and reports nothing, exactly the silent-green shape this check's own
-    # coverage line exists to expose. Check 29 is immune by accident rather than by care -- both of its
-    # sides happen to be GetFullPath'd already.
+    # BOTH SIDES OF THE PREFIX TEST GO THROUGH GetFullPath, because they arrive by different routes and
+    # only agree while the root is written canonically: $lf comes from a Get-ChildItem walk, which returns
+    # the filesystem's long form, while a pair's MirrorPath is composed as Join-Path <the root as the
+    # caller WROTE it> <relative>. Name the root any other way -- an 8.3 short name is the case that
+    # actually occurs, and GetFullPath expands one where a string compare never will -- and this StartsWith
+    # matches nothing. That is not a visible failure: an empty canonical set is compared against a claim
+    # set and reports nothing, the silent-green shape this check's coverage line exists to expose.
+    #
+    # HONEST PROVENANCE: this is a fragility found while chasing a DIFFERENT failure, not the cure for it.
+    # The CI red that prompted the look was the test hardcoding a plugin folder the trunk had renamed
+    # underneath it, and the short-name path was a plausible mechanism that turned out not to be the one
+    # operating -- the runner's own diagnostic printed the long form. Kept because the mismatch it
+    # prevents is real and costs nothing to prevent; recorded as unfired so nobody later cites it as a
+    # measurement. Check 29 is immune by accident rather than by care: both of its sides happen to be
+    # GetFullPath'd already.
     $docDir = [System.IO.Path]::GetFullPath((Split-Path -Parent $lf)).TrimEnd('\') + '\'
     Invoke-MarkedSpanWalk -MaskedText $maskedContent -RawText $content -Marker 'shared-scripts:mirror' `
         -Category 'shared-script-list' -Rel $rel -OnSpan {

@@ -1069,25 +1069,45 @@ try {
     #        -- which is exactly how check 29 came out green for the wrong reason while this branch was
     #        being written.
     #
-    #        THE DOCUMENT IS plugins/teams/team-alpha/scripts/README.md, and the folder is the point: this
+    #        THE DOCUMENT SITS IN THE scripts/ FOLDER OF WHICHEVER PLUGIN THE REGISTRY FEEDS -- resolved
+    #        below rather than named here -- and the folder is the point: this
     #        check scopes to the marked document's OWN directory rather than to its plugin. Scenario 48
     #        asserts that head-on by moving the same marker up to the plugin root, where the canonical set
     #        keeps the deeper 'scripts/' prefix -- the assertion that a plugin-scoped implementation
     #        (which would pass every other scenario here) fails.
     $MirrorFindingPattern = '\[shared-script-list\].*(has no row for:|does not mirror here:|has no matching|sits INSIDE|belongs to no published plugin)'
-    $mirrorReadme = Join-Path $Fixture 'plugins\teams\team-alpha\scripts\README.md'
+    # THE FOLDER IS DERIVED, NOT NAMED, and that is the whole lesson of the branch this arrived on.
+    # It was written as a hardcoded 'plugins\teams\team-alpha\scripts', which passed locally and went red
+    # on CI -- because CI tests the PR's MERGE commit, and the trunk had meanwhile renamed the tree to
+    # plugins\dkj-teams\dkj-team-alpha (#1480). The fixture's marketplace follows the real one, so the
+    # canonical set landed somewhere the hardcoded docDir did not point, matched=0, and every scenario
+    # below failed for a reason none of them was about. A test for a check whose entire subject is a
+    # hand-maintained path list going stale must not itself carry a hand-maintained path.
+    #
+    # So: ask the registry which plugin actually receives mirrors, and put the document in ITS scripts/
+    # folder. Any plugin with at least one mirror serves -- the scenarios below are about the mechanism,
+    # not about which plugin it is -- and the smallest one is chosen deliberately, so the table stays
+    # short and scenario 43's dropped row is easy to read in a finding.
+    . (Join-Path $PSScriptRoot '..\lib\shared-scripts-lib.ps1')
+    $mirrorAllPairs = @(Get-SharedScriptPairs -RepoRoot $Fixture -PluginRoots @(Get-RepoPluginRoots -RepoRoot $Fixture))
+    $mirrorCountByPlugin = @{}
+    foreach ($p in $mirrorAllPairs) {
+        if (-not $mirrorCountByPlugin.ContainsKey($p.Plugin)) { $mirrorCountByPlugin[$p.Plugin] = 0 }
+        $mirrorCountByPlugin[$p.Plugin]++
+    }
+    $mirrorHostRoot = @(Get-RepoPluginRoots -RepoRoot $Fixture |
+        Where-Object { $mirrorCountByPlugin.ContainsKey($_.Name) } |
+        Sort-Object { $mirrorCountByPlugin[$_.Name] })[0]
+    if (-not $mirrorHostRoot) { throw 'check 32 scenarios: no published plugin in the fixture receives a registry mirror.' }
+    $mirrorReadme = Join-Path (Join-Path $mirrorHostRoot.Root 'scripts') 'README.md'
     New-Item -ItemType Directory -Path (Split-Path -Parent $mirrorReadme) -Force | Out-Null
 
-    # What the registry says lands in that folder, resolved against the FIXTURE, exactly as the check
-    # resolves it -- GetFullPath on BOTH sides included, for the reason the check's own comment gives:
-    # $Fixture is whatever [System.IO.Path]::GetTempPath() handed back, and on a GitHub Windows runner
-    # that is the 8.3 SHORT form ('C:\Users\RUNNER~1\...'). A plain string compare between a short-form
-    # prefix and a long-form path matches nothing, which is how this block first reached CI: every
-    # scenario below red, the derived set empty, and the check under test reporting a clean pass because
-    # empty compared against empty has nothing to say. Sorted so the table below is stable run to run.
-    . (Join-Path $PSScriptRoot '..\lib\shared-scripts-lib.ps1')
+    # GetFullPath on BOTH sides, matching the check: the two paths arrive by different routes -- one from
+    # a Get-ChildItem walk, one composed as Join-Path <root as written> <relative> -- and only agree while
+    # the root is written canonically. Not the cause of the CI failure above (that was the rename), but a
+    # real fragility the check carries and the reason its own comment says so. Sorted so the table below
+    # is stable run to run.
     $mirrorDocDir = [System.IO.Path]::GetFullPath((Split-Path -Parent $mirrorReadme)).TrimEnd('\') + '\'
-    $mirrorAllPairs = @(Get-SharedScriptPairs -RepoRoot $Fixture -PluginRoots @(Get-RepoPluginRoots -RepoRoot $Fixture))
     $mirrorExpected = @(
         $mirrorAllPairs |
             Where-Object { [System.IO.Path]::GetFullPath($_.MirrorPath).StartsWith($mirrorDocDir, [System.StringComparison]::OrdinalIgnoreCase) } |
@@ -1104,8 +1124,8 @@ try {
         foreach ($r in @(Get-RepoPluginRoots -RepoRoot $Fixture)) {
             Write-Host "  [derived] root name=$($r.Name) rel=$($r.RelativeRoot) root=$($r.Root)" -ForegroundColor DarkGray
         }
-        foreach ($p in @($mirrorAllPairs | Where-Object { $_.Plugin -eq 'team-alpha' })) {
-            Write-Host "  [derived] team-alpha pair=$($p.Name) MirrorPath=$($p.MirrorPath)" -ForegroundColor DarkGray
+        foreach ($p in @($mirrorAllPairs | Where-Object { $_.Plugin -eq $mirrorHostRoot.Name })) {
+            Write-Host "  [derived] host pair=$($p.Name) MirrorPath=$($p.MirrorPath)" -ForegroundColor DarkGray
         }
         Write-Host "  [derived] plugins on disk: $((Get-ChildItem -Path (Join-Path $Fixture 'plugins') -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName '.claude-plugin\plugin.json') } | ForEach-Object { $_.FullName.Substring($Fixture.Length) }) -join ' | ')" -ForegroundColor DarkGray
         Write-Host "  [derived] pairs by plugin: $((($mirrorAllPairs | Group-Object Plugin | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ' | '))" -ForegroundColor DarkGray
@@ -1211,8 +1231,8 @@ try {
     # and fails only here, which is why this one is written ----------------------------------------------
     Write-Host "check 32 -- the scope is the marked document's OWN folder, not its plugin" -ForegroundColor Cyan
     Remove-Item -LiteralPath $mirrorReadme -Force
-    $mirrorRootReadme = Join-Path $Fixture 'plugins\teams\team-alpha\README.md'
-    $p48Lines = @('# team-alpha', '', '<!-- shared-scripts:mirror -->') + (New-MirrorTable -Rows $mirrorExpected) + @('<!-- /shared-scripts:mirror -->')
+    $mirrorRootReadme = Join-Path $mirrorHostRoot.Root 'README.md'
+    $p48Lines = @("# $($mirrorHostRoot.Name)", '', '<!-- shared-scripts:mirror -->') + (New-MirrorTable -Rows $mirrorExpected) + @('<!-- /shared-scripts:mirror -->')
     [System.IO.File]::WriteAllText($mirrorRootReadme, (($p48Lines -join "`n") + "`n"), $Utf8NoBom)
 
     $q48 = Invoke-Integrity -FixtureRoot $Fixture

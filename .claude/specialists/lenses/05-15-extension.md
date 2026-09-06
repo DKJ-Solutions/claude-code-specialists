@@ -1604,6 +1604,30 @@ defect was in check 29, and the reviewer's question was whether the *new* check 
 a real run, where the suite's guard does not reach. It could — silence needs only both sets empty — and
 the answer was not a runtime assertion but the missing figure, which is the same answer #221 gave.
 
+**AND THE SECOND FAILURE, which is the one worth reading, because the guard worked and the diagnosis did
+not.** The suite went red on CI and green on three local runs. The non-empty guard above fired exactly as
+designed — `matched=0` — so the branch could not ship a vacuous check. What went wrong was the *reason*:
+the obvious mechanism was a path-form mismatch (a GitHub Windows runner's `GetTempPath()` returns the 8.3
+short form, `C:\Users\RUNNER~1\…`, and `GetFullPath` expands one where a string compare does not), it was
+plausible, it was cheap to fix, and it was **wrong**. The runner's own diagnostic printed the long form.
+
+The actual cause: **CI tests the pull request's MERGE commit, not the branch.** While this branch was
+open, [#1480](https://github.com/DaveKJohn/claude-code-specialists/issues/1480) renamed
+`plugins/teams/team-alpha` to `plugins/dkj-teams/dkj-team-alpha` on the trunk. The suite's fixture builds
+its marketplace to match the real one, so on the merge commit the mirrors landed under the new name while
+the test's **hardcoded** `plugins\teams\team-alpha\scripts` pointed at a directory that no longer existed.
+Locally, on a base predating the rename, both agreed. A branch open across a rename sees this and a branch
+opened after it never does.
+
+**Three things to carry forward.** First, the irony is the lesson: a test for a check whose whole subject
+is *a hand-maintained path list going stale* was itself carrying a hand-maintained path. It now asks the
+registry which plugin receives mirrors and uses that plugin's folder, so the next rename moves it for
+free. Second, when local and CI disagree, **the merge commit is the first thing to check** — `git log
+origin/main` costs one command and would have ended this in a minute, where three rounds of reasoning
+about path forms did not. Third, the `GetFullPath` normalisation was kept even though it fixed nothing:
+the mismatch it prevents is real, it costs nothing, and its comment says plainly that it has never fired,
+so no later reader cites an unfired guard as a measurement.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.
