@@ -33,19 +33,50 @@
 
 ### PLAN
 
+#### What #1526 asks for
+
+The tree cites this repo under two owner names — `github.com/DaveKJohn/claude-code-specialists`
+(133 `.md` files) and `github.com/DKJ-Solutions/claude-code-specialists` (28), 22 files carrying
+both. Both resolve (GitHub transfer redirect since the September 2, 2026 org transfer), so nothing
+is broken and the dead-link gate is right not to flag it — but there is no readable answer to
+*which is canonical*, and new writing copies whichever example sits nearest.
+
+#### Scope taken here
+
+The issue's own "not measured / not claimed" section leaves the blanket rewrite and a lint check
+to the owner, and protects the archived release history under `dkj-policy/releases/**`. So this
+branch does step 1 only — **state the convention** — plus make the always-on constitution obey it.
+The bulk sweep and a lint gate are surfaced back to Dave as a choice, not done here.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add a `### Repo citation` section to `CLAUDE.md` (after `### Language`): `DKJ-Solutions`
+      canonical for new writing, the redirect it rests on, existing `DaveKJohn/` citations
+      corrected opportunistically not swept, `dkj-policy/releases/**` left as written.
+- [x] Fix `CLAUDE.md`'s own two stray repo-URL citations (#1094, #1449) so the doc that states
+      the rule follows it. The person-name attribution "Dave (DaveKJohn)" is left — it is an
+      account name, not a repo URL.
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` + all suites green (dead-link scan covers the new links).
+- [x] `grep` confirms `CLAUDE.md` carries no remaining `github.com/DaveKJohn/claude-code-specialists`.
+
 ### DEPLOY: docs/1526-canonical-repo-owner-name
 
-**Score:**
+`CLAUDE.md` now states which owner name to cite this repo under — `DKJ-Solutions/claude-code-specialists`
+— and why the old one only works through a redirect the repo does not control. New writing has a
+convention to copy instead of the nearest example. Existing `DaveKJohn/` citations are left to be
+corrected as files are touched; the archived release history stays as written.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A — internal documentation convention. No subscriber of any service notices a change in how this
+repo's own docs cite its GitHub URL.
+
+**Score:** N/A
 
 #### Pull Request
 
