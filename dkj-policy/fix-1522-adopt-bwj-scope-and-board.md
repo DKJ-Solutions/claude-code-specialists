@@ -48,8 +48,14 @@ Two verified defects in plugins/dkj-policy/dkj-policy-bwj/skills/adopt-dkj-polic
       store, never a value copied between the two repos.
 - [x] #1521 -- `Github Type` is described as multi-select, and the indirection paragraph
       beside it stays true for a field that takes an ARRAY of option GIDs.
-- [ ] Edith #17 copy-edits the diff -- language, links, and that no cross-reference broke.
-- [ ] Lint + test gates green locally before the push.
+- [x] Edith #17 copy-edited the diff. Four findings: the `xoxowildhearts'` possessive (repo
+      precedent is the bare apostrophe), "settled onto" -> "settled on", "tell apart" ->
+      "distinguish" -- all three applied. The fourth (quoting step 1's guard rather than
+      re-bolding it) was declined: step 0 cross-references that rule, it does not restate it.
+      Her out-of-scope note -- this file citing two different repo owners -- is filed as #1526.
+- [x] `check-plugin-integrity.ps1` run locally: **0 errors** across all checks. The test suites
+      are not a step of their own -- `open-pr` runs lint AND every suite as its own gate, and a
+      copy set going ahead of it proves nothing that gate would not catch.
 
 ### TEST
 

@@ -137,11 +137,11 @@ job is telling somebody where their request is. It is a `.ps1` in the repo, so i
 repo's ordinary branch and review route like any other change.
 
 **Propose the value against a real board that is this store's own, never copied from the other
-store's.** This page used to say that was settled onto exactly one board across both stores (Dave,
+store's.** This page used to say the choice was settled on exactly one board across both stores (Dave,
 September 2, 2026). Measured today the workspace holds two GitHub boards, one per store -- `GitHub -
 SWB` and `GitHub - WH` -- so whatever landed on `main` back then, the present tense above no longer
 describes the workspace; whether the decision itself was superseded since or was never carried through
-is not something this measurement can tell apart, only that it does not hold now. Two independent
+is not something this measurement can distinguish, only that it does not hold now. Two independent
 constraints decide what the GID has to name, and both are satisfied by a per-store board exactly as
 well as by a shared one:
 
@@ -166,7 +166,7 @@ colleagues on one store finding the other store's tickets sitting on theirs.
 
 `BWJ-ecommerce/smartwatchbanden` now answers `Get-AsanaProjectGid` with its own store's board, and
 added a test asserting both halves at once: that the value names smartwatchbanden's own board, and
-that xoxowildhearts's GID is never adopted in its place -- because a copied value is exactly what the
+that xoxowildhearts' GID is never adopted in its place -- because a copied value is exactly what the
 old wording invited
 ([BWJ-ecommerce/smartwatchbanden#508](https://github.com/BWJ-ecommerce/smartwatchbanden/pull/508), the
 PR; [#470](https://github.com/BWJ-ecommerce/smartwatchbanden/issues/470), the issue).
