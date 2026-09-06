@@ -25,14 +25,35 @@
 # fold step's own `gh pr list` needs it, and declaring any permissions block at all sets every unlisted
 # scope to none.
 #
-# INERT UNTIL THE main-ci-gate RULESET BYPASSES THE GITHUB ACTIONS APP (issue #1493). Its
-# required_status_checks rule blocks any push to main, including this job's, unless the pushing actor
-# is a listed bypass actor. Today's list is OrganizationAdmin + RepositoryRole id 5; the default
-# GITHUB_TOKEN pushes as the GitHub Actions app (integration_id 15368 -- the same id the lint-en-tests
-# required check already reports under), which is neither. Adding that app as a bypass actor is a
+# INERT UNTIL THE main-ci-gate RULESET BYPASSES THE GITHUB ACTIONS APP (issue #1493). TWO of its rules
+# block any push to main, including this job's, unless the pushing actor is a listed bypass actor --
+# required_status_checks AND merge_queue, and naming only the first is what made the third failed run
+# unreadable (issue #1499, below). Today's bypass list is OrganizationAdmin + RepositoryRole id 5; the
+# default GITHUB_TOKEN pushes as the GitHub Actions app (integration_id 15368 -- the same id the
+# lint-en-tests required check already reports under), which is neither. A bypass actor bypasses the
+# whole ruleset, so adding that app answers both rules in one move -- but a reader diagnosing a red run
+# has to recognise both refusals, because either one alone produces a red job. Adding it is a
 # repo-settings change and therefore Dave's, not this workflow's -- until it is made, the fold step
 # below fails its own git push with a ruleset rejection, loudly, which is the correct failure mode for
 # a workflow that is code-complete and waiting on a permission it does not grant itself.
+#
+# WHAT THAT REJECTION ACTUALLY LOOKS LIKE, because a red run here has two entirely different causes and
+# only the log tells them apart (issue #1499). Measured verbatim in run 34020828593, the push carrying
+# the #1498 merge, 2026-09-06 08:04 -- a run in which the fold itself SUCCEEDED:
+#
+#   Folded and removed: dkj-policy/fix-1497-fold-all-reserved-names.md (tier 2, significance 4 -- ...)
+#   CHANGELOG.md updated.
+#   Committed: fold: fix/1497-fold-all-reserved-names changelog (#1498)
+#   remote: error: GH013: Repository rule violations found for refs/heads/main.
+#   remote: - Required status check "lint-en-tests" is expected.
+#   remote: - Changes must be made through the merge queue
+#
+# THE FOLD STEP GOING RED IS THEREFORE NOT EVIDENCE THAT THE FOLD REFUSED. #1499 was filed on three red
+# runs of this job read as one symptom: the first two (2026-09-05 23:56 and 2026-09-06 07:32) really were
+# fold refusals -- the #1497 misread of dkj-policy/CHANGELOG.md, repaired by #1498 -- and the third was
+# this ruleset rejection with a clean fold above it. That third run was the report's own proof that
+# #1498's fix had not taken, and it proved the opposite. Read the fold script's own last lines before
+# concluding anything about the fold: it says which of the two happened, in so many words.
 #
 # NO CONCURRENCY CANCELLATION, unlike unfolded-entry.yml's read-only report. That workflow can safely
 # let a later push's run supersede an earlier one, because both would report the same fact a moment

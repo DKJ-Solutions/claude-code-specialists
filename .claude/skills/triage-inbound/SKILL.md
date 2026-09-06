@@ -35,6 +35,26 @@ just advice.
   suggested in passing was worth actually running — **7 of 326** dated headings in `CHANGELOG.md` and
   `releases/` disagreed with the real merge date, all by one or two days, deliberately left as they are
   because they sit in published records that already travelled to consumers.
+- **The same first pattern, in the shape that survives a check: the report ANTICIPATES "already
+  repaired" and cites evidence against it — and the evidence is a different failure wearing the same
+  name.** [#1499](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1499), picked up
+  September 6, 2026, the day it was filed. It reported that `fold-on-merge.yml` misreads
+  `dkj-policy/CHANGELOG.md` as an unfolded dossier and fails every time it has something to fold, and it
+  ruled out the obvious close in its own words: *"Why this isn't the #1497 bug back again"*, on the
+  ground that one of its three cited runs was **the merge of #1498 itself** — the push carrying the fix —
+  *"and it fails with the identical symptom anyway"*. That is a well-formed argument, it names the right
+  fix, and it is checkable in one command. Checked: two of the three runs are pre-#1498 commits and were
+  the #1497 bug; the third folded **cleanly** (`Folded and removed: ... CHANGELOG.md updated. Committed:
+  ...`) and then failed on the `main-ci-gate` ruleset — the blocker the issue itself sets aside as *"not
+  this"*. Same red job, same job name, two unrelated causes, and only the log separates them.
+  **What made it convincing is the part to carry forward.** A report that closes on "already repaired"
+  usually has nothing to say back; this one had a citation, and the citation was to a *run*, not to a
+  line of code — so verifying the claim meant reading a log rather than reading the tree, and reading
+  the tree was not enough. The first repro here did reproduce the reported error exactly, which felt like
+  confirmation and was not: the checkout was a **stale `main`** two commits behind the fix, and re-running
+  it at the tip folded cleanly. **Both halves generalise** — where a report cites a CI run as evidence,
+  open that run's own output before building on it, and where a repro reproduces the reported symptom,
+  check what the working copy is standing on before calling it confirmed.
 - **The second failure pattern: it still stands, but its reasoning has expired.** #469 is the easy case —
   the item was repaired, so verifying it closes it.
   [#456](https://github.com/DaveKJohn/claude-code-specialists/issues/456) is the case that looks like it
