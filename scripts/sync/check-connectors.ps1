@@ -8,10 +8,14 @@
     so it does not travel along with a consumer's plugin cache): ONE manifest per connected repo
     (connectors/<repo>.json), containing the extension
     inventory per plugin. Manifests contain only METADATA -- never
-    lens content and never absolute machine paths; localCheckout is relative to this repo's root.
+    lens content and never absolute machine paths; localCheckout is relative to this repo's root, and
+    may be a LIST of relative paths when the layout differs per machine -- the first one present here
+    wins (issue #1524).
 
     Per connector this script checks:
-      1. Checkout present on this machine?          no -> [SKIP] (not an error)
+      1. Checkout present on this machine?          no -> [SKIP] (not an error). 'Present' means any
+         one of the manifest's localCheckout candidates resolves; the [SKIP] names all of them, so a
+         register that is merely stale about this machine's layout can be told from a genuine absence.
       2. Per plugin: enabled anywhere in the consumer's settings CHAIN? no -> [ERROR]. Read via
          Get-EnabledPlugins, so the verdict names the layer it came from (inbound #294); this line used
          to say '.claude/settings.json', which is the single-file reading that produced that inbound.
@@ -239,18 +243,48 @@ foreach ($mf in $manifestFiles) {
     # someone else's session either (Sean's advice, round 3).
     if ($ConsumerPathOverride) {
         $checkout = $ConsumerPathOverride
+        $candidates = @($ConsumerPathOverride)
     } else {
-        if ([System.IO.Path]::IsPathRooted($m.localCheckout)) {
+        # localCheckout is ONE relative path, or a LIST of candidates -- the first one present on this
+        # machine wins. The list exists because the field is a single per-manifest value while the
+        # layout it describes is per-machine: measured 2026-09-06 (issue #1524), the two machines that
+        # hold the BWJ checkouts place them at '../../bwjecommerce/<repo>' and
+        # '../../GitHub/bwjecommerce/<repo>' respectively, so no single string is true on both.
+        #
+        # WHY THAT MATTERS MORE THAN A WRONG PATH USUALLY WOULD: a path this machine cannot find is not
+        # reported as wrong, it is reported as '[SKIP] not present on this machine' -- a sentence that
+        # ASSERTS the checkout is absent, exits 0, and hides everything the connector would have said.
+        # #1524 measured what one such skip covered: four [INFO] lines and a drift check reading 26
+        # missing agent-defs. A register whose miss is silent teaches nobody it is stale, which is why
+        # the answer is to record every layout rather than to pick a machine and be wrong on the others.
+        $candidates = @(@($m.localCheckout) | Where-Object { $null -ne $_ -and [string]$_ -ne '' })
+        if ($candidates.Count -eq 0) {
             if ($OnlyConsumer) { continue }
-            Write-Failure "absolute localCheckout path '$($m.localCheckout)' in $($mf.Name) -- rejected (relative sibling paths only)."
+            Write-Failure "no localCheckout path in $($mf.Name) -- rejected (a manifest names at least one relative path)."
             continue
         }
-        $checkout = Join-Path $RepoRoot $m.localCheckout
+        $rooted = @($candidates | Where-Object { [System.IO.Path]::IsPathRooted($_) })
+        if ($rooted.Count -gt 0) {
+            if ($OnlyConsumer) { continue }
+            Write-Failure "absolute localCheckout path '$($rooted -join "', '")' in $($mf.Name) -- rejected (relative sibling paths only)."
+            continue
+        }
+        # First present wins. Deliberately not 'the only one present': two candidates resolving on one
+        # machine is a layout question for whoever wrote them, not something this check can adjudicate,
+        # and refusing here would break the sweep over a register that is merely generous.
+        $checkout = $null
+        $chosenCandidate = ''
+        foreach ($candidate in $candidates) {
+            $probe = Join-Path $RepoRoot $candidate
+            if (Test-Path -LiteralPath $probe) { $checkout = $probe; $chosenCandidate = $candidate; break }
+        }
     }
-    if (-not (Test-Path -LiteralPath $checkout)) {
+    # $checkout is $null when no candidate resolved; with -ConsumerPathOverride it is the override,
+    # which is probed here exactly as a single manifest path always was.
+    if (-not $checkout -or -not (Test-Path -LiteralPath $checkout)) {
         if (-not $OnlyConsumer) {
             Write-Host "`n== connector: $($m.repo)" -ForegroundColor Cyan
-            Write-Skip "checkout '$($m.localCheckout)' not present on this machine -- not checked."
+            Write-Skip "checkout '$($candidates -join "', '")' not present on this machine -- not checked."
         }
         continue
     }
@@ -262,7 +296,7 @@ foreach ($mf in $manifestFiles) {
     if (-not $ConsumerPathOverride) {
         $scopeRoot = (Resolve-Path -LiteralPath (Join-Path $RepoRoot '..\..')).Path
         if (-not $checkout.StartsWith($scopeRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-            Write-Failure "localCheckout '$($m.localCheckout)' falls outside the allowed scope ('$scopeRoot') -- rejected."
+            Write-Failure "localCheckout '$chosenCandidate' falls outside the allowed scope ('$scopeRoot') -- rejected."
             continue
         }
     }

@@ -81,7 +81,11 @@ function New-FixtureConsumer {
 function New-FixtureManifest {
     param(
         [string[]]$Extensions,
-        [string]$LocalCheckout = 'nonexistent-fixture-path',
+        # Deliberately untyped: localCheckout is one relative path OR a list of candidates (#1524), and
+        # a [string[]] here would silently turn every single-path case into a one-element array, so the
+        # string form -- what every manifest but the two BWJ ones still carries -- would stop being
+        # exercised at all.
+        $LocalCheckout = 'nonexistent-fixture-path',
         [string]$Plugin = 'dkj-team-alpha@claude-code-specialists'
     )
     $mfPath = Join-Path $Fixture 'manifest.json'
@@ -197,6 +201,29 @@ try {
     Assert-Equal 0 $r.Code 'missing checkout: exit code 0'
     Assert-Match '\[SKIP\]' $r.Out 'missing checkout: SKIP message'
 
+    # --- 4b. A LIST of candidate paths, none present -> SKIP naming ALL of them, exit 0 -------------
+    #     The field is one per-manifest value while the layout it describes is per-machine (#1524), so
+    #     it may hold several relative paths. When none resolves, the [SKIP] has to name every one of
+    #     them: that line is the only thing a reader gets, and a skip naming one candidate out of two
+    #     reads as "the checkout is absent" when what actually happened is "this machine's layout is
+    #     not in the register".
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $mf = New-FixtureManifest -Extensions @('06-16') -LocalCheckout @('nonexistent-fixture-path', 'also-nonexistent-fixture-path')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf))
+    Assert-Equal 0 $r.Code 'candidate list, none present: exit code 0'
+    Assert-Match '\[SKIP\]' $r.Out 'candidate list, none present: SKIP message'
+    Assert-Match 'nonexistent-fixture-path' $r.Out 'candidate list, none present: the SKIP names the first candidate'
+    Assert-Match 'also-nonexistent-fixture-path' $r.Out 'candidate list, none present: the SKIP names the second candidate too'
+
+    # --- 4c. A LIST whose LATER candidate resolves -> checked, not skipped --------------------------
+    #     The regression #1524 is made of: the first candidate missing must not end the connector. '.'
+    #     is used as the resolving one for the same reason case 6 below uses it -- it is the only path
+    #     relative to the repo root that is guaranteed to exist wherever this suite runs.
+    $mf = New-FixtureManifest -Extensions @('06-16') -LocalCheckout @('nonexistent-fixture-path', '.')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf))
+    Assert-NotMatch '\[SKIP\]' $r.Out 'candidate list, later one present: NOT skipped -- the first miss does not end the connector'
+    Assert-Match '== connector: fixture/consumer' $r.Out 'candidate list, later one present: the connector is actually checked'
+
     # --- 5. Unregistered extension of this plugin -> INFO, exit 0 ------------------------
     New-FixtureConsumer -ExtensionIds @('06-16', '06-23')
     $mf = New-FixtureManifest -Extensions @('06-16')
@@ -282,6 +309,22 @@ try {
     $r = Invoke-Ps $Script ($base + @('-Manifest', $mf))
     Assert-Equal 1 $r.Code 'absolute path: exit code 1'
     Assert-Match '\[ERROR\].*rejected' $r.Out 'absolute path: rejected message'
+
+    # 7a2. An absolute path ANYWHERE in a candidate list -> rejected, exit 1. The guardrail is on the
+    #      field, not on its first element: a list whose second entry is absolute must not slip through
+    #      because the first one happened to be relative and missing.
+    $mf = New-FixtureManifest -Extensions @('06-16') -LocalCheckout @('nonexistent-fixture-path', 'C:\Windows')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf))
+    Assert-Equal 1 $r.Code 'absolute path in a candidate list: exit code 1'
+    Assert-Match '\[ERROR\].*rejected' $r.Out 'absolute path in a candidate list: rejected message'
+
+    # 7a3. An EMPTY candidate list -> rejected, exit 1. A manifest naming no checkout at all is a
+    #      malformed register entry, not a checkout that is absent here -- reporting it as [SKIP] would
+    #      be the same false-absence sentence #1524 was filed about.
+    $mf = New-FixtureManifest -Extensions @('06-16') -LocalCheckout @()
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf))
+    Assert-Equal 1 $r.Code 'empty candidate list: exit code 1'
+    Assert-Match '\[ERROR\].*no localCheckout path' $r.Out 'empty candidate list: rejected message names the missing field'
 
     # 7b. Path traversal outside the scope root -> rejected, exit 1. '..\..\..' resolved from
     #     the repo root always ends up above the scope root (= two levels above the repo root).
