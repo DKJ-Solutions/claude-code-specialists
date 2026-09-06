@@ -5601,13 +5601,23 @@ function Get-PerBranchDocumentRels {
         Every per-branch development document actually present in $RepoRoot, repo-relative, forward slashes,
         sorted -- the folder's own permanent pages excluded.
 
-        ONE SWEEP, FOUR CALLERS (#1335), and it is a function for the same reason Resolve-BranchFilePath is:
-        Resolve-BranchFilePath discovers sibling documents, Get-UnfoldedTrunkEntry hunts leftovers on the
-        trunk, and check-plugin-integrity.ps1 sweeps twice -- for heading levels and for branch-type
-        headings. All four had the same three lines inline, which was survivable while the glob carried its
-        own guard in the word 'development-'. It does not any more: the exclusion is now the only thing
-        between this sweep and CHANGELOG.md, and a guard maintained in four copies is a guard that will hold
-        in three.
+        ONE SWEEP, FIVE CALLERS (#1335, #1497), and it is a function for the same reason
+        Resolve-BranchFilePath is: Resolve-BranchFilePath discovers sibling documents, Get-UnfoldedTrunkEntry
+        hunts leftovers on the trunk, check-plugin-integrity.ps1 sweeps twice -- for heading levels and for
+        branch-type headings -- and fold-changelog-entry.ps1's fold-all mode discovers what to fold. All of
+        them had the same three lines inline, which was survivable while the glob carried its own guard in
+        the word 'development-'. It does not any more: the exclusion is now the only thing between this sweep
+        and CHANGELOG.md, and a guard maintained in copies is a guard that will hold in all but one of them.
+
+        THE FIFTH WAS FOUND THE HARD WAY (#1497, September 6, 2026), and it is why this paragraph now names
+        its callers rather than counting them. #1335 converted four and missed the fold's own loop, so that
+        loop kept the unguarded glob -- and #1437 then moved README.md, CONTRIBUTING.md and CHANGELOG.md INTO
+        the swept folder. All three declare a branch and read as filled (CHANGELOG.md off its newest folded
+        '### DEPLOY:' heading, the other two off an ordinary backtick-quoted path), so fold-all mode read
+        each as an unfolded dossier: it spliced the page into the changelog and DELETED it. With the
+        changelog outside the folder that even exits 0. The sentence above about copies was written before
+        this happened and predicted it exactly; the count was the part that went stale, which is the argument
+        for a named list over a number.
 
         NOT THE DECLARE-TEST. This answers "which files could be one", by name; every caller then asks each
         hit which branch it DECLARES, which is what keeps the filename from becoming the authority.

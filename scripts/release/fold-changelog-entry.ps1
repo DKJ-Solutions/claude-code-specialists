@@ -390,39 +390,48 @@ else {
     # entry), and it must be FILLED. The legacy 'development-cycle.md' matches this pattern too and needs no
     # exception -- if it passes all three it IS an unfolded entry and folding it is right.
     #
-    # AND IT MUST NOT BE ONE OF THIS FOLDER'S OWN RESERVED PAGES (issue #1493's own PR, first real fold-all
-    # run against this tree since CHANGELOG.md, CONTRIBUTING.md and README.md started sharing this
-    # directory with every branch's dossier, #1437). Get-BranchFilePaths.ReservedNames already names exactly
-    # these three -- it exists for this (see branch-document-path.tests.ps1) and was simply never wired into
-    # this loop, which read every '*.md' the glob found as a candidate dossier.
+    # AND IT MUST NOT BE ONE OF THIS FOLDER'S OWN RESERVED PAGES (#1497, and #1493's own PR before it --
+    # the first real fold-all run against this tree since CHANGELOG.md, CONTRIBUTING.md and README.md
+    # started sharing this directory with every branch's dossier, #1437).
     #
-    # TWO REAL, MEASURED FALSE POSITIVES, NOT A HYPOTHETICAL ONE -- and between them they rule out reaching
-    # for a content-based fix instead of a name-based one. CHANGELOG.md's own newest '### DEPLOY: <branch>'
-    # heading satisfies Get-BranchFileDeclaredBranch's entry pattern (that function reads it correctly for
-    # the document it was built for, a single branch's own dossier -- it was never asked whether a document
-    # holding MANY such headings might be handed to it too), so the whole file was read as one unfolded
-    # entry and every one of its already-folded 'Score:' pairs came back as the same tier declared twice.
-    # dkj-policy/README.md's title -- '# `dkj-policy/` -- the workflow's own folder in this repo' -- carries
-    # a backtick-quoted term with a slash in it, which is exactly the shape that function's widest pattern
-    # is built to recognise; it matched on the OPENING heading, so -OpeningHeadingOnly (built for an
-    # arbitrary-document scan exactly like this one) would not have saved it either. Reproduced locally
-    # before this fix: fold-all mode deleted the real README.md and spliced its title into CHANGELOG.md as
-    # a folded entry -- uncommitted, caught before it reached origin, but this workflow runs with -Push.
-    $foldAllPaths = Get-BranchFilePaths
-    $foldAllReserved = @($foldAllPaths.ReservedNames)
+    # THREE REAL, MEASURED FALSE POSITIVES, NOT A HYPOTHETICAL ONE -- and between them they rule out
+    # reaching for a content-based fix instead of a name-based one. CHANGELOG.md's own newest
+    # '### DEPLOY: <branch>' heading satisfies Get-BranchFileDeclaredBranch's entry pattern (that function
+    # reads it correctly for the document it was built for, a single branch's own dossier -- it was never
+    # asked whether a document holding MANY such headings might be handed to it too), so the whole file was
+    # read as one unfolded entry and every one of its already-folded 'Score:' pairs came back as the same
+    # tier declared twice. dkj-policy/README.md's title -- '# `dkj-policy/` -- the workflow's own folder in
+    # this repo' -- carries a backtick-quoted term with a slash in it, which is exactly the shape that
+    # function's widest pattern is built to recognise; it matched on the OPENING heading, so
+    # -OpeningHeadingOnly (built for an arbitrary-document scan exactly like this one) would not have saved
+    # it either. CONTRIBUTING.md is the third and was missed by the report that named the other two: it
+    # declares '<branch>.md' off a backtick-quoted path placeholder in an ordinary '###' heading. All three
+    # read as FILLED as well. The fold moves a document into the changelog and then DELETES it, so with the
+    # changelog OUTSIDE this folder -- the layout every consumer predating #1437 still has -- that
+    # succeeds and exits 0.
+    #
+    # THE LISTING IS Get-PerBranchDocumentRels' AND NOT THIS SCRIPT'S (#1497), which is the part worth
+    # reading twice, because the exclusion above is not what was missing. Get-BranchFilePaths.ReservedNames
+    # has named these three all along and Get-PerBranchDocumentRels has applied it all along; this loop
+    # simply never asked either of them. It was three lines inline here -- a Get-ChildItem over the folder
+    # with the Pattern glob -- which is the shape every caller had while that glob was 'development-*.md'
+    # and carried its own guard in the prefix. #1335 widened it to '*.md', moved the narrowing out of the
+    # glob into ReservedNames, and converted the four callers it knew about; this loop was a fifth nobody
+    # counted. So the repair is not a sixth copy of the exclusion but the removal of the last hand-rolled
+    # sweep -- it is the failure Get-PerBranchDocumentRels' own docstring predicts by name, and a sixth copy
+    # would leave the mechanism that produced it intact.
+    #
+    # The root scan below keeps its OWN $reserved list rather than borrowing this one, and that is not the
+    # same duplication: it sweeps the repo ROOT, where the set that must not be folded is a different one
+    # (CLAUDE.md sits there and not in the folder, CONTRIBUTING.md sits in the folder and not there), and
+    # it has excluded its own set correctly since it was written.
     $foldAllTrunk = Get-BranchTrunkName
-    $foldAllDir   = Join-Path $repoRoot ([string]$foldAllPaths.Directory -replace '/', '\')
-    if (Test-Path -LiteralPath $foldAllDir -PathType Container) {
-        foreach ($devDoc in @(Get-ChildItem -LiteralPath $foldAllDir -Filter ([string]$foldAllPaths.Pattern) -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
-            if ($foldAllReserved -contains $devDoc.Name) { continue }
-            $devRel = "$([string]$foldAllPaths.Directory)/$($devDoc.Name)"
-            if ($entryFiles -contains $devRel) { continue }
-            $devText = [System.IO.File]::ReadAllText($devDoc.FullName, [System.Text.Encoding]::UTF8)
-            $devDeclared = Get-BranchFileDeclaredBranch -Text $devText
-            if (-not $devDeclared -or $devDeclared -eq $foldAllTrunk) { continue }
-            if (Test-BranchChangelogIsFilled -Text $devText) { $entryFiles += $devRel }
-        }
-    }
+    foreach ($devRel in @(Get-PerBranchDocumentRels -RepoRoot $repoRoot)) {
+        if ($entryFiles -contains $devRel) { continue }
+        $devText = [System.IO.File]::ReadAllText((Join-Path $repoRoot ($devRel -replace '/', '\')), [System.Text.Encoding]::UTF8)
+        $devDeclared = Get-BranchFileDeclaredBranch -Text $devText
+        if (-not $devDeclared -or $devDeclared -eq $foldAllTrunk) { continue }
+        if (Test-BranchChangelogIsFilled -Text $devText) { $entryFiles += $devRel }    }
     $entryFiles += @(Get-ChildItem -Path $repoRoot -Filter "*.md" -File |
         Where-Object { $reserved -notcontains $_.Name } |
         Where-Object { Test-IsChangelogEntryFile -Path $_.FullName } |

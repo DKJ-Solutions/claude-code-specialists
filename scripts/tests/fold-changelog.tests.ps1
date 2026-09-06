@@ -101,6 +101,26 @@ $script:FixtureIntro = @(
     ''
 ) -join "`n"
 
+function Get-FixtureChangelogRel {
+    <#
+        Where a fixture's CHANGELOG.md sits: at the root for the repointed default, or inside the branch-
+        document folder for -CoLocated, which is this repo's own layout since #1437.
+
+        THE CO-LOCATED PATH IS COMPOSED FROM THE INTERFACE, not typed. Directory is where the sweep looks
+        and ReservedNames is what the sweep must skip, so a fixture built from those two cannot end up
+        modelling a layout the script no longer has. It throws rather than falling back if CHANGELOG.md
+        ever leaves that list -- a fixture that quietly stopped modelling the co-location would keep
+        passing while testing nothing, which is the state #1497 was already in.
+    #>
+    param([switch]$CoLocated)
+    if (-not $CoLocated) { return 'CHANGELOG.md' }
+    $paths = Get-BranchFilePaths
+    if (@($paths.ReservedNames) -notcontains 'CHANGELOG.md') {
+        throw "fixture: CHANGELOG.md is no longer in Get-BranchFilePaths().ReservedNames -- the co-located layout modelled here has changed shape."
+    }
+    return "$([string]$paths.Directory)/CHANGELOG.md"
+}
+
 function New-FoldFixture {
     <#
         A throwaway repo root with the real fold script + its repo-owned/sibling dependencies
@@ -123,8 +143,15 @@ function New-FoldFixture {
         map, adding back the legacy single-heading getter -- because which changelog sections a repo declared
         was the subject of half these tests. The fold reads no section seam at all any more, so there is
         nothing left to vary.
+        -CoLocated LEAVES THE SEAM ALONE, which is this repo's own production layout (#1437): CHANGELOG.md
+        sits INSIDE the branch-document folder, beside the dossiers the fold-all sweep lists. Every other
+        fixture here repoints the seam to the root for the reasons above, and that is what kept #1497
+        invisible -- with the changelog at the root, the folder scan could not reach it, so no test in this
+        suite ever asked what the sweep does with a reserved page sitting in the folder it sweeps. Pass this
+        switch when the co-location IS the subject; the fixture then writes its intro to the seam's own path
+        and Get-Changelog is given that path.
     #>
-    param([Parameter(Mandatory = $true)][string]$Label)
+    param([Parameter(Mandatory = $true)][string]$Label, [switch]$CoLocated)
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-test-$PID-$Label")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
@@ -153,14 +180,19 @@ function New-FoldFixture {
     # so the fixture says so in the one place that decides it. Throws if the literal changes shape, so this
     # never degrades into a silently ineffective patch.
     $foldCfgPath = Join-Path $dir 'scripts\repo-config.ps1'
-    $foldCfg = [System.IO.File]::ReadAllText($foldCfgPath)
-    $foldCfgPatched = $foldCfg -replace "(?m)^\`$script:ChangelogPath\s*=.*$", "`$script:ChangelogPath = 'CHANGELOG.md'"
-    if ($foldCfgPatched -eq $foldCfg) {
-        throw "fixture: could not repoint ChangelogPath to the root -- the seam literal in repo-config.ps1 changed shape."
+    if (-not $CoLocated) {
+        $foldCfg = [System.IO.File]::ReadAllText($foldCfgPath)
+        $foldCfgPatched = $foldCfg -replace "(?m)^\`$script:ChangelogPath\s*=.*$", "`$script:ChangelogPath = 'CHANGELOG.md'"
+        if ($foldCfgPatched -eq $foldCfg) {
+            throw "fixture: could not repoint ChangelogPath to the root -- the seam literal in repo-config.ps1 changed shape."
+        }
+        [System.IO.File]::WriteAllText($foldCfgPath, $foldCfgPatched, $Utf8NoBom)
     }
-    [System.IO.File]::WriteAllText($foldCfgPath, $foldCfgPatched, $Utf8NoBom)
 
-    [System.IO.File]::WriteAllText((Join-Path $dir 'CHANGELOG.md'), $script:FixtureIntro, $Utf8NoBom)
+    $clRel = Get-FixtureChangelogRel -CoLocated:$CoLocated
+    $clAbs = Join-Path $dir ($clRel -replace '/', '\')
+    New-Item -ItemType Directory -Path ([System.IO.Path]::GetDirectoryName($clAbs)) -Force | Out-Null
+    [System.IO.File]::WriteAllText($clAbs, $script:FixtureIntro, $Utf8NoBom)
     $script:fixtures += $dir
     return $dir
 }
@@ -252,8 +284,9 @@ function New-DocFile {
 }
 
 function Get-Changelog {
-    param([string]$Dir)
-    return [System.IO.File]::ReadAllText((Join-Path $Dir 'CHANGELOG.md'))
+    param([string]$Dir, [switch]$CoLocated)
+    $rel = Get-FixtureChangelogRel -CoLocated:$CoLocated
+    return [System.IO.File]::ReadAllText((Join-Path $Dir ($rel -replace '/', '\')))
 }
 
 function Get-EntryOrder {
@@ -375,7 +408,7 @@ Assert-True ($foldSrcText -match 'Set-EntryMergeStamp') 'and the merge moment is
 Assert-True ($foldSrcText -notmatch '\$entryHashes #\$num') 'and the heading prepend is gone from the source, not merely unused'
 
 # ---------------------------------------------------------------------------------------------------
-Write-Host "fold-all -- CHANGELOG.md and its dkj-policy/ neighbours are not mistaken for a dossier (#1493)" -ForegroundColor Cyan
+Write-Host "fold-all -Commit -- a reserved page never enters the commit's pathspec (#1493)" -ForegroundColor Cyan
 #      Since #1437 CHANGELOG.md, CONTRIBUTING.md and README.md all live in the SAME directory
 #      (dkj-policy/) the fold-all discovery loop scans for per-branch dossiers, and that loop's own
 #      '*.md' glob does not know the difference on its own -- the test above covers the LEGACY root
@@ -390,20 +423,15 @@ Write-Host "fold-all -- CHANGELOG.md and its dkj-policy/ neighbours are not mist
 #      the same tier declared twice -- modelled below by the pre-existing entry in $rnChangelog.
 #      dkj-policy/README.md's own title carries a backtick-quoted term with a slash in it -- exactly
 #      the shape that same pattern is built to recognise -- and was folded and DELETED outright.
-$dirRN = New-FoldFixture -Label 'reservednames'
+#
+#      -CoLocated RATHER THAN UN-PATCHING THE SEAM BY HAND. This block used to re-patch repo-config.ps1
+#      itself, undoing what New-FoldFixture had just written -- correct, but a second copy of the one
+#      substitution that knows the seam's literal shape, in the same file that already owns it. The switch
+#      says "do not repoint it" instead, so the fixture helper stays the only place that literal appears.
+$dirRC = New-FoldFixture -Label 'reservedcommit' -CoLocated
 $rnPaths = Get-BranchFilePaths
-$rnDir = Join-Path $dirRN $rnPaths.Directory
+$rnDir = Join-Path $dirRC $rnPaths.Directory
 New-Item -ItemType Directory -Path $rnDir -Force | Out-Null
-# UN-PATCH THE SEAM New-FoldFixture JUST SET. That helper repoints every fixture's ChangelogPath to
-# the fixture ROOT, specifically so the suite's other (pre-dkj-policy/) fixtures keep passing -- this
-# is the one test whose entire premise is CHANGELOG.md living INSIDE dkj-policy/, which is what the
-# real repo actually does since #1437, so it needs the seam pointed back at that reality rather than
-# at the root the rest of this file deliberately models.
-$rnCfgPath = Join-Path $dirRN 'scripts\repo-config.ps1'
-$rnCfg = [System.IO.File]::ReadAllText($rnCfgPath)
-$rnCfgPatched = $rnCfg -replace "(?m)^\`$script:ChangelogPath\s*=.*$", "`$script:ChangelogPath = '$($rnPaths.Directory)/CHANGELOG.md'"
-if ($rnCfgPatched -eq $rnCfg) { throw "fixture: could not repoint ChangelogPath back to dkj-policy/ -- the seam literal changed shape." }
-[System.IO.File]::WriteAllText($rnCfgPath, $rnCfgPatched, $Utf8NoBom)
 
 # A CHANGELOG.md that already looks like production: the standard fixture intro, plus one
 # already-folded entry carrying both 'Score:' lines a real folded entry always has -- same shape
@@ -424,27 +452,27 @@ New-DocFile -Dir $rnDir -Name 'CONTRIBUTING.md' -Heading 'Contributing'
 
 # The one REAL unfolded dossier this run should actually fold.
 $rnRows = @([pscustomobject]@{ Tier = 1; Score = 4; Why = 'the real one' })
-[System.IO.File]::WriteAllText((Join-Path $dirRN $rnPaths.File),
+[System.IO.File]::WriteAllText((Join-Path $dirRC $rnPaths.File),
     ((Format-Development -Branch 'feat/reserved-names-v1' -Id '20260102-000000' `
         -Description 'The genuine pending change' -Type 'feat' -ImpactRows $rnRows) -join "`n") + "`n", $Utf8NoBom)
 
 # -Commit, not a dry run: the CI workflow issue #1493 adds runs this exact fold-all mode with
 # -Commit -Push, so proving the reserved files survive ON DISK is not the same proof as showing
 # they never entered the commit's own pathspec (Sebastian #23's pre-merge review of this branch).
-Initialize-FoldGitRepo -Dir $dirRN
-$rRN = Invoke-Fold -Dir $dirRN -ExtraArgs @('-Commit')
-Assert-True ($rRN.ExitCode -eq 0) 'reserved names: exits 0 -- CHANGELOG/README/CONTRIBUTING do not choke the pre-pass'
+Initialize-FoldGitRepo -Dir $dirRC
+$rRC = Invoke-Fold -Dir $dirRC -ExtraArgs @('-Commit')
+Assert-True ($rRC.ExitCode -eq 0) 'reserved commit: exits 0 -- CHANGELOG/README/CONTRIBUTING do not choke the pre-pass'
 $rnChangelogAfter = [System.IO.File]::ReadAllText((Join-Path $rnDir 'CHANGELOG.md'))
-Assert-True ($rnChangelogAfter -match 'The genuine pending change')        'reserved names: the real dossier still folds'
-Assert-True ($rnChangelogAfter -match 'Some already-folded change')        'reserved names: the pre-existing entry survives untouched'
-Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CHANGELOG.md'))     'reserved names: CHANGELOG.md itself survives -- not folded away as an entry'
-Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'README.md'))       'reserved names: README.md survives'
-$rnCommitFiles = @(Invoke-Git -Dir $dirRN -GitArgs @('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'))
-Assert-True ($rnCommitFiles -contains "$($rnPaths.Directory)/CHANGELOG.md") 'reserved names: -Commit -- CHANGELOG.md is in the commit (the real fold)'
-Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/README.md"))       'reserved names: -Commit -- README.md is NOT in the commit'
-Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/CONTRIBUTING.md")) 'reserved names: -Commit -- CONTRIBUTING.md is NOT in the commit'
-Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CONTRIBUTING.md')) 'reserved names: CONTRIBUTING.md survives'
-Assert-True (-not (Test-Path -LiteralPath (Join-Path $dirRN $rnPaths.File))) 'reserved names: the real dossier is removed after folding'
+Assert-True ($rnChangelogAfter -match 'The genuine pending change')        'reserved commit: the real dossier still folds'
+Assert-True ($rnChangelogAfter -match 'Some already-folded change')        'reserved commit: the pre-existing entry survives untouched'
+Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CHANGELOG.md'))     'reserved commit: CHANGELOG.md itself survives -- not folded away as an entry'
+Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'README.md'))       'reserved commit: README.md survives'
+$rnCommitFiles = @(Invoke-Git -Dir $dirRC -GitArgs @('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'))
+Assert-True ($rnCommitFiles -contains "$($rnPaths.Directory)/CHANGELOG.md") 'reserved commit: -Commit -- CHANGELOG.md is in the commit (the real fold)'
+Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/README.md"))       'reserved commit: -Commit -- README.md is NOT in the commit'
+Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/CONTRIBUTING.md")) 'reserved commit: -Commit -- CONTRIBUTING.md is NOT in the commit'
+Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CONTRIBUTING.md')) 'reserved commit: CONTRIBUTING.md survives'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $dirRC $rnPaths.File))) 'reserved commit: the real dossier is removed after folding'
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host "The intro is written below, never over" -ForegroundColor Cyan
@@ -869,6 +897,158 @@ Assert-True ($rBR.ExitCode -eq 0) 'reset pair: exits 0 -- nothing to fold is not
 Assert-True ($rBR.Output -match 'No entry files found') 'reset pair: and it says there was nothing to fold'
 Assert-True ((Get-Changelog -Dir $dirBR) -eq $clBR0) 'reset pair: CHANGELOG.md is byte-identical'
 Assert-True (-not ($rBR.Output -match [regex]::Escape((Get-BranchFilesRereadNote)))) 'reset pair: and NO re-read note -- this run rewrote nothing, so nothing went stale (inbound #817)'
+
+Write-Host "fold-all -- the folder's own reserved pages are not dossiers (issue #1497)" -ForegroundColor Cyan
+#      THE FOLDER SCAN SWEPT ITS OWN PERMANENT PAGES. Get-BranchFilePaths().Pattern was 'development-*.md'
+#      until #1335 and carried its guard in that prefix, so the glob could not reach README.md,
+#      CONTRIBUTING.md or CHANGELOG.md. #1335 widened it to '*.md' and moved the narrowing into
+#      ReservedNames; the four callers Get-PerBranchDocumentRels names were converted, and this script's
+#      fold-all loop was a fifth nobody counted. Then #1437 moved all three reserved pages INTO that same
+#      folder, and the sweep has been reading them as unfolded dossiers ever since.
+#
+#      ALL THREE PASS BOTH REMAINING TESTS -- measured against this repo's live tree, September 6, 2026 --
+#      which is why this fixture writes all three rather than the two the report named. CHANGELOG.md
+#      declares a branch by every test here because every folded entry in it carries a '### DEPLOY: <branch>'
+#      heading; README.md and CONTRIBUTING.md declare one off an ordinary backtick-quoted path in a heading.
+#      The fold moves a document into the changelog and then DELETES it, so with '-Commit -Push' this
+#      succeeds: it splices a real page into CHANGELOG.md, removes the page, and says nothing. #1493's CI
+#      workflow runs exactly this mode on every push to the trunk.
+#
+#      -CoLocated IS LOAD-BEARING. With the seam repointed to the root (every other fixture in this suite)
+#      the folder scan cannot reach the changelog at all, and the sharpest half of this regression -- the
+#      sweep handing the fold the very file it is writing into -- is unreproducible. This fixture is the
+#      production layout since #1437.
+$dirRN = New-FoldFixture -Label 'reservednames' -CoLocated
+New-Item -ItemType Directory -Path (Join-Path $dirRN $bfPaths.Directory) -Force | Out-Null
+$rnChangelogRel = Get-FixtureChangelogRel -CoLocated
+$rnChangelogAbs = Join-Path $dirRN ($rnChangelogRel -replace '/', '\')
+
+function New-RnDossier {
+    # One dossier at the branch document's own path, written through the REAL formatter -- the fixture must
+    # not become a second definition of the shape the sweep reads.
+    param([string]$Branch, [string]$Id, [string]$Description, [int]$Tier, [int]$Score)
+    $rows = @([pscustomobject]@{ Tier = $Tier; Score = $Score; Why = 'the sweep' })
+    [System.IO.File]::WriteAllText((Join-Path $dirRN $bfPaths.File),
+        ((Format-Development -Branch $Branch -Id $Id -Description $Description -Type 'fix' -ImpactRows $rows) -join "`n") + "`n", $Utf8NoBom)
+}
+
+# THE CHANGELOG IS BUILT BY THE FOLD ITSELF, two entries deep, rather than hand-written. A hand-written
+# stand-in is a guess at the shape the sweep reads, and a guess that drifts leaves this test passing while
+# reproducing nothing -- which is the failure mode #1497 already is. Two entries, because ONE is not enough
+# to reach the refusal half: each folded entry carries its own legitimate significance sections, so it takes
+# two before the whole file, read as a single dossier, declares the same tier twice.
+New-RnDossier -Branch 'fix/folded-the-week-before' -Id '20260901-090000' -Description 'Folded the week before' -Tier 1 -Score 3
+Invoke-Fold -Dir $dirRN | Out-Null
+New-RnDossier -Branch 'fix/folded-yesterday' -Id '20260905-090000' -Description 'Folded yesterday' -Tier 1 -Score 3
+Invoke-Fold -Dir $dirRN | Out-Null
+
+# The other two reserved pages, carrying the heading shapes the LIVE pages carry: an ordinary heading with
+# a backtick-quoted path in it. Neither is about a branch, and both declare one by every test the sweep has.
+[System.IO.File]::WriteAllText((Join-Path $dirRN ($bfPaths.Directory + '\README.md')),
+    "# ``dkj-policy/`` -- the workflow's own folder in this repo`n`nSome prose.`n", $Utf8NoBom)
+[System.IO.File]::WriteAllText((Join-Path $dirRN ($bfPaths.Directory + '\CONTRIBUTING.md')),
+    "# Contributing`n`n### 2.1. Create the branch and the empty ``<branch>.md```n`nSome prose.`n", $Utf8NoBom)
+
+# THE FIXTURE PROVES ITSELF BEFORE IT PROVES THE FIX. All three pages must pass BOTH tests the sweep applies
+# after the name check -- otherwise the name check is not what is saving them here and every assert below is
+# green for the wrong reason. Asserted with the real predicates, so a change to either one breaks this
+# reproduction loudly instead of quietly retiring it.
+#
+# AND THE READ IS GUARDED, because on the unfixed script this file is already GONE by now: the two setup
+# folds above swept the folder, found CHANGELOG.md declaring the branch of the entry just folded into it,
+# folded it into itself and deleted it. That is #1497 in its plainest form and it happens before the run
+# under test even starts -- so an unguarded read here aborts the whole suite with a FileNotFoundException
+# instead of reporting a failure, and every assert after this point goes unreported too.
+foreach ($rnName in @('README.md', 'CONTRIBUTING.md', 'CHANGELOG.md')) {
+    $rnPath = Join-Path $dirRN ($bfPaths.Directory + "\$rnName")
+    Assert-True (Test-Path -LiteralPath $rnPath) "reserved names: fixture check -- $rnName is still there after two ordinary folds"
+    if (-not (Test-Path -LiteralPath $rnPath)) { continue }
+    $rnText = [System.IO.File]::ReadAllText($rnPath, [System.Text.Encoding]::UTF8)
+    $rnDeclared = Get-BranchFileDeclaredBranch -Text $rnText
+    Assert-True ($rnDeclared -and $rnDeclared -ne (Get-BranchTrunkName)) "reserved names: fixture check -- $rnName DECLARES a non-trunk branch, so only its name can save it"
+    Assert-True (Test-BranchChangelogIsFilled -Text $rnText) "reserved names: fixture check -- $rnName reads as FILLED too, so both content tests pass it"
+}
+
+# Every reserved page's bytes BEFORE the run, so survival is asserted on content rather than on existence
+# alone -- the fold rewrites as well as deletes, and a page left behind with an entry spliced out of it
+# would pass a bare Test-Path.
+$rnBefore = @{}
+foreach ($rnName in @('README.md', 'CONTRIBUTING.md')) {
+    $rnBefore[$rnName] = [System.IO.File]::ReadAllText((Join-Path $dirRN ($bfPaths.Directory + "\$rnName")))
+}
+
+# The run under test: a third, real dossier beside the three pages.
+New-RnDossier -Branch 'fix/a-real-dossier' -Id '20260906-090000' -Description 'A real dossier beside the reserved pages' -Tier 2 -Score 3
+$rRN = Invoke-Fold -Dir $dirRN
+# Same guard, same reason: on the unfixed script there is no changelog left to read here.
+$clRN = if (Test-Path -LiteralPath $rnChangelogAbs) { Get-Changelog -Dir $dirRN -CoLocated } else { '' }
+
+Assert-True ($rRN.ExitCode -eq 0) 'reserved names: exits 0 -- the co-located pages do not make the run refuse'
+Assert-True (Test-Path -LiteralPath $rnChangelogAbs) 'reserved names: CHANGELOG.md was never folded into itself and deleted'
+# The real dossier still folds. Without this the fix could be "skip the whole folder" and every assert below
+# would still pass while fold-all had quietly stopped doing its job.
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $dirRN $bfPaths.File))) 'reserved names: the REAL dossier is still folded and removed'
+Assert-True ($clRN -match 'A real dossier beside the reserved pages') 'reserved names: and its entry landed in CHANGELOG.md'
+# The three pages survive, with their content untouched.
+foreach ($rnName in @('README.md', 'CONTRIBUTING.md')) {
+    $rnPath = Join-Path $dirRN ($bfPaths.Directory + "\$rnName")
+    Assert-True (Test-Path -LiteralPath $rnPath) "reserved names: $rnName survives the sweep"
+    Assert-True ((Test-Path -LiteralPath $rnPath) -and ([System.IO.File]::ReadAllText($rnPath) -eq $rnBefore[$rnName])) `
+        "reserved names: $rnName is byte-identical -- not folded, and not partly rewritten either"
+}
+# CHANGELOG.md is the file the fold WRITES to, so it is not byte-identical and must not be. What it must
+# be is grown by the one real entry and otherwise intact: its pre-existing folded entry still there, and
+# no trace of itself or of the other two pages having been folded INTO it.
+Assert-True ($clRN -match 'Folded the week before') 'reserved names: CHANGELOG.md keeps the entries it already held'
+Assert-True ($clRN -match 'Folded yesterday') 'reserved names: both of them'
+Assert-True ((Get-ChangelogIntro -Changelog $clRN).TrimEnd() -eq $script:FixtureIntro.TrimEnd()) 'reserved names: and its intro is untouched'
+Assert-Equal 3 @(Get-EntryOrder -Changelog $clRN).Count 'reserved names: exactly THREE entries -- the two it held plus the one real dossier, and nothing else'
+Assert-True ($clRN -notmatch "the workflow's own folder in this repo") 'reserved names: README.md was not spliced into CHANGELOG.md'
+Assert-True ($clRN -notmatch '2\.1\. Create the branch') 'reserved names: nor CONTRIBUTING.md'
+# The refusal half of #1497: read as ONE dossier, CHANGELOG.md's many legitimate per-entry score lines
+# looked like one entry declaring a tier repeatedly, and the run died before folding anything at all.
+Assert-True (-not ($rRN.Output -match 'a second time')) 'reserved names: no duplicate-tier refusal -- the changelog was never read as a single dossier'
+# And the guard is the shared one rather than a sixth copy. The three-line inline sweep is what went stale
+# here; asserting on the source keeps the next reader from reintroducing it and passing every assert above.
+$foldSrcTextRN = [System.IO.File]::ReadAllText($FoldSrc, [System.Text.Encoding]::UTF8)
+Assert-True ($foldSrcTextRN -match 'Get-PerBranchDocumentRels') 'reserved names: the fold-all sweep is Get-PerBranchDocumentRels, the one guarded listing'
+Assert-True ($foldSrcTextRN -notmatch '\$foldAllPaths\.Pattern') 'reserved names: and the unguarded inline glob is gone from the source, not merely bypassed'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host "fold-all -- a reserved page is not folded even when the changelog is elsewhere (issue #1497)" -ForegroundColor Cyan
+#      THE SECOND HALF OF #1497, AND THE DANGEROUS ONE. Above, CHANGELOG.md is folded into ITSELF, which is
+#      loud: the run errors and the rest of the sweep never happens, so README.md survives for the wrong
+#      reason. Take the changelog out of the swept folder and nothing is loud any more -- the sweep folds
+#      README.md into a changelog it is not part of, deletes it, and EXITS 0. With '-Commit -Push' that is a
+#      real page removed from the trunk and a corrupted changelog, reported as success.
+#
+#      NOT AN ARTIFICIAL LAYOUT. It is the repointed-seam layout every other fixture in this suite uses, and
+#      the one a consumer folding into a root CHANGELOG.md has -- the layout Get-PreIsolationSeamPath exists
+#      to keep working. So this case is live in the tree AND in every consumer that predates the folder.
+$dirRE = New-FoldFixture -Label 'reservedelsewhere'
+New-Item -ItemType Directory -Path (Join-Path $dirRE $bfPaths.Directory) -Force | Out-Null
+[System.IO.File]::WriteAllText((Join-Path $dirRE ($bfPaths.Directory + '\README.md')),
+    "# ``dkj-policy/`` -- the workflow's own folder in this repo`n`nSome prose.`n", $Utf8NoBom)
+$reRows = @([pscustomobject]@{ Tier = 1; Score = 3; Why = 'the sweep' })
+[System.IO.File]::WriteAllText((Join-Path $dirRE $bfPaths.File),
+    ((Format-Development -Branch 'fix/the-only-real-one' -Id '20260906-090000' `
+        -Description 'The only real dossier here' -Type 'fix' -ImpactRows $reRows) -join "`n") + "`n", $Utf8NoBom)
+$reReadmePath = Join-Path $dirRE ($bfPaths.Directory + '\README.md')
+$reReadmeBefore = [System.IO.File]::ReadAllText($reReadmePath)
+
+$rRE = Invoke-Fold -Dir $dirRE
+$clRE = Get-Changelog -Dir $dirRE
+
+Assert-True ($rRE.ExitCode -eq 0) 'reserved elsewhere: exits 0'
+Assert-True (Test-Path -LiteralPath $reReadmePath) 'reserved elsewhere: README.md is NOT deleted -- the silent-success case'
+Assert-True ((Test-Path -LiteralPath $reReadmePath) -and ([System.IO.File]::ReadAllText($reReadmePath) -eq $reReadmeBefore)) 'reserved elsewhere: and is byte-identical'
+Assert-True ($clRE -notmatch "the workflow's own folder in this repo") 'reserved elsewhere: its title was not spliced into CHANGELOG.md as an entry'
+Assert-True ($clRE -match 'The only real dossier here') 'reserved elsewhere: while the real dossier still folds'
+Assert-Equal 1 @(Get-EntryOrder -Changelog $clRE).Count 'reserved elsewhere: exactly ONE entry -- the dossier, and not the page beside it'
+# The run said what it did, and it did not claim to have folded the page. A fold that names a reserved page
+# in its output is the fold that removed it, so this catches the defect even if a future layout change made
+# the deletion assert above unreachable.
+Assert-True ($rRE.Output -notmatch 'README\.md') 'reserved elsewhere: and the run never names README.md at all'
 
 Write-Host "The fold commit names both branch files" -ForegroundColor Cyan
 #      The entry is modified rather than deleted now, and the step list rides along because this run
