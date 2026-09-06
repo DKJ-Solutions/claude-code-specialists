@@ -600,6 +600,34 @@ infrastructure.
   mirrored into the workflow plugin and also driven by `unfolded-entry-sessioncheck.ps1`. Advisory, not
   in `main-ci-gate`. The full reasoning is in the `#1244` chain-reaction passage on the `ci.yml` bullet
   above; the detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`.
+- **`.github/workflows/fold-on-merge.yml` + `FOLD_PUSH_TOKEN`** — the fold that survives a merge the
+  shipping session never sees (a queue merge or a UI merge), by running the same fold this repo
+  otherwise only runs from `ship-pr.ps1`'s own next step, on every `push` to `main` (issue #1493, PR
+  #1507). It re-uses `check-unfolded-entry.ps1`'s own detector and adds no second one; the workflow's
+  own header comment carries the full mechanism and is the more detailed of the two.
+
+  **It pushes as an org owner, not as the GitHub Actions app, and that is structural rather than a
+  setting nobody flipped.** The default `GITHUB_TOKEN` authenticates as that app (integration_id
+  15368), which is not on `main-ci-gate`'s bypass list and cannot be added to it: the app is owned and
+  administered by `anthropics`, merely installed on this org, so there is no private key here it
+  could authenticate as. The bypass list already carries `OrganizationAdmin` with
+  `bypass_mode: always` (see the role table on the `ci.yml` bullet above), so the checkout step wires
+  in `secrets.FOLD_PUSH_TOKEN` instead — a fine-grained personal access token, created by an org owner,
+  scoped to **this repository only** and to **`Contents: Read and write` only** — and that identity
+  clears the ruleset with no ruleset change at all.
+
+  **It is a standing credential with an expiry, and nothing in this repo renews it.** The org caps a
+  fine-grained PAT's lifetime at 366 days, so the token lapses on its own schedule whatever this repo
+  does. When it does, the job keeps folding but its `git push` starts failing again — the same rejected
+  shape #1499 measured, where the ruleset names both `lint-en-tests` and the merge-queue rule together,
+  so read the run's own last lines rather than assume which of the two it is — and nothing else
+  announces the expiry; there is no reminder ahead of it. Renewal is manual: **an org owner of
+  `DKJ-Solutions`** (today DaveKJohn, davekokbwj, maikel-bwj — the same role table) **creates a new
+  fine-grained PAT with the identical scope — this repository only,
+  `Contents: Read and write` only — and overwrites the secret**,
+  `gh secret set FOLD_PUSH_TOKEN --repo DKJ-Solutions/claude-code-specialists`. Today that renewal is
+  tribal knowledge held by whoever created the token (Dave); this paragraph is what keeps it from
+  staying that way if the 366 days run out while he is not the one reading a red run.
 - **`scripts/lint/check-git-identity.ps1`** — the split-identity check (issue
   [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026): does
   this checkout commit as the same account it acts as on the tracker? The claim rule's `@me` resolves
