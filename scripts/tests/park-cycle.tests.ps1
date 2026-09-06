@@ -49,7 +49,15 @@ $script:fixtures = @()
 
 function Get-FlatOutput {
     <# Captured child output with the line breaks removed, so a phrase assert cannot fail on a wrap
-       point that park-cycle.ps1 does not decide. Same reasoning as park-branch.tests.ps1's copy. #>
+       point that park-cycle.ps1 does not decide. Same reasoning as park-branch.tests.ps1's copy.
+
+       THIS IS HALF THE REPAIR, AND THE OPPOSITE HALF FROM THE SIBLING SUITES. Deleting the newline
+       joins a word the formatter split ('resol' + 'ved' -> 'resolved'), which normalizing '\s+' to a
+       space would not. It breaks the other case for the same reason: where the wrap consumed the
+       space between two words, deleting the newline yields 'ghissue list'. No single substitution
+       survives both (#1512), so the prose asserts below go through Assert-Says, which strips ALL
+       whitespace from both sides and is immune either way. This field stays because a FAILING assert
+       still has to print one readable line. #>
     param($Captured)
     return (($Captured | Out-String) -replace "`r?`n", '')
 }
@@ -69,6 +77,32 @@ function Assert-True {
         $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
     } else {
         $script:fail++; Write-Host "  [FAIL] $Name" -ForegroundColor Red
+    }
+}
+
+function Test-Says {
+    <# Does captured child output contain this phrase, whatever the console did to it?
+
+       Strips ALL whitespace from both sides. Normalizing '\s+' to a single space -- which this file
+       does to the captured text -- repairs a wrap BETWEEN words and does nothing for a wrap INSIDE
+       one, and the child's formatter breaks at whatever character sits at the buffer column. Which
+       asserts straddle a break is decided by the width, so a green run is not evidence (issue #1512;
+       the worked measurement is in verify-resolved-issues.tests.ps1).
+
+       Literal (IndexOf), so a phrase carrying '(', ')', '.', '[' or ']' needs no escaping;
+       OrdinalIgnoreCase keeps the case-insensitivity that -match had at these call sites. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
     }
 }
 
@@ -275,7 +309,7 @@ try {
 
     $rA = Invoke-ParkCycle -Dir $fixA
     Assert-Equal 0 $rA.Code 'happy path: exit 0'
-    Assert-True ($rA.Out -match 'parked on origin') 'happy path: reports the document reached origin'
+    Assert-Says $rA.Out 'parked on origin' 'happy path: reports the document reached origin'
     Assert-Equal 2 (Get-CommitCount -Dir $fixA) 'happy path: exactly one park commit on top of the fixture commit'
     $filesA = Get-HeadFiles -Dir $fixA
     Assert-True ($filesA -contains $relA) 'happy path: the commit carries the development document'
@@ -298,7 +332,7 @@ try {
     Write-Host "park-cycle.ps1 -- a second run does nothing" -ForegroundColor Cyan
     $rB = Invoke-ParkCycle -Dir $fixA
     Assert-Equal 0 $rB.Code 'second run: exit 0'
-    Assert-True ($rB.Out -match 'already on origin') 'second run: says the document is already on origin'
+    Assert-Says $rB.Out 'already on origin' 'second run: says the document is already on origin'
     Assert-Equal 2 (Get-CommitCount -Dir $fixA) 'second run: no second commit'
 
     # --- (c) -Quiet: the hook path prints NOTHING when there is nothing to do ---------------------
@@ -320,8 +354,8 @@ try {
 
     $rD = Invoke-ParkCycle -Dir $fixD
     Assert-Equal 0 $rD.Code 'PR open: exit 0 -- this is a normal outcome, not an error'
-    Assert-True ($rD.Out -match 'PR #42 for') 'PR open: names the PR it found'
-    Assert-True ($rD.Out -match 'is open') 'PR open: and says which of the three refusals this is'
+    Assert-Says $rD.Out 'PR #42 for' 'PR open: names the PR it found'
+    Assert-Says $rD.Out 'is open' 'PR open: and says which of the three refusals this is'
     Assert-Equal 1 (Get-CommitCount -Dir $fixD) 'PR open: nothing committed'
     Assert-True (-not (Test-RefOnRemote -Bare "$fixD.git" -Ref 'refs/heads/feat/has-a-pr-v1')) 'PR open: nothing pushed'
 
@@ -341,9 +375,9 @@ try {
 
     $rD2 = Invoke-ParkCycle -Dir $fixD2
     Assert-Equal 0 $rD2.Code 'PR merged: exit 0'
-    Assert-True ($rD2.Out -match 'PR #1027 for') 'PR merged: names the PR it found -- which only --state all can return'
-    Assert-True ($rD2.Out -match 'already MERGED') 'PR merged: says the branch shipped, not that a PR is open'
-    Assert-True ($rD2.Out -match 'resurrect') 'PR merged: and names what the push would have done'
+    Assert-Says $rD2.Out 'PR #1027 for' 'PR merged: names the PR it found -- which only --state all can return'
+    Assert-Says $rD2.Out 'already MERGED' 'PR merged: says the branch shipped, not that a PR is open'
+    Assert-Says $rD2.Out 'resurrect' 'PR merged: and names what the push would have done'
     Assert-Equal 1 (Get-CommitCount -Dir $fixD2) 'PR merged: nothing committed'
     Assert-True (-not (Test-RefOnRemote -Bare "$fixD2.git" -Ref 'refs/heads/fix/already-shipped-v1')) 'PR merged: the head is NOT put back on origin'
 
@@ -358,9 +392,9 @@ try {
 
     $rD3 = Invoke-ParkCycle -Dir $fixD3
     Assert-Equal 0 $rD3.Code 'PR closed: exit 0'
-    Assert-True ($rD3.Out -match 'PR #969 for') 'PR closed: names the PR it found'
-    Assert-True ($rD3.Out -match 'is CLOSED') 'PR closed: says which refusal this is'
-    Assert-True ($rD3.Out -match 'park-branch') 'PR closed: names the escape valve for work that genuinely resumed'
+    Assert-Says $rD3.Out 'PR #969 for' 'PR closed: names the PR it found'
+    Assert-Says $rD3.Out 'is CLOSED' 'PR closed: says which refusal this is'
+    Assert-Says $rD3.Out 'park-branch' 'PR closed: names the escape valve for work that genuinely resumed'
     Assert-Equal 1 (Get-CommitCount -Dir $fixD3) 'PR closed: nothing committed'
     Assert-True (-not (Test-RefOnRemote -Bare "$fixD3.git" -Ref 'refs/heads/docs/closed-unmerged-v1')) 'PR closed: nothing pushed'
 
@@ -376,7 +410,7 @@ try {
 
     $rD4 = Invoke-ParkCycle -Dir $fixD4
     Assert-Equal 0 $rD4.Code 'no state field: exit 0, not a mid-bound crash'
-    Assert-True ($rD4.Out -match 'PR #42 for') 'no state field: still names the PR'
+    Assert-Says $rD4.Out 'PR #42 for' 'no state field: still names the PR'
     Assert-True ($rD4.Out -notmatch 'cannot be found on this object') 'no state field: StrictMode did not throw'
     Assert-Equal 1 (Get-CommitCount -Dir $fixD4) 'no state field: nothing committed'
     Assert-True (-not (Test-RefOnRemote -Bare "$fixD4.git" -Ref 'refs/heads/feat/no-state-field-v1')) 'no state field: nothing pushed'
@@ -391,8 +425,8 @@ try {
 
     $rE = Invoke-ParkCycle -Dir $fixE
     Assert-Equal 0 $rE.Code 'gh failing: exit 0'
-    Assert-True ($rE.Out -match 'not pushing') 'gh failing: says it is not pushing'
-    Assert-True ($rE.Out -match 'DEPLOY lock') 'gh failing: and names the reason, so the direction is not read as a bug'
+    Assert-Says $rE.Out 'not pushing' 'gh failing: says it is not pushing'
+    Assert-Says $rE.Out 'DEPLOY lock' 'gh failing: and names the reason, so the direction is not read as a bug'
     Assert-Equal 1 (Get-CommitCount -Dir $fixE) 'gh failing: nothing committed'
     Assert-True (-not (Test-RefOnRemote -Bare "$fixE.git" -Ref 'refs/heads/feat/gh-broken-v1')) 'gh failing: nothing pushed'
 
@@ -403,7 +437,7 @@ try {
 
     $rF = Invoke-ParkCycle -Dir $fixF
     Assert-Equal 0 $rF.Code 'trunk: exit 0'
-    Assert-True ($rF.Out -match 'on the trunk') 'trunk: names the trunk rule'
+    Assert-Says $rF.Out 'on the trunk' 'trunk: names the trunk rule'
     Assert-Equal 1 (Get-CommitCount -Dir $fixF) 'trunk: nothing committed'
 
     # --- (g) A RESET DOCUMENT declares no branch -> left alone -----------------------------------
@@ -417,7 +451,7 @@ try {
 
     $rG = Invoke-ParkCycle -Dir $fixG
     Assert-Equal 0 $rG.Code 'reset document: exit 0'
-    Assert-True ($rG.Out -match 'reset state') 'reset document: says the document belongs to no branch'
+    Assert-Says $rG.Out 'reset state' 'reset document: says the document belongs to no branch'
     Assert-Equal 1 (Get-CommitCount -Dir $fixG) 'reset document: nothing committed'
 
     # --- (h) SOMEBODY ELSE'S DOCUMENT -> left alone, owner named ---------------------------------
@@ -428,8 +462,8 @@ try {
 
     $rH = Invoke-ParkCycle -Dir $fixH
     Assert-Equal 0 $rH.Code "other branch's document: exit 0"
-    Assert-True ($rH.Out -match 'docs/somebody-else-v1') "other branch's document: names the owner"
-    Assert-True ($rH.Out -match 'left alone') "other branch's document: says it kept its hands off"
+    Assert-Says $rH.Out 'docs/somebody-else-v1' "other branch's document: names the owner"
+    Assert-Says $rH.Out 'left alone' "other branch's document: says it kept its hands off"
     Assert-Equal 1 (Get-CommitCount -Dir $fixH) "other branch's document: nothing committed"
 
     # --- (i) NO ORIGIN: nowhere to park to, and that is not a failure ----------------------------
@@ -440,7 +474,7 @@ try {
 
     $rI = Invoke-ParkCycle -Dir $fixI
     Assert-Equal 0 $rI.Code 'no origin: exit 0'
-    Assert-True ($rI.Out -match "no 'origin' remote") 'no origin: says why nothing happened'
+    Assert-Says $rI.Out "no 'origin' remote" 'no origin: says why nothing happened'
     Assert-Equal 1 (Get-CommitCount -Dir $fixI) 'no origin: nothing committed'
 
     # --- (j) NO DOCUMENT AT ALL: nothing to park ------------------------------------------------
@@ -450,7 +484,7 @@ try {
 
     $rJ = Invoke-ParkCycle -Dir $fixJ
     Assert-Equal 0 $rJ.Code 'no document: exit 0'
-    Assert-True ($rJ.Out -match 'does not exist yet') 'no document: says there is nothing to park'
+    Assert-Says $rJ.Out 'does not exist yet' 'no document: says there is nothing to park'
     Assert-Equal 1 (Get-CommitCount -Dir $fixJ) 'no document: nothing committed'
 
     # --- (k) AN UNPUSHED LOCAL COMMIT is invisibility too --------------------------------------
@@ -469,7 +503,7 @@ try {
 
     $rK = Invoke-ParkCycle -Dir $fixK
     Assert-Equal 0 $rK.Code 'unpushed commit: exit 0'
-    Assert-True ($rK.Out -match 'parked on origin') 'unpushed commit: pushed anyway'
+    Assert-Says $rK.Out 'parked on origin' 'unpushed commit: pushed anyway'
     Assert-Equal 2 (Get-CommitCount -Dir $fixK) 'unpushed commit: no empty extra commit was made'
     Assert-True (Test-RefOnRemote -Bare "$fixK.git" -Ref 'refs/heads/feat/committed-not-pushed-v1') 'unpushed commit: the branch ref is on origin'
 
@@ -488,8 +522,8 @@ try {
 
     $rL = Invoke-ParkCycle -Dir $fixL
     Assert-Equal 0 $rL.Code 'trunk seam: exit 0'
-    Assert-True (-not ($rL.Out -match 'on the trunk')) "trunk seam: 'main' is NOT treated as the trunk -- the seam was read"
-    Assert-True ($rL.Out -match 'parked on origin') 'trunk seam: and the branch was parked'
+    Assert-True (-not (Test-Says $rL.Out 'on the trunk')) "trunk seam: 'main' is NOT treated as the trunk -- the seam was read"
+    Assert-Says $rL.Out 'parked on origin' 'trunk seam: and the branch was parked'
     Assert-True ((Get-HeadFiles -Dir $fixL) -contains $relL) 'trunk seam: the commit carries the development document'
 
     # --- (m) THE SHAPE #960 WAS MEASURED ON: a plan that reads as FINISHED with nothing behind it -----
@@ -509,7 +543,7 @@ try {
 
     $rM = Invoke-ParkCycle -Dir $fixM
     Assert-Equal 0 $rM.Code 'finished plan: exit 0 -- the note is a note, never a gate'
-    Assert-True ($rM.Out -match 'parked on origin') 'finished plan: and the park still happened, which is the point of it not being a gate'
+    Assert-Says $rM.Out 'parked on origin' 'finished plan: and the park still happened, which is the point of it not being a gate'
     $msgM = Get-CommitMessage -Dir $fixM
     Assert-True ($msgM -match '2 of 2 step\(s\) resolved') 'finished plan: the note counts the resolved steps'
     Assert-True ($msgM -match 'nothing else committed on this branch') 'finished plan: and says nothing else is committed'
@@ -563,7 +597,7 @@ try {
 
     $rO = Invoke-ParkCycle -Dir $fixO
     Assert-Equal 0 $rO.Code 'rejected push: exit 0 -- the Stop-hook contract holds'
-    Assert-True ($rO.Out -match 'could NOT be pushed') 'rejected push: the caller-owned line is reached, not a raw terminating error'
+    Assert-Says $rO.Out 'could NOT be pushed' 'rejected push: the caller-owned line is reached, not a raw terminating error'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

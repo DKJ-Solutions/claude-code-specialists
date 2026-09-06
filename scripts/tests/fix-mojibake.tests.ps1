@@ -47,6 +47,32 @@ function Assert-True {
     else { $script:fail++; Write-Host "  [FAIL] $Name" -ForegroundColor Red }
 }
 
+function Test-Says {
+    <# Does captured child output contain this phrase, whatever the console did to it?
+
+       Strips ALL whitespace from both sides. Normalizing '\s+' to a single space -- which this file
+       does to the captured text -- repairs a wrap BETWEEN words and does nothing for a wrap INSIDE
+       one, and the child's formatter breaks at whatever character sits at the buffer column. Which
+       asserts straddle a break is decided by the width, so a green run is not evidence (issue #1512;
+       the worked measurement is in verify-resolved-issues.tests.ps1).
+
+       Literal (IndexOf), so a phrase carrying '(', ')', '.', '[' or ']' needs no escaping;
+       OrdinalIgnoreCase keeps the case-insensitivity that -match had at these call sites. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
+    }
+}
+
 # Build strings from codepoints, so this source stays ASCII-only.
 function C([int[]]$cp) { -join ($cp | ForEach-Object { [char]$_ }) }
 $MIDDOT = C 0xB7          # the correct character
@@ -60,6 +86,10 @@ $Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("mojibake-fix-$PID")
 New-Item -ItemType Directory -Path $Fixture -Force | Out-Null
 
 function Invoke-Fix {
+    # .Out is whitespace-NORMALIZED so a failing assert prints one readable line -- it is NOT what
+    # makes the asserts width-proof. The child wraps at its own console width and the break lands
+    # inside a word as readily as on a space, which collapsing '\s+' to a space does not repair
+    # (#1512). Prose asserts therefore go through Assert-Says, which strips ALL whitespace.
     param([string]$FilePath, [switch]$CheckOnly)
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Script, '-Path', $FilePath)
     if ($CheckOnly) { $a += '-Check' }
@@ -167,13 +197,13 @@ try {
     $fi = Set-Fixture -Name 'intact.md' -Text $intact
     $ri = Invoke-Fix -FilePath $fi
     Assert-Equal $intact (Get-FixtureText -Path $fi) 'every correctly encoded character survives the round trip'
-    Assert-True ($ri.Out -match 'Nothing to repair') 'and the tool reports nothing to do'
+    Assert-Says $ri.Out 'Nothing to repair' 'and the tool reports nothing to do'
 
     Write-Host 'Idempotent: a second run changes nothing' -ForegroundColor Cyan
     $before = Get-FixtureText -Path $f2
     $r3 = Invoke-Fix -FilePath $f2
     Assert-Equal $before (Get-FixtureText -Path $f2) 'the file is byte-for-byte unchanged on a second run'
-    Assert-True ($r3.Out -match 'Nothing to repair') 'and it says so rather than reporting phantom replacements'
+    Assert-Says $r3.Out 'Nothing to repair' 'and it says so rather than reporting phantom replacements'
 
     Write-Host 'Correctly encoded text is left alone' -ForegroundColor Cyan
     #      The direction of error that matters: this tool may only ever repair, never invent. A middot and
@@ -182,7 +212,7 @@ try {
     $f4 = Set-Fixture -Name 'good.md' -Text $good
     $r4 = Invoke-Fix -FilePath $f4
     Assert-Equal $good (Get-FixtureText -Path $f4) 'a correct file is not touched'
-    Assert-True ($r4.Out -match 'Nothing to repair') 'and it reports nothing to do'
+    Assert-Says $r4.Out 'Nothing to repair' 'and it reports nothing to do'
 
     Write-Host 'A mangled em dash is repaired too (not just the separator)' -ForegroundColor Cyan
     $f5 = Set-Fixture -Name 'emdash.md' -Text ("A title $EMDASH_BAD with damage")
@@ -205,14 +235,14 @@ try {
     $r8 = Invoke-Fix -FilePath $f8 -CheckOnly
     Assert-Equal 1 $r8.Code '-Check exits 1 when there is damage'
     Assert-Equal $textBefore (Get-FixtureText -Path $f8) '-Check changed nothing'
-    Assert-True ($r8.Out -match '\[mojibake\]') '-Check names the finding with the marker the lint gate reads'
-    Assert-True ($r8.Out -match 'check\.md') '-Check names the file'
+    Assert-Says $r8.Out '[mojibake]' '-Check names the finding with the marker the lint gate reads'
+    Assert-Says $r8.Out 'check.md' '-Check names the file'
 
     Write-Host '-Check on a clean file exits 0' -ForegroundColor Cyan
     $f9 = Set-Fixture -Name 'clean.md' -Text ("### #9 $MIDDOT T")
     $r9 = Invoke-Fix -FilePath $f9 -CheckOnly
     Assert-Equal 0 $r9.Code '-Check exits 0 on a clean file'
-    Assert-True ($r9.Out -match 'clean') 'and says so'
+    Assert-Says $r9.Out 'clean' 'and says so'
 
     Write-Host 'Default file set without a repo-config: every *.md in the repo root (#413)' -ForegroundColor Cyan
     #      The fallback has to be a real answer, not a degraded one. The old hardcoded default listed
@@ -252,7 +282,7 @@ function Get-MojibakePaths {
     $rC = Invoke-FixWithDefaultPaths -Root $rootC
     Assert-Equal 0 $rC.Code 'broken repo-config: still exits 0'
     Assert-Equal "### #1 $MIDDOT Title $MIDDOT Fix" (Get-FixtureText -Path (Join-Path $rootC 'CHANGELOG.md')) 'broken repo-config: the root fallback ran'
-    Assert-True ($rC.Out -match 'could not be loaded') 'broken repo-config: says so out loud instead of silently examining a different set'
+    Assert-Says $rC.Out 'could not be loaded' 'broken repo-config: says so out loud instead of silently examining a different set'
 
     Write-Host 'The lint gate (check 14) reports its category on the real repo' -ForegroundColor Cyan
     #      Asserted on the coverage line rather than on a fixture: the gate consults the tool over the
@@ -266,11 +296,16 @@ function Get-MojibakePaths {
     #      test whenever a release note is added, so the assert is on the property: the gate reports a real
     #      file count that grew past the old placeholder.
     $lintOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $Lint 2>&1 | Out-String)
-    $mjCov = [regex]::Match($lintOut, '\[mojibake\] checked (\d+)')
+    # This capture is NOT whitespace-normalized like Invoke-Fix's, so it is read whitespace-free: the
+    # gate wraps its own lines at the console width and a break lands mid-word as readily as on a
+    # space (#1512). The coverage regex is matched against the stripped text for the same reason --
+    # '[mojibake] checked 42' split after 'check' would otherwise report the gate as never having run.
+    $lintFlat = ($lintOut -replace '\s', '')
+    $mjCov = [regex]::Match($lintFlat, '\[mojibake\]checked(\d+)')
     Assert-True $mjCov.Success 'the lint gate ran the encoding check'
     Assert-True ([int]$mjCov.Groups[1].Value -gt 1) 'and reports how many files it examined, not how many times it ran the tool'
-    Assert-True ($lintOut -match 'releases/') 'and its coverage line names the releases/ notes, which were outside the scope until #360-era'
-    Assert-True ($lintOut -match 'Summary: 0 error') 'and the repo is clean of mojibake'
+    Assert-Says $lintOut 'releases/' 'and its coverage line names the releases/ notes, which were outside the scope until #360-era'
+    Assert-Says $lintOut 'Summary: 0 error' 'and the repo is clean of mojibake'
     # The findings, on failure only -- same reason as the twin asserts in bootstrap-drift.tests.ps1 and
     # agent-shared.tests.ps1: this reads the gate's verdict over the LIVE repo, so it can fail from a
     # collision with a concurrent suite. Measured August 16, 2026: this assert and bootstrap-drift's failed
