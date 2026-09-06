@@ -74,7 +74,6 @@ Verified against each consumer's own `origin/main` after a fresh fetch (not a lo
   xoxowildhearts: `dkj-team-shopify@` has no machine install record for that checkout path -- a
   consumer-side, other-machine state that was invisible while the whole block was being skipped, now
   surfaced where the doctrine wants it (the consumer's own move, not this repo's).
-- [x] Full lint gate (`check-plugin-integrity.ps1` + suites) green -- run before the PR.
 
 ### DEPLOY: fix/1523-connectors-bwj-rename-catchup
 
