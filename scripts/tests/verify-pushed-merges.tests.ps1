@@ -53,6 +53,26 @@ function Assert-True {
     }
 }
 
+function Assert-Says {
+    <#
+        Asserts that the child's output contains a phrase, with ALL whitespace removed from both
+        sides first -- and this is stronger than the whitespace NORMALIZATION the sibling suite does,
+        for a reason that suite's own comment gets wrong.
+
+        Normalizing runs of whitespace to one space survives a wrap between words. It does not survive
+        a wrap INSIDE a word, and PowerShell's error formatter breaks at the column whatever is there:
+        measured on this suite, `no merged pull request was resolved` came back as `... was resol` +
+        `ved from this push`, which normalizes to `resol ved` and matches nothing. The wrap column is
+        the child's console buffer width, so the same assert passes on one invocation and fails on the
+        next -- this suite passed three runs and then failed three in a row with no edit in between.
+
+        Removing whitespace entirely is immune to both, and `.Contains` is a literal search, so a
+        phrase carrying regex metacharacters needs no escaping either.
+    #>
+    param([string]$Output, [string]$Phrase, [string]$Name)
+    Assert-True (($Output -replace '\s', '').Contains(($Phrase -replace '\s', ''))) $Name
+}
+
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 $fakeBin = Join-Path ([System.IO.Path]::GetTempPath()) ("verify-pushed-bin-$PID")
 $callLog = Join-Path ([System.IO.Path]::GetTempPath()) ("verify-pushed-calls-$PID.log")
@@ -161,10 +181,12 @@ exit 1
         $out = (& powershell @runArgs 2>&1 | Out-String)
         $code = $LASTEXITCODE
         $log = if (Test-Path $callLog) { Get-Content -Path $callLog } else { @() }
-        # Whitespace-NORMALIZED once for every scenario, for the sibling suite's reason: the child
-        # renders at ITS own console width, so any phrase an assert matches can be split by a wrap
-        # whose position depends on the machine's path length. No assert in this file CAN be
-        # width-fragile.
+        # Whitespace-normalized once for every scenario, for the sibling suite's reason: the child
+        # renders at ITS own console width, so a phrase an assert matches can be split by a wrap whose
+        # position depends on the machine's path length. Normalizing is NOT sufficient on its own --
+        # see Assert-Says, which every prose assert here goes through and which is what actually makes
+        # this file width-proof. This field stays normalized so a FAILED assert prints something a
+        # human can read.
         return [pscustomobject]@{ Output = ($out -replace '\s+', ' '); ExitCode = $code; Log = @($log) }
     }
 
@@ -180,8 +202,8 @@ exit 1
         'c' = "501|2026-09-06T11:59:47Z|main"     # the same PR again, via its branch head
     } -Bodies @{ '501' = 'Closes #601'; '502' = 'Closes #602' } -ClosedIssues '601,602'
     Assert-Equal 0 $r.ExitCode 'exits 0'
-    Assert-True ($r.Output -match 'examining 3 commits') 'read the whole pushed RANGE, not just its head'
-    Assert-True ($r.Output -match 'PR #501, PR #502') 'resolved both PRs of the batch, in order'
+    Assert-Says $r.Output 'examining 3 commits' 'read the whole pushed RANGE, not just its head'
+    Assert-Says $r.Output 'PR #501, PR #502' 'resolved both PRs of the batch, in order'
     Assert-True (($r.Log | Where-Object { $_ -match 'pr view 501' }).Count -eq 1) 'verified PR #501 exactly once (deduped across two commits)'
     Assert-True (($r.Log | Where-Object { $_ -match 'pr view 502' }).Count -eq 1) 'verified PR #502'
     Assert-True (($r.Log | Where-Object { $_ -match 'issue view 601' }).Count -eq 1) 'reached the child script and checked #601'
@@ -201,26 +223,26 @@ exit 1
         -Bodies @{ '501' = 'Closes #602' } -ReportOnly
     Assert-Equal 0 $r3.ExitCode 'exits 0'
     Assert-True (($r3.Log | Where-Object { $_ -match 'issue close' }).Count -eq 0) 'closed nothing'
-    Assert-True ($r3.Output -match 'report-only') 'says it is report-only'
+    Assert-Says $r3.Output 'report-only' 'says it is report-only'
 
     # --- What must NOT be verified ----------------------------------------------------------------
     Write-Host "A pull request that never merged is not verified" -ForegroundColor Cyan
     $r4 = Invoke-Pushed -Sha $ShaHead -Pulls @{ 'a' = "501||main" } -Bodies @{ '501' = 'Closes #601' }
     Assert-Equal 0 $r4.ExitCode 'exits 0'
     Assert-True (($r4.Log | Where-Object { $_ -match 'pr view' }).Count -eq 0) 'the PR body was never even read'
-    Assert-True ($r4.Output -match 'no pull request merged') 'says there was nothing to verify'
+    Assert-Says $r4.Output 'no pull request merged' 'says there was nothing to verify'
 
     Write-Host "A pull request merged into some OTHER base is not verified" -ForegroundColor Cyan
     $r5 = Invoke-Pushed -Sha $ShaHead -Pulls @{ 'a' = "501|2026-09-06T11:59:47Z|release/4.x" } `
         -Bodies @{ '501' = 'Closes #601' }
     Assert-Equal 0 $r5.ExitCode 'exits 0'
     Assert-True (($r5.Log | Where-Object { $_ -match 'pr view' }).Count -eq 0) 'the PR body was never read'
-    Assert-True ($r5.Output -match "merged into 'main'") 'names the trunk it was looking for'
+    Assert-Says $r5.Output "merged into 'main'" 'names the trunk it was looking for'
 
     Write-Host "A push carrying no pull request at all (a fold commit) is quiet and green" -ForegroundColor Cyan
     $r6 = Invoke-Pushed -Sha $ShaNone -Pulls @{}
     Assert-Equal 0 $r6.ExitCode 'exits 0'
-    Assert-True ($r6.Output -match 'nothing to verify') 'says so'
+    Assert-Says $r6.Output 'nothing to verify' 'says so'
     Assert-True (($r6.Log | Where-Object { $_ -match 'issue' }).Count -eq 0) 'touched no issue'
 
     # --- Degrading rather than failing when the range cannot be read ------------------------------
@@ -228,7 +250,7 @@ exit 1
     $r7 = Invoke-Pushed -Sha $ShaHead -Pulls @{ 'a' = "501|2026-09-06T11:59:47Z|main" } -Bodies @{ '501' = 'Closes #601' } -ClosedIssues '601'
     Assert-Equal 0 $r7.ExitCode 'exits 0'
     Assert-True (($r7.Log | Where-Object { $_ -match '/compare/' }).Count -eq 0) 'did not ask for a range it was not given'
-    Assert-True ($r7.Output -match 'examining 1 commit') 'examined the head commit'
+    Assert-Says $r7.Output 'examining 1 commit' 'examined the head commit'
     Assert-True (($r7.Log | Where-Object { $_ -match 'pr view 501' }).Count -eq 1) 'still verified the PR'
 
     Write-Host "An all-zeros -Before (a branch's first push) is treated as no range" -ForegroundColor Cyan
@@ -241,7 +263,7 @@ exit 1
     $r9 = Invoke-Pushed -Before $ShaBase -Sha $ShaHead -FailCompare -Pulls @{ 'a' = "501|2026-09-06T11:59:47Z|main" } `
         -Bodies @{ '501' = 'Closes #601' } -ClosedIssues '601'
     Assert-Equal 0 $r9.ExitCode 'exits 0 -- verifying one PR beats verifying none'
-    Assert-True ($r9.Output -match 'could not be compared') 'warns that the range was lost'
+    Assert-Says $r9.Output 'could not be compared' 'warns that the range was lost'
     Assert-True (($r9.Log | Where-Object { $_ -match 'pr view 501' }).Count -eq 1) 'still verified the head commit PR'
 
     Write-Host "A compare that returns a range NOT containing the head still verifies the head" -ForegroundColor Cyan
@@ -256,14 +278,14 @@ exit 1
     Write-Host "Every commit lookup failing exits 1, so a broken check cannot report green" -ForegroundColor Cyan
     $r11 = Invoke-Pushed -Sha $ShaHead -FailPulls 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     Assert-Equal 1 $r11.ExitCode 'exits 1'
-    Assert-True ($r11.Output -match "not the same as 'nothing to verify'") 'says why it is not a quiet green'
+    Assert-Says $r11.Output "not the same as 'nothing to verify'" 'says why it is not a quiet green'
 
     Write-Host "A partial lookup failure verifies what it resolved AND still exits 1" -ForegroundColor Cyan
     $r12 = Invoke-Pushed -Before $ShaBase -Sha $ShaHead -Compare "$ShaHead,$ShaMid" -FailPulls 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' `
         -Pulls @{ 'a' = "501|2026-09-06T11:59:47Z|main" } -Bodies @{ '501' = 'Closes #601' } -ClosedIssues '601'
     Assert-Equal 1 $r12.ExitCode 'exits 1'
     Assert-True (($r12.Log | Where-Object { $_ -match 'pr view 501' }).Count -eq 1) 'verified the PR it COULD resolve rather than abandoning the run'
-    Assert-True ($r12.Output -match 'may have gone unverified') 'names what the failure might have hidden'
+    Assert-Says $r12.Output 'may have gone unverified' 'names what the failure might have hidden'
 
     # --- A cap is a measurement too ---------------------------------------------------------------
     Write-Host "A commit cap that bites is reported by name, never applied quietly" -ForegroundColor Cyan
@@ -271,8 +293,8 @@ exit 1
         'a' = "501|2026-09-06T11:59:47Z|main"; 'b' = "502|2026-09-06T11:58:00Z|main"; 'c' = "503|2026-09-06T11:57:00Z|main"
     } -Bodies @{ '501' = 'Closes #601'; '502' = 'Closes #602'; '503' = 'Closes #603' } -ClosedIssues '601,602,603'
     Assert-Equal 0 $r13.ExitCode 'exits 0'
-    Assert-True ($r13.Output -match 'only the newest 2 are examined') 'names the cap and the number'
-    Assert-True ($r13.Output -match 'is NOT verified') 'says plainly that something was left out'
+    Assert-Says $r13.Output 'only the newest 2 are examined' 'names the cap and the number'
+    Assert-Says $r13.Output 'is NOT verified' 'says plainly that something was left out'
     Assert-True (($r13.Log | Where-Object { $_ -match 'pr view 503' }).Count -eq 0) 'and the capped-off commit really was skipped'
 
     # --- The quoting regression, pinned ------------------------------------------------------------
