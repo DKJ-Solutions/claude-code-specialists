@@ -82,6 +82,10 @@ number, which is the act that produced the duplicate.
 - [x] Demonstrably firing: run against the pre-repair file the same reader reports 5 -- the one
       duplicate and the four headers in the other spelling
 - [x] Full lint gate green (0 errors) and every suite green, as CI runs them
+- [x] Cost measured: +~110 ms on a full gate run (10.03 s vs 9.91 s, three reps each, 205-file set) --
+      1.2%. Two savings measured and DECLINED, with the reasons recorded in the lens: making the check
+      skippable (worth ~3.6 s off the slowest CI lane, but widens `$SkippableChecks` past the three the
+      gate holds it at) and sharing check 27's read (does not clear a tenth of #1358's own bar)
 
 ### DEPLOY: fix/1494-duplicate-check-number
 

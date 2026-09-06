@@ -1677,11 +1677,37 @@ pre-repair file the same reader reports **5** — the one duplicate and the four
 so it fires on what it was written for rather than merely passing. The check is repo-wide rather than
 scoped to the gate, because the convention is: 19 files use it, not one.
 
+**What it costs, and the two savings DECLINED** (measured September 6, 2026, on this repo's 205-file
+script set). The check adds **~110 ms** to a full gate run — 10.03 s against 9.91 s over three reps each,
+a **1.2%** delta. Two ways to get some of that back were measured and both were declined:
+
+- **Making it skippable** — adding `section-number` to `$SkippedForSpeed` in
+  [`check-plugin-integrity-fixture.ps1`](../../../scripts/tests/check-plugin-integrity-fixture.ps1), so
+  the ~60 ms it costs *per `Invoke-Integrity` call* stops being paid by the 175 scenarios across the four
+  lint suites that are not about it. Worth **~10.5 s of CPU**, or up to **~3.6 s** off the slowest CI lane
+  once the four suites' parallelism is accounted for. **Declined**, because it buys that by widening
+  `$script:SkippableChecks`, which the gate holds at exactly the three its own suites need and whose
+  comment says in so many words that a fourth is a deliberate act and the narrow list is the safety
+  property. Check 31's comment records the same answer for the same reason — *"NOT SKIPPABLE, like every
+  check added since the `-SkipCheck` list was fixed"*. Three-and-a-half seconds on one lane does not buy
+  a wider surface for switching a check off by accident.
+- **Sharing the read with check 27** — the pure-ASCII check reads the *same* 205 files unconditionally,
+  through `ReadAllText` where this one uses `ReadAllLines`, at **84–92 ms**. One pass would save roughly
+  one of the two reads. **Declined as premature**, on #1358's own bar: that extraction was worth doing
+  because the *walk* cost 1.16 s and the parse only 0.26 s, and this whole check does not clear a tenth of
+  that. The AST cache is not a candidate backing store either — it retains `CommandAst` nodes, so
+  recovering line text from it would cost more than reading the file again.
+
+Recorded rather than left implicit so the next reader does not re-derive either number: the saving is real
+and small, and the reason for not taking the first one is a safety property rather than the arithmetic.
+
 **Adjacent and deliberately NOT repaired here:** the gate's own comments cite `check 19` and `check 20b`,
-neither of which exists as a header — the same class one layer over, a citation nothing reads back. Filed
-rather than folded in, because holding every `check <n>` citation to an existing header needs its own
-false-positive decision about legitimately citing a *retired* check, which two of this file's comments do
-correctly.
+neither of which exists as a header — the same class one layer over, a citation nothing reads back. Filed as
+[#1500](https://github.com/DaveKJohn/claude-code-specialists/issues/1500) rather than folded in, because
+holding every `check <n>` citation to an existing header needs its own false-positive decision about
+legitimately citing a *retired* check, which two of this file's comments do correctly — the retirement notes
+naming checks 9 and 17. The repo has paid for this class once already in the other direction: `4.12.0`
+records a lens citing check 19 for what the lint implements as check 20.
 
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
