@@ -262,7 +262,7 @@ $errors = New-Object System.Collections.Generic.List[string]
 # it immediately. Adding a finding must not depend on where in the file you add it.
 function Add-Error([string]$Msg) { $script:errors.Add($Msg) }
 
-# CHECK 30'S FINDING, hoisted here beside Add-Error because it IS an Add-Error caller and the comment
+# CHECK 33'S FINDING, hoisted here beside Add-Error because it IS an Add-Error caller and the comment
 # above says adding a finding must not depend on where in the file you add it. One place composes the
 # message, so the two scan loops below (script strings, markdown lines) cannot drift in what they tell
 # the author to do about it.
@@ -970,7 +970,7 @@ function Get-PsScriptFiles {
 }
 
 # THE CommandAst SET PER SCRIPT FILE, PARSED AND WALKED ONCE -- issue #1358. Two non-skippable checks
-# want exactly this list over exactly the set above: check 30 (barred-skill) reads the strings printed by
+# want exactly this list over exactly the set above: check 33 (barred-skill) reads the strings printed by
 # a writer cmdlet, and shopify-cli looks for a command named 'shopify'. Each used to call ParseFile and
 # then FindAll(CommandAst) itself, so every run paid for the same parse and the same full-tree walk twice.
 #
@@ -1576,7 +1576,7 @@ foreach ($lf in ($lifecycleFiles | Sort-Object -Unique)) {
 Write-Coverage -Category 'lifecycle' -Checked $lcEnforced `
     -Note $(if ($lcEnforced -eq 0) { 'no printed lifecycle command with an @-target anywhere in the scan set -- nothing to enforce, which is not the same as the docs being right' } else { "$lcBare bare mention(s) skipped as discussion; history (CHANGELOG.md, releases/, RELEASE.md, entry files) excluded" })
 
-# --- Check 12: a printed install-record query must name the fields that disambiguate the state -----
+# --- 12. a printed install-record query must name the fields that disambiguate the state -----
 # THE CLASS, and why this is a gate rather than three doc fixes. Round v8 produced three findings that
 # read as unrelated and are one: the family's own verification query -- the thing every document points a
 # reader at to answer "what am I actually running?" -- printed a green that UNDER-DETERMINED the state it
@@ -2293,7 +2293,7 @@ Write-Coverage -Category 'measured-figure' -Checked $figureChecked `
 # it out of 59 files. The check was the right repair for a real defect. The files it guarded are gone,
 # and with them the write-once text -- see the retirement note in scripts/lib/release-lib.ps1. The
 # LESSON survives in that file's header, because it is about the next template, not about these.
-# --- Check 18: a shared script's parameters appear in the skill that documents it -----------------------
+# --- 18. a shared script's parameters appear in the skill that documents it -----------------------
 # A consumer has exactly two things: the plugin mirror of a script, and the skill that describes it. So a
 # parameter the skill never names is, for them, a parameter that does not exist -- including the escape
 # valve they need when something goes wrong.
@@ -2349,7 +2349,7 @@ $gapNote = if ($skillGaps.Count -gt 0) { " NOT covered, because they declare no 
 Write-Coverage -Category 'skill-param' -Checked $skillParamChecked `
     -Note "parameters of the $skillDocumented shared entry point(s) that name a documenting skill, held against that skill's text -- a consumer has only the mirror and its page, so an undocumented parameter does not exist for them. Read via the PowerShell parser, not a regex, which missed an attributed parameter when this was first measured. Exemptions are declared per script in the registry.$gapNote"
 
-# --- Check 20: a document claiming how many sections an entry has is held to the scaffolder ---------------
+# --- 20. a document claiming how many sections an entry has is held to the scaffolder ---------------
 # Numbered 20 and not 19: the consumer-doc guard above carries no numbered header of its own, but the suite
 # already calls it check 19, and two checks answering to one number is how a finding gets discussed as the
 # wrong one.
@@ -3348,156 +3348,7 @@ Write-Coverage -Category 'plugin-link' -Checked $pluginLinkChecked `
     })
 
 
-# --- 30. printed instructions naming a model-barred skill -------------------------------------------
-# A PRINTED INSTRUCTION MUST NOT TELL ITS READER TO "RUN THE X SKILL" WHEN X IS BARRED TO THAT READER.
-# A skill whose frontmatter carries 'disable-model-invocation: true' has its page removed from the
-# model's context entirely, so a session cannot see it and will not invoke it. A message that says
-# `run the 'cut-release' skill` therefore names a route its reader does not have -- and the reader who
-# DOES have it, the person at the keyboard, is never told they are the one who has to type it. The
-# correct form names the slash-command and the actor, or names the script directly: the flag decides
-# WHO TYPES THE LINE, not whether the line may run (new-branch/SKILL.md states this in full).
-#
-# WHY A CHECK RATHER THAN CARE -- the class bit twice, a month apart, and nothing connected the two:
-# #731 -> #734 repaired it for the shipping chain, and #1093/#1096 rediscovered the same defect from
-# scratch on the adoption path, where a consumer adoption stopped on it (testrun-2, August 29, 2026).
-# Both repairs are wording, in files nothing holds to a shape, so a third instance is one message away.
-# Offered as optional by #1093 and deliberately NOT built there, under this repo's rule that a risk
-# which has not bitten gets named rather than repaired; filed as #1104 once the second instance made it
-# a class rather than a risk.
-#
-# IT IS FRONTMATTER-DRIVEN, NOT A PHRASING RULE, and that is what keeps it honest. check-script-contract
-# names 'adopt-dkj-policy' with exactly this bare imperative and is CORRECT to: that skill carries
-# no flag, so its page is in context and a session can invoke it. A grep for "run the '...' skill" would
-# have been born with that false finding. Only the barred set below is a subject.
-#
-# THE DISCRIMINATOR IS THE WORD 'skill' AFTER THE NAME, and it was measured rather than assumed. Without
-# it -- an imperative verb plus a barred name anywhere in the message -- the scan returns 8 unique sites
-# of which 4 are wrong: three name the SCRIPT rather than the skill ("run scripts/maintenance/
-# fix-mojibake.ps1 to repair", "then run ship-pr again", "run park-cycle by hand" -- that last one a
-# substring of the barred name 'park'), and one is prose offering a choice rather than issuing an
-# instruction. With the discriminator: 11 hits over 7 unique sites, all 7 correct. That is the same
-# mention-versus-use separation check 11 makes with its @-target, and it is what makes a generic scan
-# viable here where check 10 had to be opt-in.
-#
-# THE SUBJECT IS BOTH LAYERS, also measured. Printed script output carries 6 of the 7 sites; INSTALL.md
-# carries the seventh, in a consumer-facing document. Output-only would have shipped a check that passes
-# over the one instance a consumer actually reads.
-#
-# PRINTED means a string argument to a writer cmdlet, found through the PowerShell PARSER rather than by
-# line matching -- so a comment explaining the rule (this one included) is not a subject, and neither is
-# a variable name. Markdown is matched per line, where there is no such distinction to draw.
-#
-# NOT SKIPPABLE, deliberately: -SkipCheck's list is the three checks the gate's own suites need, and the
-# comment on $script:SkippableChecks says adding a fourth is a deliberate act. This one does not reuse
-# check 5's pass, which is what lets it run when 'parse' is skipped -- it takes its CommandAsts from
-# Get-PsScriptCommandAsts, shared with the equally non-skippable shopify-cli check below (issue #1358).
-# Both used to parse and walk the same file set separately; that accessor's comment holds the measurement.
-$barredSkills = New-Object System.Collections.Generic.HashSet[string]
-foreach ($skillsDir in (Get-PluginSubdirs -PluginRoots $publishedPlugins -Leaf 'skills')) {
-    Get-ChildItem -Path $skillsDir -Recurse -Filter 'SKILL.md' -File |
-        Where-Object { $_.FullName -match '\\skills\\[^\\]+\\SKILL\.md$' } | ForEach-Object {
-            # THE FLAG IS READ FROM THE FRONTMATTER BLOCK, NOT FROM THE FILE, and that is load-bearing:
-            # new-branch/SKILL.md quotes the string 'disable-model-invocation: true' in its prose to
-            # explain the mechanism, and a whole-file match reads that page as barred. It is not -- and
-            # a false entry here does not produce one wrong line, it makes every correct instruction
-            # naming that skill a finding. Same walk and same name-resolution as check 10's canonical
-            # skillset, so "which skills exist" has one answer in this file.
-            $bsText = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
-            $bsFm = [regex]::Match($bsText, '(?s)\A\uFEFF?---\r?\n(.*?)\r?\n---\r?\n')
-            if (-not $bsFm.Success) { return }
-            $bsBlock = $bsFm.Groups[1].Value
-            if ($bsBlock -notmatch '(?m)^disable-model-invocation:\s*true\s*$') { return }
-            $bsName = [regex]::Match($bsBlock, '(?m)^name:\s*(\S+)\s*$')
-            [void]$barredSkills.Add($(if ($bsName.Success) {
-                $bsName.Groups[1].Value.Trim()
-            } else {
-                Split-Path (Split-Path $_.FullName -Parent) -Leaf
-            }))
-        }
-}
-
-# Check 11 computed this set (linkFiles, minus history, minus the branch document) and this check wants
-# exactly it; see the loop below for why each exclusion matters here. Named rather than used inline so
-# that the borrowing is visible at the top of the check rather than buried in a foreach.
-$barredMdFiles = $lifecycleFiles
-$barredChecked = 0
-$barredFindings = 0
-if ($barredSkills.Count -gt 0) {
-    # LONGEST NAME FIRST, so a barred name that is a prefix of another barred name cannot claim the
-    # match. And \b alone does not settle the boundary: a hyphen is a non-word character, so '\bpark\b'
-    # matches inside 'park-cycle' -- which is exactly the false finding the naive rule produced. The
-    # trailing (?![\w-]) is what refuses a hyphenated continuation.
-    $barredAlt = (($barredSkills | Sort-Object -Property Length -Descending) |
-        ForEach-Object { [regex]::Escape($_) }) -join '|'
-    $barredQuote = "['" + '"' + [char]0x60 + ']?'
-    $barredRegex = [regex]('(?i)\b(?:run|invoke|call|use|execute|start|launch)\b\s*(?:the\s+)?' +
-        $barredQuote + '(?<skill>' + $barredAlt + ')(?![\w-])' + $barredQuote + '\s+skills?\b')
-
-    $barredWriters = @('Write-Host', 'Write-Warning', 'Write-Error', 'Write-Output', 'Write-Information',
-        'Write-Info', 'Write-Failure', 'Write-Ok', 'Write-Step', 'Write-Note', 'Add-Error')
-
-    foreach ($psFile in (Get-PsScriptFiles)) {
-        $barredChecked++
-        $bsRel = $psFile.FullName.Replace($RepoRoot, '.')
-        foreach ($cmd in (Get-PsScriptCommandAsts -Path $psFile.FullName)) {
-            $cmdName = $cmd.GetCommandName()
-            if (-not $cmdName -or $barredWriters -notcontains $cmdName) { continue }
-            $bsStrings = $cmd.FindAll({ param($n)
-                $n -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
-                $n -is [System.Management.Automation.Language.ExpandableStringExpressionAst] }, $true)
-            foreach ($bsStr in $bsStrings) {
-                # The cmdlet's own name parses as a string constant too; it is never a message.
-                if ($bsStr.Extent.Text -eq $cmdName) { continue }
-                foreach ($m in $barredRegex.Matches($bsStr.Extent.Text)) {
-                    # The extent's first line plus the newlines preceding the match inside it, so a
-                    # here-string reports the line the sentence is actually on rather than the line the
-                    # string opened on.
-                    $bsLine = $bsStr.Extent.StartLineNumber +
-                        [regex]::Matches($bsStr.Extent.Text.Substring(0, $m.Index), "`n").Count
-                    Add-BarredSkillFinding -Rel $bsRel -LineNo $bsLine -Skill $m.Groups['skill'].Value -Sample $m.Value
-                }
-            }
-        }
-    }
-
-    # THE MARKDOWN SET IS CHECK 11'S, REUSED RATHER THAN REBUILT, and it brings two exclusions this check
-    # needs for exactly the reasons check 11 documents at $lifecycleFiles. HISTORY (CHANGELOG.md root and
-    # per-plugin, releases/**, every RELEASE.md) records what was true at the time and is never rewritten,
-    # so a note describing the old wording must not become a finding. And THE BRANCH DOCUMENT is history
-    # in the making: its DEPLOY text is pasted into CHANGELOG.md at the fold, so a finding there would
-    # follow it into the changelog permanently.
-    #
-    # THAT SECOND ONE IS NOT HYPOTHETICAL -- it is how this exclusion was found. The branch that added this
-    # check quotes the forbidden wording in its own PLAN section in order to explain what the check
-    # forbids, and the gate refused to push it. A rule that cannot be written down in the document that
-    # introduces it is a rule nobody can explain.
-    #
-    # AND FENCES ARE MASKED, the same way checks 10 and 11 mask them: a fenced example of the wording is an
-    # illustration a reader compares against, not an instruction they follow. Masking keeps offsets and
-    # newline positions identical, so a line index in the mask still points at the right line in the file.
-    # Without it, the only way to show a reader what NOT to write is to not show them.
-    foreach ($bsMd in ($barredMdFiles | Sort-Object -Unique)) {
-        $barredChecked++
-        $bsRel = $bsMd.Replace($RepoRoot, '.')
-        $bsMasked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($bsMd, [System.Text.Encoding]::UTF8))
-        $bsLines = $bsMasked -split "`r?`n"
-        for ($i = 0; $i -lt $bsLines.Count; $i++) {
-            foreach ($m in $barredRegex.Matches($bsLines[$i])) {
-                Add-BarredSkillFinding -Rel $bsRel -LineNo ($i + 1) -Skill $m.Groups['skill'].Value -Sample $bsLines[$i]
-            }
-        }
-    }
-}
-
-Write-Coverage -Category 'barred-skill' -Checked $barredChecked `
-    -Note $(if ($barredSkills.Count -eq 0) {
-        'no shipped skill carries disable-model-invocation: true, so there is no barred name a printed instruction could misuse -- nothing about printed routes is being asserted'
-    } else {
-        "script file(s) and markdown file(s) held against the $($barredSkills.Count) skill(s) whose frontmatter bars model invocation -- $barredFindings printed instruction(s) naming one with a bare imperative. Frontmatter-driven rather than a phrasing rule: the same wording about an UNFLAGGED skill (check-script-contract's 'adopt-dkj-policy') is correct and passes"
-    })
-
-
-# --- Check 31: the Shopify CLI is never invoked bare ------------------------------------------------
+# --- 31. the Shopify CLI is never invoked bare ------------------------------------------------
 # WHY A STATIC GUARD RATHER THAN A CONVENTION (inbound #1183, September 1, 2026). Under
 # $ErrorActionPreference = 'Stop' -- which every script in this repo sets -- a bare
 #
@@ -3514,11 +3365,11 @@ Write-Coverage -Category 'barred-skill' -Checked $barredChecked `
 # Anything else naming 'shopify' as a command is a finding, including a new script in a plugin that does
 # not exist yet: a consumer receives whatever ships, and a second wrapper is the same defect twice.
 #
-# THROUGH THE PARSER, NOT BY LINE MATCHING, for the reason check 30 gives: a comment explaining the rule
+# THROUGH THE PARSER, NOT BY LINE MATCHING, for the reason check 33 gives: a comment explaining the rule
 # (this one included) mentions the command, and so does every printed hint that tells a reader to run
 # 'shopify theme list'. Only a CommandAst is a call. NOT SKIPPABLE, like every check added since the
 # -SkipCheck list was fixed at the three the gate's own suites need -- and because both this check and
-# check 30 always run, the two share ONE parse and ONE walk of the script set through
+# check 33 always run, the two share ONE parse and ONE walk of the script set through
 # Get-PsScriptCommandAsts (issue #1358) instead of each doing their own.
 # TWO EXEMPTIONS, BOTH BY FILE NAME AND BOTH ABOUT THE SAME ONE CALL. The wrapper holds the permitted
 # call, and shopify-cli.tests.ps1 holds the assert that gives the wrapper its meaning: it invokes the
@@ -3677,6 +3528,260 @@ Write-Coverage -Category 'shared-script-list' -Checked $mirrorSpanCount `
         "no <!-- shared-scripts:mirror --> span anywhere in the set check 4 reads. The marker is opt-in, so zero is a pass and not a gap -- but no mirror table is being held against Get-SharedScriptPairs by this run, which is the state that let the same page go stale three times"
     } else {
         "opt-in <!-- shared-scripts:mirror --> span(s), each held against the registry mirrors landing in the MARKED DOCUMENT'S OWN folder: $mirrorClaimTotal row(s) read from the first cell rather than from every backtick -- so prose and links elsewhere in a row cost nothing -- against $mirrorCanonicalTotal registered mirror(s). BOTH figures are printed because a silent pass needs both to be zero, which is how a span check fails invisibly. Check 8 is the sibling that proves each mirror's CONTENT; this one proves the page that names them is complete"
+    })
+
+
+# --- 33. printed instructions naming a model-barred skill ------------------------------------------
+# A PRINTED INSTRUCTION MUST NOT TELL ITS READER TO "RUN THE X SKILL" WHEN X IS BARRED TO THAT READER.
+# A skill whose frontmatter carries 'disable-model-invocation: true' has its page removed from the
+# model's context entirely, so a session cannot see it and will not invoke it. A message that says
+# `run the 'cut-release' skill` therefore names a route its reader does not have -- and the reader who
+# DOES have it, the person at the keyboard, is never told they are the one who has to type it. The
+# correct form names the slash-command and the actor, or names the script directly: the flag decides
+# WHO TYPES THE LINE, not whether the line may run (new-branch/SKILL.md states this in full).
+#
+# WHY A CHECK RATHER THAN CARE -- the class bit twice, a month apart, and nothing connected the two:
+# #731 -> #734 repaired it for the shipping chain, and #1093/#1096 rediscovered the same defect from
+# scratch on the adoption path, where a consumer adoption stopped on it (testrun-2, August 29, 2026).
+# Both repairs are wording, in files nothing holds to a shape, so a third instance is one message away.
+# Offered as optional by #1093 and deliberately NOT built there, under this repo's rule that a risk
+# which has not bitten gets named rather than repaired; filed as #1104 once the second instance made it
+# a class rather than a risk.
+#
+# IT IS FRONTMATTER-DRIVEN, NOT A PHRASING RULE, and that is what keeps it honest. check-script-contract
+# names 'adopt-dkj-policy' with exactly this bare imperative and is CORRECT to: that skill carries
+# no flag, so its page is in context and a session can invoke it. A grep for "run the '...' skill" would
+# have been born with that false finding. Only the barred set below is a subject.
+#
+# THE DISCRIMINATOR IS THE WORD 'skill' AFTER THE NAME, and it was measured rather than assumed. Without
+# it -- an imperative verb plus a barred name anywhere in the message -- the scan returns 8 unique sites
+# of which 4 are wrong: three name the SCRIPT rather than the skill ("run scripts/maintenance/
+# fix-mojibake.ps1 to repair", "then run ship-pr again", "run park-cycle by hand" -- that last one a
+# substring of the barred name 'park'), and one is prose offering a choice rather than issuing an
+# instruction. With the discriminator: 11 hits over 7 unique sites, all 7 correct. That is the same
+# mention-versus-use separation check 11 makes with its @-target, and it is what makes a generic scan
+# viable here where check 10 had to be opt-in.
+#
+# THE SUBJECT IS BOTH LAYERS, also measured. Printed script output carries 6 of the 7 sites; INSTALL.md
+# carries the seventh, in a consumer-facing document. Output-only would have shipped a check that passes
+# over the one instance a consumer actually reads.
+#
+# PRINTED means a string argument to a writer cmdlet, found through the PowerShell PARSER rather than by
+# line matching -- so a comment explaining the rule (this one included) is not a subject, and neither is
+# a variable name. Markdown is matched per line, where there is no such distinction to draw.
+#
+# NOT SKIPPABLE, deliberately: -SkipCheck's list is the three checks the gate's own suites need, and the
+# comment on $script:SkippableChecks says adding a fourth is a deliberate act. This one does not reuse
+# check 5's pass, which is what lets it run when 'parse' is skipped -- it takes its CommandAsts from
+# Get-PsScriptCommandAsts, shared with the equally non-skippable shopify-cli check below (issue #1358).
+# Both used to parse and walk the same file set separately; that accessor's comment holds the measurement.
+$barredSkills = New-Object System.Collections.Generic.HashSet[string]
+foreach ($skillsDir in (Get-PluginSubdirs -PluginRoots $publishedPlugins -Leaf 'skills')) {
+    Get-ChildItem -Path $skillsDir -Recurse -Filter 'SKILL.md' -File |
+        Where-Object { $_.FullName -match '\\skills\\[^\\]+\\SKILL\.md$' } | ForEach-Object {
+            # THE FLAG IS READ FROM THE FRONTMATTER BLOCK, NOT FROM THE FILE, and that is load-bearing:
+            # new-branch/SKILL.md quotes the string 'disable-model-invocation: true' in its prose to
+            # explain the mechanism, and a whole-file match reads that page as barred. It is not -- and
+            # a false entry here does not produce one wrong line, it makes every correct instruction
+            # naming that skill a finding. Same walk and same name-resolution as check 10's canonical
+            # skillset, so "which skills exist" has one answer in this file.
+            $bsText = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
+            $bsFm = [regex]::Match($bsText, '(?s)\A\uFEFF?---\r?\n(.*?)\r?\n---\r?\n')
+            if (-not $bsFm.Success) { return }
+            $bsBlock = $bsFm.Groups[1].Value
+            if ($bsBlock -notmatch '(?m)^disable-model-invocation:\s*true\s*$') { return }
+            $bsName = [regex]::Match($bsBlock, '(?m)^name:\s*(\S+)\s*$')
+            [void]$barredSkills.Add($(if ($bsName.Success) {
+                $bsName.Groups[1].Value.Trim()
+            } else {
+                Split-Path (Split-Path $_.FullName -Parent) -Leaf
+            }))
+        }
+}
+
+# Check 11 computed this set (linkFiles, minus history, minus the branch document) and this check wants
+# exactly it; see the loop below for why each exclusion matters here. Named rather than used inline so
+# that the borrowing is visible at the top of the check rather than buried in a foreach.
+$barredMdFiles = $lifecycleFiles
+$barredChecked = 0
+$barredFindings = 0
+if ($barredSkills.Count -gt 0) {
+    # LONGEST NAME FIRST, so a barred name that is a prefix of another barred name cannot claim the
+    # match. And \b alone does not settle the boundary: a hyphen is a non-word character, so '\bpark\b'
+    # matches inside 'park-cycle' -- which is exactly the false finding the naive rule produced. The
+    # trailing (?![\w-]) is what refuses a hyphenated continuation.
+    $barredAlt = (($barredSkills | Sort-Object -Property Length -Descending) |
+        ForEach-Object { [regex]::Escape($_) }) -join '|'
+    $barredQuote = "['" + '"' + [char]0x60 + ']?'
+    $barredRegex = [regex]('(?i)\b(?:run|invoke|call|use|execute|start|launch)\b\s*(?:the\s+)?' +
+        $barredQuote + '(?<skill>' + $barredAlt + ')(?![\w-])' + $barredQuote + '\s+skills?\b')
+
+    $barredWriters = @('Write-Host', 'Write-Warning', 'Write-Error', 'Write-Output', 'Write-Information',
+        'Write-Info', 'Write-Failure', 'Write-Ok', 'Write-Step', 'Write-Note', 'Add-Error')
+
+    foreach ($psFile in (Get-PsScriptFiles)) {
+        $barredChecked++
+        $bsRel = $psFile.FullName.Replace($RepoRoot, '.')
+        foreach ($cmd in (Get-PsScriptCommandAsts -Path $psFile.FullName)) {
+            $cmdName = $cmd.GetCommandName()
+            if (-not $cmdName -or $barredWriters -notcontains $cmdName) { continue }
+            $bsStrings = $cmd.FindAll({ param($n)
+                $n -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
+                $n -is [System.Management.Automation.Language.ExpandableStringExpressionAst] }, $true)
+            foreach ($bsStr in $bsStrings) {
+                # The cmdlet's own name parses as a string constant too; it is never a message.
+                if ($bsStr.Extent.Text -eq $cmdName) { continue }
+                foreach ($m in $barredRegex.Matches($bsStr.Extent.Text)) {
+                    # The extent's first line plus the newlines preceding the match inside it, so a
+                    # here-string reports the line the sentence is actually on rather than the line the
+                    # string opened on.
+                    $bsLine = $bsStr.Extent.StartLineNumber +
+                        [regex]::Matches($bsStr.Extent.Text.Substring(0, $m.Index), "`n").Count
+                    Add-BarredSkillFinding -Rel $bsRel -LineNo $bsLine -Skill $m.Groups['skill'].Value -Sample $m.Value
+                }
+            }
+        }
+    }
+
+    # THE MARKDOWN SET IS CHECK 11'S, REUSED RATHER THAN REBUILT, and it brings two exclusions this check
+    # needs for exactly the reasons check 11 documents at $lifecycleFiles. HISTORY (CHANGELOG.md root and
+    # per-plugin, releases/**, every RELEASE.md) records what was true at the time and is never rewritten,
+    # so a note describing the old wording must not become a finding. And THE BRANCH DOCUMENT is history
+    # in the making: its DEPLOY text is pasted into CHANGELOG.md at the fold, so a finding there would
+    # follow it into the changelog permanently.
+    #
+    # THAT SECOND ONE IS NOT HYPOTHETICAL -- it is how this exclusion was found. The branch that added this
+    # check quotes the forbidden wording in its own PLAN section in order to explain what the check
+    # forbids, and the gate refused to push it. A rule that cannot be written down in the document that
+    # introduces it is a rule nobody can explain.
+    #
+    # AND FENCES ARE MASKED, the same way checks 10 and 11 mask them: a fenced example of the wording is an
+    # illustration a reader compares against, not an instruction they follow. Masking keeps offsets and
+    # newline positions identical, so a line index in the mask still points at the right line in the file.
+    # Without it, the only way to show a reader what NOT to write is to not show them.
+    foreach ($bsMd in ($barredMdFiles | Sort-Object -Unique)) {
+        $barredChecked++
+        $bsRel = $bsMd.Replace($RepoRoot, '.')
+        $bsMasked = Get-FenceMaskedText -Text ([System.IO.File]::ReadAllText($bsMd, [System.Text.Encoding]::UTF8))
+        $bsLines = $bsMasked -split "`r?`n"
+        for ($i = 0; $i -lt $bsLines.Count; $i++) {
+            foreach ($m in $barredRegex.Matches($bsLines[$i])) {
+                Add-BarredSkillFinding -Rel $bsRel -LineNo ($i + 1) -Skill $m.Groups['skill'].Value -Sample $bsLines[$i]
+            }
+        }
+    }
+}
+
+Write-Coverage -Category 'barred-skill' -Checked $barredChecked `
+    -Note $(if ($barredSkills.Count -eq 0) {
+        'no shipped skill carries disable-model-invocation: true, so there is no barred name a printed instruction could misuse -- nothing about printed routes is being asserted'
+    } else {
+        "script file(s) and markdown file(s) held against the $($barredSkills.Count) skill(s) whose frontmatter bars model invocation -- $barredFindings printed instruction(s) naming one with a bare imperative. Frontmatter-driven rather than a phrasing rule: the same wording about an UNFLAGGED skill (check-script-contract's 'adopt-dkj-policy') is correct and passes"
+    })
+
+
+# --- 34. a numbered section header is unique, ascending, and in one form ----------------------------
+# THE FILE WHOSE JOB IS REFUSING HAND-MAINTAINED LISTS KEPT ONE OF ITS OWN. Every check in this script
+# announces itself with a '# --- <n>. <what it does>' header at column 0, and that number is how a finding
+# is referred to everywhere else: a repo lens, a plugin hook, a test scenario name and two published
+# release notes all say "check <n>". Nothing ever read those headers back, so they were prose -- in the
+# one file that exists to refuse a hand-maintained list a machine could check.
+#
+# THE MEASURED DEFECT (issue #1494, September 6, 2026). Two unrelated checks here both carried the number
+# 30 -- '[plugin-link]' and '[barred-skill]' -- and both were already load-bearing in published prose
+# pointing at DIFFERENT checks: release note 4.23.0 means the first, 4.24.0 the second. So a reader who
+# grepped for the number a finding came from got two answers, and a released document was the source of
+# one of them. The barred-skill check was renumbered to 33 and moved below 32. The archived notes are
+# history and are not rewritten, so 4.24.0 still says 30 and stays standing as the record of when that
+# was true -- the same way this repo keeps a superseded measurement in the past tense rather than
+# deleting it.
+#
+# ASCENDING IS THE PROPERTY THAT PREVENTS THE COLLISION, and uniqueness alone is not. Uniqueness is what
+# broke, but a check for it by itself still permits inserting a section anywhere and hand-picking its
+# number, which is the act that produced the duplicate. Requiring each header to sit strictly above the
+# one before it leaves a new check exactly ONE legal number -- the one after the last header in the file
+# -- so the number stops being a choice and the renumbering that follows a move is forced rather than
+# remembered. That is why check 33 was moved below 32 instead of being left between 30 and 31.
+#
+# GAPS ARE LEGAL AND THERE ARE THREE HERE (9, 17 and 19). A retired check leaves its number behind:
+# reusing it would silently repoint every older citation, which is the defect above arriving by the other
+# door. Two of the three carry a retirement note where the check stood, and that note is the convention.
+#
+# ONE FORM, because a second spelling is how the drift stayed invisible. Four headers read
+# '# --- Check <n>: ' where the rest read '# --- <n>. ', so no single pattern listed them all and the
+# duplicate showed up in a grep of neither. Both forms are subjects now; only the second is legal.
+#
+# COLUMN 0 ONLY, and that bound is measured rather than tidy. The same '# ---' marker is used INDENTED
+# inside this gate's own test suites to separate scenarios within a function, under its own numbering.
+# Those are not file sections, and holding them to this rule would be the gate inventing a convention the
+# repo never had -- the narrowing check 26 had to make for the same reason. A header at column 0 is the
+# file's table of contents; anything indented belongs to whatever block encloses it.
+#
+# EVERY SCRIPT, NOT JUST THIS ONE, because the convention is shared rather than local. Measured at
+# introduction over this repo's script set (September 6, 2026): 19 files carry a column-0 numbered header,
+# 123 headers before this one -- 124 with it -- 0 findings once #1494 was repaired, 0 exemptions. Run
+# against the pre-repair file the same reader reports 5 -- the one duplicate and the four headers in the
+# other form -- so it demonstrably fires on what it was written for instead of merely passing.
+$secChecked  = 0
+$secFiles    = 0
+$secFindings = 0
+foreach ($psFile in (Get-PsScriptFiles)) {
+    $secRel   = $psFile.FullName.Replace($RepoRoot, '.')
+    $secLines = [System.IO.File]::ReadAllLines($psFile.FullName, [System.Text.Encoding]::UTF8)
+    $secSeen  = @{}
+    $secPrevN = -1
+    $secPrevS = ''
+    $secPrevLine = 0
+    $secInFile = 0
+    for ($i = 0; $i -lt $secLines.Count; $i++) {
+        $secLine = $secLines[$i]
+        if ($secLine -notlike '# --- *') { continue }
+        # THE OTHER FORM IS A SUBJECT, NOT A SKIP. Passing over an unrecognised spelling would let a file
+        # opt out of the numbering rule by spelling its headers differently, which is how the duplicate
+        # survived a grep for a month.
+        if ($secLine -match '^# --- Check (\d+)([a-z]?)\s*[:.]') {
+            $secFindings++
+            Add-Error ("[section-number] ${secRel}:$($i + 1): a numbered section header in the second form." +
+                " The convention is '# --- <n>. <what it does>'; this one reads" +
+                " '# --- Check $($Matches[1])$($Matches[2]): '. Two spellings mean no single pattern lists" +
+                " every section, which is how two checks came to share the number 30 without a grep showing" +
+                " it (#1494). Rewrite it as '# --- $($Matches[1])$($Matches[2]). <what it does>'.")
+            continue
+        }
+        if ($secLine -notmatch '^# --- (\d+)([a-z]?)\. ') { continue }
+        $secN = [int]$Matches[1]
+        $secS = $Matches[2]
+        $secKey = "$secN$secS"
+        $secChecked++
+        $secInFile++
+        if ($secSeen.ContainsKey($secKey)) {
+            $secFindings++
+            Add-Error ("[section-number] ${secRel}:$($i + 1): section number $secKey is already used at line" +
+                " $($secSeen[$secKey]) of this file. That number is how a finding is referred to in lenses," +
+                " hooks, test names and published release notes, so two sections sharing one gives a reader" +
+                " two answers to the same question -- and a released document then cites the wrong one" +
+                " (#1494). Give the LATER section the next free number above the last header in the file and" +
+                " move it there; do not reuse a retired number.")
+        } elseif ($secN -lt $secPrevN -or ($secN -eq $secPrevN -and $secS -le $secPrevS)) {
+            $secFindings++
+            Add-Error ("[section-number] ${secRel}:$($i + 1): section number $secKey sits after" +
+                " $secPrevN$secPrevS at line $secPrevLine, so the numbers no longer ascend. Ascending order" +
+                " is what leaves a new section exactly one legal number -- the one after the last header --" +
+                " and it is therefore the property that stops two sections sharing a number at all. Move" +
+                " this section to where its number belongs, or renumber it to sit above the previous one.")
+        }
+        $secSeen[$secKey] = $i + 1
+        $secPrevN    = $secN
+        $secPrevS    = $secS
+        $secPrevLine = $i + 1
+    }
+    if ($secInFile -gt 0) { $secFiles++ }
+}
+Write-Coverage -Category 'section-number' -Checked $secChecked `
+    -Note $(if ($secChecked -eq 0) {
+        'no script in this set carries a column-0 numbered section header, so there is no table of contents to hold to itself -- nothing about section numbering is being asserted'
+    } else {
+        "column-0 '# --- <n>. ' section header(s) across $secFiles script file(s), each held against the one before it for uniqueness and ascending order, plus the second spelling '# --- Check <n>: ' which is a finding wherever it appears -- $secFindings in all. Indented '# ---' markers are deliberately NOT subjects: the lint suites use them inside functions under their own numbering, and they are not file sections"
     })
 
 # --- Report ---------------------------------------------------------------------------------------------

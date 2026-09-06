@@ -1628,6 +1628,61 @@ about path forms did not. Third, the `GetFullPath` normalisation was kept even t
 the mismatch it prevents is real, it costs nothing, and its comment says plainly that it has never fired,
 so no later reader cites an unfired guard as a measurement.
 
+#### Check 34, and the number that was prose (September 6, 2026, [#1494](https://github.com/DaveKJohn/claude-code-specialists/issues/1494))
+
+**The defect is the gate's own.** Two unrelated checks in `check-plugin-integrity.ps1` both carried the
+number **30** — `[plugin-link]` and `[barred-skill]` — and both were already load-bearing in *published*
+prose, pointing at different checks: release note `4.23.0` means the first, `4.24.0` the second. A reader
+who grepped for the number a finding came from got two answers, and a released document was the source of
+one of them. The numbers were hand-assigned, cited in a lens, a plugin hook, nine test scenario names and
+two release notes — and read back by nothing, in the one file whose whole purpose is refusing a
+hand-maintained list a machine could ask about.
+
+**Renumbering was chosen over disambiguating in prose**, which was the cheaper option the report
+preferred. Writing ``check 30 (`[barred-skill]`)`` everywhere answers the grep and leaves two sections
+numbered 30, so the next hand-assigned number can collide again and the disambiguation has to be
+remembered at every new citation. The barred-skill check — the later of the two, the one that took an
+already-taken number — became **33**. The archived notes are history and are not rewritten, so `4.24.0`
+still says 30 and stands as the record of when that was true, which is how this repo already treats a
+superseded measurement.
+
+**ASCENDING is the property that prevents the collision; uniqueness is only what broke.** A check for
+uniqueness alone still permits inserting a section anywhere and hand-picking its number, which is the act
+that produced the duplicate. Requiring each column-0 header to sit strictly above the one before it leaves
+a new check exactly **one** legal number — the one after the last header in the file — so the number stops
+being a choice. That is why check 33 was *moved* below 32 rather than left sitting between 30 and 31: a
+renumbering that satisfies uniqueness without moving the block lands on the ascending rule instead, and
+the suite's scenario 54 is that exact case.
+
+**Gaps are legal and there are three** (9, 17, 19). A retired check leaves its number behind; reusing one
+would silently repoint every older citation, which is the same defect arriving by the other door. Two of
+the three carry a retirement note where the check stood, and that note is the convention.
+
+**The second spelling is a finding, not a skip** — and it is why the duplicate stayed invisible. Four
+headers read `# --- Check <n>: ` where the other twenty-nine read `# --- <n>. `, so no single pattern
+listed them all and the collision showed up in a grep of neither. Passing over an unrecognised spelling
+would let a file opt out of the numbering rule by spelling its headers differently.
+
+**Column 0 only, and that bound is measured rather than tidy.** The same `# ---` marker is used *indented*
+inside the four lint suites to separate scenarios within a function, under its own numbering that restarts
+and repeats freely. Those are not file sections, and holding them to this rule would be the gate inventing
+a convention the repo never had — the narrowing check 26 had to make for the same reason. Scenario 57 is a
+purpose-built fixture for that bound rather than an assert on the suites' own headers, so it says what it
+proves instead of depending on this file staying shaped as it is.
+
+**Born green, and demonstrably firing.** Measured across this repo's script set before the check was
+written: **19** files carry a column-0 numbered header, **123** headers in all, **0** exemptions. After the
+#1494 repair the gate reports 0 findings over 124 (the check adds its own header). Run against the
+pre-repair file the same reader reports **5** — the one duplicate and the four headers in the other form —
+so it fires on what it was written for rather than merely passing. The check is repo-wide rather than
+scoped to the gate, because the convention is: 19 files use it, not one.
+
+**Adjacent and deliberately NOT repaired here:** the gate's own comments cite `check 19` and `check 20b`,
+neither of which exists as a header — the same class one layer over, a citation nothing reads back. Filed
+rather than folded in, because holding every `check <n>` citation to an existing header needs its own
+false-positive decision about legitimately citing a *retired* check, which two of this file's comments do
+correctly.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

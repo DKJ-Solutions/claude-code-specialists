@@ -1250,7 +1250,7 @@ try {
     # remediation hint naming a file the reader cannot open is worse than none.
     #
     # NAMING THE SKILL WAS NOT ENOUGH EITHER (inbound #1104). This asserted the words 'sync-roster skill'
-    # until check 30 was added, and that wording is the defect: 'sync-roster' carries
+    # until check 33 was added, and that wording is the defect: 'sync-roster' carries
     # disable-model-invocation, and the reader of a SessionStart hook is the model, which cannot invoke it
     # and cannot even read the page saying so. So the assert is on the slash-command AND on the handover
     # -- a hint the reader cannot act on is the same failure #225 was about, one layer further in.

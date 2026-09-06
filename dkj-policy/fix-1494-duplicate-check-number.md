@@ -33,21 +33,80 @@
 
 ### PLAN
 
+#### The decision the issue deliberately parked
+
+[#1494](https://github.com/DaveKJohn/claude-code-specialists/issues/1494) listed three options and
+declined to pick, because the archived release notes are history and are not rewritten -- so whichever
+check gives up the number leaves a published sentence pointing at the wrong one. Dave chose the
+specialist's recommendation (September 6, 2026): renumber, and add the machine check, so the class ends
+rather than just this instance.
+
+**Renumbering over disambiguating in prose.** Writing ``check 30 (`[barred-skill]`)`` everywhere was the
+cheaper option and the one the report leaned to. It answers the grep and leaves two sections numbered 30,
+so the next hand-assigned number can collide again and the disambiguation has to be remembered at every
+new citation.
+
+**And ascending order rather than uniqueness alone**, because uniqueness is what broke but ascending is
+what prevents it: a uniqueness check still permits inserting a section anywhere and hand-picking its
+number, which is the act that produced the duplicate.
+
+#### Two corrections to the report, both found on verification
+
+- It says check 31's header form is the odd one out. It is not -- **four** headers read
+  `# --- Check <n>: ` (12, 18, 20 and 31) where the other twenty-nine read `# --- <n>. `. Size
+  mis-measured, so the "adjacent, same cause" half is four instances rather than one.
+- Unremarked in the report: 9, 17 and 19 are unused gaps. Two carry a retirement note where the check
+  stood, which is what makes them legal rather than a defect -- so the new check had to permit gaps.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Renumber the `[barred-skill]` check from 30 to 33 in `../scripts/lint/check-plugin-integrity.ps1`,
+      and move its block below check 32 so the numbers ascend again
+- [x] Sweep every LIVE reference to the barred-skill "check 30" -- the gate's own four internal
+      cross-references, the `roster-sessioncheck` hook, `check-roster-sync.ps1` and its plugin mirror,
+      `roster-sync.tests.ps1`, and the nine scenario names plus the fixture in the commands suite
+- [x] Leave the `[plugin-link]` check at 30, and leave the archived notes under `releases/changelog/`
+      untouched -- history is not rewritten
+- [x] Normalise the four `# --- Check <n>: ` headers (12, 18, 20, 31) to the `# --- <n>. ` form
+- [x] Add check 34 (`[section-number]`): every column-0 numbered section header is unique, strictly
+      ascending, and in one form -- repo-wide, since 19 scripts share the convention
+- [x] Record the shape and the declined options in
+      `../.claude/specialists/lenses/05-15-extension.md`, beside check 32's entry
 
 ### TEST
 
+- [x] Five scenarios (53-57) in `../scripts/tests/check-plugin-integrity-commands.tests.ps1`: the
+      duplicate, the descent, the second spelling, the legal gap + lettered sub-sections, and the
+      indented header that is not a subject -- 69 asserts green
+- [x] Born green: 19 files, 123 numbered headers before this check's own, 0 findings, 0 exemptions
+- [x] Demonstrably firing: run against the pre-repair file the same reader reports 5 -- the one
+      duplicate and the four headers in the other spelling
+- [x] Full lint gate green (0 errors) and every suite green, as CI runs them
+
 ### DEPLOY: fix/1494-duplicate-check-number
 
-**Score:**
+Two unrelated checks in `../scripts/lint/check-plugin-integrity.ps1` both carried the number **30** --
+`[plugin-link]` and `[barred-skill]` -- and both numbers were already load-bearing in published release
+notes pointing at *different* checks, so a reader who grepped for the number a finding came from got two
+answers. The barred-skill check is now **33** and sits below 32; every live reference moved with it, and
+the archived notes stay as they are, because history is not rewritten.
+
+The number itself is no longer prose. **Check 34 (`[section-number]`)** holds every column-0
+`# --- <n>. ` section header in the repo's scripts to three rules: unique, strictly ascending, and in one
+spelling. Ascending is the load-bearing one -- it leaves a new check exactly one legal number, the one
+after the last header in the file, so the number stops being a choice and a second collision cannot be
+hand-assigned. Gaps stay legal, since a retired check's number must not be reused. Born green over 19
+files and 123 headers; run against the pre-repair file it reports the five findings it was written for.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A. Nothing here reaches a subscriber: the lint gate is this repo's own maintenance tooling and ships in
+no plugin. The two published release notes that cite "check 30" are deliberately left standing.
+
+**Score:** N/A
 
 #### Pull Request
 
 Renumber the duplicated lint check 30 and guard the numbering by machine
-
