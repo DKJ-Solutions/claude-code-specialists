@@ -59,6 +59,34 @@ The fold no longer runs from ship-pr.ps1 alone
 
 ---
 
+### DEPLOY: fix/1493-fold-on-merge-pat-push · 20260906-111800
+
+`fold-on-merge.yml` now pushes its fold commit authenticated as a fine-grained personal access token
+(`FOLD_PUSH_TOKEN`) belonging to an org owner, instead of the default `GITHUB_TOKEN`. `main-ci-gate`
+already bypasses `OrganizationAdmin`, so this identity clears the ruleset with no repo-settings change --
+the originally planned route (adding the GitHub Actions app as a bypass actor) turned out to be
+impossible, since that app is owned and administered by `anthropics`, not this org. Closes out the
+remaining blocker in #1493; the workflow is no longer waiting on a permission nobody here can grant.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The token requires manual rotation before it expires (org policy caps it at 366 days) -- if it lapses,
+this job starts failing its push again with no code-level cause, which is worth a subscriber-facing
+reader's awareness only in the sense that a maintenance rhythm now exists where none did. N/A for a
+direct subscriber-facing effect: nothing about what a consumer of this repo's plugins sees changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+Push fold-on-merge.yml's commit with a fine-grained PAT from an org admin instead of the default GITHUB_TOKEN
+
+[PR #1507](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1507)
+
+---
+
 ### DEPLOY: fix/1500-stale-check-citations · 20260906-111630
 
 Two stale check-number citations in `scripts/lint/check-plugin-integrity.ps1` now name the pass they
