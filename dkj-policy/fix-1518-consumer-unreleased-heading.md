@@ -44,9 +44,14 @@ instructs them without condition: *"before you write that a behaviour changed, g
 what it used to be."* In a repo `adopt-workflow-folder.ps1` scaffolded, that grep matched nothing at
 all — the string was not in their changelog. A portable page cannot direct a consumer at a heading only
 the source repo has, which rules out reading 2; and reading 3 would make a page that instructs
-unconditionally depend on a per-repo answer. `Get-ChangelogUnreleasedLabel`'s own header says the same
-thing from the other side: the label is a seam *"because a consumer may translate it"*, which presumes
-the consumer has one.
+unconditionally depend on a per-repo answer.
+
+**#1517 landed on the trunk while this branch was building, and it points the same way.** It retired the
+sentence I had first cited here — the label was described as a seam *"because a consumer may translate
+it"* — on the ground that nothing in the code ever agreed. What replaced it is a better argument for this
+change than the one it removed: the label is a single constant *because "nothing migrates the document"*,
+the heading being *"already committed in this repo's `CHANGELOG.md` and in every consumer's"*. That second
+half was not true when it was written. It is now.
 
 - [x] Read both files the issue cites and confirm the symptom still stands — it does: `$changelogIntro`
       carried no pending heading, and `Get-ChangelogUnreleasedHeading`'s only callers were the pattern

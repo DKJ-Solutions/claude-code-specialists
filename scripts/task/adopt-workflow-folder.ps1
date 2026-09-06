@@ -394,8 +394,11 @@ $entryHashes = '#' * (Get-EntryHeadingLevel)
 # `[Unreleased]` for what it used to be." In a repo scaffolded here, that grep matched nothing at all. A page
 # that reaches a consumer cannot name a heading only the source repo has -- which is what ruled out the two
 # other readings on that issue (that the heading is this repo's own, or the consumer's choice) rather than a
-# preference between them. The seam beneath it says the same thing from the other side: the label is
-# configurable "because a consumer may translate it", which presumes the consumer has one to translate.
+# preference between them. entry-scaffold-lib says the same thing from the other side, in the block that
+# defines the label: the reason it is a single constant rather than a seam is that "nothing migrates the
+# document" -- the heading is "already committed in this repo's CHANGELOG.md and in every consumer's". That
+# second half is what this change makes true of a fresh adoption; before it, the consumer had no heading to
+# migrate away from OR to keep.
 #
 # IT GOES LAST, AND THAT IS THE WHOLE PLACEMENT RULE. The heading sits one level SHALLOWER than an entry, so
 # Split-Changelog's boundary lands below it and it stays part of the head, preserved by every cut; and the
