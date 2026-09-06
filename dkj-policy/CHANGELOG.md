@@ -32,6 +32,40 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1494-duplicate-check-number · 20260906-110038
+
+Two unrelated checks in `../scripts/lint/check-plugin-integrity.ps1` both carried the number **30** --
+`[plugin-link]` and `[barred-skill]` -- and both numbers were already load-bearing in published release
+notes pointing at *different* checks, so a reader who grepped for the number a finding came from got two
+answers. The barred-skill check is now **33** and sits below 32; every live reference moved with it, and
+the archived notes stay as they are, because history is not rewritten.
+
+The number itself is no longer prose. **Check 34 (`[section-number]`)** holds every column-0
+`# --- <n>. ` section header in the repo's scripts to three rules: unique, strictly ascending, and in one
+spelling. Ascending is the load-bearing one -- it leaves a new check exactly one legal number, the one
+after the last header in the file, so the number stops being a choice and a second collision cannot be
+hand-assigned. Gaps stay legal, since a retired check's number must not be reused. Born green over 19
+files and 123 headers; run against the pre-repair file it reports the five findings it was written for.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. Nothing here reaches a subscriber: the lint gate is this repo's own maintenance tooling and ships in
+no plugin. The two published release notes that cite "check 30" are deliberately left standing.
+
+**Score:** N/A
+
+#### Pull Request
+
+Renumber the duplicated lint check 30 and guard the numbering by machine
+
+Plugins: dkj-team-alpha
+
+[PR #1502](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1502)
+
+---
+
 ### DEPLOY: docs/1499-fold-on-merge-ruleset-diagnosis · 20260906-105207
 
 A red `fold-on-merge` job now says which of its two unrelated causes fired. The workflow's header named
