@@ -230,7 +230,7 @@ try {
         # SessionStart hook, so its reader is the MODEL before it is anybody else -- and 'sync-roster'
         # carries disable-model-invocation, which removes the skill's page from context entirely. A
         # session told to run it is refused by the harness and cannot even read what it was refused.
-        # Check 30 of check-plugin-integrity.ps1 now holds every printed message to this.
+        # Check 33 of check-plugin-integrity.ps1 now holds every printed message to this.
         #
         # AND THE WORDING IS 'run X -- typed by the owner', NOT 'ask the owner to type X'. Both are
         # correct for the model and only one is correct for the OWNER, who reads this same line on their
