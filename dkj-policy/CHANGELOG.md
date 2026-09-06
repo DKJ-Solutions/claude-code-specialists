@@ -32,6 +32,37 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1500-stale-check-citations · 20260906-111630
+
+Two stale check-number citations in `scripts/lint/check-plugin-integrity.ps1` now name the pass they
+point at. The changelog-path resolver (`:771`) and the lifecycle block (`:1482`) both listed the
+readers of the resolved changelog path as `(check 19)` and `(check 20b)`; the entry-heading pass is
+**check 13** (the file names it that itself at `:2507`) and the shape-claim pass is **check 20**, so
+a reader grepping `check 19` to find the entry-heading pass was landed on an unrelated
+`[consumer-doc]` check, and `check 20b` -- a real sub-name -- was standing in for the whole pass.
+Comment-only; no behaviour changes. The remaining `check 19` at `:2354` is left as-is: it is the
+`# --- Check 20:` header explaining, correctly, why 19 was skipped as a header number (the headerless
+`[consumer-doc]` check already answers to it). Renumbering the section headers -- including the
+duplicated `# --- 30.` -- stays with #1494.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing reaches a consumer. `check-plugin-integrity.ps1` is not a shared script -- one copy, in
+`scripts/lint/`, run only where this product is maintained and in CI. A consumer never runs it and
+never reads its comments.
+
+**Score:** N/A
+
+#### Pull Request
+
+check-plugin-integrity.ps1: stale 'check 19' / 'check 20b' citations point at the wrong pass
+
+[PR #1504](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1504)
+
+---
+
 ### DEPLOY: fix/1497-fold-all-reserved-names-v2 · 20260906-110714
 
 #1498 fixed #1497 by adding the `ReservedNames` exclusion to fold-all's own inline directory scan. This
