@@ -32,6 +32,35 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1497-fold-all-reserved-names-v2 · 20260906-110714
+
+#1498 fixed #1497 by adding the `ReservedNames` exclusion to fold-all's own inline directory scan. This
+replaces that scan with `Get-PerBranchDocumentRels` -- the shared listing that has applied the exclusion
+since #1335 and that this loop simply never asked. Same behaviour, one guard instead of six, and the last
+hand-rolled `*.md` sweep outside the lib is gone. Adds the regression case #1498 could not reach: with the
+changelog outside the swept folder the fold deleted `README.md` and exited 0.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The guard was never missing. It was extracted at #1335 with a docstring that names this failure in advance,
+and the repair that shipped is the one that leaves that mechanism intact -- so the next widened glob finds
+six copies to keep in step instead of five. This is the difference between fixing the instance and closing
+the class, and it is checkable: no `.Pattern` glob remains outside the lib.
+
+**Score:** 2
+
+#### Pull Request
+
+fold-all's sweep is the shared guarded listing, not a sixth copy of the guard
+
+Plugins: dkj-policy
+
+[PR #1503](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1503)
+
+---
+
 ### DEPLOY: fix/1494-duplicate-check-number · 20260906-110038
 
 Two unrelated checks in `../scripts/lint/check-plugin-integrity.ps1` both carried the number **30** --
