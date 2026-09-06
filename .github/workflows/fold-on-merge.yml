@@ -21,21 +21,29 @@
 # a question this already answers from the tree itself, for one branch per run instead of the whole
 # backlog a push might be carrying.
 #
-# contents: write + pull-requests: read, AND NOTHING ELSE. pull-requests: read is not optional: the
-# fold step's own `gh pr list` needs it, and declaring any permissions block at all sets every unlisted
-# scope to none.
+# contents: read + pull-requests: read, AND NOTHING ELSE, for the default GITHUB_TOKEN. pull-requests:
+# read is not optional: the fold step's own `gh pr list` needs it, and declaring any permissions block
+# at all sets every unlisted scope to none. contents: write is deliberately NOT granted here -- the
+# actual push authenticates as FOLD_PUSH_TOKEN (see below), which the checkout step wires in directly
+# and which never touches this permissions block at all.
 #
-# INERT UNTIL THE main-ci-gate RULESET BYPASSES THE GITHUB ACTIONS APP (issue #1493). TWO of its rules
-# block any push to main, including this job's, unless the pushing actor is a listed bypass actor --
-# required_status_checks AND merge_queue, and naming only the first is what made the third failed run
-# unreadable (issue #1499, below). Today's bypass list is OrganizationAdmin + RepositoryRole id 5; the
-# default GITHUB_TOKEN pushes as the GitHub Actions app (integration_id 15368 -- the same id the
-# lint-en-tests required check already reports under), which is neither. A bypass actor bypasses the
-# whole ruleset, so adding that app answers both rules in one move -- but a reader diagnosing a red run
-# has to recognise both refusals, because either one alone produces a red job. Adding it is a
-# repo-settings change and therefore Dave's, not this workflow's -- until it is made, the fold step
-# below fails its own git push with a ruleset rejection, loudly, which is the correct failure mode for
-# a workflow that is code-complete and waiting on a permission it does not grant itself.
+# PUSHES AS AN ORG ADMIN, NOT AS THE GITHUB ACTIONS APP (issue #1493). TWO of main-ci-gate's rules
+# block any push to main unless the pushing actor is a listed bypass actor -- required_status_checks
+# AND merge_queue, and naming only the first is what made a diagnosis unreadable once already (issue
+# #1499, below). The default GITHUB_TOKEN pushes as the GitHub Actions app (integration_id 15368),
+# which is not on that bypass list -- and cannot be added to it: that app is owned by `anthropics`,
+# installed on this org but not administered by it, so there is no private key for it to authenticate
+# as. The bypass list already carries `OrganizationAdmin` with `bypass_mode: always`, so this job
+# checks out with a fine-grained personal access token (secrets.FOLD_PUSH_TOKEN) belonging to an org
+# owner instead -- that identity already bypasses the ruleset today, with no ruleset change needed.
+# The token is scoped to this repository only and to `Contents: Read and write` only, and it expires
+# within the org's enforced 366-day maximum, so it needs rotating before then or this job starts
+# failing its push again with no code-level cause. THIS IS A STANDING CREDENTIAL, NOT A FIX-FOR-FIX
+# SWAP: the default GITHUB_TOKEN it replaces is job-scoped and expires in about an hour, unusable
+# outside this one run; FOLD_PUSH_TOKEN is usable from anywhere for up to a year, and because
+# actions/checkout's default `persist-credentials: true` writes it into the workspace's git config,
+# every step of this job holds it, not only the push step. Sebastian's review of #1493's PR flagged
+# this asymmetry as worth stating rather than leaving implicit in the rotation note alone.
 #
 # WHAT THAT REJECTION ACTUALLY LOOKS LIKE, because a red run here has two entirely different causes and
 # only the log tells them apart (issue #1499). Measured verbatim in run 34020828593, the push carrying
@@ -67,7 +75,7 @@
 name: Fold on merge
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 on:
@@ -82,7 +90,15 @@ jobs:
   fold-on-merge:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      # token here, not the default GITHUB_TOKEN: this is what makes the fold step's later `git push`
+      # authenticate as the org-owner identity behind FOLD_PUSH_TOKEN rather than as the GitHub Actions
+      # app -- see the header comment above for why the app itself cannot be a ruleset bypass actor.
+      # Pinned to a commit SHA, matching claude.yml and claude-code-review.yml's own convention for a
+      # checkout step that handles a real credential -- a mutable tag on this line could otherwise
+      # retag its way into exfiltrating a 366-day standing write token instead of an hour-lived one.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          token: ${{ secrets.FOLD_PUSH_TOKEN }}
 
       # continue-on-error is deliberate: check-unfolded-entry.ps1 exits non-zero on a genuine
       # find, which is the case this job exists to act on, not a step failure. BUT that leaves
@@ -114,6 +130,9 @@ jobs:
             exit 1
           }
 
+          # This is commit-metadata identity only -- who authored the commit -- and is independent of
+          # the push's actual credential (FOLD_PUSH_TOKEN, wired in by the checkout step above). A
+          # ruleset bypass is checked against the pushing token's identity, not the commit author.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/fold-changelog-entry.ps1 -Commit -Push *>&1 | Tee-Object -FilePath fold-output.txt
