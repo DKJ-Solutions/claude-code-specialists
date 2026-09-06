@@ -31,6 +31,10 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (git rev-parse --show-toplevel).Trim()
 $ScriptPath = Join-Path $RepoRoot 'scripts\release\verify-pushed-merges.ps1'
+# For Invoke-NativeCapture -- see the capture note in Invoke-Pushed below. Dot-sourced here rather
+# than re-implemented, because a third private copy of "start a child and read its streams from
+# files" is exactly the duplication that let this suite inherit its sibling's broken capture.
+. (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -66,8 +70,18 @@ function Assert-Says {
         the child's console buffer width, so the same assert passes on one invocation and fails on the
         next -- this suite passed three runs and then failed three in a row with no edit in between.
 
-        Removing whitespace entirely is immune to both, and `.Contains` is a literal search, so a
-        phrase carrying regex metacharacters needs no escaping either.
+        Removing whitespace entirely is immune to both -- AND NOT TO A THIRD THING, which is what
+        #1530 measured and what this paragraph used to deny. A wrap only ever REMOVES separation, so
+        stripping separation always repairs it; what stripping cannot repair is other text INSERTED
+        into the middle of the phrase. A parent that captures a native child with '2>&1' renders the
+        child's FIRST stderr line as a NativeCommandError record and stamps 'At <path>:<line>', the
+        source echo, CategoryInfo and FullyQualifiedErrorId between it and the remainder -- so a
+        phrase straddling the child's first wrap arrives with five lines of other text through it.
+        That is a defect of the CAPTURE and not of this comparison, which is why the answer sits in
+        Invoke-Pushed below rather than here.
+
+        `.Contains` is a literal search, so a phrase carrying regex metacharacters needs no escaping
+        either.
     #>
     param([string]$Output, [string]$Phrase, [string]$Name)
     Assert-True (($Output -replace '\s', '').Contains(($Phrase -replace '\s', ''))) $Name
@@ -178,15 +192,34 @@ exit 1
         if ($Before) { $runArgs += @('-Before', $Before) }
         if ($ReportOnly) { $runArgs += '-ReportOnly' }
         if ($MaxCommits -gt 0) { $runArgs += @('-MaxCommits', "$MaxCommits") }
-        $out = (& powershell @runArgs 2>&1 | Out-String)
-        $code = $LASTEXITCODE
+        # CAPTURED VIA REDIRECT FILES, NOT '2>&1'. Invoke-NativeCapture -Utf8 starts the child with
+        # Start-Process and redirected streams, so the parent's error formatter never sees the child's
+        # stderr and cannot stamp anything into it. With '2>&1' it did, and the damage landed INSIDE an
+        # asserted phrase: measured for #1530 at width 120, with the script under test at a path of 29
+        # to 51 characters, the parent cut the rendered record inside `may have gone unverified` and
+        # put 'At line:', the source echo, CategoryInfo and FullyQualifiedErrorId into the gap. No
+        # amount of whitespace stripping rejoins a phrase across five lines of other text.
+        #
+        # WHICH IS WHY IT WAS GREEN ON CI AND RED ON A DEVELOPER'S MACHINE, on a byte-identical tree:
+        # the cut column is decided by the path length and the console width together, and both are
+        # properties of the machine rather than of the code. Outside that window every assert here
+        # passes, so a green run was never evidence that the capture worked.
+        #
+        # Same finding, same fix and same reasoning as Invoke-CapturedScript in shared-scripts.tests.ps1
+        # (measured August 14, 2026). This suite was written after that one and still copied the old
+        # capture from its sibling -- which is the argument for calling the shared lib here instead of
+        # keeping a third local variant.
+        $run = Invoke-NativeCapture -FilePath 'powershell' -Arguments $runArgs -Utf8
+        $out = ($run.Output -join [Environment]::NewLine)
+        $code = $run.ExitCode
         $log = if (Test-Path $callLog) { Get-Content -Path $callLog } else { @() }
         # Whitespace-normalized once for every scenario, for the sibling suite's reason: the child
         # renders at ITS own console width, so a phrase an assert matches can be split by a wrap whose
         # position depends on the machine's path length. Normalizing is NOT sufficient on its own --
-        # see Assert-Says, which every prose assert here goes through and which is what actually makes
-        # this file width-proof. This field stays normalized so a FAILED assert prints something a
-        # human can read.
+        # see Assert-Says, which every prose assert here goes through. THAT IS STILL ONLY HALF OF WHAT
+        # MAKES THIS FILE WIDTH-PROOF, and the missing half is the capture above: stripping repairs a
+        # wrap, and nothing at the comparison can repair decoration inserted into the phrase (#1530).
+        # This field stays normalized so a FAILED assert prints something a human can read.
         return [pscustomobject]@{ Output = ($out -replace '\s+', ' '); ExitCode = $code; Log = @($log) }
     }
 
@@ -286,6 +319,15 @@ exit 1
     Assert-Equal 1 $r12.ExitCode 'exits 1'
     Assert-True (($r12.Log | Where-Object { $_ -match 'pr view 501' }).Count -eq 1) 'verified the PR it COULD resolve rather than abandoning the run'
     Assert-Says $r12.Output 'may have gone unverified' 'names what the failure might have hidden'
+    # THE GUARD FOR #1530, and deliberately about the CAPTURE rather than about the phrase above. An
+    # assert that only looks for its own phrase is what was already here, and it fails only at the
+    # widths and path lengths where the cut happens to land inside that phrase -- which is how a broken
+    # capture stayed green on CI for as long as it did. 'NativeCommandError' can appear in this text
+    # ONLY if a parent rendered the child's stderr as an error record; a redirect file receives what
+    # the child wrote and nothing else. Its ABSENCE is therefore proof of which capture ran, at every
+    # width and every path length. This scenario is the one to hang it on: it is the only one whose
+    # child both writes to stderr and exits non-zero.
+    Assert-True (-not (($r12.Output -replace '\s', '').Contains('NativeCommandError'))) 'no parent error-record decoration was stamped into the capture'
 
     # --- A cap is a measurement too ---------------------------------------------------------------
     Write-Host "A commit cap that bites is reported by name, never applied quietly" -ForegroundColor Cyan
