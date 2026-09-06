@@ -59,6 +59,29 @@ The fold no longer runs from ship-pr.ps1 alone
 
 ---
 
+### DEPLOY: docs/1493-fold-push-token-succession · 20260906-115219
+
+`FOLD_PUSH_TOKEN`'s succession is now written down in Sylvester's system-administration lens: what it
+is, why the GitHub Actions app couldn't be used instead, its 366-day expiry and what a lapse looks like
+in a run log, and the manual renewal procedure (which org owner runs which command). Closes the
+"tribal knowledge held by one person" gap Sebastian flagged reviewing PR #1507 -- no code changed.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+N/A -- purely internal governance documentation about a CI credential; no subscriber-facing effect.
+
+**Score:** N/A
+
+#### Pull Request
+
+Write down FOLD_PUSH_TOKEN succession -- what happens if its owner becomes unreachable before the 366-day expiry
+
+[PR #1510](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1510)
+
+---
+
 ### DEPLOY: fix/1493-fold-on-merge-pat-push · 20260906-111800
 
 `fold-on-merge.yml` now pushes its fold commit authenticated as a fine-grained personal access token
