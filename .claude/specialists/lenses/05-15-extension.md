@@ -155,6 +155,32 @@ infrastructure.
   bypass now rests on **org ownership** rather than a repo role — a wider grant, since an org owner
   bypasses on every repo in the org, and one that nothing on this repo's settings page shows.
 
+  **AND THE RULE LIST GAINED A FOURTH ENTRY ON SEPTEMBER 6, 2026 — `merge_queue`, which refuses a direct
+  push on its own** ([#1499](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1499)). The
+  bypass list is unchanged; what changed is how many rules a non-bypassed actor has to get past. Measured
+  the same way, on the same ruleset id:
+
+  ```
+  $ gh api repos/DKJ-Solutions/claude-code-specialists/rulesets/19008062 --jq '[.rules[].type]'
+      ["deletion","non_fast_forward","required_status_checks","merge_queue"]
+  ```
+
+  **Why this is worth a row rather than a silent update to the list above.** Every record in this lens
+  names `required_status_checks` as *the* rule the direct-on-`main` exceptions have to be bypassed for,
+  and that was a complete answer while it was the only one that refused a push. It is not any more: the
+  `fold-on-merge` workflow's rejected push (run 34020828593, 2026-09-06 08:04) came back naming **both**
+  rules, one line each —
+
+  ```
+  remote: - Required status check "lint-en-tests" is expected.
+  remote: - Changes must be made through the merge queue
+  ```
+
+  — so a reader holding the three-rule list reads the second line as an unexplained extra and starts
+  hunting for a second cause. **The bypass answers both in one move**, because a bypass actor bypasses the
+  ruleset rather than a rule, so nothing about the remedy changes. What changes is the diagnosis, and that
+  is the half a session actually reads a red run with.
+
   **Inferred, not measured: why the roles changed** — an elevation, or the transfer's own member mapping.
   `orgs/DKJ-Solutions/audit-log` needs `admin:org` and answers 404 from a session, so the cause is not
   readable here. The roles themselves are, and nothing above depends on the cause.
