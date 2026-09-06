@@ -32,6 +32,33 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: docs/1505-fold-no-longer-ship-pr-only · 20260906-124614
+
+`CLAUDE.md` said the changelog fold runs from `ship-pr.ps1` only. It has not since September 6, 2026:
+`fold-on-merge.yml` runs it from a `push` to `main` as well (#1493), which is what makes the fold
+survive a merge the shipping session never sees -- the GitHub UI, and the merge queue since #1492. The
+always-on text now says both, and says plainly that the second runner is code-complete but inert while
+`main-ci-gate` does not bypass the GitHub Actions app: its fold succeeds and its *push* is rejected, so
+a red run there is not evidence of a refused fold. The same stale sentence is corrected in the
+`check-unfolded-entry` registry comment in `shared-scripts-lib.ps1`.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `CLAUDE.md` is this repo's own always-on constitution and ships to no consumer, and the
+registry comment is an internal script comment. No subscriber of the plugins reads either.
+
+**Score:** N/A
+
+#### Pull Request
+
+The fold no longer runs from ship-pr.ps1 alone
+
+[PR #1508](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1508)
+
+---
+
 ### DEPLOY: fix/1500-stale-check-citations · 20260906-111630
 
 Two stale check-number citations in `scripts/lint/check-plugin-integrity.ps1` now name the pass they

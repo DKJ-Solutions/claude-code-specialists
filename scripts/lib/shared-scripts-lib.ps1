@@ -704,10 +704,13 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
-            # The skipped-fold gate (issue #1270). The fold runs from ship-pr.ps1 only, locally; a PR
-            # merged from the GitHub UI never folds and nothing downstream reported the leftover. This
-            # runs from .github/workflows/unfolded-entry.yml on every push to main (merger-independent)
-            # and from the SessionStart hook unfolded-entry-sessioncheck.ps1 in every consumer.
+            # The skipped-fold gate (issue #1270). The fold runs from ship-pr.ps1, as the shipping
+            # session's own step, so a merge that session never observes -- from the GitHub UI, or via
+            # the merge queue since #1492 -- never folds, and nothing downstream reported the leftover.
+            # This runs from .github/workflows/unfolded-entry.yml on every push to main
+            # (merger-independent) and from the SessionStart hook unfolded-entry-sessioncheck.ps1 in
+            # every consumer. Since #1493 fold-on-merge.yml runs this same check on a push to main and
+            # folds on a find; this one still only reports.
             #
             # NO SKILL, and none is wanted: both callers are automatic (a CI trigger, a session hook)
             # and nobody invokes it as a procedure. Same call check-script-contract gets, for the same
