@@ -3492,8 +3492,28 @@ function Get-BranchCycleSectionLevel {
 # fresh empty '## [Unreleased]' behind on its own; and a fold, which inserts at the top of the entries,
 # inserts directly beneath it on its own. Neither needed a rule about it.
 #
-# THE LABEL IS A SEAM because a consumer may translate it, and the LEVEL is derived rather than stated so it
-# cannot drift from the entry level it is defined against.
+# THE LEVEL IS DERIVED rather than stated, so it cannot drift from the entry level it is defined against.
+#
+# THE LABEL IS A SINGLE CONSTANT AND DELIBERATELY NOT REPO-OWNED -- said here because this comment claimed the
+# opposite until September 6, 2026 ('THE LABEL IS A SEAM because a consumer may translate it'), and nothing in
+# the code ever agreed with it: this file's own vocabulary for a seam is a Get-Command probe on an optional
+# getter (Get-EntryScaffoldWording's three, Merge-WordingOverrides' -OverrideCommand), and the label has
+# neither shape, nor a line in script-contract-lib.ps1. Left standing, the next maintainer would have added
+# the override the comment promised -- and the cheapest place to add it is the reader, Get-ChangelogUnreleasedPattern,
+# which is half a seam and silently stops matching the document (issue #1517).
+#
+# THE REASON IT IS A CONSTANT IS THAT NOTHING MIGRATES THE DOCUMENT. Every function below derives from this
+# one value, so writer and reader move together -- and what they would move AWAY from is the '## [Unreleased]'
+# already committed in this repo's CHANGELOG.md and in every consumer's, which no script here rewrites. An
+# override would take the pattern off the heading it is pointed at, and the fold's insertion point with it.
+# Get-PreFlatChangelogRefusal makes that explicit from the other side: it hands a consumer migrating a
+# pre-flat document the literal string to type.
+#
+# AND IT IS AN ANCHOR, NOT PROSE -- matched by an anchored regex, never read. That is exactly what separates
+# it from the tally one block down, whose wording IS seamed (Get-ChangelogPendingSummaryOverrides): that line
+# is rendered fresh on every fold and a consumer reads it, so translating it costs nothing and gains a reader.
+# Same distinction, same file, as $script:EntryScaffoldLegacyMarkers above -- a string with nothing for a
+# consumer to choose about it is kept out of the seam rather than given one nobody asked for.
 $script:ChangelogUnreleasedLabel = '[Unreleased]'
 
 function Get-ChangelogUnreleasedLabel {

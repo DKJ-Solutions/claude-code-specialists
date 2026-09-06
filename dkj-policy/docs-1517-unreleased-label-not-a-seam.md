@@ -33,21 +33,67 @@
 
 ### PLAN
 
+#### The choice the issue left open, and why option 2
+
+Issue #1517 measured a doc-versus-code contradiction and named two ways to close it, deliberately
+without picking: make the comment true (the label is a constant), or make the code true (probe an
+optional override and register it in the contract). The tree answers it:
+
+- **Nothing migrates the document.** `## [Unreleased]` already stands committed in this repo's
+  `CHANGELOG.md` and in every consumer's, and no script here rewrites it. Every function in the block
+  derives from the one constant, so an override would move the writer and the reader together, off the
+  heading they are pointed at -- taking the fold's insertion point with them.
+- **`Get-PreFlatChangelogRefusal` hands the literal to a consumer** as the string to type when migrating
+  a pre-flat changelog, which is a fixed anchor stated from the other side.
+- **The neighbouring seam draws the line where option 2 wants it.** The tally one block down IS seamed
+  (`Get-ChangelogPendingSummaryOverrides`) because it is prose, rendered fresh on every fold and read by
+  a person. The label is matched by an anchored regex and never read.
+- **The file already has this vocabulary.** `$script:EntryScaffoldLegacyMarkers` is documented as
+  "deliberately NOT repo-configurable: it is a historical string, so there is nothing for a consumer to
+  choose about it."
+
+Verified before deciding: no override probe, no `Get-SeamValue` call, no line in
+`scripts/lib/script-contract-lib.ps1`, and no second place in the tree claiming the label is
+configurable -- so the contradiction lives in exactly that one comment.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Rewrite the pending-section comment in `scripts/lib/entry-scaffold-lib.ps1`: keep the LEVEL half
+      (true and demonstrable), replace the LABEL half with what the code does and why, and name the
+      half-seam hazard the old comment set up for the next maintainer.
+- [x] Mirror to `plugins/dkj-policy/scripts/lib/` via `scripts/sync/build-shared-scripts.ps1`.
 
 ### TEST
 
+- [x] Lint gate + all suites green (`open-pr.ps1` runs both).
+- [~] No new test. The change is a comment; the behaviour it now describes correctly is already pinned
+      by `release-lib.tests.ps1` (the derived heading and level) and `entry-scaffold.tests.ps1`. A test
+      asserting a comment's wording would pin prose, not behaviour.
+
 ### DEPLOY: docs/1517-unreleased-label-not-a-seam
 
-**Score:**
+The comment over `$script:ChangelogUnreleasedLabel` said the `[Unreleased]` label was a seam a consumer
+may translate. It never was: `Get-ChangelogUnreleasedLabel` returns the bare constant, with no
+`Get-Command` probe, no `-OverrideCommand`, and no line in the script contract. It now says what the code
+does -- a single constant, deliberately not repo-owned -- and gives the reason: nothing migrates the
+document the pattern is pointed at, so an override would move writer and reader together, off the
+`## [Unreleased]` already committed in every changelog, and take the fold's insertion point with it.
+
+The hazard was the next repair rather than today's behaviour. Writer and reader agree because both derive
+from the same constant, so nothing is failing; but a maintainer trusting the comment would most cheaply
+have added the override to `Get-ChangelogUnreleasedPattern` -- the reader's half of a seam with no writer's
+half -- and the pattern would then have stopped matching the heading, silently.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A. A comment in a shared script: nobody outside this repo's maintainers reads it, and no behaviour
+changes for a consumer. The mirror copy is updated in the same commit, so the plugin ships the corrected
+text at the next release.
+
+**Score:** N/A
 
 #### Pull Request
 
 The pending heading's label is a constant, not a seam
-
