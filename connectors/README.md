@@ -49,6 +49,14 @@ content, absolute machine paths, or other data from the (private) consuming repo
 `localCheckout` paths reveal the sibling layout of the local checkouts; that is a deliberately
 accepted degree of transparency (security review, July 16, 2026).
 
+**A candidate list widens that in degree, not in kind, and the bound is unchanged.** Since
+[#1524](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1524) `localCheckout` may hold
+several relative paths, so a manifest can reveal the sibling layout of more than one machine. Every one
+of them is still a **relative** path inside the scope root — a folder name and nothing else — and the
+rule the review actually drew still holds without amendment: **no absolute paths, no usernames, no home
+directories**, in the field or in `notes`. Record a layout because a machine genuinely has it, not to
+be thorough about machines nobody uses.
+
 ## The manifest format
 
 ```json
@@ -69,6 +77,32 @@ accepted degree of transparency (security review, July 16, 2026).
 - `localCheckout` is **relative to the root of this repo** (the workshop checkout); if the
   checkout is not on the machine, the check skips it. Absolute paths and paths outside the scope
   root are rejected by the check.
+
+  **It may also be a LIST, when the layout genuinely differs per machine** — the first candidate
+  present on the machine running the check wins, and where none resolves the `[SKIP]` names all of
+  them:
+
+  ```json
+  "localCheckout": [
+    "../../bwjecommerce/smartwatchbanden",
+    "../../GitHub/bwjecommerce/smartwatchbanden"
+  ]
+  ```
+
+  A plain string keeps working and stays the normal answer; reach for the list only once a second
+  machine has been *measured* to place that checkout somewhere else. The guardrails are on the field
+  rather than on its first element: one absolute path anywhere in the list rejects the whole manifest,
+  and an empty list is rejected as malformed rather than reported as an absent checkout.
+
+  **Why a list rather than picking a machine** ([#1524](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1524),
+  September 6, 2026). Both BWJ manifests recorded a `davekokbwj/` path that exists on neither machine
+  holding those checkouts, and the cost is not that the path was wrong — it is *how* a wrong path is
+  reported. A path that does not resolve produces `[SKIP] checkout ... not present on this machine`: a
+  sentence that **asserts an absence**, exits 0, and suppresses the whole connector block. On the
+  machine that finding was measured from, one such skip covered four `[INFO]` lines and a drift check
+  reading 26 missing agent-defs. A wrong-but-loud value would have been repaired the day it drifted; a
+  false skip taught nobody anything, so writing one machine's answer in and leaving the others silently
+  skipped would only move the defect rather than close it.
 - `plugins` contains, per installed plugin, that plugin's `extensions` inventory.
 - **A plugin rename does not get written into `plugins[].id` on the day the rename lands here — only
   after the consumer itself has migrated.** The same "registry data should follow reality" discipline
