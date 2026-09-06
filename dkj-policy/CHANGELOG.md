@@ -32,6 +32,53 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1497-fold-all-reserved-names · 20260906-100407
+
+`fold-changelog-entry.ps1`'s fold-all mode (no `-Branch`) no longer mistakes `CHANGELOG.md`,
+`CONTRIBUTING.md` or `README.md` for an unfolded per-branch dossier. Since `dkj-policy/` started
+holding all three alongside every branch's own dossier file (#1437), the fold-all discovery loop's
+`*.md` glob over that directory had no exclusion for them -- unlike the legacy root-level scan a few
+lines below it, which has always excluded these names correctly. `Get-BranchFilePaths` already exposed
+exactly the exclusion needed, `.ReservedNames`, built for this and simply never wired into this loop
+([`branch-document-path.tests.ps1`](../scripts/tests/branch-document-path.tests.ps1) already covers the
+property itself).
+
+**Two real, measured false positives, not a hypothetical one.** Found while testing #1493's CI fold
+workflow (which runs fold-all mode on every push to `main`): `CHANGELOG.md`'s own newest
+`### DEPLOY: <branch>` heading satisfied the widest branch-declaration pattern (built for a genuine
+single-branch dossier, never asked whether a document holding *many* such headings might be handed to
+it too), so the whole file read as one unfolded entry and every one of its already-folded `Score:`
+pairs came back as "the same tier declared twice." Separately, `dkj-policy/README.md`'s own title
+carries a backtick-quoted term with a slash in it -- exactly the shape that same pattern is built to
+recognise -- and fold-all mode folded it and **deleted** the real file, splicing its title into
+`CHANGELOG.md` as a folded entry. Reproduced directly against this repo's live tree; uncommitted and
+caught before it reached `origin`, but the workflow in #1493 runs with `-Push`, so this would not have
+failed loudly in CI -- it would have succeeded, silently.
+
+**Score:** 5
+
+#### What makes this deploy extra special
+
+`fold-changelog-entry.ps1` is a shared script, mirrored to every consumer running the `dkj-policy`
+plugin -- and every one of them has the identical `dkj-policy/` layout (CHANGELOG.md, CONTRIBUTING.md
+and per-branch dossiers, all co-located) that makes fold-all mode reachable this way. Any consumer
+whose fold ever runs without `-Branch` -- today that is only a hand-run "catch up the backlog" fold,
+but #1493 is adding an automated one -- carries the identical risk until this update reaches them.
+
+**Score:** 4
+
+#### Pull Request
+
+fold-all mode no longer mistakes CHANGELOG.md/README.md for a dossier
+
+Resolves #1497
+
+Plugins: dkj-policy
+
+[PR #1498](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1498)
+
+---
+
 ### DEPLOY: feat/1491-shared-scripts-table-drift · 20260906-093244
 
 `plugins/dkj-policy/scripts/README.md`'s table is now held against `Get-SharedScriptPairs` by check 32
