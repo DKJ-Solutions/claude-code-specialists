@@ -389,11 +389,32 @@ else {
     # definition: it must DECLARE a branch, that branch must not be the trunk (a reset document is not an
     # entry), and it must be FILLED. The legacy 'development-cycle.md' matches this pattern too and needs no
     # exception -- if it passes all three it IS an unfolded entry and folding it is right.
+    #
+    # AND IT MUST NOT BE ONE OF THIS FOLDER'S OWN RESERVED PAGES (issue #1493's own PR, first real fold-all
+    # run against this tree since CHANGELOG.md, CONTRIBUTING.md and README.md started sharing this
+    # directory with every branch's dossier, #1437). Get-BranchFilePaths.ReservedNames already names exactly
+    # these three -- it exists for this (see branch-document-path.tests.ps1) and was simply never wired into
+    # this loop, which read every '*.md' the glob found as a candidate dossier.
+    #
+    # TWO REAL, MEASURED FALSE POSITIVES, NOT A HYPOTHETICAL ONE -- and between them they rule out reaching
+    # for a content-based fix instead of a name-based one. CHANGELOG.md's own newest '### DEPLOY: <branch>'
+    # heading satisfies Get-BranchFileDeclaredBranch's entry pattern (that function reads it correctly for
+    # the document it was built for, a single branch's own dossier -- it was never asked whether a document
+    # holding MANY such headings might be handed to it too), so the whole file was read as one unfolded
+    # entry and every one of its already-folded 'Score:' pairs came back as the same tier declared twice.
+    # dkj-policy/README.md's title -- '# `dkj-policy/` -- the workflow's own folder in this repo' -- carries
+    # a backtick-quoted term with a slash in it, which is exactly the shape that function's widest pattern
+    # is built to recognise; it matched on the OPENING heading, so -OpeningHeadingOnly (built for an
+    # arbitrary-document scan exactly like this one) would not have saved it either. Reproduced locally
+    # before this fix: fold-all mode deleted the real README.md and spliced its title into CHANGELOG.md as
+    # a folded entry -- uncommitted, caught before it reached origin, but this workflow runs with -Push.
     $foldAllPaths = Get-BranchFilePaths
+    $foldAllReserved = @($foldAllPaths.ReservedNames)
     $foldAllTrunk = Get-BranchTrunkName
     $foldAllDir   = Join-Path $repoRoot ([string]$foldAllPaths.Directory -replace '/', '\')
     if (Test-Path -LiteralPath $foldAllDir -PathType Container) {
         foreach ($devDoc in @(Get-ChildItem -LiteralPath $foldAllDir -Filter ([string]$foldAllPaths.Pattern) -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
+            if ($foldAllReserved -contains $devDoc.Name) { continue }
             $devRel = "$([string]$foldAllPaths.Directory)/$($devDoc.Name)"
             if ($entryFiles -contains $devRel) { continue }
             $devText = [System.IO.File]::ReadAllText($devDoc.FullName, [System.Text.Encoding]::UTF8)

@@ -375,6 +375,78 @@ Assert-True ($foldSrcText -match 'Set-EntryMergeStamp') 'and the merge moment is
 Assert-True ($foldSrcText -notmatch '\$entryHashes #\$num') 'and the heading prepend is gone from the source, not merely unused'
 
 # ---------------------------------------------------------------------------------------------------
+Write-Host "fold-all -- CHANGELOG.md and its dkj-policy/ neighbours are not mistaken for a dossier (#1493)" -ForegroundColor Cyan
+#      Since #1437 CHANGELOG.md, CONTRIBUTING.md and README.md all live in the SAME directory
+#      (dkj-policy/) the fold-all discovery loop scans for per-branch dossiers, and that loop's own
+#      '*.md' glob does not know the difference on its own -- the test above covers the LEGACY root
+#      scan's denylist, which this directory has its own copy of (Get-BranchFilePaths.ReservedNames)
+#      that nothing exercised until this bug was found the expensive way.
+#
+#      TWO REAL FALSE POSITIVES, REPRODUCED AGAINST THIS REPO'S OWN TREE BEFORE THIS FIX, not a
+#      hypothetical either of them: CHANGELOG.md's own newest '### DEPLOY: <branch>' heading satisfies
+#      Get-BranchFileDeclaredBranch's widest pattern (built for a genuine single-branch dossier, never
+#      asked whether a document holding MANY such headings might be handed to it too), so the whole
+#      file read as one unfolded entry and every one of its already-folded 'Score:' pairs came back as
+#      the same tier declared twice -- modelled below by the pre-existing entry in $rnChangelog.
+#      dkj-policy/README.md's own title carries a backtick-quoted term with a slash in it -- exactly
+#      the shape that same pattern is built to recognise -- and was folded and DELETED outright.
+$dirRN = New-FoldFixture -Label 'reservednames'
+$rnPaths = Get-BranchFilePaths
+$rnDir = Join-Path $dirRN $rnPaths.Directory
+New-Item -ItemType Directory -Path $rnDir -Force | Out-Null
+# UN-PATCH THE SEAM New-FoldFixture JUST SET. That helper repoints every fixture's ChangelogPath to
+# the fixture ROOT, specifically so the suite's other (pre-dkj-policy/) fixtures keep passing -- this
+# is the one test whose entire premise is CHANGELOG.md living INSIDE dkj-policy/, which is what the
+# real repo actually does since #1437, so it needs the seam pointed back at that reality rather than
+# at the root the rest of this file deliberately models.
+$rnCfgPath = Join-Path $dirRN 'scripts\repo-config.ps1'
+$rnCfg = [System.IO.File]::ReadAllText($rnCfgPath)
+$rnCfgPatched = $rnCfg -replace "(?m)^\`$script:ChangelogPath\s*=.*$", "`$script:ChangelogPath = '$($rnPaths.Directory)/CHANGELOG.md'"
+if ($rnCfgPatched -eq $rnCfg) { throw "fixture: could not repoint ChangelogPath back to dkj-policy/ -- the seam literal changed shape." }
+[System.IO.File]::WriteAllText($rnCfgPath, $rnCfgPatched, $Utf8NoBom)
+
+# A CHANGELOG.md that already looks like production: the standard fixture intro, plus one
+# already-folded entry carrying both 'Score:' lines a real folded entry always has -- same shape
+# the "duplicate" fixture further down in this file already builds and proves correct.
+$rnMidDot = [char]0x00B7
+$rnChangelog = $script:FixtureIntro.TrimEnd() + "`n`n" + ((@(
+    "$foldEntryH DEPLOY: fix/already-folded $rnMidDot 20260101-000000", '',
+    'Some already-folded change.', '',
+    '**Score:** 3', '',
+    "$foldSectH What makes this deploy extra special", '',
+    'N/A', '',
+    '**Score:** N/A', ''
+) -join "`n"))
+[System.IO.File]::WriteAllText((Join-Path $rnDir 'CHANGELOG.md'), $rnChangelog, $Utf8NoBom)
+# A backtick-quoted, slash-carrying title -- the exact shape that fooled Get-BranchFileDeclaredBranch.
+New-DocFile -Dir $rnDir -Name 'README.md'       -Heading ('`dkj-policy/` -- the workflow folder')
+New-DocFile -Dir $rnDir -Name 'CONTRIBUTING.md' -Heading 'Contributing'
+
+# The one REAL unfolded dossier this run should actually fold.
+$rnRows = @([pscustomobject]@{ Tier = 1; Score = 4; Why = 'the real one' })
+[System.IO.File]::WriteAllText((Join-Path $dirRN $rnPaths.File),
+    ((Format-Development -Branch 'feat/reserved-names-v1' -Id '20260102-000000' `
+        -Description 'The genuine pending change' -Type 'feat' -ImpactRows $rnRows) -join "`n") + "`n", $Utf8NoBom)
+
+# -Commit, not a dry run: the CI workflow issue #1493 adds runs this exact fold-all mode with
+# -Commit -Push, so proving the reserved files survive ON DISK is not the same proof as showing
+# they never entered the commit's own pathspec (Sebastian #23's pre-merge review of this branch).
+Initialize-FoldGitRepo -Dir $dirRN
+$rRN = Invoke-Fold -Dir $dirRN -ExtraArgs @('-Commit')
+Assert-True ($rRN.ExitCode -eq 0) 'reserved names: exits 0 -- CHANGELOG/README/CONTRIBUTING do not choke the pre-pass'
+$rnChangelogAfter = [System.IO.File]::ReadAllText((Join-Path $rnDir 'CHANGELOG.md'))
+Assert-True ($rnChangelogAfter -match 'The genuine pending change')        'reserved names: the real dossier still folds'
+Assert-True ($rnChangelogAfter -match 'Some already-folded change')        'reserved names: the pre-existing entry survives untouched'
+Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CHANGELOG.md'))     'reserved names: CHANGELOG.md itself survives -- not folded away as an entry'
+Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'README.md'))       'reserved names: README.md survives'
+$rnCommitFiles = @(Invoke-Git -Dir $dirRN -GitArgs @('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'))
+Assert-True ($rnCommitFiles -contains "$($rnPaths.Directory)/CHANGELOG.md") 'reserved names: -Commit -- CHANGELOG.md is in the commit (the real fold)'
+Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/README.md"))       'reserved names: -Commit -- README.md is NOT in the commit'
+Assert-True (-not ($rnCommitFiles -contains "$($rnPaths.Directory)/CONTRIBUTING.md")) 'reserved names: -Commit -- CONTRIBUTING.md is NOT in the commit'
+Assert-True (Test-Path -LiteralPath (Join-Path $rnDir 'CONTRIBUTING.md')) 'reserved names: CONTRIBUTING.md survives'
+Assert-True (-not (Test-Path -LiteralPath (Join-Path $dirRN $rnPaths.File))) 'reserved names: the real dossier is removed after folding'
+
+# ---------------------------------------------------------------------------------------------------
 Write-Host "The intro is written below, never over" -ForegroundColor Cyan
 #      There is no configured heading to insert after any more, so the boundary between the intro and the
 #      list is derived structurally -- the first entry heading. Getting that wrong writes an entry into the
