@@ -212,6 +212,28 @@ function Get-SharedScriptPairs {
             Skill  = 'ship-pr'
         },
         @{
+            # Travels for the same reason verify-resolved-issues above does, one step further out: it is
+            # that script running from the MERGE instead of from the shipping session (#1511), which is
+            # what a merge queue forces. Registered here by #1516, which is the issue that made the queue
+            # a policy for every consumer rather than a setting on one trunk -- a consumer's
+            # verify-resolved.yml calls THIS file out of the plugin tree, so a copy that stayed behind in
+            # the source would leave the scaffolded runner pointing at a path they do not have.
+            #
+            # Portable as it stands: dual-context root, both API calls go through gh with an explicit
+            # -Repo, the trunk arrives as a parameter, and verify-resolved-issues (which it drives) is
+            # already mirrored beside it.
+            Name   = 'verify-pushed-merges'
+            Source = 'scripts\release\verify-pushed-merges.ps1'
+            Plugin = 'dkj-policy'
+            # No skill of its own, on verify-resolved-issues' reasoning exactly: it is a step of the ship
+            # sequence relocated to a CI trigger, and nobody invokes it as a procedure. Its one caller is
+            # a workflow file, which is the same call check-unfolded-entry gets.
+            Skill  = ''
+            # NO MeasureArgs, and it is a declaration rather than an omission: with no -Before/-Sha this
+            # script has no push to resolve and refuses, so a timed bare run would measure the refusal
+            # rather than the work. Every argument that WOULD make it do something names a real merge.
+        },
+        @{
             # Issue #413. Three repos had written their own copy of this repair tool, which is the
             # argument for one source rather than for a fourth. Its workshop-shaped default file set --
             # the part that made it unusable elsewhere -- moved into the seam as Get-MojibakePaths.
@@ -558,6 +580,32 @@ function Get-SharedScriptPairs {
             Source = 'scripts\task\adopt-workflow-folder.ps1'
             Plugin = 'dkj-policy'
             Skill  = 'adopt-dkj-policy'
+        },
+        @{
+            # The merge-queue floor (issue #1516). The queue went live on this workflow's source repo on
+            # September 6, 2026 (#1492) and the policy is that every repo running this workflow adopts
+            # one -- but the SETTING is the last step, not the first. A queue takes the fold (#1493) and
+            # the resolves verification (#1511) away from the shipping session, and demands a merge_group
+            # trigger on every required check before it is switched on at all (#1325). None of that
+            # travelled: a consumer flipping the setting today gets an outage or a trunk quietly
+            # collecting unfolded entries. This command is the floor, and it is shared for the reason
+            # every entry here is -- the alternative is each consumer deriving three CI files and a
+            # prerequisite from the source's tree, which is what they did for the branch-entry gate.
+            #
+            # THIRD SIBLING OF adopt-config AND adopt-workflow-folder, and Part 3 of the same skill page.
+            # A page rather than a skill of its own, deliberately: a fourth always-on skill description
+            # is paid by every session in every consumer, and this operation is run about once per repo.
+            Name   = 'adopt-merge-queue'
+            Source = 'scripts\task\adopt-merge-queue.ps1'
+            Plugin = 'dkj-policy'
+            Skill  = 'adopt-dkj-policy'
+            # A test points the command at a fixture rules payload instead of calling gh, which is the
+            # only way to reach the queue-is-active arm without a network and a trunk. A consumer never
+            # types it, and documenting it would invite someone to.
+            SkillParamsExempt = @('RulesJsonOverride')
+            # Timeable with no arguments: the default is a dry run that writes nothing. It does make one
+            # gh call, so the figure carries a network leg -- which is the honest cost of this command.
+            MeasureArgs = @()
         },
         @{
             # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the

@@ -69,6 +69,7 @@ an absent link is a fact rather than an oversight.
 | `task/park-branch.ps1` | commits all outstanding work + `git push -u` — no PR, no live action | [`park`](../skills/park/SKILL.md) |
 | `task/adopt-config.ps1` | reads the config blueprint and places or proposes each seam answer | [`adopt-dkj-policy`](../skills/adopt-dkj-policy/SKILL.md) (Part 2) |
 | `task/adopt-workflow-folder.ps1` | scaffolds `dkj-policy/` — the folder docs, the releases root and the branch dossier | [`adopt-dkj-policy`](../skills/adopt-dkj-policy/SKILL.md) (Part 1) |
+| `task/adopt-merge-queue.ps1` | reports whether this repo would survive a GitHub merge queue on its trunk, places the two CI runners a queue takes away from the shipping session, and prints the ruleset command without running it | [`adopt-dkj-policy`](../skills/adopt-dkj-policy/SKILL.md) (Part 3) |
 | `task/claim-issue.ps1` | claims a GitHub issue for this checkout by the account its commits will name, not `@me` — refuses on a closed issue or one already held by someone else | [`claim-issue`](../skills/claim-issue/SKILL.md) |
 | `task/worktree-lane.ps1` | opens a branch in its own git worktree — a "lane" — so one branch can be built while another ships, and hands a lane's branch back to the primary checkout when it is ready | [`worktree-lane`](../skills/worktree-lane/SKILL.md) |
 | `task/park-cycle.ps1` | the automatic half of parking: pushes the branch's development document to origin, unless a PR has already published it | documented on the [`park`](../skills/park/SKILL.md) page; run only by the `cycle-autopark` Stop hook, never by hand |
@@ -77,6 +78,7 @@ an absent link is a fact rather than an oversight.
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
 | `release/verify-resolved-issues.ps1` | checks that a merged PR closed what it declared | [`ship-pr`](../skills/ship-pr/SKILL.md) |
+| `release/verify-pushed-merges.ps1` | the check above, run from a push to the trunk instead of from the shipping session: resolves the pull requests that push carried and verifies each | none — invoked by a `verify-resolved.yml` CI workflow, which [`adopt-dkj-policy`](../skills/adopt-dkj-policy/SKILL.md) (Part 3) places |
 | `release/fold-changelog-entry.ps1` | folds the entry into `CHANGELOG.md` at the top of the list and removes the branch document | [`fold-changelog`](../skills/fold-changelog/SKILL.md) |
 | `release/cut-release.ps1` | the lockstep version bump, the release notes and the tag | [`cut-release`](../skills/cut-release/SKILL.md) |
 | `release/new-internal-note.ps1` | the tier-1 note's skeleton, which needs the development notes as input | [`cut-release`](../skills/cut-release/SKILL.md) |

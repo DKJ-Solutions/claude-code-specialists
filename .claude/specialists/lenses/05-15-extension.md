@@ -710,6 +710,28 @@ infrastructure.
   it answers `accepts 1 arg(s), received 3`, with nothing about quoting in it. The bracket-plus-`@tsv`
   form says the same thing in characters that survive, and a suite assert reads the *recorded arguments*
   for a quote rather than the behaviour, since a fake `gh` would answer either form happily.
+
+  **BOTH RUNNERS ABOVE NOW HAVE A CONSUMER-SHAPED TWIN, AND NOTHING HOLDS THE TWO IN SYNC** (issue
+  [#1516](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1516), September 6, 2026).
+  The queue became this workflow's policy for every repo running it, and a queue reaches a consumer as
+  a *policy* rather than as a release: the setting is theirs to flip, and neither runner is plugin
+  payload — a plugin install writes nothing into a repo. So
+  [`scripts/task/adopt-merge-queue.ps1`](../../../scripts/task/adopt-merge-queue.ps1) carries derived
+  copies of both, as generated line arrays, and places them on `-Apply`. They differ from the originals
+  in exactly two structural ways: they reach their scripts through a checked-out `.workflow-scripts`
+  clone of the plugin tree instead of through this repo's in-repo paths, and they set
+  `CLAUDE_PROJECT_DIR` so those mirrored scripts judge the consumer's tree. Everything else — the
+  `FOLD_PUSH_TOKEN` checkout, the `contents: read` block, the two-outcome check step, the
+  `issues: write` split — is the same decision, restated.
+
+  **That restatement is the drift risk, and it is stated here rather than gated because no gate fits.**
+  A byte comparison would be wrong (the two paths genuinely differ), and a property gate would be a
+  third statement of the same rules. What holds today is
+  [`scripts/tests/adopt-merge-queue.tests.ps1`](../../../scripts/tests/adopt-merge-queue.tests.ps1),
+  which pins the properties that would break a consumer silently — the plugin paths, the
+  `CLAUDE_PROJECT_DIR`, and the credential split in both directions. **So: change either workflow on
+  this page and read that script in the same movement.** The script itself refuses to run here, which
+  is right and is also why nobody editing these two files is reminded of it by the tooling.
 - **`scripts/lint/check-git-identity.ps1`** — the split-identity check (issue
   [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026): does
   this checkout commit as the same account it acts as on the tracker? The claim rule's `@me` resolves
