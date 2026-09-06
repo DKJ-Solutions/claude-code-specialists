@@ -386,6 +386,22 @@ Where your repo has a plugin tier — declared by `Get-ReleasePluginTier` — th
 `Plugins:` line from the PR's files, which the release documents read. A repo with no plugins never sees
 that line.
 
+**And it refreshes a one-line tally at the top of the pending list** — how many entries are waiting for the
+next release, how they split by tier, and how many of them reach your repo's audience tier. It answers *how
+big is this release going to be* without anybody counting, and it is **derived rather than accumulated**:
+the line is recounted from the entries in the document about to be written, so there is no counter to drift
+and an entry added or removed by hand is corrected by the next fold. The **release cut** rewrites it too,
+on the emptied document — the line lives in the changelog's head, which is the part a cut keeps, so
+otherwise a freshly released changelog would carry an intact count over an empty list.
+
+Your repo needs no heading for it: the tally anchors on the pending heading where you have one and on the
+first entry where you do not, which is the shape the scaffolded changelog has. Every word of it is
+overridable through `Get-ChangelogPendingSummaryOverrides`, like the rest of the generated prose, so a
+changelog kept in another language stays in it. The line ends with an HTML comment that identifies it as
+machine-written — that marker is the only thing a later run replaces, so a note of your own in that space
+is never overwritten, and quoting the marker in your intro (in a fence or in inline backticks) is read as
+a quotation rather than as the line itself.
+
 ---
 
 ## Ticket work — the layer before the branch

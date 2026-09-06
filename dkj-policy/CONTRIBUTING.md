@@ -775,6 +775,17 @@ cleared by this run, so leaving it out would produce a commit that clears half t
 cut before the two files merged, since one document is cleared in one move. See
 [Rendall #06](../.claude/specialists/lenses/05-06-extension.md#changelog).
 
+**The same run refreshes the pending tally** — the one line under `## [Unreleased]` saying how many entries
+are waiting, how they split by tier, and how many of them reach this repo's audience tier. It is **derived,
+never accumulated**: `Set-ChangelogPendingSummary` recounts the entries in the document it is about to
+write, so no counter exists to drift and a hand-edited list is corrected by the next fold. The **cut**
+rewrites it too, on the emptied document — the line sits in the changelog's head, which is exactly the part
+a cut keeps, so without that second call a freshly released changelog would carry an intact count over an
+empty list. Requested by Dave in
+[#1515](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1515), and it adds no path to the
+exception above: the tally is written into `CHANGELOG.md`, which is one of the two paths the fold commit
+was already bounded to.
+
 The pending entries, ranked furthest-reach-first, are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---

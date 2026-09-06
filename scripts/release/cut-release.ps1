@@ -994,6 +994,13 @@ $notesContent = Build-ReleaseNotes -TierGroups $tierGroups -Version $new -Date $
 # the pointer in that intro -- which is why this now takes the content and nothing else.
 $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 
+# AND THE PENDING TALLY IS RESET WITH THEM (issue #1515). The line sits in the document's HEAD, which is
+# exactly what Convert-ChangelogForRelease keeps verbatim -- so without this call a freshly cut changelog
+# would carry an intact "37 entries pending" over an empty list, which is the worst shape a derived line
+# can take: not missing, but confidently wrong. It is re-derived rather than blanked, so the empty state is
+# written by the same function that writes every other state.
+$changelogNew = Set-ChangelogPendingSummary -Content $changelogNew
+
 # The ONE hand-written release document, drafted here with everything else so a failure leaves no
 # half-written release behind. Two documents used to be written per release -- an internal note for the
 # organisation and a consumer document -- and both were written at all twelve releases since the internal

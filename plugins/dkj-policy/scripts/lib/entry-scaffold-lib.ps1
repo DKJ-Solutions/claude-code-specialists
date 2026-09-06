@@ -3519,6 +3519,252 @@ function Get-ChangelogUnreleasedPattern {
         [regex]::Escape((Get-ChangelogUnreleasedLabel)) + '\s*$')
 }
 
+# --- THE PENDING TALLY, WRITTEN UNDER THE PENDING HEADING (issue #1515) ---------------------------
+#
+# What Dave asked for is the one question CHANGELOG.md could not answer without counting by hand: how
+# much is waiting for the next release, and how much of it reaches anybody outside this repo. Both
+# numbers are already in the document -- Get-ChangelogEntryBlocks knows how many entries are pending
+# and Resolve-EntryImpact knows each one's reach -- so the line below is a RENDERING of the list rather
+# than a record kept beside it.
+#
+# WHICH IS THE WHOLE DESIGN, AND THE REASON IT NEEDS NO BOOKKEEPING. It is recomputed from the entries
+# every time it is written, by the two scripts that change the list: the fold, which adds one entry, and
+# the cut, which removes them all. Nothing increments a counter, so nothing can drift -- an entry
+# hand-edited into or out of the file is simply re-measured on the next fold and comes out right. That
+# is also what makes it safe on the trunk: the fold is a direct push under one of this repo's named
+# exceptions, and a derived line can be wrong for exactly as long as it takes the next fold to run.
+#
+# IT CARRIES A MARKER, AND IS REPLACED ONLY WHERE THAT MARKER IS FOUND. Recognising the line
+# structurally -- "the first paragraph under the pending heading" -- is what this file does everywhere
+# else, and it is the wrong answer HERE: that region is a human's to write in as much as the fold's, and
+# a note silently eaten by the next merge is precisely the class of failure a direct-to-trunk commit must
+# not have. An HTML comment renders as nothing, survives a consumer translating every word around it,
+# and cannot be produced by accident.
+#
+# THE COUNT IS PER TIER AND IT SUMS TO THE TOTAL, because Resolve-EntryImpact reports the HIGHEST tier an
+# entry declares -- the same disjoint grouping Get-PullRequestEntriesByTier uses, so the tally cannot
+# disagree with what the cut is about to read.
+#
+# WHICH TIERS GET A BUCKET IS Get-EntryAskedTiers' QUESTION, NOT Get-EntryTierMax'S, and the difference is
+# visible in this repo's own line. Tier 0 and the repo's audience tier are printed EVEN AT ZERO, because
+# '0 at tier 2' is the answer to "is there anything for a consumer yet" and a bucket that disappears when
+# it is empty makes that question unanswerable. Every OTHER tier appears only where it actually carries
+# entries -- a repo whose audience is 2 is never asked about tier 1, so a standing '0 at tier 1' would be
+# a bucket for a question nobody put. A tier above the model's max is printed on the same terms where an
+# entry declares one, rather than dropped: the same "read every shape ever written" rule the impact
+# parser follows.
+#
+# NO BUMP IS NAMED HERE, deliberately, and it is the obvious thing to add: 'tier 0 only -> patch, tier 1
+# or higher -> minor' is two lines. That rule lives in Test-ReleaseBumpEarned, in release-lib, which the
+# fold does not load and must not start loading for a console nicety -- and a second copy of a release
+# gate's arithmetic, in the document that gate then reads, is the second-literal shape this repo keeps
+# getting bitten by. The tally gives the numbers the rule is computed FROM; the cut still states the rule.
+$script:ChangelogPendingSummaryMarker = '<!-- pending-tally -->'
+
+# ENGLISH DEFAULTS, OVERRIDABLE, for the reason every string written into a consumer's changelog is: this
+# is generated prose in a document a repo may keep in its own language, and the retired
+# Get-ChangelogReleaseWording seam went only because the output it described stopped being written. This
+# is new output into that same file, so the argument it was retired under does not cover it.
+$script:ChangelogPendingSummaryDefaults = [ordered]@{
+    Empty         = '**Nothing pending.** The last release took every entry.'
+    Lead          = '**{0} {1} pending**'
+    Entry         = 'entry'
+    Entries       = 'entries'
+    Bucket        = '{0} at tier {1}'
+    AudienceShare = 'Tier {0} is this repo''s audience: {1} of {2} reach it.'
+}
+
+function Get-ChangelogPendingSummaryMarker {
+    <# The HTML comment that identifies a tally this system wrote, so nothing else in the pending
+       heading's region is ever overwritten. #>
+    return $script:ChangelogPendingSummaryMarker
+}
+
+function Test-ChangelogTallyIsQuoted {
+    <#
+        Pure: is the marker on this line being QUOTED rather than being the tally itself -- i.e. does it
+        begin inside an inline code span?
+
+        THE FENCE CHECK IS NOT ENOUGH ON ITS OWN, and this is the hazard it misses. The one document that
+        will ever describe this line in prose is the changelog's own intro, and the natural way to name
+        the marker there is inline backticks -- which Get-FencedLineFlags does not see, so the next fold
+        would overwrite that sentence with a tally. A doc silently eaten by a commit that lands directly
+        on the trunk is exactly what the marker exists to prevent, so the marker must not be able to cause
+        it one paragraph up.
+
+        NOT Get-EntryCodeSpans, which is the obvious reuse and is wrong here: its third pass treats HTML
+        COMMENTS as spans, and this marker IS an html comment -- so every occurrence, real and quoted
+        alike, would come back quoted. The backtick pass is the only one of its three that discriminates,
+        and it is one line.
+
+        PER LINE, which is a stated bound rather than an oversight: a marker split across a line break
+        inside an inline span is not reachable from anything that writes this file, and the caller is
+        walking lines because the tally is defined as one.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Line)
+
+    $at = $Line.IndexOf((Get-ChangelogPendingSummaryMarker))
+    if ($at -lt 0) { return $false }
+    foreach ($m in [regex]::Matches($Line, '(`+).*?\1')) {
+        if ($at -ge $m.Index -and $at -lt ($m.Index + $m.Length)) { return $true }
+    }
+    return $false
+}
+
+function Get-ChangelogPendingSummaryWording {
+    <# The tally's wording, this repo's answers merged over the English defaults -- the same mechanism,
+       and the same empty-is-ignored fail-safe, as Get-EntrySignificanceWording. #>
+    return Merge-WordingOverrides -Defaults $script:ChangelogPendingSummaryDefaults `
+        -OverrideCommand 'Get-ChangelogPendingSummaryOverrides'
+}
+
+function Get-ChangelogPendingCounts {
+    <#
+        Pure: what is pending in a CHANGELOG.md. Returns
+
+          Total     how many entries sit under the pending heading
+          ByTier    tier -> count, disjoint (an entry is counted at the highest tier it declares) and
+                    always carrying every tier from 0 to Get-EntryTierMax, present or not
+          Audience  the one tier this repo publishes to, or $null where it has stated none
+          Reaching  how many entries reach that audience -- tier >= Audience, so it reads correctly in a
+                    tier-1 and a tier-2 repo alike; 0 where no audience is stated
+
+        AT OR ABOVE, not equal to, and that is the cumulative model rather than a looseness: an entry
+        declaring tier 2 in a repo whose audience is 1 does reach that audience. Written as '>=' for the
+        same reason Test-ReleaseBumpEarned writes its own count that way -- neither repo has to translate.
+
+        AN EMPTY DOCUMENT IS A COUNT OF ZERO, NOT A FAILURE, which is why this reads
+        Get-ChangelogEntryBlocks and not Split-Changelog: the second one throws on a changelog with no
+        entries, and the moment right after a release cut is exactly when this has to answer.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Content)
+
+    $blocks = @(Get-ChangelogEntryBlocks -Content $Content)
+    $byTier = @{}
+    foreach ($t in 0..(Get-EntryTierMax)) { $byTier[$t] = 0 }
+    foreach ($b in $blocks) {
+        $tier = [int](Resolve-EntryImpact -EntryText $b).Tier
+        if (-not $byTier.ContainsKey($tier)) { $byTier[$tier] = 0 }
+        $byTier[$tier] = $byTier[$tier] + 1
+    }
+
+    $audience = Get-EntryAudienceTier
+    $reaching = 0
+    if ($null -ne $audience) {
+        foreach ($t in @($byTier.Keys)) { if ($t -ge $audience) { $reaching += $byTier[$t] } }
+    }
+
+    return [pscustomobject]@{
+        Total    = $blocks.Count
+        ByTier   = $byTier
+        Audience = $audience
+        Reaching = $reaching
+    }
+}
+
+function Format-ChangelogPendingSummary {
+    <#
+        Pure: the tally line for a CHANGELOG.md, marker included. ONE line, always -- it sits directly
+        under a heading, and a paragraph there would push the first entry off the screen the tally exists
+        to summarise.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Content)
+
+    $w = Get-ChangelogPendingSummaryWording
+    $counts = Get-ChangelogPendingCounts -Content $Content
+    $marker = Get-ChangelogPendingSummaryMarker
+
+    if ($counts.Total -eq 0) { return ($w.Empty + ' ' + $marker) }
+
+    $noun = if ($counts.Total -eq 1) { $w.Entry } else { $w.Entries }
+
+    # The tiers this repo is ASKED about are printed whether or not they carry anything; the rest only
+    # when they do. Get-EntryAskedTiers is the same answer the scaffolder writes sections for and the
+    # completeness gate reads, which is what keeps the tally about the same tiers an author was asked to
+    # fill in -- one arithmetic, not a fourth copy of it.
+    $show = @{}
+    foreach ($t in @(Get-EntryAskedTiers)) { $show[[int]$t] = $true }
+    foreach ($t in @($counts.ByTier.Keys)) { if ($counts.ByTier[$t] -gt 0) { $show[[int]$t] = $true } }
+
+    $buckets = @()
+    foreach ($t in @($show.Keys | Sort-Object)) {
+        $n = if ($counts.ByTier.ContainsKey($t)) { $counts.ByTier[$t] } else { 0 }
+        $buckets += ($w.Bucket -f $n, $t)
+    }
+    $line = ($w.Lead -f $counts.Total, $noun) + ' -- ' + ($buckets -join ', ') + '.'
+    if ($null -ne $counts.Audience) {
+        $line += ' ' + ($w.AudienceShare -f $counts.Audience, $counts.Reaching, $counts.Total)
+    }
+    return ($line + ' ' + $marker)
+}
+
+function Set-ChangelogPendingSummary {
+    <#
+        Pure: a CHANGELOG.md with its tally line current -- replaced where one is already there, inserted
+        where it is not. Content in, content out; nothing is written and nothing is thrown.
+
+        THREE ANCHORS, IN THIS ORDER, because three shapes of this document exist right now:
+
+          1. the marker          -- replace in place, wherever it sits. The position is not re-derived, so
+                                    a repo that moved the line keeps it where they put it.
+          2. the pending heading -- insert directly beneath it. This repo's shape.
+          3. the first entry     -- insert directly above it. A consumer scaffolded by
+                                    adopt-workflow-folder.ps1 has NO pending heading: their intro is
+                                    followed straight by the entries. Anchoring on the heading alone would
+                                    have the tally silently never appear there, which is the direction
+                                    that ships a feature to nobody.
+
+        And with none of the three -- an intro and nothing else -- the line is appended, which is the
+        empty-list case and the one a freshly cut repo is in.
+
+        FENCE-AWARE ON ALL THREE, for the reason every reader in this file is: this repo's changelog intro
+        quotes an entry heading inside a fence to document the format, and a tally inserted into the
+        middle of that fence would be both wrong and invisible to the next run's replace. The marker
+        anchor takes one guard more -- Test-ChangelogTallyIsQuoted, for the inline backticks a fence check
+        cannot see, which is how the intro will actually name it.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Content)
+
+    $nl = if ($Content.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $summary = Format-ChangelogPendingSummary -Content $Content
+    $lines = @($Content -split "`r?`n")
+    $fenced = Get-FencedLineFlags -Lines $lines
+    $markerRx = [regex]::Escape((Get-ChangelogPendingSummaryMarker))
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($fenced[$i]) { continue }
+        if ($lines[$i] -notmatch $markerRx) { continue }
+        if (Test-ChangelogTallyIsQuoted -Line $lines[$i]) { continue }
+        $lines[$i] = $summary
+        return ($lines -join $nl)
+    }
+
+    $headingRx = Get-ChangelogUnreleasedPattern
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ((-not $fenced[$i]) -and $lines[$i] -match $headingRx) {
+            $tail = @()
+            if ($i + 1 -lt $lines.Count) { $tail = @($lines[($i + 1)..($lines.Count - 1)]) }
+            # A blank line before AND after: the heading needs one or markdown reads the two as a single
+            # paragraph, and whatever follows needs one for the same reason. The second is added only
+            # where the document does not already have it, so a rerun cannot grow the gap.
+            $block = @('', $summary)
+            if ($tail.Count -eq 0 -or $tail[0].Trim() -ne '') { $block += '' }
+            return ((@($lines[0..$i]) + $block + $tail) -join $nl)
+        }
+    }
+
+    $entryRx = Get-EntryHeadingPattern
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ((-not $fenced[$i]) -and $lines[$i] -match $entryRx) {
+            $head = @()
+            if ($i -gt 0) { $head = @($lines[0..($i - 1)]) }
+            return (($head + @($summary, '') + @($lines[$i..($lines.Count - 1)])) -join $nl)
+        }
+    }
+
+    return ($Content.TrimEnd() + $nl + $nl + $summary + $nl)
+}
+
 function Get-EntryHeadingPattern {
     <#
         The anchored regex that matches an entry's OWN heading and nothing else -- '^###\s' while the entry

@@ -300,11 +300,23 @@ function Get-EntryOrder {
 }
 
 function Get-ChangelogIntro {
-    <# Everything above the first entry heading. The fold must never write into this. #>
+    <#
+        The intro's PROSE: everything above the first entry heading, with the pending tally taken back
+        out. The fold must never write into the prose.
+
+        THE TALLY IS THE ONE THING IT MAY WRITE THERE (issue #1515), and excluding it here is what keeps
+        the two asserts below saying what they were written to say. That line lives in the document's head
+        by design -- it is derived from the entries and refreshed on every fold, so a byte-identical head
+        would mean the fold had NOT refreshed it. Stripping it leaves the original guarantee exactly as
+        strong: the repo's own intro paragraphs come back unchanged, and an entry written into the middle
+        of them still fails. The tally's own correctness is asserted separately, right after each caller,
+        so nothing about it is merely tolerated here.
+    #>
     param([string]$Changelog)
     $m = ([regex]('(?m)^' + $foldEntryH + ' ')).Match($Changelog)
-    if (-not $m.Success) { return $Changelog }
-    return $Changelog.Substring(0, $m.Index)
+    $intro = if ($m.Success) { $Changelog.Substring(0, $m.Index) } else { $Changelog }
+    $markerRx = [regex]::Escape((Get-ChangelogPendingSummaryMarker))
+    return ((@($intro -split "`r?`n") | Where-Object { $_ -notmatch $markerRx }) -join "`n")
 }
 
 function Initialize-FoldGitRepo {
@@ -481,6 +493,16 @@ Write-Host "The intro is written below, never over" -ForegroundColor Cyan
 #      middle of the intro, which is why it is asserted rather than assumed.
 Assert-True ((Get-ChangelogIntro -Changelog $changelogText).TrimEnd() -eq $script:FixtureIntro.TrimEnd()) `
     'the intro is byte-identical after the fold'
+
+# AND THE ONE LINE THE FOLD MAY WRITE INTO THE HEAD IS THERE, AND COUNTS (issue #1515). The assert above
+# proves the prose survives; this proves the tally was actually refreshed rather than merely tolerated by
+# the strip. Asserted from the REAL fold's output, which is the half the pure suite cannot give: it is the
+# only proof the call site runs at all, in a script whose own suite is the one that would notice.
+$tallyLines = @(@($changelogText -split "`r?`n") | Where-Object { $_ -match [regex]::Escape((Get-ChangelogPendingSummaryMarker)) })
+Assert-Equal 1 $tallyLines.Count 'the fold writes exactly one pending tally'
+Assert-True ($tallyLines[0] -match '(\d+) (entry|entries) pending') 'and it states how many entries are pending'
+Assert-Equal (@(Get-ChangelogEntryBlocks -Content $changelogText).Count) ([int]([regex]::Match($tallyLines[0], '(\d+) (entry|entries) pending').Groups[1].Value)) `
+    'and the number it states is the number of entries actually in the document'
 Assert-True ((Get-Changelog -Dir $dir).IndexOf('Demo thing') -gt $script:FixtureIntro.TrimEnd().Length) `
     'and the entry sits below all of it'
 
