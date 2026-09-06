@@ -59,6 +59,40 @@ The fold no longer runs from ship-pr.ps1 alone
 
 ---
 
+### DEPLOY: feat/1506-ship-pr-enqueue · 20260906-115947
+
+`ship-pr.ps1` no longer treats a merge queue as a failure. On a trunk behind one it opens the PR, waits
+for CI, ENQUEUES, and ends successfully at step 4 -- the queue merges the PR against its real base and
+`fold-on-merge.yml` folds off that push. On a trunk without one nothing changes: the same merge, the
+same fold, and the same #1325 refusal for a state that has no explanation.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+The change is small; what took the work was refusing to build on the reason the tree already carried.
+`fold-on-merge.yml` stated as settled fact that adding the GitHub Actions app to the ruleset would make
+it live. Applying that produced a 422, and the route does not exist -- so the record now carries the
+refusal text rather than the plan. A repair built on the unverified half would have satisfied the issue
+and been wrong, with a citation.
+
+And the second half of that lesson arrived by collision: #1507 landed the same repair from another
+session while this branch sat in its CI wait, which is what a merge queue with two shipping sessions
+looks like. The resolution is the same rule pointed at my own work -- take what landed, drop what
+duplicates it, and keep only the part nobody built, which here was the test.
+
+**Score:** 2
+
+#### Pull Request
+
+ship-pr enqueues via the merge queue instead of direct-merging
+
+Plugins: dkj-policy
+
+[PR #1509](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1509)
+
+---
+
 ### DEPLOY: docs/1493-fold-push-token-succession · 20260906-115219
 
 `FOLD_PUSH_TOKEN`'s succession is now written down in Sylvester's system-administration lens: what it
