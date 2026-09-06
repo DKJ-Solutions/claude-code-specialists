@@ -76,8 +76,8 @@ $entry = $marketplace.plugins | Where-Object { $_.name -eq 'dkj-policy-bwj' }
 Assert-True ($null -ne $entry) 'dkj-policy-bwj is listed in marketplace.json'
 Assert-Equal './plugins/dkj-policy/dkj-policy-bwj' $entry.source 'marketplace source points at the plugin folder'
 
-$alphaManifest = Get-Content -LiteralPath (Join-Path $RepoRoot 'plugins\teams\team-alpha\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
-Assert-Equal $alphaManifest.version $manifest.version 'version is in lockstep with team-alpha'
+$alphaManifest = Get-Content -LiteralPath (Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
+Assert-Equal $alphaManifest.version $manifest.version 'version is in lockstep with dkj-team-alpha'
 
 # --- 3. asana-mirror pure helpers ------------------------------------------------------------------
 Write-Host "`n-- asana-mirror helpers --" -ForegroundColor Cyan

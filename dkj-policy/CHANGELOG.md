@@ -32,6 +32,119 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: fix/1493-fold-on-merge-queue · 20260906-015631
+
+Adds `.github/workflows/fold-on-merge.yml`: after every push to `main`, it checks for a changelog
+entry left unfolded by a merge the shipping session never saw -- the `main-ci-gate` merge queue (#1492)
+merges a PR itself, so `ship-pr.ps1`'s own post-merge fold step never runs for a queue-merged PR, and
+the branch's `dkj-policy/<branch>.md` dossier was otherwise left sitting on the trunk with nobody to
+fold it but a human doing it by hand. The workflow adds no new detection logic and no new fold logic --
+it runs the two scripts this repo already has (`check-unfolded-entry.ps1`, then
+`fold-changelog-entry.ps1 -Commit -Push` in its existing fold-all mode) from the one place that always
+sees a queue merge: a push to `main`.
+
+**Code-complete, and inert until one more thing lands that is not part of this PR.** `main-ci-gate`'s
+`required_status_checks` rule blocks any push to `main` -- including this job's -- unless the pushing
+actor is a listed bypass actor. The default `GITHUB_TOKEN` a workflow run carries pushes as the GitHub
+Actions app, which is not on that list today. Adding it is a repo-settings/ruleset change, so it is
+Dave's action to take, not this branch's -- see #1493 for the exact API payload already prepared for
+him. Until he applies it, this workflow's fold step will visibly fail its own `git push` with a
+ruleset rejection whenever it finds something to fold, which is the correct failure mode for code that
+is finished but waiting on a permission it cannot grant itself.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this workflow lives in `.github/workflows/`, not under `plugins/`, so it never ships to a
+consumer via the plugin mechanism. It is specific to how this source repo's own `main` is guarded.
+
+**Score:** N/A
+
+#### Pull Request
+
+Fold the changelog entry automatically after a queue merge
+
+[PR #1496](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1496)
+
+---
+
+### DEPLOY: feat/1480-rename-teams-to-dkj-teams · 20260906-011211
+
+`plugins/teams/` is `plugins/dkj-teams/`, and the four teams are `dkj-team-alpha`,
+`dkj-team-ecomm`, `dkj-team-lifehub` and `dkj-team-shopify`. That finishes what
+[#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) started on the workflow
+side a commit earlier: every plugin this marketplace publishes now carries the owner in its name,
+and both top-level directories say whose kind they hold rather than only which kind.
+
+**The `[plugin-kind]` gate moved its directory rule rather than gaining a second one, and that is
+the part worth reading twice.** `dkj-team-*` now claims `plugins/dkj-teams/`; bare `team-*` keeps
+the naming half and loses the directory half, joining `workflow-*`, `contributing-*` and `*-codex`
+where #1467 put them. The reasoning is that decision applied to the half it had not reached: once
+this family's own teams carry the prefix, a prefixless `team-*` is exactly what **somebody else's**
+team is called, and ordering it into this family's directory is the failure the workflow side
+already refuses to commit. The tempting third option -- leave `team-*` pointed at
+`plugins/dkj-teams/` and add `dkj-team-*` beside it -- reads as harmless and is, right up until
+somebody publishes a plugin actually named `team-something`, which is the one case the rule exists
+for. The else-branch is untouched: a name matching none of the shapes is still an error.
+
+Archived release notes were split the way #1467 split them -- **targets** repointed so navigation
+still works, **prose** untouched. `connectors/*.json` is untouched entirely, ids included: the
+register records what a consumer HAS, so a record naming `team-alpha@` is correct until that
+consumer migrates, and `check-connectors.ps1` reporting the retired id as an `[INFO]` is the
+designed behaviour of a rename rather than a regression.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**This one renames plugin IDs, so it breaks every consumer at the moment it lands, and unlike
+[#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) there is no one-line
+version of the migration.** #1467 moved a directory and left the ids alone, which is why it could
+promise that `claude plugin install`, `${CLAUDE_PLUGIN_ROOT}` and every skill invocation resolved
+exactly as before. None of that holds here. `team-alpha@claude-code-specialists` stops existing;
+so do the other three.
+
+What each consuming repo has to do, in order:
+
+```text
+claude plugin marketplace update claude-code-specialists
+claude plugin uninstall team-alpha@claude-code-specialists
+claude plugin install   dkj-team-alpha@claude-code-specialists --scope project
+```
+
+...repeated for whichever of `team-ecomm`, `team-lifehub` and `team-shopify` that repo enables. Then
+three edits in its own tree, none of which any plugin can make for it:
+
+- **`.claude/settings.json`** -- the keys under `enabledPlugins` are the old ids.
+- **The orchestrator `@`-import**, normally in `.claude/specialists/SPECIALISTS.md`. It is a fixed,
+  versionless path into the marketplace clone, and `@`-imports take no variables, so it names
+  `plugins/teams/team-alpha/personas/01-01-persona.md` literally. Re-running `specialists-init`
+  rewrites it, because the bootstrap derives that path from where it is actually running rather than
+  from any literal; editing the one line by hand is equally good.
+- **Every `@team-alpha:<name>` subagent invocation** in that repo's own lenses, skills and docs
+  becomes `@dkj-team-alpha:<name>`.
+
+**A dead `@`-import is the one to get right, because it fails silently and expensively:** Claude Code
+drops the line without an error and the session loses the whole document, so an orchestrator that
+simply never loads reads as a model problem rather than a path problem.
+
+Nothing else moves. The marketplace name is unchanged, so the `extraKnownMarketplaces` block stays as
+it is, and no lens, manual or specialist id changes -- the specialists are the same people in a
+differently-named box.
+
+**Score:** 5
+
+#### Pull Request
+
+Rename plugins/teams to plugins/dkj-teams and prefix the four team plugins with dkj-
+
+Plugins: dkj-policy, dkj-policy-bwj, dkj-team-alpha
+
+[PR #1487](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1487)
+
+---
+
 ### DEPLOY: docs/1486-dkj-policy-scripts-readme-rows · 20260906-003910
 
 `plugins/dkj-policy/scripts/README.md`'s table now lists all 21 scripts and libs the registry already

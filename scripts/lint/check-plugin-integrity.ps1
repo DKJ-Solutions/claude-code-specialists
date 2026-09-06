@@ -35,7 +35,7 @@
          which it also names, and conversely every manual is backed by an agent def OR a persona of
          the same id (no orphan manual) -- a persona-backed manual must be named by that persona.
       7. shared agent-def blocks: every <!-- BEGIN/END shared:NAME --> region in an agent def still
-         equals its canonical source in teams/agent-shared/<name>.md (see scripts/agents/build-agent-defs.ps1)
+         equals its canonical source in dkj-teams/agent-shared/<name>.md (see scripts/agents/build-agent-defs.ps1)
          -- a hand-edit inside the sentinels or a forgotten rebuild is thus caught at the gate.
       8. shared workflow scripts: every plugin mirror of a repo-agnostic script (issue #81) is
          still LF-identical to its root source -- a hand-edit in the mirror or a forgotten
@@ -140,7 +140,7 @@
          the '-File' argument rather than paths in general, because a tree-wide rule would be born
          accusing three correct comments that quote a user path to explain a path-mangling bug.
      23. a plugin's name says which kind it is, and where that name claims a directory it must sit
-         there: 'team-*' under plugins/teams/, and '*-policy' / '*-policy-*' under plugins/dkj-policy/.
+         there: 'team-*' under plugins/dkj-teams/, and '*-policy' / '*-policy-*' under plugins/dkj-policy/.
          'workflow-*', 'contributing-*' and '*-codex' are accepted names held to no directory since
          #1467, because plugins/workflows/ -- which used to name their kind -- is gone. Every plugin is
          still one or the other BY NAME. The directory rule is DERIVED from the
@@ -629,7 +629,7 @@ $linkFiles += @(Get-ChildItem -Path $RepoRoot -Filter '*.md' -File |
 # agent defs, skills, manuals, personas and the plugin CHANGELOGs, and false of anything else. A markdown
 # file at PLUGIN level matched no rule at all, which is where a plugin's own README.md sits: the first page
 # a consumer reads, its links never once validated. Measured on the day this was widened: six such files,
-# five of them already in the tree (plugins\teams\README.md, plugins\workflows\README.md -- the latter
+# five of them already in the tree (plugins\dkj-teams\README.md, plugins\workflows\README.md -- the latter
 # merged into the plugin's own page by #1467 -- both workflow
 # plugin READMEs, and dkj-policy\scripts\README.md) and the sixth the portable contribution guide
 # added by that same change -- a consumer-facing page whose whole purpose is to be copied, and whose dead
@@ -688,7 +688,7 @@ $lensLinkFiles = @()
 foreach ($extDir in @(
     (Join-Path $RepoRoot '.claude\specialists\lenses'),
     (Join-Path $RepoRoot '.claude\specialists'),
-    (Join-Path $RepoRoot '.claude\plugins\claude-specialists\team-alpha'),
+    (Join-Path $RepoRoot '.claude\plugins\claude-specialists\dkj-team-alpha'),
     (Join-Path $RepoRoot '.claude\extensions'))) {
     if (Test-Path -LiteralPath $extDir) {
         $lensLinkFiles += (Get-ChildItem -Path $extDir -Filter '*.md' -File | Select-Object -ExpandProperty FullName)
@@ -703,7 +703,7 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -Fi
     Where-Object { $_.FullName -match '\\personas\\' } | Select-Object -ExpandProperty FullName)
 # THE AGENT DEFS, THE SHARED BLOCKS, AND THE TWO CONFIG-ADJACENT DOC LAYERS (#481). Every category above
 # names a shape of file, and four kinds of markdown matched none of them: */agents/*.md (26 files),
-# plugins/teams/agent-shared/*.md (11), .github/**/*.md (2) and .claude/rules/*.md (1). Agent defs are the
+# plugins/dkj-teams/agent-shared/*.md (11), .github/**/*.md (2) and .claude/rules/*.md (1). Agent defs are the
 # glaring one -- they are the largest single body of prose this repo ships, they are payload, and their
 # links had never been read by anything. Measured on the day this was added: one genuinely dead link had
 # been sitting in an agent def, plus the location-dependent CLAUDE.md links repaired alongside it.
@@ -712,7 +712,7 @@ $linkFiles += (Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -Fi
 # directory is guarded, for the reason the plugins/ glob is: a consumer has some of these and not others.
 foreach ($payloadSpec in @(
     @{ Dir = 'plugins';        Recurse = $true;  Filter = '*.md'; Match = '\\agents\\' },
-    @{ Dir = 'plugins\teams\agent-shared'; Recurse = $false; Filter = '*.md'; Match = $null },
+    @{ Dir = 'plugins\dkj-teams\agent-shared'; Recurse = $false; Filter = '*.md'; Match = $null },
     @{ Dir = '.github';        Recurse = $true;  Filter = '*.md'; Match = $null },
     @{ Dir = '.claude\rules';  Recurse = $false; Filter = '*.md'; Match = $null })) {
     $payloadDir = Join-Path $RepoRoot $payloadSpec.Dir
@@ -1429,7 +1429,7 @@ if ($skillSpanCount -eq 0) {
 #
 # THE DISCRIMINATOR, and it is the whole reason this can be a generic scan where check 10 could not be.
 # A command with an explicit @-TARGET is an instruction someone runs:
-#     claude plugin install team-alpha@claude-code-specialists --scope project
+#     claude plugin install dkj-team-alpha@claude-code-specialists --scope project
 #     claude plugin update <plugin>@<marketplace> --scope project
 # A BARE mention is prose discussing the command, and demanding flags there would be nonsense:
 #     "`claude plugin update` has the same default", "Because `claude plugin update` pins the cache"
@@ -2624,10 +2624,10 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # hook in another plugin.
 #
 # ANCHORED ON THE PUBLISHED SET, so a directory that is not a plugin is not held to a rule about
-# plugins. That is what lets plugins/teams/agent-shared/ sit beside the teams it feeds without being
+# plugins. That is what lets plugins/dkj-teams/agent-shared/ sit beside the teams it feeds without being
 # read as a team whose name is missing its 'team-' prefix -- it is in no marketplace, so this loop
 # never sees it. Worth knowing before anyone hardens the directory half into a filesystem sweep:
-# 'every directory under plugins/teams/ is named team-*' is a DIFFERENT check from this one, and it
+# 'every directory under plugins/dkj-teams/ is named team-*' is a DIFFERENT check from this one, and it
 # would be false the moment it was written.
 
 # SEVERAL NAME SHAPES MAP TO THE SAME KIND SINCE AUGUST 26, 2026 (#886), AND THAT IS DELIBERATE.
@@ -2657,28 +2657,39 @@ Write-Coverage -Category 'skill-command' -Checked $skillCmdChecked `
 # family's renames somebody else's problem -- but pointing it at plugins/dkj-policy/ would be worse than
 # saying nothing: it would order a stranger's workflow into this government. So they fall through with no
 # location check, DELIBERATELY, which is a real narrowing of this check and is recorded as one. The
-# else-branch below is untouched: a name matching none of the five shapes is still an error, because the
+# else-branch below is untouched: a name matching none of the shapes is still an error, because the
 # failure it guards -- a plugin silently held to nothing at all -- is the one that has actually happened.
+#
+# 'team-*' JOINED THAT NAME-ONLY GROUP ON SEPTEMBER 5, 2026 (#1480), and the directory rule moved with the
+# teams to 'dkj-team-*' -> plugins\dkj-teams\. The reasoning is the paragraph above applied to the half it
+# had not reached yet: once this family's own teams carry the owner prefix, a bare 'team-*' is exactly what
+# a team from ANYBODY ELSE is called, and holding it to plugins/dkj-teams/ orders a stranger's team into
+# this family's directory -- the same failure the workflow half already refuses to commit. So the shape is
+# still recognised as a team by name (an unclassifiable plugin remains an error), and only the location
+# question is dropped for it. What must NOT happen is the tempting third option: leaving 'team-*' pointed
+# at plugins\dkj-teams\ and adding 'dkj-team-*' beside it. The first branch that matches wins, and
+# 'dkj-team-alpha' does not match 'team-*', so that arrangement reads as harmless and is -- until somebody
+# publishes a plugin literally named 'team-something', which is the one case the rule exists for.
 $kindChecked = 0
 foreach ($p in $publishedPlugins) {
     $kindChecked++
     $rel = $p.RelativeRoot
-    if ($p.Name -like 'team-*') {
-        if ($rel -notmatch '^plugins\\teams\\') {
-            Add-Error "[plugin-kind] '$($p.Name)' is a team by its name but its source is '$rel' -- a team belongs under plugins/teams/."
+    if ($p.Name -like 'dkj-team-*') {
+        if ($rel -notmatch '^plugins\\dkj-teams\\') {
+            Add-Error "[plugin-kind] '$($p.Name)' is one of this family's teams by its name but its source is '$rel' -- 'dkj-team-*' belongs under plugins/dkj-teams/."
         }
     } elseif ($p.Name -like '*-policy' -or $p.Name -like '*-policy-*') {
         if ($rel -notmatch '^plugins\\dkj-policy($|\\)') {
             Add-Error "[plugin-kind] '$($p.Name)' is a ministry of the policy by its name but its source is '$rel' -- '*-policy' and '*-policy-*' belong under plugins/dkj-policy/, the prime ministry at its root and every other ministry one level inside it."
         }
-    } elseif ($p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*' -or $p.Name -like '*-codex') {
+    } elseif ($p.Name -like 'team-*' -or $p.Name -like 'workflow-*' -or $p.Name -like 'contributing-*' -or $p.Name -like '*-codex') {
         # Accepted by name, held to no location: see the retired-shapes note above.
     } else {
-        Add-Error "[plugin-kind] '$($p.Name)' is none of 'team-*', 'workflow-*', 'contributing-*', '*-codex', '*-policy' or '*-policy-*'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the name, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
+        Add-Error "[plugin-kind] '$($p.Name)' is none of 'dkj-team-*', 'team-*', 'workflow-*', 'contributing-*', '*-codex', '*-policy' or '*-policy-*'. Every plugin here is a team or a way of working, and the name is what says which: the directory rule is DERIVED from the name, so a plugin whose name matches none of them has its location held against nothing at all -- this check switches itself off for it."
     }
 }
 Write-Coverage -Category 'plugin-kind' -Checked $kindChecked `
-    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name. Two name shapes still carry a directory rule: 'team-*' maps to plugins/teams/, and '*-policy' / '*-policy-*' map to plugins/dkj-policy/ -- the government, with the prime ministry at its root and every other ministry one level inside it. 'workflow-*', 'contributing-*' and '*-codex' are accepted by name and held to no location since #1467, because the directory that used to name their kind is gone. The naming half is the one that cannot be seen by reading the tree: a directory rule is derived from the name, so an unclassifiable plugin is silently held to nothing" })
+    -Note $(if ($kindChecked -eq 0) { 'no published plugin was read, so neither the naming rule nor the directory rule could be applied' } else { "every published plugin is a team or a way of working by name. Two name shapes still carry a directory rule: 'dkj-team-*' maps to plugins/dkj-teams/, and '*-policy' / '*-policy-*' map to plugins/dkj-policy/ -- the government, with the prime ministry at its root and every other ministry one level inside it. 'workflow-*', 'contributing-*' and '*-codex' are accepted by name and held to no location since #1467, because the directory that used to name their kind is gone; bare 'team-*' joined them on #1480, when this family's own teams took the owner prefix and a prefixless team became what SOMEBODY ELSE's team is called. The naming half is the one that cannot be seen by reading the tree: a directory rule is derived from the name, so an unclassifiable plugin is silently held to nothing" })
 
 # --- 24. the PR template keeps the two promises open-pr makes about it ------------------------------------
 # WHAT THIS IS FOR, measured at a consumer rather than imagined (#573). open-pr fills the PR body's
@@ -3113,8 +3124,8 @@ Write-Coverage -Category 'import' -Checked $importScanFiles.Count `
 #
 # WHY IT MUST STAY OPT-IN, measured across all four plugins before it was proposed (#920): a generic
 # rule -- 'a plugin README lists every skill it ships' -- would be born needing an exemption list.
-# dkj-policy ships 16 and lists 16; team-alpha ships 4 and lists 0; team-shopify ships 4
-# and lists 0; team-ecomm ships 0. So a non-opt-in version produces 8 findings on two documents that
+# dkj-policy ships 16 and lists 16; dkj-team-alpha ships 4 and lists 0; dkj-team-shopify ships 4
+# and lists 0; dkj-team-ecomm ships 0. So a non-opt-in version produces 8 findings on two documents that
 # never claimed to enumerate anything, which is the shape this repo has scar tissue from (check 10's
 # own prose scan rejected at 147 hits, the stale-path check declined at 124, check 27's exemption
 # argument). An explicit sentinel fires on exactly the one table that means it.
@@ -3237,7 +3248,7 @@ Write-Coverage -Category 'skill-list-plugin' -Checked $pluginSkillSpanCount `
 # THE SIZE, RECOUNTED. #1066 reported zero findings and argued from that ("today's expected answer is
 # zero, which is itself the reason not to build it yet"), and added that the defect "never shipped".
 # The real count on the day the check landed was 17 escapes across 5 files, every one passing check 4 --
-# and resolving all 17 inside the INSTALLED copies (team-alpha 4.21.0, dkj-policy 4.22.0)
+# and resolving all 17 inside the INSTALLED copies (dkj-team-alpha 4.21.0, dkj-policy 4.22.0)
 # rather than in this tree, all 17 are dead. Not one of them, all of them. That inverts the report's own
 # conclusion instead of qualifying it: the failure mode has bitten, in released payload, so the repo's
 # name-it-and-leave-it rule no longer holds it back.

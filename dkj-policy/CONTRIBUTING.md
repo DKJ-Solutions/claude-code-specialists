@@ -186,7 +186,7 @@ name** until the two agree — which is what `claim-issue` does for you: it read
 **git** one, because the commits are the half nothing can rewrite afterwards.
 
 **These rules are Chris's, stated here rather than owned here.** The filing bar, the six inbound checks and
-the claim live in the orchestrator's persona body, which ships with `team-alpha` — so where this paragraph
+the claim live in the orchestrator's persona body, which ships with `dkj-team-alpha` — so where this paragraph
 and that body disagree, the body is the source and this is the bug. They are written out anyway because a
 contributor reading this page has no guarantee of having the plugin, and a route with a step that is only
 legible to an agent is not a route.

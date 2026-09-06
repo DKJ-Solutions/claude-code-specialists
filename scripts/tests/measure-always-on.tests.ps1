@@ -118,7 +118,7 @@ try {
 
     Assert-Equal '.claude/x.md' (Get-ImportLinePath '@.claude/x.md') 'a column-0 @ line is an import'
     Assert-Equal $null (Get-ImportLinePath '  @.claude/x.md') 'an indented @ is not an import'
-    Assert-Equal $null (Get-ImportLinePath 'ask @team-alpha:tessa about it') 'an @ mid-line is not an import'
+    Assert-Equal $null (Get-ImportLinePath 'ask @dkj-team-alpha:tessa about it') 'an @ mid-line is not an import'
     Assert-Equal $null (Get-ImportLinePath 'plain prose') 'prose is not an import'
     Assert-Equal $null (Get-ImportLinePath '@') 'a bare @ is not an import'
 

@@ -10,7 +10,7 @@ where they are installed, and nothing below assumes either one is:
 
 - **`dkj-policy`** — the branch, entry and release mechanics, on its own page
   [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md).
-- **`team-alpha`** — the specialists, reached through the single `@`-import at the foot of this file.
+- **`dkj-team-alpha`** — the specialists, reached through the single `@`-import at the foot of this file.
 
 Uninstall both and this guide still describes how the repo is run: the rules below are the repo's own,
 and where a plugin adds to one, the addition lives in that plugin's layer rather than here. Read a
@@ -163,12 +163,12 @@ The reasoning, and which sense of the word deliberately survived, is in
 
 **The nuance, so nobody repairs the wrong thing: lockstep *within* this product is correct** and
 [`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The plugins are one system — a
-stack of teams plus one opt-in workflow — and a consumer running `team-alpha` alongside `team-shopify`
+stack of teams plus one opt-in workflow — and a consumer running `dkj-team-alpha` alongside `dkj-team-shopify`
 needs matching versions. What was wrong was never the lockstep but housing unrelated products in a
 single release train, and that dissolved with the reorganisation rather than needing a fix.
 
 **The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
-its own `team-alpha` plugin (the core team), with the `github` marketplace source
+its own `dkj-team-alpha` plugin (the core team), with the `github` marketplace source
 `DKJ-Solutions/claude-code-specialists` — so the repo points at itself. That way work here runs against
 exactly the product it maintains. One consequence to be aware of: a session reads the plugins from the
 **local marketplace clone**, and that clone advances on a `claude plugin marketplace update` — **not on
@@ -188,7 +188,7 @@ instances, and why detection is deliberately left alone, are in
 output, and script-generated document content. **The session-reply language is separate and follows
 the user.** That second half applies to every turn regardless of which files it touches, which is why
 it lives here rather than in a path-scoped rule. The system-wide norm (and its three exceptions) is in
-[the technical writer's portable manual](plugins/teams/team-alpha/manuals/06-16-manual.md#what-tessa-covers)
+[the technical writer's portable manual](plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md#what-tessa-covers)
 under **"Guarding the language convention,"** so it travels to every consuming repo.
 
 **The per-layer detail — which layers are in scope, and the deliberate exceptions (`VUL-IN`,
@@ -204,7 +204,7 @@ July 20, 2026; sharpened July 21 and July 26, 2026.
 
 ### Structure — where everything lives
 
-The full repo layout (`.claude-plugin/`, `plugins/` incl. `teams/agent-shared/`, `connectors/` at the root,
+The full repo layout (`.claude-plugin/`, `plugins/` incl. `dkj-teams/agent-shared/`, `connectors/` at the root,
 `scripts/`, `dkj-policy/` (the changelog, the contributing page and the release history since
 August 27, 2026; the folder was `contributing-davekjohn/` until September 5, 2026, #1437),
 `.claude/`, and the root docs + `.github/`) is described in
@@ -216,13 +216,13 @@ level existed to hold several product families side by side, which the
 `scripts/sync/`, not plugin payload, and must not travel along in the plugin cache. `agent-shared/`
 stayed **inside** `plugins/` for the mirror-image reason: it *is* plugin source.
 
-**And on August 17, 2026 it moved one level further in, to `plugins/teams/agent-shared/`** (Dave):
+**And on August 17, 2026 it moved one level further in, to `plugins/dkj-teams/agent-shared/`** (Dave):
 every file carrying a shared block is a team's, so sitting beside `teams/` and `workflows/` claimed a
 reach the folder does not have. **Nothing in the tooling had to learn the new address** — every script
 that asks which plugins exist reads `marketplace.json` through
 [`plugin-tree-lib.ps1`](scripts/lib/plugin-tree-lib.ps1), so a directory in no marketplace is not a
 plugin wherever it sits. Reader-facing statement, and what the move changed for the publish, in
-[`plugins/teams/README.md`](plugins/teams/README.md).
+[`plugins/dkj-teams/README.md`](plugins/dkj-teams/README.md).
 
 ### claude-code-specialists's safety implementation
 
@@ -347,7 +347,7 @@ The constitution above, concretely implemented here:
   and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
-  information, credentials, or secrets. The core team's (`team-alpha`) agent defs are therefore
+  information, credentials, or secrets. The core team's (`dkj-team-alpha`) agent defs are therefore
   deliberately repo-neutral; repo-specific context lives in the consuming (private) repo's
   `.claude/specialists/lenses/` lens.
 

@@ -10,7 +10,7 @@ themselves**. It is **not a replacement** for the safety rules or the routing.
 > **This repo is an outlier.** claude-code-specialists is the marketplace repo of one product; the
 > specialists system lives here as the plugins under `plugins/` — a stack of teams plus an opt-in
 > workflow (see [`../../README.md`](../../README.md)) — and the repo also consumes that system here
-> **itself**, via the `team-alpha` plugin (the core team). The team here is therefore small and focused
+> **itself**, via the `dkj-team-alpha` plugin (the core team). The team here is therefore small and focused
 > on maintaining this product (agent defs, manuals, docs, tooling), not the broad team of a
 > content repo.
 
@@ -30,7 +30,7 @@ just like inline text.
   roster + routing. The single file `CLAUDE.md` names.
 - **`lenses/`** — the **repo layer** of the specialists system: one file per specialist,
   `<group>-<id>-extension.md`, flat (ids are unique family-wide). There are two kinds:
-  - **Subagent lens** — for the fifteen specialists that come out of the `team-alpha` plugin as
+  - **Subagent lens** — for the fifteen specialists that come out of the `dkj-team-alpha` plugin as
     subagents (the full list is in the [index below](#index-of-the-extensions-present)): only the
     `## Specific to this repo` part, which
     supplements the portable playbook in the plugin with the context of this repo. The subagent
@@ -38,7 +38,7 @@ just like inline text.
   - **Persona lens (lens-only)** — for the persona-only specialists (Chris, Bianca, Derek, Rendall), who run
     in the main conversation instead of as subagents. The main loop loads no plugin subagents, so the
     **portable body** comes straight from the plugin install via an `@` import: Chris always
-    (`@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/teams/team-alpha/personas/01-01-persona.md`,
+    (`@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-teams/dkj-team-alpha/personas/01-01-persona.md`,
     stated in [`SPECIALISTS.md`](SPECIALISTS.md) rather than in `CLAUDE.md` itself — the seam spends
     two of the four allowed import hops), Derek and Rendall on demand from that same path. **Bianca
     is the fourth persona and currently has no trigger**: her body would load the same way, but
@@ -50,13 +50,13 @@ just like inline text.
     extension itself is therefore **lens-only**: only the repo-specific `## Specific to this repo`
     part, no copy of the body — just like the subagent lens. That way every portable behavioral rule
     lives in one place (the plugin), not duplicated.
-- **Subagent definitions — from the repo's own `team-alpha` plugin, not local.** The compact,
+- **Subagent definitions — from the repo's own `dkj-team-alpha` plugin, not local.** The compact,
   executable form of a specialist (`<group>-<id>-agent.md`) is **not** kept by this repo in a local
-  `.claude/agents/` directory: they come from the `team-alpha` plugin of this very marketplace,
-  enabled via [`settings.json`](../settings.json) and invocable as `@team-alpha:<name>`.
+  `.claude/agents/` directory: they come from the `dkj-team-alpha` plugin of this very marketplace,
+  enabled via [`settings.json`](../settings.json) and invocable as `@dkj-team-alpha:<name>`.
 - **`settings.json`** — the harness config: `extraKnownMarketplaces` (the `github` source
   `DKJ-Solutions/claude-code-specialists` — the repo points to itself) + `enabledPlugins`
-  (`team-alpha@claude-code-specialists`). [Sylvester #15](lenses/05-15-extension.md)'s domain.
+  (`dkj-team-alpha@claude-code-specialists`). [Sylvester #15](lenses/05-15-extension.md)'s domain.
 
 ## How a specialist is structured
 
@@ -108,7 +108,7 @@ anything specific to this repo.
 
 **Which of the three layers a rule belongs in follows from what the layer already carries**, a
 convention the repo has held consistently rather than one invented here. Re-measured **August 15,
-2026** across `team-alpha`'s **15 manuals, 4 personas and 4 skills** — count each category with
+2026** across `dkj-team-alpha`'s **15 manuals, 4 personas and 4 skills** — count each category with
 `grep -rho` over `manuals/`, `personas/` and `skills/`, and the table reproduces:
 
 | layer | holds | repo-specific detail (measured) |
@@ -120,7 +120,7 @@ convention the repo has held consistently rather than one invented here. Re-meas
 **The previous figures are kept here as the thing that went wrong, because the failure is instructive**:
 this table read *"14 manuals, 4 personas and 9 skills"* and *"103 references across the 9 skills"*, and
 by August 15 none of the three counts held — a manual had been added, and the August 8 workflow split
-had moved nine of `team-alpha`'s skills into `dkj-policy`, leaving four. **`CLAUDE.md` points at
+had moved nine of `dkj-team-alpha`'s skills into `dkj-policy`, leaving four. **`CLAUDE.md` points at
 this table as the evidence for the whole source-vs-lens doctrine**, so a reader who checked it found the
 numbers wrong and had no way to tell whether the doctrine was wrong with them. The claim itself was
 false too, by exactly two person names — both now moved to the lens that should have held them, which
@@ -204,7 +204,7 @@ crafts this maintenance repo rarely calls on. They are in the index below with t
 they are not reachable the same way, and the difference is worth knowing before you type a name:
 
 - **Invocable today as subagents** — Paula 📅 #09, Vera 📊 #11, Gwen 🎨 #12, Cody 💻 #13 and
-  Auden 🖋️ #30. Each ships an agent def, so `@team-alpha:<name>` reaches them.
+  Auden 🖋️ #30. Each ships an agent def, so `@dkj-team-alpha:<name>` reaches them.
 - **Not invocable** — Bianca 🎙️ #02, who ships as a **persona** (`personas/03-02-persona.md`, no
   agent def). Personas run in the main conversation, and the only one loaded here is Chris; Derek and
   Rendall are read on demand when work reaches them. Nothing reaches Bianca — see the persona-lens
@@ -227,27 +227,27 @@ state, not a backlog item**, exactly as
 | 02 | Bianca 🎙️ — Biographer | [`lenses/03-02-extension.md`](lenses/03-02-extension.md) *(scaffold)* | — (persona-only) |
 | 05 | Derek 🐙 — DevOps Engineer | [`lenses/05-05-extension.md`](lenses/05-05-extension.md) | — (persona-only) |
 | 06 | Rendall 🎬 — Release Manager | [`lenses/05-06-extension.md`](lenses/05-06-extension.md) | — (persona-only) |
-| 07 | Rebecca 🔬 — Research Specialist | [`lenses/03-07-extension.md`](lenses/03-07-extension.md) | `@team-alpha:rebecca` |
-| 09 | Paula 📅 — Project Planner | [`lenses/02-09-extension.md`](lenses/02-09-extension.md) *(scaffold)* | `@team-alpha:paula` |
-| 11 | Vera 📊 — Data Analyst | [`lenses/04-11-extension.md`](lenses/04-11-extension.md) *(scaffold)* | `@team-alpha:vera` |
-| 12 | Gwen 🎨 — Graphic & Front-end Designer | [`lenses/04-12-extension.md`](lenses/04-12-extension.md) *(scaffold)* | `@team-alpha:gwen` |
-| 13 | Cody 💻 — App Developer | [`lenses/04-13-extension.md`](lenses/04-13-extension.md) *(scaffold)* | `@team-alpha:cody` |
-| 15 | Sylvester ⚙️ — System Administrator | [`lenses/05-15-extension.md`](lenses/05-15-extension.md) | `@team-alpha:sylvester` |
-| 16 | Tessa 📜 — Technical Writer | [`lenses/06-16-extension.md`](lenses/06-16-extension.md) | `@team-alpha:tessa` |
-| 17 | Edith 🔍 — Copy Editor | [`lenses/06-17-extension.md`](lenses/06-17-extension.md) | `@team-alpha:edith` |
-| 18 | Tycho 🧪 — Test Engineer | [`lenses/04-18-extension.md`](lenses/04-18-extension.md) | `@team-alpha:tycho` |
-| 19 | Victor 🧐 — Code Reviewer | [`lenses/06-19-extension.md`](lenses/06-19-extension.md) | `@team-alpha:victor` |
-| 23 | Sebastian 🛡️ — Security Engineer | [`lenses/06-23-extension.md`](lenses/06-23-extension.md) | `@team-alpha:sebastian` |
-| 24 | Ravi ♻️ — Refactoring Specialist | [`lenses/06-24-extension.md`](lenses/06-24-extension.md) | `@team-alpha:ravi` |
-| 25 | Nolan ⚡ — Performance Engineer | [`lenses/06-25-extension.md`](lenses/06-25-extension.md) | `@team-alpha:nolan` |
-| 29 | Marlowe 🕵️ — Investigative Journalist | [`lenses/06-29-extension.md`](lenses/06-29-extension.md) | `@team-alpha:marlowe` |
-| 30 | Auden 🖋️ — Academic & Long-form Writer | [`lenses/06-30-extension.md`](lenses/06-30-extension.md) *(scaffold)* | `@team-alpha:auden` |
+| 07 | Rebecca 🔬 — Research Specialist | [`lenses/03-07-extension.md`](lenses/03-07-extension.md) | `@dkj-team-alpha:rebecca` |
+| 09 | Paula 📅 — Project Planner | [`lenses/02-09-extension.md`](lenses/02-09-extension.md) *(scaffold)* | `@dkj-team-alpha:paula` |
+| 11 | Vera 📊 — Data Analyst | [`lenses/04-11-extension.md`](lenses/04-11-extension.md) *(scaffold)* | `@dkj-team-alpha:vera` |
+| 12 | Gwen 🎨 — Graphic & Front-end Designer | [`lenses/04-12-extension.md`](lenses/04-12-extension.md) *(scaffold)* | `@dkj-team-alpha:gwen` |
+| 13 | Cody 💻 — App Developer | [`lenses/04-13-extension.md`](lenses/04-13-extension.md) *(scaffold)* | `@dkj-team-alpha:cody` |
+| 15 | Sylvester ⚙️ — System Administrator | [`lenses/05-15-extension.md`](lenses/05-15-extension.md) | `@dkj-team-alpha:sylvester` |
+| 16 | Tessa 📜 — Technical Writer | [`lenses/06-16-extension.md`](lenses/06-16-extension.md) | `@dkj-team-alpha:tessa` |
+| 17 | Edith 🔍 — Copy Editor | [`lenses/06-17-extension.md`](lenses/06-17-extension.md) | `@dkj-team-alpha:edith` |
+| 18 | Tycho 🧪 — Test Engineer | [`lenses/04-18-extension.md`](lenses/04-18-extension.md) | `@dkj-team-alpha:tycho` |
+| 19 | Victor 🧐 — Code Reviewer | [`lenses/06-19-extension.md`](lenses/06-19-extension.md) | `@dkj-team-alpha:victor` |
+| 23 | Sebastian 🛡️ — Security Engineer | [`lenses/06-23-extension.md`](lenses/06-23-extension.md) | `@dkj-team-alpha:sebastian` |
+| 24 | Ravi ♻️ — Refactoring Specialist | [`lenses/06-24-extension.md`](lenses/06-24-extension.md) | `@dkj-team-alpha:ravi` |
+| 25 | Nolan ⚡ — Performance Engineer | [`lenses/06-25-extension.md`](lenses/06-25-extension.md) | `@dkj-team-alpha:nolan` |
+| 29 | Marlowe 🕵️ — Investigative Journalist | [`lenses/06-29-extension.md`](lenses/06-29-extension.md) | `@dkj-team-alpha:marlowe` |
+| 30 | Auden 🖋️ — Academic & Long-form Writer | [`lenses/06-30-extension.md`](lenses/06-30-extension.md) *(scaffold)* | `@dkj-team-alpha:auden` |
 
 The six scaffolds mark specialists who rarely have work in this maintenance repo — Bianca's intake
 interviews, Paula's timelines, Vera's dashboards, Gwen's visuals, Cody's application code, Auden's
 long-form writing. On the day one of them first has work here,
 [Tessa #16](lenses/06-16-extension.md) fills the lens in before that specialist is deployed.
-The add-on teams `team-lifehub` and `team-shopify` are **off** here — this repo is
+The add-on teams `dkj-team-lifehub` and `dkj-team-shopify` are **off** here — this repo is
 not a life-hub-like or Shopify repo.
 
 ## This organization changes with the team

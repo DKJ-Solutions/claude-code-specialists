@@ -27,7 +27,7 @@ Three things have to be true, and only the first one might not be:
 
 1. **The plugins are installed *and* enabled for this repo — two acts, not one.** If you installed
    them yourself, that is [INSTALL.md](../INSTALL.md). If they arrived through your organisation, this
-   is already done — the specialists appear in your session as `@team-alpha:<name>` subagents.
+   is already done — the specialists appear in your session as `@dkj-team-alpha:<name>` subagents.
 2. **You have restarted the session since that happened.** A skill that ships inside a plugin only
    becomes available once the session has loaded the plugin.
 3. **`specialists-init` is in your slash list.** That is the check for both of the above at once: if it
@@ -61,7 +61,7 @@ and code/security reviewers for the independent final pass before a PR or merge.
 charge: the governance (your `CLAUDE.md`, your safety rules) remains yours; the plugins only supply
 the team and its playbooks.
 
-The system consists of **teams and a workflow**: the repo-neutral core team `team-alpha` (always
+The system consists of **teams and a workflow**: the repo-neutral core team `dkj-team-alpha` (always
 enable it), three optional add-on teams, and exactly one **way-of-working** plugin, chosen from the two
 the marketplace offers. Which specialists live in which plugin and who they are meant for is covered in
 the [root README](../README.md).
@@ -77,7 +77,7 @@ working it already had. Two consequences worth knowing before you enable the one
 - **Enabling it later is a plain enable + re-run of `specialists-init`**, which then adds the config it
   needs. Nothing has to be undone — and that sentence is finally true rather than merely short. It said
   the same thing until August 20, 2026 while it was **false**, because a second workflow then had to be
-  set to `false` in the same edit or `team-alpha`'s `workflow-sessioncheck` hook reported
+  set to `false` in the same edit or `dkj-team-alpha`'s `workflow-sessioncheck` hook reported
   `[ERROR] 2 workflows are enabled at once` at the *next* session start — one step after the commit that
   switched, so the wrong state got committed, pushed and reviewed first (inbound
   [#785](https://github.com/DaveKJohn/claude-code-specialists/issues/785)). Both the second plugin and
@@ -128,7 +128,7 @@ path are in the
 > of the gates, or hesitating over the only commit that can possibly happen next.
 
 **What it should report, so you can check it rather than trust it** (inbound
-[#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). With only the core `team-alpha`
+[#337](https://github.com/DaveKJohn/claude-code-specialists/issues/337)). With only the core `dkj-team-alpha`
 plugin enabled, the closing line reads:
 
 ```
@@ -149,7 +149,7 @@ gets everything under `created`, which is the sample above. A repo that already 
 than the sample is not an error, and neither is one that is lower: what matters is that each pair adds up
 and that the skill names anything it skipped. If you enabled an add-on team as well, expect its
 specialists on top of these. `dkj-policy`, on the other hand, changes nothing here: it carries no
-specialists, so this sample's numbers hold whether or not it is enabled alongside `team-alpha`.
+specialists, so this sample's numbers hold whether or not it is enabled alongside `dkj-team-alpha`.
 
 > The sample above was itself the finding: until August 2, 2026 it showed `0 script-scaffold(s) created,
 > 2 already present` — captured in a repo that already had them, and therefore inverted for exactly the
@@ -191,13 +191,13 @@ The set as of this release:
 | skill | shipped by | what your repo lacks without it | what reports it |
 |---|---|---|---|
 | `adopt-dkj-policy` | `dkj-policy` | two independent things, either order: **Part 1** — `dkj-policy/` itself, the only location the shared scripts read the branch dossier and the release documents from; **Part 2** — the seam values that state the shared way of working, answering what step 1 only *scaffolded* (`scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1`) | `script-contract-sessioncheck` |
-| `adopt-shopify-floor` | `team-shopify` | the live-theme guard's id half, a starter `.theme-check.yml`, and the CI gate that runs it | `shopify-floor-sessioncheck` |
+| `adopt-shopify-floor` | `dkj-team-shopify` | the live-theme guard's id half, a starter `.theme-check.yml`, and the CI gate that runs it | `shopify-floor-sessioncheck` |
 
 **Enumerate it from your own slash list rather than from this table.** A plugin added after this release
 brings its own adopt skill, and the table cannot know about it; the rule is what does not go stale —
 *every plugin you enabled that owns repo state ships an `adopt-*` skill, and you owe it one run.* Your
 slash list holds exactly the ones your enabled plugins ship, namespaced as `<plugin>:adopt-*`, so it
-answers the question for your repo rather than for the repo this page was written in. `team-alpha` is the
+answers the question for your repo rather than for the repo this page was written in. `dkj-team-alpha` is the
 exception that shows the shape: its adopt skill **is** `specialists-init`, which is step 1.
 
 **All of them are additive and a dry run by default** — each prints exactly what it would do and writes
@@ -245,7 +245,7 @@ before you write anything, because every gate stays green while your lenses are 
 `Get-RosterIgnoredIds`), which `scripts/sync/check-script-contract.ps1` reports for you and step 3's
 `adopt-dkj-policy` (Part 2) is what answers.
 
-The worker specialists can be invoked directly as `@team-alpha:<name>` from the moment Step 2 is
+The worker specialists can be invoked directly as `@dkj-team-alpha:<name>` from the moment Step 2 is
 done — with an empty lens they simply answer out of their portable playbook.
 
 > **Do not attribute this half hour to the installer.** `specialists-init` places the seam, 25 lens

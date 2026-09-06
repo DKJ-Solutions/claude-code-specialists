@@ -144,7 +144,7 @@ function Get-ImportLinePath {
 
         An '@'-import sits at the START of a line and takes the rest of the line as its path. Two things
         this deliberately does NOT treat as an import:
-          - an '@' anywhere but column 0 (an email address, a persona's `@team-alpha:name`);
+          - an '@' anywhere but column 0 (an email address, a persona's `@dkj-team-alpha:name`);
           - a line inside a fenced code block -- the caller tracks fences and does not ask.
     #>
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Line)

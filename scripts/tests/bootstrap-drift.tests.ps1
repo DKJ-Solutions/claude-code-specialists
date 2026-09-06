@@ -19,7 +19,7 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-$Bootstrap  = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\specialists-init\bootstrap.ps1'
+$Bootstrap  = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\skills\specialists-init\bootstrap.ps1'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 $Integrity  = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
 $Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-test-fixture-$PID"
@@ -31,8 +31,8 @@ $SeamInclusion = '.claude\specialists\SPECIALISTS.md'
 $SeamImport = '@.claude/specialists/SPECIALISTS.md'
 # The pre-seam plugin path (family = claude-specialists). Still READ by every reader, and still WRITTEN
 # for a consumer that already has a lens tree there -- the bootstrap never relocates one.
-$PpLegacy   = '.claude\plugins\claude-specialists\team-alpha'
-$PersonaSrc = Join-Path $RepoRoot 'plugins\teams\team-alpha\personas\01-01-persona.md'
+$PpLegacy   = '.claude\plugins\claude-specialists\dkj-team-alpha'
+$PersonaSrc = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\personas\01-01-persona.md'
 
 $script:pass = 0
 $script:fail = 0
@@ -249,7 +249,7 @@ try {
     # Without this, a file the bootstrap just wrote is classified as authored and kept forever --
     # adoption exactly as irreversible as specialists-teardown promises it is not.
     Write-Host "bootstrap.ps1 -- the core-only scaffold stays removable by the teardown" -ForegroundColor Cyan
-    $teardownScript = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\specialists-teardown\teardown.ps1'
+    $teardownScript = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\skills\specialists-teardown\teardown.ps1'
     function Test-TeardownSeesGenerated {
         param([string]$Path)
         # The classifier alone, lifted out of the script text: running the whole teardown here would
@@ -284,7 +284,7 @@ try {
     if (Test-Path -LiteralPath $FixtureWf) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf }
     New-Item -ItemType Directory -Path (Join-Path $FixtureWf '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'),
-        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }', $Utf8NoBom)
     $rWf = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureWf)
     Assert-Equal 0 $rWf.Code 'workflow plugin: bootstrap exit 0'
     $rcScaffold = Join-Path $FixtureWf 'scripts\repo-config.ps1'
@@ -336,7 +336,7 @@ try {
         # THE DEFECT ITSELF. Without this the paste produces a valid settings file with no plugin
         # surface at all -- 3 -> 0 SessionStart hooks, 6 -> 0 skills, 15 -> 0 subagents, and no message
         # (the state #1076 measured). Both plugins, because losing one is the same failure for that one.
-        foreach ($id in @('team-alpha@claude-code-specialists', 'dkj-policy@claude-code-specialists')) {
+        foreach ($id in @('dkj-team-alpha@claude-code-specialists', 'dkj-policy@claude-code-specialists')) {
             Assert-True (@($wfObj.enabledPlugins.PSObject.Properties | Where-Object { $_.Name -eq $id }).Count -eq 1) `
                 "workflow plugin: the merged file KEEPS enabledPlugins['$id'] -- the key a whole-file paste deleted (#1124)"
         }
@@ -383,7 +383,7 @@ try {
     # written for it.
     Assert-True ($rWf.Out -match '(?s)"id":\s*"dkj-policy@claude-code-specialists",\s*\r?\n\s*"extensions":\s*\[\s*\]') `
         'workflow plugin: the agent-less plugin IS in the register proposal, with an empty extensions array (#1084)'
-    Assert-True ($rWf.Out -match '(?s)"id":\s*"team-alpha@claude-code-specialists",\s*\r?\n\s*"extensions":\s*\["01-01"') `
+    Assert-True ($rWf.Out -match '(?s)"id":\s*"dkj-team-alpha@claude-code-specialists",\s*\r?\n\s*"extensions":\s*\["01-01"') `
         'workflow plugin: and the agent-bearing plugin still carries its ids -- the widening did not flatten the inventory'
     # The notice is the other half of the repair: it was worded as a missing DIRECTORY, so the reader
     # had to infer several hundred lines later what it meant for the manifest they were about to paste.
@@ -432,10 +432,10 @@ try {
     if (Test-Path -LiteralPath $FixtureMp) { Remove-Item -Recurse -Force -LiteralPath $FixtureMp }
     New-Item -ItemType Directory -Path (Join-Path $FixtureMp '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureMp '.claude\settings.json'),
-        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true, "somewidget@some-other-marketplace": true } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true, "somewidget@some-other-marketplace": true } }', $Utf8NoBom)
     $rMp = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureMp)
     Assert-Equal 0 $rMp.Code 'marketplace scope: bootstrap exit 0 with a foreign plugin enabled'
-    Assert-True ($rMp.Out -match 'team-alpha@claude-code-specialists') 'marketplace scope: our own plugins are in the proposal'
+    Assert-True ($rMp.Out -match 'dkj-team-alpha@claude-code-specialists') 'marketplace scope: our own plugins are in the proposal'
     Assert-True ($rMp.Out -match 'dkj-policy@claude-code-specialists') 'marketplace scope: including the agent-less one (#1084)'
     Assert-True (-not ($rMp.Out -match 'somewidget@some-other-marketplace')) 'marketplace scope: a plugin of ANOTHER marketplace is NOT in the proposal'
     # And it says so where the reader is, rather than dropping it in silence -- the same rule the skip
@@ -464,7 +464,7 @@ try {
     $hookCmd = 'powershell -File C:\uadded\check.ps1 && echo <done>'
     [System.IO.File]::WriteAllText((Join-Path $FixtureEsc '.claude\settings.json'), (@'
 {
-  "enabledPlugins": { "team-alpha@claude-code-specialists": true },
+  "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true },
   "permissions": { "allow": null },
   "hooks": { "Stop": [ { "hooks": [ { "type": "command", "command": "HOOKCMD" } ] } ] }
 }
@@ -497,7 +497,7 @@ try {
     & git -C $FixtureIgn init --quiet 2>$null | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.gitignore'), ".claude/settings.json`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.claude\settings.json'),
-        '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true }, "env": { "SOME_TOKEN": "x" } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true }, "env": { "SOME_TOKEN": "x" } }', $Utf8NoBom)
     $rIgn = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureIgn)
     Assert-Equal 0 $rIgn.Code 'ignore-gap: bootstrap exit 0'
     Assert-True ($rIgn.Out -match 'gitignored here and the merged copy beside it is NOT') `
@@ -565,7 +565,7 @@ try {
     # ONE [ERROR] IS THE DESIGNED STATE SINCE AUGUST 14, 2026, and it is not about anything the
     # bootstrap wrote: the workflow folder (dkj-policy/) arrives through the workflow plugin's
     # own adopt-dkj-policy skill (Part 1), a step AFTER the bootstrap -- the same split that keeps
-    # specialists-init (team-alpha) out of workflow-specific territory. So the guarantee #226 bought is
+    # specialists-init (dkj-team-alpha) out of workflow-specific territory. So the guarantee #226 bought is
     # asserted at its true width: every FUNCTION the bootstrap scaffolds satisfies the contract, and
     # the single finding left is the pointer at that next step.
     Assert-Equal 1 $rc.Code 'scaffolds vs contract: exit-code 1 -- the one finding is the workflow-folder pointer, by design'
@@ -620,7 +620,7 @@ try {
             # below would pass or fail for the wrong reason.
             New-Item -ItemType Directory -Path (Join-Path $gitFix '.claude') -Force | Out-Null
             [System.IO.File]::WriteAllText((Join-Path $gitFix '.claude\settings.json'),
-                '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }', $Utf8NoBom)
+                '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }', $Utf8NoBom)
             $rg = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $gitFix)
             Assert-Equal 0 $rg.Code "git derivation ($Label): bootstrap exit 0"
             $txt = [System.IO.File]::ReadAllText((Join-Path $gitFix 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
@@ -699,15 +699,15 @@ try {
     $cacheRoot = Join-Path $Fixture 'cache\claude-code-specialists'
     $ownCache  = Join-Path $cacheRoot 'specialists\1.4.0'
     New-Item -ItemType Directory -Path $ownCache -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\teams\team-alpha\*') -Destination $ownCache -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\*') -Destination $ownCache -Recurse
     foreach ($v in '1.9.0', '1.10.0') {
-        New-Item -ItemType Directory -Path (Join-Path $cacheRoot "team-lifehub\$v\agents") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $cacheRoot "dkj-team-lifehub\$v\agents") -Force | Out-Null
     }
-    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'team-lifehub\1.9.0\agents\04-88-agent.md'), "---`nname: oldie`nid: 88`ngroup: 04`n---`nfixture")
-    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'team-lifehub\1.10.0\agents\04-99-agent.md'), "---`nname: newest`nid: 99`ngroup: 04`n---`nfixture")
+    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'dkj-team-lifehub\1.9.0\agents\04-88-agent.md'), "---`nname: oldie`nid: 88`ngroup: 04`n---`nfixture")
+    [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'dkj-team-lifehub\1.10.0\agents\04-99-agent.md'), "---`nname: newest`nid: 99`ngroup: 04`n---`nfixture")
     $cacheConsumer = Join-Path $Fixture 'cache-consumer'
     New-Item -ItemType Directory -Path (Join-Path $cacheConsumer '.claude') -Force | Out-Null
-    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "team-alpha@claude-code-specialists": true, "team-lifehub@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true, "dkj-team-lifehub@claude-code-specialists": true } }')
     $cachedBootstrap = Join-Path $ownCache 'skills\specialists-init\bootstrap.ps1'
     $rc = Invoke-Script -Path $cachedBootstrap -ScriptArgs @('-ConsumerRoot', $cacheConsumer)
     Assert-Equal 0 $rc.Code 'version cache: bootstrap exit 0'
@@ -733,16 +733,16 @@ try {
     $mp = 'mp-fixture'
     # The cache directory is named after the PLUGIN, and the bootstrap derives its own name from exactly
     # that segment -- so this has to be the same plugin the clone below carries. It said 'specialists'
-    # while the clone said 'team-alpha' for the length of one rename sweep, and the symptom was precisely
+    # while the clone said 'dkj-team-alpha' for the length of one rename sweep, and the symptom was precisely
     # what this scenario exists to catch: the @-import fell back to the version-pinned cache path,
     # because the durable clone it was looking for was under a name nothing had put there.
-    $cacheInit = Join-Path $pluginsRoot "cache\$mp\team-alpha\9.9.9"
+    $cacheInit = Join-Path $pluginsRoot "cache\$mp\dkj-team-alpha\9.9.9"
     New-Item -ItemType Directory -Path $cacheInit -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\teams\team-alpha\*') -Destination $cacheInit -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\*') -Destination $cacheInit -Recurse
     # Versionless marketplaces clone with (at minimum) the personas under plugins/<plugin>/.
-    $cloneP = Join-Path $pluginsRoot "marketplaces\$mp\plugins\teams\team-alpha\personas"
+    $cloneP = Join-Path $pluginsRoot "marketplaces\$mp\plugins\dkj-teams\dkj-team-alpha\personas"
     New-Item -ItemType Directory -Path $cloneP -Force | Out-Null
-    Copy-Item -Path (Join-Path $RepoRoot 'plugins\teams\team-alpha\personas\*') -Destination $cloneP -Recurse
+    Copy-Item -Path (Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\personas\*') -Destination $cloneP -Recurse
     $durConsumer = Join-Path $Fixture 'durable-consumer'
     New-Item -ItemType Directory -Path $durConsumer -Force | Out-Null
     $rd = Invoke-Script -Path (Join-Path $cacheInit 'skills\specialists-init\bootstrap.ps1') -ScriptArgs @('-ConsumerRoot', $durConsumer)
@@ -750,7 +750,7 @@ try {
     # The body import now lives in SPECIALISTS.md, not in CLAUDE.md -- so that is where the durability
     # property has to be asserted. Reading the wrong file here would make this pass vacuously.
     $durIncl = [System.IO.File]::ReadAllText((Join-Path $durConsumer $SeamInclusion), [System.Text.Encoding]::UTF8)
-    Assert-True ($durIncl -match [regex]::Escape("marketplaces/$mp/plugins/teams/team-alpha/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
+    Assert-True ($durIncl -match [regex]::Escape("marketplaces/$mp/plugins/dkj-teams/dkj-team-alpha/personas/01-01-persona.md")) 'durable body path: @-import points to the marketplaces clone'
     Assert-True (-not ($durIncl -match '/cache/')) 'durable body path: @-import does NOT point to the version-pinned cache'
     # And CLAUDE.md itself must be free of the cache path too -- the one line it carries is repo-relative.
     $durMd = [System.IO.File]::ReadAllText((Join-Path $durConsumer 'CLAUDE.md'), [System.Text.Encoding]::UTF8)

@@ -5,7 +5,7 @@ group: 06
 
 # Edith 🔍 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `team-alpha` plugin (`plugins/teams/team-alpha/manuals/06-17-manual.md`). This file does not describe the craft, but what Edith does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/06-17-manual.md`). This file does not describe the craft, but what Edith does in this repo.
 
 A copy editor does the same thing everywhere — the independent final look before publication:
 language, spelling, consistency, dead links, deviations between what is written and what should be
@@ -22,7 +22,7 @@ links in the README/manuals. Edith does not need to redo that — she does what 
 - **Readability & tone**: is a new manual/agent-def text clear, and does the personality/tone match
   the rest of the team?
 - **Consistency across the plugins**: the same term, the same format, the same
-  `<group>-<id>` notation in `team-alpha`, `team-lifehub`, and `team-shopify`.
+  `<group>-<id>` notation in `dkj-team-alpha`, `dkj-team-lifehub`, and `dkj-team-shopify`.
 - **Portable vs. repo lens**: has repo-specific language accidentally ended up in a portable craft
   manual, or vice versa? (Substantively Tessa's rule; Edith flags it at the final check.)
 - **Cross-references that resolve but are wrong**: a link that technically exists but points to the

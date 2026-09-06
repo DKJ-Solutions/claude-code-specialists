@@ -35,8 +35,8 @@ function Assert-Equal {
     else { $script:fail++; Write-Host "  [FAIL] $Name`n         expected: '$Expected'`n         got:      '$Actual'" -ForegroundColor Red }
 }
 
-$skillPath   = Join-Path $RepoRoot 'plugins\teams\team-alpha\skills\orchestrator\SKILL.md'
-$personaPath = Join-Path $RepoRoot 'plugins\teams\team-alpha\personas\01-01-persona.md'
+$skillPath   = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\skills\orchestrator\SKILL.md'
+$personaPath = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\personas\01-01-persona.md'
 
 Write-Host "orchestrator skill -- it exists and names itself" -ForegroundColor Cyan
 Assert-True (Test-Path -LiteralPath $skillPath) 'the skill page is where the plugin expects it'
@@ -55,7 +55,7 @@ Assert-True ($text -match '\$\{CLAUDE_PLUGIN_ROOT\}/personas/01-01-persona\.md')
 Assert-True (Test-Path -LiteralPath $personaPath) 'and that persona file is really there'
 # A skill that points at a moved file reads perfectly and does nothing. Held against the real tree
 # rather than against a second copy of the path.
-$personaRel = 'plugins\teams\team-alpha\personas\01-01-persona.md'
+$personaRel = 'plugins\dkj-teams\dkj-team-alpha\personas\01-01-persona.md'
 Assert-True (Test-Path -LiteralPath (Join-Path $RepoRoot $personaRel)) 'the asserted path is the one the plugin ships'
 
 Write-Host "orchestrator skill -- it points a repo consumer somewhere else" -ForegroundColor Cyan

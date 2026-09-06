@@ -113,8 +113,8 @@ try {
     # combined check would pass while three of them were absent.
     Write-Host "check 4 coverage -- the payload layers (#481) are IN the scan set" -ForegroundColor Cyan
     $payloadTargets = @(
-        @{ Rel = 'plugins\teams\team-alpha\agents\09-99-agent.md';   Label = 'an agent def' },
-        @{ Rel = 'plugins\teams\agent-shared\fixture-block.md';  Label = 'a shared agent-def block' },
+        @{ Rel = 'plugins\dkj-teams\dkj-team-alpha\agents\09-99-agent.md';   Label = 'an agent def' },
+        @{ Rel = 'plugins\dkj-teams\agent-shared\fixture-block.md';  Label = 'a shared agent-def block' },
         @{ Rel = '.github\pull_request_template.md';             Label = 'a .github template' },
         @{ Rel = '.claude\rules\fixture-rule.md';                Label = 'a path-scoped rule' }
     )
@@ -201,14 +201,14 @@ try {
     # the tree", which is the property scenarios A and B2 already defend at their own boundaries.
     Write-Host "check 4 coverage -- a plugin-level document is IN the scan set, and counted once" -ForegroundColor Cyan
     $pluginDocTargets = @(
-        @{ Rel = 'plugins\teams\team-alpha\README.md';         Label = "a plugin's own README (plugin level, no shape rule matches it)" },
-        @{ Rel = 'plugins\teams\team-alpha\scripts\README.md'; Label = 'a README in a plugin subdirectory that no shape rule reaches' }
+        @{ Rel = 'plugins\dkj-teams\dkj-team-alpha\README.md';         Label = "a plugin's own README (plugin level, no shape rule matches it)" },
+        @{ Rel = 'plugins\dkj-teams\dkj-team-alpha\scripts\README.md'; Label = 'a README in a plugin subdirectory that no shape rule reaches' }
     )
     # The dedupe witness: an agent def is gathered by the */agents/*.md payload rule AND by the recursive
     # plugins/ glob. One dead link in it must produce exactly one [link] finding. Counted on LINES carrying
     # both the path and the [link] tag, because check 3 also names this file (no frontmatter) and a naive
     # match on the path alone would count that too.
-    $dupWitnessRel = 'plugins\teams\team-alpha\agents\09-98-agent.md'
+    $dupWitnessRel = 'plugins\dkj-teams\dkj-team-alpha\agents\09-98-agent.md'
     foreach ($pd in @($pluginDocTargets.Rel + $dupWitnessRel)) {
         $pdFull = Join-Path $Fixture $pd
         New-Item -ItemType Directory -Path (Split-Path -Parent $pdFull) -Force | Out-Null
@@ -228,9 +228,9 @@ try {
     # Removing them clears exactly those findings, so the assertions above are bound to these files rather
     # than to other noise this near-empty fixture produces.
     foreach ($pd in @($pluginDocTargets.Rel + $dupWitnessRel)) { Remove-Item -LiteralPath (Join-Path $Fixture $pd) -Force }
-    Remove-Item -LiteralPath (Join-Path $Fixture 'plugins\teams\team-alpha\scripts') -Recurse -Force
+    Remove-Item -LiteralPath (Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\scripts') -Recurse -Force
     $b6 = Invoke-Integrity -FixtureRoot $Fixture
-    Assert-True (-not ($b6.Out -match [regex]::Escape('.\plugins\teams\team-alpha\README.md'))) `
+    Assert-True (-not ($b6.Out -match [regex]::Escape('.\plugins\dkj-teams\dkj-team-alpha\README.md'))) `
         "plugin-doc scan: removing the plugin README clears its finding -- the report tracked the file, not the fixture"
 
     # === check 10: marked "all skills" enumerations vs. the canonical skillset ==========================
@@ -610,7 +610,7 @@ try {
     #        wrong everywhere else, and a check without the discriminators would be born accusing correct
     #        files -- which is the shape this repo refuses on principle (see check 27's exemption note).
     Write-Host "check 28: '@'-import targets resolve" -ForegroundColor Cyan
-    $impDir     = Join-Path $Fixture 'plugins\teams\team-alpha'
+    $impDir     = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha'
     $impProbe   = Join-Path $impDir 'import-probe.md'
     $impSibling = Join-Path $impDir 'import-sibling.md'
     [System.IO.File]::WriteAllText($impSibling, "# The sibling`n`nA target that exists.`n", $Utf8NoBom)
@@ -703,13 +703,13 @@ try {
     #        not incidental: this marker resolves its plugin from the FILE'S OWN PATH, so a root document
     #        cannot carry a valid one at all -- which is scenario 31.
     $PluginSkillFindingPattern = '\[skill-list-plugin\].*(links to none for:|ship no SKILL\.md there:|has no matching|sits INSIDE|belongs to no published plugin)'
-    $pluginReadme = Join-Path $Fixture 'plugins\teams\team-alpha\README.md'
+    $pluginReadme = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\README.md'
 
     # --- Scenario 25: a complete plugin-scoped span passes, and the coverage line proves it read the
     # links rather than merely finding the markers ---------------------------------------------------
     Write-Host "check 29 -- a complete <!-- skills:plugin --> span passes" -ForegroundColor Cyan
     $p25Lines = @(
-        '# team-alpha'
+        '# dkj-team-alpha'
         ''
         '<!-- skills:plugin -->'
         ''
@@ -730,7 +730,7 @@ try {
     # --- Scenario 26: a span that omits one of the plugin's skills fails, naming it ------------------
     Write-Host "check 29 -- a span omitting one of the plugin's skills fails" -ForegroundColor Cyan
     $p26Lines = @(
-        '# team-alpha'
+        '# dkj-team-alpha'
         ''
         '<!-- skills:plugin -->'
         '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | the only row |'
@@ -744,12 +744,12 @@ try {
 
     # --- Scenario 27 (the SCOPE difference, and the reason this check exists at all): the canonical set
     # is THIS plugin's, not the marketplace's. A third skill is manufactured in a SECOND plugin, so the
-    # two sets differ -- 3 marketplace-wide against 2 for team-alpha -- and both are asserted in the same
+    # two sets differ -- 3 marketplace-wide against 2 for dkj-team-alpha -- and both are asserted in the same
     # run: check 10's span sees 3, check 29's span passes with 2. Under the marketplace-wide set this
     # span would report skill-gamma missing, which is exactly what #920 measured and why a second marker
     # was needed rather than a wider check 10 ----------------------------------------------------------
     Write-Host "check 29 -- the canonical set is the DOCUMENT'S OWN plugin, not the marketplace" -ForegroundColor Cyan
-    $gammaDir = Join-Path $Fixture 'plugins\teams\team-shopify\skills\skill-gamma'
+    $gammaDir = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-shopify\skills\skill-gamma'
     New-Item -ItemType Directory -Path $gammaDir -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $gammaDir 'SKILL.md'), "---`nname: skill-gamma`n---`n`n# Gamma`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText($pluginReadme, (($p25Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -779,7 +779,7 @@ try {
     # span, because "ignores backticks" and "reads links" can each be implemented without the other -----
     Write-Host "check 29 -- prose and backticked paths in a row are not claims; the link is" -ForegroundColor Cyan
     $p28Lines = @(
-        '# team-alpha'
+        '# dkj-team-alpha'
         ''
         '<!-- skills:plugin -->'
         '| skill | when |'
@@ -800,7 +800,7 @@ try {
     # this asserts the [skill-list-plugin] half, which is the one that says WHY it matters.
     Write-Host "check 29 -- a link to a skill this plugin does not ship is reported" -ForegroundColor Cyan
     $p29Lines = @(
-        '# team-alpha'
+        '# dkj-team-alpha'
         ''
         '<!-- skills:plugin -->'
         '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | real |'
@@ -819,7 +819,7 @@ try {
     # level-3 progressive-disclosure page would be read as a claimed skill and reported as an extra ----
     Write-Host "check 29 -- a link to a level-3 SKILL.md is not a claim" -ForegroundColor Cyan
     $p30Lines = @(
-        '# team-alpha'
+        '# dkj-team-alpha'
         ''
         '<!-- skills:plugin -->'
         '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | real |'
@@ -838,12 +838,12 @@ try {
     # against, and the honest answer is to say so rather than to pass. The message points at check 10,
     # which is the marker the author almost certainly wanted ------------------------------------------
     Write-Host "check 29 -- a span outside any plugin is refused, and points at the right marker" -ForegroundColor Cyan
-    [System.IO.File]::WriteAllText($pluginReadme, "# team-alpha`n`nNo markers here.`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText($pluginReadme, "# dkj-team-alpha`n`nNo markers here.`n", $Utf8NoBom)
     $s31Lines = @(
         '# Contributing'
         ''
         '<!-- skills:plugin -->'
-        '- [`skill-alpha`](plugins/teams/team-alpha/skills/skill-alpha/SKILL.md)'
+        '- [`skill-alpha`](plugins/dkj-teams/dkj-team-alpha/skills/skill-alpha/SKILL.md)'
         '<!-- /skills:plugin -->'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s31Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -857,7 +857,7 @@ try {
     # --- Scenario 32: an unpaired BEGIN, reported with its line number -------------------------------
     Write-Host "check 29 -- an unpaired BEGIN is reported" -ForegroundColor Cyan
     $p32Lines = @(
-        '# team-alpha'                                    # line 1
+        '# dkj-team-alpha'                                    # line 1
         ''                                                # line 2
         '<!-- skills:plugin -->'                          # line 3
         '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | no closer follows |'
@@ -871,7 +871,7 @@ try {
     # --- Scenario 33: a lone orphan END, the symmetric half ------------------------------------------
     Write-Host "check 29 -- a lone orphan END is reported" -ForegroundColor Cyan
     $p33Lines = @(
-        '# team-alpha'                                    # line 1
+        '# dkj-team-alpha'                                    # line 1
         ''                                                # line 2
         '<!-- /skills:plugin -->'                         # line 3
     )
@@ -886,7 +886,7 @@ try {
     # run came out GREEN with the real BEGIN swallowed. Both halves asserted, as in 14b -----------------
     Write-Host "check 29 -- a second BEGIN inside a real span is caught, not silently swallowed" -ForegroundColor Cyan
     $p34Lines = @(
-        '# team-alpha'                                    # line 1
+        '# dkj-team-alpha'                                    # line 1
         ''                                                # line 2
         '<!-- skills:plugin -->'                          # line 3
         '| [`skill-alpha`](skills/skill-alpha/SKILL.md) | real |'
@@ -907,7 +907,7 @@ try {
     # findings is also what a check that stopped reading the file would produce.
     Write-Host "check 29 -- a fenced example is not a live marker, and the fixture ends clean" -ForegroundColor Cyan
     $p35Lines = @(
-        '# team-alpha'
+        '# dkj-team-alpha'
         ''
         'Wrap the table like this:'
         ''
@@ -939,15 +939,15 @@ try {
     # cache gives each plugin its own versioned directory, so a sibling is not a neighbour. Without 37
     # a wrong-but-plausible rule passes every other scenario here.
     $PluginLinkFindingPattern = '\[plugin-link\] \.'
-    $plNotes = Join-Path $Fixture 'plugins\teams\team-alpha\NOTES.md'
+    $plNotes = Join-Path $Fixture 'plugins\dkj-teams\dkj-team-alpha\NOTES.md'
     # Real targets, so each scenario tests CONTAINMENT and not existence. A dead target would make the
     # finding appear for the wrong reason and the scenario would keep passing after the rule was broken.
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'README.md'), "# Fixture root`n", $Utf8NoBom)
-    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\teams\team-shopify\GUIDE.md'), "# Shopify guide`n", $Utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $Fixture 'plugins\dkj-teams\dkj-team-shopify\GUIDE.md'), "# Shopify guide`n", $Utf8NoBom)
 
     Write-Host "check 30 -- a link out of the plugin root is a finding, at the right line" -ForegroundColor Cyan
     $p36Lines = @(
-        '# team-alpha notes'
+        '# dkj-team-alpha notes'
         ''
         'Line three is prose.'
         ''
@@ -957,7 +957,7 @@ try {
     $q36 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($q36.Out -match $PluginLinkFindingPattern) 'scenario 36: a link leaving the plugin root is reported'
     Assert-True ($q36.Out -match 'NOTES\.md:5 ') 'scenario 36: the finding names the line the link is on, not the file'
-    Assert-True ($q36.Out -match "leaves the 'team-alpha' plugin root") 'scenario 36: the finding names the plugin the file belongs to'
+    Assert-True ($q36.Out -match "leaves the 'dkj-team-alpha' plugin root") 'scenario 36: the finding names the plugin the file belongs to'
     # The link resolves in this tree, so check 4 has nothing to say about it. Asserted head-on: if this
     # ever fails, the two checks have started overlapping and 30's findings are no longer its own.
     Assert-True (-not ($q36.Out -match 'dead link .\.\./\.\./\.\./README\.md')) 'scenario 36: check 4 stays silent -- the link is live HERE, which is the whole premise'
@@ -967,18 +967,18 @@ try {
 
     Write-Host "check 30 -- a SIBLING plugin is not a neighbour, though it shares plugins/" -ForegroundColor Cyan
     $p37Lines = @(
-        '# team-alpha notes'
+        '# dkj-team-alpha notes'
         ''
-        'See [the shopify guide](../team-shopify/GUIDE.md) for the rest.'
+        'See [the shopify guide](../dkj-team-shopify/GUIDE.md) for the rest.'
     )
     [System.IO.File]::WriteAllText($plNotes, (($p37Lines -join "`n") + "`n"), $Utf8NoBom)
     $q37 = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True ($q37.Out -match $PluginLinkFindingPattern) 'scenario 37: a link into a sibling plugin is reported, though it never leaves plugins/'
-    Assert-True ($q37.Out -match "leaves the 'team-alpha' plugin root") 'scenario 37: the finding is attributed to the plugin the FILE sits in, not the one it points at'
+    Assert-True ($q37.Out -match "leaves the 'dkj-team-alpha' plugin root") 'scenario 37: the finding is attributed to the plugin the FILE sits in, not the one it points at'
 
     Write-Host "check 30 -- a link inside the plugin root is not a finding" -ForegroundColor Cyan
     $p38Lines = @(
-        '# team-alpha notes'
+        '# dkj-team-alpha notes'
         ''
         'See [skill alpha](skills/skill-alpha/SKILL.md) and [beta](./skills/skill-beta/SKILL.md).'
     )
@@ -991,7 +991,7 @@ try {
     # preserving its length would still suppress these three and then misreport the fourth's line. That is
     # the failure this scenario is shaped to catch -- a passing absence assert would hide it.
     $p39Lines = @(
-        '# team-alpha notes'
+        '# dkj-team-alpha notes'
         ''
         '```'
         'See [fenced](../../../README.md) -- illustration, not a link.'
@@ -1010,7 +1010,7 @@ try {
 
     Write-Host "check 30 -- three forms are passed over rather than reported" -ForegroundColor Cyan
     $p40Lines = @(
-        '# team-alpha notes'
+        '# dkj-team-alpha notes'
         ''
         'An [absolute URL](https://github.com/DaveKJohn/claude-code-specialists/blob/main/README.md) is the repair, not the defect.'
         ''
@@ -1018,7 +1018,7 @@ try {
         ''
         'A [marketplace-clone path](~/.claude/plugins/marketplaces/x/README.md) points there deliberately.'
         ''
-        'A [pure anchor](#team-alpha-notes) never leaves the file.'
+        'A [pure anchor](#dkj-team-alpha-notes) never leaves the file.'
     )
     [System.IO.File]::WriteAllText($plNotes, (($p40Lines -join "`n") + "`n"), $Utf8NoBom)
     $q40 = Invoke-Integrity -FixtureRoot $Fixture
@@ -1039,7 +1039,7 @@ try {
 
     # Now the other branch: one link, contained, so something was genuinely resolved and passed.
     $p41Lines = @(
-        '# team-alpha notes'
+        '# dkj-team-alpha notes'
         ''
         'See [skill alpha](skills/skill-alpha/SKILL.md).'
     )
@@ -1049,7 +1049,7 @@ try {
     Assert-True ($q41a.Out -match '0 escaping') 'scenario 41: and it reports zero escaping'
 
     Remove-Item -LiteralPath $plNotes -Force
-    Remove-Item -LiteralPath (Join-Path $Fixture 'plugins\teams\team-shopify\GUIDE.md') -Force
+    Remove-Item -LiteralPath (Join-Path $Fixture 'plugins\dkj-teams\dkj-team-shopify\GUIDE.md') -Force
     $q41b = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($q41b.Out -match $PluginLinkFindingPattern)) 'scenario 41: the fixture is clean again once the notes file is gone'
 

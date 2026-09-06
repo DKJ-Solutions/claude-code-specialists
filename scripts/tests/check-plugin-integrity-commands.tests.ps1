@@ -44,7 +44,7 @@ try {
         ''
         '```powershell'
         'claude plugin marketplace update claude-code-specialists'
-        'claude plugin install team-alpha@claude-code-specialists --scope project'
+        'claude plugin install dkj-team-alpha@claude-code-specialists --scope project'
         '```'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s17Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -59,7 +59,7 @@ try {
     $s18Lines = @(
         '# Contributing'
         ''
-        'Run `claude plugin install team-alpha@claude-code-specialists` from the repo root.'
+        'Run `claude plugin install dkj-team-alpha@claude-code-specialists` from the repo root.'
         ''
         'Refresh first with `claude plugin marketplace update claude-code-specialists`.'
     )
@@ -74,7 +74,7 @@ try {
     $s19Lines = @(
         '# Contributing'
         ''
-        'Run `claude plugin install team-alpha@claude-code-specialists --scope project` from the root.'
+        'Run `claude plugin install dkj-team-alpha@claude-code-specialists --scope project` from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s19Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL19 = Invoke-Integrity -FixtureRoot $Fixture
@@ -107,7 +107,7 @@ try {
     $s21Lines = @(
         '# Contributing'
         ''
-        'Removing it is a separate step: `claude plugin uninstall team-alpha@claude-code-specialists'
+        'Removing it is a separate step: `claude plugin uninstall dkj-team-alpha@claude-code-specialists'
         '--scope project`, run from the repo root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s21Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -126,7 +126,7 @@ try {
         'Write-Host "an unrelated example"'
         '```'
         ''
-        'Removing it: `claude plugin uninstall team-alpha@claude-code-specialists'
+        'Removing it: `claude plugin uninstall dkj-team-alpha@claude-code-specialists'
         '--scope project`, from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s22Lines -join "`n") + "`n"), $Utf8NoBom)
@@ -139,7 +139,7 @@ try {
     $s23Lines = @(
         '# Contributing'
         ''
-        'Afterwards run `claude plugin uninstall team-alpha@claude-code-specialists` to detach.'
+        'Afterwards run `claude plugin uninstall dkj-team-alpha@claude-code-specialists` to detach.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s23Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL23 = Invoke-Integrity -FixtureRoot $Fixture
@@ -155,7 +155,7 @@ try {
     $s24Changelog = @(
         '# Changelog'
         ''
-        'The install back then was `claude plugin install team-alpha@claude-code-specialists`, with no'
+        'The install back then was `claude plugin install dkj-team-alpha@claude-code-specialists`, with no'
         'scope flag and no refresh -- which is exactly what that release documented.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'dkj-policy\CHANGELOG.md'), (($s24Changelog -join "`n") + "`n"), $Utf8NoBom)
@@ -175,7 +175,7 @@ try {
         ''
         'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
         ''
-        'Then `claude plugin install team-alpha@claude-code-specialists --scope project ; claude plugin install team-ecomm@claude-code-specialists` for both.'
+        'Then `claude plugin install dkj-team-alpha@claude-code-specialists --scope project ; claude plugin install dkj-team-ecomm@claude-code-specialists` for both.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s25Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL25 = Invoke-Integrity -FixtureRoot $Fixture
@@ -193,7 +193,7 @@ try {
         '# Contributing'
         ''
         'Remove a record a session start left behind with'
-        '`claude plugin uninstall team-alpha@claude-code-specialists --scope local`, then re-install.'
+        '`claude plugin uninstall dkj-team-alpha@claude-code-specialists --scope local`, then re-install.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s26Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL26 = Invoke-Integrity -FixtureRoot $Fixture
@@ -209,7 +209,7 @@ try {
         ''
         'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
         ''
-        'Then run `claude plugin install team-alpha@claude-code-specialists --scope local` from the root.'
+        'Then run `claude plugin install dkj-team-alpha@claude-code-specialists --scope local` from the root.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s27Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL27 = Invoke-Integrity -FixtureRoot $Fixture
@@ -283,7 +283,7 @@ try {
         'A record in `installed_plugins.json` looks like this:'
         ''
         '```json'
-        '{ "plugins": { "team-alpha@claude-code-specialists": ['
+        '{ "plugins": { "dkj-team-alpha@claude-code-specialists": ['
         '  { "scope": "project", "version": "3.0.8", "projectPath": "C:\\repo" } ] } }'
         '```'
     )
@@ -332,7 +332,7 @@ try {
         'Remove it again:'
         ''
         '```powershell'
-        'claude plugin uninstall team-alpha@claude-code-specialists'
+        'claude plugin uninstall dkj-team-alpha@claude-code-specialists'
         '```'
     )
     [System.IO.File]::WriteAllText($s33Path, (($s33 -join "`n") + "`n"), $Utf8NoBom)
@@ -449,7 +449,7 @@ try {
     $s48Lines = @(
         '# Contributing'
         ''
-        'When the roster drifts, type `/team-alpha:skill-beta` to stage the catch-up -- that command is'
+        'When the roster drifts, type `/dkj-team-alpha:skill-beta` to stage the catch-up -- that command is'
         'reserved for explicit user invocation, so a session hands it to you rather than running it.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s48Lines -join "`n") + "`n"), $Utf8NoBom)

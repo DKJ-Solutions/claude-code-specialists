@@ -120,7 +120,7 @@ function Read-PluginDetailsOutput {
     foreach ($line in @($Lines)) {
         if ($null -eq $line) { continue }
 
-        # The header line ends in the version: '... (team-alpha) 4.17.0'. First match only, so a
+        # The header line ends in the version: '... (dkj-team-alpha) 4.17.0'. First match only, so a
         # version-looking string further down cannot overwrite it.
         if ($null -eq $version -and $line -match '\s(\d+\.\d+\.\d+)\s*$') { $version = $Matches[1] }
 

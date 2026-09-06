@@ -732,7 +732,7 @@ function Get-EnabledPlugins {
     # bootstrap walks its plugins in.
     #
     # THE PAIR THAT MEASUREMENT WAS TAKEN ON NO LONGER DEMONSTRATES IT. Those two plugins were renamed to
-    # 'team-alpha' and 'team-lifehub' on August 9, 2026, and for that pair the two collations agree --
+    # 'dkj-team-alpha' and 'dkj-team-lifehub' on August 9, 2026, and for that pair the two collations agree --
     # so anyone re-checking the claim against today's plugin names will find no difference and conclude
     # this sort is pointless. It is not: the divergence needs a name that is a prefix of another with
     # punctuation between, which the next plugin added here may well be. The property is asserted on a
