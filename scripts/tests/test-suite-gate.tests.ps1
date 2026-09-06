@@ -52,6 +52,32 @@ function Assert-True {
     else { $script:fail++; Write-Host "  [FAIL] $Label" -ForegroundColor Red }
 }
 
+function Test-Says {
+    <# Does captured child output contain this phrase, whatever the console did to it?
+
+       Strips ALL whitespace from both sides. Normalizing '\s+' to a single space -- which this file
+       does to the captured text -- repairs a wrap BETWEEN words and does nothing for a wrap INSIDE
+       one, and the child's formatter breaks at whatever character sits at the buffer column. Which
+       asserts straddle a break is decided by the width, so a green run is not evidence (issue #1512;
+       the worked measurement is in verify-resolved-issues.tests.ps1).
+
+       Literal (IndexOf), so a phrase carrying '(', ')', '.', '[' or ']' needs no escaping;
+       OrdinalIgnoreCase keeps the case-insensitivity that -match had at these call sites. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Label)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Label" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Label`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
+    }
+}
+
 $Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) "test-suite-gate-test-$PID"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
@@ -82,12 +108,17 @@ function Invoke-Gate {
     return [pscustomobject]@{
         Lines   = $lines
         Text    = $text
-        # ASSERT PROSE AGAINST .Flat, NOT .Text. Write-Host writes its string through untouched, but
-        # Write-Warning goes through the formatter, which HARD-WRAPS at the console width of a redirected
-        # child -- and a fixture path is long enough that the break lands mid-sentence. The first version
-        # of the missing-dir assert failed for exactly that, on a gate that was behaving correctly.
-        # Collapsing every run of whitespace to one space makes a wrapped line and an unwrapped one read
-        # the same.
+        # Write-Host writes its string through untouched, but Write-Warning goes through the formatter,
+        # which HARD-WRAPS at the console width of a redirected child -- and a fixture path is long
+        # enough that the break lands mid-sentence. The first version of the missing-dir assert failed
+        # for exactly that, on a gate that was behaving correctly.
+        #
+        # .Flat IS FOR READING, NOT FOR MATCHING, and this comment used to claim otherwise ("makes a
+        # wrapped line and an unwrapped one read the same"). Collapsing every run of whitespace to one
+        # space makes that true of a break BETWEEN words and false of a break INSIDE one, which the
+        # formatter produces just as readily -- it breaks at whatever sits at the column. Prose asserts
+        # therefore go through Assert-Says, which strips ALL whitespace from both sides (#1512); .Flat
+        # stays so a FAILING assert prints one readable line.
         Flat    = ($text -replace '\s+', ' ')
         Seconds = $sw.Elapsed.TotalSeconds
     }
@@ -178,13 +209,13 @@ Write-Host "GATE-RESULT: `$r"
     $missing = Join-Path $Fixture 'no-such-dir'
     $r = Invoke-Gate -TestsDir $missing
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'a missing tests dir returns true'
-    Assert-True ($r.Flat -match 'test gate skipped') 'and says so instead of passing in silence'
+    Assert-Says $r.Flat 'test gate skipped' 'and says so instead of passing in silence'
 
     $empty = Join-Path $Fixture 'empty-suites'
     New-Item -ItemType Directory -Path $empty -Force | Out-Null
     $r = Invoke-Gate -TestsDir $empty
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'a dir with no suites returns true'
-    Assert-True ($r.Flat -match 'had nothing to run') 'and says that too'
+    Assert-Says $r.Flat 'had nothing to run' 'and says that too'
 
     # --- 2. All-pass: the count, the filter, the blocks, the summary --------------------------------
     Write-Host "an all-passing run -- attribution comes from the header, not the position" -ForegroundColor Cyan
@@ -290,7 +321,7 @@ Write-Host "GATE-RESULT: `$r"
     Get-ChildItem -Path $stamps -Filter '*.txt' -File | Remove-Item -Force
     $ser = Invoke-Gate -TestsDir $slow -MaxParallel 1
     Assert-True ($ser.Text -match 'GATE-RESULT: True') '-MaxParallel 1 still passes them'
-    Assert-True ($ser.Flat -match 'one at a time') 'and says which mode it is in'
+    Assert-Says $ser.Flat 'one at a time' 'and says which mode it is in'
     # -MaxParallel 1 is the one deterministic lane count, so it is the one the summary can be asserted on
     # exactly: singular 'lane', not 'lanes' (issue #1318).
     Assert-True ($ser.Text -match 'test gate: all 6 suites passed in \d+s \(1 lane\)\.') 'the summary says one lane, singular, when the valve is closed'
@@ -325,8 +356,8 @@ Write-Host "GATE-RESULT: `$r"
         }
     })
     Assert-Equal 6 $rows.Count 'the table carries one row per suite'
-    Assert-True ($ser.Flat -match 'per-suite durations, slowest first') 'and says what it is and how it is ordered'
-    Assert-True ($ser.Flat -match 'recorded, not reconstructed') 'and that it is recorded rather than derived from timestamps'
+    Assert-Says $ser.Flat 'per-suite durations, slowest first' 'and says what it is and how it is ordered'
+    Assert-Says $ser.Flat 'recorded, not reconstructed' 'and that it is recorded rather than derived from timestamps'
 
     $maxOffset = ($rows | Measure-Object -Property Offset -Maximum).Maximum
     Assert-True ($maxOffset -ge 5) "serially the last lane really opened late (largest offset +$([math]::Round($maxOffset,1))s)"
@@ -359,7 +390,7 @@ Write-Host "GATE-RESULT: `$r"
     # Exactly one, because it is the claim '#714 proved: only the last-finishing suite's cost moves the
     # pool's total. Two markers would mean the comparison is against the wrong end.
     Assert-Equal 1 (@($rows | Where-Object { $_.Makespan }).Count) 'exactly one row is marked as having set the makespan'
-    Assert-True ($ser.Flat -match 'a late start is lane wait, not runtime') 'the header warns the reader what the offset is, since that is the trap'
+    Assert-Says $ser.Flat 'a late start is lane wait, not runtime' 'the header warns the reader what the offset is, since that is the trap'
 
     # --- 5. The working directory the child is handed ----------------------------------------------
     Write-Host "-WorkingDirectory -- the child inherits PowerShell's location, not the process's" -ForegroundColor Cyan
@@ -388,7 +419,7 @@ Write-Host "GATE-RESULT: `$r"
     [System.IO.File]::WriteAllText($cmdOk, "Write-Host 'CMD-MARKER-OK'`r`n", $Utf8NoBom)
     $r = Invoke-Gate -TestsDir $ok -CommandsFile $cmdOk
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'three suites plus a passing command: the gate returns true'
-    Assert-True ($r.Flat -match 'running 1 repo test command') 'and it announces the command half separately'
+    Assert-Says $r.Flat 'running 1 repo test command' 'and it announces the command half separately'
     Assert-True ($r.Text -match 'CMD-MARKER-OK') 'the command''s own output is printed'
     Assert-True ($r.Text -match 'test gate: all 4 suites passed in \d+s \(\d+ lanes?\)\.') 'the summary counts the command with the suites and still names the lane count (issue #1318)'
 
@@ -436,8 +467,8 @@ Write-Host "GATE-RESULT: `$r"
 
     $r = Invoke-Gate -TestsDir $ok -ResidentCount 25
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'a high resident count: still just a warning -- the gate still passes'
-    Assert-True ($r.Flat -match '25 powershell processes already resident') 'and names the count'
-    Assert-True ($r.Flat -match '-MaxParallel') 'and suggests the same knob the report asked for'
+    Assert-Says $r.Flat '25 powershell processes already resident' 'and names the count'
+    Assert-Says $r.Flat '-MaxParallel' 'and suggests the same knob the report asked for'
 
     # The real (unshadowed) path: whatever this machine's own Get-Process says, it must not be able to
     # fail the gate. -ResidentCount is omitted entirely here (Invoke-Gate's -1 default), so the driver
