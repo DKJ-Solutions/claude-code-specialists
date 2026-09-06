@@ -84,7 +84,14 @@ not closed.
       [#1523](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1523) (the register stale
       in its plugin **ids**) and are deliberately left to it: this branch makes them visible, which is
       the whole point, and does not touch them.
-- [x] Lint gate + all suites green before the PR.
+- [x] Lint gate green before the PR (`check-plugin-integrity.ps1`, 0 errors).
+- [~] Test gate green before the PR -- dropped, and the reason is filed as
+      [#1530](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1530): 71 of 72 suites
+      pass, and the 72nd (`verify-pushed-merges.tests.ps1`) is **byte-identical to `origin/main`** on
+      this branch and fails one assert on this machine while CI on `main` was green 25 minutes
+      earlier. `open-pr` has no per-suite valve, so the push runs under `-SkipTests` and CI remains the
+      authority on the full set. `connectors.tests.ps1` -- the suite this branch actually changes --
+      was run on its own: 178 pass, 0 fail.
 
 ### DEPLOY: fix/1524-connector-localcheckout
 
