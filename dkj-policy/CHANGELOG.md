@@ -32,6 +32,42 @@ a release with nobody to announce it to.
 
 ## [Unreleased]
 
+### DEPLOY: feat/1491-shared-scripts-table-drift · 20260906-093244
+
+`plugins/dkj-policy/scripts/README.md`'s table is now held against `Get-SharedScriptPairs` by check 32
+(`[shared-script-list]`) in `check-plugin-integrity.ps1`, so the drift that hit it three times -- three
+rows in August 2026, then the header and the destination split, then 21 rows in #1486 -- fails the gate on
+the PR that causes it instead of being found months later. The check reads an opt-in
+`shared-scripts:mirror` span, takes each row's first cell as its claim, scopes to the mirrors
+landing in the marked document's own folder, and reports both a registered script with no row and a row
+the registry no longer mirrors. It is not check 8: that one proves each mirror's *content* matches its
+source, and nothing before this asked whether the page naming them was complete. Opt-in for the measured
+reason its two siblings are -- the root `scripts/README.md` is a deliberate subset of the same registry,
+so a blanket rule would be born needing an allow-list. The same movement extracted the span walk checks 10
+and 29 had been carrying as two copies into one `Invoke-MarkedSpanWalk`, since a third copy of a walk that
+had already drifted once was the wrong thing to paste.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing to run and nothing to change: the gate runs where this plugin is maintained, not where it is
+installed. What a consumer gets is the page itself -- `dkj-policy/scripts/README.md`, the one place that
+says which shared scripts the mirror carries -- with a guarantee behind it that it lists all of them,
+where until now it was three times measurably short.
+
+**Score:** 2
+
+#### Pull Request
+
+A lint check holds plugins/dkj-policy/scripts/README.md against Get-SharedScriptPairs
+
+Plugins: dkj-policy
+
+[PR #1495](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1495)
+
+---
+
 ### DEPLOY: fix/1493-fold-on-merge-queue · 20260906-015631
 
 Adds `.github/workflows/fold-on-merge.yml`: after every push to `main`, it checks for a changelog
