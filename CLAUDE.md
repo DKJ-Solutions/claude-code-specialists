@@ -290,14 +290,23 @@ The constitution above, concretely implemented here:
   the measurements behind them are in
   [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
   sits at the point where it fires rather than in a list of its own.
-- **And one guard fires *after* the merge, on the trunk.** The fold runs from `ship-pr.ps1` only, so a
-  PR merged from the GitHub UI never folds it and the entry stays trapped in the development document on
+- **And one guard fires *after* the merge, on the trunk.** The fold runs from `ship-pr.ps1`, as the
+  shipping session's own step once its own merge call returns — so a merge that session never observes
+  never folds: a PR merged from the GitHub UI, or, since the merge queue went live on `main-ci-gate`
+  ([#1492](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1492)), one merged by the
+  queue. The entry then stays trapped in the development document on
   `main`, with nothing saying so ([#1270](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1270),
   the residual [#1244](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1244) left). Since
   September 3, 2026 `check-unfolded-entry.ps1` reports a per-branch `dkj-policy/<branch>.md` sitting
   on the trunk whose branch is not the one checked out — from a CI workflow on every `push` to `main`
   (merger-independent, **advisory**, not in `main-ci-gate`) and from a SessionStart hook in every
-  consumer. It is Sylvester's; the reasoning is in
+  consumer. **And since September 6, 2026 a second runner acts on what that detector reports**:
+  [`fold-on-merge.yml`](.github/workflows/fold-on-merge.yml) runs it on every `push` to `main` and, only
+  on a find, folds ([#1493](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1493)) — so
+  the fold no longer depends on the shipping session being alive. It is code-complete and **inert while
+  `main-ci-gate` does not bypass the GitHub Actions app**: its fold succeeds and its *push* is rejected,
+  which reads as a failing job rather than as a refused fold. Both are Sylvester's; the reasoning, and
+  how to tell those two red runs apart, are in
   [his lens](.claude/specialists/lenses/05-15-extension.md#what-sylvester-owns-here).
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
