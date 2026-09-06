@@ -38,7 +38,12 @@
 # owner instead -- that identity already bypasses the ruleset today, with no ruleset change needed.
 # The token is scoped to this repository only and to `Contents: Read and write` only, and it expires
 # within the org's enforced 366-day maximum, so it needs rotating before then or this job starts
-# failing its push again with no code-level cause.
+# failing its push again with no code-level cause. THIS IS A STANDING CREDENTIAL, NOT A FIX-FOR-FIX
+# SWAP: the default GITHUB_TOKEN it replaces is job-scoped and expires in about an hour, unusable
+# outside this one run; FOLD_PUSH_TOKEN is usable from anywhere for up to a year, and because
+# actions/checkout's default `persist-credentials: true` writes it into the workspace's git config,
+# every step of this job holds it, not only the push step. Sebastian's review of #1493's PR flagged
+# this asymmetry as worth stating rather than leaving implicit in the rotation note alone.
 #
 # WHAT THAT REJECTION ACTUALLY LOOKS LIKE, because a red run here has two entirely different causes and
 # only the log tells them apart (issue #1499). Measured verbatim in run 34020828593, the push carrying
@@ -86,9 +91,12 @@ jobs:
     runs-on: windows-latest
     steps:
       # token here, not the default GITHUB_TOKEN: this is what makes the fold step's later `git push`
-      # authenticate as the org-admin identity behind FOLD_PUSH_TOKEN rather than as the GitHub Actions
+      # authenticate as the org-owner identity behind FOLD_PUSH_TOKEN rather than as the GitHub Actions
       # app -- see the header comment above for why the app itself cannot be a ruleset bypass actor.
-      - uses: actions/checkout@v5
+      # Pinned to a commit SHA, matching claude.yml and claude-code-review.yml's own convention for a
+      # checkout step that handles a real credential -- a mutable tag on this line could otherwise
+      # retag its way into exfiltrating a 366-day standing write token instead of an hour-lived one.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           token: ${{ secrets.FOLD_PUSH_TOKEN }}
 

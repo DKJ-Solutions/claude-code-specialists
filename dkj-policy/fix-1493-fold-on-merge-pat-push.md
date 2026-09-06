@@ -55,6 +55,22 @@ account instead, sidestepping the ruleset-bypass dead end entirely -- no ruleset
 - [x] Update the workflow's own header comment: it previously said the job was inert pending a
       repo-settings ruleset change; it now explains the PAT-based bypass and that the token needs
       rotating within the org's enforced 366-day maximum.
+- [x] Sebastian's security review (parallel, before merge) came back with no blocking findings and two
+      concrete advisory fixes, both applied: pin `actions/checkout` to a commit SHA (matching
+      `claude.yml`/`claude-code-review.yml`'s own convention for a checkout step handling a real
+      credential -- an unpinned tag on this line could now retag its way into a 366-day standing write
+      token instead of an hour-lived one), and state the blast-radius asymmetry between the ephemeral
+      GITHUB_TOKEN this replaces and the standing FOLD_PUSH_TOKEN explicitly in the header comment
+      rather than leaving it implicit in the rotation note alone. His third point (writing down PAT
+      succession -- what happens if the token owner becomes unreachable before the 366-day expiry) is
+      left as a follow-up for Dave/Tessa: it's a process note for `dkj-policy/CONTRIBUTING.md`, not
+      this workflow, and out of this branch's scope.
+- [x] Victor's code review (parallel, before merge) came back with no blocking findings -- confirmed
+      the checkout-token-to-git-push mechanism against the actual push script and this job's own prior
+      run history rather than assuming it. Two non-blocking notes: "org admin" vs. "org owner" wording
+      was inconsistent (fixed above, now "org owner" throughout, GitHub's actual role name); and there's
+      no automated test for "which token authenticates the push" since that needs a live ruleset -- the
+      real proof is the next genuine merge-queue-triggered run of this workflow after this merges.
 
 ### TEST
 
@@ -67,7 +83,7 @@ account instead, sidestepping the ruleset-bypass dead end entirely -- no ruleset
 ### DEPLOY: fix/1493-fold-on-merge-pat-push
 
 `fold-on-merge.yml` now pushes its fold commit authenticated as a fine-grained personal access token
-(`FOLD_PUSH_TOKEN`) belonging to an org admin, instead of the default `GITHUB_TOKEN`. `main-ci-gate`
+(`FOLD_PUSH_TOKEN`) belonging to an org owner, instead of the default `GITHUB_TOKEN`. `main-ci-gate`
 already bypasses `OrganizationAdmin`, so this identity clears the ruleset with no repo-settings change --
 the originally planned route (adding the GitHub Actions app as a bypass actor) turned out to be
 impossible, since that app is owned and administered by `anthropics`, not this org. Closes out the
