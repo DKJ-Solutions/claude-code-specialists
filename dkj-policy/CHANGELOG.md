@@ -40,7 +40,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 entries pending** -- 1 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 5 reach it. <!-- pending-tally -->
+**6 entries pending** -- 2 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 6 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1524-connector-localcheckout · 20260906-200252
+
+A connector manifest's `localCheckout` may now name several candidate relative paths, and both BWJ
+manifests record the two layouts that were actually measured. The check takes the first candidate
+present on the machine running it and, where none resolves, names all of them in the `[SKIP]`.
+
+This closes a defect whose cost was invisible by construction. A checkout path that does not resolve is
+not reported as wrong -- it is reported as `[SKIP] checkout ... not present on this machine`, which
+asserts an absence, exits 0, and suppresses everything that connector would have said. On the machine
+[#1524](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1524) was measured from, one
+such skip covered four `[INFO]` lines and a drift check reading 26 missing agent-defs. The list exists
+rather than one corrected string because the two machines holding those checkouts place them
+differently, so any single value is false on one of them -- which would have moved the false skip
+instead of removing it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the connector register is this repo's own bookkeeping about its consumers. It changes nothing a
+subscriber of a service could notice.
+
+**Score:** N/A
+
+#### Pull Request
+
+connectors: localCheckout accepts per-machine candidate paths, and both BWJ manifests record the real ones
+
+[PR #1531](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1531)
+
+---
 
 ### DEPLOY: docs/1517-unreleased-label-not-a-seam · 20260906-194830
 
