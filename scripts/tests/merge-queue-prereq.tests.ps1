@@ -1,7 +1,9 @@
 <#
 .SYNOPSIS
     Regression tests for the merge queue on 'main': the two prerequisites that had to be true before it
-    could be switched on (issue #1325), and the enqueue path ship-pr takes now that it is (issue #1506).
+    could be switched on (issue #1325), the enqueue path ship-pr takes now that it is (issue #1506), and
+    the half of that arrangement a CONSUMER receives once the queue became a policy rather than a
+    setting on one trunk (issue #1516).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Reads the workflow and the script as text and
@@ -30,6 +32,14 @@
     fold-on-merge.yml folds off the queue's own push to the trunk (#1493). The fourth section is that
     workflow's push credential, which belongs here because a fold that commits and cannot push is the
     same merged-but-unfolded state the guards exist to prevent, reached by a third route.
+
+    AND THE FIFTH IS WHAT TRAVELS. #1516 made the queue this workflow's policy for every repo running
+    it, and a queue reaches a consumer as a policy rather than as a release: the setting is theirs to
+    flip, the two runners are not plugin payload, and a plugin install writes nothing into a repo. So
+    exactly three things about a consumer are this repo's to guarantee, and that section is those three
+    -- ship-pr not promising a fold runner it cannot see, and both scripts a consumer's own runners call
+    being registered mirrors rather than files only this tree has. The adoption command itself is
+    covered by adopt-merge-queue.tests.ps1.
 
     BOTH FAIL SILENTLY AND BOTH FAIL BADLY, which is why they are pinned rather than commented:
 
@@ -229,6 +239,42 @@ if (Test-Path -LiteralPath $foldWf) {
     Assert-True ($fom -match '(?i)cannot be added to it|cannot be a ruleset bypass actor') `
         'the header says the Actions app cannot be a bypass actor, so nobody retries that route'
 }
+
+Write-Host "== the policy travels: what a CONSUMER under a queue needs (#1516) ==" -ForegroundColor Cyan
+
+# WHY THIS SECTION IS HERE AND NOT ONLY IN adopt-merge-queue.tests.ps1. That suite proves the adoption
+# command works; these three asserts are about the half a consumer gets whether they run it or not, and
+# each closes a route by which the queue policy silently does not travel. The queue is a repo setting
+# per repo, so it reaches a consumer as a POLICY rather than as a release -- which means the only things
+# this repo can actually guarantee are the ones below.
+
+# 1. THE ENQUEUE ARM MUST NOT PROMISE A RUNNER THAT IS NOT THERE. In the source repo fold-on-merge.yml
+#    exists, so a flat sentence naming it is true; in a consumer it is not plugin payload -- a plugin
+#    install writes nothing into a repo -- and the sentence is then a lie told at the exact moment the
+#    entry is being stranded. Matched on the FILE TEST rather than on the wording, so rephrasing the
+#    message keeps this green and deleting the condition does not.
+$idxMergeCall = $ship.IndexOf("'pr', 'merge'")
+$tail = if ($idxMergeCall -gt 0) { $ship.Substring($idxMergeCall) } else { $ship }
+Assert-True ($tail -match "Test-Path -LiteralPath \`$foldRunner") `
+    'the enqueue arm TESTS for .github/workflows/fold-on-merge.yml before promising it folds anything'
+Assert-True ($tail -match 'NOTHING HERE FOLDS THAT ENTRY') `
+    'and where there is none it says so, instead of naming a workflow this repo does not have'
+Assert-True ($tail -match 'fold-changelog-entry\.ps1 -Branch \$branch -Commit -Push') `
+    'and hands over the command that repairs it by hand, since nothing else will'
+
+# 2. THE ADOPTION COMMAND IS SHARED, or it exists only for the repo that does not need it. Read from
+#    the registry rather than from the filesystem: the mirror is BUILT from that registration, so a
+#    file present in plugins/ with no row behind it is one build away from disappearing.
+. (Join-Path $repoRoot 'scripts\lib\shared-scripts-lib.ps1')
+$pairNames = @((Get-SharedScriptPairs -RepoRoot $repoRoot) | ForEach-Object { $_.Name })
+Assert-True ($pairNames -contains 'adopt-merge-queue') `
+    'adopt-merge-queue is a registered shared pair -- a floor only the source can build is not a policy'
+
+# 3. AND SO IS WHAT THE PLACED RUNNER CALLS. verify-resolved.yml runs verify-pushed-merges.ps1 out of
+#    the plugin tree; unregistered, that scaffolded workflow points at a path no consumer has, and it
+#    fails on a push to the trunk after a merge has already landed -- the quietest place to fail.
+Assert-True ($pairNames -contains 'verify-pushed-merges') `
+    'verify-pushed-merges is registered too, so the resolves runner a consumer places can reach it'
 
 Write-Host "== the plugin mirror carries the same script ==" -ForegroundColor Cyan
 

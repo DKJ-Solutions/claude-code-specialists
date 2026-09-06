@@ -1505,7 +1505,32 @@ if ($queueActive) {
     Write-Host ""
     Write-Host "Done: PR #$pr shipped -- opened, CI green, handed to the merge queue on 'main'." -ForegroundColor Green
     Write-Host "  The queue merges it against its real base and pushes that merge to 'main'." -ForegroundColor DarkGray
-    Write-Host "  fold-on-merge.yml folds the entry off that push (#1493) -- not this session (#1506)." -ForegroundColor DarkGray
+
+    # THE PROMISE IS CHECKED BEFORE IT IS MADE (issue #1516). This line used to name fold-on-merge.yml
+    # flatly, and in the source repo that is true. It is not true in a consumer: that workflow is not
+    # plugin payload -- a plugin install writes nothing into a repo -- so a consumer running this script
+    # under a queue reads "the entry will be folded" at the exact moment nothing is going to fold it. The
+    # entry then sits on their trunk until check-unfolded-entry.ps1 reports it after the fact, with the
+    # one line that could have said so having said the opposite.
+    #
+    # A FILE TEST, NOT A WORKFLOW-RUN QUERY, deliberately. The question is whether this repo has put
+    # SOMETHING in the fold's place, and the tree answers that for free; asking the API which workflows
+    # exist would cost a call per ship to be marginally more literal about a file the repo owns. A repo
+    # that folds by some other route renames nothing and simply sees the second arm, which names the
+    # command rather than refusing -- the enqueue itself is not in doubt either way.
+    $foldRunner = Join-Path $repoRoot '.github\workflows\fold-on-merge.yml'
+    if (Test-Path -LiteralPath $foldRunner -PathType Leaf) {
+        Write-Host "  fold-on-merge.yml folds the entry off that push (#1493) -- not this session (#1506)." -ForegroundColor DarkGray
+    } else {
+        Write-Host "  NOTHING HERE FOLDS THAT ENTRY. This repo has no .github/workflows/fold-on-merge.yml," -ForegroundColor Yellow
+        Write-Host "  and under a queue the fold is not this session's to make (#1506): the merge lands in a" -ForegroundColor Yellow
+        Write-Host "  process this run never observes. The branch document will sit on 'main' unfolded, so the" -ForegroundColor Yellow
+        Write-Host '  changelog never receives the entry and a release cut in that window misses the change.' -ForegroundColor Yellow
+        Write-Host '  Fold it by hand once the merge has landed:' -ForegroundColor Yellow
+        Write-Host "    fold-changelog-entry.ps1 -Branch $branch -Commit -Push" -ForegroundColor Yellow
+        Write-Host '  And put the runner in place so the next ship does not need this -- run the adopt-dkj-policy' -ForegroundColor Yellow
+        Write-Host '  skill (Part 3, adopt-merge-queue.ps1), which places it and the rest of the queue floor.' -ForegroundColor Yellow
+    }
     Write-Host "  Watch it land:  gh pr view $pr --repo $repo" -ForegroundColor DarkGray
     # STEP 6 HAS NO HOME IN THIS SCRIPT ONCE THE MERGE IS THE QUEUE'S, so it is named rather than
     # silently dropped. GitHub honours the body's closing keywords on the queue's merge exactly as on

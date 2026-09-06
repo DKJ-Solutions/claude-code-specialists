@@ -331,6 +331,39 @@ a governance decision rather than a configuration value. Write it in your own `C
 `CLAUDE.md` and link it from there; a contributor who has to guess will guess from whichever repo they last
 worked in.
 
+#### Behind a merge queue the motion is shorter, and the difference is not cosmetic
+
+**A GitHub merge queue is this workflow's policy for every repo that runs it**, and it changes what step 5
+*is*. Under a queue `gh pr merge` does not merge: gh's own help says the pull request "will be added to the
+merge queue" — added, exit 0, not merged. So `ship-pr` reads the trunk's rules before it merges and, where
+it finds a queue, **enqueues, ends successfully, and folds nothing**. The queue merges the PR against the
+projected merge (the trunk's tip plus whatever is queued ahead of it) minutes later, in a process your
+session never observes. That is the point of it: staleness is gone by construction, and it is the only
+remedy for that race that converges.
+
+**What it takes away has to be put back before the setting is switched on, or it fails silently.** Three
+things, and none of them arrive with the plugin, because none of them is plugin payload:
+
+1. **The fold.** It ran as `ship-pr`'s own next step after its own merge call returned. There is no such
+   moment any more, so the branch document sits on the trunk unfolded, your changelog never receives the
+   entry, and a release cut in that window misses the change. It moves to a workflow triggered by the push
+   the queue's merge produces — and that workflow needs a push credential of its own, because a
+   `merge_queue` rule blocks the default token's push to the trunk.
+2. **The resolves verification** (step 6). The issues still close — GitHub honours a body's closing keywords
+   on a queue merge exactly as on any other — but nothing checks that they did, and nothing repairs the case
+   the check exists for: a body that carried a plain mention instead of a keyword. It moves to a workflow
+   triggered by the same push.
+3. **A `merge_group` trigger on every workflow carrying a *required* check.** Without it that check never
+   runs for a queue entry, never reports, and **every merge fails** — a total merge outage, not a
+   degradation, and invisible until the first merge after the switch.
+
+**`adopt-merge-queue` is that floor**, and it is Part 3 of the [`adopt-dkj-policy`
+skill](skills/adopt-dkj-policy/SKILL.md): it reports where your repo stands against all three, places the
+two runners, and prints the ruleset command **without running it**. Switching the queue on is a
+repo-settings change and therefore the owner's, never a script's — so do the floor first and the setting
+last. `ship-pr` tells you where you stand from the other side: under a queue with no fold runner in your
+tree, its closing lines say so instead of promising a fold that is not coming.
+
 ### 6. Fold
 
 [`skills/fold-changelog/SKILL.md`](skills/fold-changelog/SKILL.md) · `fold-changelog-entry.ps1`

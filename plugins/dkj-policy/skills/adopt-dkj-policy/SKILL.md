@@ -1,18 +1,19 @@
 ---
 name: adopt-dkj-policy
-description: Adopt the dkj-policy workflow in a consuming repo, in two independent parts that can run in either order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, and the branch-entry CI gate; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Both parts are strictly additive and dry-run by default; neither overwrites anything.
+description: Adopt the dkj-policy workflow in a consuming repo, in three independent parts that can run in any order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, and the branch-entry CI gate; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Part 3 builds the merge-queue floor -- it reports whether this repo would survive a GitHub merge queue on its trunk, places the two CI runners a queue takes away from the shipping session (the fold and the resolves verification), and prints the ruleset command without running it; use it before switching a merge queue on, or when ship-pr says a queue is active here and nothing is folding. All three parts are strictly additive and dry-run by default; none overwrites anything.
 ---
 
-# adopt-dkj-policy -- scaffold the folder and place the config seams
+# adopt-dkj-policy -- scaffold the folder, place the config seams, build the queue floor
 
 An install writes nothing into your repo: it clones the plugin into your cache, and that is all. This
-command is the two things that actually place `dkj-policy` on your side, and they are independent of
-each other -- run either one first, or run only the one you need:
+command is the three things that actually place `dkj-policy` on your side, and they are independent of
+each other -- run them in any order, or run only the one you need:
 
 - **Part 1** creates the workflow's own root folder and its CI gate.
 - **Part 2** places or proposes the answers to the repo-owned config seam the shared scripts read.
+- **Part 3** builds the floor a GitHub merge queue needs, and tells you whether you are standing on it.
 
-Neither part depends on the other having run. Both are dry-run by default and never overwrite a file
+No part depends on another having run. All three are dry-run by default and never overwrite a file
 that already exists.
 
 ## Part 1 -- scaffold the workflow folder
@@ -281,3 +282,92 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/sync/check-script-con
 **In the source repo, run its own copy instead -- `scripts/sync/check-script-contract.ps1`.** That one is
 a gate there rather than a one-off, and reading the seam through a lagging mirror is exactly the reading
 it exists to prevent.
+
+---
+
+## Part 3 -- the merge-queue floor
+
+**A GitHub merge queue is this workflow's policy for every repo that runs it** (issue #1516), and it is
+the only remedy for the staleness race that converges: a queue tests each PR against the *projected*
+merge -- the trunk's tip plus whatever is queued ahead of it -- rather than against the base the branch
+was cut from. Everything short of that was measured and rejected in the source repo:
+`strict_required_status_checks_policy`, `allow_auto_merge` and `allow_update_branch` were all switched on
+and reverted the same day, because **GitHub performs no server-side base-sync of a PR branch outside a
+queue.**
+
+**But the setting is the last step, not the first.** A queue takes three things away, and every one of
+them fails silently:
+
+| what the queue takes | what happens if nothing replaces it | who replaces it |
+|---|---|---|
+| **the merge** -- `gh pr merge` now *enqueues* and exits 0 | -- | `ship-pr` already handles this; it travels with the plugin |
+| **the fold** -- it ran as `ship-pr`'s step right after its own merge returned | the branch document sits on your trunk unfolded; the changelog never gets the entry; a release cut in that window misses the change | `.github/workflows/fold-on-merge.yml`, **placed by this command** |
+| **the resolves verification** -- `ship-pr`'s step 6 | the issues still close (GitHub honours the keywords), but nothing verifies it and nothing repairs a body that carried a plain mention | `.github/workflows/verify-resolved.yml`, **placed by this command** |
+
+And one prerequisite has to be true **before** the switch is flipped at all: every workflow carrying a
+**required** check must trigger on `merge_group`. Without it that check never runs for a queue entry,
+never reports, and **every merge fails** -- a total merge outage, not a degradation, invisible until the
+first merge afterwards. This command reports it and cannot place it: the workflow carrying your required
+check is yours, and adding a trigger to it is an edit to your file rather than an addition beside it.
+
+### Run it
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/adopt-merge-queue.ps1"
+```
+
+A **dry run**: it reads your trunk's rules, reads your workflow files, prints where you stand, and writes
+nothing. Add `-Apply` when the list looks right.
+
+**In the source repo there is nothing to run.** It arranges its own runners by hand -- they are the
+originals these are derived from, they call its in-repo scripts rather than a checked-out mirror, and its
+fold runner carries a push-credential decision no scaffold should make for somebody else. The command
+refuses there, the same way Part 1's does and for the same reason.
+
+### Parameters
+
+| parameter | what it does |
+|---|---|
+| `-Apply` | write the two runners this repo does not have. Without it the command is a dry run that prints the plan and touches nothing -- the same default Parts 1 and 2 use. |
+
+### What it will not do, and why
+
+**It never switches the queue on.** It composes the change and stops. A ruleset changes what every
+contributor's merge does, immediately, for everybody -- that is the repo owner's act, not a script's, and
+reading a ruleset needs only a token that can read while writing one needs a token that can administer
+the repo. A command that quietly held the second would be a different kind of tool.
+
+### The secret you have to create yourself
+
+**`FOLD_PUSH_TOKEN`, and the fold runner does not work without it.** A `merge_queue` rule blocks every
+direct push to the trunk unless the pushing actor is a listed bypass actor, and the default
+`GITHUB_TOKEN` pushes as the GitHub Actions app -- which **cannot** be added to that list: an Integration
+bypass actor has to be an app installed on the org, and that one is not administered by yours (measured
+in the source repo, September 6, 2026: `422 -- Actor GitHub Actions integration must be part of the
+ruleset source or owner organization`).
+
+So the fold job checks out with a fine-grained personal access token belonging to somebody who **already**
+bypasses the ruleset, scoped to that repository only and to `Contents: Read and write` only, stored as the
+repository secret `FOLD_PUSH_TOKEN`. Two things follow that are worth knowing before you create it:
+
+- it is a **standing** credential -- usable from anywhere until it expires, unlike the hour-lived
+  job-scoped token it replaces -- and `actions/checkout` writes it into the workspace git config, so
+  **every step of that job holds it**. That is why the resolves check is a separate workflow rather than
+  a step in the same job: it needs `issues: write`, and the two never meet;
+- it **expires**, and when it does the job starts failing its push with no code-level cause. Rotate it
+  before then.
+
+Without the secret the fold commits and its push is rejected -- which is the same merged-but-unfolded
+state, reached one step later. A red run of that job therefore has two entirely different causes, and only
+the log tells them apart: **read the fold step's own last lines before concluding anything.**
+
+### Exit code
+
+`0` while the queue is off and the floor is merely unbuilt -- that is a to-do, not a defect, and your
+merges are fine today. `1` when a queue is **active** on your trunk and a piece of the floor is missing,
+because that is a live defect: entries are being stranded, or merges are about to stop.
+
+### Afterwards
+
+`ship-pr` tells you the same thing from the other side. Under a queue with no fold runner in your tree, its
+closing lines say so and print the fold command, instead of promising a fold that is not coming.
