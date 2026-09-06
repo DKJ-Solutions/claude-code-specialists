@@ -2580,6 +2580,179 @@ Assert-True ($null -eq (Get-FoldedEntryForBranch -ChangelogText $dupLog -Branch 
 $foldText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'), [System.Text.Encoding]::UTF8)
 Assert-True ($foldText -match 'Get-FoldedEntryForBranch -ChangelogText') 'the fold consults this read before it writes'
 Assert-True ($foldText -match '\$alreadyFolded -and -not \$Force') 'and -Force is the only way past it'
+
+# --- THE PENDING TALLY (issue #1515) --------------------------------------------------------------
+#
+# The line the fold and the cut write under the pending heading: how many entries are waiting, split by
+# tier, and how many of them reach this repo's audience. Everything here is pure -- content in, content
+# or numbers out -- so no fixture is needed; the two CALL SITES are asserted at the foot of the block,
+# because a correct formatter nobody calls is the shape a reverted wiring leaves green.
+Write-Host ""
+Write-Host "-- the pending tally --" -ForegroundColor Cyan
+
+$tallyH = Get-ChangelogUnreleasedHeading
+function New-TallyEntry {
+    param([string]$Branch, $Tier)
+    $body = @("$eH DEPLOY: ``$Branch``", '', 'What it does.', '')
+    # The 'Tier: N' LINE shape -- the oldest of the three the impact parser reads, and the cheapest to
+    # build here. What is being tested is the tally, not the parser: the shapes themselves are covered
+    # where Resolve-EntryImpact is, and an entry declaring NOTHING (the $null case below) is the one
+    # declaration state this block genuinely has to get right, because it is every non-adopting consumer.
+    if ($null -ne $Tier) { $body += @("$(Get-EntryTierLabel): $Tier", '') }
+    return ($body -join "`n")
+}
+function New-TallyLog {
+    param([string[]]$Entries)
+    return ((@('# Changelog', '', 'Intro prose.', '', $tallyH, '') + $Entries) -join "`n")
+}
+
+# THE COUNTS, against the three declaration shapes the impact parser reads. An entry that declares
+# NOTHING must read as tier 0 rather than as unreadable -- that is the whole non-adopting-consumer case,
+# and a tally that dropped those entries would report a smaller release than the cut is about to make.
+$tallyLog = New-TallyLog @(
+    (New-TallyEntry -Branch 'feat/a-v1' -Tier 2),
+    (New-TallyEntry -Branch 'feat/b-v1' -Tier 2),
+    (New-TallyEntry -Branch 'docs/c-v1' -Tier 0),
+    (New-TallyEntry -Branch 'fix/d-v1'  -Tier $null)
+)
+$tallyCounts = Get-ChangelogPendingCounts -Content $tallyLog
+Assert-Equal 4 $tallyCounts.Total 'tally: every pending entry is counted'
+Assert-Equal 2 $tallyCounts.ByTier[2] 'tally: the tier-2 entries are grouped at 2'
+Assert-Equal 2 $tallyCounts.ByTier[0] 'tally: a declared 0 and an entry declaring nothing both land at tier 0'
+Assert-Equal 0 $tallyCounts.ByTier[1] 'tally: a tier with no entries is present and zero, never absent'
+Assert-Equal 4 (($tallyCounts.ByTier.Keys | ForEach-Object { $tallyCounts.ByTier[$_] } | Measure-Object -Sum).Sum) `
+    'tally: the buckets are disjoint, so they sum to the total'
+
+# AN EMPTY LIST IS ZERO, NOT A THROW -- the state a repo is in for the whole minute after a release cut,
+# and the reason this reads Get-ChangelogEntryBlocks rather than Split-Changelog.
+$tallyEmpty = Get-ChangelogPendingCounts -Content (@('# Changelog', '', 'Intro prose.', '', $tallyH, '') -join "`n")
+Assert-Equal 0 $tallyEmpty.Total 'tally: a changelog with no entries counts zero rather than throwing'
+Assert-True ((Format-ChangelogPendingSummary -Content '# Changelog') -match 'Nothing pending') `
+    'tally: and renders the empty wording'
+
+# THE AUDIENCE HALF. Get-EntryAudienceTier probes a repo-config seam that this suite does not load, so
+# both states are reachable here by defining the function and removing it again -- which is also the
+# honest test of the default, because absence is what every non-adopting consumer has.
+Assert-True ($null -eq $tallyCounts.Audience) 'tally: no audience seam means no audience claim'
+Assert-Equal 0 $tallyCounts.Reaching 'tally: and nothing is reported as reaching one'
+$tallyNoAudienceLine = Format-ChangelogPendingSummary -Content $tallyLog
+Assert-True ($tallyNoAudienceLine -notmatch 'audience') 'tally: the audience sentence is omitted, not written with a hole in it'
+Assert-True ($tallyNoAudienceLine -match '0 at tier 1') `
+    'tally: with no audience stated every tier of the model is printed, as it was before the knob existed'
+
+function Get-ReleaseAudienceTier { return 2 }
+$tallyAud = Get-ChangelogPendingCounts -Content $tallyLog
+Assert-Equal 2 $tallyAud.Audience 'tally: the audience tier is read from the seam'
+Assert-Equal 2 $tallyAud.Reaching 'tally: and the entries reaching it are counted'
+$tallyAudLine = Format-ChangelogPendingSummary -Content $tallyLog
+Assert-True ($tallyAudLine -match 'Tier 2 is this repo''s audience: 2 of 4 reach it\.') `
+    'tally: the audience share is stated as asked -- how many of the total reach that reader'
+Assert-True ($tallyAudLine -notmatch 'at tier 1') `
+    'tally: and the empty tier this repo is never asked about drops out of the line'
+
+# AT OR ABOVE, NOT EQUAL TO. A tier-2 entry in a tier-1 repo reaches that audience -- the cumulative
+# model -- so a repo that answered 1 must not report it as unreached.
+function Get-ReleaseAudienceTier { return 1 }
+Assert-Equal 2 (Get-ChangelogPendingCounts -Content $tallyLog).Reaching `
+    'tally: an entry above the audience tier still reaches that audience'
+Remove-Item Function:\Get-ReleaseAudienceTier
+
+# THE LINE IS ONE LINE, and it carries the marker that makes it replaceable.
+Assert-True ((Format-ChangelogPendingSummary -Content $tallyLog) -notmatch "`n") 'tally: the summary is a single line'
+Assert-True ((Format-ChangelogPendingSummary -Content $tallyLog).EndsWith((Get-ChangelogPendingSummaryMarker))) `
+    'tally: and ends with the marker the replace anchors on'
+
+# PLACEMENT. Directly under the pending heading, with a blank line either side.
+$tallySet = Set-ChangelogPendingSummary -Content $tallyLog
+$tallyLines = @($tallySet -split "`n")
+$tallyAt = -1
+for ($i = 0; $i -lt $tallyLines.Count; $i++) { if ($tallyLines[$i] -match [regex]::Escape((Get-ChangelogPendingSummaryMarker))) { $tallyAt = $i; break } }
+Assert-True ($tallyAt -gt 0) 'tally: the line is written into the document'
+Assert-Equal $tallyH $tallyLines[$tallyAt - 2] 'tally: it sits under the pending heading'
+Assert-Equal '' $tallyLines[$tallyAt - 1] 'tally: with a blank line between, or markdown reads them as one paragraph'
+Assert-Equal '' $tallyLines[$tallyAt + 1] 'tally: and a blank line before the first entry'
+Assert-Equal 4 (@(Get-ChangelogEntryBlocks -Content $tallySet).Count) 'tally: and the entries below it still parse'
+
+# IDEMPOTENT, which is what makes it safe to run on every fold: a rerun replaces the line in place
+# rather than stacking a second one.
+Assert-Equal $tallySet (Set-ChangelogPendingSummary -Content $tallySet) 'tally: re-running writes the same document'
+$tallyGrown = Set-ChangelogPendingSummary -Content (Set-ChangelogPendingSummary -Content $tallySet)
+Assert-Equal 1 (@([regex]::Matches($tallyGrown, [regex]::Escape((Get-ChangelogPendingSummaryMarker)))).Count) `
+    'tally: and never leaves a second one behind'
+
+# AND IT IS RE-DERIVED, NOT KEPT. A stale line over a changed list is the failure mode a counter would
+# have; this proves the number follows the document rather than the other way round.
+$tallyStale = $tallySet -replace [regex]::Escape('4 entries pending'), '99 entries pending'
+Assert-True ((Set-ChangelogPendingSummary -Content $tallyStale) -match '4 entries pending') `
+    'tally: a hand-edited count is corrected on the next write rather than trusted'
+
+# THE CONSUMER SHAPE: adopt-workflow-folder.ps1 scaffolds a changelog with NO pending heading, so the
+# tally anchors on the first entry instead. Without this the feature would ship to this repo alone.
+$tallyNoHead = (@('# Changelog', '', 'Intro prose.', '', (New-TallyEntry -Branch 'feat/e-v1' -Tier 2)) -join "`n")
+$tallyNoHeadSet = Set-ChangelogPendingSummary -Content $tallyNoHead
+$tallyNoHeadLines = @($tallyNoHeadSet -split "`n")
+$tallyNoHeadAt = -1
+for ($i = 0; $i -lt $tallyNoHeadLines.Count; $i++) { if ($tallyNoHeadLines[$i] -match [regex]::Escape((Get-ChangelogPendingSummaryMarker))) { $tallyNoHeadAt = $i; break } }
+Assert-True ($tallyNoHeadAt -gt 0) 'tally: a changelog with no pending heading still gets the line'
+Assert-True ($tallyNoHeadLines[$tallyNoHeadAt + 2] -match '^' + [regex]::Escape("$eH DEPLOY")) `
+    'tally: anchored directly above the first entry'
+Assert-True ((Format-ChangelogPendingSummary -Content $tallyNoHead) -match '1 entry pending') `
+    'tally: and one entry is an entry, not "1 entries"'
+
+# FENCE-AWARE, both ways. This repo's own changelog intro quotes an entry heading inside a fence, and a
+# future one may well quote the tally itself -- neither may be mistaken for the real thing.
+$tallyFenced = (@(
+    '# Changelog', '', 'The line under the heading looks like this:', '', '```markdown',
+    ('**7 entries pending** -- 7 at tier 0. ' + (Get-ChangelogPendingSummaryMarker)),
+    '```', '', $tallyH, '', (New-TallyEntry -Branch 'feat/f-v1' -Tier 0)
+) -join "`n")
+$tallyFencedSet = Set-ChangelogPendingSummary -Content $tallyFenced
+Assert-True ($tallyFencedSet -match [regex]::Escape('**7 entries pending**')) `
+    'tally: a quoted example inside a fence is left exactly as written'
+Assert-Equal 2 (@([regex]::Matches($tallyFencedSet, [regex]::Escape((Get-ChangelogPendingSummaryMarker)))).Count) `
+    'tally: and the real line is inserted beside it rather than replacing it'
+
+# AND INLINE BACKTICKS, which the fence check cannot see -- the shape the changelog intro will actually
+# use when it names the marker, one paragraph above a line this same run rewrites.
+$tallyInline = (@(
+    '# Changelog', '',
+    ('The fold keeps a `' + (Get-ChangelogPendingSummaryMarker) + '` line current under the heading below.'), '',
+    $tallyH, '', (New-TallyEntry -Branch 'feat/h-v1' -Tier 0)
+) -join "`n")
+$tallyInlineSet = Set-ChangelogPendingSummary -Content $tallyInline
+Assert-True ($tallyInlineSet -match 'The fold keeps a `') 'tally: a marker quoted in inline code is not the tally'
+Assert-Equal 2 (@([regex]::Matches($tallyInlineSet, [regex]::Escape((Get-ChangelogPendingSummaryMarker)))).Count) `
+    'tally: so the real line is inserted under the heading instead of overwriting that sentence'
+Assert-Equal $tallyInlineSet (Set-ChangelogPendingSummary -Content $tallyInlineSet) `
+    'tally: and the run stays idempotent with the quoted copy standing'
+Assert-True (Test-ChangelogTallyIsQuoted -Line ('see `' + (Get-ChangelogPendingSummaryMarker) + '`')) 'tally: quoted marker reads as quoted'
+Assert-True (-not (Test-ChangelogTallyIsQuoted -Line ('**1 entry pending** ' + (Get-ChangelogPendingSummaryMarker)))) 'tally: a real tally line does not'
+
+# A HUMAN'S PARAGRAPH UNDER THE PENDING HEADING IS NOT EATEN. This is the reason the line carries a
+# marker at all instead of being recognised by position, and the fold pushes straight to the trunk.
+$tallyProse = (@('# Changelog', '', $tallyH, '', 'A note somebody wrote here by hand.', '', (New-TallyEntry -Branch 'feat/g-v1' -Tier 0)) -join "`n")
+Assert-True ((Set-ChangelogPendingSummary -Content $tallyProse) -match 'A note somebody wrote here by hand\.') `
+    'tally: prose already under the heading survives the write'
+
+# THE WORDING IS OVERRIDABLE, for the repo whose changelog is not in English -- the same mechanism, and
+# the same empty-is-ignored fail-safe, as every other piece of generated prose in this file.
+function Get-ChangelogPendingSummaryOverrides { return @{ Lead = 'WACHTRIJ: {0} {1}'; Entries = 'wijzigingen'; Empty = '' } }
+$tallyNl = Format-ChangelogPendingSummary -Content $tallyLog
+Assert-True ($tallyNl -match 'WACHTRIJ: 4 wijzigingen') 'tally: a translated repo gets its own wording'
+Assert-True ((Format-ChangelogPendingSummary -Content '# Changelog') -match 'Nothing pending') `
+    'tally: and an override that is present but EMPTY keeps the default rather than blanking the line'
+Remove-Item Function:\Get-ChangelogPendingSummaryOverrides
+
+# THE TWO CALL SITES. Everything above proves the rendering; these prove somebody asks for it. The fold
+# must call it AFTER its insert (a call before would count one entry short) and the cut AFTER it empties
+# the list (a call before would preserve the count it is about to invalidate).
+$tallyFoldSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($tallyFoldSrc -match '(?s)\$entryBlock \+ \$changelogContent\.Substring\(\$insertPos\).*?Set-ChangelogPendingSummary.*?Write-Utf8NoBom -Path \$changelogPath') `
+    'tally: the fold refreshes it between the insert and the write'
+$tallyCutSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\cut-release.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($tallyCutSrc -match '(?s)Convert-ChangelogForRelease -Content \$changelogRaw.*?\$changelogNew = Set-ChangelogPendingSummary -Content \$changelogNew') `
+    'tally: and the cut resets it on the emptied document, so no released changelog carries a stale count'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

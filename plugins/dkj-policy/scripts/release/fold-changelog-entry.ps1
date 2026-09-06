@@ -965,6 +965,13 @@ foreach ($file in $entryFiles) {
     $entryBlock = "$entryContent$nl$nl---$nl$nl"
     $changelogContent = $changelogContent.Substring(0, $insertPos) + $entryBlock + $changelogContent.Substring($insertPos)
 
+    # THE PENDING TALLY, RE-DERIVED FROM THE LIST THIS RUN JUST CHANGED (issue #1515). It answers how much
+    # is waiting for the next release and how much of it reaches this repo's audience -- both from the
+    # entries themselves, so there is no counter here to increment and nothing that can drift. Placed
+    # AFTER the insert deliberately: it must count the entry this iteration just added, and this loop
+    # folds one entry per pass, so each pass leaves the line correct rather than only the last one.
+    $changelogContent = Set-ChangelogPendingSummary -Content $changelogContent
+
     Write-Utf8NoBom -Path $changelogPath -Content $changelogContent
 
     # DISPOSAL IS THE SAME FOR EVERY ENTRY AGAIN (Dave, August 23, 2026): a folded entry's file is deleted.

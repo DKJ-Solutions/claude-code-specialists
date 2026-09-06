@@ -28,6 +28,14 @@ follows the highest tier pending**: **tier 0 only earns a patch**, **tier 1 or h
 a **major** recaps ten minors. So a changelog holding nothing but tier 0 is a patch waiting to be cut, not
 a release with nobody to announce it to.
 
+**The line directly under `## [Unreleased]` is a tally, and nobody types it.** It says how many entries are
+waiting for the next release and how they split by tier — including how many reach the audience this repo
+publishes to, which is the number that says whether there is a release here or only a patch. It is
+**derived from the entries below it every time it is written**, by the fold that adds one and the cut that
+removes them all, so it holds no state of its own and a hand-edited count is simply corrected on the next
+fold. It ends with an HTML comment that marks it as machine-written; that marker is what the next run
+replaces, so anything else written in this space is left alone.
+
 ---
 
 ## [Unreleased]
