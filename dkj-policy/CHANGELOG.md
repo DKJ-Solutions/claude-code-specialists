@@ -40,7 +40,51 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 entries pending** -- 3 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 7 reach it. <!-- pending-tally -->
+**8 entries pending** -- 4 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 8 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1518-consumer-unreleased-heading · 20260906-202744
+
+A repo adopting this workflow now gets a `CHANGELOG.md` with `## [Unreleased]` in it. Until today
+`adopt-workflow-folder.ps1` scaffolded the intro and stopped, so an adopting repo's entries sat directly
+under the prose — the flat shape this workflow left behind on August 26, 2026 — while
+`DEVELOPMENT-portable.md`, which travels to every consumer, tells them to grep `[Unreleased]` for what a
+behaviour used to be. That grep matched nothing in their tree.
+
+Nothing was broken and nothing is repaired in that sense: the fold inserts at the first entry heading or,
+where there is none, at the end of the content, and the cut writes the head back whatever is in it, so
+both shapes fold and cut correctly and no gate had anything to say. What was wrong is that one shape was
+documented and a different one shipped.
+
+The heading is composed from `Get-ChangelogUnreleasedHeading` rather than typed — a repo that translated
+the label or repointed the entry level gets its own — and it is written **last**, because the first fold
+into an entry-less document appends at the end of the content and anything below the heading would
+collect its entries above it.
+
+**An adoption older than today keeps the flat shape**, and that is left alone deliberately: the
+scaffolder is strictly additive and never revisits a repo it has scaffolded. The tally's third anchor
+exists for exactly those repos and is untouched; what changed there is the sentence justifying it, which
+described the scaffolder's present tense.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. The audience here is this repo's own developers and the consumers of `dkj-policy`, which is tier 0
+and tier 1 — nobody subscribes to a service that changes. A consumer maintainer adopting the workflow
+today gets a changelog that matches the page they are told to read, which is worth a 3 there; it is
+invisible to anyone else.
+
+**Score:** N/A
+
+#### Pull Request
+
+The scaffolded consumer changelog carries the pending heading
+
+Plugins: dkj-policy
+
+[PR #1533](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1533)
+
+---
 
 ### DEPLOY: fix/1530-test-capture-decoration · 20260906-201920
 
