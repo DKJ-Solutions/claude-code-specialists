@@ -141,8 +141,19 @@ tag. **The floor no longer decides who wins a file** — content does that — a
 one remaining job is to notice that live's content is foreign *and* the trunk changed the same path
 recently, which is both sides having moved, and escalate that to a human. The refusal is protecting that
 one job: without a floor the script cannot ask the question at all, so such a conflict would be **taken
-silently**. A floor that is merely *wrong* now costs an extra conflict report rather than silent data loss
-— a far better failure mode for the piece of this that is hardest to get right.
+silently**.
+
+**The floor is asked per path, and that correction is what makes the sentence above true** (inbound
+[#1535](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1535)). "A floor that is merely
+*wrong* costs an extra conflict report rather than silent data loss" holds for a floor that is too **old**
+and fails for one that is too **recent** — and a floor taken once per run is systematically too recent for
+every path the last sync did not take, because a sync commit establishes agreement with live only for the
+paths it actually **took**. Measured in a consumer: **six** paths verdicted *take from live* where the
+trunk was a strict superset of live, 0 keys arriving from five locale files against 6 key-deletions and 7
+string reversions. Each path is now judged against the most recent sync that touched **it**, and a path no
+sync has ever taken has **no** agreement point at all — which is reported for a person to reconcile, never
+taken. A tag is deliberately not accepted as one path's base: it is a release marker and says nothing
+about agreement with live.
 
 **The exposure grows the day a repo adopts a changelog**, which is worth saying because nothing else does:
 "merged into the trunk but not live yet" then becomes a *designed* state rather than an accident — it is

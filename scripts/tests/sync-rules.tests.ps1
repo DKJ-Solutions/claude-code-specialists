@@ -291,6 +291,95 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
         # The floor itself is exclusive: the sync commit is not "since the sync commit".
         Assert-True (-not (Test-MainTouchedSince -Since $floor -Path 'floor.txt')) 'rule/floor: the reference commit''s own change is not counted as later work'
     } finally { Pop-Location }
+
+    # --- The base is PER PATH (inbound #1535) -------------------------------------------------------
+    # THE SHAPE THE CONSUMER MEASURED, rebuilt with the smallest history that carries it. A sync commit
+    # establishes agreement with live only for the paths it actually TOOK; the defect was taking the most
+    # recent sync GLOBALLY and asking "has the trunk moved since" against it for every path. For a path
+    # that sync never touched, that base simply post-dates the trunk's own work -- so the trunk read as
+    # stationary and live was taken over it, on a green run.
+    #
+    # The fixture is the report's own ordering: own work on a path, and then a sync that takes a
+    # DIFFERENT path. In the consumer that sync took 167 files and none of the six was among them.
+    Write-Host ''
+    Write-Host 'Get-SyncPathReferencePoint'
+
+    $perPath = New-GitTree -Label 'perpath'
+    Add-Commit -Dir $perPath -Message 'initial' -Write @{
+        'locales/nl.json'         = '{"a":1}'
+        'sections/header.liquid'  = 'h1'
+        'snippets/dropped.liquid' = 'd1'
+    } | Out-Null
+    $syncTookHeader = Add-Commit -Dir $perPath -Message 'sync: mirror the header from live' -Write @{ 'sections/header.liquid' = 'h2' }
+    $syncTookDrop   = Add-Commit -Dir $perPath -Message 'sync: mirror the snippet from live' -Write @{ 'snippets/dropped.liquid' = 'd2' }
+    # The own work: merged on the trunk, never pushed to live. This is what a take-live would revert.
+    Add-Commit -Dir $perPath -Message 'fix: grammar in the Dutch locale' -Write @{ 'locales/nl.json' = '{"a":2}' } | Out-Null
+    # And the newest sync, which takes the header again and NOT the locale -- so it becomes the global
+    # floor while saying nothing about locales/nl.json.
+    $syncNewest = Add-Commit -Dir $perPath -Message 'sync: mirror the header from live again' -Write @{ 'sections/header.liquid' = 'h3' }
+    # A path the trunk later DELETED, to prove the '--' reaches git here (see Get-SyncCommitShas).
+    Add-Commit -Dir $perPath -Message 'chore: drop the snippet' -Delete @('snippets/dropped.liquid') | Out-Null
+
+    Push-Location -LiteralPath $perPath
+    try {
+        # The global answer is the newest sync, exactly as before -- unchanged behaviour.
+        Assert-Equal $syncNewest (Get-SyncReferencePoint).Ref 'perpath/global: the repo-wide floor is still the most recent sync commit'
+
+        # THIS PAIR IS THE DEFECT. The global floor says the trunk has not moved on the locale, which is
+        # true of that base and false of the question -- the trunk's work on it is OLDER than that sync.
+        Assert-True (-not (Test-MainTouchedSince -Since $syncNewest -Path 'locales/nl.json')) `
+            'perpath/defect: measured from the GLOBAL floor the trunk looks stationary on a path that sync never took'
+        Assert-True ($null -eq (Get-SyncPathReferencePoint -Path 'locales/nl.json')) `
+            'perpath/none: no sync ever took the locale, so it has NO agreement point -- the answer is $null, not the newest sync'
+        Assert-Equal 'conflict' (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false `
+            -PathAgreementKnown ([bool](Get-SyncPathReferencePoint -Path 'locales/nl.json'))).Action `
+            'perpath/verdict: so the verdict is a conflict, where the global floor produced take-live'
+
+        # A path a sync DID take answers with that sync, and with the RIGHT one of the two.
+        Assert-Equal $syncNewest (Get-SyncPathReferencePoint -Path 'sections/header.liquid') `
+            'perpath/taken: a path the syncs took answers with the most recent sync THAT TOUCHED IT'
+        Assert-True ((Get-SyncPathReferencePoint -Path 'sections/header.liquid') -ne $syncTookHeader) `
+            'perpath/taken: and not the earlier one'
+        # Live moved alone on it, so it is still taken -- the repair must not turn every path into a conflict.
+        Assert-Equal 'take-live' (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false `
+            -MainTouchedSinceFloor (Test-MainTouchedSince -Since (Get-SyncPathReferencePoint -Path 'sections/header.liquid') -Path 'sections/header.liquid') `
+            -PathAgreementKnown $true).Action `
+            'perpath/still-takes: a reconciled path the trunk has not touched since is still taken from live'
+
+        # A path whose own sync is OLDER than the trunk's work on it: both moved, which is the arm that
+        # could not fire from a global floor.
+        Add-Commit -Dir $perPath -Message 'fix: tweak the header' -Write @{ 'sections/header.liquid' = 'h4' } | Out-Null
+        $headerBase = Get-SyncPathReferencePoint -Path 'sections/header.liquid'
+        Assert-Equal $syncNewest $headerBase 'perpath/both: the base is unchanged by the trunk''s own later commit'
+        Assert-True (Test-MainTouchedSince -Since $headerBase -Path 'sections/header.liquid') `
+            'perpath/both: and the trunk HAS moved since it'
+        Assert-Equal 'conflict' (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false `
+            -MainTouchedSinceFloor $true -PathAgreementKnown $true).Action `
+            'perpath/both: so both sides moved and neither is taken'
+
+        # THE '--' CASE, the one that errors without a pathspec separator and would answer "no base"
+        # for the wrong reason. A deleted path still has history, so its sync is still findable.
+        Assert-Equal $syncTookDrop (Get-SyncPathReferencePoint -Path 'snippets/dropped.liquid') `
+            'perpath/deleted: a path the trunk deleted still answers with the sync that took it (the ''--'' case)'
+
+        # A path that never existed is an ordinary "no base" rather than a throw -- same wrapper property
+        # Test-MainTouchedSince asserts above.
+        Assert-True ($null -eq (Get-SyncPathReferencePoint -Path 'never/existed.liquid')) `
+            'perpath/absent: a path that never existed answers $null without throwing'
+
+        # NO TAG FALLBACK, and this is the assert that keeps it. A tag says nothing about agreement with
+        # live, so reading one as a per-path base would reintroduce this defect by a second route.
+        & git -C $perPath tag 'v9.9.9' | Out-Null
+        Assert-True ($null -eq (Get-SyncPathReferencePoint -Path 'locales/nl.json')) `
+            'perpath/no-tag: a tag is not an agreement point -- it must not become one path''s base'
+        Assert-Equal 'sync' (Get-SyncReferencePoint).Kind `
+            'perpath/no-tag: while the repo-wide answer keeps its own tag fallback, untouched'
+
+        # The pattern seam reaches the per-path answer too, or a repo that narrowed it would silently get
+        # the default here.
+        Assert-True ($null -eq (Get-SyncPathReferencePoint -Path 'sections/header.liquid' -Pattern '^mirror:')) `
+            'perpath/pattern: the -Pattern seam applies per path as well'
+    } finally { Pop-Location }
     # --- The quoted path, decoded off the wire ------------------------------------------------------
     # WHY THESE ARE UNIT ASSERTS AND NOT AN INTEGRATION CASE (inbound #821). The bug they pin is that a
     # git-reported path used to be decoded with whatever console code page the RUN inherited -- so the
@@ -449,9 +538,13 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
     Write-Host ''
     Write-Host 'Get-SyncFileVerdict'
 
+    # EVERY M+foreign CELL NOW NAMES -PathAgreementKnown, and the omission is itself asserted further
+    # down. Before inbound #1535 this cell took live whenever the (global) floor said the trunk had not
+    # moved; the question is now per path, so "untouched" is only an answer where a base EXISTS to be
+    # untouched since.
     Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $true).Action  'verdict/M+ours: the trunk has moved on, so it wins'
-    Assert-Equal 'take-live'  (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false).Action 'verdict/M+foreign: a third party''s edit to an untouched path is taken'
-    Assert-Equal 'conflict'   (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Action 'verdict/M+both: both sides moved, so neither is taken'
+    Assert-Equal 'take-live'  (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -PathAgreementKnown $true).Action 'verdict/M+foreign: a third party''s edit to a path untouched since ITS OWN base is taken'
+    Assert-Equal 'conflict'   (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true -PathAgreementKnown $true).Action 'verdict/M+both: both sides moved, so neither is taken'
     Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'A' -LiveContentIsOurs $true).Action  'verdict/A+ours: a deliberate deletion is not undone'
     Assert-Equal 'take-live'  (Get-SyncFileVerdict -Status 'A' -LiveContentIsOurs $false).Action 'verdict/A+foreign: a file only live has and we never held is taken'
     # 'A' has no conflict cell: the trunk does not have the file, so there is no trunk-side change to lose.
@@ -461,11 +554,36 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
     Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'D' -LiveContentIsOurs $false).Action 'verdict/D+foreign: nor when live''s side is foreign'
     Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'D' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Action 'verdict/D+both: nor when the trunk moved too'
 
+    # --- THE CELL INBOUND #1535 WAS ------------------------------------------------------------------
+    # No sync has ever taken this path, so there is no moment at which the trunk and live are known to
+    # have agreed. 'Live's content is foreign' then does not mean live moved alone -- it means nobody can
+    # say -- and the answer is a report rather than a take. This is the assert that would have held back
+    # all six paths the consumer measured.
+    Assert-Equal 'conflict' (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -PathAgreementKnown $false).Action `
+        'verdict/M+foreign+no base: a path no sync ever took is reconciled by hand, never taken'
+    Assert-Equal 'conflict' (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false).Action `
+        'verdict/M+foreign+unanswered: the DEFAULT is the protective one -- an unanswered base is not "live moved alone"'
+
+    # AND THE TWO CONFLICTS ARE TOLD APART, because they lead a person to different work: one side has
+    # changes to merge, the other has never been reconciled at all.
+    $rBoth = (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true -PathAgreementKnown $true).Reason
+    $rNone = (Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -PathAgreementKnown $false).Reason
+    Assert-True ($rBoth -ne $rNone) 'verdict/reason: both-sides-moved and no-agreement-point do not share one reason'
+    Assert-True ($rNone -match 'no sync ever took this path') 'verdict/reason: and the no-base reason says why it cannot be decided'
+
+    # 'A' IS DELIBERATELY UNAFFECTED BY THE NEW FACT: there is no trunk copy to lose, so an unknown
+    # agreement point changes no answer there. Asserted so a later "make it consistent" pass has to
+    # argue with a test rather than with a comment.
+    Assert-Equal 'take-live' (Get-SyncFileVerdict -Status 'A' -LiveContentIsOurs $false -PathAgreementKnown $false).Action `
+        'verdict/A+foreign+no base: still taken -- an unknown base cannot cost what the trunk does not have'
+    Assert-Equal 'keep-trunk' (Get-SyncFileVerdict -Status 'D' -LiveContentIsOurs $false -PathAgreementKnown $false).Action `
+        'verdict/D+no base: and a sync still never deletes'
+
     # A verdict always carries a reason: it is printed into the PR body, and a blank one there reads as
     # "nothing was held back" -- the one thing the exclusion list exists to contradict.
     Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $true).Reason -ne '')  'verdict/reason: keep-trunk carries a reason'
-    Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false).Reason -ne '') 'verdict/reason: take-live carries a reason'
-    Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true).Reason -ne '') 'verdict/reason: and so does a conflict'
+    Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -PathAgreementKnown $true).Reason -ne '') 'verdict/reason: take-live carries a reason'
+    Assert-True ([string](Get-SyncFileVerdict -Status 'M' -LiveContentIsOurs $false -MainTouchedSinceFloor $true -PathAgreementKnown $true).Reason -ne '') 'verdict/reason: and so does a conflict'
 
 
     # --- The PR body ---------------------------------------------------------------------------------
