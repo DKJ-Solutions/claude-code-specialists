@@ -222,6 +222,17 @@ layer left exactly as written is the archived release history under `dkj-policy/
 documents are deliberately historical, the same carve-out
 [`.claude/rules/language-layers.md`](.claude/rules/language-layers.md) already makes.
 
+**A checkout's own `origin` remote is this same citation in a place the tree cannot reach.** It is
+per-checkout git config, not tracked, so no gate sees it and the "corrected when edited for other
+reasons" rule above has nothing to act on. A checkout cloned before the transfer still pushes to
+`https://github.com/DaveKJohn/claude-code-specialists.git` and lands only because GitHub answers
+`remote: This repository moved`; every push of the `v4.32.0` cut did exactly that
+([#1562](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1562)). Repoint such a
+checkout in one command — `git remote set-url origin
+https://github.com/DKJ-Solutions/claude-code-specialists.git` — and the redirect stops being
+load-bearing there. It is the same fragility as the prose citation: the redirect holds only while
+nothing is created at the old path.
+
 ### Structure — where everything lives
 
 The full repo layout (`.claude-plugin/`, `plugins/` incl. `dkj-teams/agent-shared/`, `connectors/` at the root,

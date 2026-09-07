@@ -33,19 +33,46 @@
 
 ### PLAN
 
+#1562: this checkout's `origin` still spelled `DaveKJohn/claude-code-specialists.git`, so every
+`v4.32.0` push landed only via GitHub's transfer redirect. The tree cannot see or fix a remote URL
+(per-checkout config), so the repair is a note in the repo-citation section of `CLAUDE.md` telling a
+pre-transfer checkout to repoint. Repointing this checkout's own remote is a separate, untracked
+`git remote set-url` for Dave to run.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add a paragraph to the "Repo citation — one owner name" section of `CLAUDE.md`: a checkout's
+      `origin` remote is the same citation the tree cannot reach, `v4.32.0` pushed against the old
+      URL and landed on the redirect (#1562), and the one-command fix is
+      `git remote set-url origin https://github.com/DKJ-Solutions/claude-code-specialists.git`.
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` — dead-link scan and manifest/frontmatter checks green over the
+      `CLAUDE.md` edit.
+
 ### DEPLOY: fix/1562-origin-remote-redirect
 
-**Score:**
+The repo-citation section of `CLAUDE.md` now covers the layer it could not reach: a checkout's own
+`origin` remote. A checkout cloned before the September 2, 2026 transfer still pushes to
+`DaveKJohn/claude-code-specialists.git` and succeeds only because GitHub answers `remote: This
+repository moved` — every push of the `v4.32.0` cut did exactly that. The note names the
+one-command repoint (`git remote set-url origin
+https://github.com/DKJ-Solutions/claude-code-specialists.git`) and ties the fragility to the same
+condition the prose rule already carries: the redirect holds only while nothing is created at the
+old path.
+
+**Score:** 1
+
+The failure this prevents has not happened: pushes from un-repointed checkouts still work today. It
+bites the day anything is created at `DaveKJohn/claude-code-specialists` — every such checkout's
+pushes then fail with no redirect to catch them, and nothing in the tree points at the cause.
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A — an internal documentation note. A subscriber of the service never sees a repo remote URL.
+
+**Score:** N/A
 
 #### Pull Request
 
