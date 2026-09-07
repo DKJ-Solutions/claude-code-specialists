@@ -1,8 +1,8 @@
 ---
 name: adopt-dkj-policy-bwj
 description: >-
-  One-time setup of dkj-policy-bwj in a BWJ store repo (smartwatchbanden or xoxowildhearts) -- it
-  refuses to run anywhere else -- both chapters: copy the asana-mirror CI mechanism into .github/,
+  One-time setup of dkj-policy-bwj in a BWJ store repo (smartwatchbanden or xoxowildhearts, whichever
+  org) -- it refuses to run anywhere else -- both chapters: copy the asana-mirror CI mechanism into .github/,
   propose the Asana config seam for scripts/repo-config.ps1, print the repo secret and variables the
   CI needs, check that the classification labels exist, report whether the board's sections are
   numbered so the stage model can read them, and scaffold chapter two's dkj-policy-bwj/SYNC-LOG.md
@@ -20,7 +20,7 @@ and the CI both read, and chapter two's `SYNC-LOG.md` scaffold (step 7).
 ## 0 -- establish that this is a BWJ store repo
 
 **Refuse, not warn: nothing is written, copied or proposed until this check passes.** The two-repo
-constraint -- `BWJ-ecommerce/smartwatchbanden` or `BWJ-ecommerce/xoxowildhearts`, and nothing else --
+constraint -- `smartwatchbanden` or `xoxowildhearts`, and nothing else --
 lived only in this file's own frontmatter until now; none of the seven steps below actually checked
 which repo the session is standing in.
 
@@ -28,7 +28,14 @@ which repo the session is standing in.
 git remote get-url origin
 ```
 
-Match the result against the two slugs above. **Anything else stops the skill here**: report which
+**Match the repo NAME -- the last path segment -- and not the org.** This check named
+`BWJ-ecommerce/<store>` until September 7, 2026, and on that day it became wrong in the live repo:
+`smartwatchbanden` moved to `BWJ-Development` as a fresh repo, the `BWJ-ecommerce` one was archived,
+and a fresh repo carries no redirect. An org-path match then refuses the one adoption it exists to
+serve, which is the worse of the two failure directions -- and the org may move again while the store
+names will not. The names are still exactly two, so nothing about the strength of this refusal changes.
+
+**Anything else stops the skill here**: report which
 repo the session is actually in and go no further -- no file copied, no config proposed, no label
 checked. There is no override flag, and there will not be one: there is no legitimate third adoption
 target, and a skill whose whole job is placing a mechanism in exactly two repos should not ship the
@@ -164,7 +171,7 @@ second repo mirrors its issues onto the other store's board, the create call suc
 writes, the sections still move a card -- nothing fails on the day, and the only symptom is
 colleagues on one store finding the other store's tickets sitting on theirs.
 
-`BWJ-ecommerce/smartwatchbanden` now answers `Get-AsanaProjectGid` with its own store's board, and
+`smartwatchbanden` now answers `Get-AsanaProjectGid` with its own store's board, and
 added a test asserting both halves at once: that the value names smartwatchbanden's own board, and
 that xoxowildhearts' GID is never adopted in its place -- because a copied value is exactly what the
 old wording invited
