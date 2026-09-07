@@ -40,7 +40,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**12 entries pending** -- 8 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 12 reach it. <!-- pending-tally -->
+**13 entries pending** -- 9 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 13 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1542-fold-on-merge-corrections · 20260907-173512
+
+`fold-on-merge.yml` and `verify-resolved.yml` -- and the `adopt-merge-queue.ps1` copies a consumer
+gets -- had four defects measured in a BWJ store on 2026-09-07. The merge stamp is now rendered in UTC,
+so a repo that folds from both a CI runner and a laptop no longer orders its changelog by the
+maintainer's timezone (it became a sort key in #1280). The fold runner checks out the trunk tip
+instead of the pushed commit, so a fold `ship-pr` already did is not re-attempted into a false red. The
+concurrency group is constant per trunk, so two trunk pushes queue instead of racing for a trunk this
+job pushes to. And the red-run triage note names the third cause -- an unusable `FOLD_PUSH_TOKEN` fails
+the checkout, not the push -- and says to rule that one out first because it leaves no fold step to
+read. Stamps written before this change stay local; the insert walk stops at the first older stamp, so
+the skew is bounded to entries adjacent across that boundary until they age out at the next cut.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- internal workflow mechanics. No subscriber of any service notices; the visible effect is that a
+consumer adopting the merge-queue floor stops meeting a false red on their first `ship-pr` merge and a
+maintainer outside UTC stops seeing changelog entries land out of order.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct fold-on-merge's merge stamp, checkout ref, concurrency key and failure-mode docs
+
+Plugins: dkj-policy
+
+[PR #1551](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1551)
+
+---
 
 ### DEPLOY: feat/1546-retire-merge-queue-policy · 20260907-172625
 
