@@ -500,8 +500,13 @@ Assert-True ((Get-ChangelogIntro -Changelog $changelogText).TrimEnd() -eq $scrip
 # only proof the call site runs at all, in a script whose own suite is the one that would notice.
 $tallyLines = @(@($changelogText -split "`r?`n") | Where-Object { $_ -match [regex]::Escape((Get-ChangelogPendingSummaryMarker)) })
 Assert-Equal 1 $tallyLines.Count 'the fold writes exactly one pending tally'
-Assert-True ($tallyLines[0] -match '(\d+) (entry|entries) pending') 'and it states how many entries are pending'
-Assert-Equal (@(Get-ChangelogEntryBlocks -Content $changelogText).Count) ([int]([regex]::Match($tallyLines[0], '(\d+) (entry|entries) pending').Groups[1].Value)) `
+# THE TOTAL IS THE NUMBER DIRECTLY BEFORE THE BUMP WORD, in both shapes the line has (#1545): with an
+# audience tier it reads '**4 / 9 minor entries**' and without one '**9 minor entries**'. Matching that
+# position rather than either whole shape is deliberate -- this suite's subject is that the fold CALLED
+# the tally at all, and the shapes themselves are entry-scaffold.tests.ps1's to pin.
+$tallyTotalRx = '(\d+) \S+ (?:entry|entries)\*\*'
+Assert-True ($tallyLines[0] -match $tallyTotalRx) 'and it states how many entries are pending'
+Assert-Equal (@(Get-ChangelogEntryBlocks -Content $changelogText).Count) ([int]([regex]::Match($tallyLines[0], $tallyTotalRx).Groups[1].Value)) `
     'and the number it states is the number of entries actually in the document'
 Assert-True ((Get-Changelog -Dir $dir).IndexOf('Demo thing') -gt $script:FixtureIntro.TrimEnd().Length) `
     'and the entry sits below all of it'
