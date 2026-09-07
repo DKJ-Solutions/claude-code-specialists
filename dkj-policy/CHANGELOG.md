@@ -43,7 +43,41 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 18 minor entries** <!-- pending-tally -->
+**8 / 19 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1556-asana-mirror-get-issueclosure · 20260907-195814
+
+`dkj-policy-bwj`'s `asana-mirror.ps1` template called `Get-IssueClosure`, which nothing defines --
+the rename in `fa3a4e55` updated the event call site and missed the sweep's. The reconciliation sweep
+therefore crashed the first time it had a close comment to write, and because `Invoke-ReconcileMode`
+aborts at the first crash, the prio-label and stage sweeps went down with it. `Update-MirroredTask`
+now calls `Get-IssueLinkState`, and passes `-StatusField ''` because it writes a comment and moves no
+card. A new suite, `template-selfcontained.tests.ps1`, holds every shipped template to the property
+this broke: each Verb-Noun name it calls is one it defines, one PowerShell provides, or one it
+declares external with a `Get-Command` guard -- which is how the template's two real seams into the
+consumer's `repo-config.ps1` stay legal without an allowlist to maintain.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running the Asana mirror had a daily reconciliation sweep that could not complete, and no
+signal saying so: event runs stayed green, and a sweep with nothing to do stayed green too. Since a
+project status change fires no `issues:` event at all, that sweep is the mechanism rather than a
+backstop -- so cards stopped moving and closed tickets stopped being commented on, silently. Adopting
+this release restores all three sweeps; nothing needs re-configuring.
+
+**Score:** 4
+
+#### Pull Request
+
+The Asana mirror's reconciliation sweep no longer crashes on a renamed helper
+
+Plugins: dkj-policy-bwj
+
+[PR #1560](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1560)
+
+---
 
 ### DEPLOY: fix/1549-required-check-green · 20260907-185842
 
