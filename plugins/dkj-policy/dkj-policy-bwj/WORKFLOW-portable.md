@@ -1,7 +1,10 @@
 # BWJ ticket handling -- the portable rule
 
-**This page applies in exactly two repos: `BWJ-ecommerce/smartwatchbanden` and
-`BWJ-ecommerce/xoxowildhearts`.** They are one business (BWJ) running two Shopify stores that behave
+**This page applies in exactly two repos, named by store rather than by org: `smartwatchbanden` and
+`xoxowildhearts`.** They are not in the same organisation any more -- `smartwatchbanden` moved to
+`BWJ-Development` on September 7, 2026 and its `BWJ-ecommerce` predecessor is archived, with no
+redirect behind the old name -- so the org is deliberately left out of the scope. What has not changed
+is the pair. They are one business (BWJ) running two Shopify stores that behave
 identically and differ only in brand, so they handle a discovered issue the same way. This page is
 that way, written once so neither repo can drift from the other.
 
@@ -71,8 +74,10 @@ issues across the two -- and that state holds only if every filing from here on 
 repos on September 1, 2026, because the type already carried them: all 28 `bug` issues held type `Bug`
 and all 16 `enhancement` issues held `Feature`. Nothing was lost with them, and they are not re-added.
 
-**`documentation` was deliberately kept** (Dave). The `BWJ-ecommerce` org has exactly three issue types
-and none of them is Documentation, so its 42 doc issues sit on `Task` and `Feature`. Deleting the label
+**`documentation` was deliberately kept** (Dave). Both BWJ orgs have exactly three issue types and none
+of them is Documentation -- measured September 7, 2026: `gh api orgs/<org>/issue-types` returns Task,
+Bug and Feature in `BWJ-ecommerce` and in `BWJ-Development` alike, so the store that moved took the
+same three with it -- and the 42 doc issues sit on `Task` and `Feature`. Deleting the label
 would have buried them in a 91-issue `Task` pile -- that is not *covered by the type*, that is lost. A
 `Documentation` type was considered and not taken: issue types are **org-wide**, so adding one would put
 it in every BWJ repo, which is a wider decision than these two.

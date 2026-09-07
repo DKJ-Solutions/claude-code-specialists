@@ -1,7 +1,11 @@
 # dkj-policy-bwj -- BWJ's shared extra layer, packaged so two repos cannot drift on it
 
-**This is the shared law layer for BWJ's two Shopify stores -- `BWJ-ecommerce/smartwatchbanden` and
-`BWJ-ecommerce/xoxowildhearts`.** The two repos are identical in behaviour and differ only in brand,
+**This is the shared law layer for BWJ's two Shopify stores -- `smartwatchbanden` and
+`xoxowildhearts`.** The two repos are named by **store, not by org**, deliberately: they sat side by
+side in `BWJ-ecommerce` until September 7, 2026, when `smartwatchbanden` moved to `BWJ-Development` as
+a fresh repo and the old one was archived. There is no redirect behind the old name, and the move may
+not be finished -- so an org in a scope statement is a fact with a shelf life, while the store names
+are what this plugin is actually about. The two repos are identical in behaviour and differ only in brand,
 and the connector register already flags them as the pair most at risk of quietly diverging. This
 plugin is the thing that holds them together on the points that belong to exactly these two repos
 and to none of the others Dave runs.

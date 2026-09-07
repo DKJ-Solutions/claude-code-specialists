@@ -1,7 +1,8 @@
 # The sync log -- the portable rule
 
-**This page applies in exactly two repos: `BWJ-ecommerce/smartwatchbanden` and
-`BWJ-ecommerce/xoxowildhearts`.** It is chapter two of this plugin, beside
+**This page applies in exactly two repos, named by store rather than by org: `smartwatchbanden` and
+`xoxowildhearts`** -- see [`WORKFLOW-portable.md`](WORKFLOW-portable.md) for why the org is left out.
+It is chapter two of this plugin, beside
 [`WORKFLOW-portable.md`](WORKFLOW-portable.md), and it answers one question that chapter does not:
 **what a sync owes.**
 

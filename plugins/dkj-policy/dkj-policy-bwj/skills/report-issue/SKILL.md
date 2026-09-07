@@ -3,7 +3,7 @@ name: report-issue
 description: >-
   File a discovered issue the BWJ way -- GitHub first (the source of truth, classified at creation with
   its issue type and the `tier-1` reach label), then a colleague-facing Asana task, cross-linked both
-  ways. Use this in BWJ-ecommerce/smartwatchbanden or BWJ-ecommerce/xoxowildhearts whenever a real
+  ways. Use this in a BWJ store repo -- smartwatchbanden or xoxowildhearts, whichever org -- whenever a real
   finding needs tracking: a bug, a broken customer-facing behaviour, a stale doc, a decision that is
   not yours to make. The Asana card lands in the board's `Filed` section -- tracked on GitHub now --
   because the board's sections are the cycle's stages. The GitHub issue always gets created
@@ -21,8 +21,11 @@ colleague-facing translation is a judgement call, not a transform. The full rule
 
 ## Before you start
 
-- Confirm you are in a BWJ store repo (`BWJ-ecommerce/smartwatchbanden` or
-  `BWJ-ecommerce/xoxowildhearts`). This procedure applies nowhere else.
+- Confirm you are in a BWJ store repo: `git remote get-url origin` ends in `smartwatchbanden` or
+  `xoxowildhearts`. This procedure applies nowhere else. **Match the repo NAME, not the org** -- these
+  two are no longer in one organisation (`smartwatchbanden` moved to `BWJ-Development` on
+  September 7, 2026, its `BWJ-ecommerce` predecessor is archived, and there is no redirect), so a
+  check written against an org path refuses in the live repo it was meant to serve.
 - Confirm `gh auth status` is clean.
 - Read `Get-AsanaWorkspaceGid` and `Get-AsanaProjectGid` from the repo's `scripts/repo-config.ps1`.
   If either is missing, run [`adopt-dkj-policy-bwj`](../adopt-dkj-policy-bwj/SKILL.md) first.
@@ -46,7 +49,7 @@ gh issue create --repo <owner>/<repo> --title "<precise technical title>" --body
 
 | what to set | how to decide it |
 |---|---|
-| `--type` | **Bug** for a defect in behaviour that already exists, **Feature** for a capability the store does not have yet, **Task** for everything else -- which is most of it, doc findings included. Always one of the three; the `BWJ-ecommerce` org has no others |
+| `--type` | **Bug** for a defect in behaviour that already exists, **Feature** for a capability the store does not have yet, **Task** for everything else -- which is most of it, doc findings included. Always one of the three; both BWJ orgs have exactly these and no others (measured September 7, 2026 -- `gh api orgs/<org>/issue-types` returns Task, Bug, Feature in `BWJ-ecommerce` and in `BWJ-Development` alike) |
 | `--label tier-1` | **only** where management or the commissioner would notice it. The test is whether that reader notices the **defect**, not whether the file renders to them: a customer-facing template with a developer-only defect is tier 0, and a build script whose breakage stops a release the business is waiting on is not. **In doubt, leave it off** |
 | `--label documentation` | on a doc finding, on top of its type -- the one content distinction the three types cannot express here |
 
