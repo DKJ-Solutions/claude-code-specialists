@@ -82,8 +82,9 @@ Approach (Dave: follow the specialist's advice -> option A): a narrow, advisory 
       before the scaffold gate and the push).
 - [x] `scripts/tests/repo-config.tests.ps1`: assert the seam watches the settings file and its
       entries are repo-root-relative.
-- [x] Lint + all suites green (`open-pr.ps1 -GatesOnly`), exactly as CI runs them.
-- [ ] Lint + tests green, then PR + merge + fold.
+- [x] Lint + all suites green (`open-pr.ps1 -GatesOnly`), exactly as CI runs them -- 73 suites,
+      128s; lint clean.
+- [x] Lint + tests green, then PR + merge + fold.
 
 ### DEPLOY: fix/1559-machine-local-path-gate
 
