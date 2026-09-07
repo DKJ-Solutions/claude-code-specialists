@@ -92,6 +92,9 @@ would do to it.
 3. **Reads the conflict-check reference point** -- *before* the pull, on the state the pull is about to
    change. Reading it afterwards would read it off a tree that already holds live's version of
    everything, which is the one ordering mistake that leaves the check useless while looking fine.
+   The commit it prints here is the repo's most recent sync; **the base each path is actually judged
+   against is asked per path in step 6**, and the two are the same commit only for the paths that sync
+   happened to take.
 4. **Decides the sync branch's name**, before anything is pulled. A name that cannot be created is a
    reason to stop while the tree is still clean, not after several hundred files have been written.
    **Then asks `origin` whether a sync branch from a PREVIOUS run is still standing, and refuses if one
@@ -164,6 +167,29 @@ capturing nothing is useless:
 the trunk changed the same path recently -- both sides moved -- and refuse. So a wrong floor now costs an
 extra conflict report, never silent data loss, which is a far better failure mode for the piece of this
 that is hardest to get right.
+
+**And the floor is asked PER PATH, not once per run** (inbound
+[#1535](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1535)). The paragraph above is
+only true of a floor that is too *old*. A floor taken once for the whole run is systematically too
+*recent* for every path the last sync did not take -- because a sync commit establishes agreement with
+live only for the paths it actually **took**, and for any other path it is just a trunk commit newer than
+the trunk's own work there. Measured from such a base the trunk looks stationary, the both-sides-moved
+arm cannot fire, and the conflict is taken silently.
+
+| | |
+|---|---|
+| what it cost, measured in a consumer | **six** paths verdicted `take-live` where the trunk was a strict **superset** of live. Across five locale files, **0** keys would have come in from live against **6** key-deletions and **7** string reversions -- including four strings reverted from English back to Dutch in the *default* locale -- plus a canonical-URL rewrite deleted from `layout/theme.liquid`. The sync it measured from had taken 167 files and none of those six. |
+| the repair | each differing path is judged against **its own** base: the most recent sync commit that touched *that* path. |
+| a path no sync has ever taken | has **no** agreement point, so nothing can prove live moved alone -- that is a **conflict** to reconcile by hand, not a take. This is the arm that would have held back all six. |
+
+**No tag fallback per path, deliberately.** A tag is a release marker and says nothing about agreement
+with live; the repo-wide answer uses one only as a deliberately wide heuristic window. Reading a tag as
+one path's agreement point would reintroduce this same defect by a second route, and silently, which is
+how the first one survived.
+
+**The two conflicts are reported separately**, because they lead you to different work: *both sides
+moved* means there are two sets of changes to merge, and *nothing is known to have agreed* means the
+path has never been reconciled at all.
 
 ## Why it stops before the merge
 
@@ -263,7 +289,7 @@ default beside it. `adopt-shopify-floor` writes the block; the two required ones
 |---|---|---|
 | `Get-ShopifyLiveThemeId` | **required** | which theme is live. A non-numeric answer counts as no answer, exactly as the guard reads it -- a `VUL-IN` left in place would otherwise read as answered. |
 | `Get-ShopifyStoreDomain` | **required** | the store the pull reads from. `-Store` gets you through one run; answering the seam is the durable fix. |
-| `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the pattern that recognises a previous sync commit. It is matched against the commit **subject** read as its own field, so it is a .NET regex -- not git's `--grep`, which the lookup no longer uses. |
+| `Get-ShopifySyncReferencePattern` | `^[Ss]ync` | the pattern that recognises a sync commit. It is matched against the commit **subject** read as its own field, so it is a .NET regex -- not git's `--grep`, which the lookup no longer uses. It applies to the repo-wide answer and to each path's own base alike. |
 | `Get-ShopifySyncBranchPrefix` | `sync/live-` | the drift branch's prefix. It has to line up with whatever your PR guardrails and CI exempt, which is why it is yours to set. |
 | `Get-ShopifySyncMerges` | `$false` | `$true` opens the PR and merges it once CI is green. |
 | `Get-ShopifySyncPrBody` | *(none)* | the PR body. Called with `-Take`, `-Keep` (the classified rows, each carrying `Status`/`Path`/`Reason`) and `-Default` (the body the script composed), and it returns the body to use. |
@@ -311,7 +337,7 @@ otherwise see it arrive as brand-new foreign content on every single run.
 | the working tree is not clean | commit or stash. Your work would otherwise be committed as third-party drift. Or pass `-DryRun`, which writes nothing. |
 | `Get-ShopifyLiveThemeId` does not answer with a theme id | run `shopify theme list` and answer it -- see the `adopt-shopify-floor` skill. |
 | no store domain | answer `Get-ShopifyStoreDomain`, or pass `-Store` for this run. |
-| **no reference point: no matching commit and no tag** | the floor no longer decides who wins a file, but it is what notices that **both** sides changed the same path -- and without it such a conflict would be taken silently. Tag the current state, or sync by hand this once. |
+| **no reference point: no matching commit and no tag** | this repo has no sync history at all, so no path has an agreement point with live and nothing can tell third-party drift from work the trunk has simply not pushed yet. Tag the current state, or sync by hand this once. **Kept as deliberate conservatism since #1535**, not as a guard against data loss: a path with no agreement point is now *reported* rather than taken, so such a run would conflict on everything foreign instead of overwriting it -- but a first-ever reconciliation is better done by a person than read off a hundred-path conflict list. |
 | **REFUSING TO SYNC: both sides changed these paths** | the one case nothing can decide for you. Nothing was written. Run the `git diff --no-index` line it prints for each path, merge the two by hand, commit that, and run the sync again. |
 | twenty sync branches already exist for today | something is wrong upstream of this; nothing was written. |
 | **a sync branch from a previous run is still standing** | look at what it holds and merge or close it, then run this again. Nothing was pulled and nothing was written. `-DryRun` answers whether *this* run supersedes it without writing anything; `-AllowStacking` runs anyway where the two are genuinely independent. |

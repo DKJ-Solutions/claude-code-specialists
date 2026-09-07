@@ -183,18 +183,102 @@ function Get-SyncReferencePoint {
         [string]$Pattern = (Get-SyncDefaultReferencePattern)
     )
 
-    # The pattern is applied to the SUBJECT FIELD, not through '--grep'. See the note above: '--grep'
-    # is line-oriented over the whole message, so the match has to happen outside it. Reading the
-    # subject as its own field is the only way to ask the question the rule actually means.
-    $sync = Invoke-SyncGitQuiet log --no-merges '--format=%H%x09%s' $Ref |
-        Where-Object { $_ -and (($_ -split "`t", 2)[1] -match $Pattern) } |
-        Select-Object -First 1
-    if ($sync) { return @{ Ref = [string]($sync -split "`t", 2)[0]; Kind = 'sync' } }
+    $sync = Get-SyncCommitShas -Ref $Ref -Pattern $Pattern | Select-Object -First 1
+    if ($sync) { return @{ Ref = [string]$sync; Kind = 'sync' } }
 
     $tag = Invoke-SyncGitQuiet describe --tags --abbrev=0 $Ref |
         Where-Object { $_ } | Select-Object -First 1
     if ($tag) { return @{ Ref = [string]$tag; Kind = 'tag' } }
 
+    return $null
+}
+
+function Get-SyncCommitShas {
+    <#
+    .SYNOPSIS
+        The commits whose SUBJECT matches the sync pattern, newest first -- optionally only those that
+        touched one path.
+
+    .DESCRIPTION
+        THE SUBJECT SCAN, ONCE. Get-SyncReferencePoint's whole docstring above is about where this
+        pattern may be applied and why '--grep' cannot do it; extracting the scan is what keeps that
+        reasoning attached to ONE implementation now that Get-SyncPathReferencePoint asks the same
+        question about a single path. Two copies of "match the pattern against the subject field" is how
+        a repair lands on one of them.
+
+        '--no-merges' AND THE SUBJECT MATCH ARE BOTH LOAD-BEARING -- see Get-SyncReferencePoint, which
+        carries the two measurements (inbound #801 and #819) that put them there.
+
+        -Path IS PASSED AFTER '--', through an array plus splatting, for the pitfall this file's header
+        names: a bare '--' written inline into a native call does not reach git, and the pathspec is then
+        read as a revision. It matters more here than in most places -- a path the trunk has DELETED
+        errors without it, Invoke-SyncGitQuiet swallows the error, and the caller sees an empty history,
+        which reads as "no agreement point" and is the protective direction only by luck.
+
+        A PATHSPEC SEARCHES HISTORY, NOT THE CURRENT TREE, which is what makes a deleted path answerable
+        at all -- the same property Test-MainTouchedSince relies on and pins with a test of its own.
+    #>
+    param(
+        [string]$Ref = 'HEAD',
+        [string]$Pattern = (Get-SyncDefaultReferencePattern),
+        [string]$Path
+    )
+
+    $logArgs = @('log', '--no-merges', '--format=%H%x09%s', $Ref)
+    if ($Path) { $logArgs += @('--', $Path) }
+
+    return @(Invoke-SyncGitQuiet @logArgs |
+        Where-Object { $_ -and (($_ -split "`t", 2)[1] -match $Pattern) } |
+        ForEach-Object { [string]($_ -split "`t", 2)[0] })
+}
+
+function Get-SyncPathReferencePoint {
+    <#
+    .SYNOPSIS
+        The commit at which ONE path is known to have agreed with live: the most recent sync commit that
+        actually touched it. $null where there is none.
+
+    .DESCRIPTION
+        THE DEFECT THIS REPAIRS (inbound #1535, September 7, 2026), and it arrived as a green run. The
+        floor was Get-SyncReferencePoint's answer, taken GLOBALLY and then handed to
+        Test-MainTouchedSince for every path. But a sync commit only establishes agreement with live for
+        the paths that sync actually TOOK. For every other path it is simply a trunk commit that happens
+        to be newer than the trunk's own work there -- so "the trunk has not moved on this path since the
+        base" came back $true for work that had moved, the both-sides-moved branch could not fire, and
+        live was taken over merged-but-unpushed own work.
+
+        MEASURED IN A CONSUMER: six paths verdicted 'take-live' where the trunk was a strict superset of
+        live. Across five locale files, 0 keys would have come in from live against 6 key-deletions and 7
+        string reversions -- including four strings reverted from English back to Dutch in the DEFAULT
+        locale, and a canonical-URL rewrite deleted from layout/theme.liquid. The previous sync
+        (167 files) had touched none of those six, and the own work resolving the previous round of
+        conflicts on exactly those paths sat three days behind that sync commit.
+
+        THE ANSWER IS PER PATH, AND $null IS A REAL ANSWER RATHER THAN A FAILURE. Where no sync ever took
+        this path, there is no moment at which it is known to have agreed with live -- so nothing can
+        prove live moved alone, and Get-SyncFileVerdict must report rather than take. That is what
+        -PathAgreementKnown carries.
+
+        NO TAG FALLBACK, deliberately, and this is the one place this file's reasoning parts company with
+        Get-SyncReferencePoint. A tag is a release marker: it says nothing whatever about agreement with
+        live, and Get-SyncReferencePoint uses it only as a deliberately WIDE heuristic window. Reading a
+        tag as a per-path agreement point would reintroduce this very defect by a second route -- a base
+        that post-dates the trunk's work on a path it never reconciled -- and it would do it silently,
+        which is how the first one survived. Absent a sync commit for the path, the honest answer is that
+        there is none.
+
+        COST: one 'git log' per differing path whose content is foreign, bounded by that path's own
+        history. It sits beside Test-LiveContentIsOurs, which already spends one 'git rev-parse' per
+        commit touching the path, so it does not change the shape of what a run costs.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Ref = 'HEAD',
+        [string]$Pattern = (Get-SyncDefaultReferencePattern)
+    )
+
+    $sha = Get-SyncCommitShas -Ref $Ref -Pattern $Pattern -Path $Path | Select-Object -First 1
+    if ($sha) { return [string]$sha }
     return $null
 }
 
@@ -260,6 +344,20 @@ function Test-MainTouchedSince {
 # trunk changed the same path recently -- both sides moved -- and refuse. A wrong floor then costs an
 # extra conflict report rather than silent data loss, which is a far better failure mode for the piece of
 # this that is hardest to get right.
+#
+# AND THE FLOOR IS PER PATH, NOT GLOBAL (inbound #1535, September 7, 2026). The sentence above is only
+# true of a floor that is too OLD. A floor taken globally is systematically too RECENT for every path the
+# last sync did not take -- a sync commit establishes agreement with live only for the paths it actually
+# TOOK, and for any other path it is just a trunk commit newer than the trunk's own work there. From such
+# a base the trunk reads as stationary, the both-sides-moved arm cannot fire, and the conflict is taken
+# silently. Measured in a consumer: six paths verdicted take-live where the trunk was a strict superset
+# of live, 0 keys coming in from five locale files against 6 deletions and 7 reversions.
+#
+# So Get-SyncPathReferencePoint answers per path, and where it answers $null there is no agreement point
+# at all -- which is a conflict rather than a take, because "live's content is foreign" then does not
+# mean live moved alone, it means nobody can say. This is the same hole as inbound #353 one layer down:
+# that one was diagnosed as the time-window rule and repaired by moving to content provenance. Content
+# provenance is the right question; it was being asked against a base that was not per path.
 # ----------------------------------------------------------------------------------------------------
 
 function Convert-GitQuotedPath {
@@ -528,10 +626,24 @@ function Get-SyncFileVerdict {
           A  only live has it             keep-trunk (no resurrection)  take-live
           D  only the trunk has it        keep-trunk (never delete)     keep-trunk (never delete)
 
-        * the only place the floor is still consulted, and it can only ever escalate to a human: live's
-          content is foreign AND the trunk has changed this path since the floor, so BOTH sides moved.
-          Taking either would lose the other, so nothing is decided -- the caller refuses and reports.
-          This is why a wrong floor now costs extra conflict reports instead of silent data loss.
+        * the only place the base is still consulted, and it can only ever escalate to a human. TWO ways
+          this cell reaches a conflict, and they are reported separately because they lead a person to
+          different work:
+
+            BOTH SIDES MOVED -- there is a per-path agreement point and the trunk has changed the path
+            since it. Taking either side would lose the other, so nothing is decided.
+
+            NOTHING IS KNOWN TO HAVE AGREED -- no sync ever took this path, so there is no moment at
+            which the trunk and live are known to have matched (-PathAgreementKnown $false). Live's
+            content being foreign then does NOT mean live moved alone; it means nobody can say. This arm
+            is inbound #1535, and without it the answer here was 'take-live' -- which is how six paths
+            in a consumer were verdicted as third-party drift while the trunk held a strict superset of
+            live.
+
+          The old note here said "a wrong floor now costs extra conflict reports instead of silent data
+          loss". That was true of a floor that is too OLD and false of one that is too RECENT, and a
+          global floor is systematically too recent for every path the last sync did not take. It is
+          true again now, because a base that cannot be established reports instead of deciding.
 
         WHY 'D' IS UNCONDITIONAL. A path the trunk has and live does not is either a file the trunk added
         that was never pushed, or a file a third party deleted on live. The first must be kept, the second
@@ -542,7 +654,13 @@ function Get-SyncFileVerdict {
     param(
         [Parameter(Mandatory = $true)][ValidateSet('M', 'A', 'D')][string]$Status,
         [Parameter(Mandatory = $true)][bool]$LiveContentIsOurs,
-        [bool]$MainTouchedSinceFloor = $false
+        [bool]$MainTouchedSinceFloor = $false,
+        # DEFAULTS TO $false, THE PROTECTIVE DIRECTION, and that is the whole reason it is a new
+        # parameter rather than a wider meaning for the one above. A caller that does not answer this
+        # gets 'conflict' on the M+foreign cell -- a report a person reads -- instead of the silent
+        # 'take-live' that made inbound #1535. The old default sat on the other side of that choice by
+        # accident: the floor was optional, and an unanswered floor meant "live moved alone".
+        [bool]$PathAgreementKnown = $false
     )
 
     if ($Status -eq 'D') {
@@ -556,8 +674,16 @@ function Get-SyncFileVerdict {
         return [pscustomobject]@{ Action = 'keep-trunk'; Reason = 'live holds a version this repo has had before; the trunk has moved on since' }
     }
 
-    if ($Status -eq 'M' -and $MainTouchedSinceFloor) {
-        return [pscustomobject]@{ Action = 'conflict'; Reason = 'live has foreign content AND the trunk changed this path since the last sync -- both sides moved, so neither is taken' }
+    if ($Status -eq 'M') {
+        if ($MainTouchedSinceFloor) {
+            return [pscustomobject]@{ Action = 'conflict'; Reason = 'live has foreign content AND the trunk changed this path since the last sync that took it -- both sides moved, so neither is taken' }
+        }
+        # 'A' DELIBERATELY DOES NOT REACH THIS. A path only live has costs nothing to take: there is no
+        # trunk copy to lose, so an unknown agreement point changes no answer there -- which is also why
+        # the existing A+both cell stays 'take-live'.
+        if (-not $PathAgreementKnown) {
+            return [pscustomobject]@{ Action = 'conflict'; Reason = 'live has foreign content and no sync ever took this path, so there is no point at which the two are known to have agreed -- reconcile by hand' }
+        }
     }
 
     return [pscustomobject]@{ Action = 'take-live'; Reason = 'content this repo has never held for this path: a third party wrote it on live' }
