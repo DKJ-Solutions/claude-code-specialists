@@ -346,6 +346,37 @@ function Get-PrMergeMethod {
     return $script:PrMergeMethod
 }
 
+# --- Machine-local tracked paths -- files a `git add -A` can sweep into a branch (issue #1559) ----
+#
+# A tracked file that a person edited for THEIR OWN clone -- .claude/settings.json with four extra
+# plugins enabled locally and "autoUpdate": false -- rides into a branch commit on a `git add -A` and
+# past every gate: measured on PR #1557, where it reached the merge queue. The scaffold, step-list,
+# backing, impact and link gates all read the branch's development document, never the diff's file
+# set; the backing gate reads the diff but asks the opposite question (work MISSING from the commit,
+# not surplus in it). So open-pr.ps1 probes this list and, when the branch's committed diff touches
+# one of these paths, says so -- twice, advisory, never a refusal. The refusal shape was declined in
+# the issue on purpose: a branch that legitimately changes the shared settings file must not need an
+# escape valve, and this repo has scar tissue from findings-list gates (the stale-path check, 124
+# findings, all false).
+#
+# The sanctioned home for machine-local plugin enablement is .claude/settings.local.json, which is
+# gitignored -- so the note points there. #303 (v3.0.7) already documented that
+# `claude plugin install --scope project` writes enabledPlugins into the tracked settings.json; this
+# is the gate side of the same class.
+#
+# OPTIONAL and probed with Get-Command, following Get-PrAssignee / Get-PrDescriptionPlaceholder
+# rather than the script contract: absent or an empty return means "nothing is machine-local here"
+# and the gate stays silent. A repo-root-relative path; end an entry with '/' to match a whole
+# directory rather than one file.
+$script:MachineLocalPaths = @('.claude/settings.json')
+
+function Get-MachineLocalPaths {
+    <# Repo-root-relative paths whose edits belong to a clone, not the tree. open-pr.ps1 reports
+       (never refuses) when the branch's committed diff touches one. A trailing '/' matches a
+       directory. Return @() to disable the check. #>
+    return $script:MachineLocalPaths
+}
+
 # --- What cut-release.ps1 does differently per repo (issue #417) -----------------------------------
 #
 # cut-release.ps1 became a SHARED script in #417, after an audit in a second consumer found the two
