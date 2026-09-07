@@ -40,7 +40,56 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**11 entries pending** -- 7 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 11 reach it. <!-- pending-tally -->
+**12 entries pending** -- 8 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 12 reach it. <!-- pending-tally -->
+
+### DEPLOY: feat/1546-retire-merge-queue-policy · 20260907-172625
+
+A GitHub merge queue is no longer this workflow's policy. **Detect-and-rebase is** -- `ship-pr` dates the
+run behind your required check, counts what the trunk gained after it, and refuses the merge when that is
+not zero, naming the commits and the way forward. It converges by repetition rather than by construction,
+and unlike a queue it runs anywhere.
+
+**The queue was prescribed to readers who are not allowed to have one.** GitHub offers merge queue on a
+private repo only under Enterprise Cloud, and otherwise only on a public repo owned by an organization;
+on Free, Pro or Team it hides the *Require merge queue* checkbox rather than disabling it. The policy was
+set in this workflow's source repo, which is public and therefore qualifies through the public clause --
+the one repo where the constraint cannot be felt. A private consumer built the entire floor beneath the
+setting before the missing checkbox surfaced.
+
+**So `adopt-merge-queue` no longer reports a missing queue as a gap.** It is a note saying this is the
+ordinary state. The gap that survives is the one every repo can close and should: **a required status
+check**, because that is the certificate the staleness guard dates itself from, and without one `ship-pr`
+says so and skips the step. The command now also names the trap under that instruction -- the
+`branch-entry` gate this plugin ships **cannot** be that check, since it reads `github.head_ref`, which is
+empty outside a pull request.
+
+**And the two CI runners are every repo's, queue or no queue.** What breaks the fold is a merge the
+shipping session does not observe, and the GitHub UI merge button produces one in every repository on
+earth; a queue only made it the normal case. Only the `merge_group` trigger is queue-only, and in a repo
+without one it is inert.
+
+Where a repo does run a queue nothing is taken away: `ship-pr` still enqueues, and both runners still
+catch what that merge skips.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own developers and the consuming repos, and neither is a subscriber of
+a service. The consumers do get the substance at the next release: an instruction they could not follow
+becomes one they can, and the `[gap]` they could never close stops being reported as one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Retire the merge queue as policy -- detect-and-rebase is the mechanism every repo can run
+
+Plugins: dkj-policy
+
+[PR #1550](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1550)
+
+---
 
 ### DEPLOY: fix/1536-boardless-stage-floor · 20260907-161113
 
