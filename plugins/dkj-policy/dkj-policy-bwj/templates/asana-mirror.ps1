@@ -1497,7 +1497,12 @@ function Update-MirroredTask {
     if ($task.completed) { return 0 }
     if (Test-MirrorUpdatePosted -Gid $Gid -IssueRef $IssueRef -Pat $AsanaPat) { return 0 }
 
-    $closure = Get-IssueClosure -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1])
+    # NO -StatusField, deliberately. This step writes a comment and moves no card, so the project
+    # status is not its question -- the stage sweep is the caller that steers on it. Asking anyway
+    # would spend the projectItems round trip on an answer nobody reads, and would print the
+    # GH_PROJECT_TOKEN notice once per swept issue in a repo that has not set one.
+    $closure = Get-IssueLinkState -Repo ($IssueRef -split '#')[0] -Number ([int]($IssueRef -split '#')[1]) `
+                   -StatusField ''
     $text = New-MirrorComment -IssueRef $IssueRef -Event 'closed' -ClosedBy $closure.PullRequests -StateReason $closure.StateReason
     Add-AsanaComment -Gid $Gid -Text $text -Pat $AsanaPat
     $how = if ($MatchedBy) { " (matched by $MatchedBy)" } else { '' }
