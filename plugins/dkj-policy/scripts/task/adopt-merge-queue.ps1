@@ -283,12 +283,28 @@ $foldRunner = @(
     '# That is why nothing else is ever added to this job. Rotate it before it expires or this job starts',
     '# failing its push with no code-level cause.',
     '#',
-    '# READ THE FOLD STEP''S OWN LAST LINES BEFORE CONCLUDING ANYTHING FROM A RED RUN. Two entirely',
-    '# different things turn this job red -- the fold refusing, and the fold succeeding and its push being',
-    '# rejected by the ruleset -- and only the log tells them apart.',
+    '# READ THE FOLD STEP''S OWN LAST LINES BEFORE CONCLUDING ANYTHING FROM A RED RUN. THREE different',
+    '# things turn this job red, and only the log tells them apart (inbound #1539):',
+    '#   1. the CHECKOUT failing -- an absent or under-scoped FOLD_PUSH_TOKEN fails actions/checkout, and',
+    '#      every later step then shows `skipped`. Rule this one out FIRST: it is the only cause that',
+    '#      leaves the fold step with no last lines to read at all. A fine-grained PAT lists repositories',
+    '#      one by one, so a repo created rather than transferred (an org move with no GitHub transfer',
+    '#      does exactly that) silently falls outside an existing token''s selection.',
+    '#   2. the fold REFUSING -- it ran and declined; its own last lines say why.',
+    '#   3. the fold SUCCEEDING and its push being rejected by the ruleset -- a clean fold above a GH013.',
     '#',
-    '# NO CONCURRENCY CANCELLATION. This job WRITES: cancelling a fold in progress is exactly the silent',
-    '# skip it exists to close, so every push gets its own run and none is dropped.',
+    '# THE FIRST CHECKOUT TAKES THE TRUNK TIP, NOT THE EVENT SHA (inbound #1543). On a push event',
+    '# actions/checkout defaults to github.sha; ship-pr then folds locally and pushes on top within',
+    '# seconds, so by the time this slower runner reads the tree the trunk has already moved and the',
+    '# checkout is one commit behind origin -- which the fold''s trunk-gap guard (#1405) then refuses on,',
+    '# turning every ship-pr merge into a false red. Checking out the trunk tip makes this job answer the',
+    '# question it exists for -- "does the trunk carry a leftover NOW" -- so a fold ship-pr already did is',
+    '# simply not found, and the trunk-gap guard is unreachable here rather than load-bearing.',
+    '#',
+    '# NO CONCURRENCY CANCELLATION, AND A CONSTANT GROUP (inbound #1544). This job WRITES and pushes to',
+    '# the trunk: cancel-in-progress: false so no push is dropped, AND a group name that is constant per',
+    '# trunk (github.ref, not github.sha) so two trunk pushes close together QUEUE instead of racing for',
+    '# the trunk -- a per-SHA group is its own group every time and serialises nothing.',
     '#',
     '# WINDOWS: the shared scripts target Windows PowerShell 5.1, which is what ''shell: powershell'' is.',
     'name: Fold on merge',
@@ -305,15 +321,19 @@ $foldRunner = @(
     ('    branches: [' + $trunk + ']'),
     '',
     'concurrency:',
-    '  group: fold-on-merge-${{ github.sha }}',
+    '  group: fold-on-merge-${{ github.ref }}',
     '  cancel-in-progress: false',
     '',
     'jobs:',
     '  fold-on-merge:',
     '    runs-on: windows-latest',
     '    steps:',
+    '      # ref: the trunk tip, not the pushed SHA -- see the header comment (inbound #1543). This job',
+    '      # asks whether the trunk carries a leftover NOW, and a fold ship-pr already pushed on top of',
+    '      # the merge commit must not read as still-unfolded here.',
     '      - uses: actions/checkout@v5',
     '        with:',
+    ('          ref: ' + $trunk),
     '          token: ${{ secrets.FOLD_PUSH_TOKEN }}',
     '',
     '      - name: Fetch the shared workflow scripts',
@@ -396,9 +416,11 @@ $resolvesRunner = @(
     '# on the trunk, because an entry is what a fold needs. This check has to run for EVERY merge --',
     '# including one carrying no changelog entry at all -- so it resolves its PRs from the push itself.',
     '#',
-    '# NO CONCURRENCY CANCELLATION: this job ACTS, so letting a later push supersede an in-flight run',
-    '# would drop the verification of whatever the earlier push carried. Two runs overlapping is harmless',
-    '# -- the second finds every issue already closed and says so.',
+    '# NO CONCURRENCY CANCELLATION, AND A CONSTANT GROUP (inbound #1544): this job ACTS, so letting a',
+    '# later push supersede an in-flight run would drop the verification of whatever the earlier push',
+    '# carried -- cancel-in-progress: false. The group is keyed on github.ref, not github.sha, so it is',
+    '# constant per trunk; two overlapping runs are harmless here (the second finds every issue already',
+    '# closed) but a constant group keeps them ordered anyway.',
     '#',
     '# WINDOWS: the shared scripts target Windows PowerShell 5.1, which is what ''shell: powershell'' is.',
     'name: Verify resolved issues',
@@ -415,7 +437,7 @@ $resolvesRunner = @(
     ('    branches: [' + $trunk + ']'),
     '',
     'concurrency:',
-    '  group: verify-resolved-${{ github.sha }}',
+    '  group: verify-resolved-${{ github.ref }}',
     '  cancel-in-progress: false',
     '',
     'jobs:',
@@ -541,8 +563,11 @@ if ($created -gt 0) {
     Write-Host '  A merge_queue rule blocks every direct push to the trunk, and the default GITHUB_TOKEN' -ForegroundColor Yellow
     Write-Host '  cannot be given a bypass. Create a fine-grained PAT owned by somebody who already bypasses' -ForegroundColor Yellow
     Write-Host '  the ruleset, scoped to this repository and to Contents: Read and write, and store it as' -ForegroundColor Yellow
-    Write-Host '  the repository secret FOLD_PUSH_TOKEN. Without it the fold commits and its push is' -ForegroundColor Yellow
-    Write-Host '  rejected -- which is the same merged-but-unfolded state, reached one step later.' -ForegroundColor Yellow
+    Write-Host '  the repository secret FOLD_PUSH_TOKEN. Without it -- or with one that does not grant this' -ForegroundColor Yellow
+    Write-Host '  repository -- actions/checkout FAILS and the job never reaches the fold: every later step' -ForegroundColor Yellow
+    Write-Host '  shows skipped. Create it BEFORE you merge the floor, not after. (A fine-grained PAT lists' -ForegroundColor Yellow
+    Write-Host '  repositories one by one, so a repo created rather than transferred falls outside an' -ForegroundColor Yellow
+    Write-Host '  existing token''s selection.)' -ForegroundColor Yellow
 }
 Write-Host ''
 

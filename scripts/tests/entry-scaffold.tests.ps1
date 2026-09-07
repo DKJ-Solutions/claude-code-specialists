@@ -455,14 +455,22 @@ Assert-Equal $footer (Format-EntryFoldFooter -Number 468 -Url 'https://gh.test/p
 
 # THE DATE ITSELF IS STILL THE PR'S RATHER THAN THE CLOCK'S -- the reasoning the line used to carry, now
 # living on the stamp. Same three cases, one heading up.
+#
+# RENDERED IN UTC, and asserted to the second (inbound #1542): since #1280 this stamp is
+# Get-EntryInsertOffset's sort key, so it has to be the SAME string on every machine. These asserts used
+# to allow an adjacent day ('2026080[45]', '2026080[56]') to tolerate .ToLocalTime() shifting the date
+# under a non-UTC runner -- exactly the timezone dependence #1542 removes. The exact value is now the
+# point: '2026-08-05T09:14:00Z' is '20260805-091400' in every timezone.
 $stampOnTime = Format-EntryMergeStamp -MergedAt '2026-08-05T09:14:00Z' -FallbackNow '20990101-000000'
-Assert-True ($stampOnTime -match '^2026080[45]-\d{6}$') 'the stamp is the PR merge moment'
+Assert-Equal '20260805-091400' $stampOnTime 'the stamp is the PR merge moment, rendered in UTC to the second'
 Assert-True ($stampOnTime -notmatch '2099') 'the PR timestamp wins over the fallback -- the clock is not consulted when gh answered'
+# A non-Z offset is normalised to UTC, not kept: 11:14+02:00 is the same instant as 09:14Z.
+Assert-Equal '20260805-091400' (Format-EntryMergeStamp -MergedAt '2026-08-05T11:14:00+02:00' -FallbackNow '20990101-000000') 'an offset timestamp is converted to UTC, so the same instant renders the same stamp'
 # THE CASE THE WHOLE MECHANISM IS ABOUT: a fold that runs the day after the merge must still date the
 # entry by the merge, not by the run. Measured in this repo -- unfolded entries were once found in the
 # root the morning after they landed.
 $stampLate = Format-EntryMergeStamp -MergedAt '2026-08-05T23:30:00Z' -FallbackNow '20260807-101500'
-Assert-True ($stampLate -match '^2026080[56]-') 'a late fold still dates the entry by the merge, not by the day it was folded'
+Assert-Equal '20260805-233000' $stampLate 'a late fold still dates the entry by the merge (UTC), not by the day it was folded'
 # No timestamp: a PR found but not yet merged, which -Branch mode can reach. Then "now" really is the
 # best available answer, so the fallback is used rather than the stamp being dropped.
 Assert-Equal '20260805-120000' (Format-EntryMergeStamp -FallbackNow '20260805-120000') 'no merge timestamp: the caller-supplied moment is used'

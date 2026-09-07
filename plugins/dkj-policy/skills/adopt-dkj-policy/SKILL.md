@@ -357,9 +357,20 @@ repository secret `FOLD_PUSH_TOKEN`. Two things follow that are worth knowing be
 - it **expires**, and when it does the job starts failing its push with no code-level cause. Rotate it
   before then.
 
-Without the secret the fold commits and its push is rejected -- which is the same merged-but-unfolded
-state, reached one step later. A red run of that job therefore has two entirely different causes, and only
-the log tells them apart: **read the fold step's own last lines before concluding anything.**
+An absent or under-scoped `FOLD_PUSH_TOKEN` fails `actions/checkout` -- the job never reaches the fold,
+and every later step shows `skipped`. So create it **before** you merge the floor, not after. (A
+fine-grained PAT lists repositories one by one, so a repo **created** rather than transferred -- which is
+what an org move without a GitHub transfer produces -- silently falls outside an existing token's
+selection.)
+
+A red run of that job has **three** entirely different causes, and only the log tells them apart:
+
+1. the **checkout** failing on the token -- rule this out first, it is the only one that leaves every
+   later step `skipped` and the fold step with no last lines at all;
+2. the fold **refusing** -- it ran and declined; its own last lines say why;
+3. the fold **succeeding** and its push being rejected by the ruleset -- a clean fold above a `GH013`.
+
+**Read the fold step's own last lines before concluding anything** -- once there is a fold step to read.
 
 ### Exit code
 

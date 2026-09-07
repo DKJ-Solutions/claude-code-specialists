@@ -897,8 +897,11 @@ foreach ($file in $entryFiles) {
         # the day before, in the one document whose subject is when things landed. Test-EntryHasSection is
         # the same reader the emptiness gate uses for "absent versus empty", so the two cannot disagree
         # about which shape they are looking at.
+        # The fallback is UTC, matching Format-EntryMergeStamp's own rendering (inbound #1542): since
+        # #1280 this stamp is Get-EntryInsertOffset's sort key, and a local-time fallback on one machine
+        # would sort against UTC stamps written on another.
         $mergeStamp = Format-EntryMergeStamp -MergedAt ([string]$prs[0].mergedAt) `
-            -FallbackNow (Get-Date -Format 'yyyyMMdd-HHmmss')
+            -FallbackNow ((Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss'))
         $stampFitsTheHeading = Test-EntryHasSection -EntryText $entryContent -Key 'PullRequest'
         $entryContent = $entryContent.TrimEnd() + "$nl$nl" + (Format-EntryFoldFooter `
             -Number $num -Url $prs[0].url `

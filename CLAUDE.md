@@ -344,7 +344,8 @@ The constitution above, concretely implemented here:
   a stated decision rather than by a side effect**: it holds `issues: write`, the first such grant here,
   and it is its own workflow precisely so that scope never sits in the same job as the standing
   `FOLD_PUSH_TOKEN`. All three are Sylvester's; the reasoning, that decision, and
-  how to tell those two red runs apart, are in
+  how to tell the three ways `fold-on-merge.yml` goes red apart (the checkout failing on the token, the
+  fold refusing, the fold succeeding and its push rejected — inbound #1539), are in
   [his lens](.claude/specialists/lenses/05-15-extension.md#what-sylvester-owns-here).
 - **Three deliberate exceptions to "never directly on `main`", each one bounded.** Together they are
   one procedure read end to end — **fold the changelog, bump the version, write the release notes** —
