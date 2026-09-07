@@ -746,6 +746,59 @@ $vTwoBad = Get-MergeBlockVerdict -RequiredChecksJson '[{"bucket":"pass","name":"
 Assert-NameSet @('branch-entry') $vTwoBad.FailedRequired 'the SECOND of two required checks failing is still seen'
 Assert-True $vTwoBad.Blocked 'and it blocks'
 
+# --- UnfinishedRequired: the pending list, returned rather than only spoken (inbound #1549) -------
+# This function already computed which required checks had not concluded and only ever handed it to the
+# caller as prose inside Reason. The one caller that had to ACT on it -- ship-pr's green path, deciding
+# whether a green `--watch` exit really means every required check finished -- had no field to read, and
+# so read nothing. Measured September 7, 2026 in a consumer (`dkj-policy` 4.31.0,
+# BWJ-Development/smartwatchbanden PR #529): `.github/dependabot.yml` passed in 1s, ship-pr called CI
+# green after 5s, and the merge was refused by the base branch policy while required `Shopify theme
+# check` (2m1s) was still pending.
+#
+# THE ASSERTS BELOW PIN THE FIELD, NEVER THE VERDICT. Every Blocked value above is unchanged and stays
+# unchanged: a caller reading this field can only ever WAIT longer, which is why the fail-open assert is
+# the load-bearing one here rather than an edge case.
+$pr529Required = '[{"bucket":"pending","name":"Shopify theme check","state":"PENDING"}]'
+$pr529All      = '[{"bucket":"pass","completedAt":"2026-09-07T12:00:01Z","name":".github/dependabot.yml","state":"SUCCESS"},{"bucket":"pending","name":"Shopify theme check","state":"PENDING"},{"bucket":"pending","name":"branch-entry","state":"PENDING"}]'
+$v529 = Get-MergeBlockVerdict -RequiredChecksJson $pr529Required -ChecksJson $pr529All
+Assert-NameSet @('Shopify theme check') $v529.UnfinishedRequired 'PR #529 shape: the pending REQUIRED check is named in the field, not only in the reason'
+Assert-True $v529.Blocked 'and the verdict it always gave is unchanged'
+
+# THE FAIL-OPEN HALF, and the assert this whole change stands or falls on. An unreadable required list
+# still BLOCKS -- that is #943's conservative half and must not move -- but it reports NO unfinished
+# names, because nothing was read. The green path waits only on a non-empty list, so this is what keeps
+# the invariant intact: an unreadable payload can never turn a GREEN run red, and a repo with no ruleset
+# at all (GitHub Free, nothing required) never enters that wait.
+foreach ($bad in @('', '   ', 'not json at all', '[]', '[{"noname":1}]')) {
+    $vBadU = Get-MergeBlockVerdict -RequiredChecksJson $bad -ChecksJson $pr529All
+    Assert-True $vBadU.Blocked "an unreadable required list ('$bad') still refuses on a FAILING run"
+    Assert-NameSet @() $vBadU.UnfinishedRequired "and reports no unfinished names, so a GREEN run is left green ('$bad')"
+}
+
+# Every required check green -> nothing to wait for. Without this the green path would spin forever on
+# the ordinary case, which is the one way this change could have broken every ship in the repo.
+Assert-NameSet @() $v.UnfinishedRequired 'PR #937 shape: required green -> nothing unfinished, so the green path breaks out as before'
+Assert-NameSet @() $vTwo.UnfinishedRequired 'two required checks, both green -> nothing unfinished'
+
+# Not-green is broader than pending, exactly as the Blocked asserts above already require: a required
+# record whose state cannot be read is a check nobody has proved green, so the green path waits on it
+# too rather than merging past it.
+Assert-NameSet @('lint-en-tests') $vPend.UnfinishedRequired 'a pending required check is unfinished'
+Assert-NameSet @('lint-en-tests') $vUnk.UnfinishedRequired 'so is one whose state cannot be read -- unknown is not a synonym for pass here either'
+
+# Only the unfinished ones, and the 5.1 flattening pitfall the block above measured applies here too.
+$vMixed = Get-MergeBlockVerdict -RequiredChecksJson '[{"bucket":"pass","name":"lint-en-tests","state":"SUCCESS"},{"bucket":"pending","name":"branch-entry","state":"IN_PROGRESS"}]' -ChecksJson $pr529All
+Assert-NameSet @('branch-entry') $vMixed.UnfinishedRequired 'one of two required checks pending -> only that one is named'
+Assert-True $vMixed.Blocked 'and a half-finished required list is not a green merge'
+
+# THE FIELD IS ON EVERY SHAPE, so a caller reading it does not have to know which branch produced the
+# verdict. A missing property reads as $null under StrictMode and @($null).Count is 1 -- i.e. a shape
+# that forgot the field would send the green path into a wait on a name that does not exist.
+foreach ($shape in @($v, $vReq, $vPend, $vUnk, $v529, $vMixed, $vTwo, $vTwoBad, $vNoAll)) {
+    Assert-True ($null -ne $shape.PSObject.Properties['UnfinishedRequired']) 'every verdict shape carries UnfinishedRequired, including the ones that cannot have any'
+}
+Assert-NameSet @() $vReq.UnfinishedRequired 'a required check that FAILED is failed, not unfinished -- it belongs in FailedRequired'
+
 # The same pitfall in Get-CheckWaitReport's required-name parse, which had been there since #831 and
 # mislabelled every wait in any repo with more than one required check.
 $twoChecks = '[{"name":"a","startedAt":"2026-08-26T16:00:00Z","completedAt":"2026-08-26T16:07:10Z"},{"name":"b","startedAt":"2026-08-26T16:00:00Z","completedAt":"2026-08-26T16:15:43Z"}]'
@@ -836,6 +889,21 @@ Assert-True ($shipText -like '*Fix CI and re-run, or merge manually once green.*
 $idxWatch   = $shipText.IndexOf("'--watch'")
 $idxVerdict = $shipText.IndexOf('Get-MergeBlockVerdict')
 Assert-True ($idxWatch -ge 0 -and $idxVerdict -gt $idxWatch) 'the wait still happens FIRST and the verdict second -- #831 kept the wait, #943 changed only the verdict'
+
+# AND THE GREEN PATH READS THE PENDING LIST (inbound #1549). The field asserts above prove the function
+# reports it; these prove the caller acts on it. Same failure mode as the pins above and worse here,
+# because the defect being closed is precisely a call site that had the facts in hand and broke past
+# them: reverting this one line would leave every assert in this suite green while ship-pr merged past
+# a pending required check again.
+Assert-True ($shipText -like '*.UnfinishedRequired*') 'ship-pr.ps1 reads the pending-required list, not just the --watch exit code, before calling CI green'
+$idxGreenBreak = $shipText.IndexOf('$pendingRequired.Count -eq 0')
+Assert-True ($idxGreenBreak -gt $idxVerdict -or $shipText -like '*$pendingRequired.Count -eq 0*') 'and it breaks out of the wait only when that list is EMPTY'
+Assert-True ($shipText -like '*went green off a NOT-required check*') 'a green watch over a pending required check re-enters the wait, in a sentence that says which reading was wrong'
+Assert-True ($shipText -like '*still not finished after*') 'and the bounded case refuses rather than merging into the base-branch policy'
+# The fail-open direction, pinned as text because it is a decision rather than a behaviour this suite can
+# drive: the caller must spin on a NON-EMPTY list, so an unreadable payload (empty list, per the asserts
+# above) leaves a green run green.
+Assert-True ($shipText -like '*FAIL-OPEN ON AN UNREADABLE PAYLOAD*') 'and the call site records that an unreadable required list does not start a wait'
 
 # THE FALLBACK LINE IS ABOUT THE PAYLOAD, NOT ABOUT THE RULESET (inbound #1083). $line3 above already
 # proves a repo that requires NOTHING still gets a rendered report -- so the fallback is not that repo's

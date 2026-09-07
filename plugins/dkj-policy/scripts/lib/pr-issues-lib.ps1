@@ -909,7 +909,8 @@ function Get-MergeBlockVerdict {
     <#
     .SYNOPSIS
         Whether a failing CI run actually blocks the merge -- i.e. whether what failed is a check the
-        repo's ruleset REQUIRES. Returns Blocked / Reason / FailedRequired / FailedOther.
+        repo's ruleset REQUIRES. Returns Blocked / Reason / FailedRequired / FailedOther /
+        UnfinishedRequired.
 
     .DESCRIPTION
         ship-pr.ps1 waits for every check a PR has and used to read the exit code of
@@ -945,6 +946,21 @@ function Get-MergeBlockVerdict {
         is a worse defect than the one being repaired. `gh pr checks --required` prints nothing and exits
         non-zero where a ruleset requires nothing, which is exactly that case.
 
+        AND SINCE INBOUND #1549 THE PENDING LIST IS RETURNED, NOT ONLY SPOKEN. `$unfinishedRequired` was
+        already computed here and only ever reached the caller as prose inside `Reason`, so the one
+        caller that needed to ACT on it -- ship-pr's step 3, deciding whether a green `--watch` exit is
+        really green -- had no field to read and broke past this function entirely. That is the whole
+        defect #1549 reported: `gh pr checks --watch` watches the checks registered when it STARTS, so a
+        fast non-required check reporting first exits 0 while the required one is still pending, and the
+        script called CI green after 5s and was refused by the base-branch policy at the merge. Measured
+        in a consumer on September 7, 2026 (`dkj-policy` 4.31.0, BWJ-Development/smartwatchbanden PR
+        #529): required `Shopify theme check` pending at 0s and green at 2m1s, and a plain
+        `gh pr merge` succeeded unchanged once it finished.
+
+        THE VERDICT ITSELF IS UNTOUCHED, which is the same sentence every sibling note here gives. This
+        change adds a field; it does not move a single Blocked decision, and it cannot let a merge
+        through -- the caller reading the new field only ever WAITS longer.
+
     .PARAMETER RequiredChecksJson
         `gh pr checks <pr> --required --json name,bucket,state` output. The verdict is made from this and
         from nothing else.
@@ -960,10 +976,18 @@ function Get-MergeBlockVerdict {
     )
 
     $unreadable = [pscustomobject]@{
-        Blocked        = $true
-        Reason         = 'the required-check list could not be read, so which checks this ruleset requires is unknown -- refusing on the CI failure, exactly as before'
-        FailedRequired = @()
-        FailedOther    = @()
+        Blocked            = $true
+        Reason             = 'the required-check list could not be read, so which checks this ruleset requires is unknown -- refusing on the CI failure, exactly as before'
+        FailedRequired     = @()
+        FailedOther        = @()
+        # EMPTY BECAUSE NOTHING WAS READ, and the asymmetry that produces is deliberate (inbound
+        # #1549). On the FAILURE path this shape still refuses, exactly as it always did. On the GREEN
+        # path the caller waits only on a NON-EMPTY list, so an unreadable payload leaves a green run
+        # green -- which is what keeps this function's founding invariant intact: an unreadable payload
+        # can never turn a GREEN run red. "This ruleset requires nothing" and "the required checks have
+        # not reported yet" are indistinguishable from here, and only one of the two is worth waiting
+        # on, so the tie is broken towards not waiting.
+        UnfinishedRequired = @()
     }
 
     if (-not $RequiredChecksJson -or -not $RequiredChecksJson.Trim()) { return $unreadable }
@@ -992,20 +1016,22 @@ function Get-MergeBlockVerdict {
     if ($failedRequired.Count -gt 0) {
         $it = if ($failedRequired.Count -eq 1) { 'it' } else { 'they' }
         return [pscustomobject]@{
-            Blocked        = $true
-            Reason         = "the ruleset REQUIRES $(Format-CheckNameList -Names $failedRequired), and $it failed"
-            FailedRequired = $failedRequired
-            FailedOther    = @()
+            Blocked            = $true
+            Reason             = "the ruleset REQUIRES $(Format-CheckNameList -Names $failedRequired), and $it failed"
+            FailedRequired     = $failedRequired
+            FailedOther        = @()
+            UnfinishedRequired = $unfinishedRequired
         }
     }
 
     if ($unfinishedRequired.Count -gt 0) {
         $has = if ($unfinishedRequired.Count -eq 1) { 'has' } else { 'have' }
         return [pscustomobject]@{
-            Blocked        = $true
-            Reason         = "the required check $(Format-CheckNameList -Names $unfinishedRequired) $has not finished, or its state could not be read -- so the merge is not green"
-            FailedRequired = @()
-            FailedOther    = @()
+            Blocked            = $true
+            Reason             = "the required check $(Format-CheckNameList -Names $unfinishedRequired) $has not finished, or its state could not be read -- so the merge is not green"
+            FailedRequired     = @()
+            FailedOther        = @()
+            UnfinishedRequired = $unfinishedRequired
         }
     }
 
@@ -1035,10 +1061,14 @@ function Get-MergeBlockVerdict {
         'what failed is not a check the ruleset requires'
     }
     return [pscustomobject]@{
-        Blocked        = $false
-        Reason         = "every required check passed ($(Format-CheckNameList -Names $requiredNames)); $what"
-        FailedRequired = @()
-        FailedOther    = $failedOther
+        Blocked            = $false
+        Reason             = "every required check passed ($(Format-CheckNameList -Names $requiredNames)); $what"
+        FailedRequired     = @()
+        FailedOther        = $failedOther
+        # Necessarily empty on this path -- reaching it means both lists above were empty -- and carried
+        # anyway so every shape this function returns has the same fields. A caller that reads
+        # UnfinishedRequired must not have to know which branch produced its verdict.
+        UnfinishedRequired = $unfinishedRequired
     }
 }
 
