@@ -40,7 +40,31 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 entries pending** -- 5 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 9 reach it. <!-- pending-tally -->
+**10 entries pending** -- 6 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 10 reach it. <!-- pending-tally -->
+
+### DEPLOY: docs/1526-canonical-repo-owner-name · 20260907-160338
+
+`CLAUDE.md` now states which owner name to cite this repo under — `DKJ-Solutions/claude-code-specialists`
+— and why the old one only works through a redirect the repo does not control. New writing has a
+convention to copy instead of the nearest example. Existing `DaveKJohn/` citations are left to be
+corrected as files are touched; the archived release history stays as written.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — internal documentation convention. No subscriber of any service notices a change in how this
+repo's own docs cite its GitHub URL.
+
+**Score:** N/A
+
+#### Pull Request
+
+State DKJ-Solutions as the canonical repo owner name for new writing
+
+[PR #1547](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1547)
+
+---
 
 ### DEPLOY: fix/1523-connectors-bwj-rename-catchup · 20260907-140434
 
