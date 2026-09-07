@@ -10,19 +10,14 @@
   },
   "enabledPlugins": {
     "dkj-team-alpha@claude-code-specialists": true,
-    "dkj-policy@claude-code-specialists": true,
-    "dkj-policy-bwj@claude-code-specialists": true,
-    "dkj-team-ecomm@claude-code-specialists": true,
-    "dkj-team-lifehub@claude-code-specialists": true,
-    "dkj-team-shopify@claude-code-specialists": true
+    "dkj-policy@claude-code-specialists": true
   },
   "extraKnownMarketplaces": {
     "claude-code-specialists": {
       "source": {
         "source": "github",
         "repo": "DKJ-Solutions/claude-code-specialists"
-      },
-      "autoUpdate": false
+      }
     }
   }
 }
