@@ -454,6 +454,46 @@ Assert-True ($null -eq (Get-SubmitterFromNotes -Notes $notes -Pattern '')) 'and 
 Assert-Equal '' ([string]$statusMap.SubmitterPattern) 'which is what the DEFAULT map does, so stage 6 is opt-in per repo'
 Assert-True ($null -eq (Get-SubmitterFromNotes -Notes $notes -Pattern '(unclosed')) 'a pattern that will not compile names nobody rather than throwing mid-sweep'
 
+# --- a repo with NO project board (inbound #1536) --------------------------------------------------
+# An empty FieldName is the repo SAYING it has no board, which is the declaration that did not exist
+# before. Without it a board-less repo derived $null for every issue, which also switched off the
+# feedback promotion below -- so closing an issue told the submitter it was ready and left their card
+# where it stood. Four stages lost, not the three the docs described.
+$boardless = @{ FieldName = ''; Statuses = @{}; SubmitterPattern = $withPattern.SubmitterPattern }
+Assert-Equal 0 (Test-GithubStatusMap -Map $boardless).Count 'a map naming no project field validates -- "this repo has no board" is an answer, not a gap'
+
+$bothWays = @{ FieldName = ''; Statuses = @{ 'Done' = 'InReview' }; SubmitterPattern = '' }
+Assert-True (((Test-GithubStatusMap -Map $bothWays) -join ' ') -match 'not both') 'while saying there is no board AND naming its columns is refused as a half-finished edit'
+
+# The floor comes off the issue itself, and only here.
+Assert-Equal $map.InReview      (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed' -StatusMap $boardless -Map $map) 'with no board a closed issue floors at In review'
+Assert-Equal $map.InDevelopment (Get-StageFloorForIssue -State 'OPEN' -StatusMap $boardless -Map $map -HasLinkedPullRequest) 'an open one with a pull request linked floors at In development'
+Assert-Equal $map.Filed         (Get-StageFloorForIssue -State 'OPEN' -StatusMap $boardless -Map $map) 'and an open one with nothing linked floors at Filed'
+Assert-True ($null -eq (Get-StageFloorForIssue -State '' -StatusMap $boardless -Map $map)) 'while an issue GitHub could not be asked about floors nowhere -- nothing is derived from silence'
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'not_planned' -StatusMap $boardless -Map $map)) 'and the not_planned guard outranks the fallback too -- nothing was built, so nothing is staged'
+Assert-Equal $shifted.InReview (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed' -StatusMap $boardless -Map $shifted) 'the numbers come off the stage map here as well, or the fallback is literals'
+
+foreach ($case in @(@{ S = 'CLOSED'; P = $false }, @{ S = 'OPEN'; P = $true }, @{ S = 'OPEN'; P = $false })) {
+    $f = Get-StageFloorForIssue -State $case.S -StatusMap $boardless -Map $map -HasLinkedPullRequest:$case.P
+    Assert-True (Test-StageIsWritable -Stage $f -Map $map) "the board-less derivation never leaves the writable range ($($case.S), PR=$($case.P))"
+    Assert-True ($f -ne $map.ReadyToTest) "and never reaches Ready to test off the floor alone ($($case.S), PR=$($case.P)) -- that stays the feedback rule's"
+}
+
+# THE HEADLINE: the promotion this issue was filed about now fires without a board.
+$t = Resolve-TargetStage @closed -StatusMap $boardless -Map $map -Submitter 'Jordy Navarro' -SubmitterTold
+Assert-Equal $map.ReadyToTest $t.Stage 'a closed issue in a board-less repo IS handed back to the submitter -- the transition #1536 measured as silently lost'
+$t = Resolve-TargetStage @closed -StatusMap $boardless -Map $map -Submitter 'Jordy Navarro'
+Assert-Equal $map.InReview $t.Stage 'and the two conditions still both apply -- an untold submitter waits in In review exactly as with a board'
+$t = Resolve-TargetStage -State 'OPEN' -StatusMap $boardless -Map $map -Labels @('needs-info')
+Assert-Equal $map.NeedsInfo $t.Stage 'the needs-info label still outranks everything, board or no board'
+$t = Resolve-TargetStage -State 'OPEN' -StatusMap $boardless -Map $map
+Assert-True ($t.Why -match 'no project board') 'and the log says the stage came off the issue, so a move is still attributable'
+
+# THE CONTAINMENT, and it is the assert that matters most: a repo that HAS a board is untouched, and
+# the pull-request fact cannot leak onto that path -- the September 2, 2026 rule is not weakened.
+Assert-True ($null -eq (Get-StageFloorForIssue -State 'OPEN' -ProjectStatus '' -StatusMap $statusMap -Map $map -HasLinkedPullRequest)) 'where a repo names a project field, a linked pull request derives NOTHING -- an issue off that board stays off it'
+Assert-Equal $map.Filed (Get-StageFloorForIssue -State 'CLOSED' -StateReason 'completed' -ProjectStatus 'Todo' -StatusMap $statusMap -Map $map -HasLinkedPullRequest) 'and the column still outranks the issue there -- the status is the source, unchanged'
+
 # Terminal, and it OUTRANKS -AllowBackward: a card the submitter is holding is never taken back.
 Assert-True (Test-StageIsTerminal -Stage $map.ReadyToTest -Map $map) 'a card in Ready to test is never moved out of it'
 Assert-True (Test-StageIsTerminal -Stage $map.Completed   -Map $map) 'nor one in Completed'

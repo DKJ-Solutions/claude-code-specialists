@@ -120,12 +120,25 @@
     still goes out and simply names no pull request, and sweep (d) derives no stage rather than
     guessing one.
 
-    AND THE STAGE SWEEP NEEDS A SECOND TOKEN, in GH_PROJECT_TOKEN. `GITHUB_TOKEN` cannot read an
-    organization's Projects v2 -- there is no `permissions:` key that grants it -- so with the
-    workflow's own token the status field comes back as an error rather than a value. That failure is
-    contained rather than fatal: the query retries once without projectItems, so the close update goes
-    out exactly as before and only the staging goes quiet, naming the missing token. Set
-    GH_PROJECT_TOKEN to a PAT that can read the org's projects to turn staging back on.
+    AND THE STAGE SWEEP NEEDS A SECOND TOKEN, in GH_PROJECT_TOKEN -- WHERE THERE IS A BOARD.
+    `GITHUB_TOKEN` cannot read an organization's Projects v2 -- there is no `permissions:` key that
+    grants it -- so with the workflow's own token the status field comes back as an error rather than a
+    value. That failure is contained rather than fatal: the query retries once without projectItems, so
+    the close update goes out exactly as before and only the staging goes quiet, naming the missing
+    token. Set GH_PROJECT_TOKEN to a PAT that can read the org's projects to turn staging back on.
+
+    A REPO WITH NO PROJECT BOARD SAYS SO AND NEEDS NEITHER (inbound #1536). Give Get-GithubStatusMap an
+    empty FieldName and no Statuses: the projectItems query is then never sent, so GH_PROJECT_TOKEN is
+    not read at all, and Get-StageFloorForIssue derives the floor from the issue itself -- closed means
+    InReview, an open issue with a linked pull request means InDevelopment, an open one without means
+    Filed. Everything above still holds for a repo that HAS a board; nothing on that path changed.
+
+    THAT DECLARATION EXISTS BECAUSE ITS ABSENCE WAS SILENT AND COST FOUR STAGES, not three. Advising
+    GH_PROJECT_TOKEN is no answer where there is no board to read, and a $null floor also disabled the
+    ReadyToTest promotion -- which is reached from a floor of InReview and is the one stage no column
+    names. So closing an issue told the submitter the work was ready and left their card where it was.
+    The sweep now says in one line when a whole run derived nothing, whichever of the three reasons it
+    was, so the same failure cannot be quiet again -- see Invoke-StageSweep.
 
     The comment text is English, like everything else this repo ships. It is the workflow speaking,
     not the subject -- the same boundary a BWJ store repo already draws when it keeps its ticket
@@ -446,6 +459,9 @@ function Get-DefaultGithubStatusMap {
         as a follower when it can find them in Asana.
     #>
     return @{
+        # The project field the three middle stages are read off. EMPTY means this repo has no project
+        # board at all, and then the floor is derived from the issue instead -- see Get-StageFloorForIssue
+        # and Test-GithubStatusMap (inbound #1536). Leave Statuses empty when you say that.
         FieldName        = 'Status'
         Statuses         = @{
             'Todo'        = 'Filed'          # on the board, nothing linked yet
@@ -582,27 +598,47 @@ function Test-GithubStatusMap {
         columns anything, but a value that is not a stage of the cycle can never be looked up in the
         stage map, and would read as stage 0 at runtime -- silently, which is the failure this
         validation exists to make loud.
+
+        AN EMPTY FieldName IS A REAL ANSWER, NOT A GAP: 'this repo has no project board' (inbound
+        #1536). It is the one declaration a repo could not make before, which is why the failure that
+        issue reported was silent -- with no way to SAY there is no board, a board-less repo was
+        indistinguishable from a misconfigured one, and Resolve-GithubStatusMap handed it the built-in
+        map naming three columns it does not have. Get-StageFloorForIssue reads this same emptiness and
+        derives the floor from the issue instead; Get-IssueLinkState already skips the projectItems
+        query on an empty -StatusField, so such a repo needs no GH_PROJECT_TOKEN at all.
+
+        SAYING BOTH IS REFUSED. An empty FieldName beside a Statuses table that still names columns is
+        a half-finished edit, not a configuration: it reads as 'there is no board' and 'here are its
+        columns' at once, and guessing which half was meant is how a board-less repo would silently
+        get board behaviour back. One or the other, and the complaint says so.
     #>
     param([AllowNull()]$Map)
 
     if (-not $Map) { return @('the status map is empty') }
 
-    $bad = @()
-    if (-not ([string]$Map.FieldName)) { $bad += 'FieldName names no project field' }
-
     $statuses = $Map.Statuses
+    $named    = if ($statuses -is [System.Collections.IDictionary]) { @($statuses.Keys) } else { @() }
+
+    if (-not ([string]$Map.FieldName)) {
+        if ($named.Count -gt 0) {
+            return @("FieldName names no project field -- which says this repo has no project board -- while Statuses still names $($named.Count) column(s) of one. Say either that there is a board or that there is none, not both.")
+        }
+        return @()
+    }
+
+    $bad = @()
     if (-not $statuses)            { return @($bad + 'Statuses names no status at all') }
     if (-not ($statuses -is [System.Collections.IDictionary])) {
         return @($bad + 'Statuses is not a name-to-stage table')
     }
-    if (@($statuses.Keys).Count -eq 0) { $bad += 'Statuses names no status at all' }
+    if ($named.Count -eq 0) { $bad += 'Statuses names no status at all' }
 
     # What a STATUS may name is narrower than what this script may write. ReadyToTest is writable, but
     # only the feedback rule may reach it -- a status that named it would hand a card to the submitter
     # on a column change instead of on an actual handover.
     $stageKeys = @('Requests', 'NeedsInfo', 'Filed', 'InDevelopment', 'InReview', 'ReadyToTest', 'Completed')
     $mappable  = @('NeedsInfo', 'Filed', 'InDevelopment', 'InReview')
-    foreach ($k in @($statuses.Keys)) {
+    foreach ($k in $named) {
         $v = [string]$statuses[$k]
         if (-not $v)                    { $bad += "status '$k' names no stage"; continue }
         if ($stageKeys -notcontains $v) { $bad += "status '$k' names '$v', which is not a stage of the cycle"; continue }
@@ -797,6 +833,13 @@ function Get-StageFloorForIssue {
             no status, or one the map misses     $null         this issue is on no pipeline
             closed as not planned                $null         nothing was built, so nothing to stage
 
+        AND WHERE THE REPO HAS NO BOARD AT ALL, the issue itself is read instead:
+
+            closed                               InReview      the work is done
+            open, a pull request linked           InDevelopment somebody is building it
+            open, nothing linked                  Filed         on the tracker, not started
+            no state (GitHub could not be asked)  $null         nothing is derived from silence
+
         THE PROJECT STATUS IS THE SOURCE, and the issue's own state is no longer read for this (Dave,
         September 2, 2026). Stages Filed, InDevelopment and InReview are linked to the three statuses
         of the project board and must always be in sync with them -- so this reads that field instead
@@ -805,9 +848,31 @@ function Get-StageFloorForIssue {
         'Item closed' sets Done); doing it a second time here made two writers of one fact, which is a
         race rather than a sync.
 
+        THAT RULE IS UNCHANGED WHEREVER THERE IS A BOARD, and the fallback below cannot weaken it
+        (inbound #1536). The two-writers race it removed exists only when a board is present -- it IS
+        GitHub's project workflow being the other writer -- so a derivation that fires only where there
+        is no board has no second writer to race with. A repo naming a FieldName takes exactly the path
+        it took before, to the line.
+
+        WHAT THE MISSING FALLBACK COST, because it is not the three stages it looks like. With no board
+        the floor was $null for every issue, and a $null floor also switched off the ONE promotion that
+        is not a column at all: Resolve-TargetStage reaches ReadyToTest only from a floor already at
+        InReview, so closing an issue stopped handing the card back to the submitter -- the transition
+        the whole board model exists for. The close update still went out, so the person was told the
+        work was ready while their card never moved, and no run failed. Four stages, not three, and the
+        fourth was the one nobody had written down as depending on a board.
+
+        IT IS THE REPO'S DECLARATION THAT SWITCHES THIS ON, never a missing status. Those are two
+        different facts that both used to arrive as $null: 'this repo has no board' and 'this issue is
+        not on the board'. Only the first may derive a stage -- deriving one from the second would stage
+        every issue a board deliberately leaves off its pipeline, which is the failure Select-ProjectStatus
+        refuses by design ('a missing status must never read as stage 0'). An empty FieldName is that
+        declaration and is repo-wide, so within a board-less repo the second case cannot arise.
+
         THE not_planned GUARD SURVIVES THE CHANGE, and it has to. 'Item closed' sets Done whatever the
         reason, so a ticket closed as 'will not be built' arrives here looking exactly like a finished
-        one. Nothing was built, so nothing is staged.
+        one. Nothing was built, so nothing is staged. It is checked FIRST, so it outranks the fallback
+        too -- a board-less repo closing a ticket as not planned stages nothing either.
 
         A FLOOR, not a position, and that is what makes the daily sweep safe to run. Sync-AsanaTaskStage
         moves forward only, which is what protects the one hop CI cannot see: a session that opened a
@@ -825,12 +890,24 @@ function Get-StageFloorForIssue {
         [AllowEmptyString()][string]$StateReason = '',
         [AllowNull()][AllowEmptyString()]$ProjectStatus = $null,
         [Parameter(Mandatory = $true)]$StatusMap,
-        [Parameter(Mandatory = $true)]$Map
+        [Parameter(Mandatory = $true)]$Map,
+
+        # Does a pull request close, or would it close, this issue? Get-IssueLinkState's PullRequests.
+        # Read ONLY on the board-less path -- where there is a board, GitHub's own project workflow has
+        # already turned this same fact into the 'In Progress' column and that column is the source.
+        [switch]$HasLinkedPullRequest
     )
 
     if ($State -and $State.ToUpperInvariant() -eq 'CLOSED' -and
         $StateReason -and $StateReason.ToLowerInvariant() -eq 'not_planned') {
         return $null
+    }
+
+    if (-not ([string]$StatusMap.FieldName)) {
+        if (-not $State)                             { return $null }
+        if ($State.ToUpperInvariant() -eq 'CLOSED')  { return [int]$Map.InReview }
+        if ($HasLinkedPullRequest)                   { return [int]$Map.InDevelopment }
+        return [int]$Map.Filed
     }
 
     return Get-StageForProjectStatus -Status $ProjectStatus -StatusMap $StatusMap -Map $Map
@@ -881,7 +958,11 @@ function Resolve-TargetStage {
         [AllowNull()][AllowEmptyString()][string]$Submitter = '',
 
         # Has that submitter already been told the issue is closed? Test-MirrorUpdatePosted.
-        [switch]$SubmitterTold
+        [switch]$SubmitterTold,
+
+        # Passed straight through to Get-StageFloorForIssue, which reads it only where the repo has
+        # declared it has no project board. See its own docstring.
+        [switch]$HasLinkedPullRequest
     )
 
     $label = [string]$Map.NeedsInfoLabel
@@ -894,7 +975,8 @@ function Resolve-TargetStage {
     }
 
     $floor = Get-StageFloorForIssue -State $State -StateReason $StateReason `
-                 -ProjectStatus $ProjectStatus -StatusMap $StatusMap -Map $Map
+                 -ProjectStatus $ProjectStatus -StatusMap $StatusMap -Map $Map `
+                 -HasLinkedPullRequest:$HasLinkedPullRequest
 
     if ($null -ne $floor -and [int]$floor -eq [int]$Map.InReview -and $Submitter -and $SubmitterTold) {
         return [pscustomobject]@{
@@ -904,7 +986,10 @@ function Resolve-TargetStage {
         }
     }
 
-    $why = if ($Reopened) { 'the reopen' } elseif ($ProjectStatus) { "the project status '$ProjectStatus'" } else { 'the project status' }
+    $why = if ($Reopened)                              { 'the reopen' }
+           elseif ($ProjectStatus)                     { "the project status '$ProjectStatus'" }
+           elseif (-not ([string]$StatusMap.FieldName)) { 'the issue itself -- this repo has no project board' }
+           else                                        { 'the project status' }
     return [pscustomobject]@{
         Stage         = $floor
         AllowBackward = [bool]$Reopened
@@ -1380,8 +1465,10 @@ function Invoke-EventMode {
 
     # And the card follows. The status comes from the query above rather than from -Event, so a close
     # the API has already superseded cannot move a card on a stale reading.
+    $hasPr = (@($link.PullRequests).Count -gt 0)
     $floor = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason `
-                 -ProjectStatus $link.ProjectStatus -StatusMap $script:StatusMap -Map $script:StageMap
+                 -ProjectStatus $link.ProjectStatus -StatusMap $script:StatusMap -Map $script:StageMap `
+                 -HasLinkedPullRequest:$hasPr
     $hand = Get-SubmitterHandoff -Gid $ref.Gid -IssueRef $IssueRef -Pat $AsanaPat -Floor $floor `
                 -StatusMap $script:StatusMap -Map $script:StageMap -Labels $link.Labels
 
@@ -1389,6 +1476,7 @@ function Invoke-EventMode {
                   -ProjectStatus $link.ProjectStatus -Labels $link.Labels `
                   -StatusMap $script:StatusMap -Map $script:StageMap `
                   -Submitter $hand.Submitter -SubmitterTold:$hand.Told `
+                  -HasLinkedPullRequest:$hasPr `
                   -Reopened:($Event -eq 'reopened')
     Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $target.Stage -Pat $AsanaPat -Map $script:StageMap `
         -For $IssueRef -Why $target.Why -AllowBackward:$target.AllowBackward | Out-Null
@@ -1635,9 +1723,10 @@ function Invoke-StageSweep {
         return 0
     }
 
-    $issues = @(Get-OpenIssues -Repo $Repo) + @(Get-ClosedIssues -Repo $Repo -SinceDays $SinceDays)
-    $moved  = 0
-    $carded = 0
+    $issues   = @(Get-OpenIssues -Repo $Repo) + @(Get-ClosedIssues -Repo $Repo -SinceDays $SinceDays)
+    $moved    = 0
+    $carded   = 0
+    $unstaged = 0
     foreach ($i in $issues) {
         $ref = Resolve-AsanaTaskRef -IssueBody ([string]$i.body)
         if (-not $ref.Gid) { continue }
@@ -1645,19 +1734,33 @@ function Invoke-StageSweep {
         $link = Get-IssueLinkState -Repo $Repo -Number ([int]$i.number) `
                     -StatusField ([string]$script:StatusMap.FieldName)
         if (-not $link.State) { continue }
+        $hasPr = (@($link.PullRequests).Count -gt 0)
         $floor = Get-StageFloorForIssue -State $link.State -StateReason $link.StateReason `
-                     -ProjectStatus $link.ProjectStatus -StatusMap $script:StatusMap -Map $script:StageMap
+                     -ProjectStatus $link.ProjectStatus -StatusMap $script:StatusMap -Map $script:StageMap `
+                     -HasLinkedPullRequest:$hasPr
         $hand = Get-SubmitterHandoff -Gid $ref.Gid -IssueRef "$Repo#$($i.number)" -Pat $AsanaPat -Floor $floor `
                     -StatusMap $script:StatusMap -Map $script:StageMap -Labels $link.Labels
         $target = Resolve-TargetStage -State $link.State -StateReason $link.StateReason `
                       -ProjectStatus $link.ProjectStatus -Labels $link.Labels `
                       -StatusMap $script:StatusMap -Map $script:StageMap `
-                      -Submitter $hand.Submitter -SubmitterTold:$hand.Told
+                      -Submitter $hand.Submitter -SubmitterTold:$hand.Told `
+                      -HasLinkedPullRequest:$hasPr
+        if ($null -eq $target.Stage) { $unstaged++ }
         if (Sync-AsanaTaskStage -Gid $ref.Gid -TargetStage $target.Stage -Pat $AsanaPat `
                 -Map $script:StageMap -For "$Repo#$($i.number)" -Why $target.Why `
                 -AllowBackward:$target.AllowBackward) { $moved++ }
     }
     Write-Host "Stage sweep: $($issues.Count) issue(s) examined, $carded carrying an Asana task, $moved card(s) moved."
+
+    # AND ONE LINE WHEN THE WHOLE RUN DERIVED NOTHING (inbound #1536). Silence is what made that issue
+    # expensive: a per-issue note scrolls past, and 'N card(s) moved' reads the same on a quiet day as
+    # on a run that could not answer for a single ticket. This says which of the two it was, once, and
+    # only when every carded issue came back with no stage -- the shape of a configuration fault rather
+    # than of a board that happens to be up to date. A partial figure is deliberately not reported: one
+    # issue off the pipeline is the design working, and a line that fired on it would be noise daily.
+    if ($carded -gt 0 -and $unstaged -eq $carded) {
+        Write-Host "  NOTHING WAS STAGED: all $carded carded issue(s) derived no stage at all, so no card can move. That is a configuration fault, not a quiet day -- read the per-issue lines above for which of the three it is: the project field could not be read (set GH_PROJECT_TOKEN), the board's columns are not named in Get-GithubStatusMap, or this repo has no board and has not said so (an empty FieldName says it)."
+    }
     return $moved
 }
 
