@@ -79,6 +79,12 @@ alone rather than guessed at.
 rather than re-derived from the issue, because GitHub's own project workflows already write that field
 and deriving it twice made two writers of one fact. `Get-GithubStatusMap` is where a repo states it.
 
+**A board is not required, and a repo without one says so** -- an empty `FieldName` in that same map,
+and the three stages come off the issue instead (closed / a pull request linked / neither). That is the
+declaration the seam could not express until inbound #1536, which is what made its absence silent: the
+missing floor also switched off *ready to test* below, so closing an issue told the submitter the work
+was ready and left their card where it stood.
+
 **The stage past those is reached by FEEDBACK, not by a column:** a card moves to *ready to test* once
 the submitter has actually been told, which is the workflow's own close update -- and where a ticket
 has no submitter that stage is skipped entirely, because there is nobody to hand it to.
@@ -161,7 +167,9 @@ the project:
   Semantic keys rather than GIDs, so a rebuilt column costs nothing.
 - `Get-GithubStatusMap` -- which **GitHub Project status** each of the three middle stages is, keyed on
   the project board's own column names, plus `SubmitterPattern`: the regex over an Asana task's notes
-  that names who asked for it. **Also optional**, with one consequence worth knowing: leave the pattern
+  that names who asked for it. It is also where a repo with **no board** says so, by naming no field at
+  all; the stages then come off the issue and no `GH_PROJECT_TOKEN` is needed. **Also optional**, with
+  one consequence worth knowing: leave the pattern
   out and *ready to test* is never entered automatically, so every closed ticket waits a column short
   for a person. That is the fail-safe default rather than a fault -- a card pushed into the submitter's
   column claims a handover that never happened -- but it is silent, so it is worth stating deliberately.

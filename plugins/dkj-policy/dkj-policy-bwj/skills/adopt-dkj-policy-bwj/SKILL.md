@@ -216,16 +216,31 @@ The CI workflow needs, on the repo (Settings -> Secrets and variables -> Actions
 
 Print these as a checklist. This skill does not set secrets.
 
-**`GH_PROJECT_TOKEN` is not optional if you want the stage sweep**, and it is worth saying why rather
-than listing it. The three middle stages are read off the project board's `Status` field, and
-`GITHUB_TOKEN` -- the token the workflow gets for free -- **cannot see an organization's Projects v2 at
-all**. There is no `permissions:` key that grants it; it is not a scope this workflow can ask for.
+**`GH_PROJECT_TOKEN` is not optional if you want the stage sweep off a project board**, and it is worth
+saying why rather than listing it. The three middle stages are read off the project board's `Status`
+field, and `GITHUB_TOKEN` -- the token the workflow gets for free -- **cannot see an organization's
+Projects v2 at all**. There is no `permissions:` key that grants it; it is not a scope this workflow can
+ask for.
 
 Without the secret the workflow still runs and the close update still goes out: the query retries once
 without the project field, and the log says the status could not be read. **So the symptom is cards that
 never move, with the reason in the run log** -- which is the right failure, but only if somebody reads
 it. Say that plainly when you report, because "the mirror works" and "the board moves" are two claims
 here and the first can be true while the second is not.
+
+**ASK WHETHER THIS REPO HAS A PROJECT BOARD AT ALL, before you print the secret** (inbound
+[#1536](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1536)). Where it has none, the
+secret is not a gap to close but a line to leave out: there is nothing for the token to read. Such a repo
+says so with an empty `FieldName` and no `Statuses` in `Get-GithubStatusMap`, and the three middle stages
+then come off the issue itself -- closed means `InReview`, open with a pull request linked means
+`InDevelopment`, open with nothing linked means `Filed`. Report it as **a choice between two working
+configurations**, never as one configuration with a missing secret.
+
+**And say what the missing declaration used to cost, because it is why this paragraph exists.** With no
+board and no way to say so, every issue derived no stage -- which also switched off the promotion that is
+not a column at all: a card reaches `ReadyToTest` only from a floor already at `InReview`, so closing an
+issue no longer handed it back to the submitter. The close update still went out. The person was told the
+work was ready, their card never moved, and no run failed.
 
 **There is deliberately no workspace variable here**, and do not add one back: the CI half addresses
 every task and project by GID, so it never needs the workspace. `Get-AsanaWorkspaceGid` from step 2
@@ -322,7 +337,7 @@ query { organization(login: "<org>") { projectV2(number: <n>) {
   fields(first: 30) { nodes { ... on ProjectV2SingleSelectField { name options { name } } } } } } }'
 ```
 
-Three cases to name when you report:
+Four cases to name when you report:
 
 - **The three defaults** (`Todo` / `In Progress` / `Done`). The built-in status map fits, and
   `Get-GithubStatusMap` is optional.
@@ -330,6 +345,11 @@ Three cases to name when you report:
   and an unmapped column derives no stage, so cards simply stop moving.
 - **A fourth column** (a `Blocked`, a `Icebox`). Leave it out of the map: an unmapped status is a
   **hold**, which is the intended way to park a card outside the pipeline.
+- **No board at all** -- the query above returns nothing, or the repo's org simply keeps none. Then the
+  map is **not** optional either, and what it must say is that there is no board: an empty `FieldName`
+  with no `Statuses`. The stage then comes off the issue, and `GH_PROJECT_TOKEN` is not needed. **Do not
+  report this as the first case**: the built-in map names three columns this repo does not have, so
+  "the default fits" is exactly wrong here, and it is the reading that made inbound #1536 silent.
 
 **Also report which of the project's built-in workflows are enabled**, because they are what writes
 that field: `Item added to project`, `Pull request linked to issue` and `Item closed` are the three

@@ -421,6 +421,54 @@ knowing is to do nothing, because a missing status must never read as stage 0.
 `Item closed` sets `Done` whatever the reason, so a ticket that will never be built arrives looking
 exactly like a finished one. It derives no stage, because nothing was built.
 
+#### A repo with NO project board says so, and then the issue is read instead
+
+**The board is not a requirement of this workflow, and a repo that has none states that by giving
+`Get-GithubStatusMap` an empty `FieldName` and no `Statuses`:**
+
+```powershell
+function Get-GithubStatusMap {
+    return @{
+        FieldName        = ''   # this repo has no GitHub Project board
+        Statuses         = @{}
+        SubmitterPattern = '(?m)^\s*Requested by:\s*(.+?)\s*$'
+    }
+}
+```
+
+The sweep then never sends the `projectItems` query at all -- so **such a repo needs no
+`GH_PROJECT_TOKEN`** -- and derives the floor from the issue: **closed** means `InReview`, **open with a
+pull request linked** means `InDevelopment`, **open with nothing linked** means `Filed`. An issue GitHub
+could not be asked about derives nothing, and `closed as not planned` still derives nothing.
+
+**Saying both is refused.** An empty `FieldName` beside a `Statuses` table that still names columns
+reads as "there is no board" and "here are its columns" at once, so the validator complains instead of
+guessing which half was meant.
+
+**This does not weaken the rule above, and the reason is mechanical rather than a promise.** The
+two-writers race that made the status the source *is* GitHub's project workflow being the other
+writer -- so a derivation that fires only where there is no board has no second writer to race with. A
+repo naming a `FieldName` takes exactly the path it took before.
+
+**It is the repo's declaration that switches this on, never a missing status**, and those are two
+different facts that both used to arrive as nothing: *this repo has no board* and *this issue is not on
+the board*. Only the first may derive a stage; deriving one from the second would stage every issue a
+board deliberately leaves off its pipeline.
+
+**What its absence cost, because it is four stages and not the three this page describes** (inbound
+[#1536](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1536)). With no board every
+issue derived nothing, and that also switched off the one promotion no column names: `ReadyToTest` is
+reached from a floor already at `InReview`, so **closing an issue stopped handing the card back to the
+submitter** -- the transition the whole board model exists for. The close update still went out, so the
+person was told the work was ready while their card never moved, and no run failed. Advising a token was
+no answer either, there being no board to read.
+
+**And the sweep now says so in one line when a whole run derives nothing at all** -- naming the three
+reasons it can be: the project field could not be read, the board's columns are not named in the map, or
+the repo has no board and has not said so. Silence is what made that issue expensive: `N card(s) moved`
+reads the same on a quiet day as on a run that could not answer for a single ticket. A *partial* figure
+is deliberately not reported -- one issue off the pipeline is the design working.
+
 #### `ReadyToTest` is entered on FEEDBACK, and no status can reach it
 
 **A card advances from `InReview` to `ReadyToTest` once the submitter has actually been told** (Dave,
@@ -532,12 +580,14 @@ still a session's to make first**, and forward-only is what keeps it: a card lef
 branch is open is the one inaccuracy this model tolerates, and it corrects itself the moment the pull
 request opens and the board says `In Progress`.
 
-**And the stage sweep needs its own token.** `GITHUB_TOKEN` cannot read an organization's Projects v2
-at all -- there is no `permissions:` key that grants it -- so with the workflow's own token the status
-comes back as an error rather than a value. That failure is **contained rather than fatal**: the query
-retries once without the project field, so the close update of step 4 goes out exactly as before and
-only the staging goes quiet, naming the missing token in the log. Set `GH_PROJECT_TOKEN` to a PAT that
-can read the org's projects to turn staging on.
+**And the stage sweep needs its own token -- where there is a board.** `GITHUB_TOKEN` cannot read an
+organization's Projects v2 at all -- there is no `permissions:` key that grants it -- so with the
+workflow's own token the status comes back as an error rather than a value. That failure is **contained
+rather than fatal**: the query retries once without the project field, so the close update of step 4
+goes out exactly as before and only the staging goes quiet, naming the missing token in the log. Set
+`GH_PROJECT_TOKEN` to a PAT that can read the org's projects to turn staging on. **A repo with no board
+needs neither the token nor the board** -- it says so with an empty `FieldName` and the issue is read
+instead, per the section above.
 
 ### 7. What still needs a person
 
@@ -549,7 +599,9 @@ can read the org's projects to turn staging on.
   says which Asana section each stage is; `Get-GithubStatusMap` says which GitHub status each of the
   three middle stages is, and carries `SubmitterPattern`. Leave that pattern out and stage 6 is never
   entered automatically -- which is a working configuration, not a broken one, but it does mean every
-  card waits in `InReview` for a person.
+  card waits in `InReview` for a person. **Or say there is no board at all** -- an empty `FieldName` with
+  no `Statuses` -- and the three middle stages come off the issue instead; that is a working
+  configuration too, and the one thing this seam could not express until inbound #1536.
 - **Numbering the board's sections, once, and stating what each number means.** Step 6 reads a stage
   off the number a section's name starts with, so a board whose sections are named in prose has no
   stages and nothing is ever moved on it. That is the safe default rather than a failure -- but it is
