@@ -61,7 +61,7 @@ for this repo (the main branch, the lint gate, the fold exception, being public)
 
   **The inbound route is NOT this**, and it is carved out by name because an unstated exception is
   indistinguishable from a prohibition (inbound
-  [#1094](https://github.com/DaveKJohn/claude-code-specialists/issues/1094), August 29, 2026). Filing
+  [#1094](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1094), August 29, 2026). Filing
   an `inbound` issue on the **source repo of a plugin this repo consumes** needs no permission from
   anyone: it is the one outward-facing act this family asks a session to perform unprompted, and the
   only way a defect found in a consumer reaches the tree that can repair it. What applies to it is the
@@ -178,7 +178,7 @@ whichever machine has actually run `claude plugin install ... --scope project` f
 carries an install record keyed on its **folder path** there, and renaming or moving the checkout on
 that machine unlinks the plugin without any error. A machine that has never run that install carries no
 such record and has nothing to unlink — the record is per-machine state, not a fixed property of the
-repo (inbound [#1449](https://github.com/DaveKJohn/claude-code-specialists/issues/1449)). Both measured
+repo (inbound [#1449](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1449)). Both measured
 instances, and why detection is deliberately left alone, are in
 [the system-administration lens](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
 
@@ -201,6 +201,26 @@ loads when you touch one of those layers instead of in every session. Two things
 *without* `paths:` loads unconditionally and therefore **saves nothing** — the scoping is the saving.
 So only content that is inert until you open a matching file belongs there. Decision by Dave,
 July 20, 2026; sharpened July 21 and July 26, 2026.
+
+### Repo citation — one owner name
+
+**Cite this repo as `DKJ-Solutions/claude-code-specialists`** in every new GitHub URL, `gh --repo`
+argument, and `owner/name` reference in prose. It was transferred from the personal account
+`DaveKJohn` into the `DKJ-Solutions` organisation on September 2, 2026, and `DaveKJohn/…` now resolves
+only through a **transfer redirect this repo does not control** — it holds just as long as nothing is
+created at the old path, which is why `DaveKJohn/claude-code-specialists` must never be recreated (the
+canonical-channel note in [`README.md`](README.md#consumption)). The machine layer already treats the
+new name as canonical — `scripts/repo-config.ps1` states it once as the single source, and a fresh
+marketplace install uses it — so this is the same canon extended to prose.
+
+Both spellings resolve today, so nothing is broken and the dead-link gate is right not to flag the
+mix; the cost is that new writing copies whichever example sits nearest, and the tree held 133 `.md`
+files on the old name against 28 on the new when this was measured
+([#1526](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1526)). **Existing
+`DaveKJohn/` citations are corrected when a file is edited for other reasons, not swept.** The one
+layer left exactly as written is the archived release history under `dkj-policy/releases/**` — those
+documents are deliberately historical, the same carve-out
+[`.claude/rules/language-layers.md`](.claude/rules/language-layers.md) already makes.
 
 ### Structure — where everything lives
 
