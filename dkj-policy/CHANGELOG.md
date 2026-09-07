@@ -43,7 +43,55 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 14 minor entries** <!-- pending-tally -->
+**5 / 15 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1537-bwj-scope-org-agnostic · 20260907-175651
+
+`dkj-policy-bwj` states its scope by **store** rather than by org: `smartwatchbanden` and
+`xoxowildhearts`, in whichever organisation each currently sits. Thirteen lines across five files
+carried `BWJ-ecommerce/<store>`, and on September 7, 2026 that stopped being true --
+`smartwatchbanden` moved to `BWJ-Development` as a fresh repo, the old one was archived, and a fresh
+repo carries no redirect.
+
+**What that cost was a refusal pointed at the wrong thing.** Two of those lines are preconditions a
+session is told to enforce: `report-issue` step 1 says *"confirm you are in a BWJ store repo"* and
+`adopt-dkj-policy-bwj` step 0 refuses outright, both by matching an org path against `git remote get-url
+origin`. In the live consumer that match now fails, so the correct response to a stated precondition --
+stop -- became the wrong answer, and nothing errors on the way. A session either declines a filing it was
+always allowed to make, or files while knowingly ignoring a written instruction. Both checks match the
+repo **name** now, which is the half that does not move; the names are still exactly two, so neither
+refusal is any weaker.
+
+**The org is left out rather than corrected per repo, and that is the measured choice.** The two stores
+are no longer in one organisation, and the move may not be finished: `BWJ-Development/xoxowildhearts`
+already exists while `BWJ-ecommerce/xoxowildhearts` is still live and more recently pushed. Naming an
+org per repo would be wrong again the day the second store moves; naming neither is right under either
+outcome. The one claim that genuinely was about an org -- *"the org has exactly three issue types"* --
+was measured in both and holds in both (Task, Bug, Feature), so it carries that measurement instead of a
+seam.
+
+Dated measurements keep the names they were written with, per #952, so the three `github.com` permalinks
+and the one prose citation of where the #388 measurement was taken are untouched.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own developers and the consuming repos, and a BWJ store's customers
+are not subscribers of a service. The two BWJ consumers do get the substance at the next release: the
+skill that tells them to stop in a repo they are allowed to work in stops telling them that.
+
+**Score:** N/A
+
+#### Pull Request
+
+dkj-policy-bwj states its scope by store, not by org
+
+Plugins: dkj-policy-bwj
+
+[PR #1554](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1554)
+
+---
 
 ### DEPLOY: feat/1545-pending-tally-short-form · 20260907-174242
 
