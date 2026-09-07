@@ -726,6 +726,47 @@ Both are honest answers; the gate only refuses to guess.
     }
 }
 
+# --- Machine-local path gate (issue #1559): advisory, never a refusal -----------------------------
+#
+# A tracked file a person edited for their own clone -- .claude/settings.json with extra plugins
+# enabled locally plus "autoUpdate": false -- rides into a branch commit on a `git add -A` and past
+# every gate: measured on PR #1557, where it reached the merge queue and had to be pulled back out by
+# hand. The gates below read the branch's development document; the backing gate reads the diff but
+# asks the opposite question -- work MISSING from the commit, not surplus in it.
+#
+# WARN, NEVER REFUSE, and no -Force valve -- the issue asked for exactly that: a branch that
+# legitimately changes the shared settings file must not need an escape valve, and this repo declines
+# findings-list gates on their false-positive rate (the stale-path check, 124 findings, all false).
+# SAID TWICE, once here and once from whichever end the run reaches, because everything printed after
+# this point -- the gates, the push, the create -- is off-screen by the time the operator reads
+# anything (the same reason new-branch.ps1 double-prints its stale-base warning).
+#
+# OPTIONAL SEAM, probed like Get-PrAssignee rather than declared in the script contract: no
+# Get-MachineLocalPaths, or an empty return, means the check is silent. Get-BranchMachineLocalFindings
+# degrades to Known = $false when it cannot read the diff, which is silent too.
+$machineLocalNote = ''
+if (Get-Command -Name Get-MachineLocalPaths -ErrorAction SilentlyContinue) {
+    $mlPaths = @(Get-MachineLocalPaths)
+    if ($mlPaths.Count -gt 0) {
+        $mlFinding = Get-BranchMachineLocalFindings -RepoRoot $repoRoot -Trunk (Get-BranchTrunkName) -MachineLocalPaths $mlPaths
+        if ($mlFinding.Known -and @($mlFinding.Paths).Count -gt 0) {
+            $mlList = (@($mlFinding.Paths) -join ', ')
+            $machineLocalNote = @"
+machine-local path gate: this branch's commits touch $mlList.
+
+That path is on this repo's machine-local list (Get-MachineLocalPaths) -- a tracked file whose edits
+usually belong to a clone, not the tree. A 'git add -A' sweeps such a file into the branch, where no
+other gate reads it: on PR #1557 a locally-enabled plugin set reached the merge queue that way.
+
+If this change is deliberate, nothing to do -- this is a note, not a refusal. If it is not, drop it
+from the branch (machine-local plugin enablement belongs in .claude/settings.local.json, which is
+gitignored) and run again.
+"@
+            Write-Warning $machineLocalNote
+        }
+    }
+}
+
 # Scaffold gate: an entry that still carries its scaffold wording must not become a PR.
 #
 # MEASURED, AND IT HAD ALREADY SHIPPED. At v3.2.0 three of the twenty-one entries (#424, #425, #426)
@@ -1601,6 +1642,9 @@ if ($existingPr) {
         }
     }
 
+    # SAID TWICE (issue #1559): the machine-local note from before the gates is off-screen by now.
+    if ($machineLocalNote) { Write-Warning $machineLocalNote }
+
     Write-Host "PR #$($existingPr.number) was already open for '$branch' - the push above updated it." -ForegroundColor Green
     Write-Host "  $($existingPr.url)"
     if (-not $RefreshBody) {
@@ -1783,4 +1827,6 @@ try {
 } finally {
     Remove-Item -Path $bodyFile -Force -ErrorAction SilentlyContinue
 }
+# SAID TWICE (issue #1559): the machine-local note from before the gates is off-screen by now.
+if ($machineLocalNote) { Write-Warning $machineLocalNote }
 Write-Host "PR created for '$branch'." -ForegroundColor Green

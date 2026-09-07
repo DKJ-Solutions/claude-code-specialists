@@ -176,6 +176,13 @@ $mergeMethod = Get-PrMergeMethod
 Assert-True (@('merge', 'squash', 'rebase') -contains $mergeMethod) "Get-PrMergeMethod ('$mergeMethod') is one of merge/squash/rebase"
 Assert-Equal 'merge' $mergeMethod 'Get-PrMergeMethod is merge in this workshop (every PR keeps its own commits on main)'
 
+# The machine-local path list open-pr.ps1 warns about when a branch commit touches one (issue #1559).
+# Optional and probed like the four Get-Pr* seams, so it is not in the script contract; asserted here
+# for the same reason Get-MojibakePaths is -- a repo-owned list can quietly stop describing its repo.
+$mlPaths = @(Get-MachineLocalPaths)
+Assert-True ($mlPaths -contains '.claude/settings.json') 'Get-MachineLocalPaths watches the shared harness settings file'
+Assert-Equal 0 (@($mlPaths | Where-Object { $_ -match '^[\\/]|^[A-Za-z]:' }).Count) 'Get-MachineLocalPaths entries are repo-root-relative, not absolute'
+
 # The file set fix-mojibake.ps1 examines by default (issue #413, Optional in the contract). Asserted
 # against the real repo root rather than a fixture: the point of moving this list out of the tool was
 # that a list can silently stop matching the repo it describes, and only the real tree can show that.

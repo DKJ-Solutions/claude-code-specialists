@@ -244,6 +244,96 @@ function Get-GitParkBacking {
     }
 }
 
+function Get-BranchMachineLocalFindings {
+    <#
+        Which of $MachineLocalPaths appear in this branch's COMMITTED diff against its merge base with
+        the trunk -- as an object: Paths (the matches, sorted-unique) and Known (whether the diff could
+        be read at all).
+
+        THE PROBLEM THIS EXISTS FOR (issue #1559). A tracked file a person edited for their own clone
+        -- .claude/settings.json with extra plugins enabled locally -- rides into a branch commit on a
+        `git add -A` and past every gate: measured on PR #1557, where it reached the merge queue. The
+        development-document gates (scaffold, step-list, impact, link) never read the diff's file set;
+        the backing gate reads the diff but asks the opposite question -- work MISSING from the commit,
+        not surplus in it. open-pr.ps1 turns this list into an advisory note before the push.
+
+        THREE DOTS, like Get-GitParkBacking: the branch against its MERGE BASE with the trunk, so a
+        trunk that moved on since the branch was cut does not put its own touched files in this list.
+
+        THE REMOTE-TRACKING REF IS PREFERRED over the bare local name, the same #1399 reason
+        Get-GitParkBacking gives: a bare `main` that has fallen behind origin/main, then caught up via
+        `git merge origin/main` (the documented, non-force way), makes `$Trunk...HEAD` include commits
+        that are already upstream. refs/remotes/origin/$Trunk is advanced by that merge's own fetch, so
+        it lands on the branch's real diff. A six-line copy of that resolution rather than a shared
+        helper, deliberately: extracting it would touch Get-GitParkBacking, which is the backing gate.
+
+        core.quotePath IS FORCED ON, the language rule about reading a native command's output: the
+        paths here are COMPARED against $MachineLocalPaths, and PowerShell 5.1 decodes a child's stdout
+        with whatever console code page the run inherited. Quoting holds the wire to ASCII, where every
+        candidate code page agrees, so an accented filename cannot decode into something that
+        accidentally matches -- or misses -- a path being watched.
+
+        AN UNREADABLE DIFF IS Known = $false, NEVER an empty Paths that reads as "all clear" -- same
+        degrade-to-cannot-answer rule as every lookup in this file. A repo that defines no machine-local
+        paths gets Known = $true and Paths = @(): there is nothing to check, which is an answer.
+
+        A TRAILING '/' on an entry matches a whole directory; anything else is an exact path match.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$Trunk,
+        [string[]]$MachineLocalPaths = @()
+    )
+
+    # Forward slashes throughout: git reports them, a caller may hand back either. Split the specs into
+    # exact-match keys and directory prefixes (the entries ending '/').
+    $exact = @{}
+    $dirs  = @()
+    foreach ($p in $MachineLocalPaths) {
+        if (-not $p) { continue }
+        $norm = ([string]$p -replace '\\', '/').Trim()
+        if (-not $norm) { continue }
+        if ($norm.EndsWith('/')) { $dirs += $norm } else { $exact[$norm] = $true }
+    }
+    if ($exact.Count -eq 0 -and $dirs.Count -eq 0) {
+        return [pscustomobject]@{ Paths = @(); Known = $true }
+    }
+
+    # PREFER THE REMOTE-TRACKING REF (#1399); fall back to the bare local name only where this checkout
+    # has no such ref. The successful verify is reused rather than asked twice.
+    $trunkRef = $Trunk
+    $remoteRefRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', "refs/remotes/origin/$Trunk") -DiscardStderr
+    $refRes = if ($remoteRefRes.ExitCode -eq 0) {
+        $trunkRef = "refs/remotes/origin/$Trunk"
+        $remoteRefRes
+    } else {
+        Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', $trunkRef) -DiscardStderr
+    }
+    if ($refRes.ExitCode -ne 0) {
+        return [pscustomobject]@{ Paths = @(); Known = $false }
+    }
+
+    $diffRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-c', 'core.quotePath=true', '-C', $RepoRoot, 'diff', '--name-only', "$trunkRef...HEAD")
+    if ($diffRes.ExitCode -ne 0) {
+        return [pscustomobject]@{ Paths = @(); Known = $false }
+    }
+
+    $hits = @{}
+    foreach ($line in (($diffRes.Output | Out-String) -split '\r?\n')) {
+        $path = $line.Trim().Trim('"') -replace '\\', '/'
+        if (-not $path) { continue }
+        if ($exact.ContainsKey($path)) { $hits[$path] = $true; continue }
+        foreach ($d in $dirs) {
+            if ($path.StartsWith($d)) { $hits[$path] = $true; break }
+        }
+    }
+
+    return [pscustomobject]@{
+        Paths = @($hits.Keys | Sort-Object)
+        Known = $true
+    }
+}
+
 function Split-GitParkBackingLines {
     <#
         Word-wraps one sentence to commit-body width, as an array of lines. No hanging indent, no
