@@ -2645,18 +2645,20 @@ Assert-True ($null -eq $tallyCounts.Audience) 'tally: no audience seam means no 
 Assert-Equal 0 $tallyCounts.Reaching 'tally: and nothing is reported as reaching one'
 $tallyNoAudienceLine = Format-ChangelogPendingSummary -Content $tallyLog
 Assert-True ($tallyNoAudienceLine -notmatch 'audience') 'tally: the audience sentence is omitted, not written with a hole in it'
-Assert-True ($tallyNoAudienceLine -match '0 at tier 1') `
-    'tally: with no audience stated every tier of the model is printed, as it was before the knob existed'
+# NO FRACTION WHERE NO AUDIENCE IS STATED (#1545). Reaching is 0 there for want of a question rather than
+# for want of entries, so '0 / 4' would report an unanswered seam as an absence of reach.
+Assert-Equal ('**4 minor entries** ' + (Get-ChangelogPendingSummaryMarker)) $tallyNoAudienceLine `
+    'tally: with no audience stated the line is the total and the bump, with no fraction to mislead'
 
 function Get-ReleaseAudienceTier { return 2 }
 $tallyAud = Get-ChangelogPendingCounts -Content $tallyLog
 Assert-Equal 2 $tallyAud.Audience 'tally: the audience tier is read from the seam'
 Assert-Equal 2 $tallyAud.Reaching 'tally: and the entries reaching it are counted'
 $tallyAudLine = Format-ChangelogPendingSummary -Content $tallyLog
-Assert-True ($tallyAudLine -match 'Tier 2 is this repo''s audience: 2 of 4 reach it\.') `
-    'tally: the audience share is stated as asked -- how many of the total reach that reader'
-Assert-True ($tallyAudLine -notmatch 'at tier 1') `
-    'tally: and the empty tier this repo is never asked about drops out of the line'
+Assert-Equal ('**2 / 4 minor entries** ' + (Get-ChangelogPendingSummaryMarker)) $tallyAudLine `
+    'tally: the short form is reach over total plus the bump those entries earn (#1545)'
+Assert-True ($tallyAudLine -notmatch 'at tier') `
+    'tally: and the per-tier buckets are gone -- they are one grep away in the entries themselves'
 
 # AT OR ABOVE, NOT EQUAL TO. A tier-2 entry in a tier-1 repo reaches that audience -- the cumulative
 # model -- so a repo that answered 1 must not report it as unreached.
@@ -2664,6 +2666,40 @@ function Get-ReleaseAudienceTier { return 1 }
 Assert-Equal 2 (Get-ChangelogPendingCounts -Content $tallyLog).Reaching `
     'tally: an entry above the audience tier still reaches that audience'
 Remove-Item Function:\Get-ReleaseAudienceTier
+
+# THE BUMP WORD, AND THE ONE CASE WHERE IT DISAGREES WITH THE FRACTION (#1545). Reaching counts entries at
+# or above the repo's AUDIENCE tier; the bump follows tier 1 OR HIGHER. In a repo whose audience is 2 those
+# are different sets, so '0 / 2 minor entries' is reachable and correct -- nothing reaches a subscriber and
+# the version still owes a minor. This is the assert that stops somebody "fixing" the divergence away.
+function Get-ReleaseAudienceTier { return 2 }
+$tallyT1 = New-TallyLog @(
+    (New-TallyEntry -Branch 'feat/i-v1' -Tier 1),
+    (New-TallyEntry -Branch 'feat/j-v1' -Tier 1)
+)
+Assert-Equal 0 (Get-ChangelogPendingCounts -Content $tallyT1).Reaching `
+    'tally: a tier-1 entry reaches no subscriber in a tier-2 repo'
+Assert-Equal ('**0 / 2 minor entries** ' + (Get-ChangelogPendingSummaryMarker)) (Format-ChangelogPendingSummary -Content $tallyT1) `
+    'tally: and the bump still says minor, because the two numbers answer different questions'
+
+# TIER 0 ONLY EARNS A PATCH, which is the other half of the rule and the one a release of internal work is.
+$tallyT0 = New-TallyLog @(
+    (New-TallyEntry -Branch 'docs/k-v1' -Tier 0),
+    (New-TallyEntry -Branch 'docs/l-v1' -Tier $null)
+)
+Assert-Equal ('**0 / 2 patch entries** ' + (Get-ChangelogPendingSummaryMarker)) (Format-ChangelogPendingSummary -Content $tallyT0) `
+    'tally: everything at tier 0 earns a patch, and an entry declaring nothing counts as tier 0'
+Remove-Item Function:\Get-ReleaseAudienceTier
+
+# THE RULE ITSELF, AS ONE FUNCTION (#1545). It lives in this lib rather than in release-lib so the FOLD can
+# reach it -- release-lib dot-sources this file and never the reverse -- and Test-ReleaseBumpEarned calls
+# this same function instead of keeping its own copy of the loop. release-lib.tests.ps1 pins that side.
+Assert-Equal 'patch' (Get-EntryEarnedBump -ByTier @{ 0 = 5 }).Bump 'earned bump: tier 0 alone is a patch'
+Assert-Equal 0 (Get-EntryEarnedBump -ByTier @{ 0 = 5 }).Notable 'earned bump: and nothing is notable'
+Assert-Equal 'minor' (Get-EntryEarnedBump -ByTier @{ 0 = 5; 1 = 1 }).Bump 'earned bump: one tier-1 entry earns a minor'
+Assert-Equal 1 (Get-EntryEarnedBump -ByTier @{ 0 = 5; 1 = 1 }).Notable 'earned bump: and that entry is the notable one'
+Assert-Equal 'minor' (Get-EntryEarnedBump -ByTier @{ 2 = 3 }).Bump 'earned bump: tier 2 earns a minor too, not a major'
+Assert-Equal 3 (Get-EntryEarnedBump -ByTier @{ 0 = 1; 1 = 1; 2 = 2 }).Notable 'earned bump: notable sums every tier at or above 1'
+Assert-Equal 'patch' (Get-EntryEarnedBump -ByTier @{}).Bump 'earned bump: an empty map is a patch rather than a throw'
 
 # THE LINE IS ONE LINE, and it carries the marker that makes it replaceable.
 Assert-True ((Format-ChangelogPendingSummary -Content $tallyLog) -notmatch "`n") 'tally: the summary is a single line'
@@ -2690,8 +2726,9 @@ Assert-Equal 1 (@([regex]::Matches($tallyGrown, [regex]::Escape((Get-ChangelogPe
 
 # AND IT IS RE-DERIVED, NOT KEPT. A stale line over a changed list is the failure mode a counter would
 # have; this proves the number follows the document rather than the other way round.
-$tallyStale = $tallySet -replace [regex]::Escape('4 entries pending'), '99 entries pending'
-Assert-True ((Set-ChangelogPendingSummary -Content $tallyStale) -match '4 entries pending') `
+$tallyStale = $tallySet -replace [regex]::Escape('**4 minor entries**'), '**99 minor entries**'
+Assert-True ($tallyStale -match '99 minor entries') 'tally: the stale-count fixture actually edited the line'
+Assert-True ((Set-ChangelogPendingSummary -Content $tallyStale) -match [regex]::Escape('**4 minor entries**')) `
     'tally: a hand-edited count is corrected on the next write rather than trusted'
 
 # THE PRE-#1518 CONSUMER SHAPE: adopt-workflow-folder.ps1 scaffolded a changelog with NO pending heading
@@ -2706,18 +2743,18 @@ for ($i = 0; $i -lt $tallyNoHeadLines.Count; $i++) { if ($tallyNoHeadLines[$i] -
 Assert-True ($tallyNoHeadAt -gt 0) 'tally: a changelog with no pending heading still gets the line'
 Assert-True ($tallyNoHeadLines[$tallyNoHeadAt + 2] -match '^' + [regex]::Escape("$eH DEPLOY")) `
     'tally: anchored directly above the first entry'
-Assert-True ((Format-ChangelogPendingSummary -Content $tallyNoHead) -match '1 entry pending') `
+Assert-True ((Format-ChangelogPendingSummary -Content $tallyNoHead) -match [regex]::Escape('**1 minor entry**')) `
     'tally: and one entry is an entry, not "1 entries"'
 
 # FENCE-AWARE, both ways. This repo's own changelog intro quotes an entry heading inside a fence, and a
 # future one may well quote the tally itself -- neither may be mistaken for the real thing.
 $tallyFenced = (@(
     '# Changelog', '', 'The line under the heading looks like this:', '', '```markdown',
-    ('**7 entries pending** -- 7 at tier 0. ' + (Get-ChangelogPendingSummaryMarker)),
+    ('**7 / 7 minor entries** ' + (Get-ChangelogPendingSummaryMarker)),
     '```', '', $tallyH, '', (New-TallyEntry -Branch 'feat/f-v1' -Tier 0)
 ) -join "`n")
 $tallyFencedSet = Set-ChangelogPendingSummary -Content $tallyFenced
-Assert-True ($tallyFencedSet -match [regex]::Escape('**7 entries pending**')) `
+Assert-True ($tallyFencedSet -match [regex]::Escape('**7 / 7 minor entries**')) `
     'tally: a quoted example inside a fence is left exactly as written'
 Assert-Equal 2 (@([regex]::Matches($tallyFencedSet, [regex]::Escape((Get-ChangelogPendingSummaryMarker)))).Count) `
     'tally: and the real line is inserted beside it rather than replacing it'
@@ -2736,7 +2773,7 @@ Assert-Equal 2 (@([regex]::Matches($tallyInlineSet, [regex]::Escape((Get-Changel
 Assert-Equal $tallyInlineSet (Set-ChangelogPendingSummary -Content $tallyInlineSet) `
     'tally: and the run stays idempotent with the quoted copy standing'
 Assert-True (Test-ChangelogTallyIsQuoted -Line ('see `' + (Get-ChangelogPendingSummaryMarker) + '`')) 'tally: quoted marker reads as quoted'
-Assert-True (-not (Test-ChangelogTallyIsQuoted -Line ('**1 entry pending** ' + (Get-ChangelogPendingSummaryMarker)))) 'tally: a real tally line does not'
+Assert-True (-not (Test-ChangelogTallyIsQuoted -Line ('**1 / 1 minor entry** ' + (Get-ChangelogPendingSummaryMarker)))) 'tally: a real tally line does not'
 
 # A HUMAN'S PARAGRAPH UNDER THE PENDING HEADING IS NOT EATEN. This is the reason the line carries a
 # marker at all instead of being recognised by position, and the fold pushes straight to the trunk.
@@ -2746,9 +2783,13 @@ Assert-True ((Set-ChangelogPendingSummary -Content $tallyProse) -match 'A note s
 
 # THE WORDING IS OVERRIDABLE, for the repo whose changelog is not in English -- the same mechanism, and
 # the same empty-is-ignored fail-safe, as every other piece of generated prose in this file.
-function Get-ChangelogPendingSummaryOverrides { return @{ Lead = 'WACHTRIJ: {0} {1}'; Entries = 'wijzigingen'; Empty = '' } }
+function Get-ChangelogPendingSummaryOverrides { return @{ NoShare = 'WACHTRIJ: {0} {2} ({1})'; Entries = 'wijzigingen'; Minor = 'klein'; Empty = '' } }
 $tallyNl = Format-ChangelogPendingSummary -Content $tallyLog
-Assert-True ($tallyNl -match 'WACHTRIJ: 4 wijzigingen') 'tally: a translated repo gets its own wording'
+Assert-True ($tallyNl -match 'WACHTRIJ: 4 wijzigingen \(klein\)') 'tally: a translated repo gets its own wording'
+# THE BUMP WORD IS SEAMED TOO, and it has to be: 'minor' is generated prose in a document a consumer may
+# keep in their own language, unlike the machine-read Tier label. The placeholders are reorderable for the
+# same reason the trunk warning's are (inbound #562) -- a translation rarely wants them in English order.
+Assert-True ($tallyNl -notmatch 'minor') 'tally: and the bump word is translated with the rest, not left in English'
 Assert-True ((Format-ChangelogPendingSummary -Content '# Changelog') -match 'Nothing pending') `
     'tally: and an override that is present but EMPTY keeps the default rather than blanking the line'
 Remove-Item Function:\Get-ChangelogPendingSummaryOverrides

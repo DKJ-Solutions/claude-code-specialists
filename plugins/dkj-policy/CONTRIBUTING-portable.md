@@ -436,18 +436,31 @@ Where your repo has a plugin tier — declared by `Get-ReleasePluginTier` — th
 `Plugins:` line from the PR's files, which the release documents read. A repo with no plugins never sees
 that line.
 
-**And it refreshes a one-line tally at the top of the pending list** — how many entries are waiting for the
-next release, how they split by tier, and how many of them reach your repo's audience tier. It answers *how
-big is this release going to be* without anybody counting, and it is **derived rather than accumulated**:
+**And it refreshes a one-line tally at the top of the pending list** — `**4 / 9 minor entries**`: how many
+of the entries waiting for the next release reach your repo's audience tier, out of how many are pending,
+and which bump that work has earned. It answers *how big is this release going to be* without anybody
+counting, and it is **derived rather than accumulated**:
 the line is recounted from the entries in the document about to be written, so there is no counter to drift
 and an entry added or removed by hand is corrected by the next fold. The **release cut** rewrites it too,
 on the emptied document — the line lives in the changelog's head, which is the part a cut keeps, so
 otherwise a freshly released changelog would carry an intact count over an empty list.
 
+**The two numbers answer different questions and may differ** — worth knowing before reading the line as a
+contradiction. The fraction counts entries at or above your **audience** tier; the bump follows tier **1 or
+higher**. So in a repo whose audience is 2, `**0 / 8 minor entries**` is correct and says something precise:
+eight entries pending, none of them reaching a subscriber, and the version still owes a minor because some
+of them reach management. The fraction is who *notices*; the bump is what the version *owes*. Where your
+repo has stated **no** audience tier the fraction is dropped rather than shown as `0 / 8` — a `0` there
+would report an unanswered seam as an absence of reach.
+
 Your repo needs no heading for it: the tally anchors on the pending heading where you have one and on the
 first entry where you do not, which is the shape the scaffolded changelog has. Every word of it is
 overridable through `Get-ChangelogPendingSummaryOverrides`, like the rest of the generated prose, so a
-changelog kept in another language stays in it. The line ends with an HTML comment that identifies it as
+changelog kept in another language stays in it — the bump word included, and its placeholders are
+reorderable, because a translation rarely wants them in English order. **Three of that seam's keys were
+retired with the per-tier shape** on September 7, 2026 (`Lead`, `Bucket`, `AudienceShare`); the two that
+replaced them are `Share` and `NoShare`. Only keys the defaults carry are read, so an answer for a retired
+key is silently *inert* rather than an error — if you had translated the old line, re-answer it. The line ends with an HTML comment that identifies it as
 machine-written — that marker is the only thing a later run replaces, so a note of your own in that space
 is never overwritten, and quoting the marker in your intro (in a fence or in inline backticks) is read as
 a quotation rather than as the line itself.
