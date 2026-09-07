@@ -65,6 +65,8 @@ $wfDir = Join-Path $PSScriptRoot '..\..\.github\workflows'
 # questions, so a YAML parser would add a dependency to answer nothing extra.
 $ci = Get-Content -LiteralPath (Join-Path $wfDir 'ci.yml') -Raw
 $ue = Get-Content -LiteralPath (Join-Path $wfDir 'unfolded-entry.yml') -Raw
+$fom = Get-Content -LiteralPath (Join-Path $wfDir 'fold-on-merge.yml') -Raw
+$vr = Get-Content -LiteralPath (Join-Path $wfDir 'verify-resolved.yml') -Raw
 
 Write-Host "== ci.yml: a push to main is its own concurrency group (#1294) ==" -ForegroundColor Cyan
 
@@ -114,6 +116,31 @@ Assert-True ($ue -match 'group:[^\r\n]*github\.ref') 'its group is shared across
 Assert-True ($ue -notmatch 'group:[^\r\n]*github\.sha') 'and is NOT keyed per commit -- superseding the ship window is the wanted behaviour here'
 Assert-True ($ue -match 'cancel-in-progress:\s*true') 'cancel-in-progress: true, so a ~6s ship window does not leave a stale red'
 Assert-True ($ue -like '*ci.yml*') 'and it says why it is the opposite of ci.yml, so neither gets harmonised into the other'
+
+Write-Host "== fold-on-merge.yml + verify-resolved.yml: a THIRD arrangement -- shared group, no cancel (#1544) ==" -ForegroundColor Cyan
+
+# These jobs WRITE and push to the trunk. Shared trunk group like unfolded-entry.yml (two trunk pushes
+# must not run their folds concurrently), but cancel-in-progress: false unlike it (a superseded fold is
+# the silent skip #1493 exists to close). A per-SHA group -- what these carried until #1544 -- is its own
+# group every run and serialises nothing, so two pushes minutes apart raced for the trunk.
+Assert-True ($fom -match '(?m)^\s*group:\s*fold-on-merge-\$\{\{\s*github\.ref\s*\}\}\s*$') 'fold-on-merge.yml groups on github.ref, so two trunk pushes queue rather than race'
+Assert-True ($fom -notmatch 'group:[^\r\n]*github\.sha') 'and NOT on github.sha, which would serialise nothing while this job pushes'
+Assert-True ($fom -match '(?m)^\s*cancel-in-progress:\s*false\s*$') 'cancel-in-progress: false -- a superseded fold is a dropped fold'
+Assert-True ($vr -match '(?m)^\s*group:\s*verify-resolved-\$\{\{\s*github\.ref\s*\}\}\s*$') 'verify-resolved.yml groups on github.ref too'
+Assert-True ($vr -notmatch 'group:[^\r\n]*github\.sha\s*\}\}\s*$') 'and its group is not per-commit (PUSH_SHA in the run body is a different use)'
+Assert-True ($vr -match '(?m)^\s*cancel-in-progress:\s*false\s*$') 'cancel-in-progress: false -- a superseded verification is a dropped one'
+Assert-True ($fom -like '*#1544*') 'fold-on-merge.yml cites the issue behind the constant group'
+
+Write-Host "== fold-on-merge.yml: the fold checkout takes the trunk tip, not the event SHA (#1543) ==" -ForegroundColor Cyan
+
+# On a push event actions/checkout defaults to github.sha. This job asks "does the trunk carry a
+# leftover NOW", so a fold already pushed on top of the merge commit must not read as still-unfolded.
+Assert-True ($fom -match '(?ms)-\s*uses:\s*actions/checkout@[0-9a-f]{40}[^\n]*\n\s*with:\s*\n\s*ref:\s*main\s*\n\s*token:\s*\$\{\{\s*secrets\.FOLD_PUSH_TOKEN') `
+    'the first checkout pins ref: main ahead of the FOLD_PUSH_TOKEN line'
+Assert-True ($fom -like '*#1543*') 'and cites the issue that explains why the event SHA is the wrong ref here'
+# verify-resolved.yml deliberately does NOT pin ref -- it reads the pushed range from PUSH_SHA and must
+# see the commits that push actually carried.
+Assert-True ($vr -match 'PUSH_SHA:\s*\$\{\{\s*github\.sha\s*\}\}') 'verify-resolved.yml still resolves the PRs from the event SHA -- pinning its checkout would break that'
 
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

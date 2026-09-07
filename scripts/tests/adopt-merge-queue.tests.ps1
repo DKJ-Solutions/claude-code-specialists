@@ -220,7 +220,27 @@ try {
     Assert-True ($fold -notlike '*issues: write*') 'and never holds issues: write beside that standing credential'
     Assert-True ($verify -like '*issues: write*') 'the resolves runner holds issues: write, which is what makes it repair rather than report'
     Assert-True ($verify -notlike '*FOLD_PUSH_TOKEN*') 'and never touches the standing credential'
-    Assert-True ($r.Flat -like '*FOLD_PUSH_TOKEN*') 'and the run TELLS you to create that secret -- without it the fold commits and its push is rejected'
+    Assert-True ($r.Flat -like '*FOLD_PUSH_TOKEN*') 'and the run TELLS you to create that secret'
+    Assert-True ($r.Flat -like '*actions/checkout FAILS*') 'and says an absent/under-scoped token fails the checkout, not the push (inbound #1539)'
+    Assert-True ($r.Flat -like '*every later step*skipped*') 'naming the tell -- every later step skipped -- so the checkout is ruled out first'
+
+    # --- 2b. The three corrections that landed together (inbound #1539/#1543/#1544) -----------------
+    # THE CONCURRENCY GROUP IS CONSTANT PER TRUNK, NOT PER COMMIT (#1544). A per-SHA group is its own
+    # group every run and serialises nothing, so two trunk pushes race -- and this job pushes.
+    Assert-True ($fold -match '(?m)^\s*group:\s*fold-on-merge-\$\{\{\s*github\.ref\s*\}\}\s*$') `
+        'the fold runner concurrency group is keyed on github.ref, so two trunk pushes queue rather than race'
+    Assert-True ($fold -notmatch '(?m)^\s*group:[^\r\n]*github\.sha') 'and the group line is never keyed on github.sha, which would serialise nothing'
+    Assert-True ($verify -match '(?m)^\s*group:\s*verify-resolved-\$\{\{\s*github\.ref\s*\}\}\s*$') `
+        'the resolves runner group is keyed on github.ref too'
+    Assert-True ($fold -like '*cancel-in-progress: false*') 'and cancellation stays off -- no fold is dropped'
+
+    # THE FOLD CHECKOUT TAKES THE TRUNK TIP, NOT THE EVENT SHA (#1543). On a push event actions/checkout
+    # defaults to github.sha; a fold ship-pr already pushed on top of the merge then reads as unfolded
+    # and the trunk-gap guard refuses -- a false red on every ship-pr merge.
+    Assert-True ($fold -match '(?ms)uses:\s*actions/checkout@v5\s*\n\s*with:\s*\n\s*ref:\s*main\s*\n\s*token:\s*\$\{\{\s*secrets\.FOLD_PUSH_TOKEN') `
+        'the fold runner first checkout pins ref to the trunk, ahead of the token line'
+    # The resolves runner keeps the event SHA -- it resolves THIS push''s PRs and has no trunk-gap guard.
+    Assert-True ($verify -like '*PUSH_SHA: ${{ github.sha }}*') 'the resolves runner still reads the event SHA -- it resolves the PRs that push carried'
 
     # --- 3. Additive: a re-run never overwrites -----------------------------------------------------
     Write-Host '-- 3. a re-run is additive --' -ForegroundColor Cyan
@@ -274,6 +294,8 @@ try {
     $fold = [System.IO.File]::ReadAllText((Join-Path $dir '.github\workflows\fold-on-merge.yml'))
     Assert-True ($fold.Contains('branches: [trunk]')) 'the fold runner triggers on the trunk Get-TrunkBranchName names, not on a hardcoded main'
     Assert-True ($fold -like '*-Branch trunk*') 'and passes that same trunk to the check it runs'
+    Assert-True ($fold -match '(?m)^\s*ref:\s*trunk\s*$') 'and its first checkout pins ref to that same trunk, not a hardcoded main (#1543)'
+    Assert-True ($fold -match '(?m)^\s*group:\s*fold-on-merge-\$\{\{\s*github\.ref\s*\}\}\s*$') 'the concurrency group is still github.ref-keyed on a non-main trunk (#1544)'
 
     # --- 7. The switch is composed, never pulled -----------------------------------------------------
     Write-Host '-- 7. the setting itself is the owner act, and this script does not make it --' -ForegroundColor Cyan

@@ -751,6 +751,38 @@ infrastructure.
   `CLAUDE_PROJECT_DIR`, and the credential split in both directions. **So: change either workflow on
   this page and read that script in the same movement.** The script itself refuses to run here, which
   is right and is also why nobody editing these two files is reminded of it by the tooling.
+
+  **FOUR CORRECTIONS LANDED TOGETHER, ALL MEASURED IN A BWJ CONSUMER ON 2026-09-07** (inbound
+  [#1539](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1539),
+  [#1542](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1542),
+  [#1543](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1543),
+  [#1544](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1544)), and all four applied
+  to both this repo's own two workflows and the `adopt-merge-queue.ps1` twins:
+  - **#1542 — the merge stamp is UTC.** `Format-EntryMergeStamp` rendered it with `.ToLocalTime()`,
+    which was a display string until #1280 made `Get-EntryInsertOffset` derive the entry's *insert
+    position* from it. A sort key cannot be local time: a repo that folds from both a UTC GitHub runner
+    and a maintainer's laptop then writes stamps offset by the maintainer's UTC offset, dropping entries
+    out of the chronological TIER 0 order #1280 fixed. `.ToUniversalTime()` in `entry-scaffold-lib.ps1`
+    and the `FallbackNow` in `fold-changelog-entry.ps1`. Stamps written before this stay local; the
+    insert walk stops at the first older stamp, so the skew is bounded to neighbours across that
+    boundary until they age out at the next cut.
+  - **#1543 — the fold runner checks out the trunk tip, not the event SHA.** `actions/checkout` on a
+    `push` defaults to `github.sha`; in a queueless consumer `ship-pr` folds locally and pushes on top
+    within seconds, so the slower runner read a tree one commit behind origin and the fold's trunk-gap
+    guard (#1405) refused — a false red on every `ship-pr` merge. `ref: main` (here) / `ref: <trunk>`
+    (the template) makes the job read "does the trunk carry a leftover NOW", which is the question it
+    exists for, and makes the trunk-gap guard unreachable here rather than load-bearing. `verify-resolved`
+    keeps the event SHA — it resolves *this push's* PRs and has no trunk-gap guard.
+  - **#1544 — the concurrency group is constant per trunk.** Keyed on `github.sha` it was its own group
+    every run and serialised nothing, so two trunk pushes close together raced — and this job *pushes*.
+    `github.ref` keeps `cancel-in-progress: false` (no fold dropped) and adds queueing (no race). Same
+    change to `verify-resolved.yml`.
+  - **#1539 — the red-run triage names three causes, not two.** An absent or under-scoped
+    `FOLD_PUSH_TOKEN` fails `actions/checkout` and leaves every later step `skipped`, with no fold step
+    to read — the cause a consumer meets first, on adoption day, and the one to rule out first. The
+    workflow headers, `adopt-dkj-policy`'s SKILL, and `adopt-merge-queue.ps1`'s own console note now say
+    so; a fine-grained PAT lists repositories one by one, so a repo *created* rather than transferred
+    (an org move with no GitHub transfer) falls outside an existing token's selection silently.
 - **`scripts/lint/check-git-identity.ps1`** — the split-identity check (issue
   [#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026): does
   this checkout commit as the same account it acts as on the tracker? The claim rule's `@me` resolves

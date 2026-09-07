@@ -51,10 +51,13 @@
 # required is a repo-settings change and therefore Dave's -- and a required status check cannot gate a
 # `push` anyway, since it would have to be green before the push it is triggered by is accepted.
 #
-# NO CONCURRENCY CANCELLATION, for fold-on-merge.yml's reason rather than unfolded-entry.yml's: this
-# job ACTS. Letting a later push supersede an in-flight run would drop the verification of whatever
-# the earlier push carried, which is the silent skip this workflow exists to close. Two runs
-# overlapping is harmless -- the second finds every issue already closed and says so.
+# NO CONCURRENCY CANCELLATION, AND A CONSTANT GROUP (issue #1544), for fold-on-merge.yml's reason
+# rather than unfolded-entry.yml's: this job ACTS. Letting a later push supersede an in-flight run would
+# drop the verification of whatever the earlier push carried, which is the silent skip this workflow
+# exists to close -- cancel-in-progress: false. The group is keyed on github.ref, not github.sha, so it
+# is constant per trunk and two trunk pushes queue rather than run in parallel; overlapping runs are
+# harmless here anyway (the second finds every issue already closed), but a per-SHA group serialises
+# nothing at all, which is not a property to rely on by accident.
 #
 # IT COSTS A SECOND RUN PER SHIP, KNOWINGLY. fold-on-merge.yml pushes the fold commit as a PAT, and a
 # PAT push triggers workflows where the default GITHUB_TOKEN's would not -- so every shipped branch
@@ -80,7 +83,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: verify-resolved-${{ github.sha }}
+  group: verify-resolved-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

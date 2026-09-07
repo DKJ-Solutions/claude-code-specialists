@@ -670,21 +670,27 @@ function Format-EntryMergeStamp {
     <#
         Pure: the merge moment as it is written into the 'Pull Request' heading -- '20260819-171500'.
 
-        THE SAME SHAPE AS THE BRANCH'S CREATION STAMP, deliberately (Dave, August 19, 2026): the cycle
-        file's heading stamps the moment the branch began and this one the moment it landed, so a reader
-        can subtract them. That is also why it carries the TIME and not only the date, which is what the
-        closing line has always shown alongside the link.
+        RENDERED IN UTC, deliberately (inbound #1542): since #1280 Get-EntryInsertOffset derives the
+        entry's INSERT POSITION from this stamp -- it walks to the first entry in the list whose own stamp
+        is older -- so the stamp is a sort key, not only a display string. A sort key cannot be local
+        time: once adopt-merge-queue.ps1 ships fold-on-merge.yml, a repo folds both from a UTC GitHub
+        runner and from a maintainer's laptop, and ToLocalTime() on the laptop would offset every
+        locally-written stamp from every CI-written one by the maintainer's UTC offset -- dropping entries
+        out of chronological order in the very TIER 0 section #1280 fixed to be chronological. It carries
+        the TIME and not only the date, which is what the closing line has always shown alongside the link,
+        and which the insert walk needs to order two entries that landed on the same day.
 
         $MergedAt is gh's own ISO 8601 timestamp; empty or unparseable falls back to $FallbackNow, for the
         same reason Format-EntryFoldFooter has a fallback -- a cosmetic field must not turn a completed
-        fold into a failure.
+        fold into a failure. That fallback is a UTC stamp too (fold-changelog-entry.ps1), or a local-time
+        fallback would reintroduce the skew this rendering exists to remove.
     #>
     param(
         [string]$MergedAt = '',
         [Parameter(Mandatory)][string]$FallbackNow
     )
     if (-not $MergedAt) { return $FallbackNow }
-    try { return ([datetime]$MergedAt).ToLocalTime().ToString('yyyyMMdd-HHmmss') } catch { return $FallbackNow }
+    try { return ([datetime]$MergedAt).ToUniversalTime().ToString('yyyyMMdd-HHmmss') } catch { return $FallbackNow }
 }
 
 function Set-EntryMergeStamp {

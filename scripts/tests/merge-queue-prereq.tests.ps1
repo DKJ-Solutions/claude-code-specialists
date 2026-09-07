@@ -202,7 +202,7 @@ Write-Host "== fold-on-merge.yml can actually push what it folds (#1493) ==" -Fo
 # fold that commits and cannot push is the same merged-but-unfolded state guard 2 exists to prevent,
 # reached by a third route. The wiring itself landed in #1507 with no test of its own, which is what
 # these asserts close -- every one of them is about a property that fails SILENTLY, in a workflow whose
-# red runs already have two causes that look alike (#1499).
+# red runs already have three causes that look alike (#1499, #1539).
 $foldWf = Join-Path $repoRoot '.github\workflows\fold-on-merge.yml'
 Assert-True (Test-Path -LiteralPath $foldWf) 'fold-on-merge.yml is still where the fold runs from'
 if (Test-Path -LiteralPath $foldWf) {
@@ -211,8 +211,9 @@ if (Test-Path -LiteralPath $foldWf) {
     # THE CHECKOUT TOKEN IS THE PUSH CREDENTIAL. actions/checkout persists whatever it authenticated
     # with, and the fold's own `git push` reuses it -- so this line, and not the permissions block,
     # decides which actor GitHub judges against main-ci-gate. The default GITHUB_TOKEN pushes as the
-    # GitHub Actions app, which is not on that bypass list and cannot be added to it.
-    Assert-True ($fom -match '(?s)uses: actions/checkout@[^\r\n]*\r?\n\s*with:\s*\r?\n\s*token: \$\{\{ secrets\.FOLD_PUSH_TOKEN \}\}') `
+    # GitHub Actions app, which is not on that bypass list and cannot be added to it. The `ref: main`
+    # line between `with:` and `token:` is #1543's -- the checkout reads the trunk tip, not the event SHA.
+    Assert-True ($fom -match '(?s)uses: actions/checkout@[^\r\n]*\r?\n\s*with:\s*\r?\n(\s*ref: main\r?\n)?\s*token: \$\{\{ secrets\.FOLD_PUSH_TOKEN \}\}') `
         'checkout authenticates with FOLD_PUSH_TOKEN, which is what the fold s push then reuses'
 
     # AND IT IS PINNED TO A COMMIT SHA, which is this file's own stated reasoning rather than a general

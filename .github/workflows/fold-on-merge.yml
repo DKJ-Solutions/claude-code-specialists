@@ -45,30 +45,49 @@
 # every step of this job holds it, not only the push step. Sebastian's review of #1493's PR flagged
 # this asymmetry as worth stating rather than leaving implicit in the rotation note alone.
 #
-# WHAT THAT REJECTION ACTUALLY LOOKS LIKE, because a red run here has two entirely different causes and
-# only the log tells them apart (issue #1499). Measured verbatim in run 34020828593, the push carrying
-# the #1498 merge, 2026-09-06 08:04 -- a run in which the fold itself SUCCEEDED:
+# WHAT A RED RUN HERE MEANS, because THREE entirely different things turn this job red and only the log
+# tells them apart (issues #1499, #1539, #1543):
 #
-#   Folded and removed: dkj-policy/fix-1497-fold-all-reserved-names.md (tier 2, significance 4 -- ...)
-#   CHANGELOG.md updated.
-#   Committed: fold: fix/1497-fold-all-reserved-names changelog (#1498)
-#   remote: error: GH013: Repository rule violations found for refs/heads/main.
-#   remote: - Required status check "lint-en-tests" is expected.
-#   remote: - Changes must be made through the merge queue
+#   1. THE CHECKOUT FAILING on the token. actions/checkout is given token: FOLD_PUSH_TOKEN, which
+#      overrides its GITHUB_TOKEN default -- so an absent, expired or under-scoped secret fails step 1
+#      and leaves every later step `skipped`, with no fold step to read at all. Rule this one out first:
+#      it is the only cause that produces no fold output. A fine-grained PAT lists repositories one by
+#      one, so a repo created rather than transferred (an org move with no GitHub transfer does exactly
+#      that) silently falls outside an existing token's selection -- measured in a BWJ consumer,
+#      2026-09-07, on the first two runs after this file was placed there (#1539).
 #
-# THE FOLD STEP GOING RED IS THEREFORE NOT EVIDENCE THAT THE FOLD REFUSED. #1499 was filed on three red
-# runs of this job read as one symptom: the first two (2026-09-05 23:56 and 2026-09-06 07:32) really were
-# fold refusals -- the #1497 misread of dkj-policy/CHANGELOG.md, repaired by #1498 -- and the third was
-# this ruleset rejection with a clean fold above it. That third run was the report's own proof that
-# #1498's fix had not taken, and it proved the opposite. Read the fold script's own last lines before
-# concluding anything about the fold: it says which of the two happened, in so many words.
+#   2. THE FOLD REFUSING. It ran and declined; its own last lines say why. The #1497 misread of
+#      dkj-policy/CHANGELOG.md (2026-09-05 23:56 and 2026-09-06 07:32, repaired by #1498) was this.
 #
-# NO CONCURRENCY CANCELLATION, unlike unfolded-entry.yml's read-only report. That workflow can safely
-# let a later push's run supersede an earlier one, because both would report the same fact a moment
-# apart. This one WRITES: cancelling a fold in progress is exactly the silent skip #1493 exists to
-# close, so every push gets its own run and none is dropped. The resulting race (two runs folding
-# close together) is already handled by fold-changelog-entry.ps1's own push-failure diagnosis, which
-# tells the two apart rather than corrupting anything.
+#   3. THE FOLD SUCCEEDING and its push being rejected by the ruleset -- a clean fold above a GH013.
+#      Measured verbatim in run 34020828593, the push carrying the #1498 merge, 2026-09-06 08:04:
+#
+#        Folded and removed: dkj-policy/fix-1497-fold-all-reserved-names.md (tier 2, significance 4 -- ...)
+#        CHANGELOG.md updated.
+#        Committed: fold: fix/1497-fold-all-reserved-names changelog (#1498)
+#        remote: error: GH013: Repository rule violations found for refs/heads/main.
+#        remote: - Required status check "lint-en-tests" is expected.
+#        remote: - Changes must be made through the merge queue
+#
+# #1499 was filed on runs 1-3 above read as one symptom -- two fold refusals and one ruleset rejection
+# with a clean fold above it. The fold step going red is not by itself evidence that the fold refused;
+# read the fold script's own last lines, which say which of the three happened in so many words.
+#
+# THE CHECKOUT TAKES THE TRUNK TIP, NOT THE EVENT SHA (issue #1543). On a push event actions/checkout
+# defaults to github.sha. This repo's ship-pr enqueues rather than folding, so the merge-then-local-fold
+# race #1543 measured in a queueless consumer does not arise here -- but reading the pushed SHA still
+# answers the wrong question ("did the trunk carry a leftover at commit S") when the one this job exists
+# for is "does the trunk carry a leftover NOW". ref: main answers that, keeps this file in step with the
+# adopt-merge-queue.ps1 template, and makes the fold's trunk-gap guard (#1405) unreachable here rather
+# than something a fast second push can trip.
+#
+# NO CONCURRENCY CANCELLATION, AND A CONSTANT GROUP (issue #1544), unlike unfolded-entry.yml's read-only
+# report -- that one can let a later run supersede an earlier one, because both report the same fact.
+# This one WRITES and pushes to main: cancel-in-progress: false so no fold is dropped (the silent skip
+# #1493 exists to close), AND a group keyed on github.ref rather than github.sha so two trunk pushes
+# close together QUEUE instead of racing for the trunk -- a per-SHA group is its own group every run and
+# serialises nothing. Two folds that still overlap are handled by fold-changelog-entry.ps1's own
+# push-failure diagnosis, which tells them apart rather than corrupting anything.
 #
 # WINDOWS, like every other workflow that runs these scripts: they target Windows PowerShell 5.1, so
 # this runs under `shell: powershell` (5.1) rather than pwsh.
@@ -83,7 +102,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: fold-on-merge-${{ github.sha }}
+  group: fold-on-merge-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -96,8 +115,11 @@ jobs:
       # Pinned to a commit SHA, matching claude.yml and claude-code-review.yml's own convention for a
       # checkout step that handles a real credential -- a mutable tag on this line could otherwise
       # retag its way into exfiltrating a 366-day standing write token instead of an hour-lived one.
+      # ref: main, not the pushed SHA -- this job asks "does the trunk carry a leftover NOW", and a fold
+      # already pushed on top of the merge commit must not read as still-unfolded here (issue #1543).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          ref: main
           token: ${{ secrets.FOLD_PUSH_TOKEN }}
 
       # continue-on-error is deliberate: check-unfolded-entry.ps1 exits non-zero on a genuine
