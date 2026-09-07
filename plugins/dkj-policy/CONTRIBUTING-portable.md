@@ -331,38 +331,88 @@ a governance decision rather than a configuration value. Write it in your own `C
 `CLAUDE.md` and link it from there; a contributor who has to guess will guess from whichever repo they last
 worked in.
 
-#### Behind a merge queue the motion is shorter, and the difference is not cosmetic
+#### The staleness race, and what this workflow does about it
 
-**A GitHub merge queue is this workflow's policy for every repo that runs it**, and it changes what step 5
-*is*. Under a queue `gh pr merge` does not merge: gh's own help says the pull request "will be added to the
-merge queue" — added, exit 0, not merged. So `ship-pr` reads the trunk's rules before it merges and, where
-it finds a queue, **enqueues, ends successfully, and folds nothing**. The queue merges the PR against the
-projected merge (the trunk's tip plus whatever is queued ahead of it) minutes later, in a process your
-session never observes. That is the point of it: staleness is gone by construction, and it is the only
-remedy for that race that converges.
+**A pull request is certified by CI against the base it was branched from, and the trunk moves after
+that.** The certificate then describes a merge that is no longer the merge about to happen. That is the
+race, and every repo running this workflow has it.
 
-**What it takes away has to be put back before the setting is switched on, or it fails silently.** Three
-things, and none of them arrive with the plugin, because none of them is plugin payload:
+**Detect-and-rebase is the answer, and it is the one every repo can run.** `ship-pr` reads the moment the
+run behind your required check was *created*, counts what the trunk gained after it, and **refuses the
+merge** when the answer is not zero — naming the commits, the two commands that bring the branch forward,
+and `-SkipStaleCheck` for a window you have judged harmless. It converges by repetition rather than by
+construction: bring the branch forward, CI re-runs against the current trunk, ship again.
 
-1. **The fold.** It ran as `ship-pr`'s own next step after its own merge call returned. There is no such
-   moment any more, so the branch document sits on the trunk unfolded, your changelog never receives the
-   entry, and a release cut in that window misses the change. It moves to a workflow triggered by the push
-   the queue's merge produces — and that workflow needs a push credential of its own, because a
+**It needs a required status check to have a certificate to read.** With none named, `ship-pr` says so and
+skips the step rather than inventing a verdict — which is honest and is also blind, so making one check
+required on your trunk is the single thing that turns this mechanism on. `adopt-merge-queue` reports where
+you stand on it.
+
+##### A merge queue is SUPPORTED, and is no longer prescribed
+
+**It used to be this workflow's policy for every repo, and it is not any more** (Dave, September 7, 2026,
+[#1546](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1546)). A queue removes the race by
+construction rather than by repetition, which is genuinely stronger — and **most repos running this
+workflow are not allowed to have one.** GitHub's own GA terms: merge queue is available on private repos
+only on **Enterprise Cloud**, and otherwise only on **public** repos owned by organizations. On Free, Pro or
+Team the *Require merge queue* rule is not offered at all; GitHub hides the checkbox rather than disabling
+it, so it reads as a UI mystery rather than as an entitlement.
+
+**The policy was set in the one repo where that constraint cannot be felt**, which is what made it look
+universal: this workflow's source repo is public, so it qualifies through the public clause while every
+private consumer does not. Measured September 7, 2026 — the source repo `public` on plan `free` (eligible),
+the consumer `BWJ-Development/smartwatchbanden` `private` on plan `team` (the checkbox absent). That
+consumer built the entire floor — both runners placed, the `merge_group` trigger added, `FOLD_PUSH_TOKEN`
+working — before the missing checkbox surfaced
+([#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540)).
+
+**A prescription most readers cannot follow is worse than no prescription**: it turns an ineligible repo's
+correct state into an open `[gap]`, and sends its owner looking through the ruleset UI for a control that
+is not rendered. So the queue is now one option among the repos that can have one, and detect-and-rebase is
+what the workflow actually relies on.
+
+**Where a repo does run one, everything below still applies and `ship-pr` still handles it.** Under a queue
+`gh pr merge` does not merge: gh's own help says the pull request "will be added to the merge queue" —
+added, exit 0, not merged. So `ship-pr` reads the trunk's rules before it merges and, where it finds a
+queue, **enqueues, ends successfully, and folds nothing**. The queue merges the PR against the projected
+merge (the trunk's tip plus whatever is queued ahead of it) minutes later, in a process your session never
+observes.
+
+**Three things have to be in place, and only the third belongs to the queue.** None of them arrives with
+the plugin, because none of them is plugin payload:
+
+1. **A fold runner.** The fold ran as `ship-pr`'s own next step after its own merge call returned. **Any
+   merge your session does not observe skips it** — a queue merge, and equally a PR merged from the GitHub
+   UI by anybody at all. The branch document then sits on the trunk unfolded, your changelog never receives
+   the entry, and a release cut in that window misses the change. So it moves to a workflow triggered by
+   the push the merge produces. **Every repo wants this, queue or no queue**, because the UI merge button
+   exists in all of them. Under a queue it additionally needs a push credential of its own, because a
    `merge_queue` rule blocks the default token's push to the trunk.
-2. **The resolves verification** (step 6). The issues still close — GitHub honours a body's closing keywords
-   on a queue merge exactly as on any other — but nothing checks that they did, and nothing repairs the case
-   the check exists for: a body that carried a plain mention instead of a keyword. It moves to a workflow
-   triggered by the same push.
-3. **A `merge_group` trigger on every workflow carrying a *required* check.** Without it that check never
-   runs for a queue entry, never reports, and **every merge fails** — a total merge outage, not a
-   degradation, and invisible until the first merge after the switch.
+2. **A resolves-verification runner** (step 6). Same shape and the same reason: the issues still close —
+   GitHub honours a body's closing keywords on any merge — but nothing checks that they did, and nothing
+   repairs the case the check exists for, a body that carried a plain mention instead of a keyword. Also
+   every repo's, for the UI-merge reason above.
+3. **A `merge_group` trigger on every workflow carrying a *required* check — QUEUE ONLY.** Without it that
+   check never runs for a queue entry, never reports, and **every merge fails**: a total merge outage, not
+   a degradation, and invisible until the first merge after the switch. In a repo with no queue this is
+   inert, so leaving it out costs nothing.
 
-**`adopt-merge-queue` is that floor**, and it is Part 3 of the [`adopt-dkj-policy`
-skill](skills/adopt-dkj-policy/SKILL.md): it reports where your repo stands against all three, places the
-two runners, and prints the ruleset command **without running it**. Switching the queue on is a
-repo-settings change and therefore the owner's, never a script's — so do the floor first and the setting
-last. `ship-pr` tells you where you stand from the other side: under a queue with no fold runner in your
-tree, its closing lines say so instead of promising a fold that is not coming.
+**`adopt-merge-queue` reports all three**, and it is Part 3 of the [`adopt-dkj-policy`
+skill](skills/adopt-dkj-policy/SKILL.md): it places the two runners, says whether a required check exists
+at all — the one detect-and-rebase reads — and, for a repo that has chosen a queue, prints the ruleset
+command **without running it**. Switching a queue on is a repo-settings change and therefore the owner's,
+never a script's.
+
+**And it does not report a missing queue as a gap.** Adopting one is a choice, and for most repos it is not
+even an available one, so a repo with no `merge_queue` rule is in the ordinary state rather than an
+unfinished one. `ship-pr` tells you where you stand from the other side: under a queue with no fold runner
+in your tree, its closing lines say so instead of promising a fold that is not coming.
+
+**Read the trigger warning as conditional, because the reverse mistake is expensive.** A consumer who
+follows *"make your CI check required"* and then adds a `merge_group` trigger to a workflow that cannot
+serve one has done work for a queue they do not have; a consumer who switches a queue on **without** that
+trigger has stopped every merge in the repo. The required check is for detect-and-rebase and every repo
+wants it. The trigger is for the queue and only a repo with one does.
 
 ### 6. Fold
 

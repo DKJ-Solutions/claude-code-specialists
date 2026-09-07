@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Tests for scripts/task/adopt-merge-queue.ps1 -- the merge-queue floor a consuming repo adopts
-    (issue #1516).
+    Tests for scripts/task/adopt-merge-queue.ps1 -- the CI floor a consuming repo adopts (issues
+    #1516, #1546).
 
 .DESCRIPTION
     WHY THIS SUITE EXISTS. Every property below fails SILENTLY, which is the same reason
@@ -19,6 +19,11 @@
       4. the two vocabularies and the exit code. A '[gap]' on a trunk with no queue is a to-do and
          exits 0; the same gap with a queue ACTIVE is a live defect and exits 1. Collapsing the two is
          how an honest report earns being ignored, and it is the one judgement this script makes;
+      4b. AND A MISSING QUEUE IS NEITHER (#1540, #1546). It printed as a closable '[gap]' until
+         September 7, 2026, while GitHub offers merge queue on a private repo only under Enterprise
+         Cloud -- so for most consumers that gap named a checkbox their ruleset UI does not render.
+         It is a '[note]' now. What survives as a gap is the REQUIRED CHECK, whose reason changed with
+         the policy: with none named ship-pr has no certificate to date and the staleness guard is off;
       5. the merge_group prerequisite is read as a KEY of the on: block, so a workflow that merely
          mentions the trigger in a comment is not reported as ready. This is the assert that would go
          green on a substring match while the outage it prevents is live;
@@ -72,6 +77,9 @@ function Assert-Equal {
 # context inside parameters.required_status_checks, which is where Get-DirectPushBlockingRules reads it.
 $RulesQueueOn = '[{"type":"deletion"},{"type":"required_status_checks","ruleset_id":7,"parameters":{"required_status_checks":[{"context":"lint-en-tests"}]}},{"type":"merge_queue"}]'
 $RulesQueueOff = '[{"type":"required_status_checks","ruleset_id":7,"parameters":{"required_status_checks":[{"context":"lint-en-tests"}]}}]'
+# NO QUEUE AND NOTHING REQUIRED -- the shape that leaves the staleness guard with no certificate to
+# date, which is the one gap this command still reports after the queue stopped being policy (#1546).
+$RulesQueueOffNoChecks = '[{"type":"deletion"},{"type":"non_fast_forward"}]'
 
 function New-FixtureConsumer {
     <#
@@ -166,6 +174,7 @@ try {
     New-Item -ItemType Directory -Path $Fixture -Force | Out-Null
     $rulesOn = New-RulesFile -Label 'on' -Json $RulesQueueOn
     $rulesOff = New-RulesFile -Label 'off' -Json $RulesQueueOff
+    $rulesOffNoChecks = New-RulesFile -Label 'off-nochecks' -Json $RulesQueueOffNoChecks
 
     # --- 1. Dry run (the default): the plan is printed, nothing is written -------------------------
     Write-Host '-- 1. the dry run writes nothing --' -ForegroundColor Cyan
@@ -279,6 +288,33 @@ try {
     $r = Invoke-Adopt -Dir $dir -ScriptArgs @('-RulesJsonOverride', $rulesOff)
     Assert-True ($r.Flat -like '*WILL NOT DO IT FOR YOU*') 'and it says so, rather than leaving the reader to notice nothing happened'
     Assert-True ($r.Flat -like '*Require merge queue*') 'while naming the change precisely enough to make it'
+
+    # --- 7b. A MISSING QUEUE IS NOT A GAP (issues #1540, #1546) ---------------------------------------
+    # It printed '[gap] no merge_queue rule' until September 7, 2026, on the policy that every repo
+    # running this workflow adopts one. GitHub offers merge queue on a PRIVATE repo only under
+    # Enterprise Cloud, so for most consumers the instruction named a checkbox their ruleset UI does not
+    # render -- an unclosable gap, measured after a consumer had built the entire floor beneath it. The
+    # queue is optional now and a trunk without one is in the ORDINARY state.
+    Write-Host '-- 7b. a trunk with no queue is the ordinary state, not a gap --' -ForegroundColor Cyan
+    $dir = New-FixtureConsumer -Label 'noqueue-note'
+    $r = Invoke-Adopt -Dir $dir -ScriptArgs @('-RulesJsonOverride', $rulesOff)
+    Assert-True ($r.Out -notmatch "(?m)\[gap\][^\r\n]*merge_queue rule") 'a trunk with no queue is NOT reported as a gap any more'
+    Assert-True ($r.Out -match "(?m)\[note\][^\r\n]*no merge_queue rule") 'it is a note instead'
+    Assert-True ($r.Flat -like '*ordinary state*') 'and says in those words that this is the ordinary state'
+    Assert-True ($r.Flat -like '*Enterprise Cloud*') 'naming the entitlement that makes a queue unavailable to most private repos'
+    Assert-True ($r.Flat -like '*detect-and-rebase*') 'and naming what the workflow relies on instead'
+    Assert-Equal 0 $r.Code 'and it still exits 0 -- nothing here is a defect'
+
+    # THE ONE GAP THAT SURVIVES, and its reason changed with the policy: with no required check named,
+    # ship-pr has no certificate to date, so the staleness guard is off. That is every repo's business
+    # now, where it used to read as a precondition for a switch a reader might never be able to flip.
+    $dir = New-FixtureConsumer -Label 'noreq'
+    $r = Invoke-Adopt -Dir $dir -ScriptArgs @('-RulesJsonOverride', $rulesOffNoChecks)
+    Assert-True ($r.Out -match "(?m)\[gap\][^\r\n]*no required status check") 'a trunk with nothing required is still a gap'
+    Assert-True ($r.Flat -like '*staleness guard is OFF*') 'and the reason given is the staleness guard, not the queue'
+    Assert-True ($r.Flat -like '*branch-entry*') 'it names the gate that CANNOT carry the role (issue #1538)'
+    Assert-True ($r.Flat -like '*github.head_ref*') 'and says why -- head_ref is empty outside a pull request'
+    Assert-Equal 0 $r.Code 'still a to-do rather than a defect, so the run exits 0'
 
     # --- 8. The source repo is refused ----------------------------------------------------------------
     Write-Host '-- 8. the repo that publishes this workflow is refused --' -ForegroundColor Cyan

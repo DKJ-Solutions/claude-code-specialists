@@ -343,7 +343,7 @@ infrastructure.
   step 3b exists to catch. #1292 (the red-trunk mechanism issue) stays open and assigned in its own
   right; the keep-`strict`-or-adopt-a-merge-queue decision is where #1325 now sits.
 
-  **The real fix is a GitHub merge queue**, which tests each PR against the projected merge
+  **The strongest fix is a GitHub merge queue**, which tests each PR against the projected merge
   (target-branch tip + the PRs already queued), so staleness is gone by construction. It **is**
   available to this repo (public + org-owned; the earlier "Enterprise only" reading was wrong).
   `ship-pr.ps1` step 3b is unchanged: its detection is correct and it stays the mechanism and the
@@ -352,6 +352,25 @@ infrastructure.
   staleness race that is not a merge queue does not converge** — `strict` + `allow_auto_merge` +
   `allow_update_branch` look like the unattended loop, but the base never moves under the PR on its
   own, so all they add is the block.
+
+  **THAT "the earlier reading was wrong" CORRECTION WAS RIGHT ABOUT THIS REPO AND WRONG AS A RULE, and
+  the difference cost a policy** (September 7, 2026, [#1546](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1546)).
+  GitHub's terms are: merge queue on a **private** repo only under Enterprise Cloud, and otherwise only
+  on a **public** repo owned by an organization. This repo is public on plan `free`, so it qualifies
+  through the *public* clause — the Enterprise reading was wrong **here** and is exactly right for a
+  private consumer. Re-measured: `DKJ-Solutions` plan `free` + this repo `public` (eligible);
+  `BWJ-Development` plan `team` + its repo `private` (the "Require merge queue" checkbox is not
+  rendered at all — GitHub hides it rather than disabling it, which is why it reads as a UI mystery).
+  So step 3b is not the "portable net" beneath a policy any more; **it is the policy**, and the queue is
+  one option for the repos that can have one.
+
+  **The lesson is about where a capability check is performed, not about queues.** The claim was
+  verified in the one repo whose own answer could not reveal the constraint, and a capability that is
+  *present* announces nothing about why. `adopt-merge-queue` then carried the generalisation outward as
+  a closable `[gap]`, so a consumer built the whole floor before meeting a checkbox that does not exist
+  ([#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540)). Where a finding will
+  travel to a consumer, measure it on the axis the consumer differs on — here `private`/`public` and the
+  org plan — before writing it down as a rule.
 
   **BOTH PREREQUISITES ARE NOW IN THE TREE, AND THE SWITCH IS STILL DAVE'S** (September 3, 2026,
   #1325). Enabling the queue is a repo-settings change; making the repo survive one is not, and the
