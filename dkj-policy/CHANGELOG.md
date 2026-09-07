@@ -43,7 +43,34 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 19 minor entries** <!-- pending-tally -->
+**8 / 20 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1559-machine-local-path-gate · 20260907-201435
+
+`open-pr.ps1` now warns -- twice, and never refuses -- when a branch's commits touch a path this repo
+has marked machine-local (`Get-MachineLocalPaths`, `.claude/settings.json` here). A file a person
+edited for their own clone and swept in with `git add -A` reached the merge queue on PR #1557 past
+every other gate, because none of them reads the diff's file set. The new optional seam lets each
+consumer name its own such paths; undefined, the check is silent.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a workflow-internal guardrail. It changes what `open-pr` prints for a repo developer running a
+PR; a subscriber of any consuming service never sees it.
+
+**Score:** N/A
+
+#### Pull Request
+
+warn when a branch commit touches a machine-local path such as .claude/settings.json
+
+Plugins: dkj-policy
+
+[PR #1561](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1561)
+
+---
 
 ### DEPLOY: fix/1556-asana-mirror-get-issueclosure · 20260907-195814
 
