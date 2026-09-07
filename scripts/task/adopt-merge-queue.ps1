@@ -1,14 +1,33 @@
 <#
 .SYNOPSIS
-    The merge-queue floor, in a consuming repo: report where this repo stands against the four things
-    a GitHub merge queue needs to be true, place the two CI runners it takes away from the shipping
-    session, and print the ruleset command WITHOUT running it. Issue #1516.
+    The CI floor, in a consuming repo: place the two runners that keep the fold and the resolves
+    verification alive across a merge this session never observes, report whether a required status
+    check exists at all -- the one detect-and-rebase reads -- and, for a repo that has CHOSEN a merge
+    queue, print the ruleset command WITHOUT running it. Issues #1516, #1546.
 
 .DESCRIPTION
-    WHY A FLOOR AND NOT A SWITCH. The queue went live on this workflow's source repo on September 6,
-    2026 (#1492) and the policy is that every repo running this workflow adopts it. But the switch is
-    the last step, not the first: a merge queue takes THREE things away from the shipping session, and
-    each one fails SILENTLY in a repo that has not put something in its place.
+    A MERGE QUEUE IS NO LONGER THIS WORKFLOW'S POLICY (Dave, September 7, 2026, #1546). It was, from
+    September 6 (#1492) -- and the policy was set in the one repo where its central constraint cannot
+    be felt. GitHub offers merge queue on a PRIVATE repo only under Enterprise Cloud, and otherwise
+    only on a PUBLIC repo owned by an organization; on Free, Pro or Team it HIDES the 'Require merge
+    queue' checkbox rather than disabling it. This workflow's source repo is public on plan 'free', so
+    it qualifies through the public clause while most consumers do not -- and this script reported that
+    unreachable setting as a closable '[gap]', sending its reader through the ruleset UI after a
+    control that is not rendered (#1540, measured in BWJ-Development/smartwatchbanden: private, plan
+    'team', the whole floor built before the missing checkbox surfaced).
+
+    SO THE STANDING MECHANISM IS DETECT-AND-REBASE, which every repo can run. ship-pr dates a PR's
+    certificate from the run behind a REQUIRED check, counts what the trunk gained after it, and
+    refuses the merge when that is not zero. It converges by repetition rather than by construction --
+    bring the branch forward, CI re-runs, ship again -- which is weaker than a queue and available.
+
+    WHICH MOVES THE ONE GAP THAT MATTERS. With no required check named, ship-pr says so and skips the
+    step, so the staleness guard is simply off. That is now this script's headline finding, where it
+    used to read as a precondition for a switch a reader might never be able to flip.
+
+    THE TWO RUNNERS ARE EVERY REPO'S, QUEUE OR NO QUEUE, and this is the half most easily mis-read as
+    queue machinery. What breaks the fold is a merge THE SHIPPING SESSION DOES NOT OBSERVE, and the
+    GitHub UI merge button produces one in every repo on earth. A queue only makes it the normal case.
 
       1. THE MERGE. Under a queue `gh pr merge` does not merge -- gh's own help: "When targeting a
          branch that requires a merge queue ... the pull request will be added to the merge queue."
@@ -18,25 +37,37 @@
          this script does not have to place it.
 
       2. THE FOLD. It ran from exactly one place -- ship-pr's own next step after its own merge call
-         returned. The queue merges minutes later in a process that session never observes, so that
-         step never runs and the branch document sits on the trunk unfolded, with CHANGELOG.md never
-         receiving the entry and a release cut in that window missing the change. The source repo
-         answered it with .github/workflows/fold-on-merge.yml (#1493, #1507). A consumer has no such
-         file, and nothing tells them: ship-pr's enqueue arm PROMISES one.
+         returned. Any merge that session does not observe skips it: a queue merge, and equally a PR
+         merged from the GitHub UI by anybody at all. The branch document then sits on the trunk
+         unfolded, with CHANGELOG.md never receiving the entry and a release cut in that window missing
+         the change. The source repo answered it with .github/workflows/fold-on-merge.yml (#1493,
+         #1507). A consumer has no such file, and nothing tells them: ship-pr's enqueue arm PROMISES one.
 
       3. THE RESOLVES VERIFICATION. verify-resolved-issues.ps1 is ship-pr's step 6, and it went the
          same way for the same reason (#1511). The closing itself is not at risk -- GitHub honours a
-         body's keywords on a queue merge exactly as on any other -- but the verification is, and so is
-         the repair when a keyword missed, which is the case the script was built for.
+         body's keywords on any merge -- but the verification is, and so is the repair when a keyword
+         missed, which is the case the script was built for.
 
-    AND ONE PREREQUISITE HAS TO BE TRUE BEFORE THE SWITCH IS FLIPPED AT ALL (#1325): every workflow
-    carrying a REQUIRED check context must trigger on `merge_group`. A required workflow without it
-    never runs for a queue entry, so its check never reports -- and GitHub's own warning is that the
-    merge then fails. That is a TOTAL MERGE OUTAGE on the trunk, not a degradation, and it is invisible
-    until the first merge after the switch.
+    AND ONE PREREQUISITE BELONGS TO THE QUEUE ALONE (#1325): every workflow carrying a REQUIRED check
+    context must trigger on `merge_group`. A required workflow without it never runs for a queue entry,
+    so its check never reports -- and GitHub's own warning is that the merge then fails. That is a TOTAL
+    MERGE OUTAGE on the trunk, not a degradation, and it is invisible until the first merge after the
+    switch. In a repo with NO queue it is inert, so leaving it out costs nothing -- which is why it is
+    reported as a gap only where a queue is actually active.
 
-    SO THE ORDER MATTERS AND THIS SCRIPT KEEPS IT: report point 4 (the trigger) and points 2-3 (the
-    runners) first, and the switch last. A run that placed the switch first would be the outage.
+    DO NOT CONFUSE IT WITH THE REQUIRED CHECK ITSELF, because the two point opposite ways. Making a
+    check required is every repo's business and turns detect-and-rebase on. Adding merge_group to it is
+    a queue repo's business and does nothing anywhere else. A consumer who follows the second without
+    the first has done work for a queue they do not have.
+
+    AND THE PLUGIN'S OWN branch-entry GATE CANNOT BE THAT REQUIRED CHECK (#1538). It reads
+    github.head_ref, which is empty in a merge_group event -- there is no pull request left to read --
+    so it stays a pull-request check. The source repo requires its own lint-en-tests instead, a
+    repo-owned workflow triggering on both pull_request and merge_group; that arrangement is right and
+    was nowhere written down, so a consumer could not reach it by reading. This script now says it.
+
+    SO THE ORDER MATTERS AND THIS SCRIPT KEEPS IT: report the required check and the trigger first, then
+    the runners, and the queue last. A run that placed the queue first would be the outage.
 
     IT NEVER FLIPS THE SETTING, AND THAT IS A RULE RATHER THAN A LIMITATION. A ruleset is a
     repo-settings change: irreversible in the sense that matters (it changes what every contributor's
@@ -469,7 +500,7 @@ $liveDefects = 0
 # 1. THE TRIGGER, FIRST, because it is the one that is an OUTAGE rather than a gap. It is also the one
 #    piece of the floor this command cannot place: the workflow carrying your required check is yours,
 #    and adding a trigger to it is an edit to somebody else's file rather than an addition beside it.
-Write-Host '-- 1. the merge_group trigger on every REQUIRED check --' -ForegroundColor Cyan
+Write-Host '-- 1. the required check, and (queue only) its merge_group trigger --' -ForegroundColor Cyan
 if (-not $queueReadable) {
     Write-Host "  [skip]    the trunk's rules could not be read, so which checks are REQUIRED is unknown." -ForegroundColor DarkGray
     Write-Host '            Every workflow below is listed with its trigger so you can judge it yourself.' -ForegroundColor DarkGray
@@ -478,9 +509,21 @@ if (-not $queueReadable) {
         Write-Host "            $($w.Rel) -- $mark" -ForegroundColor DarkGray
     }
 } elseif ($requiredContexts.Count -eq 0) {
-    Write-Host "  [gap]     no required status check on '$trunk'. A queue with nothing required certifies nothing:" -ForegroundColor Yellow
-    Write-Host '            every entry merges unverified, which is weaker than what you have today.' -ForegroundColor Yellow
-    Write-Host '            Make your CI check required on the trunk before switching a queue on.' -ForegroundColor Yellow
+    # THE REASON CHANGED WITH THE POLICY (#1546), AND IT GOT STRONGER. This used to read as a
+    # precondition for switching a queue on -- which made it somebody else's problem in a repo that was
+    # never going to have one. Detect-and-rebase reads the RUN BEHIND A REQUIRED CHECK to date the
+    # certificate, so with nothing required ship-pr prints 'no required check name is known -- not
+    # checked' and the staleness guard is simply off. That is the standing mechanism now, so this is the
+    # one gap on this page that every repo should close.
+    Write-Host "  [gap]     no required status check on '$trunk', so the staleness guard is OFF." -ForegroundColor Yellow
+    Write-Host '            ship-pr dates a PR certificate from the run behind a REQUIRED check; with none' -ForegroundColor Yellow
+    Write-Host '            named it says so and skips the step, which is honest and is also blind. Making' -ForegroundColor Yellow
+    Write-Host '            one CI check required on the trunk is what turns detect-and-rebase on.' -ForegroundColor Yellow
+    Write-Host '' -ForegroundColor Yellow
+    Write-Host '            IT MUST BE A CHECK THAT CAN CARRY THE ROLE, and the branch-entry gate this' -ForegroundColor Yellow
+    Write-Host '            plugin ships CANNOT: it reads github.head_ref, which is empty outside a pull' -ForegroundColor Yellow
+    Write-Host '            request, so it stays a pull-request check. Use your own CI workflow. If you also' -ForegroundColor Yellow
+    Write-Host '            run a queue, that workflow needs the merge_group trigger of this section too.' -ForegroundColor Yellow
 } else {
     foreach ($ctx in $requiredContexts) {
         $owner = @($workflows | Where-Object { $_.JobIds -contains $ctx })
@@ -512,7 +555,7 @@ Write-Host ''
 
 # 2 + 3. THE TWO RUNNERS. These this command CAN place: they are new files beside yours, not edits to
 #        one of them, which is the same line adopt-workflow-folder draws.
-Write-Host '-- 2. the two runners a queue takes away from the shipping session --' -ForegroundColor Cyan
+Write-Host '-- 2. the two runners ANY unobserved merge takes away (queue, or the UI button) --' -ForegroundColor Cyan
 $created = 0
 $kept = 0
 foreach ($t in $targets) {
@@ -546,25 +589,41 @@ if ($created -gt 0) {
 }
 Write-Host ''
 
-# 4. THE SWITCH, LAST, AND NEVER PULLED HERE.
-Write-Host '-- 3. the queue itself --' -ForegroundColor Cyan
+# 4. THE QUEUE, LAST, NEVER PULLED HERE -- AND NEVER REPORTED AS A GAP (issues #1540, #1546).
+#    It was a '[gap]' until September 7, 2026, on the reading that every repo running this workflow
+#    adopts one. Most of them are not ALLOWED to: GitHub offers merge queue on private repos only under
+#    Enterprise Cloud, and otherwise only on public repos owned by organizations -- and on Free, Pro or
+#    Team it hides the 'Require merge queue' checkbox rather than disabling it. So the instruction could
+#    not be followed and the gap could not be closed, and the reader went looking through the ruleset UI
+#    for a control that is not rendered. Measured: this workflow's own source repo is public on plan
+#    'free' and qualifies through the public clause, which is why the policy looked universal to the one
+#    repo that set it. A missing queue is now the ORDINARY state and prints as a note.
+Write-Host '-- 3. the queue (optional -- not this workflow''s policy) --' -ForegroundColor Cyan
 if (-not $queueReadable) {
     Write-Host "  [skip]    the trunk's rules could not be read here -- no gh, no network, or a token that" -ForegroundColor DarkGray
     Write-Host '            cannot read rulesets. That is not "no queue": nothing above assumed either way.' -ForegroundColor DarkGray
     Write-Host "            Read it yourself with:  gh api repos/<owner>/<repo>/rules/branches/$trunk --jq '[.[].type]'" -ForegroundColor DarkGray
 } elseif ($queueActive) {
     Write-Host "  [ok]      a merge_queue rule is active on '$trunk' ($rulesSource)." -ForegroundColor Green
+    Write-Host '            Point 1 above is what keeps it honest -- a required check with no merge_group' -ForegroundColor DarkGray
+    Write-Host '            trigger stops every merge in this repo.' -ForegroundColor DarkGray
 } else {
-    Write-Host "  [gap]     no merge_queue rule on '$trunk'. Every repo running this workflow adopts one:" -ForegroundColor Yellow
-    Write-Host '            it is the only remedy for the staleness race that converges, because a queue tests' -ForegroundColor Yellow
-    Write-Host '            each PR against the PROJECTED merge rather than against the base it was branched' -ForegroundColor Yellow
-    Write-Host '            from. Switch it on in Settings -> Rules -> Rulesets, on the ruleset that already' -ForegroundColor Yellow
-    Write-Host "            protects '$trunk', by adding the 'Require merge queue' rule." -ForegroundColor Yellow
-    Write-Host '' -ForegroundColor Yellow
-    Write-Host '            THIS COMMAND WILL NOT DO IT FOR YOU, and that is deliberate: a ruleset changes what' -ForegroundColor Yellow
-    Write-Host '            every contributor''s merge does, immediately, for everybody. It is the repo owner''s' -ForegroundColor Yellow
-    Write-Host '            act. Do points 1 and 2 above FIRST -- flipping this with a required check that has' -ForegroundColor Yellow
-    Write-Host '            no merge_group trigger is a total merge outage on the first merge afterwards.' -ForegroundColor Yellow
+    Write-Host "  [note]    no merge_queue rule on '$trunk' -- which is the ordinary state, not a gap." -ForegroundColor DarkGray
+    Write-Host '            This workflow relies on detect-and-rebase instead: ship-pr refuses to merge on a' -ForegroundColor DarkGray
+    Write-Host '            certificate the trunk has moved past, and you bring the branch forward. That works' -ForegroundColor DarkGray
+    Write-Host '            in every repo, which a queue does not -- GitHub offers one on a PRIVATE repo only' -ForegroundColor DarkGray
+    Write-Host '            under Enterprise Cloud, and otherwise only on a PUBLIC repo owned by an org. On' -ForegroundColor DarkGray
+    Write-Host '            Free, Pro or Team the checkbox is not rendered at all, so this is usually not even' -ForegroundColor DarkGray
+    Write-Host '            an available choice. What detect-and-rebase DOES need is point 1 above: a required' -ForegroundColor DarkGray
+    Write-Host '            check to read a certificate from.' -ForegroundColor DarkGray
+    Write-Host '' -ForegroundColor DarkGray
+    Write-Host '            If your repo is eligible and you want one anyway, add the rule named' -ForegroundColor DarkGray
+    Write-Host "            'Require merge queue' in Settings -> Rules -> Rulesets, on the ruleset that" -ForegroundColor DarkGray
+    Write-Host "            already protects '$trunk'." -ForegroundColor DarkGray
+    Write-Host '            THIS COMMAND WILL NOT DO IT FOR YOU, deliberately: a ruleset changes what' -ForegroundColor DarkGray
+    Write-Host '            every contributor''s merge does, immediately, for everybody. Do points 1 and 2' -ForegroundColor DarkGray
+    Write-Host '            FIRST -- flipping it with a required check that has no merge_group trigger is a' -ForegroundColor DarkGray
+    Write-Host '            total merge outage on the first merge afterwards.' -ForegroundColor DarkGray
 }
 Write-Host ''
 

@@ -310,11 +310,28 @@ The constitution above, concretely implemented here:
   the measurements behind them are in
   [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
   sits at the point where it fires rather than in a list of its own.
+- **The staleness race is answered by detect-and-rebase, and a merge queue is no longer the policy**
+  (Dave, September 7, 2026, [#1546](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1546)).
+  `ship-pr.ps1` dates the run behind the required check `lint-en-tests`, counts what `main` gained after
+  it, and **refuses the merge** when that is not zero, naming the commits and the way forward
+  ([#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292)). The queue held that
+  job from September 6 to September 7, and it was retired as policy because **most repos running this
+  workflow are not allowed to have one**: GitHub offers merge queue on a private repo only under
+  Enterprise Cloud, and otherwise only on a public repo owned by an org. This repo is `public` on plan
+  `free`, so it qualifies through the public clause — which is exactly why the constraint was invisible
+  from here, and why the policy was wrong in the one repo that set it
+  ([#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540)). A prescription a
+  consumer cannot follow turns their correct state into an open gap. **Taking the `merge_queue` rule off
+  `main-ci-gate` is a ruleset change and therefore Dave's own act**, so read the queue as live here until
+  he has made it; nothing below depends on which way that goes.
 - **And one guard fires *after* the merge, on the trunk.** The fold runs from `ship-pr.ps1`, as the
   shipping session's own step once its own merge call returns — so a merge that session never observes
-  never folds: a PR merged from the GitHub UI, or, since the merge queue went live on `main-ci-gate`
+  never folds: a PR merged from the GitHub UI, or, while the merge queue is live on `main-ci-gate`
   ([#1492](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1492)), one merged by the
-  queue. **Under a queue `ship-pr.ps1` no longer even tries** ([#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)):
+  queue. **That first case survives the queue's retirement, and is why both runners below stay whatever
+  happens to it**: the UI merge button exists in every repo, so a fold that depends on the shipping
+  session is one merge away from being skipped either way.
+  **Under a queue `ship-pr.ps1` no longer even tries** ([#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)):
   it reads the trunk's rules before it merges, and where it finds a queue it enqueues, ends
   successfully, and folds nothing — because folding on `gh pr merge`'s exit code would write the entry
   onto the trunk ahead of the merge it describes. The entry then stays in the development document on

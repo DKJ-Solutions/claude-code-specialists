@@ -1,9 +1,9 @@
 ---
 name: adopt-dkj-policy
-description: Adopt the dkj-policy workflow in a consuming repo, in three independent parts that can run in any order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, and the branch-entry CI gate; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Part 3 builds the merge-queue floor -- it reports whether this repo would survive a GitHub merge queue on its trunk, places the two CI runners a queue takes away from the shipping session (the fold and the resolves verification), and prints the ruleset command without running it; use it before switching a merge queue on, or when ship-pr says a queue is active here and nothing is folding. All three parts are strictly additive and dry-run by default; none overwrites anything.
+description: Adopt the dkj-policy workflow in a consuming repo, in three independent parts that can run in any order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, and the branch-entry CI gate; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Part 3 builds the CI floor -- it places the two runners that keep the fold and the resolves verification alive across a merge the shipping session never observes (a merge queue, or the GitHub UI merge button), and reports whether a required status check exists at all, which is the certificate ship-pr dates its staleness guard from; use it after installing the plugin, when ship-pr says the staleness guard is off because no required check is known, or when a merge landed and nothing folded. A merge queue is optional and is not this workflow policy: most repos cannot have one, so a missing queue is reported as the ordinary state rather than as a gap. All three parts are strictly additive and dry-run by default; none overwrites anything.
 ---
 
-# adopt-dkj-policy -- scaffold the folder, place the config seams, build the queue floor
+# adopt-dkj-policy -- scaffold the folder, place the config seams, build the CI floor
 
 An install writes nothing into your repo: it clones the plugin into your cache, and that is all. This
 command is the three things that actually place `dkj-policy` on your side, and they are independent of
@@ -11,7 +11,8 @@ each other -- run them in any order, or run only the one you need:
 
 - **Part 1** creates the workflow's own root folder and its CI gate.
 - **Part 2** places or proposes the answers to the repo-owned config seam the shared scripts read.
-- **Part 3** builds the floor a GitHub merge queue needs, and tells you whether you are standing on it.
+- **Part 3** builds the CI floor: the two runners that survive a merge your session never sees, and
+  whether a required check exists for the staleness guard to read. A merge queue is optional here.
 
 No part depends on another having run. All three are dry-run by default and never overwrite a file
 that already exists.
@@ -285,30 +286,73 @@ it exists to prevent.
 
 ---
 
-## Part 3 -- the merge-queue floor
+## Part 3 -- the CI floor
 
-**A GitHub merge queue is this workflow's policy for every repo that runs it** (issue #1516), and it is
-the only remedy for the staleness race that converges: a queue tests each PR against the *projected*
-merge -- the trunk's tip plus whatever is queued ahead of it -- rather than against the base the branch
-was cut from. Everything short of that was measured and rejected in the source repo:
-`strict_required_status_checks_policy`, `allow_auto_merge` and `allow_update_branch` were all switched on
-and reverted the same day, because **GitHub performs no server-side base-sync of a PR branch outside a
-queue.**
+**Every pull request is certified by CI against the base it was branched from, and your trunk moves
+after that.** The certificate then describes a merge that is no longer the merge about to happen. That
+race is real in every repo, and this part is how you stand against it.
 
-**But the setting is the last step, not the first.** A queue takes three things away, and every one of
-them fails silently:
+**Detect-and-rebase is this workflow's answer** (Dave, September 7, 2026,
+[#1546](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1546)). `ship-pr` dates the run
+behind your **required** check, counts what the trunk gained after it, and **refuses the merge** when
+that is not zero -- naming the commits and the two commands that bring the branch forward. It converges
+by repetition rather than by construction, and it runs anywhere.
 
-| what the queue takes | what happens if nothing replaces it | who replaces it |
+**So the one thing to close here is a required status check.** With none named, `ship-pr` prints *"no
+required check name is known -- not checked"* and the staleness guard is simply **off**. Making one CI
+check required on your trunk is what turns it on.
+
+> **It cannot be the `branch-entry` gate Part 1 placed**
+> ([#1538](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1538)). That gate reads
+> `github.head_ref`, which is empty outside a pull request, so it stays a pull-request check. Use your
+> own CI workflow. The source repo requires `lint-en-tests` -- its own, triggering on both
+> `pull_request` and `merge_group` -- and deliberately does not require `branch-entry`.
+
+### A merge queue is optional, and is no longer the policy
+
+A queue removes the race by *construction* rather than by repetition, which is genuinely stronger. **It
+was this workflow's policy from September 6 to September 7, 2026 (issue #1516), and it is not any
+more**, because most repos running this workflow are not allowed to have one:
+
+> GitHub's own GA terms -- merge queue is available on private repos **only on Enterprise Cloud**, and
+> otherwise only on **public** repos owned by organizations. On Free, Pro or Team the *Require merge
+> queue* rule is **not offered at all**: GitHub hides the checkbox rather than disabling it.
+
+**The policy was set in the one repo where that cannot be felt.** This workflow's source repo is public
+on plan `free`, so it qualifies through the public clause while every private consumer does not --
+measured September 7, 2026 in `BWJ-Development/smartwatchbanden` (private, plan `team`), which built the
+entire floor before the missing checkbox surfaced
+([#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540)). A prescription its
+reader cannot follow is worse than none: it turns a correct state into an open `[gap]` and sends
+somebody hunting for a control that is not rendered. **So this command no longer reports a missing queue
+as a gap.**
+
+Everything short of a queue *within GitHub's own settings* was measured and rejected in the source repo:
+`strict_required_status_checks_policy`, `allow_auto_merge` and `allow_update_branch` were switched on and
+reverted the same day, because **GitHub performs no server-side base-sync of a PR branch outside a
+queue.** That is why the answer is a refusal in `ship-pr` rather than a setting.
+
+### The two runners are every repo's, queue or no queue
+
+**What breaks the fold is a merge your shipping session does not observe** -- and the GitHub UI merge
+button produces one in every repo. A queue only makes it the normal case:
+
+| what an unobserved merge takes | what happens if nothing replaces it | who replaces it |
 |---|---|---|
-| **the merge** -- `gh pr merge` now *enqueues* and exits 0 | -- | `ship-pr` already handles this; it travels with the plugin |
 | **the fold** -- it ran as `ship-pr`'s step right after its own merge returned | the branch document sits on your trunk unfolded; the changelog never gets the entry; a release cut in that window misses the change | `.github/workflows/fold-on-merge.yml`, **placed by this command** |
 | **the resolves verification** -- `ship-pr`'s step 6 | the issues still close (GitHub honours the keywords), but nothing verifies it and nothing repairs a body that carried a plain mention | `.github/workflows/verify-resolved.yml`, **placed by this command** |
+| **the merge itself** -- under a queue `gh pr merge` *enqueues* and exits 0 | -- | `ship-pr` already handles this; it travels with the plugin |
 
-And one prerequisite has to be true **before** the switch is flipped at all: every workflow carrying a
-**required** check must trigger on `merge_group`. Without it that check never runs for a queue entry,
-never reports, and **every merge fails** -- a total merge outage, not a degradation, invisible until the
-first merge afterwards. This command reports it and cannot place it: the workflow carrying your required
-check is yours, and adding a trigger to it is an edit to your file rather than an addition beside it.
+**And one prerequisite belongs to a queue alone**: every workflow carrying a **required** check must
+trigger on `merge_group`. Without it that check never runs for a queue entry, never reports, and **every
+merge fails** -- a total merge outage, not a degradation, invisible until the first merge afterwards. In
+a repo with no queue it is inert, so leaving it out costs nothing. This command reports it and cannot
+place it: the workflow carrying your required check is yours, and adding a trigger to it is an edit to
+your file rather than an addition beside it.
+
+**Do not run the two instructions together without reading which is which.** Making a check required is
+every repo's business and turns detect-and-rebase on. Adding `merge_group` to it is a queue repo's
+business and does nothing anywhere else.
 
 ### Run it
 
