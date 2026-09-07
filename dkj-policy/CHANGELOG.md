@@ -43,7 +43,65 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 15 minor entries** <!-- pending-tally -->
+**5 / 16 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1535-per-path-sync-base · 20260907-182557
+
+The pre-task sync judges each path against **its own** base -- the most recent sync commit that touched
+that path -- instead of against one base taken per run. A path no sync has ever taken has **no**
+agreement point with live, and that is now a **conflict** to reconcile by hand rather than a take.
+
+**What it repairs arrived as a green run, which is why it is worth stating in full.** A sync commit
+establishes agreement with live only for the paths it actually **took**. Taken globally, that commit is
+simply newer than the trunk's own work on every path the sync skipped -- so `has the trunk moved on this
+path since the base` answered *no* for work that had moved, the both-sides-moved arm could not fire, and
+live was taken over merged-but-unpushed own work with every gate passing.
+
+Measured in a consumer: **six** paths verdicted *take from live* where the trunk was a strict
+**superset** of live. Across five locale files, **0** keys would have come in from live against **6**
+key-deletions and **7** string reversions -- four of them reverting English strings back to Dutch in the
+*default* locale -- plus a canonical-URL rewrite deleted from `layout/theme.liquid`. The sync it measured
+from had taken 167 files, and none of those six was among them.
+
+**The conflict now says which kind it is.** *Both sides moved* means there are two sets of changes to
+merge; *nothing is known to have agreed* means the path has never been reconciled at all. They lead to
+different work, so they no longer share one sentence.
+
+**A tag is deliberately not accepted as a path's base.** It is a release marker and says nothing about
+agreement with live -- the repo-wide answer uses one only as a wide heuristic window. Reading a tag as an
+agreement point would rebuild this defect by a second route, and silently, which is how the first one
+survived. And the new parameter defaults to *no known agreement*: a caller that does not answer gets a
+report, never a take. The old default sat on the other side of that choice by accident.
+
+This is the same hole as #353 one layer down. That one was diagnosed as the time-window rule and
+repaired by moving to content provenance. Provenance is the right question; it was being asked against a
+base that was not per path.
+
+**Score:** 5
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own developers and the consuming repos, and a Shopify store's shoppers
+are not subscribers of a service.
+
+What the consuming Shopify repos get at the next release is the reason this is scored 5 rather than 3:
+the sync stops being able to revert merged work, and the run that would have done it was green. The
+consumer that filed this is **holding a live push** on exactly those six paths, because the refusal that
+correctly blocked the push pointed at a sync that would have reverted the work. That standoff clears.
+No configuration changes and no seam moves; the `Get-ShopifySyncReferencePattern` answer a repo already
+gave now applies per path as well as repo-wide.
+
+**Score:** N/A
+
+#### Pull Request
+
+The pre-task sync's conflict base is per path, so merged-but-unpushed work is not taken as live drift
+
+Plugins: dkj-team-shopify
+
+[PR #1555](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1555)
+
+---
 
 ### DEPLOY: docs/1537-bwj-scope-org-agnostic · 20260907-175651
 
