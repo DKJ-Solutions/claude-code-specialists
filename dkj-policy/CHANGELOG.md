@@ -28,9 +28,12 @@ follows the highest tier pending**: **tier 0 only earns a patch**, **tier 1 or h
 a **major** recaps ten minors. So a changelog holding nothing but tier 0 is a patch waiting to be cut, not
 a release with nobody to announce it to.
 
-**The line directly under `## [Unreleased]` is a tally, and nobody types it.** It says how many entries are
-waiting for the next release and how they split by tier — including how many reach the audience this repo
-publishes to, which is the number that says whether there is a release here or only a patch. It is
+**The line directly under `## [Unreleased]` is a tally, and nobody types it.** It reads
+`**4 / 9 minor entries**`: how many of the pending entries reach the audience this repo publishes to, out of
+how many are waiting for the next release, and which bump that work has earned. The two numbers answer
+different questions and may differ — the fraction counts tier 2 and above, the bump follows tier 1 and
+above — so `**0 / 8 minor entries**` says nothing reaches a subscriber while the version still owes a minor
+for what reaches management. It is
 **derived from the entries below it every time it is written**, by the fold that adds one and the cut that
 removes them all, so it holds no state of its own and a hand-edited count is simply corrected on the next
 fold. It ends with an HTML comment that marks it as machine-written; that marker is what the next run

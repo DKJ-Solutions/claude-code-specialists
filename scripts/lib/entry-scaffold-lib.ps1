@@ -436,6 +436,52 @@ function Get-EntryAskedTiers {
     return @(0, $audience)
 }
 
+function Get-EntryEarnedBump {
+    <#
+        Pure: what a pending set of entries EARNS, from a tier -> count map. Returns
+
+          Notable  how many entries sit at tier 1 or higher
+          Bump     'minor' where Notable is above zero, else 'patch'
+
+        THE RULE (Dave, August 7, 2026): tier 0 only earns a PATCH -- publishing to no audience is what a
+        patch is for -- and one entry at tier 1 or higher earns a MINOR, because somebody beyond this
+        repo's own developers got something out of it. 'major' is deliberately not reachable from here:
+        what earns one is the ten minors behind it, a milestone somebody decides to mark rather than a
+        size this work adds up to. Test-ReleaseBumpEarned answers that second question and this one does
+        not.
+
+        TIER 1 OR HIGHER, NOT 'AT OR ABOVE THE AUDIENCE TIER', and the difference is load-bearing. This is
+        written as '>= 1' so it reads correctly in a tier-1 repo and a tier-2 repo alike with neither
+        having to translate it -- the same reason Get-ChangelogPendingCounts writes its own Reaching that
+        way. So the two numbers on the tally line answer different questions and may differ: Reaching is
+        who NOTICES, and this is what the version OWES them.
+
+        IT LIVES HERE, IN THE LOWER LIB, BECAUSE TWO CALLERS AT DIFFERENT DEPTHS NEED IT. It was inline in
+        Test-ReleaseBumpEarned in release-lib until September 7, 2026, and the tally line one lib down had
+        no way to reach it: release-lib dot-sources THIS file, never the reverse, so the fold -- which
+        loads entry-scaffold-lib standalone -- cannot see anything defined up there. The tally's own
+        comment block named that and declined to name a bump at all rather than copy the arithmetic, on
+        the ground that a second copy of a release gate's rule, inside the document that gate then reads,
+        is the shape this repo keeps getting bitten by. That reasoning was right about the copy and wrong
+        about the conclusion: the answer is one definition in the layer both callers already share, which
+        is what this is. Test-ReleaseBumpEarned calls it and keeps the questions only it can answer --
+        whether the bump ASKED for is the one earned, and whether a major is available.
+    #>
+    param([Parameter(Mandatory)]$ByTier)
+
+    $notable = 0
+    foreach ($tier in @($ByTier.Keys)) {
+        # ContainsKey rather than a bare read for the reason Test-ReleaseBumpEarned's own loop gives: a
+        # caller (or a test) handing over a map built by hand must not make this throw under StrictMode.
+        if ([int]$tier -ge 1) { $notable += [int]$ByTier[$tier] }
+    }
+
+    return [pscustomobject]@{
+        Notable = $notable
+        Bump    = if ($notable -gt 0) { 'minor' } else { 'patch' }
+    }
+}
+
 # --- WHO EACH AUDIENCE TIER IS, IN ONE PLACE (August 19, 2026) ------------------------------------
 #
 # The heading over the audience tier's section stopped naming a number, so the guidance underneath it is
@@ -3574,37 +3620,57 @@ function Get-ChangelogUnreleasedPattern {
 # not have. An HTML comment renders as nothing, survives a consumer translating every word around it,
 # and cannot be produced by accident.
 #
-# THE COUNT IS PER TIER AND IT SUMS TO THE TOTAL, because Resolve-EntryImpact reports the HIGHEST tier an
-# entry declares -- the same disjoint grouping Get-PullRequestEntriesByTier uses, so the tally cannot
-# disagree with what the cut is about to read.
+# IT IS THREE FACTS ON ONE LINE, AND IT USED TO BE A PER-TIER BREAKDOWN (Dave, September 7, 2026, issue
+# #1545). It read '**9 entries pending** -- 5 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of
+# 9 reach it.' -- every number the document holds, none of them ranked, in a sentence long enough to push
+# the first entry off the screen the tally exists to summarise. Dave's instruction was to keep it short
+# and simple, and what survived the cut is the reach fraction plus the bump it earns: '**4 / 9 minor
+# entries**'. The per-tier buckets are gone -- they are one 'grep' away in the entries themselves, which
+# is where Resolve-EntryImpact reads them from anyway, so the line was spending its length on the one
+# thing the document below it already spells out per entry.
 #
-# WHICH TIERS GET A BUCKET IS Get-EntryAskedTiers' QUESTION, NOT Get-EntryTierMax'S, and the difference is
-# visible in this repo's own line. Tier 0 and the repo's audience tier are printed EVEN AT ZERO, because
-# '0 at tier 2' is the answer to "is there anything for a consumer yet" and a bucket that disappears when
-# it is empty makes that question unanswerable. Every OTHER tier appears only where it actually carries
-# entries -- a repo whose audience is 2 is never asked about tier 1, so a standing '0 at tier 1' would be
-# a bucket for a question nobody put. A tier above the model's max is printed on the same terms where an
-# entry declares one, rather than dropped: the same "read every shape ever written" rule the impact
-# parser follows.
+# THE COUNT IT KEEPS IS STILL DISJOINT AND STILL SUMS, because Resolve-EntryImpact reports the HIGHEST
+# tier an entry declares -- the same grouping Get-PullRequestEntriesByTier uses, so the tally cannot
+# disagree with what the cut is about to read. That property mattered for the buckets and it still matters
+# for the fraction: Reaching is a subset of Total by construction, never a second measurement of it.
 #
-# NO BUMP IS NAMED HERE, deliberately, and it is the obvious thing to add: 'tier 0 only -> patch, tier 1
-# or higher -> minor' is two lines. That rule lives in Test-ReleaseBumpEarned, in release-lib, which the
+# AND THE BUMP *IS* NAMED HERE NOW, which reverses a decision this comment used to state. It said: 'NO
+# BUMP IS NAMED HERE, deliberately... that rule lives in Test-ReleaseBumpEarned, in release-lib, which the
 # fold does not load and must not start loading for a console nicety -- and a second copy of a release
 # gate's arithmetic, in the document that gate then reads, is the second-literal shape this repo keeps
-# getting bitten by. The tally gives the numbers the rule is computed FROM; the cut still states the rule.
+# getting bitten by.' Both halves of that were true and the conclusion did not follow. The copy is the
+# hazard, not the naming, and the fix for a copy is one definition rather than silence:
+# Get-EntryEarnedBump now lives in THIS file, which release-lib dot-sources, so the fold reaches the rule
+# without loading release-lib and Test-ReleaseBumpEarned reads the same function instead of its own inline
+# loop. There is one copy where there were about to be two, and it sits in the layer both callers already
+# share.
+#
+# THE TWO NUMBERS ANSWER DIFFERENT QUESTIONS AND MAY DIFFER, which is the one thing to know before reading
+# the line. Reaching counts entries at or above the repo's AUDIENCE tier; the bump follows tier 1 OR
+# HIGHER. In a repo whose audience is 2 those are not the same set, so '0 / 8 minor entries' is a
+# reachable and correct sentence -- eight entries pending, none of them reaching a subscriber, and the
+# version still owes a minor because some of them reach management. Reaching is who NOTICES; the bump is
+# what the version OWES.
 $script:ChangelogPendingSummaryMarker = '<!-- pending-tally -->'
 
 # ENGLISH DEFAULTS, OVERRIDABLE, for the reason every string written into a consumer's changelog is: this
 # is generated prose in a document a repo may keep in its own language, and the retired
 # Get-ChangelogReleaseWording seam went only because the output it described stopped being written. This
 # is new output into that same file, so the argument it was retired under does not cover it.
+#
+# THREE KEYS RETIRED WITH THE PER-TIER SHAPE (issue #1545): Lead, Bucket and AudienceShare are no longer
+# written by anything. Merge-WordingOverrides reads only keys the defaults carry, so a consumer who had
+# translated those three keeps a seam answer that is now INERT rather than one that errors -- there is no
+# way for this file to tell them, which is why the changelog entry for #1545 says it in words. Share and
+# NoShare are the two lines that replaced them, and a repo that translated nothing is unaffected.
 $script:ChangelogPendingSummaryDefaults = [ordered]@{
-    Empty         = '**Nothing pending.** The last release took every entry.'
-    Lead          = '**{0} {1} pending**'
-    Entry         = 'entry'
-    Entries       = 'entries'
-    Bucket        = '{0} at tier {1}'
-    AudienceShare = 'Tier {0} is this repo''s audience: {1} of {2} reach it.'
+    Empty   = '**Nothing pending.** The last release took every entry.'
+    Share   = '**{0} / {1} {2} {3}**'
+    NoShare = '**{0} {1} {2}**'
+    Entry   = 'entry'
+    Entries = 'entries'
+    Minor   = 'minor'
+    Patch   = 'patch'
 }
 
 function Get-ChangelogPendingSummaryMarker {
@@ -3711,24 +3777,19 @@ function Format-ChangelogPendingSummary {
 
     $noun = if ($counts.Total -eq 1) { $w.Entry } else { $w.Entries }
 
-    # The tiers this repo is ASKED about are printed whether or not they carry anything; the rest only
-    # when they do. Get-EntryAskedTiers is the same answer the scaffolder writes sections for and the
-    # completeness gate reads, which is what keeps the tally about the same tiers an author was asked to
-    # fill in -- one arithmetic, not a fourth copy of it.
-    $show = @{}
-    foreach ($t in @(Get-EntryAskedTiers)) { $show[[int]$t] = $true }
-    foreach ($t in @($counts.ByTier.Keys)) { if ($counts.ByTier[$t] -gt 0) { $show[[int]$t] = $true } }
+    # ONE definition of the rule, called rather than restated -- see Get-EntryEarnedBump, which
+    # Test-ReleaseBumpEarned reads too.
+    $earned = Get-EntryEarnedBump -ByTier $counts.ByTier
+    $bump = if ($earned.Bump -eq 'minor') { $w.Minor } else { $w.Patch }
 
-    $buckets = @()
-    foreach ($t in @($show.Keys | Sort-Object)) {
-        $n = if ($counts.ByTier.ContainsKey($t)) { $counts.ByTier[$t] } else { 0 }
-        $buckets += ($w.Bucket -f $n, $t)
+    # NO FRACTION WHERE THE REPO HAS STATED NO AUDIENCE, because Reaching is 0 there for want of a
+    # question rather than for want of entries -- and '0 / 9' would report the absence of a config value
+    # as the absence of reach, which is the one reading a maintainer must not be given. Get-EntryAskedTiers
+    # is asking about every tier in that repo, so the total is the honest number and the bump still stands.
+    if ($null -eq $counts.Audience) {
+        return (($w.NoShare -f $counts.Total, $bump, $noun) + ' ' + $marker)
     }
-    $line = ($w.Lead -f $counts.Total, $noun) + ' -- ' + ($buckets -join ', ') + '.'
-    if ($null -ne $counts.Audience) {
-        $line += ' ' + ($w.AudienceShare -f $counts.Audience, $counts.Reaching, $counts.Total)
-    }
-    return ($line + ' ' + $marker)
+    return (($w.Share -f $counts.Reaching, $counts.Total, $bump, $noun) + ' ' + $marker)
 }
 
 function Set-ChangelogPendingSummary {

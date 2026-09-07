@@ -996,7 +996,7 @@ $changelogNew = Convert-ChangelogForRelease -Content $changelogRaw
 
 # AND THE PENDING TALLY IS RESET WITH THEM (issue #1515). The line sits in the document's HEAD, which is
 # exactly what Convert-ChangelogForRelease keeps verbatim -- so without this call a freshly cut changelog
-# would carry an intact "37 entries pending" over an empty list, which is the worst shape a derived line
+# would carry an intact "15 / 37 minor entries" over an empty list, which is the worst shape a derived line
 # can take: not missing, but confidently wrong. It is re-derived rather than blanked, so the empty state is
 # written by the same function that writes every other state.
 $changelogNew = Set-ChangelogPendingSummary -Content $changelogNew

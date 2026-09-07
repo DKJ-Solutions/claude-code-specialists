@@ -261,8 +261,16 @@ function Test-ReleaseBumpEarned {
     # tier-2 entry, and the rule became "tier 1 or higher -> minor" on August 7 without the variable
     # going with it. Written as >= 1 rather than against the audience tier deliberately, so this reads
     # correctly in a tier-1 repo and a tier-2 repo alike with neither having to translate it.
-    $notable = 0
-    foreach ($tier in $counts.Keys) { if ($tier -ge 1) { $notable += $counts[$tier] } }
+    #
+    # THE LOOP AND THE 'minor'/'patch' CHOICE BELOW MOVED TO Get-EntryEarnedBump, in entry-scaffold-lib,
+    # on September 7, 2026 (issue #1545). It is called and not restated: the changelog's pending tally
+    # names the earned bump now, and the tally is written by the FOLD, which loads entry-scaffold-lib
+    # standalone and never this file. Defining it there and calling it here is what keeps that one rule
+    # one rule -- the alternative was a second copy of this arithmetic inside the document this gate then
+    # reads. Everything this function still owns is below: whether the bump ASKED for is the one earned,
+    # and whether a major is available at all.
+    $earned  = Get-EntryEarnedBump -ByTier $counts
+    $notable = $earned.Notable
 
     if ($CurrentVersion -notmatch '^\d+\.(\d+)\.\d+$') { throw "CurrentVersion '$CurrentVersion' is not X.Y.Z." }
     $minorsSoFar = [int]$Matches[1]
@@ -290,7 +298,7 @@ function Test-ReleaseBumpEarned {
     # trigger in cut-release.ps1, which keys on a tier-2 entry rather than on this bump type for exactly
     # that reason.
     $result.MajorAvailable = ($minorsSoFar -ge $MinMinorsForMajor)
-    $result.EarnedBump = if ($notable -gt 0) { 'minor' } else { 'patch' }
+    $result.EarnedBump = $earned.Bump
 
     # BOTH minor AND major, and that second one is a defect this file's own suite caught on the first run.
     # The refusal was written for 'minor' alone, which let a MAJOR through on tier-0-only work -- a bigger

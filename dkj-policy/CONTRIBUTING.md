@@ -775,9 +775,10 @@ cleared by this run, so leaving it out would produce a commit that clears half t
 cut before the two files merged, since one document is cleared in one move. See
 [Rendall #06](../.claude/specialists/lenses/05-06-extension.md#changelog).
 
-**The same run refreshes the pending tally** — the one line under `## [Unreleased]` saying how many entries
-are waiting, how they split by tier, and how many of them reach this repo's audience tier. It is **derived,
-never accumulated**: `Set-ChangelogPendingSummary` recounts the entries in the document it is about to
+**The same run refreshes the pending tally** — the one line under `## [Unreleased]`, which reads
+`**4 / 9 minor entries**`: how many of the pending entries reach this repo's audience tier, out of how many
+are waiting, and which bump that work has earned. It is **derived, never accumulated**:
+`Set-ChangelogPendingSummary` recounts the entries in the document it is about to
 write, so no counter exists to drift and a hand-edited list is corrected by the next fold. The **cut**
 rewrites it too, on the emptied document — the line sits in the changelog's head, which is exactly the part
 a cut keeps, so without that second call a freshly released changelog would carry an intact count over an
@@ -785,6 +786,18 @@ empty list. Requested by Dave in
 [#1515](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1515), and it adds no path to the
 exception above: the tally is written into `CHANGELOG.md`, which is one of the two paths the fold commit
 was already bounded to.
+
+**It was a per-tier breakdown until September 7, 2026** — `**9 entries pending** -- 5 at tier 0, 4 at tier 2.
+Tier 2 is this repo's audience: 4 of 9 reach it.` — and Dave's instruction on
+[#1545](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1545) was to keep it short and
+simple. What survived is the reach fraction and the bump; the buckets went, because they are one `grep` away
+in the entries the line sits directly above. **The two numbers answer different questions and may differ**:
+the fraction counts tier 2 and above, the bump follows tier 1 and above, so `**0 / 8 minor entries**` says
+nothing reaches a subscriber while the version still owes a minor for what reaches management. Naming the
+bump reversed a stated decision — the rule used to live only in `Test-ReleaseBumpEarned`, in `release-lib`,
+which the fold does not load — and the way it was reversed is `Get-EntryEarnedBump` in `entry-scaffold-lib`,
+the layer both callers already share, so there is **one** copy of the rule rather than the second one that
+decision was written to prevent.
 
 The pending entries, ranked furthest-reach-first, are in [`CHANGELOG.md`](CHANGELOG.md).
 
