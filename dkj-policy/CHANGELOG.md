@@ -43,7 +43,55 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**13 entries pending** -- 9 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 13 reach it. <!-- pending-tally -->
+**5 / 14 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1545-pending-tally-short-form · 20260907-174242
+
+The changelog's pending tally is one short line again. It read
+`**9 entries pending** -- 5 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 9 reach it.`
+and now reads `**4 / 9 minor entries**`: how many pending entries reach this repo's audience, out of how
+many are waiting, and which bump that work has earned. The per-tier buckets are gone -- they are one
+`grep` away in the entries the line sits directly above, so the sentence was spending its length on the
+one thing the document below it already spells out per entry.
+
+**The bump is named there for the first time, and it is one rule rather than two.** It used to live only
+in `Test-ReleaseBumpEarned`, in `release-lib`, which the fold never loads -- so the tally could not reach
+it and the comment block chose silence over a copy. `Get-EntryEarnedBump` now holds it in
+`entry-scaffold-lib`, the layer `release-lib` already dot-sources, and `Test-ReleaseBumpEarned` calls it.
+The gate and the line it summarises can no longer disagree about what a minor is.
+
+**Two numbers, two questions, and they may differ by design.** The fraction counts entries at or above
+the repo's audience tier; the bump follows tier 1 or higher. So `**0 / 8 minor entries**` is correct and
+precise -- nothing reaches a subscriber, and the version still owes a minor for what reaches management.
+A test pins that case so it is not later mistaken for a bug and "repaired". Where a repo has stated no
+audience tier the fraction is dropped rather than shown as `0 / 8`, which would report an unanswered seam
+as an absence of reach.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer sees the shorter line on their next fold, with no action needed -- and the two numbers are
+explained in `CONTRIBUTING-portable.md` before anyone reads `0 / 8 minor` as a contradiction.
+
+**One thing does need a consumer's attention, and only if they translated the tally.** Three keys of
+`Get-ChangelogPendingSummaryOverrides` are retired: `Lead`, `Bucket` and `AudienceShare`. Only keys the
+defaults carry are read, so an answer for a retired key is silently **inert** rather than an error -- the
+line simply comes back in English. `Share` and `NoShare` replaced them, and the bump word is seamed too
+(`Minor`/`Patch`), with reorderable placeholders because a translation rarely wants them in English
+order. A repo that translated nothing is unaffected.
+
+**Score:** 2
+
+#### Pull Request
+
+The pending tally reads as one short reach-over-total line
+
+Plugins: dkj-policy
+
+[PR #1552](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1552)
+
+---
 
 ### DEPLOY: fix/1542-fold-on-merge-corrections · 20260907-173512
 
