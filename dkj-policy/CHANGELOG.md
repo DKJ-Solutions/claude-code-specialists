@@ -40,7 +40,31 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 entries pending** -- 4 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 8 reach it. <!-- pending-tally -->
+**9 entries pending** -- 5 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 9 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1523-connectors-bwj-rename-catchup · 20260907-140434
+
+The `connectors/` register now records the plugin ids the two BWJ consumers actually enable, so
+`check-connectors` resolves and version-checks all five of each consumer's plugin blocks -- where
+before it skipped the four it could not resolve and never saw the fifth. Both manifests carry a
+dated `CAUGHT UP` note; no extension inventory or version bookkeeping was otherwise changed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. `connectors/` is workshop administration -- it does not travel to consumers' plugin caches and
+a subscriber of the specialists service notices nothing.
+
+**Score:** N/A
+
+#### Pull Request
+
+connectors/ registry catches up with the two BWJ consumers' dkj- plugin renames
+
+[PR #1532](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1532)
+
+---
 
 ### DEPLOY: fix/1518-consumer-unreleased-heading · 20260906-202744
 
