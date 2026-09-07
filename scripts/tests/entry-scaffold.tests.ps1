@@ -2686,8 +2686,10 @@ $tallyStale = $tallySet -replace [regex]::Escape('4 entries pending'), '99 entri
 Assert-True ((Set-ChangelogPendingSummary -Content $tallyStale) -match '4 entries pending') `
     'tally: a hand-edited count is corrected on the next write rather than trusted'
 
-# THE CONSUMER SHAPE: adopt-workflow-folder.ps1 scaffolds a changelog with NO pending heading, so the
-# tally anchors on the first entry instead. Without this the feature would ship to this repo alone.
+# THE PRE-#1518 CONSUMER SHAPE: adopt-workflow-folder.ps1 scaffolded a changelog with NO pending heading
+# until September 6, 2026, so the tally anchors on the first entry instead. That scaffold writes the heading
+# now, but it is additive and never revisits a repo it already scaffolded -- so this shape is permanent in
+# every adoption older than that, and without this anchor the feature would ship to this repo alone.
 $tallyNoHead = (@('# Changelog', '', 'Intro prose.', '', (New-TallyEntry -Branch 'feat/e-v1' -Tier 2)) -join "`n")
 $tallyNoHeadSet = Set-ChangelogPendingSummary -Content $tallyNoHead
 $tallyNoHeadLines = @($tallyNoHeadSet -split "`n")

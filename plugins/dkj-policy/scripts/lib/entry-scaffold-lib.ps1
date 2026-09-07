@@ -3492,6 +3492,14 @@ function Get-BranchCycleSectionLevel {
 # fresh empty '## [Unreleased]' behind on its own; and a fold, which inserts at the top of the entries,
 # inserts directly beneath it on its own. Neither needed a rule about it.
 #
+# AND 'EVERY' IS TRUE OF A CONSUMER ONLY SINCE #1518, which is worth knowing before reading a document
+# that has none as broken. adopt-workflow-folder.ps1 scaffolded a changelog without this heading until
+# September 6, 2026, so an adoption older than that is the flat shape -- and that scaffolder is additive,
+# so it never goes back and adds one. Nothing needs it: the fold inserts at the first entry heading or at
+# the end of the content, the cut writes the head back whatever is in it, and the tally carries a third
+# anchor for exactly those repos. The word is a claim about what this workflow WRITES, not a precondition
+# any reader here enforces.
+#
 # THE LEVEL IS DERIVED rather than stated, so it cannot drift from the entry level it is defined against.
 #
 # THE LABEL IS A SINGLE CONSTANT AND DELIBERATELY NOT REPO-OWNED -- said here because this comment claimed the
@@ -3508,6 +3516,11 @@ function Get-BranchCycleSectionLevel {
 # override would take the pattern off the heading it is pointed at, and the fold's insertion point with it.
 # Get-PreFlatChangelogRefusal makes that explicit from the other side: it hands a consumer migrating a
 # pre-flat document the literal string to type.
+#
+# (That 'and in every consumer's' is what #1518 above made true of a FRESH adoption; in an older one the
+# string is absent rather than different, which is the flat shape and not a second spelling. Either way
+# there is nothing for an override to migrate away from -- the two findings landed the same day and point
+# the same way.)
 #
 # AND IT IS AN ANCHOR, NOT PROSE -- matched by an anchored regex, never read. That is exactly what separates
 # it from the tally one block down, whose wording IS seamed (Get-ChangelogPendingSummaryOverrides): that line
@@ -3727,11 +3740,13 @@ function Set-ChangelogPendingSummary {
 
           1. the marker          -- replace in place, wherever it sits. The position is not re-derived, so
                                     a repo that moved the line keeps it where they put it.
-          2. the pending heading -- insert directly beneath it. This repo's shape.
-          3. the first entry     -- insert directly above it. A consumer scaffolded by
-                                    adopt-workflow-folder.ps1 has NO pending heading: their intro is
-                                    followed straight by the entries. Anchoring on the heading alone would
-                                    have the tally silently never appear there, which is the direction
+          2. the pending heading -- insert directly beneath it. This repo's shape, and since #1518 the
+                                    shape adopt-workflow-folder.ps1 scaffolds as well.
+          3. the first entry     -- insert directly above it. A consumer scaffolded BEFORE #1518 has NO
+                                    pending heading: that scaffold wrote none, so their intro is followed
+                                    straight by the entries -- and the scaffolder is additive, so it never
+                                    goes back and adds one. Anchoring on the heading alone would have the
+                                    tally silently never appear in those repos, which is the direction
                                     that ships a feature to nobody.
 
         And with none of the three -- an intro and nothing else -- the line is appended, which is the

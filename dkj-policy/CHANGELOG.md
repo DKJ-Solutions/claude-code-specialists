@@ -40,7 +40,130 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 entries pending** -- 1 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 5 reach it. <!-- pending-tally -->
+**8 entries pending** -- 4 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 8 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1518-consumer-unreleased-heading · 20260906-202744
+
+A repo adopting this workflow now gets a `CHANGELOG.md` with `## [Unreleased]` in it. Until today
+`adopt-workflow-folder.ps1` scaffolded the intro and stopped, so an adopting repo's entries sat directly
+under the prose — the flat shape this workflow left behind on August 26, 2026 — while
+`DEVELOPMENT-portable.md`, which travels to every consumer, tells them to grep `[Unreleased]` for what a
+behaviour used to be. That grep matched nothing in their tree.
+
+Nothing was broken and nothing is repaired in that sense: the fold inserts at the first entry heading or,
+where there is none, at the end of the content, and the cut writes the head back whatever is in it, so
+both shapes fold and cut correctly and no gate had anything to say. What was wrong is that one shape was
+documented and a different one shipped.
+
+The heading is composed from `Get-ChangelogUnreleasedHeading` rather than typed — a repo that translated
+the label or repointed the entry level gets its own — and it is written **last**, because the first fold
+into an entry-less document appends at the end of the content and anything below the heading would
+collect its entries above it.
+
+**An adoption older than today keeps the flat shape**, and that is left alone deliberately: the
+scaffolder is strictly additive and never revisits a repo it has scaffolded. The tally's third anchor
+exists for exactly those repos and is untouched; what changed there is the sentence justifying it, which
+described the scaffolder's present tense.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. The audience here is this repo's own developers and the consumers of `dkj-policy`, which is tier 0
+and tier 1 — nobody subscribes to a service that changes. A consumer maintainer adopting the workflow
+today gets a changelog that matches the page they are told to read, which is worth a 3 there; it is
+invisible to anyone else.
+
+**Score:** N/A
+
+#### Pull Request
+
+The scaffolded consumer changelog carries the pending heading
+
+Plugins: dkj-policy
+
+[PR #1533](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1533)
+
+---
+
+### DEPLOY: fix/1530-test-capture-decoration · 20260906-201920
+
+`verify-pushed-merges.tests.ps1` failed one assert on a tree byte-identical to `origin/main` while CI on
+`main` was green, and `open-pr.ps1` has no per-suite valve -- so on the affected checkout every branch
+was pushed with the whole test gate off, or not at all. The suite is repaired, and the cause was neither
+the fixture nor the script under test.
+
+Both suites captured their child with `& powershell ... 2>&1 | Out-String`. Under `2>&1` the parent
+re-renders the child's **first** stderr line as its own `NativeCommandError` and stamps the record
+decoration -- `At <path>:<line>`, the source echo, `CategoryInfo`, `FullyQualifiedErrorId` -- *into* that
+line at the cut. `Assert-Says` strips all whitespace, which repairs a **wrap**; it cannot repair
+**insertion**, and the docstring claiming otherwise is corrected here. The parent renders
+`<powershell.exe> : <full script path> : <message>` and cuts the whole of it at the console width, so the
+verdict is decided by the checkout's path length and the terminal width -- neither of which is a property
+of the code. Measured: green at this repo's 108-character script path, red at 45, same commit and same
+machine; the failing window at width 120 is 29 to 51 characters.
+
+Both suites now capture through `Invoke-NativeCapture -Utf8`, which starts the child with `Start-Process`
+and redirected streams, so the parent's formatter never touches the child's stderr. Each gained one assert
+that `NativeCommandError` is **absent** from the captured text: it can only appear there if a parent
+rendered the stderr as an error record, so its absence pins **which capture ran** at every width and path
+length -- where the phrase-only assert that was already there fails only where the cut happens to land
+inside its phrase, which is how this stayed green on CI.
+
+`verify-resolved-issues.tests.ps1` is changed without a failing assert to point at, deliberately: it is
+where the broken capture was copied from, and "it passes here today" is a fact about one checkout rather
+than a property of the file. The same reasoning put the lesson in Tycho's lens -- it existed only as a
+comment inside `shared-scripts.tests.ps1`, repaired in August 2026, and the suite written after that
+repair still copied the old capture from its sibling.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A. Both files are this repo's own test suites; neither is mirrored into a plugin, and no shipped script
+changes. A consumer sees nothing.
+
+**Score:** N/A
+
+#### Pull Request
+
+Test capture: a parent's error-record decoration splits asserted phrases
+
+[PR #1534](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1534)
+
+---
+
+### DEPLOY: fix/1524-connector-localcheckout · 20260906-200252
+
+A connector manifest's `localCheckout` may now name several candidate relative paths, and both BWJ
+manifests record the two layouts that were actually measured. The check takes the first candidate
+present on the machine running it and, where none resolves, names all of them in the `[SKIP]`.
+
+This closes a defect whose cost was invisible by construction. A checkout path that does not resolve is
+not reported as wrong -- it is reported as `[SKIP] checkout ... not present on this machine`, which
+asserts an absence, exits 0, and suppresses everything that connector would have said. On the machine
+[#1524](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1524) was measured from, one
+such skip covered four `[INFO]` lines and a drift check reading 26 missing agent-defs. The list exists
+rather than one corrected string because the two machines holding those checkouts place them
+differently, so any single value is false on one of them -- which would have moved the false skip
+instead of removing it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the connector register is this repo's own bookkeeping about its consumers. It changes nothing a
+subscriber of a service could notice.
+
+**Score:** N/A
+
+#### Pull Request
+
+connectors: localCheckout accepts per-machine candidate paths, and both BWJ manifests record the real ones
+
+[PR #1531](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1531)
+
+---
 
 ### DEPLOY: docs/1517-unreleased-label-not-a-seam · 20260906-194830
 

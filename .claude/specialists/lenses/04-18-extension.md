@@ -87,6 +87,53 @@ make it more than one file. The four together run in **~51s**.
 **What is NOT the lever here, so nobody re-derives it:** narrowing what the suites check. That was
 explicitly refused in #714 and is not what bought the time; the same 110 gate invocations still run.
 
+### A suite captures a child script through redirect files, never `2>&1` (September 6, 2026)
+
+Every suite here drives a script as a **child process** and then asserts on its text. That text is
+captured with `Invoke-NativeCapture -Utf8` (or `shared-scripts.tests.ps1`'s own
+`Invoke-CapturedScript`) â€” both start the child with `Start-Process` and redirected streams.
+**`& powershell ... 2>&1 | Out-String` is the wrong capture and it fails in a way that reads as a
+defect in the script under test.**
+
+**What goes wrong.** Under `2>&1` the parent re-renders the child's **first** stderr line as its own
+`NativeCommandError` and stamps the record decoration â€” `At <path>:<line>`, the `+ ` source echo,
+`CategoryInfo`, `FullyQualifiedErrorId` â€” *into* that line at the cut. The sentence is then not
+reformatted but **interrupted**, and no comparison can rejoin it. This is the half that whitespace
+stripping cannot repair, and the distinction is the whole rule: a **wrap** only ever *removes*
+separation, so stripping separation always repairs it; **insertion** adds text, and nothing at the
+comparison undoes that.
+
+**Where the cut lands is not a property of the code.** The parent renders
+`<powershell.exe> : <full script path> : <message>` and cuts the whole of it at the console width â€” so
+the verdict is decided by the **checkout's path length** and the **terminal width** together.
+
+**Measured twice, and the second time is why this is written here and not only in a code comment:**
+
+- **August 14, 2026** â€” `shared-scripts.tests.ps1` scenario C1's assert on `#332` failed at width 152
+  with the source at a 95-character path, and passed on the **same machine, same commit** in an
+  80-column shell. That produced `Invoke-CapturedScript`.
+- **September 6, 2026** ([#1530](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1530))
+  â€” `verify-pushed-merges.tests.ps1` reported `FAILS: 1 failed, 47 passed` on a tree **byte-identical
+  to `origin/main`** while CI on `main` was green. Reproduced here by checkout path alone: green at this
+  repo's 108-character script path, red at a 45-character one, on the same commit and the same machine.
+  At width 120 the failing window is a script path of **29 to 51 characters** â€” outside it every assert
+  passes.
+
+**So a green run is not evidence that the capture works**, on a developer's machine or on CI. Two
+consequences:
+
+- **Pin the capture, not the phrase.** `NativeCommandError` can appear in captured text *only* if a
+  parent rendered the child's stderr as an error record; a redirect file receives what the child wrote
+  and nothing else. Asserting its **absence** holds at every width and every path length, where an
+  assert that merely looks for its own phrase fails only where the cut happens to land inside it. Both
+  suites repaired for #1530 carry that assert on the scenario whose child writes to stderr.
+- **Do not copy a capture from a neighbouring suite without reading this.** #1530 happened because
+  `verify-pushed-merges.tests.ps1` was written *after* the August 14 repair and still copied the old
+  capture from its sibling â€” the lesson existed only inside the one file that had been fixed. Both
+  siblings now call the shared lib, and `verify-resolved-issues.tests.ps1` was changed **without a
+  failing assert to point at**, deliberately: "it passes here today" is a fact about one checkout, and
+  leaving the old capture in the file others copy from is what makes the next instance.
+
 In short: the **how** (automated tests, regression guarding) is portable; the **what** (the
 PowerShell scripts as the test surface, and building out a suite once the lint gate warrants it)
 belongs to this repo.

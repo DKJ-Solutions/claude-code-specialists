@@ -24,6 +24,8 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (git rev-parse --show-toplevel).Trim()
 $ScriptPath = Join-Path $RepoRoot 'scripts\release\verify-resolved-issues.ps1'
+# For Invoke-NativeCapture -- see the capture note in Invoke-Verify below.
+. (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -117,8 +119,16 @@ exit 1
         if ($FailPrView) { $env:GH_FAIL_PR_VIEW = '1' } else { Remove-Item Env:\GH_FAIL_PR_VIEW -ErrorAction SilentlyContinue }
         $shipArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath, '-Pr', '999', '-Repo', 'fake/repo')
         if ($ReportOnly) { $shipArgs += '-ReportOnly' }
-        $out = (& powershell @shipArgs 2>&1 | Out-String)
-        $code = $LASTEXITCODE
+        # CAPTURED VIA REDIRECT FILES, NOT '2>&1' -- see the paragraph below, and #1530 for the
+        # measurement. Changed here WITHOUT a failing assert to point at, deliberately: this suite is
+        # where verify-pushed-merges.tests.ps1 copied its capture from, and that copy was the defect.
+        # Whether a given suite currently survives '2>&1' is decided by its own phrase offsets against
+        # the machine's path length and console width -- so "it passes here today" is a fact about this
+        # checkout, not a property of the file, and leaving the old capture in the file others copy
+        # from is what makes the next instance.
+        $run = Invoke-NativeCapture -FilePath 'powershell' -Arguments $shipArgs -Utf8
+        $out = ($run.Output -join [Environment]::NewLine)
+        $code = $run.ExitCode
         $log = if (Test-Path $callLog) { Get-Content -Path $callLog } else { @() }
         # Output is whitespace-NORMALIZED here so that a FAILING assert prints one readable line. The
         # child renders Write-Host/Write-Warning at ITS OWN console buffer width, so any phrase an
@@ -134,10 +144,16 @@ exit 1
         # assert on 'not the same as' matches nothing. Which asserts straddle a break is decided by the
         # width, so a green run is not evidence that any of them are safe (issue #1512).
         #
-        # THE FIX IS AT THE COMPARISON, so it is the comparison that has to be used: every assert
-        # reading prose out of this Output goes through Assert-Says / Test-Says above, which strip ALL
-        # whitespace from both sides. Asserts on .Log are exempt and stay plain -- the fake gh writes
-        # that file with Add-Content, so nothing ever wrapped it.
+        # THE FIX IS AT THE COMPARISON *AND* AT THE CAPTURE, and this paragraph used to name only the
+        # first. Every assert reading prose out of this Output goes through Assert-Says / Test-Says
+        # above, which strip ALL whitespace from both sides -- and that repairs a WRAP, because a wrap
+        # only ever REMOVES separation. It cannot repair text INSERTED into the middle of a phrase,
+        # which is exactly what a '2>&1' capture does: the parent renders the child's first stderr line
+        # as a NativeCommandError record and stamps 'At <path>:<line>', the source echo, CategoryInfo
+        # and FullyQualifiedErrorId between it and the remainder. Nothing at the comparison rejoins a
+        # phrase across five lines of other text, which is why the capture above changed too (#1530).
+        # Asserts on .Log are exempt and stay plain -- the fake gh writes that file with Add-Content,
+        # so nothing ever wrapped it.
         return [pscustomobject]@{ Output = ($out -replace '\s+', ' '); ExitCode = $code; Log = @($log) }
     }
 
@@ -218,6 +234,10 @@ exit 1
     Assert-Says $r8.Output 'could not read the body' 'warns about it'
     Assert-Says $r8.Output 'gh issue list' 'points at the manual check'
     Assert-True (($r8.Log | Where-Object { $_ -match 'issue close' }).Count -eq 0) 'closed nothing while blind'
+    # Proof of WHICH capture ran, at every width and path length: 'NativeCommandError' can only appear
+    # in this text if a parent rendered the child's stderr as an error record. This is the suite's only
+    # scenario whose child writes to stderr at all, so it is the one to hang it on (#1530).
+    Assert-True (-not (Test-Says $r8.Output 'NativeCommandError')) 'no parent error-record decoration was stamped into the capture'
 } finally {
     $ErrorActionPreference = $prevEap
     $env:PATH = $prevPath

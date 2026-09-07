@@ -380,18 +380,47 @@ $historyRelFromFolder = if ($historyRelPath -like 'dkj-policy/*') {
 # stops the sentence drifting from the constant again -- and it also answers the repo that legitimately
 # overrode the level, which a corrected literal would not.
 $entryHashes = '#' * (Get-EntryHeadingLevel)
+#
+# AND THE PENDING HEADING IS PLACED, COMPOSED THE SAME WAY (issue #1518). This array had no
+# '## [Unreleased]' line in it and nothing else in the tree wrote one, so every repo this command
+# scaffolded got the pre-August-26 FLAT shape -- an intro followed directly by one entry per change --
+# while entry-scaffold-lib called that heading "the heading every un-cut entry sits under". Nothing broke,
+# which is why it survived: the fold inserts at the first entry heading or, where there is none, at the end
+# of the content, and the cut writes the head back whatever is in it. Both shapes fold and cut correctly,
+# so no gate had anything to say.
+#
+# WHAT FORCED IT IS THE PORTABLE PAGE, NOT THE COMMENT. DEVELOPMENT-portable.md travels to every consumer
+# with the plugin and instructs them unconditionally: "before you write that a behaviour changed, grep
+# `[Unreleased]` for what it used to be." In a repo scaffolded here, that grep matched nothing at all. A page
+# that reaches a consumer cannot name a heading only the source repo has -- which is what ruled out the two
+# other readings on that issue (that the heading is this repo's own, or the consumer's choice) rather than a
+# preference between them. entry-scaffold-lib says the same thing from the other side, in the block that
+# defines the label: the reason it is a single constant rather than a seam is that "nothing migrates the
+# document" -- the heading is "already committed in this repo's CHANGELOG.md and in every consumer's". That
+# second half is what this change makes true of a fresh adoption; before it, the consumer had no heading to
+# migrate away from OR to keep.
+#
+# IT GOES LAST, AND THAT IS THE WHOLE PLACEMENT RULE. The heading sits one level SHALLOWER than an entry, so
+# Split-Changelog's boundary lands below it and it stays part of the head, preserved by every cut; and the
+# first fold into an entry-less document appends at the end of the content, which is beneath it. Composed
+# from Get-ChangelogUnreleasedHeading rather than typed, for exactly the reason $entryHashes above is: a repo
+# that repointed the entry level or translated the label gets its own heading, and the one sentence a
+# consumer ever reads ABOUT their changelog cannot drift from the constant their parsers read.
+$unreleasedHeading = Get-ChangelogUnreleasedHeading
 $changelogIntro = @(
     '# Changelog',
     '',
-    ('Everything merged since the last release, newest first: one `' + $entryHashes + '` per change, and under it the'),
-    'sections your own `CONTRIBUTING.md` names for your audience tier. The mechanism itself -- the',
-    'branch document a change is written in, the fold that moves it here, and what the release cut does',
-    'with this list -- is the plugin''s `CONTRIBUTING-portable.md`, which travels with `dkj-policy`',
-    'and is not restated here.',
+    ('Everything merged since the last release sits under `' + $unreleasedHeading + '`, newest first:'),
+    ('one `' + $entryHashes + '` per change, and under it the sections your own `CONTRIBUTING.md` names'),
+    'for your audience tier. The mechanism itself -- the branch document a change is written in, the fold',
+    'that moves it here, and what the release cut does with this list -- is the plugin''s',
+    '`CONTRIBUTING-portable.md`, which travels with `dkj-policy` and is not restated here.',
     '',
-    ('This file is emptied down to this intro at every release; what was in it moves into that'),
-    ('release''s own documents instead. See [`' + $historyRelPath + '`](' + $historyRelFromFolder + ')'),
-    'for the list of releases actually cut.'
+    ('This file is emptied down to this intro and that heading at every release; what was in it moves into'),
+    ('that release''s own documents instead. See [`' + $historyRelPath + '`](' + $historyRelFromFolder + ')'),
+    'for the list of releases actually cut.',
+    '',
+    $unreleasedHeading
 )
 
 $targets = @(
