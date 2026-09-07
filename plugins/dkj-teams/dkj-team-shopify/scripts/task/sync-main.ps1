@@ -602,17 +602,33 @@ Write-Host '[2/6] the conflict-check reference point ...' -ForegroundColor Yello
 $ref = Get-SyncReferencePoint -Ref 'HEAD' -Pattern $pattern
 if (-not $ref) {
     Write-Host "No reference point found: no commit matching $pattern and no tag." -ForegroundColor Red
-    Write-Host '  It no longer decides who wins a file -- content does -- but it is what notices that BOTH' -ForegroundColor Red
-    Write-Host '  sides changed the same path, and without it such a conflict would be taken silently.' -ForegroundColor Red
+    Write-Host '  This repo has no sync history at all, so no path has an agreement point with live and' -ForegroundColor Red
+    Write-Host '  nothing here can tell third-party drift from work the trunk simply has not pushed yet.' -ForegroundColor Red
     Write-Host '  Tag the current state, or sync by hand this once.' -ForegroundColor Red
     exit 1
 }
+# THE REASON FOR THIS REFUSAL CHANGED WITH THE PER-PATH BASE (inbound #1535), and the old one is worth
+# recording because it was the more alarming of the two. It read: "without it such a conflict would be
+# taken silently" -- true while the base was global and an absent one meant every M+foreign path took
+# live. It is no longer: Get-SyncFileVerdict now REPORTS a path with no agreement point, so a run with no
+# reference point anywhere would conflict on everything foreign rather than take it.
+#
+# SO THIS IS KEPT AS DELIBERATE CONSERVATISM RATHER THAN AS A GUARD AGAINST DATA LOSS. A first-ever sync
+# in a repo with no history to measure from is a reconciliation a person should do once, with their eyes
+# on it, rather than a hundred-path conflict report. Removing it would now be safe and is a separate
+# decision from this repair, which is why it was not taken here.
 $since = $ref.Ref
 if ($ref.Kind -eq 'tag') {
     Write-Host "      $since (a TAG -- no sync commit found, so the window is wider and more is flagged)."
 } else {
     Write-Host "      $since (the previous sync commit)."
 }
+# SAID HERE BECAUSE THIS LINE USED TO BE THE WHOLE ANSWER, and reading it as such is what inbound #1535
+# was. The commit above is the repo's most recent sync; the base each path is actually judged against is
+# the most recent sync that took THAT path, asked per path in step 6. They are the same commit only for
+# the paths the last sync happened to take.
+Write-Host '      Each path is judged against its OWN base -- the last sync that took that path.' -ForegroundColor DarkGray
+Write-Host '      A path no sync has ever taken has no agreement point, and is reported rather than taken.' -ForegroundColor DarkGray
 
 # --- 4. the branch name, decided BEFORE anything is pulled -----------------------------------------
 # Before, not after: the wholesale version worked this out at the very end and died on a collision with
@@ -973,10 +989,24 @@ try {
         if ($f.Status -eq 'D') {
             $v = Get-SyncFileVerdict -Status 'D' -LiveContentIsOurs $false
         } else {
-            $ours    = Test-LiveContentIsOurs -Path $f.Path -LiveBytes $f.Bytes -Ref 'HEAD'
-            # The floor is only consulted where it can still change the answer: live's content is foreign.
-            $touched = if ($ours) { $false } else { Test-MainTouchedSince -Since $since -Path $f.Path }
-            $v = Get-SyncFileVerdict -Status $f.Status -LiveContentIsOurs $ours -MainTouchedSinceFloor $touched
+            $ours = Test-LiveContentIsOurs -Path $f.Path -LiveBytes $f.Bytes -Ref 'HEAD'
+            # THE BASE IS THIS PATH'S OWN, NOT THE RUN'S (inbound #1535). $since above is the previous
+            # sync commit for the REPO, and a sync commit only establishes agreement with live for the
+            # paths it actually took -- so for any other path it is a base newer than the trunk's own
+            # work there, from which the trunk reads as stationary and live is taken silently. The base
+            # asked for here is the most recent sync commit that touched THIS path, and $null means no
+            # such moment exists, which Get-SyncFileVerdict reports rather than decides.
+            #
+            # Still only where it can change the answer: live's content has to be foreign first, which is
+            # also what keeps the extra 'git log' off every path that is already settled by provenance.
+            $pathBase = $null
+            $touched  = $false
+            if (-not $ours) {
+                $pathBase = Get-SyncPathReferencePoint -Path $f.Path -Ref 'HEAD' -Pattern $pattern
+                if ($pathBase) { $touched = Test-MainTouchedSince -Since $pathBase -Path $f.Path }
+            }
+            $v = Get-SyncFileVerdict -Status $f.Status -LiveContentIsOurs $ours `
+                    -MainTouchedSinceFloor $touched -PathAgreementKnown ([bool]$pathBase)
         }
         $row = [pscustomobject]@{ Status = $f.Status; Path = $f.Path; Source = $f.Source; Reason = $v.Reason }
         switch ($v.Action) {
