@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 16 minor entries** <!-- pending-tally -->
+**6 / 17 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1553-connector-live-repo-slug · 20260907-184949
+
+The connector register points at the live `smartwatchbanden` repo again. `smartwatchbanden` moved out
+of `BWJ-ecommerce` into `BWJ-Development` as a **fresh** repo rather than a transfer -- so the old name
+has no redirect behind it, and the `BWJ-ecommerce` original is archived. The register's `repo` field is
+a live field, not a dated measurement, and it still named the archived one.
+
+It read wrong rather than answering wrong, and the branch says so in the register itself instead of
+leaving it to be re-measured: the field is used only as a label -- the connector header, the
+two-consumer disambiguator, and the drift-check scope -- and is resolved against GitHub nowhere. That
+was the open question #1553 filed alongside the symptom, and it is what keeps this to one field.
+
+The reason it went unnoticed is worth more than the field. Nothing in this register resolves a slug
+against GitHub, which the 2026-08-09 note already stated, so a stale slug is never reported as *wrong*
+-- it is simply never checked. That is the same silent class the `localCheckout` correction
+([#1524](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1524)) recorded for a
+different field of the same file: a value that fails by asserting something false and exiting 0.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+It is a lesson about where a finding is allowed to live. The move was raised as a **comment** on #1523
+-- correct at the time, to avoid duplicating #1537 -- and when #1523 was closed for the plugin-id
+renames it was actually about, the comment closed with it and nothing open carried the move any more.
+A finding parked on somebody else's thread inherits that thread's lifetime, and this one outlived its
+host by a day.
+
+**Score:** 2
+
+#### Pull Request
+
+connectors/smartwatchbanden.json points at the live BWJ-Development repo, since the BWJ-ecommerce one is archived
+
+[PR #1558](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1558)
+
+---
 
 ### DEPLOY: fix/1535-per-path-sync-base · 20260907-182557
 
