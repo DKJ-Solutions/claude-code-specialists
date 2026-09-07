@@ -113,6 +113,17 @@
          pass, and so does a payload that cannot be read. If the attempts run out the merge is still
          refused, in a sentence that says CI is still RUNNING -- the verdict does not move.
 
+         AND RE-ENTER IT WHEN THE WATCH WENT GREEN OFF A CHECK THE RULESET DOES NOT REQUIRE (inbound
+         #1549). `--watch` watches whatever was registered when it STARTED, so a required workflow that
+         has not created its check run yet is absent from that set rather than pending in it: a
+         non-required check passing in 1s exits the watch 0 with the required one still to come, and the
+         merge is then refused by the base-branch policy -- past the gates, past the PR, with the merge
+         and the fold still owed to a process that is about to die. So the green exit is held against
+         `gh pr checks --required` before it is believed, and a required check that has not concluded
+         sends the run back to the wait rather than to the merge. Fail-open by construction: an
+         unreadable required list spins on nothing, which is what keeps a repo with no ruleset out of
+         this branch and keeps an unreadable payload from ever turning a green run red.
+
          AND SAY, BEFORE THE WATCH BEGINS, THAT NOBODY HAS TO SIT THROUGH IT (issue #985). Backgrounding
          this run is the default: the merge cannot move before the check is green either way, so the only
          thing the wait buys in the foreground is a second look at a result the local gate already gave.
@@ -738,8 +749,11 @@ function Wait-CheckRegistration {
 # That poll is Wait-CheckRegistration, a function so the watch loop can RE-ENTER it: `--watch` can win
 # the race the poll just lost and come back saying `no checks reported` itself (#1350), and the answer
 # to that is this same wait, not the merge verdict.
-# Deliberately does NOT name a check: this step watches whatever checks the PR has and reads the exit
-# code, so naming one here would be a claim about the consumer's CI that this script cannot keep.
+# Deliberately does NOT name a check: this step watches whatever checks the PR has, so naming one here
+# would be a claim about the consumer's CI that this script cannot keep. What it does ask the ruleset,
+# since inbound #1549, is whether the checks it just watched INCLUDE every required one -- a green
+# `--watch` exit alone does not say so, because the watch only ever sees what was registered when it
+# started. That reads the repo's own answer via `gh pr checks --required` rather than naming anything.
 #
 # WHAT IT DOES SAY, once the watch is over, is which check actually held it up (#831). The wait used to
 # be invisible -- the run printed gh's own table and nothing about the ordering, so learning which check
@@ -928,7 +942,77 @@ while ($true) {
         $requiredFactsJson = ''
     }
 
-    if ($checks.ExitCode -eq 0) { $lostWatchNote = ''; break }
+    # A GREEN WATCH IS NOT THE SAME CLAIM AS "EVERY REQUIRED CHECK CONCLUDED" -- inbound #1549. This line
+    # used to break straight out of the loop, past the two fact reads directly above it, and the wait
+    # report printed two lines later already knew the difference: it annotates the governing check
+    # `NOT required`. So the required/not-required distinction was in hand at the moment of the verdict,
+    # was PRINTED, and was not acted on -- and the two readings that line supports are opposite. "The
+    # check that governed the merge was not a required one" is a reason to keep waiting, not a certificate.
+    #
+    # WHY THE EXIT CODE CANNOT CARRY IT. `gh pr checks --watch` watches the checks registered at the
+    # moment it STARTS. A required workflow that has not yet created its check run is absent from that
+    # set rather than pending in it, so a fast non-required check reporting first satisfies the watch
+    # and it exits 0 with the required one still to come. Measured September 7, 2026 in a consumer
+    # (`dkj-policy` 4.31.0, BWJ-Development/smartwatchbanden PR #529): `.github/dependabot.yml` passed in
+    # 1s, this step said "CI green" after 5s, and the merge came back `the base branch policy prohibits
+    # the merge` while required `Shopify theme check` (2m1s) and `branch-entry` (31s) were both pending.
+    # A plain `gh pr merge --merge` succeeded on the first try once they finished -- nothing was broken
+    # except when this step asked.
+    #
+    # AND THE FAILURE DIRECTION IS THE EXPENSIVE ONE, which is why this is a wait and not a diagnostic.
+    # The refusal at the merge is loud and safe; WHERE it leaves the work is not. It lands past the local
+    # gates, past the PR, with the merge and the fold still owed -- and step 5 owes those to THIS
+    # process, so the session holding the context is the one that dies. A later session finds an open PR
+    # with a green tick and no visible reason it did not land. On a repo whose required check takes two
+    # minutes, that fired on every ship where a fast non-required check reported first.
+    #
+    # SO THE ANSWER IS THE WAIT, THE SAME ONE #1350 AND #1219 REACH FOR. Nothing has failed here: a
+    # pending check is pending. Re-entering `--watch` costs one call and now finds the required check
+    # registered, so it blocks on it properly -- one extra iteration in the ordinary case. The wait
+    # itself is still untouched in the sense #831 fixed it (Dave kept waiting on non-required checks);
+    # what changes is that a non-required check can no longer END the wait on the required one's behalf.
+    #
+    # FAIL-OPEN ON AN UNREADABLE PAYLOAD, and that is deliberate rather than an oversight.
+    # Get-MergeBlockVerdict returns an EMPTY UnfinishedRequired when the required-check list could not be
+    # read, so this spins only on a payload that positively names a required check as unfinished. That
+    # keeps the invariant the verdict was built under -- an unreadable payload can never turn a GREEN run
+    # red -- and it keeps a repo with no ruleset at all (GitHub Free, no required check) out of this
+    # branch entirely, the same line step 3b draws for the same reason.
+    #
+    # BOUNDED BY THE WATCH-ATTEMPT COUNTER RATHER THAN A SECOND ONE. What is being limited is the number
+    # of `--watch` calls, which is exactly what $watchAttempt counts, so a run that drops its socket
+    # twice and then meets a pending required check has still made three watch calls and stops. On
+    # exhaustion this REFUSES instead of merging: the merge would be refused by GitHub anyway, and
+    # refusing here says which required check is still pending, locally, in a run the operator can
+    # simply re-enter.
+    if ($checks.ExitCode -eq 0) {
+        $pendingRequired = @()
+        # Best-effort like every other read in this loop: a throw costs the wait, never the ship.
+        try {
+            $pendingRequired = @((Get-MergeBlockVerdict -RequiredChecksJson $requiredFactsJson `
+                -ChecksJson $checkFactsJson).UnfinishedRequired)
+        } catch {
+            $pendingRequired = @()
+        }
+        if ($pendingRequired.Count -eq 0) { $lostWatchNote = ''; break }
+
+        if ($watchAttempt -ge $maxWatchAttempts) {
+            $has = if ($pendingRequired.Count -eq 1) { 'has' } else { 'have' }
+            Write-Error @"
+The required check $(Format-CheckNameList -Names $pendingRequired) $has still not finished after
+$maxWatchAttempts watch attempts -- NOT merged (inbound #1549).
+
+The watch kept returning green off a check the ruleset does not require, so it never blocked on this
+one. Nothing has failed: re-run ship-pr once the required check is green, or merge manually.
+"@
+            exit 1
+        }
+
+        $has = if ($pendingRequired.Count -eq 1) { 'has' } else { 'have' }
+        Write-Host "ship-pr: the watch went green off a NOT-required check while the required check $(Format-CheckNameList -Names $pendingRequired) $has not finished -- back to the wait (attempt $($watchAttempt + 1) of $maxWatchAttempts, inbound #1549)." -ForegroundColor DarkYellow
+        Start-Sleep -Seconds $PollSeconds
+        continue
+    }
 
     # Best-effort, like every diagnostic on the refusal path below: a read that throws costs the retry
     # and the sentence, never the refusal itself.
