@@ -40,7 +40,53 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**10 entries pending** -- 6 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 10 reach it. <!-- pending-tally -->
+**11 entries pending** -- 7 at tier 0, 4 at tier 2. Tier 2 is this repo's audience: 4 of 11 reach it. <!-- pending-tally -->
+
+### DEPLOY: fix/1536-boardless-stage-floor · 20260907-161113
+
+A repo that runs the Asana mirror without a GitHub Projects board can now say so, and its cards move
+again. Giving `Get-GithubStatusMap` an empty `FieldName` and no `Statuses` is that declaration; the
+stage floor then comes off the issue itself -- closed means *in review*, an open issue with a linked
+pull request means *in development*, an open one without means *filed* -- and no `GH_PROJECT_TOKEN` is
+needed, there being no board to read.
+
+**What it repairs is not the three stages it looks like.** With no board the floor was nothing for every
+issue, which also switched off the one promotion no column names: *ready to test* is reached from a floor
+already at *in review*, so closing an issue stopped handing the card back to the submitter. The close
+update still went out -- so the person was told the work was ready while their card never moved, and no
+run failed. That is the worst shape of the failure, and it is the fourth stage nobody had written down as
+depending on a board.
+
+**A repo that has a board is unchanged, to the line.** The fallback fires on the repo's own declaration
+rather than on a missing status, because those were two different facts arriving as one: *no board here*
+and *this issue is off the board*. The two-writers race that made the project status the source is
+GitHub's own project workflow being the other writer, so a derivation firing only where there is no board
+has nothing to race with.
+
+**And the sweep no longer goes quiet.** Where every carded issue derives no stage, one line says so and
+names the three reasons it can be -- an unreadable project field, unmapped columns, or a board-less repo
+that has not said so. `N card(s) moved` used to read the same on a quiet day as on a run that could not
+answer for a single ticket.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo is the source of the plugin, not a store repo that runs the mirror, so no subscriber of
+a service notices. The two consumers that do run it are `smartwatchbanden` and `xoxowildhearts`, and the
+change reaches them at the next release.
+
+**Score:** N/A
+
+#### Pull Request
+
+Derive the stage floor from the issue where a repo has no project board
+
+Plugins: dkj-policy-bwj
+
+[PR #1548](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1548)
+
+---
 
 ### DEPLOY: docs/1526-canonical-repo-owner-name · 20260907-160338
 
