@@ -1918,6 +1918,55 @@ legitimately citing a *retired* check, which two of this file's comments do corr
 naming checks 9 and 17. The repo has paid for this class once already in the other direction: `4.12.0`
 records a lens citing check 19 for what the lint implements as check 20.
 
+#### The template self-containment gate, which is a SUITE and not a numbered check (September 7, 2026, [#1556](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1556))
+
+**It lives in [`scripts/tests/template-selfcontained.tests.ps1`](../../../scripts/tests/template-selfcontained.tests.ps1), so do not go looking for a check number.**
+The section above is about `check-plugin-integrity.ps1`; this one is a test suite, and the placement is
+the point rather than an accident. The subject is a **PowerShell AST**, which the lint gate reads nowhere
+else, and the property is per-file rather than repo-wide — while the lint gate is what every consumer's
+adoption runs, and check 34's own measurement above is the record of what an extra ~110 ms there is
+argued over. Both run inside `lint-en-tests`, so a suite catches this at exactly the same moment a check
+would.
+
+**What it guards.** A template under `plugins/**/templates/` is copied wholesale into a consumer's
+`.github/` and run by *their* CI. It dot-sources none of this repo's libraries — it cannot, since none of
+them travel with it — so every Verb-Noun name it calls must be one it defines, one PowerShell provides, or
+one it declares external. Today that is one file, `asana-mirror.ps1`.
+
+**The `Get-Command` guard IS the declaration, and reading it is what keeps the check allowlist-free.**
+That template legitimately calls `Get-AsanaStageMap` and `Get-GithubStatusMap`, which live in the
+*consumer's* `scripts/repo-config.ps1` and are dot-sourced at run time — and it tests for each with
+`Get-Command -Name '<name>'` before calling it, because a consumer defining neither must still get a
+working run. The check believes that guard. A hand-maintained exemption list was the obvious alternative
+and is the same defect one layer up: it goes stale the first time a seam is added, silently, which is the
+answer check 34 above reaches for the same reason.
+
+**File-wide rather than paired**, deliberately: the guard and the call it protects are routinely in
+different functions, and matching them would be a dataflow analysis buying no extra safety.
+
+**Only hyphenated names are judged.** `gh` and `git` are external executables whose presence says nothing
+about the template's correctness, and resolving them would fail the suite on a machine that merely lacks
+the CLI. Every function this defect class can produce is Verb-Noun.
+
+**Born green and demonstrably firing** — the bar check 34 set. Against the repaired template it reports
+0 over 65 hyphenated call sites and 49 definitions; run against the pre-repair file it reports exactly
+`Get-IssueClosure`, measured by dropping that copy into `templates/` and running the suite unmodified.
+The two seams above are what made the naive version report three, and finding them is what settled the
+guard rule rather than an allowlist.
+
+**Two PowerShell traps are pinned by fixtures rather than left to be rediscovered**, because both fail in
+the direction that reads as success: a returned empty `@()` is unrolled to `$null` (so `,@(...)` is
+returned, or a clean template is indistinguishable from an unparseable one), and `$null -ne @()` *filters*
+instead of comparing (so the parse assert reads `$null -eq` and negates). The suite also asserts that it
+found at least one template at all — a renamed `templates/` folder would otherwise turn the whole thing
+into a no-op reporting green.
+
+**Why a parse-time check is the only thing that could have caught #1556 here.** Nothing executes the
+template end to end during its own release, and the crash was in `Update-MirroredTask`, which the sweep
+reaches only when it has something to say — so the consumer's Actions tab filled with green event runs and
+green empty sweeps, and the first sweep with real work to do died on it, taking the prio-label and stage
+sweeps with it.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.
