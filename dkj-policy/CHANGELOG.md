@@ -43,7 +43,56 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 17 minor entries** <!-- pending-tally -->
+**7 / 18 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1549-required-check-green · 20260907-185842
+
+`ship-pr` no longer calls CI green off a check the ruleset does not require. `gh pr checks --watch`
+only ever watches what was registered when it started, so a required workflow that has not yet created
+its check run is **absent** from that set rather than pending in it -- and a fast advisory check
+passing first exited the watch 0 with the required one still to come. The run then said `CI green` and
+walked into `the base branch policy prohibits the merge`.
+
+The green exit is now held against `gh pr checks --required` before it is believed, and a required
+check that has not concluded sends the run **back to the wait** rather than to the merge. Nothing has
+failed in that state, so waiting is the answer rather than a refusal; the wait itself is untouched in
+the sense [#831](https://github.com/DKJ-Solutions/claude-code-specialists/issues/831) settled it, and
+what changed is only that a non-required check can no longer end the wait on the required one's behalf.
+
+Measured in a consumer on September 7, 2026 (`dkj-policy` 4.31.0,
+[BWJ-Development/smartwatchbanden#529](https://github.com/BWJ-Development/smartwatchbanden/pull/529)):
+`.github/dependabot.yml` passed in 1s, ship-pr declared green after 5s, and required
+`Shopify theme check` (2m1s) and `branch-entry` (31s) were both still pending -- a plain
+`gh pr merge --merge` succeeded on the first try once they finished. On any repo whose required check
+outlasts a fast advisory one, that fired on **every** ship.
+
+The failure direction is what makes this worth a release rather than a tidy-up. The refusal itself was
+loud and safe; *where* it left the work was not -- past the local gates, past the PR, with the merge
+and the fold still owed to a process that then exits, so the session holding the context is the one
+that dies and a later session finds an open PR with a green tick and no visible reason it never landed.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+The facts were already being printed. The wait report annotated the governing check `NOT required` in
+the same run that then merged on it -- so the distinction was read, rendered, and shown to the operator
+one line below a verdict that ignored it. The two readings that label supports are opposite, and the
+script had been picking the wrong one: *"the check that governed the merge was not a required one"* is a
+reason to keep waiting, not a certificate. The repair is therefore mostly a field on a return value; the
+computation, the query and the verdict are all untouched.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr consults the required-check verdict on the GREEN path too, so a pending required check is waited for instead of merged past
+
+Plugins: dkj-policy
+
+[PR #1557](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1557)
+
+---
 
 ### DEPLOY: fix/1553-connector-live-repo-slug · 20260907-184949
 
