@@ -37,21 +37,38 @@
 
 #1623 reports that a branch name reaches eighteen prose print sites raw, and says in so many words
 that the count is a measurement rather than a boundary: *"Not that 18 sites must each get a call...
-Whoever picks this up should measure it, not assume it."* Measured here, the class is **thirty-one
-sites in the same four files**, and the extra thirteen are not a second subject:
+Whoever picks this up should measure it, not assume it."* Measured here, the class is **thirty-two
+sites in the same four files**, and the extra fourteen are not a second subject:
 
-| where | issue's count | measured | the thirteen it did not see |
+| where | issue's count | measured | the fourteen it did not see |
 |---|---|---|---|
 | `scripts/release/ship-pr.ps1` | 11 | 15 | `$headNow` in the same sentence as a counted site; `$shipCycleRef` and `$shipProgressRel` in the two here-string refusals; the branch document path in the spent-branch note |
-| `scripts/task/sync-main.ps1` | 6 | 19 | `$trunk` in nine progress sentences; three `$r.Branch` rows from `git ls-remote`; the sync-log line |
+| `scripts/task/sync-main.ps1` | 6 | 20 | `$trunk` in nine progress sentences; four rows printing branch names read off `git ls-remote`; the sync-log line |
 | `scripts/lib/remote-ahead-lib.ps1` | 1 | 1 | -- |
 | `scripts/lib/worktree-lib.ps1` | (named via ship-pr:1177) | 1 | -- |
 
-The issue read the scripts for `$branch`; the thirteen are the same name reached through a derived
+The issue read the scripts for `$branch`; the fourteen are the same name reached through a derived
 variable or a second seam answer. **The sharpest of them is not `$branch` at all**: the three
-predecessor rows in `sync-main.ps1` print names that came off `git ls-remote`, so whoever pushed a
-branch matching the prefix chose that text -- and the operator reads those rows to decide which PR to
-close.
+four standing-branch rows in `sync-main.ps1` print names that came off `git ls-remote`, so whoever
+pushed a branch matching the prefix chose that text -- and the operator reads those rows to decide
+which PR to close.
+
+**And one thing that is not in the tree at all: PR #1624 is open on `fix/1617-ref-print-display-scope-reason`
+and rewrites two of the same prose blocks in `ref-print-lib.ps1`.** This branch shrank its own footprint
+there to the minimum rather than racing it -- the reasoning paragraph is left to #1617, which owns it, and
+what this branch adds is the second function and one appended implementation note. Two small prose hunks
+still conflict; whichever lands second resolves them by keeping the corrected reasoning and saying the
+axis is now closed. Filed as #1630 so it is not discovered at the merge.
+
+#### What was scoped out and filed
+
+- **#1627** -- `sync-main.ps1` prints two paste-ready `gh` commands carrying a raw ref name #1594 never
+  measured: `--base $trunk` and `--head $($s.Branch)`. That is the paste axis, so it wants a placeholder
+  rather than a strip; stripping would hand the reader a command that runs with a different value than
+  the one on screen.
+- **#1629** -- the uncovered paths printed two lines under a row this branch strips come from another
+  branch's tree, and that `git diff --name-only` sets no `core.quotePath`, unlike its neighbour.
+- **#1630** -- the contradiction #1624 and this branch will leave in one `.DESCRIPTION` once both land.
 
 **What was scoped OUT, and filed instead.** `sync-main.ps1:1184` puts a raw `$trunk` into a printed,
 paste-ready `gh pr create --base $trunk ...` -- that is #1594's axis (a command a reader is invited to
@@ -73,7 +90,7 @@ step further out. Both are filed rather than folded in here.
       argued "interpolated raw on purpose" is rewritten with what #1617 measured
 - [x] `ship-pr.ps1`: `$branchShown` judged once beside the read, at the fifteen prose sites
 - [x] `sync-main.ps1`: `$branchShown`, `$trunkShown` and a per-row strip in
-      `Write-SyncPredecessorVerdict`, at the nineteen prose sites
+      `Write-SyncPredecessorVerdict` and on the standing-branch line above it, at the twenty prose sites
 - [x] the mirrors rebuilt via `scripts/sync/build-shared-scripts.ps1`
 
 ### TEST
@@ -97,13 +114,13 @@ step further out. Both are filed rather than folded in here.
 A branch name this workflow prints in a sentence can no longer read as a different branch. `git
 check-ref-format` enforces `\p{Cc}` and **accepts** `\p{Cf}`, so a branch carrying U+202E, U+200B,
 U+200D or U+2066 is creatable, checkout-able and returned verbatim by `git rev-parse` -- and
-thirty-one printed sentences across `ship-pr.ps1`, `sync-main.ps1`, `remote-ahead-lib.ps1` and
+thirty-two printed sentences across `ship-pr.ps1`, `sync-main.ps1`, `remote-ahead-lib.ps1` and
 `worktree-lib.ps1` put that name straight into a console. `Get-DisplayRef`, one definition in
 `ref-print-lib.ps1`, now replaces every control and format character with a space, collapses the
 runs and trims; the words stay, because a reader standing on that branch has to recognise it. The
 paste axis is unchanged and stays distinct: a command gets a placeholder, a sentence gets a strip.
 
-Two of the thirty-one are worth naming on their own. `ship-pr.ps1`'s go-ahead line is the one line
+Two of the thirty-two are worth naming on their own. `ship-pr.ps1`'s go-ahead line is the one line
 the ship documents as safe to act on. And `sync-main.ps1`'s standing-predecessor rows print names
 that came off `git ls-remote` -- text chosen by whoever pushed the branch, read by an operator
 deciding which pull request to close.

@@ -855,7 +855,10 @@ elseif ($candidates.Count -eq 0) {
         foreach ($s in $standing) {
             $n    = @($s.Paths).Count
             $what = if ($n -gt 0) { "$n file(s)" } else { 'file set unreadable' }
-            Write-Host "      STILL STANDING: $($s.Branch) -- $what" -ForegroundColor Yellow
+            # SAME ls-remote NAME AS THE PREDECESSOR ROWS BELOW, and stripped for the same reason
+            # (issue #1623): whoever pushed a branch matching the prefix chose this text, and this is
+            # the line the operator reads it from first.
+            Write-Host "      STILL STANDING: $(Get-DisplayRef -Ref ([string]$s.Branch)) -- $what" -ForegroundColor Yellow
         }
         if (-not $ghKnown) {
             Write-Host '      (gh could not list merged PRs, so a squash-merged branch reads as standing.)' -ForegroundColor DarkGray

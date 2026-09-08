@@ -336,6 +336,7 @@ Assert-True ($shipText -match [regex]::Escape('$shipProgressRelShown = Get-Displ
 # AND THE MOST EXTERNALLY-AUTHORED NAME OF ALL: sync-main's standing-predecessor rows come off
 # `git ls-remote`, so whoever pushed a branch matching the prefix chose the text printed there.
 Assert-True ($syncText -match [regex]::Escape('$branchRow = Get-DisplayRef -Ref ([string]$r.Branch)')) 'sync-main.ps1 strips the ls-remote branch names in its predecessor rows'
+Assert-True ($syncText -match [regex]::Escape('STILL STANDING: $(Get-DisplayRef -Ref ([string]$s.Branch))')) 'and the standing-branch line the operator reads first, which prints the same names'
 
 # --- the mirrors carry it too --------------------------------------------------------------------
 # A CONSUMER RUNS THE MIRROR, so a repair present only in the root copy is a repair no consumer has. The
