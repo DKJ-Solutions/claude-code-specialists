@@ -440,8 +440,126 @@ foreach ($m in @(
         $mirrorText = [System.IO.File]::ReadAllText($full)
         Assert-True ($mirrorText -match 'function Get-PasteableRef') "...and that mirror carries the paste verdict: $($m.Label)"
         Assert-True ($mirrorText -match 'function Get-DisplayRef') "...and the prose strip as well, which two other libs now dot-source: $($m.Label)"
+        Assert-True ($mirrorText -match 'function Get-DisplayPath') "...and the path strip (#1638), which the paste verdict itself calls under -Kind Path: $($m.Label)"
     }
 }
+
+# --- the PATH axis: Get-DisplayPath (issue #1638) -------------------------------------------------
+# THE SAME WALL, ONE CLASS FURTHER OUT. These paths come from this repo's own HEAD (`git ls-tree`, then
+# Convert-GitQuotedPath) and from a filesystem walk of the pulled LIVE theme, which third parties edit
+# through the Shopify theme editor. git's incidental quoting is no help: measured in #1637, `ls-tree` and
+# `diff --name-only` return shell metacharacters unquoted in every core.quotePath setting, because git
+# quotes control characters and high bytes -- not this class.
+Write-Host ''
+Write-Host 'Get-DisplayPath -- the prose strip for a file path' -ForegroundColor Cyan
+
+foreach ($cp in @(0x202E, 0x200D, 0x200B, 0x2066, 0x1B, 0x0D, 0x07, 0x00)) {
+    $path = 'assets/a' + [char]$cp + 'b.js'
+    Assert-Equal 'assets/a b.js' (Get-DisplayPath -Path $path) "stripped to a visible space: U+$('{0:X4}' -f $cp)"
+}
+
+# THE THREE PROPERTIES THAT MAKE THIS A SECOND FUNCTION RATHER THAN A CALL TO Get-DisplayRef. Each one is
+# a case where the ref strip is right for a ref and wrong for a path, so each is asserted against the ref
+# strip's own answer -- if the two are ever collapsed into one function, these go red and say why.
+$runPath = 'assets/a' + [char]0x200B + [char]0x200B + [char]0x202E + 'b.js'
+Assert-Equal 'assets/a   b.js' (Get-DisplayPath -Path $runPath) 'a run is NOT collapsed: one space per removed character, so format width and display width agree again'
+Assert-Equal 'assets/a b.js'   (Get-DisplayRef  -Ref  $runPath) '...where the ref strip collapses it, which is what would misalign a padded column'
+Assert-Equal $runPath.Length   (Get-DisplayPath -Path $runPath).Length 'and the length is preserved exactly -- the alignment argument, asserted as the property it is'
+
+Assert-Equal 'assets/a  b.js' (Get-DisplayPath -Path 'assets/a  b.js') 'a genuinely doubled space in a path survives'
+Assert-Equal 'assets/my file.js' (Get-DisplayPath -Path 'assets/my file.js') 'and a single genuine space does too -- git and NTFS both allow one, where a ref may not'
+Assert-Equal ' assets/a.js ' (Get-DisplayPath -Path ' assets/a.js ') 'the ends are NOT trimmed: a leading or trailing space is part of the path a reader has to type back'
+Assert-Equal 'assets/a.js' (Get-DisplayRef -Ref ' assets/a.js ') '...where the ref strip trims, which would aim that reader at a different file'
+
+# THE ALL-INVISIBLE PATH IS NAMED RATHER THAN BLANKED, which is the one place this function must NOT copy
+# Get-DisplayRef's answer: '' is wording its callers already have ("on its branch"), and a row in a padded
+# table has none -- it would print as an empty column, a row whose path is silently not there.
+Assert-Equal '(no printable path)' (Get-DisplayPath -Path ([char]0x200B + [char]0x200D + [char]0x2066)) 'a path made entirely of format characters says so instead of coming back as blanks'
+Assert-Equal '' (Get-DisplayRef -Ref ([char]0x200B + [char]0x200D + [char]0x2066)) '...where the ref strip answers the same input with the empty string, deliberately'
+Assert-Equal '' (Get-DisplayPath -Path '') 'the empty path stays empty'
+Assert-Equal '' (Get-DisplayPath -Path $null) 'a null path is the empty path'
+
+# AND AN ORDINARY THEME PATH IS RETURNED UNTOUCHED -- the assert that catches a strip pattern widened by
+# accident into the case every real run takes.
+foreach ($ok in @('assets/theme.js', 'sections/main-product.liquid', 'locales/en.default.json', 'templates/customers/login.liquid', 'config/settings_schema.json')) {
+    Assert-Equal $ok (Get-DisplayPath -Path $ok) "an ordinary theme path is returned unchanged: '$ok'"
+}
+
+# --- the PASTE axis for a path: Get-PasteableRef -Kind Path (issue #1637) --------------------------
+Write-Host ''
+Write-Host 'Get-PasteableRef -Kind Path -- the same allowlist, a path-shaped refusal' -ForegroundColor Cyan
+
+# THE ALLOWLIST NEEDED NO WIDENING, which is the argument for a parameter rather than a second function.
+foreach ($ok in @('assets/theme.js', 'sections/main-product.liquid', 'locales/en.default.json', 'config/settings_schema.json')) {
+    $v = Get-PasteableRef -Ref $ok -Placeholder '<path>' -Kind Path
+    Assert-True $v.IsSafe "an ordinary theme path passes the ref allowlist unchanged: '$ok'"
+    Assert-Equal $ok $v.Token '...and is carried into the command as itself'
+    Assert-Equal '' $v.Note '...with no note, because there is nothing to explain'
+}
+
+# THE THREE PATHS MEASURED THROUGH git mktree IN #1637, plus the classes around them.
+foreach ($bad in @('assets/x$(id -un).js', 'assets/y`id -un`.js', 'assets/z;touch owned.js', 'assets/a&b.js', 'assets/a|b.js', "assets/it's-fine.js", 'assets/a b.js', '-assets/leading-dash.js')) {
+    $v = Get-PasteableRef -Ref $bad -Placeholder '<path>' -Kind Path
+    Assert-True (-not $v.IsSafe) "refused on the paste axis: '$bad'"
+    Assert-Equal '<path>' $v.Token "...and the placeholder is what reaches the command: '$bad'"
+    Assert-True ($v.Note.Contains($bad)) "...while the note names the real path, so the reader can still act: '$bad'"
+    Assert-True ($v.Note.Contains('1594')) "...and cites the issue: '$bad'"
+}
+
+# THE NOUN IS THE POINT OF -Kind, so it is asserted in both directions: a note about a path that says
+# "branch name" sends the reader looking for the wrong kind of thing, and the default must not have moved.
+$pathNote = (Get-PasteableRef -Ref 'assets/z;touch owned.js' -Placeholder '<path>' -Kind Path).Note
+Assert-True ($pathNote -like '*the file path is not safe to paste*') 'the refusal speaks in the path noun'
+Assert-True ($pathNote -like '*The file path is:*')                  '...and names it in the same noun'
+Assert-True ($pathNote -notlike '*branch*')                          '...with no mention of a branch anywhere in it'
+
+$refNote = (Get-PasteableRef -Ref 'fix/evil;touch').Note
+Assert-True ($refNote -like '*the branch name is not safe to paste*') 'and the default is still the branch noun'
+Assert-True ($refNote -like '*The branch name is:*')                  '...in both sentences'
+
+# THE NOTE USES THE PATH STRIP, NOT THE REF STRIP. This is the one consequence of -Kind that a reader
+# could not see from the noun: the note is the ONLY place the real path is printed, and the reader is being
+# told to compose the command themselves from it, so a collapsed or trimmed path aims them at a different
+# file than the one that conflicted.
+$spacey = 'assets/a  b;touch.js'
+Assert-True ((Get-PasteableRef -Ref $spacey -Placeholder '<path>' -Kind Path).Note.Contains($spacey)) 'the note carries the doubled space through verbatim'
+Assert-True (-not ((Get-PasteableRef -Ref $spacey).Note.Contains($spacey))) '...where the ref default would have collapsed it, which is why -Kind selects the strip too'
+
+# AND THE REFUSAL PATH IS STILL NOT AN INJECTION SURFACE at the new axis -- the same property #1439 and
+# #1446 bought, asserted for a path rather than a ref.
+foreach ($esc in @("assets/a$([char]0x1B)[31mb.js", "assets/a$([char]0x202E)b.js", "assets/a$([char]0x07)b.js")) {
+    $n = (Get-PasteableRef -Ref $esc -Placeholder '<path>' -Kind Path).Note
+    Assert-True ([bool]$n) 'a control-character path still carries a note'
+    $body = $n -replace "`r", '' -replace "`n", ''
+    Assert-True ($body -notmatch '[\p{Cc}\p{Cf}]') 'and no control or format character from the path survives into it'
+}
+
+# THE ALL-INVISIBLE PATH DOES NOT FALL THROUGH TO THE BRANCH WORDING, which is the seam between the two
+# strips showing up in the note: Get-DisplayPath does not trim, so this never arrives as '' and is named.
+$invisiblePath = Get-PasteableRef -Ref ([char]0x200B + [char]0x200D) -Placeholder '<path>' -Kind Path
+Assert-Equal '<path>' $invisiblePath.Token 'a path made entirely of format characters is not paste-safe either'
+Assert-True ($invisiblePath.Note -like '*(no printable path)*') 'and its note names that state rather than reading "could not read it"'
+
+# --- the four sync-main sites the two issues measured ---------------------------------------------
+Write-Host ''
+Write-Host 'The path call sites in sync-main.ps1' -ForegroundColor Cyan
+
+# THE THREE PADDED LISTINGS (#1638). Asserted as a count rather than one by one: they are the same line
+# three times, and what must hold is that none of the three was left behind.
+Assert-Equal 3 ([regex]::Matches($syncText, [regex]::Escape('(Get-DisplayPath -Path $r.Path)')).Count) 'all three of the take / hold-back / conflict listings go through the path strip'
+Assert-True (-not $syncText.Contains('-f $r.Status, $r.Path,')) 'and none of them still formats the raw path into the padded column'
+
+# THE CONFLICT REMEDY (#1637). One judgement per row, both operands answered from it.
+Assert-True ($syncText.Contains("`$pathPaste = Get-PasteableRef -Ref `$r.Path -Placeholder '<path>' -Kind Path")) 'the conflict remedy judges the path once, on the paste axis'
+Assert-True ($syncText.Contains('git diff --no-index -- $($pathPaste.Token)')) '...and the printed command carries the token, never the raw path'
+Assert-True ($syncText.Contains('$pathPaste.Note')) '...and prints the note, so a refused row explains its own placeholder'
+Assert-True ($syncText.Contains('Join-Path $mirror $pathPaste.Token')) '...with the mirror operand answered from the SAME verdict, so the two holes are visibly one substitution'
+
+# THE SPELLING THIS ISSUE WAS ABOUT, ASSERTED ABSENT. The old line double-quoted both operands, which is
+# the exact repair ref-print-lib's own header was written to reject: substitution runs inside double
+# quotes in bash and PowerShell alike, so it read as a guard while closing nothing -- worse than a bare
+# interpolation, because the next reader sees quotes and stops looking.
+Assert-True (-not $syncText.Contains('--no-index -- `"$($r.Path)`"')) 'the double-quoted raw path is gone from the conflict remedy'
 
 # --- the creation-side half ----------------------------------------------------------------------
 # THE OTHER HALF OF #1594, and it is asserted here rather than only in branch-info.tests.ps1 because the
