@@ -6720,9 +6720,23 @@ function Get-BranchFileDeclaredBranch {
         would have been the narrowing this predicate's own comments forbid: the title is a wording seam, a repo
         may set it to anything, and branches open across a rename carry titles no list holds.
 
-        THE '**Branch:**' FALLBACK IS NOT NARROWED, deliberately. It is a legacy shape that sits BELOW the H1
-        title of a pre-split root entry -- exactly the file this scan exists to catch -- and its line regex is
-        anchored end to end, so it cannot collide with ordinary prose the way the heading pattern can.
+        THE '**Branch:**' FALLBACK IS NOT NARROWED, deliberately -- and WHICH FILE IT ANSWERS FOR was
+        mis-stated here until September 8, 2026 (#1642). It is the shape the pre-split PER-BRANCH files
+        carried: 'branch/branch-changelog.md' and 'branch/branch-progress.md', whose own titles were the
+        H1s '# Branch changelog' and '# Branch progress', with '**Branch:** `feat/x`' on a line BELOW that
+        title. That is why the opening-heading narrowing cannot see it and this fallback has to stay wide.
+
+        IT IS NOT THE PRE-SPLIT ROOT ENTRY, which is what this claimed and what the two sibling comments
+        below cited: of the 344 root entries in this repo's history, 0 carry a '**Branch:**' line and 0 open
+        with an H1 (334 open at H3, 10 at H2) -- and the root scan is non-recursive, so 'branch/' was never
+        in its reach either. THAT COUNT NEEDS NO DATE FILTER, which is worth saying because the sentence
+        above hands you one: no root entry was ever added AFTER the split, so 344 is the whole population and
+        a '--until' boundary removes nothing. A re-measurement that applies one splits the 10 H2 files across
+        it -- they were written in the flat window itself -- and comes out disagreeing with this comment
+        about the very numbers it cites. Measured that way once already, on this branch's own review.
+
+        WHAT SURVIVES as the reason to leave the fallback un-narrowed for that scan is the regex alone: it
+        is anchored end to end, so it cannot collide with ordinary prose the way the heading pattern can.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
@@ -7128,9 +7142,12 @@ function Test-DevelopmentEntryMissing {
 
         NOR THE DECLARED BRANCH, which was the near miss. A development document declares its branch in
         its title heading, which looks like a clean discriminator until Get-BranchFileDeclaredBranch's
-        '**Branch:**' fallback -- deliberately un-narrowed, and documented as sitting below the H1 title of
-        a pre-split root entry -- answers for that legacy shape too. Refusing on it would refuse a file
-        that is a perfectly good entry.
+        '**Branch:**' fallback -- deliberately un-narrowed, and sitting below the H1 title of a pre-split
+        PER-BRANCH file ('branch/branch-changelog.md') -- answers for that legacy shape too. Refusing on it
+        would refuse a file that is a perfectly good entry. The shape was named here as a pre-split ROOT
+        entry until September 8, 2026, which no root entry ever was (#1642); the near miss is unaffected,
+        because what makes the discriminator unsafe is that the fallback answers at all, not which file
+        taught it to.
 
         THE GUIDANCE ARM IS ANCHORED TO THE TITLE, not merely 'somewhere before the second heading'. An
         entry BODY may legitimately quote something, and a blockquote in a legacy entry's prose must not
@@ -7203,10 +7220,14 @@ function Test-BranchChangelogIsFilled {
 
         AND THE OLD LEVEL TEST IS STILL ONE OF THE TWO ANSWERS, which is a repair rather than politeness --
         caught by shared-scripts.tests.ps1 when the name test was the ONLY one. A PRE-SPLIT ROOT ENTRY
-        (`feat-x.md`, from before August 6, 2026) opens with its own TITLE as an H2 and names no branch
-        anywhere, so the name test reads it as empty. Every consumer with such a file still has one, and the
-        consequences are the silent kind: open-pr would leave the changelog checklist item unticked, and the
-        release cut -- whose guard is "no unfolded entry anywhere" -- would cut a release straight over it.
+        (`feat-x.md`, from before August 6, 2026) opens with its own TITLE AT AN ENTRY LEVEL and names no
+        branch anywhere, so the name test reads it as empty. Measured over the 344 in this repo's history
+        (#1642): 334 open at H3 and 10 at H2 -- the flat window of August 5-6 -- and NONE names a branch,
+        which is the half the name test cannot see. Both levels are ones this test accepts, so the shape is
+        covered end to end; it read 'as an H2' until September 8, 2026, which was true of 10 of the 344.
+        Every consumer with such a file still has one, and the consequences are the silent kind: open-pr
+        would leave the changelog checklist item unticked, and the release cut -- whose guard is "no
+        unfolded entry anywhere" -- would cut a release straight over it.
         So: filled if the first non-blank line is AT an entry level, OR if the document names a branch other
         than the trunk. Each shape is answered by the test that can see it.
 
