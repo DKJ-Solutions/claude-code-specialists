@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 5 minor entries** <!-- pending-tally -->
+**3 / 6 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/source-enables-every-plugin · 20260908-081857
+
+The source repo now enables **every** plugin in its own marketplace, not just the core team and the
+workflow, and says why: a plugin whose agent defs, manifests and hooks are never resolved anywhere is one
+whose install is only ever proven in somebody else's session. Enabling all six means a frontmatter that
+stops parsing, a manifest that goes stale or a hook that stops resolving surfaces at this repo's own
+session start instead of downstream. The three add-on teams and `dkj-policy-bwj` have no work here and are
+not expected to, so the eleven specialists they bring get roster entries and empty `VUL-IN` lenses -- and
+`CLAUDE.md` and `SPECIALISTS.md` both now say, in as many words, that those eleven lenses are the intended
+end state and not a backlog. The one cost that cannot be documented away is `dkj-team-shopify`'s floor
+check, which reports an `[ERROR]` every session here because it asks which theme is live and has no third
+state for a repo with no store; that is named in the repo slot and filed as #1570, with an explicit
+instruction not to silence it by inventing a theme id.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- nothing under `plugins/` changed, so no released payload moves and no consumer sees anything from
+this branch. It is a change to how the source repo is configured and what its own governance documents
+claim.
+
+**Score:** N/A
+
+#### Pull Request
+
+Enable every plugin in the source repo, with the roster catch-up it owes
+
+[PR #1573](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1573)
+
+---
 
 ### DEPLOY: feat/consumer-readme-update-topup · 20260908-080839
 
