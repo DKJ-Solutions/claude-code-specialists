@@ -68,6 +68,39 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
 - Fanning out read-only exploration in parallel is perfectly fine — for example via a fresh
   research/exploration agent.
 
+### A review is dispatched into the primary checkout, never into a worktree
+
+**Decided September 8, 2026, and the measurement is the whole of the reasoning.** `isolation:
+"worktree"` looks like the mechanical answer to the hazard a review carries — a reviewer holding
+`Bash` can `git stash`, `git checkout HEAD --` or `git reset` the orchestrator's uncommitted work
+away, which is prevented by instruction (the `working-copy-boundary` block) and by nothing else. It
+is not that answer, for two reasons that were **probed rather than reasoned about**, in this
+system's own source repo.
+
+- **The worktree carries no uncommitted work.** An untracked file and a tracked edit made in the
+  primary seconds before the dispatch were both invisible inside it: the harness cuts a fresh
+  checkout of the primary's **HEAD commit**, on a branch of its own (`worktree-agent-<id>`), with a
+  clean `git status`. A review sits *before* the PR, so the tree it would read is the one that does
+  not contain the change — and the report that comes back is a confident "no findings" with nothing
+  in it to say which tree it read. That failure is silent, where the one being prevented at least
+  leaves a diff behind.
+- **It dirties the tree it was meant to protect.** The harness puts the worktree at
+  `.claude/worktrees/agent-<id>`, **inside the checkout**, and nothing ignores that path — while the
+  agent runs, the primary's own `git status` carries `?? .claude/worktrees/`. Every step of this
+  workflow that refuses on a dirty tree sees it, and the backing gate counts it. This is why the
+  repo's own lane mechanism puts its worktrees in a **sibling** directory outside the tree; the
+  harness flag does not offer that choice.
+
+So a reviewer is a fresh agent in the primary checkout, and the boundary it works under stays an
+instruction. **That instruction is not weakened by being unenforceable** — no lint gate could reach
+this anyway, because `isolation` is set by the caller at dispatch and lives in no agent def.
+
+**The bullet above stays true for the case it was written for** — several sub-agents *writing* to
+the same files at once — and the two costs apply there as well rather than being waived: such a
+worktree starts from HEAD and not from the working copy, and whatever it produces has to be
+reconciled back into the primary by hand. A sub-agent dispatched to change files *in* the primary
+checkout is therefore dispatched there.
+
 ## Picking up an inbound report — the six checks, in full
 
 The persona carries the route (an improvement to the shared core becomes an `inbound` issue on the

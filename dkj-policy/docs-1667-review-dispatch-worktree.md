@@ -36,21 +36,79 @@
 
 ### PLAN
 
-Take the decision #1667 left open: whether a dispatched review should run in isolation: worktree instead of relying on the working-copy boundary.
+Take the decision #1667 left open: whether a dispatched review should run in `isolation: "worktree"`
+instead of relying on the working-copy boundary #1665 is writing.
+
+#### Why this is a measurement and not a weighing
+
+#1667 names one correctness cost as its first bullet -- "a worktree checks out a commit; it does not
+carry uncommitted work" -- and files the decision as the owner's because that cost was **inferred**
+rather than read. The verification rule this repo applies to an inbound report applies to a report it
+filed against itself: read what would have to be true for the explanation to hold. So the branch
+probes the harness first and decides on what comes back, rather than reasoning from the name of a
+flag.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Probe `isolation: "worktree"` in this checkout: dispatch an agent with the flag, with an
+      untracked file and a tracked edit sitting uncommitted in the primary, and have it report what
+      it can see.
+- [x] Probe the second half the report does not mention: where the harness puts that worktree, and
+      what the primary's own `git status` says while it stands there.
+- [x] Record the decision in Chris's portable manual, under *Delegating parallel work* -- the
+      section that already names worktree isolation as an option, and therefore the one place a
+      reader meets the question.
+- [x] File the finding the probe turned up that is not this decision's to make: `.claude/worktrees/`
+      is not ignored, so any dispatched worktree reads as a dirty tree while it stands -- #1673.
 
 ### TEST
 
+- [x] Probe 1, a dispatched agent carrying `isolation: "worktree"`, September 8, 2026: `pwd`
+      reported `.claude/worktrees/agent-<id>`, `git rev-parse HEAD` the primary's own HEAD
+      (`73993473`), `git branch --show-current` a branch of the harness's own making
+      (`worktree-agent-<id>`), and `git status --porcelain` **clean**. The untracked probe file did
+      not exist there and the tracked edit was absent from the file -- so #1667's first bullet is
+      **confirmed**: the change under review would not have been in the tree.
+- [x] Probe 2, `git worktree add --detach .claude/worktrees/probe-1667 HEAD` in the primary: the
+      primary's `git status --porcelain` then carries `?? .claude/worktrees/`, and
+      `git check-ignore .claude/worktrees/x` matches nothing. So the worktree the harness opens
+      **dirties the checkout it was meant to protect**, for as long as it stands.
+- [x] Both probes reverted: worktree removed, probe file deleted, `README.md` restored,
+      `git status` clean and `git worktree list` back to the primary alone.
+- [x] Lint gate + all suites green before the push.
+
 ### DEPLOY: docs/1667-review-dispatch-worktree
 
-**Score:**
+A dispatched review runs in the primary checkout and never in `isolation: "worktree"`, and Chris's
+portable manual now says so at the one place a reader meets the question -- the *Delegating parallel
+work* section, which already named worktree isolation as an option. #1667 filed the call as the
+owner's because its own first bullet was inferred; both halves were probed instead, in this repo, on
+September 8, 2026.
+
+The flag is worse than the hazard it would remove. A dispatched worktree is a fresh checkout of the
+primary's **HEAD commit** on a branch of the harness's own making, with a clean `git status`: an
+untracked file and a tracked edit made seconds earlier were both invisible inside it. A review sits
+*before* the PR, so the tree it would read is the one without the change, and what comes back is a
+confident "no findings" carrying nothing that says which tree it read. And the worktree lands at
+`.claude/worktrees/agent-<id>` **inside** the checkout, ignored by nothing, so while it stands the
+primary's own `git status` carries `?? .claude/worktrees/` -- it dirties the tree it was dispatched
+to protect. That is why the repo's lane mechanism puts its worktrees in a sibling directory; the
+harness flag does not offer the choice.
+
+So the working-copy boundary #1665 is writing stays the whole of the answer for reviewers, and it is
+not weakened by being unenforceable: `isolation` is set by the caller at dispatch and lives in no
+agent def, so no lint gate could ever have reached it. The existing bullet stands for the case it
+was written for -- several sub-agents writing the same files at once -- with both costs now named
+there rather than waived.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- nothing a subscriber of a service sees. This is guidance in an orchestrator's on-demand
+manual about how sub-agents are dispatched; no behaviour anybody invokes changes.
+
+**Score:** N/A
 
 #### Pull Request
 
