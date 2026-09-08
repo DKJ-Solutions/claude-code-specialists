@@ -4015,6 +4015,57 @@ Write-Coverage -Category 'fixture-git' -Checked $fixtureGitFiles.Count `
         "script file(s) under scripts/tests/ walked for a git command (named 'git', or invoked through a variable named exactly `$git) whose result is DISCARDED (| Out-Null, `$null =, or a [void] cast -- each judged after ONE shared unwrap of any (...) or cast, so a pair of brackets is not an escape hatch) and whose exit code is judged, through the AST rather than the line text, on neither the same statement nor the next -- $fixtureGitFindings finding(s). The immediate-read rule is what separates a fixture MUTATION from a git QUESTION such as 'rev-parse --verify --quiet' on a ref expected to be absent: zero probe false positives over both the current tree and the pre-#1635 tree (182 findings there, in 18 files). Born green: 27 findings at introduction, in the 4 files that sweep missed, all converted rather than exempted, 0 exemptions. A bare statement pipeline is deliberately NOT a subject -- widening to it yields 20 findings here and 20/20 are value-returning questions"
     })
 
+
+# --- 36. a tool that obliges a shared block, against the defs that hold it ---------------------------
+# WHY A SECOND CHECK BESIDE CHECK 7 (issue #1665, September 8, 2026). Check 7 compares the inside of a
+# sentinel pair against its source, so it answers "has this block drifted" and has never had an opinion
+# about a pair that is ABSENT. For a block placed by CRAFT that is right -- who carries it is a judgement,
+# and a check cannot hold a judgement. working-copy-boundary is the first block placed by CAPABILITY: it
+# goes to every agent def whose 'tools:' line names Bash, because that is what makes the failure
+# reachable at all.
+#
+# AND A CAPABILITY CIRCLE IS EXACTLY THE KIND A CHECK CAN KEEP. Without this, the circle held only as long
+# as somebody remembered it: an agent def gaining Bash later -- a new specialist, or one edited 'tools:'
+# line on an existing one -- sits silently outside the boundary with every gate green. That is the same
+# enforced-by-memory shape as the defect #1665 reported, arriving through the maintenance door, and it was
+# reported by the red-team pass on #1665's own branch before the block had shipped.
+#
+# THE TABLE IS THE SUBJECT, NOT A FILE LIST. Get-ToolRequiredSharedBlocks maps tool -> block name; a list
+# of expected carriers here would be the memory this check replaces, and would go stale the first time the
+# roster changes. Nothing declares the reverse direction: an agent def is free to carry a block it is not
+# obliged to, because a wider circle is a decision somebody can make and a narrower one is the defect.
+#
+# THE PERSONAS NEED NO EXCLUSION and deliberately have none: a persona carries no 'tools:' line, so it
+# names no tool and is never obliged. That falls out of the data rather than being an exemption, which is
+# what keeps it true when the generator's scope changes again.
+#
+# BORN GREEN: 11 obliged agent def(s) at introduction, all 11 carrying the block, 0 exemptions.
+$toolBlockMap = Get-ToolRequiredSharedBlocks
+$toolBlockObliged = 0
+$toolBlockFindings = 0
+foreach ($def in @($agentDefs)) {
+    $raw = [System.IO.File]::ReadAllText($def.FullName, [System.Text.Encoding]::UTF8)
+    $rel = $def.FullName.Replace($RepoRoot, '.')
+    $declaredTools = @(Get-AgentDefTools -Content $raw)
+    foreach ($tool in $toolBlockMap.Keys) {
+        if ($declaredTools -notcontains $tool) { continue }
+        $toolBlockObliged++
+        $blockName = $toolBlockMap[$tool]
+        if ($raw -notmatch [regex]::Escape("<!-- BEGIN shared:$blockName")) {
+            Add-Error ("[tool-block] ${rel}: names '$tool' in its tools line but carries no" +
+                " 'shared:$blockName' block. That block is placed by CAPABILITY rather than by craft" +
+                " (agent-shared/README.md says why), so holding the tool is what obliges it. Add the" +
+                " sentinel pair and run scripts/agents/build-agent-defs.ps1.")
+            $toolBlockFindings++
+        }
+    }
+}
+Write-Coverage -Category 'tool-block' -Checked $toolBlockObliged `
+    -Note $(if ($toolBlockObliged -eq 0) {
+        "no agent def names a tool in Get-ToolRequiredSharedBlocks ($($toolBlockMap.Count) mapping(s)), so no obligation could be missed"
+    } else {
+        "obligation(s) from $($toolBlockMap.Count) tool -> block mapping(s) in Get-ToolRequiredSharedBlocks, held against the defs that declare the tool -- $toolBlockFindings finding(s). Check 7 is the sibling and cannot serve this: it compares the INSIDE of a sentinel pair against its source and is silent on a pair that is absent, which is correct for a block placed by craft and wrong for one placed by capability. The personas are unaffected without an exemption -- a persona carries no 'tools:' line, so it names no tool. The reverse direction is deliberately not checked: carrying a block you are not obliged to is a decision, carrying none you are is the defect"
+    })
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
