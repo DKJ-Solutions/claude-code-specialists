@@ -390,7 +390,41 @@ if (Get-Command Get-PrMergeMethod -ErrorAction SilentlyContinue) {
 }
 
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
-if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a branch."; exit 1 }
+if ($branch -eq 'main') {
+    # THE REFUSAL DIAGNOSES INSTEAD OF ONLY RESTATING THE RULE (issue #1620). Standing on the trunk is
+    # usually a plain mistake -- and it is ALSO the state this script's own step 2b creates: the trunk is
+    # handed back the moment the PR exists (#1073), so for the whole CI wait, the longest step in the run,
+    # HEAD says 'main' while a merge and a fold are still owed. A run that does not survive that wait
+    # leaves exactly this checkout, and the operator re-running ship-pr met a message about the wrong
+    # problem. Measured on PR #1618, September 8, 2026: the backgrounded process was killed by the host
+    # for low memory, and `git checkout <branch>` plus the same command resumed correctly.
+    #
+    # #1588's REPAIR CANNOT REACH THIS. It put the checkout at the head of the stale-CI refusal's printed
+    # remedy, which helps a run that gets as far as printing one; an interrupted process prints nothing at
+    # all, and the kill takes the scrollback with it. The sentence the operator needs was in this file the
+    # whole time -- the dropped-watch retry block's comment says resuming a ship that died there means
+    # checking the branch out again -- which is a comment nobody is reading at that moment.
+    #
+    # BEST-EFFORT, AND THE REFUSAL IS UNCHANGED WHERE IT CANNOT READ. Two reads, neither of them load-
+    # bearing: an unreadable one yields no candidates and the message is the line it has always been.
+    # Same posture and same reason as Get-MissingCheckSuiteRefusalNote below -- a diagnostic must never be
+    # why a refusal cannot be printed. It costs two commands on a path that is already refusing.
+    $resumeNote = ''
+    $openPrList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--state', 'open', '--json', 'number,headRefName', '--limit', '100', '--repo', $repo) -DiscardStderr
+    $localHeads = Invoke-NativeCapture -FilePath 'git' -Arguments @('for-each-ref', '--format=%(refname:short)', 'refs/heads') -DiscardStderr
+    if ($openPrList.ExitCode -eq 0 -and $localHeads.ExitCode -eq 0) {
+        # THE PASTE VERDICT IS RESOLVED HERE rather than in the lib, because ref-print-lib.ps1 owns that
+        # judgement (#1594) and these names are the least trustworthy refs this script prints: a head ref
+        # is chosen by whoever opened the PR, not by this operator's own checkout.
+        $resumeCandidates = @(Get-InterruptedShipCandidates -Json ($openPrList.Output -join "`n") -LocalBranches @($localHeads.Output) -TrunkBranch 'main' | ForEach-Object {
+            $candidatePaste = Get-PasteableRef -Ref $_.Branch
+            [pscustomobject]@{ Number = $_.Number; Branch = $_.Branch; Token = $candidatePaste.Token; Note = $candidatePaste.Note }
+        })
+        $resumeNote = Get-InterruptedShipResumeNote -Candidates $resumeCandidates -TrunkBranch 'main'
+    }
+    Write-Error "You are on main; ship-pr runs from a branch.$resumeNote"
+    exit 1
+}
 
 # JUDGED ONCE, HERE, RATHER THAN AT EACH OF THE FIVE PRINT SITES (issue #1594). Every remedy this
 # script prints puts the SAME name into a command, so one verdict beside the read that produced it
