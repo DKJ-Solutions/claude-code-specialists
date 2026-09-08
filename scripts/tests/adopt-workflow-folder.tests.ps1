@@ -350,6 +350,64 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c10 'scripts\repo-config.ps1'))) 'seam no-config: no lib was conjured up'
     Assert-True (Test-Path -LiteralPath (Join-Path $c10 'dkj-policy\README.md')) 'seam no-config: the folder was scaffolded anyway'
     Assert-Match 'has no scripts/repo-config\.ps1' $r10.Flat 'seam no-config: and the run says why the seam is unanswered'
+
+    # --- 11. The UPDATE section: placed fresh, topped up when missing, left alone when present ------
+    # THE ONE WRITE THIS COMMAND MAKES INTO A FILE IT DID NOT CREATE, so every branch is pinned: a fresh
+    # scaffold carries it, an existing page without it gets it appended, an existing page WITH it is
+    # untouched, and a dry run over a page without it writes nothing while still saying so. The
+    # untouched case is the assert that matters most -- a top-up that ran twice would grow the page on
+    # every re-run, and a re-run finding nothing to do is the promise this whole command makes.
+    Write-Host "adopt-workflow-folder -- the UPDATE section is placed, and never placed twice" -ForegroundColor Cyan
+    $Marker = '<!-- dkj-policy:update-section -->'
+
+    $c11 = New-FixtureConsumer -Label 'update-fresh'
+    $r11 = Invoke-Adopt -Dir $c11 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r11.Code 'update fresh: exit 0'
+    $readme11 = [System.IO.File]::ReadAllText((Join-Path $c11 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match ([regex]::Escape($Marker)) $readme11 'update fresh: the scaffolded README carries the marker'
+    Assert-Match '## Updating the plugins' $readme11 'update fresh: and the section heading'
+    Assert-Match 'claude plugin marketplace update' $readme11 'update fresh: the refresh command is in it'
+    Assert-Match '--scope project' $readme11 'update fresh: and the scope flag, which is the half a reader drops'
+    # THE REFRESH BEFORE THE UPDATE, not merely both present: a printed update without the refresh beside
+    # it is the doc defect the source repo's lint gate refuses, and this page is generated rather than
+    # written, so nothing else would ever read it.
+    Assert-True ($readme11.IndexOf('claude plugin marketplace update') -lt $readme11.IndexOf('claude plugin update ')) `
+        'update fresh: the refresh is printed BEFORE the per-plugin update'
+
+    # A RE-RUN OVER THE PAGE IT JUST WROTE. Two runs, one section.
+    $r11b = Invoke-Adopt -Dir $c11 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r11b.Code 'update re-run: exit 0'
+    $readme11b = [System.IO.File]::ReadAllText((Join-Path $c11 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
+    Assert-Equal 1 ([regex]::Matches($readme11b, [regex]::Escape($Marker)).Count) 'update re-run: still exactly one section'
+    Assert-Equal $readme11 $readme11b 'update re-run: the page was not touched at all'
+    Assert-Match 'already carries the UPDATE section' $r11b.Flat 'update re-run: and it says so rather than staying silent'
+
+    # THE CASE THIS BLOCK EXISTS FOR: a repo that adopted BEFORE the section existed. Its README is its
+    # own writing with no marker anywhere -- the state every already-adopted consumer is in.
+    Write-Host "adopt-workflow-folder -- an already-adopted README is topped up, not rewritten" -ForegroundColor Cyan
+    $c12 = New-FixtureConsumer -Label 'update-topup'
+    New-Item -ItemType Directory -Path (Join-Path $c12 'dkj-policy') -Force | Out-Null
+    $ownReadme = "# ``dkj-policy/`` -- our folder`n`nWe wrote this ourselves, before the section existed.`n"
+    [System.IO.File]::WriteAllText((Join-Path $c12 'dkj-policy\README.md'), $ownReadme, (New-Object System.Text.UTF8Encoding($false)))
+
+    # Dry run first: it reports the top-up and changes nothing.
+    $r12dry = Invoke-Adopt -Dir $c12
+    Assert-Equal 0 $r12dry.Code 'update topup dry: exit 0'
+    Assert-Match 'has no UPDATE section' $r12dry.Flat 'update topup dry: the run names what it would append'
+    Assert-Equal $ownReadme ([System.IO.File]::ReadAllText((Join-Path $c12 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)) `
+        'update topup dry: and wrote nothing'
+
+    $r12 = Invoke-Adopt -Dir $c12 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r12.Code 'update topup: exit 0'
+    Assert-Match 'UPDATE section appended' $r12.Flat 'update topup: the run reports the append'
+    $readme12 = [System.IO.File]::ReadAllText((Join-Path $c12 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
+    Assert-Match ([regex]::Escape($Marker)) $readme12 'update topup: the section is there now'
+    # THEIR OWN WRITING SURVIVES BYTE FOR BYTE, and it still leads: this is an append, not a merge.
+    Assert-True $readme12.StartsWith($ownReadme) 'update topup: their page is untouched and still first'
+    Assert-Equal 1 ([regex]::Matches($readme12, [regex]::Escape($Marker)).Count) 'update topup: exactly one section was added'
+    # BOTH HALVES OF THE EXCEPTION AT ONCE: the loop still leaves the FILE alone while this block appends
+    # to it, which is what keeps the append bounded rather than a rewrite in disguise.
+    Assert-Match '\[exists\]\s+dkj-policy/README\.md' $r12.Out 'update topup: the file itself was still left as it is'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
