@@ -61,6 +61,9 @@ pre-existing on the trunk rather than introduced by any in-flight branch.
 - [x] `check-plugin-integrity.ps1` — the printed-command check holds each new `claude plugin update`
       line to `--scope project` plus the marketplace refresh above it.
 - [x] All script test suites, as CI runs them.
+- [x] Copy edit on the diff (Edith): no findings — the six ids and their order match
+      `.claude/settings.json`'s `enabledPlugins` exactly, each line carries `--scope project`, and the
+      "six since #1573" claim agrees with `CLAUDE.md`'s repo slot.
 
 ### DEPLOY: docs/1597-readme-six-enabled-plugins
 

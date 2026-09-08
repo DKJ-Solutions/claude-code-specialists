@@ -69,11 +69,12 @@ default — that is an answer, not an omission.
 ## Updating the plugins — in every other checkout of this repo
 
 **This repo consumes itself**, so the workflow a session here runs is the *installed* copy, not the tree
-you are standing in. Via [`.claude/settings.json`](../.claude/settings.json) it enables `dkj-team-alpha`
-and `dkj-policy` from the `github` marketplace source `DKJ-Solutions/claude-code-specialists` — itself.
-That is what makes the update a step of its own rather than something a merge does for you, and the whole
-reason this section sits in the folder index instead of only in the plugin's own
-[README](../plugins/dkj-policy/README.md).
+you are standing in. Via [`.claude/settings.json`](../.claude/settings.json) it enables **every plugin in
+the marketplace** — six of them since
+[#1573](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1573) — from the `github`
+marketplace source `DKJ-Solutions/claude-code-specialists`, itself. That is what makes the update a step
+of its own rather than something a merge does for you, and the whole reason this section sits in the
+folder index instead of only in the plugin's own [README](../plugins/dkj-policy/README.md).
 
 **First, whether an update is even due in this checkout.** The
 [`plugin-versions`](../plugins/dkj-policy/skills/plugin-versions/SKILL.md) skill — run
@@ -86,13 +87,23 @@ the marketplace clone — and the exact command for each. It compares the instal
 below: it reads the marketplace clone this checkout already has and cannot tell you whether that clone
 itself trails `origin`. Read-only, no arguments, runs on any machine.
 
-Two commands, from the root of the checkout you want to move, once per plugin:
+Two commands, from the root of the checkout you want to move — the refresh once, the update once per
+enabled plugin:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists                        # 1. refresh the clone
-claude plugin update dkj-policy@claude-code-specialists --scope project         # 2. then update, per plugin
-claude plugin update dkj-team-alpha@claude-code-specialists --scope project
+claude plugin marketplace update claude-code-specialists                            # 1. refresh the clone
+claude plugin update dkj-team-alpha@claude-code-specialists --scope project         # 2. then update, per plugin
+claude plugin update dkj-team-ecomm@claude-code-specialists --scope project
+claude plugin update dkj-team-lifehub@claude-code-specialists --scope project
+claude plugin update dkj-team-shopify@claude-code-specialists --scope project
+claude plugin update dkj-policy@claude-code-specialists --scope project
+claude plugin update dkj-policy-bwj@claude-code-specialists --scope project
 ```
+
+**The set step 2 walks is `.claude/settings.json`'s own, and a plugin left off it simply stays on its old
+commit — no error, no verdict, nothing that reads as behind.** That is why the block names all six rather
+than only the two with real work here: read the enabled set from that file when the two disagree, and let
+`plugin-versions` above say which of them actually need the command.
 
 Then **restart the session** — a skill or a hook that arrived with the update is not in a session that
 started before it.
