@@ -813,6 +813,15 @@ function Get-InstallRecord {
          Ids           -- ordinally sorted ids that have at least one record for this repo.
          PathlessById  -- hashtable id -> records carrying no projectPath (see the block above).
          PathlessIds   -- ordinally sorted ids of those.
+         AllRecords    -- EVERY record in the file, whatever path it names and whether or not that path
+                          still resolves. The three fields above are all FILTERED -- to this repo, or to
+                          the pathless -- so none of them can answer a question about the file ITSELF,
+                          which is what check-claude-home.ps1 asks (issue #1609): does the real
+                          administration hold records a FIXTURE wrote? Such a record names a scratch
+                          tree, so it is neither this repo's nor pathless, and it is dropped twice over
+                          -- once for the path mismatch, and again because a deleted fixture root no
+                          longer resolves. A field rather than a second reader, for the reason the
+                          block above this function gives: one reader, tightened here.
 
        Records are projected onto a fixed shape (Id/Scope/Version/GitCommitSha/InstallPath/ProjectPath/
        InstalledAt/LastUpdated) so callers never reach into raw JSON -- the field a caller reads is then
@@ -839,6 +848,7 @@ function Get-InstallRecord {
     $anyRecord = $false
     $forPath = @{}
     $pathless = @{}
+    $allRecords = @()
 
     # Normalize the repo root once, the same way the record side is normalized below. Best-effort
     # Resolve-Path: the root normally exists (it is the repo being inspected), but a fixture may name one
@@ -867,6 +877,9 @@ function Get-InstallRecord {
                             InstalledAt  = (Get-JsonField $rec 'installedAt')
                             LastUpdated  = (Get-JsonField $rec 'lastUpdated')
                         }
+                        # COLLECTED BEFORE EITHER FILTER BELOW, and that order is the whole point: both
+                        # of them drop a record on purpose, and this field's job is to see what they drop.
+                        $allRecords += $projected
                         if (-not $projected.ProjectPath) {
                             if (-not $pathless.ContainsKey($id)) { $pathless[$id] = @() }
                             $pathless[$id] += $projected
@@ -908,6 +921,7 @@ function Get-InstallRecord {
         Ids          = $ids
         PathlessById = $pathless
         PathlessIds  = $plIds
+        AllRecords   = @($allRecords)
     }
 }
 

@@ -2017,6 +2017,89 @@ reaches only when it has something to say — so the consumer's Actions tab fill
 green empty sweeps, and the first sweep with real work to do died on it, taking the prio-label and stage
 sweeps with it.
 
+#### The `~/.claude` pollution check, and the guard that was measured and DECLINED (September 8, 2026, [#1609](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1609))
+
+**It is [`scripts/lint/check-claude-home.ps1`](../../../scripts/lint/check-claude-home.ps1), driven by
+the `claude-home-sessioncheck` SessionStart hook in `dkj-policy`** — a sixth machine-fact check beside
+`git-identity`, and in no gate for the same reason: a CI runner has no plugin administration at all, so a
+workflow leg would report the empty state on every push.
+
+**What happened.** While working #1591 an exploratory debug script — throwaway, written
+mid-investigation, never committed — ran without redirecting `$env:USERPROFILE`, so every path it built
+from the user home resolved to the real one. It overwrote `~/.claude/plugins/installed_plugins.json` with
+two fixture records naming a `%TEMP%` `projectPath`, and left a fixture marketplace clone at
+`~/.claude/plugins/marketplaces/ccs-fixture/`. Every real per-checkout record was gone — this checkout and
+both registered consumers — with no backup beside the file and no error anywhere. What a session *saw*
+was `roster-sessioncheck` and `plugin-versions` reporting every plugin as *"not installed in this checkout
+(enabled declaratively only)"*, which by then was literally true and is indistinguishable from the
+ordinary state [#1449](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1449) describes. It
+was found by reading the file.
+
+**The guard #1609 proposed does not fit, and that was measured before anything was built.** The report
+asked for a helper that refuses to write under `~/.claude` unless the resolved home is a scratch path.
+Two things rule that shape out here:
+
+- **Nothing in the committed tree writes under `~/.claude` — every reference in `scripts/` is a READER.**
+  So the helper would ship with no in-tree caller, enforced only by a one-off script's author remembering
+  to call it: the same unenforced instruction #1609 correctly criticises `Get-InstallRecord`'s docstring
+  for being. And the lint gate could not hold anyone to it either, there being no committed writes to
+  check.
+- **A command-string guard cannot see it.** The `PreToolUse` shape that works for
+  [`guard-live-theme.ps1`](../../../plugins/dkj-teams/dkj-team-shopify/hooks/guard-live-theme.ps1) reads
+  the command a session is about to run; here that command was `powershell -File <temp>/dbg.ps1` and the
+  write lived inside the file. Inspecting the **heredoc that wrote the script** is a real vector and is
+  the one worth revisiting if this recurs — but the false-positive surface is exactly the one
+  `guard-live-theme` spent a release learning, and worse here: this repo writes *about*
+  `installed_plugins.json` constantly (check 12 is entirely about printed queries against it), so the
+  first thing such a guard blocks is the fixture that tests it.
+
+So the harness is the only thing that reaches a throwaway script, and it reaches it twice — detect, and
+recover. **Decision by Dave, September 8, 2026**, on those two measurements.
+
+**The signature is ONE thing: a record whose `projectPath` sits under a scratch tree.** No checkout lives
+in `%TEMP%`, so such a record was written by a fixture. It is a signature no existing reader can see, which
+is why `Get-InstallRecord` gained an `AllRecords` field: the three fields it already returned are all
+filtered — to this repo's path, or to the pathless — and a fixture record is dropped **twice**, once for the
+path mismatch and again because a deleted fixture root no longer resolves (#301).
+
+**The orphan marketplace directory is reported only as part of that finding, never as a scan of its own,
+and that is the declined half.** An independent *"a directory under `marketplaces/` that
+`known_marketplaces.json` does not reference"* check fires on ordinary residue: measured the same day,
+`~/.claude/plugins/marketplaces/claude-plugins-official/` is exactly that — left behind by removing a
+marketplace, nothing to do with any fixture. Reporting it forever is the cry-wolf failure #294 spent a
+release removing, and the stale-path check was already declined here at 124 findings all false. So a
+polluted **record** names its marketplace and the check then says whether that clone is also sitting in the
+real tree, which is the actionable half and is how `ccs-fixture/` would have been named.
+
+**The snapshot is the recovery half, and the ORDER is what makes it safe.** On a healthy read the check
+copies the administration to `installed_plugins.snapshot.json` beside it — after the verdict, only on a
+clean one, and only when the content differs. A polluted file can therefore never become the snapshot, and
+restoring it puts the previous records **back**, where re-installing writes new ones and changes what is
+installed. That distinction is why #1609 was left unrepaired at filing rather than fixed in a minute.
+
+**It is the only session check in the family that WRITES**, and that is a change in kind rather than an
+oversight — its five siblings each state that they change nothing. The write is bounded to one path it
+owns, never happens on a finding, and is switched off by `-NoSnapshot`. It also has no `MeasureArgs` in the
+registry, deliberately: the no-argument form reads the real administration, and a timing harness must not
+write to it as a side effect of measuring.
+
+**A missing administration is a finding only when a snapshot sits beside it.** On its own, absent is the
+ordinary state of a machine that has never installed a plugin into a project — so the snapshot is the one
+thing that separates that from a file something deleted, and the verdict turns on it rather than on the
+missing file. Without that the check would cry wolf on every fresh machine and be switched off before it
+ever caught anything.
+
+**Its suite may never touch the real `~/.claude`, and that is the defect under test rather than a
+courtesy.** [`scripts/tests/claude-home-gate.tests.ps1`](../../../scripts/tests/claude-home-gate.tests.ps1)
+passes `-HomeOverride` into a fixture tree for every case, and `-NoSnapshot` for every case that is not
+about the snapshot. It also passes `-ScratchRootOverride` everywhere, for a reason particular to this
+check: the fixture trees live under `%TEMP%`, which is what the check calls scratch, so without the
+override every record a fixture writes reads as polluted and the **clean** case cannot be expressed at
+all. The machine's own resolution — `$env:TEMP` and a literal `\temp\` path segment — is therefore a
+**named test gap**: a suite asserting on it would be asserting about the machine it happens to run on.
+What is pinned instead is the boundary logic those roots feed, including that a sibling directory whose
+name merely *begins* with a scratch root's name is not inside it.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.
