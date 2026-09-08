@@ -760,9 +760,9 @@ other gate reads it: on PR #1557 a locally-enabled plugin set reached the merge 
 
 Two cases, and only the author can tell them apart. If this branch deliberately changes what the
 TREE declares -- the shared, tracked answer every clone inherits -- there is nothing to do: this is
-a note, not a refusal. If instead the edit is only THIS clone's own, drop it from the branch and
-keep it in that file's gitignored sibling where one exists (.claude/settings.local.json for the
-harness settings), then run again.
+a note, not a refusal. If instead an edit here is only THIS clone's own, drop it from the branch and
+keep it in the gitignored sibling of the file it belongs to, where one exists
+(.claude/settings.local.json for the harness settings), then run again.
 "@
             Write-Warning $machineLocalNote
         }
