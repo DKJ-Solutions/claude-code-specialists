@@ -138,6 +138,54 @@ Two defects, both mine, both only reachable on a real lap:
 - [x] One assert of my own was passing vacuously: `-like '*[string[]]$RequiredNames*'` opens a
       character class on `[`, so it matched a single character and never the type accelerator. Now
       `.Contains`, which is the trap this repo already documents from the other side.
+
+#### And the THIRD ship found the last one: the required check registers LATE (PR #1614, attempt 3)
+
+The narrowed wait now waited for the right thing -- and timed out doing it:
+
+```
+  Blocking on the REQUIRED check(s) only: 'lint-en-tests'. ...
+  (no required check registered yet -- waited 0s/180s)
+  ... twelve polls ...
+Wait-CheckRegistration : No CI required check registered for PR #1614 after 180s -- NOT merged.
+                         Check the workflow, or merge manually once it is green.
+```
+
+`lint-en-tests` is an **aggregator** -- `needs: [lint, suites]` in `ci.yml` -- so GitHub does not
+create its check run until the jobs it waits on have finished, about five minutes after the 180s
+budget ran out. The refusal then blamed a workflow that was running perfectly.
+
+- [x] Two waits, two budgets. "Is there any CI at all" keeps #1234's 180s, because a repo with no
+      check suite must hear about it in seconds. "Has the required check registered" gets 1800s,
+      because a required check that gates a merge is very often exactly this shape. Splitting them
+      was the point: one bigger number on the first wait would cost the no-suite repo half an hour.
+- [x] The narrowed timeout is its own diagnosis. Reaching it means CI **is** running and only the
+      required check is absent, so it names the two causes a reader can act on -- a required context
+      no workflow produces, or a job still waiting on dependencies -- and prints the two commands
+      that tell them apart. `Get-MissingCheckSuiteRefusalNote` is not asked: its subject is already
+      ruled out on that path.
+- [x] The #1350 re-entry inherits whichever budget its own question deserves.
+
+**And this does not lengthen a ship.** The aggregator cannot conclude before the jobs it needs, so
+waiting for it to register is waiting for CI itself, which the merge must do anyway. What the
+narrowing drops is the wait on the **separate** workflows -- `branch-entry` and `claude-review` --
+which is exactly the tail #1602 measured and nothing else.
+
+#### The narrowed wait stayed VISIBLE, which is #831's own finding turned on this branch
+
+A required aggregator registers seven minutes in, and the first build of that wait polled
+`gh pr checks --required` -- which for those seven minutes can say nothing but "not yet". gh's live
+table used to run underneath the old watch, so shipping a blind counter in its place would have
+re-created the exact defect #831 was filed about: an invisible wait, which is how two anecdotes became
+a policy question nobody could check.
+
+- [x] The narrowed poll reads the full payload instead and decides the question itself -- same one
+      call per poll -- so the line names which required check is still missing **and** how many checks
+      have reported. Registration is presence of **every** required name, not any: one registered
+      while another is absent is the #1549 hole this wait exists to close.
+- [x] Verified against five payloads before spending another CI lap: the real one (9 reported,
+      registered), gh's two "nothing yet" wordings, an empty JSON array, and the partial payload that
+      is precisely attempt 2's failure -- `claude-review` present, `lint-en-tests` absent, keep waiting.
 #### The contradictions this change created, both repaired here
 
 - [x] Nolan's lens recorded option C as DECLINED, and named a cost that does not exist: the merge

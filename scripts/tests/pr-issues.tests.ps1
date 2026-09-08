@@ -2095,14 +2095,43 @@ Assert-True ($shipText -like "*-match 'no (required )?checks reported'*") 'and s
 Assert-True ($shipText -notlike "*-match 'no checks reported'*") 'the narrow match that cost PR #1614 three watch attempts is gone'
 Assert-True ($shipText -notlike "*-notmatch 'no checks reported'*") 'from the poll as well as from the loop'
 
-Assert-True ($shipText -like '*if ($waitNarrowed) { $probeArgs += ''--required'' }*') 'the poll itself narrows, so it waits for the check the watch will block on rather than for any check'
+# THE NARROWED POLL DECIDES THE QUESTION ITSELF rather than delegating it to `--required`, and that is
+# about legibility: a required aggregator registers only once the jobs it needs finish, so `--required`
+# could say nothing but "not yet" for seven minutes -- a blind counter where gh's live table used to
+# run, which is the invisible wait #831 was filed about. Reading the full payload costs the same one
+# call per poll and lets the line say what IS happening.
+Assert-True ($shipText -like '*if ($waitNarrowed) { $probeArgs += @(''--json'', ''name,bucket,state'') }*') 'the narrowed poll reads the FULL payload, so it can report progress instead of only absence'
+Assert-True ($shipText -like '*$missing = @($wanted | Where-Object { $seen -notcontains $_ })*') 'and decides "registered" on presence of every required name, not on gh''s --required filter'
+Assert-True ($shipText -like '*if ($missing.Count -eq 0) { return $waited }*') 'ALL of them rather than any -- one registered while another is absent is the #1549 hole this wait closes'
+Assert-True ($shipText -like '*to register -- $reported check(s) have reported so far*') 'the progress line names which required check is missing AND that the rest of CI is moving'
 # .Contains RATHER THAN -like, and this suite walked into it: a `[` in a -like pattern opens a
 # CHARACTER CLASS, so '*[string[]]$RequiredNames*' matches a single character out of {s,t,r,i,n,g,[}
 # and never the literal type accelerator. The same trap Test-IsFoldOnlyCommit documents beside its own
 # StartsWith, met from the other side.
 Assert-True ($shipText.Contains('[string[]]$RequiredNames = @()')) 'Wait-CheckRegistration takes the required names -- empty leaves it the wait every ship made before #1602'
-Assert-True ($shipText -like '*-MaxWaitSec $maxWaitSec -RequiredNames $requiredWaitNames*') 'and the first call passes them'
-Assert-True ($shipText -like '*-RequiredNames $requiredWaitNames*') 'as does the #1350 re-entry -- a re-entry that widened would reintroduce the bug on the retry'
+Assert-True ($shipText -like '*-RequiredNames $requiredWaitNames*') 'the call sites pass them -- including the #1350 re-entry, which would otherwise reintroduce the bug on the retry'
+
+# TWO WAITS, TWO BUDGETS -- measured on PR #1614's THIRD ship, where one budget for both questions
+# refused a healthy CI run. "Is there any CI at all" is answered in seconds and keeps #1234's 180s.
+# "Has the REQUIRED check registered" can legitimately be minutes: in this repo `lint-en-tests` is an
+# aggregator (needs: [lint, suites]), so GitHub creates its check run only once those finish.
+Assert-True ($shipText -like '*$maxRequiredWaitSec = 1800*') 'the required-registration wait has a budget sized for CI, not for a registration race'
+Assert-True ($shipText -like '*-MaxWaitSec $maxRequiredWaitSec -AlreadyWaited $waited*') 'and the second call uses it, sharing the seconds the first already spent'
+Assert-True ($shipText -like '*$maxWaitSec = 180*') 'while the FIRST wait keeps #1234''s 180s -- a repo with no check suite still hears in seconds'
+$idxAnyWait = $shipText.IndexOf('-PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec' + "`r`n")
+if ($idxAnyWait -lt 0) { $idxAnyWait = $shipText.IndexOf('-PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec' + "`n") }
+$idxReqWait = $shipText.IndexOf('-MaxWaitSec $maxRequiredWaitSec -AlreadyWaited $waited')
+Assert-True ($idxAnyWait -ge 0 -and $idxReqWait -gt $idxAnyWait) 'the any-check wait runs BEFORE the required-check wait, so the narrowed refusal can say "CI is running, the required check is not there"'
+Assert-True ($shipText -like '*$reentryMaxWaitSec = if ($requiredWaitNames.Count -gt 0) { $maxRequiredWaitSec } else { $maxWaitSec }*') 'and the #1350 re-entry inherits whichever budget its own question deserves'
+
+# THE NARROWED TIMEOUT IS A DIFFERENT DIAGNOSIS, because reaching it means CI IS running and only the
+# required check is missing -- so "Check the workflow" would be the wrong sentence.
+Assert-True ($shipText -like '*never registered on PR #$Pr within*') 'the narrowed timeout names the required check rather than claiming no CI registered'
+Assert-True ($shipText -like '*Other checks DID register, so CI is running*') 'and says so, since the first wait already proved it'
+Assert-True ($shipText -like '*a rename or a typo in the*') 'and names the cause a reader can actually act on -- a required context no workflow produces'
+$idxNarrowRefusal = $shipText.IndexOf('never registered on PR #$Pr within')
+$idxSuiteNote = $shipText.IndexOf('$suiteNote = Get-MissingCheckSuiteRefusalNote')
+Assert-True ($idxNarrowRefusal -ge 0 -and $idxSuiteNote -gt $idxNarrowRefusal) 'and it returns before the no-check-suite note, whose subject is already ruled out on this path'
 
 # ORDER IS THE REPAIR, not tidiness: the wait cannot wait for the right thing before the mode is
 # known. Asserted by offset, since that is the actual claim.

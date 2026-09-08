@@ -940,18 +940,56 @@ function Wait-CheckRegistration {
     }
 
     # WAIT FOR THE THING THE WATCH WILL WATCH, not for anything at all (issue #1602). With names given
-    # the probe carries `--required`, so a repo whose fast advisory workflows register first no longer
-    # satisfies a wait whose whole job is to guarantee the NARROWED watch has something to block on.
+    # this waits until every REQUIRED check has registered, because that is what the narrowed watch
+    # will block on -- a repo whose fast advisory workflows register first no longer satisfies it.
     $waitNarrowed = @($RequiredNames | Where-Object { $_ -and ([string]$_).Trim() }).Count -gt 0
-    $probeArgs = @('pr', 'checks', "$Pr", '--repo', $Repo)
-    if ($waitNarrowed) { $probeArgs += '--required' }
+    $wanted = @($RequiredNames | Where-Object { $_ -and ([string]$_).Trim() } | ForEach-Object { ([string]$_).Trim() })
     $subject = if ($waitNarrowed) { 'required check' } else { 'check' }
+
+    # THE NARROWED PROBE READS THE FULL PAYLOAD, NOT `--required`, AND THAT IS ABOUT LEGIBILITY RATHER
+    # THAN CORRECTNESS. `--required` answers the question in one flag, and the first build used it --
+    # but a required aggregator registers only once the jobs it needs have finished, so on this repo
+    # that is a SEVEN MINUTE wait during which `--required` can say nothing except "not yet". gh's live
+    # table used to run underneath the old watch, and replacing it with a blind counter would
+    # re-create the exact defect #831 was filed about: an invisible wait, which is how two anecdotes
+    # became a policy question nobody could check. So the probe asks for every check and decides the
+    # narrowed question itself, at the same one call per poll, and can then say what IS happening.
+    $probeArgs = @('pr', 'checks', "$Pr", '--repo', $Repo)
+    if ($waitNarrowed) { $probeArgs += @('--json', 'name,bucket,state') }
     while ($true) {
         $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments $probeArgs
-        # BOTH OF GH'S WORDINGS. `--required` says `no required checks reported`, the plain call says
-        # `no checks reported`, and matching only the second is what cost PR #1614 three watch attempts
-        # and a refusal about a CI run that was perfectly healthy.
-        if (($probe.Output | Out-String) -notmatch 'no (required )?checks reported') { return $waited }
+
+        if ($waitNarrowed) {
+            # PRESENCE, NOT OUTCOME. A registered required check is enough for the watch to block on;
+            # whether it passed is the watch's question and then the verdict's, not this wait's. ALL of
+            # them rather than any: with two required checks, watching while one is still unregistered
+            # is the #1549 hole this wait exists to keep the watch out of.
+            $seen = @()
+            $reported = 0
+            try {
+                # Assign first, wrap second -- the 5.1 rule every parse in this tree follows.
+                $probeParsed = ($probe.Output -join "`n") | ConvertFrom-Json
+                $probeRecords = @(@($probeParsed) | Where-Object { $_ -and $_.name })
+                $reported = $probeRecords.Count
+                $seen = @($probeRecords | ForEach-Object { ([string]$_.name).Trim() })
+            } catch {
+                # An unparseable payload is "not yet", never "registered". gh prints
+                # `no checks reported` as TEXT even under --json, so this arm is the ordinary early
+                # state rather than an error, and treating it as registered would hand the watch
+                # nothing to block on -- the failure this wait exists to prevent.
+                $seen = @()
+                $reported = 0
+            }
+            $missing = @($wanted | Where-Object { $seen -notcontains $_ })
+            if ($missing.Count -eq 0) { return $waited }
+        } elseif (($probe.Output | Out-String) -notmatch 'no (required )?checks reported') {
+            # BOTH OF GH'S WORDINGS. `--required` says `no required checks reported`, the plain call
+            # says `no checks reported`, and matching only the second is what cost PR #1614 three watch
+            # attempts and a refusal about a CI run that was perfectly healthy. Kept on this arm even
+            # though the narrowed one no longer passes `--required`, because the re-entry from the watch
+            # loop reaches here with whatever the watch itself printed.
+            return $waited
+        }
         if ($waited -ge $MaxWaitSec) {
             # WHICH REFUSAL THIS IS -- issue #1234, and the same move #1044 and #1219 made one step later in
             # this file. The refusal is unchanged and cannot let a merge through; only the sentence beside it
@@ -960,6 +998,28 @@ function Wait-CheckRegistration {
             # commit. Reading the suite list separates the two, and only the second is about the workflow.
             # The read itself is Get-MissingCheckSuiteRefusalNote (above), shared with #1584's early exit;
             # best-effort by construction, so any failure degrades to the wording that was already here.
+            # AND THE NARROWED TIMEOUT IS A DIFFERENT DIAGNOSIS (issue #1602). Reaching this with names
+            # given means SOME check registered -- the caller's first wait proved that -- and the
+            # required one still has not. "Check the workflow" is then the wrong sentence: the likely
+            # causes are a required context the ruleset names but no workflow produces (a rename, a
+            # typo), or a job whose own dependencies never completed. Get-MissingCheckSuiteRefusalNote
+            # is not asked either, since its subject is "no check suite at all", which is already
+            # ruled out here.
+            if ($waitNarrowed) {
+                Write-Error @"
+The required check $(Format-CheckNameList -Names $RequiredNames) never registered on PR #$Pr within
+${MaxWaitSec}s -- NOT merged (issue #1602).
+
+Other checks DID register, so CI is running: what has not appeared is the check the ruleset requires.
+Either the ruleset names a context no workflow of this repo produces (a rename or a typo in the
+required-check name), or the job that produces it is still waiting on dependencies that have not
+finished. Compare the two:
+
+  gh api repos/$Repo/rules/branches/main --jq '[.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context]'
+  gh pr checks $Pr --repo $Repo
+"@
+                exit 1
+            }
             $suiteNote = Get-MissingCheckSuiteRefusalNote -Pr "$Pr" -Repo $Repo -Branch $Branch
             if ($suiteNote) {
                 Write-Error "No CI $subject registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. $suiteNote"
@@ -968,7 +1028,15 @@ function Wait-CheckRegistration {
             }
             exit 1
         }
-        Write-Host "  (no $subject registered yet -- waited ${waited}s/${MaxWaitSec}s)" -ForegroundColor DarkYellow
+        # SAY WHAT IS HAPPENING, not merely that nothing is. On the narrowed arm the payload just read
+        # names every check that HAS reported, so the line can carry the two facts a reader waiting
+        # seven minutes actually wants: which required check is still absent, and that the rest of CI
+        # is moving. That is #831's finding applied to this wait rather than only to the watch below.
+        if ($waitNarrowed) {
+            Write-Host "  (waiting for $(Format-CheckNameList -Names $missing) to register -- $reported check(s) have reported so far; ${waited}s/${MaxWaitSec}s)" -ForegroundColor DarkYellow
+        } else {
+            Write-Host "  (no $subject registered yet -- waited ${waited}s/${MaxWaitSec}s)" -ForegroundColor DarkYellow
+        }
         Start-Sleep -Seconds $PollSeconds
         $waited += $PollSeconds
     }
@@ -1184,7 +1252,43 @@ if ($requiredWaitNames.Count -gt 0) {
 # budget is shared across the probe and any fallback rather than restarting.
 $maxWaitSec = 180
 $waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
-    -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec -RequiredNames $requiredWaitNames
+    -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec
+
+# TWO WAITS, AND THE SECOND ONE NEEDS A BUDGET OF ITS OWN (issue #1602, measured on PR #1614's THIRD
+# ship). The wait above asks "is there any CI at all" and refuses at 180s with #1234's diagnostics --
+# that is the right question and the right budget, because "no check suite was created" is answered in
+# seconds and a repo that cannot answer it should not be kept waiting.
+#
+# THE REQUIRED CHECK IS A DIFFERENT QUESTION AND CAN LEGITIMATELY BE MINUTES AWAY. In this repo
+# `lint-en-tests` is an AGGREGATOR -- `needs: [lint, suites]` in ci.yml -- so GitHub does not create
+# its check run until the jobs it waits on have finished. Asked with the 180s budget it timed out
+# twelve polls in a row and refused with "Check the workflow", about a workflow that was running
+# perfectly and would register the check about five minutes later. A required check that gates a merge
+# is very often exactly this shape, so the budget has to fit CI rather than fit a registration race.
+#
+# WHICH IS WHY IT IS A SECOND CALL AND NOT A BIGGER NUMBER ON THE FIRST. Raising the 180s would cost a
+# repo with genuinely no check suite half an hour before it heard about it, and #1234's whole point is
+# that it hears in seconds. Split, each wait keeps the budget its own question deserves.
+#
+# AND THIS DOES NOT LENGTHEN THE SHIP. The aggregator cannot conclude before the jobs it needs, so
+# waiting for it to register is waiting for CI itself -- which the merge must do anyway. What the
+# narrowing drops is the wait on the SEPARATE workflows (`branch-entry`, `claude-review`), which is
+# exactly the tail #1602 measured and nothing else.
+$maxRequiredWaitSec = 1800
+# THE #1350 RE-ENTRY BELOW INHERITS WHICHEVER BUDGET ITS QUESTION DESERVES. Narrowed, it is asking the
+# aggregator question again and must not be handed the 180s that has just been proven too small;
+# unnarrowed it is #1350's original spin and keeps #1350's budget exactly.
+$reentryMaxWaitSec = if ($requiredWaitNames.Count -gt 0) { $maxRequiredWaitSec } else { $maxWaitSec }
+if ($requiredWaitNames.Count -gt 0) {
+    # NO BACKTICKS IN THIS STRING. A backtick is PowerShell's escape character inside double quotes,
+    # so a literal 'needs:' written as a code span would have made the 'n' a NEWLINE mid-sentence --
+    # written and caught here, which is the same class as the ASCII rule this repo's script layer
+    # already carries.
+    Write-Host "  Now waiting for $(Format-CheckNameList -Names $requiredWaitNames) to register. A required check is often an aggregator job that waits on the others, so this can take as long as CI does -- it is not a stall (#1602)." -ForegroundColor DarkGray
+    $waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
+        -PollSeconds $PollSeconds -MaxWaitSec $maxRequiredWaitSec -AlreadyWaited $waited `
+        -RequiredNames $requiredWaitNames
+}
 # --watch now blocks until the registered check finishes; exit 0 = all passed, non-zero = SOMETHING
 # failed. WHICH something is the whole question, and the answer is NOT in that exit code (#943). This
 # line used to read "branch protection blocks the merge until green, so a non-zero here means we must
@@ -1256,7 +1360,7 @@ while ($true) {
         Start-Sleep -Seconds $PollSeconds
         $waited += $PollSeconds
         $waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
-            -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec -AlreadyWaited $waited `
+            -PollSeconds $PollSeconds -MaxWaitSec $reentryMaxWaitSec -AlreadyWaited $waited `
             -RequiredNames $requiredWaitNames
         continue
     }
