@@ -814,9 +814,11 @@ function Get-InstallRecord {
          PathlessById  -- hashtable id -> records carrying no projectPath (see the block above).
          PathlessIds   -- ordinally sorted ids of those.
 
-       Records are projected onto a fixed shape (Id/Scope/Version/InstallPath/ProjectPath/InstalledAt/
-       LastUpdated) so callers never reach into raw JSON -- the field a caller reads is then a decision
-       made once, here, rather than at each call site.
+       Records are projected onto a fixed shape (Id/Scope/Version/GitCommitSha/InstallPath/ProjectPath/
+       InstalledAt/LastUpdated) so callers never reach into raw JSON -- the field a caller reads is then
+       a decision made once, here, rather than at each call site. GitCommitSha is the commit the CLI
+       recorded at install/update time; plugin-versions.ps1 compares it against the marketplace clone's
+       HEAD, which is finer than the cut-granular .version.
 
        -UserHomeOverride is for fixtures, same as Get-EnabledPlugins'. Note that the two checks
        deliberately do NOT pass their own -UserHomeOverride through to this function: that parameter is
@@ -856,13 +858,14 @@ function Get-InstallRecord {
                         if ($null -eq $rec) { continue }
                         $anyRecord = $true
                         $projected = [pscustomobject]@{
-                            Id          = $id
-                            Scope       = (Get-JsonField $rec 'scope')
-                            Version     = (Get-JsonField $rec 'version')
-                            InstallPath = (Get-JsonField $rec 'installPath')
-                            ProjectPath = (Get-JsonField $rec 'projectPath')
-                            InstalledAt = (Get-JsonField $rec 'installedAt')
-                            LastUpdated = (Get-JsonField $rec 'lastUpdated')
+                            Id           = $id
+                            Scope        = (Get-JsonField $rec 'scope')
+                            Version      = (Get-JsonField $rec 'version')
+                            GitCommitSha = (Get-JsonField $rec 'gitCommitSha')
+                            InstallPath  = (Get-JsonField $rec 'installPath')
+                            ProjectPath  = (Get-JsonField $rec 'projectPath')
+                            InstalledAt  = (Get-JsonField $rec 'installedAt')
+                            LastUpdated  = (Get-JsonField $rec 'lastUpdated')
                         }
                         if (-not $projected.ProjectPath) {
                             if (-not $pathless.ContainsKey($id)) { $pathless[$id] = @() }
