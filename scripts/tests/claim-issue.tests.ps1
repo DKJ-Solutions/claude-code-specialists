@@ -181,10 +181,55 @@ Assert-True ($body -match 'if\s*\(-not\s+\$readOk\)') 'a read that did not answe
 # other half: a cause asserted rather than measured.
 $unverified = if ($body -match '(?s)if\s*\(-not\s+\$readOk\)\s*\{(.*?)\n\}') { $Matches[1] } else { '' }
 Assert-True ($unverified -ne '') 'the unverified branch is findable as a block'
-Assert-True ($unverified -notmatch '\bexit\b') 'the unverified read does NOT block -- the write returned 0 and the claim most likely landed'
+
+# THE 'DOES IT BLOCK' ASSERT READS CODE, NOT PROSE, and that distinction was measured rather than
+# anticipated (#1639). The assert below is about an `exit` STATEMENT; run over the raw block it also
+# matched the word "exit" inside a comment -- and the comment that tripped it was a correct one,
+# explaining that a stall and an exit code point the reader at different things. A test that a true
+# comment can fail teaches the next author to write a worse comment, so the comment lines come off
+# first and the assert keeps exactly the subject it always had.
+function Get-CodeOnly {
+    param([string]$Block)
+    return (($Block -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
+}
+
+Assert-True ((Get-CodeOnly -Block $unverified) -notmatch '\bexit\b') 'the unverified read does NOT block -- the write returned 0 and the claim most likely landed'
 Assert-True ($unverified -match '\[WARNING\]') 'it reports as a warning, not as the refusal it is not'
 Assert-True ($unverified -match 'exited \$\(\$after\.ExitCode\)') 'it names the exit code it actually measured'
-Assert-True ($unverified -notmatch [regex]::Escape('$after.TimedOut')) 'no reason branches on TimedOut -- this script passes no timeout, so it could never print'
+Assert-True ($unverified -match [regex]::Escape('$after.TimedOut')) 'and it names a TIMEOUT as its own reason, which #1639 made reachable -- a stall says nothing about the tracker, where an exit code says gh answered and disagreed'
+
+# --- the network bound on every gh call (#1639) ---------------------------------------------------
+# ALL THREE CALLS WERE UNBOUNDED while every sibling script bounded its own, and the reason was a stale
+# comment on the shared value: it opened "THE BOUND A GIT NETWORK CALL PASSES" and listed three sites,
+# by which time six files read it and two passed it to `gh`. So a `gh`-only script read the policy as
+# somebody else's. The claim is the FIRST step of an issue-driven assignment (#1485), so a stall here
+# is a session that never starts with nothing printed to say why.
+Write-Host ''
+Write-Host 'The network bound (#1639)' -ForegroundColor Cyan
+
+$ghCalls = ([regex]::Matches($body, [regex]::Escape("Invoke-NativeCapture -FilePath 'gh'"))).Count
+$bounds  = ([regex]::Matches($body, [regex]::Escape('-TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds'))).Count
+Assert-True ($ghCalls -ge 3) "the three gh calls are still here (found $ghCalls)"
+# AS AN EQUALITY RATHER THAN A COUNT OF THREE, which is the whole point: a fourth gh call added later
+# is the next instance of this defect, and a test pinned to 3 would pass while it went unbounded.
+Assert-True ($ghCalls -eq $bounds) "every gh call carries the shared bound -- $ghCalls call(s), $bounds bound(s)"
+Assert-True ($body -match [regex]::Escape('$NativeCaptureNetworkTimeoutSeconds')) 'and it is the SHARED value, not a number typed in here'
+
+# THE READ AND THE READ-BACK REPORT A STALL AS A STALL. The pre-write read's failure branch offers a
+# list of three causes gh reached a verdict for; a hang is none of them, so sending a reader down that
+# list would be the bound announcing itself as the wrong thing.
+Assert-True ($body -match [regex]::Escape('if ($view -and $view.TimedOut)')) 'the pre-write read distinguishes a stall from the three verdicts it otherwise lists'
+
+# THE WRITE IS THE ONE TIMEOUT THAT IS NOT A FAILURE, and it gets its own branch above the failure one.
+# `gh issue edit` changes the tracker, so a write that reached the network and never answered may have
+# landed -- reporting "the claim failed" there would be a claim about the tracker this run cannot make.
+$editTimeout = if ($body -match '(?s)if\s*\(\$edit\s+-and\s+\$edit\.TimedOut\)\s*\{(.*?)\n\}') { $Matches[1] } else { '' }
+Assert-True ($editTimeout -ne '') 'the write has a timeout branch of its own, ahead of the failure branch'
+Assert-True ($editTimeout -match 'DOES NOT KNOW') 'it says the run does not know whether the claim landed, rather than that it failed'
+Assert-True ((Get-CodeOnly -Block $editTimeout) -match '\bexit\b') 'and it DOES stop -- unlike the read-back, nothing about this write is known'
+Assert-True ($editTimeout -match 'already yours') 'while naming the safe way out: re-running reports an already-landed claim as already yours'
+# The failure branch must not swallow the timeout case by running first.
+Assert-True ($body.IndexOf('$edit.TimedOut') -lt $body.IndexOf('the claim failed')) 'the timeout branch is tested BEFORE the generic failure branch, or it could never be reached'
 
 # ...and the closing verdict must not contradict the warning it sits under: an unconditional
 # '[OK] claimed' there asserts exactly what the read-back failed to establish.
