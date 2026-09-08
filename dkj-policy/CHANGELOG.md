@@ -43,7 +43,41 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 3 minor entries** <!-- pending-tally -->
+**2 / 4 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1564-fold-stale-offset-after-tally · 20260908-075318
+
+`fold-changelog-entry.ps1` crashed on the first fold after every release cut -- folding into an empty
+`## [Unreleased]` -- because it read byte offsets against the changelog *before* the pending-tally
+rewrite replaced that string with a shorter one, then used them in the "placed above N" console line.
+The crash landed between the changelog write and the commit, so `-Commit -Push` silently did neither
+and left the fold uncommitted on the trunk with the entry file already deleted. The offset-dependent
+counts now run before the tally rewrite, while the offsets are still valid; a regression test folds
+into a freshly-cut `## [Unreleased]` and checks the fold is committed.
+
+**Score:** 4
+
+Every first fold after a release cut hit this; recovering it meant a hand-typed commit of the two
+bounded paths, twice in one day per the issue. Not a 5 only because that recovery was known and
+in-bounds.
+
+#### What makes this deploy extra special
+
+A consumer running the `dkj-policy` workflow hits the same crash on their first fold after their own
+release cut -- a shipped script broken on a guaranteed code path, leaving their trunk in a silent
+half-state (`-Commit -Push` doing neither, entry file gone so `check-unfolded-entry.ps1` sees nothing).
+
+**Score:** 4
+
+#### Pull Request
+
+fold-changelog-entry.ps1 no longer crashes on the first fold after a release cut
+
+Plugins: dkj-policy
+
+[PR #1568](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1568)
+
+---
 
 ### DEPLOY: docs/dkj-policy-folder-update-section · 20260908-074642
 
