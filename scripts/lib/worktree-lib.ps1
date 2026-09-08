@@ -7,7 +7,7 @@
 
         . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 
-    Supplies the five pure functions below. None of them runs git -- the caller passes the lines
+    Supplies the six pure functions below. None of them runs git -- the caller passes the lines
     `git worktree list --porcelain` produced, so every one of them is testable, which is the whole
     reason this file exists rather than a fourth inline parse.
 
@@ -210,4 +210,42 @@ function Get-TrunkReturnDecision {
         }
     }
     return [pscustomobject]@{ Return = $true; Reason = '' }
+}
+
+# THE SENTENCE THAT DESCRIBES THE DECISION ABOVE, and it is here because the one that used to describe it
+# was a literal (issue #1616). ship-pr.ps1's step-3 preamble printed "step 2b already put it back on the
+# trunk (#1073)" with no condition on it and no reference to what step 2b decided -- so on every run where
+# the decision above declined, the line four rows under it asserted the opposite. Measured on PR #1615,
+# September 8, 2026: step 2b printed "staying on 'fix/...' -- the working tree is not clean (1 path(s))",
+# and the go-ahead then said the tree was back on the trunk.
+#
+# WHY IT MATTERS MORE THAN AN ORDINARY WRONG LINE: that line is explicitly framed as THE GO-AHEAD, printed
+# so a reader can act on it. Believing the primary checkout is home while it is standing on the shipping
+# branch is exactly the state #1073 and the orchestrator's "it ends on the trunk" rule exist to prevent --
+# reported, there, as already handled.
+#
+# THE TRUNK CLAUSE IS THE ONLY HALF THAT WAS WRONG, so the other two are unconditional here as they were
+# in the literal. Step 1 is the only step that reads the working tree, so "step 1 is over, the tree is
+# free (#1145)" is true at that point on every path through the script.
+#
+# AND THE FALSE ARM POINTS AT THE LANE RATHER THAN ONLY WITHDRAWING THE CLAIM. A reader who has just been
+# told the trunk clause does not hold needs the next move, not a gap: a lane is detached at origin/<trunk>,
+# so it is unaffected by where the primary happens to stand (#1069), which is what keeps the invitation
+# whole in both arms. Naming only what is unsafe was the defect #1428 repaired one line up; this must not
+# reintroduce it one line down.
+#
+# THE BRANCH NAME IS OPTIONAL because it is the caller's variable rather than something this function can
+# read, and a go-ahead that cannot be worded is worse than one that names the branch less precisely. Empty
+# gives "on its branch", which is still true and still points at the lane.
+function Get-TrunkReturnGoAheadLine {
+    param(
+        [Parameter(Mandatory = $true)][bool]$Returned,
+        [AllowEmptyString()][string]$Branch = ''
+    )
+    $lead = 'This line is the go-ahead: step 1 is over, the tree is free (#1145)'
+    if ($Returned) {
+        return "$lead, and step 2b already put it back on the trunk (#1073)."
+    }
+    $where = if ("$Branch".Trim()) { "on '$($Branch.Trim())'" } else { 'on its branch' }
+    return "$lead -- but step 2b left this checkout $where (its line above says why), so take the lane below rather than a second terminal in this checkout (#1073)."
 }
