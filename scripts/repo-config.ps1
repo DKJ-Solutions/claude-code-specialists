@@ -367,8 +367,8 @@ function Get-PrMergeMethod {
 # BUT THE FILE ITSELF IS NOT MACHINE-LOCAL, and the note must not read as though it were (#1574).
 # What settings.json declares is a shared, tracked answer every clone inherits, so a branch whose
 # subject IS that declaration -- a plugin added to the enabled set, one turned off -- is the happy
-# path, and this gate fires on it: measured on PR #1573, whose entire subject was that change. So the
-# note states BOTH cases and prescribes the move only for the clone's own edit. Wrong advice on the
+# path, and this gate fires on it: measured on PR #1573, a branch that existed to make that change.
+# The note states BOTH cases and prescribes the move only for the clone's own edit. Wrong advice on the
 # intended path is how an advisory note gets scrolled past, and it is then scrolled past on the day it
 # is right -- the failure the neighbouring Shopify floor check argues against in its own .DESCRIPTION
 # ("a check that goes quiet for the right-looking reason is worse than one that speaks").
