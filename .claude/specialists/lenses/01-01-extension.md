@@ -54,9 +54,15 @@ product: agent defs, manuals, docs, and tooling.
   `scripts/task/prune-merged.ps1 -IncludeRemote` instead**: it puts every head through the same two
   proofs the local pass uses, prints the paste-ready delete command for a merged leftover and
   `Kept ... -- live work` for everything else, and touches nothing — including the working tree, since
-  [#1147](https://github.com/DaveKJohn/claude-code-specialists/issues/1147), so running it mid-assignment
-  can no longer move the tree under a gate. Hand-derivation was itself the
-  defect ([#1042](https://github.com/DaveKJohn/claude-code-specialists/issues/1042)), measured three
+  [#1147](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1147), so running it mid-assignment
+  can no longer move the tree under a gate. **Add `-DryRun` when the checkout is dirty and you are
+  standing on a branch** — that is the one state the script still refuses, because a branch can be
+  squash-merged while its work is uncommitted and the step-off would then drag that work onto the trunk.
+  `-DryRun` deletes nothing, so it never has to step off, and the classification above is exactly the
+  same. On the trunk or detached, a dirty tree is reported and the run proceeds untouched
+  ([#1575](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1575) — it used to refuse
+  there too, on the ground of a step-off that run can never reach). Hand-derivation was itself the
+  defect ([#1042](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1042)), measured three
   times in two days. **The instance behind each of the three modes is in the
   [specialists handbook](../README.md#the-three-ways-a-briefing-fails-measured-here)** — the rule stays
   here, the evidence is one file away.
@@ -94,7 +100,7 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
     away from working in the wrong place. The instance that produced this rule, and the shape of the
     trap, are in the
     [specialists handbook](../README.md#the-branch-check-fires-on-the-follow-up-assignment).
-  - **And since [#1073](https://github.com/DaveKJohn/claude-code-specialists/issues/1073) a chain that is
+  - **And since [#1073](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1073) a chain that is
     still *shipping* leaves you there too.** `ship-pr.ps1`'s step 2b hands the primary checkout back to
     the trunk as soon as the PR exists, so a backgrounded ship no longer parks you on the branch until
     CI is done. That widens the trap above rather than narrowing it — a clean trunk now also means
