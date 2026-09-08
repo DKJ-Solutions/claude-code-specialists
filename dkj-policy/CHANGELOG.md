@@ -43,7 +43,51 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**23 / 44 minor entries** <!-- pending-tally -->
+**23 / 45 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1635-fixture-git-judged-siblings · 20260908-173553
+
+A test fixture's own git commands are now judged in every suite that builds one. The standing idiom was
+`& git -C $dir init -q 2>$null | Out-Null` inside a lowered `$ErrorActionPreference` -- and lowering the
+preference is right and stays, because git writes ordinary progress to stderr and under `EAP=Stop` that
+is a terminating error before any exit code is read. What was wrong is that the **exit code went with
+it**: a git command that failed was indistinguishable from one that worked. That matters more in a
+fixture than in production code, where a failed git usually goes on to fail visibly: a fixture that
+ignores one produces a repo that is *plausible* -- it exists, it has a HEAD, it just does not hold what
+the case assumed -- and every assert below it then measures the wrong thing, attributing the failure to
+the script under test. Thirty concurrent lanes over one temp tree make a transient `index.lock` sharing
+violation ordinary rather than rare, so the shape to expect is a suite that is red under the gate, green
+alone, and silent about why.
+
+`scripts/lib/fixture-git-lib.ps1` now holds that rule once -- judge, print git's own output, count, and
+fail the run on the count **even when every assert passed**, because a clean sweep over a repo that was
+never built proves less than it appears to. Seventeen suites route through it; each keeps its own helper
+signature, so the pass was a substitution rather than fifteen redesigns. Reads and existence probes are
+deliberately not subjects, and the two that were converted by mistake are back to a raw `& git` with the
+reason at the call site. `sync-main.tests.ps1` -- where #1622 wrote the rule inline, merged from `main`
+part-way through this branch -- reads the shared source too, so the forty lines exist once rather than
+sixteen times.
+
+**Score:** 3
+
+A red gate now names the broken fixture instead of the script that was fine, which is the difference
+between reading a failure and spending a 190s run reproducing one that may not reproduce. Noticed the
+moment it fires and invisible until then, so not higher.
+
+#### What makes this deploy extra special
+
+Nothing -- this is the source repo's own test suites, which no consumer runs and no release ships. The
+lib is workshop-only by design: nothing under `scripts/tests/` is mirrored into a plugin.
+
+**Score:** N/A
+
+#### Pull Request
+
+fixture git commands are judged in every suite
+
+[PR #1646](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1646)
+
+---
 
 ### DEPLOY: fix/1629-predecessor-paths-quotepath · 20260908-172319
 
