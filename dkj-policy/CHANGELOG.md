@@ -43,7 +43,185 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**26 / 50 minor entries** <!-- pending-tally -->
+**26 / 54 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1605-sessioncheck-version-cache · 20260908-204605
+
+A session start on a machine with no source checkout stops paying for its version verdict twice.
+`connector-sessioncheck`'s consumer fallback ran `plugin-versions.ps1 -Brief` -- two nested
+powershell bring-ups plus git in the marketplace clone -- at every firing of the
+`startup|resume|clear|compact` matcher, so a session with four compactions measured five times for an
+answer that had not changed. The matcher stays exactly as it is; narrowing it is what makes the whole
+report go silent after the first `/compact`. Instead the engine's output is now held for the life of
+the session, keyed on the `session_id` the harness writes to the hook's stdin: a compaction keeps
+that id and replays, a startup and a `/clear` bring a new one and re-measure, so nothing has to read
+the payload's `source` field or decide which kinds of firing may trust a cache. Measured over five
+measure-then-replay pairs against a synthetic five-plugin consumer fixture: a median of 1,288 ms
+against 439 ms, about 850 ms back per compaction.
+
+What a replay guarantees is a **bound, not an invariant**, and that is the one place this branch
+disagrees with the issue that asked for it. #1605 argued the cached answer cannot go stale within a
+session, citing the hook's own "restart the session" line -- but that line is about a hook's *code*
+being pinned, while the verdict is about two ordinary mutable files, and a sibling terminal running
+`claude plugin update` moves them with no restart involved. So a replay is bounded by age at one hour
+rather than the four this started with, the reasoning is written into the lib's header instead of the
+citation that does not carry it, and the direction a reader acts on self-heals: acting on "you are
+behind" means an update, after which this hook says to restart -- which is a new id and a bypass.
+
+Everything about it fails towards measuring. No session id, an unwritable cache directory, a corrupt
+entry, a plugin payload predating the lib: each falls back to the spawn this branch exists to avoid,
+which is exactly what the hook did before. The suite counts engine spawns on disk rather than
+inferring them from wall-clock, so "the second firing spawns nothing" is a measurement.
+
+**The cache does not live under the shared temp root**, and that answers #1666, which landed while
+this branch was open: every temp path in this layer is now composed per run with a guid, so nothing
+can be pre-planted at a name that does not exist yet. A cache is the one thing that cannot take that
+shape -- a later process has to find what an earlier one wrote, and a guid is what a later process
+cannot re-derive. So instead of a third exemption from that gate it leaves the shared root
+altogether, for the per-user cache directory (`LOCALAPPDATA`, else `XDG_CACHE_HOME`, else
+`~/.cache`), where a stable name sits in a directory only this user can write. Not under `~/.claude`
+either: that tree is what these checks READ, and one of them snapshots it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This repo is not a service anyone subscribes to; the reader here is a developer maintaining it,
+and what they get is already scored above. The saving lands in every consuming repo through a
+release, but a consumer of this product is a developer too.
+
+**Score:** N/A
+
+#### Pull Request
+
+connector-sessioncheck measures the version verdict once per session instead of on every compaction
+
+Plugins: dkj-policy
+
+[PR #1672](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1672)
+
+---
+
+### DEPLOY: docs/1667-review-dispatch-worktree · 20260908-204043
+
+A dispatched review runs in the primary checkout and never in `isolation: "worktree"`, and Chris's
+portable manual now says so at the one place a reader meets the question -- the *Delegating parallel
+work* section, which already named worktree isolation as an option. #1667 filed the call as the
+owner's because its own first bullet was inferred; both halves were probed instead, in this repo, on
+September 8, 2026.
+
+The flag is worse than the hazard it would remove. A dispatched worktree is a fresh checkout of the
+primary's **HEAD commit** on a branch of the harness's own making, with a clean `git status`: an
+untracked file and a tracked edit made seconds earlier were both invisible inside it. A review sits
+*before* the PR, so the tree it would read is the one without the change, and what comes back is a
+confident "no findings" carrying nothing that says which tree it read. And the worktree lands at
+`.claude/worktrees/agent-<id>` **inside** the checkout, ignored by nothing, so while it stands the
+primary's own `git status` carries `?? .claude/worktrees/` -- it dirties the tree it was dispatched
+to protect. That is why the repo's lane mechanism puts its worktrees in a sibling directory; the
+harness flag does not offer the choice.
+
+So the `working-copy-boundary` block -- #1665, merged the same evening this was measured -- stays the
+whole of the answer for reviewers, and it is not weakened by being unenforceable: `isolation` is set
+by the caller at dispatch and lives in no agent def, so no lint gate could ever have reached it. The
+section now sits under the bullets #1665 added rather than restating them, and worktree isolation
+stands for the case the `fork` bullet named it for -- several sub-agents writing the same files at
+once -- with both costs named there rather than waived.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. This is guidance in an orchestrator's on-demand
+manual about how sub-agents are dispatched; no behaviour anybody invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The review chain is not dispatched into a worktree, and the measurement says why
+
+Plugins: dkj-team-alpha
+
+[PR #1675](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1675)
+
+---
+
+### DEPLOY: docs/1668-fixture-teardown-measured · 20260908-203035
+
+#1668 reported 413 leftover fixture trees in the temp directory and named a cause:
+`fold-changelog.tests.ps1`'s per-case tree helper never tears down. Measured, the cause does not hold.
+The helper registers every tree it builds and the register is swept twice, both since the file's
+creation commit on July 24, 2026; run to completion the suite leaks **zero**, and so does
+`new-branch.tests.ps1`, the second-largest contributor. What the standing entries have in common is
+*where* they were registered -- all after a suite's last completed sweep -- which is the signature of an
+interrupted run, and no in-process teardown reaches those.
+
+The count was also read for more than it was. Of the directory measured, 546 entries were
+`sync-pr-body-*`, written deliberately by `sync-main.ps1` for an operator to paste into
+`gh pr create --body-file` and therefore required to outlive their run, and 162 belonged to an unrelated
+tool; the suites' own share was ~215, not 413. So the largest group counted as litter was the one thing
+in that directory that is retained on purpose.
+
+`scripts/README.md` now carries both findings beside the `$PID` fixture convention, because the
+distinction decides the repair: the obvious fix is to give a helper a teardown it already has, and the
+fix that would actually reach an interrupted run's residue is a sweep by name pattern in a shared temp
+directory -- the same delete primitive `New-ScratchPath` was introduced to remove. Written down rather
+than re-measured, so the next reader of that directory does not re-file it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. `scripts/README.md` documents this repo's own script
+layer, ships in no plugin, and no behaviour a consumer invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The fixture convention records that suites DO tear down, and what a leftover actually means
+
+[PR #1674](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1674)
+
+---
+
+### DEPLOY: fix/1665-working-copy-boundary · 20260908-202038
+
+A dispatched specialist holding `Bash` is now told, in its own always-loaded boundary, that the checkout
+it stands in is not its own to move: no `git stash`, `checkout -- <path>`, `reset`, `clean`, `restore`,
+branch switch, or anything else that mutates the tree, the index or **any ref** -- whatever files it may
+legitimately edit. The block names the read-only way to read another ref instead, and says that a clean
+`git status` proves nothing, because it is exactly what discarded uncommitted work looks like.
+
+It closes a real loss rather than a hypothetical one: a review stashed, hit other sessions' stash
+entries, and resolved the conflict with `git checkout HEAD -- <file>` on three files, taking four of the
+orchestrator's uncommitted edits with it and reporting `No repo content was altered`. The old wording
+did not reach that, because a stash corrects nothing and lands nothing.
+
+**And the circle that carries it is now kept by a gate rather than by memory.** This is the first shared
+block placed by **capability** instead of by craft -- it goes wherever `tools:` names `Bash` -- and that
+is the one kind of circle a check can hold, so **lint check 36** reports any agent def that names the
+tool and carries no block. Without it a specialist gaining `Bash` later would have sat silently outside
+the boundary with every gate green, which is the same enforced-by-memory failure as the defect itself.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- the block ships to every consumer of the four team plugins, but its reader is a subagent rather
+than a subscriber of a service, and this repo publishes to none.
+
+**Score:** N/A
+
+#### Pull Request
+
+A review may not mutate the working copy: no git stash, checkout --, reset or clean
+
+Plugins: dkj-team-alpha, dkj-team-ecomm
+
+[PR #1671](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1671)
+
+---
 
 ### DEPLOY: feat/1659-temp-path-unpredictable · 20260908-190619
 

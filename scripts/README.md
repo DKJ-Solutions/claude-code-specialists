@@ -135,6 +135,29 @@ the dot-source and `-Directory` reasons given there. Until #1664 the fixture rul
 and so left the exposure standing across 49 files; the exclusion is now a division of enforcement rather
 than a gap in it.
 
+**And a leftover under the temp directory is an aborted run, not a missing teardown.** Measured on
+September 8, 2026 ([#1668](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1668)) over a
+machine carrying twelve days of gate runs: 107 `fold-test-*` and 96 `new-branch-test-*` entries were
+standing, and **both suites leaked zero** when run to completion. Every suite here that composes a
+fixture path also removes it — `fold-changelog.tests.ps1` registers each tree the moment it builds one
+and sweeps that register twice, and has done since the file was created. What the leftovers have in
+common is *where* they were registered: all of them after a suite's last completed sweep, which is the
+signature of a run that was interrupted or threw, not of a helper without a teardown. The distinction
+decides the repair, which is why it is written down rather than left to be re-measured — the obvious fix
+is to give a helper the teardown it already has, and the fix that would actually reach these is a sweep
+by name pattern in a shared temp directory, i.e. the same delete primitive `New-ScratchPath` exists to
+remove. So the entries are left standing on purpose: `$PID` in the leaf is what makes one attributable
+to a run that is no longer alive, and a person can clear it by hand.
+
+**Attribute before you count, because most of what is down there is not litter.** That same measurement
+first read 413 entries as leaked fixtures. Of the directory it was taken over, 546 were `sync-pr-body-*`
+— written deliberately by [`task/sync-main.ps1`](task/sync-main.ps1) for the operator to paste into
+`gh pr create --body-file`, so they *must* outlive the run that wrote them, the same
+retained-on-purpose category as the gate's capture directories
+([#1636](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1636)) — and 162 were an
+unrelated tool's logs. The suites' own share was roughly half the figure reported, and none of it was
+what that figure was read as.
+
 `repo-config.ps1` sits at the top level rather than in a directory, deliberately: it is **not machinery
 but data** — this repo's own answers to the seam the shared scripts read (the trunk name, the lint script,
 the release grouping, the merge method). A consuming repo has its own, and that is the whole point of the

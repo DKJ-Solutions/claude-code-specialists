@@ -190,6 +190,80 @@ try {
     Assert-Equal '' ($lensStray -join ', ') 'and no persona carries it -- the scope is a decision, not a default'
     Assert-Equal '' ($pointerUnqualified -join ', ') 'every lens pointer says the repo has one only "if it has one"'
     Assert-True (Test-Path -LiteralPath (Join-Path $RepoRoot 'plugins\dkj-teams\agent-shared\lens-optional.md')) 'the canonical source file exists'
+
+    # --- 9. THE CAPABILITY CIRCLE: a tool that obliges a shared block (issue #1665) ------------------
+    # working-copy-boundary is the first block placed by CAPABILITY rather than by craft, and lint check
+    # 36 is what keeps that circle complete as the roster changes. These asserts cover the two halves
+    # that can fail independently: the lib deciding WHO is obliged, and the gate actually LOOKING.
+    Write-Host "the tool -> block obligation (check 36)" -ForegroundColor Cyan
+
+    $map = Get-ToolRequiredSharedBlocks
+    Assert-Equal 'working-copy-boundary' $map['Bash'] 'Bash obliges working-copy-boundary'
+
+    # THE FOLDED description: IS THE CASE THAT BROKE THIS. Every agent def in this tree writes its
+    # description as a multi-line '>' block, so a frontmatter pattern whose '.' does not span newlines
+    # matches nothing and reports every def as tool-less. That shipped as '[tool-block] checked 0' -- a
+    # SILENT PASS -- and was caught only because the gate prints what it walked. Hence a fixture whose
+    # frontmatter is multi-line rather than the one-line shape that would have passed either way.
+    $folded = @(
+        '---'
+        'name: fixture'
+        'description: >'
+        '  A description that spans'
+        '  more than one line.'
+        'tools: Read, Grep, Glob, Bash, Skill'
+        'model: sonnet'
+        '---'
+        ''
+        'Body text that mentions tools: Read, Write in prose.'
+    ) -join "`n"
+    $foldedTools = @(Get-AgentDefTools -Content $folded)
+    Assert-True ($foldedTools -contains 'Bash') 'Bash is read through a multi-line folded description'
+    Assert-Equal 5 $foldedTools.Count 'and the whole list is read, not just the matched tool'
+
+    # The body's own 'tools:' line must not answer for the file: an agent def may discuss a colleague's
+    # tools, and a body match would oblige (or excuse) the wrong specialist.
+    $bodyOnly = "---`nname: fixture`n---`n`ntools: Read, Bash`n"
+    Assert-Equal 0 (@(Get-AgentDefTools -Content $bodyOnly).Count) 'a tools line in the BODY is not read'
+
+    # THE REFUSAL, which is the only thing that makes this a gate rather than a description. The fixture
+    # above names Bash and carries no block, so it is precisely what check 36 must report; asserted on
+    # the two readings the check ands together, since a live agent def cannot be broken to prove it.
+    Assert-True (($foldedTools -contains 'Bash') -and ($folded -notmatch 'BEGIN shared:working-copy-boundary')) `
+        'an obliged def with no block satisfies both halves of the finding -- the check fires'
+    # And the mirror: a def that does NOT name the tool is not obliged, so the same missing block is
+    # silence rather than a finding. Without this the check would demand the block of all 26.
+    $noBash = $folded -replace ', Bash', ''
+    Assert-True (@(Get-AgentDefTools -Content $noBash) -notcontains 'Bash') 'and a def without the tool is not obliged'
+
+    # A persona is unaffected without an exemption -- it carries no tools line at all. Asserted on the
+    # real personas rather than a fixture, because the claim in agent-shared/README.md is about them.
+    $personaWithTools = @($realPersonas | Where-Object {
+        @(Get-AgentDefTools -Content ([System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8))).Count -gt 0
+    })
+    Assert-Equal '' (($personaWithTools | ForEach-Object { $_.Name }) -join ', ') 'no persona declares tools, so none is ever obliged'
+
+    # The real tree, both directions of the circle.
+    $obligedDefs = @()
+    $obligedMissing = @()
+    foreach ($f in $realAgents) {
+        $text = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
+        if (@(Get-AgentDefTools -Content $text) -notcontains 'Bash') { continue }
+        $obligedDefs += $f.Name
+        if ($text -notmatch 'BEGIN shared:working-copy-boundary') { $obligedMissing += $f.Name }
+    }
+    Assert-True ($obligedDefs.Count -gt 0) 'some agent def holds Bash -- otherwise this check proves nothing'
+    Assert-Equal '' ($obligedMissing -join ', ') 'every agent def holding Bash carries working-copy-boundary'
+    Assert-True (Test-Path -LiteralPath (Join-Path $RepoRoot 'plugins\dkj-teams\agent-shared\working-copy-boundary.md')) 'the canonical source file exists'
+
+    # AND THE GATE MUST BE LOOKING AT THEM. This is the assert that would have failed on the silent pass:
+    # the coverage line's own count, held against the set derived here. A check that walks nothing reports
+    # zero findings exactly like a check that walks everything and finds nothing.
+    if ($ri.Out -match '\[tool-block\]\s+checked\s+(\d+)') {
+        Assert-Equal $obligedDefs.Count ([int]$Matches[1]) 'the gate walked every obliged agent def, not zero of them'
+    } else {
+        Assert-True $false 'the gate printed a [tool-block] coverage line'
+    }
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

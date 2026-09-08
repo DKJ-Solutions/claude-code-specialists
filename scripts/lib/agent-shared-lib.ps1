@@ -50,6 +50,65 @@ function Get-AgentSharedDir {
     return (Join-Path $RepoRoot 'plugins\dkj-teams\agent-shared')
 }
 
+function Get-ToolRequiredSharedBlocks {
+    <#
+        Which shared block a TOOL obliges an agent def to carry -- @{ '<tool>' = '<block name>' }.
+
+        WHY THIS EXISTS (issue #1665, September 8, 2026). Every other shared block is placed by craft, and
+        a craft circle is a judgement nothing can check. This one is placed by CAPABILITY: the
+        working-copy-boundary block goes to every agent def whose 'tools:' line names Bash, because that is
+        what makes the failure reachable -- a dispatched subagent running 'git stash' plus
+        'git checkout HEAD -- <path>' and discarding the orchestrating session's uncommitted work.
+
+        AND A CAPABILITY CIRCLE IS THE ONE KIND A CHECK CAN KEEP. The gate on the blocks (check 7) compares
+        the inside of a sentinel pair against its source; it has never had an opinion about a pair that is
+        ABSENT, which is right for a craft block and wrong here. So the circle held only as long as somebody
+        remembered: an agent def gaining Bash later -- a new specialist, or one line edited on an existing
+        one -- would sit silently outside it, with every gate green. That is the same
+        enforced-by-memory failure #1665 itself was, which is why it is a table read by a check rather than
+        a sentence in a README.
+
+        Reported by the red-team pass on #1665's own branch, before the block had shipped: prose plus a
+        gate on the prose is not the same thing as a gate on the circle.
+
+        The personas are deliberately unaffected and need no exclusion: a persona carries no 'tools:' line
+        at all, so it can never name a tool here. That is also why the table is keyed on the tool rather
+        than on a list of files -- a file list would be the memory this replaces.
+    #>
+    return @{
+        'Bash' = 'working-copy-boundary'
+    }
+}
+
+function Get-AgentDefTools {
+    <#
+        The tools an agent def's frontmatter names, as a string array, or an EMPTY array when it has no
+        'tools:' line -- which is the normal state of a persona.
+
+        Read from the frontmatter's single-line 'tools:' form, which is what every agent def in this tree
+        uses ('tools: Read, Grep, Glob, Bash, Skill'). A YAML block sequence would need a real parser;
+        nothing here writes one, and Get-ToolRequiredSharedBlocks' caller reports what it could not read
+        rather than assuming a miss, so an unrecognised shape can never quietly satisfy the requirement.
+
+        Anchored to the FIRST frontmatter block: an agent def's body may quote a 'tools:' line while
+        discussing another specialist, and a body match would then answer for the wrong file.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content)
+
+    $normalized = $Content -replace "`r`n", "`n"
+    # (?s) is load-bearing: without it '.' does not span newlines, the frontmatter block never matches,
+    # and every agent def reads as tool-less -- which the caller's coverage line reported as 'checked 0',
+    # a silent pass. Caught before this shipped only because that figure is printed.
+    if ($normalized -notmatch '(?s)\A---\n(.*?)\n---(\n|\z)') { return @() }
+    $frontmatter = $Matches[1]
+    foreach ($line in ($frontmatter -split "`n")) {
+        if ($line -match '^tools:\s*(.+)$') {
+            return @($Matches[1] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        }
+    }
+    return @()
+}
+
 function Format-SharedBeginSentinel {
     <#
         The one canonical BEGIN sentinel, so its wording has a single source instead of 178 hand-typed
