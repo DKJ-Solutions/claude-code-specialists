@@ -84,6 +84,7 @@ copy editor's context.
 | `language-behavior` | everyone who writes anything |
 | `filecontent-boundary` · `lens-optional` | every agent def, all 26; no persona — see below |
 | `no-conversation-history` · `no-commit-push-pr` | the specialists who deliver material rather than land it |
+| `working-copy-boundary` | every agent def that holds `Bash`, and no persona — the circle is the capability, see below |
 | `browser-compatibility` · `webcontent-boundary` · `artifact-publishing-boundary` · `design-owner-boundary` · `changelog-entry-boundary` · `storefront-preview-boundary` | the narrow circles whose craft touches that surface |
 
 Run `build-agent-defs.ps1 -Check` for the exact carrier count per block; a table of numbers here would be
@@ -128,6 +129,52 @@ The per-file half of the same repair sits in those opening sentences: they now s
 consuming repo **"if it has one"**. Both halves are needed, and neither is sufficient. The pointer alone
 would still leave a specialist deciding for itself what a missing file means; the block alone would sit
 under **Boundaries** contradicting a sentence twenty lines above it.
+
+### Why `working-copy-boundary`'s circle is a TOOL rather than a craft
+
+Every other block on this page is scoped by craft — who writes prose, who touches a storefront, who
+delivers material rather than landing it. This one is scoped by **capability**: the 11 agent defs whose
+`tools:` line names `Bash`, and no persona. A block is placed where the rule applies, and the rule here
+applies wherever `git` can be typed at all.
+
+**What it cost to have no such block, measured September 8, 2026
+([#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665)).** A code review needed
+to compare a branch against `main`, ran `git stash`, met stash entries left by other sessions, hit a
+conflict popping them, and settled it with `git checkout HEAD -- <file>` on three files. Those three
+files were the **orchestrating session's** uncommitted work — four edits made after the branch's last
+commit — and they went without an error, a notice or a refusal. The review's own report ended
+`No repo content was altered` and `the working tree is back to git status clean, matching this commit
+exactly`; both sentences were true of the committed tree and wrong about the work in front of it.
+
+**The reviewer was reading its boundary correctly.** `06-19-agent.md` said *"does not correct the code
+and does not land it"*, and a `git stash` corrects nothing and lands nothing — so the prohibition genuinely
+did not reach it. That is why the block's first bullet says out loud that this is *not* the editing
+boundary in another register: the gap was not carelessness but a rule whose subject was the wrong verb.
+
+**Why the circle is not "the reviewers", which is what the report proposed.** Two independent
+corrections, in opposite directions:
+
+- The report's table listed **five** reviewers holding `Bash` and named Marlowe #29 among them. He holds
+  `Read, Grep, Glob, WebSearch, WebFetch, Skill` — no `Bash` — so a block placed on that table would
+  have put the rule in a context that cannot break it and, worse, would have read as complete.
+- Four of the 11 carriers are not reviewers at all: the app developer, the test engineer, the systems
+  administrator and the refactoring specialist all hold `Bash` beside `Edit`/`Write`. A `git stash` from
+  a test run discards exactly the same three files as one from a review. Their legitimate editing is
+  what makes the distinction the block draws load-bearing rather than pedantic: **files in your scope,
+  through your own tools, yes; the tree, the index and `HEAD`, never.**
+
+**No persona carries it, and that is the mirror of the other two exclusions above rather than a copy.**
+The DevOps engineer and the release manager ship as personas and mutating the working copy *is* their
+craft — a checkout, a merge, the fold's step onto the trunk. Giving them this block would forbid the work
+they exist to do. The personas are also not the exposure: this hazard is a **dispatched** subagent
+sharing one checkout with a session that is still editing in it, and the parallel review chain in Chris's
+lens (six specialists on one diff while the orchestrator keeps working) is precisely that arrangement.
+
+**Whether a reviewer should instead be dispatched into a worktree of its own** — removing the hazard
+mechanically rather than by instruction — is a separate decision, filed as
+[#1667](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1667). It is not an alternative to
+this block: a reviewer sometimes reviews work that is not committed yet, which is exactly what a fresh
+worktree does not have.
 
 ## Personas carry blocks too
 
