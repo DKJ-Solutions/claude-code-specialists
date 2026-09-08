@@ -386,6 +386,46 @@ function Get-MachineLocalPaths {
     return $script:MachineLocalPaths
 }
 
+# --- THIS REPO HAS NO SHOPIFY STORE, AND SAYS SO (issue #1579; the seam from inbound #1570) --------
+#
+# dkj-team-shopify is enabled here and this repo is not a store. It is on for validation: the repo
+# that ships a plugin is also a repo that loads it, so an agent def, a manifest, a frontmatter or a
+# hook that stops resolving surfaces at this repo's own session start instead of in somebody else's.
+# The repo slot in CLAUDE.md states that reason, for all four add-on teams at once.
+#
+# WHICH LEFT THE FLOOR CHECK ASKING A QUESTION THIS REPO CANNOT ANSWER TRUTHFULLY.
+# shopify-floor-sessioncheck.ps1 wants Get-ShopifyLiveThemeId -- the live theme's numeric id -- because
+# the live-theme guard is armed for publish, delete and an '--allow-live' push and cannot recognise a
+# push aimed at live BY ID without it. With no store there is no such id: seeding one would arm that
+# guard over a revenue-serving theme on a number nobody verified, and a 'VUL-IN' placeholder reads as
+# forgotten. So the check reported an [ERROR] at every session start here -- correctly, and forever.
+#
+# ANSWERING IS NOT SILENCING, and that distinction is the whole reason this function exists rather
+# than a seeded id. inbound #1570 (PR #1578) gave the check the third state it lacked: a repo declares
+# it has no store, and the half-armed finding goes quiet -- exactly as it does for a repo that HAS
+# answered the id. What makes that safe is that it follows a deliberate, self-authored DECLARATION and
+# never an inference the check drew from the tree (a theme directory, a shopify.theme.toml). It
+# suppresses that first finding ONLY; the duplicate-guard finding beside it is independent and still
+# speaks. This repo's own rule for such lists applies unchanged -- a check that reports something
+# inconvenient is not silenced, it is answered (see Get-RosterIgnoredIds above, which is empty for it).
+#
+# OPTIONAL, probed with Get-Command -- like Get-MachineLocalPaths above rather than via the script
+# contract. Absent, which is every store repo, means "this repo has a store": the answer the check
+# acted on before the seam existed. The check dot-sources this file with StrictMode OFF in a child
+# scope, so the function takes no parameters and does nothing but answer.
+#
+# THE DAY THIS REPO GETS A STORE, THE FUNCTION GOES rather than being flipped to $false. Both readings
+# mean the same thing to the check, and only removal takes this comment with it -- a stated $false
+# would leave the paragraphs above describing a repo that no longer exists.
+$script:ShopifyRepoHasNoStore = $true
+
+function Get-ShopifyRepoHasNoStore {
+    <# $true when this repo enables dkj-team-shopify without owning a store, which is what stops
+       shopify-floor-sessioncheck.ps1 asking for a live-theme id this repo cannot truthfully give.
+       Remove the function outright if this repo ever gets a store. #>
+    return $script:ShopifyRepoHasNoStore
+}
+
 # --- What cut-release.ps1 does differently per repo (issue #417) -----------------------------------
 #
 # cut-release.ps1 became a SHARED script in #417, after an audit in a second consumer found the two

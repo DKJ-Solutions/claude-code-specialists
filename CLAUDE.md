@@ -192,15 +192,23 @@ frontmatter or a hook that stops resolving then surfaces at this repo's own sess
 somebody else's. Validation is the whole reason — none of those four is used for work here, and none is
 expected to be, which is why an empty lens under one of them is not a gap.
 
-**What that costs, so nobody reads the noise as breakage.** Two things, both known, neither a defect of
-this repo. First, every specialist an enabled plugin ships needs a roster row and a repo lens —
+**What that costs, so nobody reads the noise as breakage.** Two things came with it; one stands and one
+is answered. First, every specialist an enabled plugin ships needs a roster row and a repo lens —
 [`SPECIALISTS.md`](.claude/specialists/SPECIALISTS.md) says so without exception — so eleven of them hold
 an empty `VUL-IN` scaffold here, which is the intended state rather than a backlog item. Second,
-`dkj-team-shopify`'s floor check reports an `[ERROR]` at every session start: it asks which theme is live,
-a repo with no store has no truthful answer, and the check has no third state to be told that in. That is
-a gap in the check ([#1570](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1570)), not a
-configuration this repo has neglected — **do not silence it by seeding a theme id**, which would arm a
-guard over a revenue-serving theme on a number nobody verified.
+`dkj-team-shopify`'s floor check asks which theme is live, and a repo with no store has no truthful
+answer, so it reported an `[ERROR]` at every session start until
+[#1570](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1570) gave the check a third
+state to be told that in. **This repo declares `Get-ShopifyRepoHasNoStore` in
+[`scripts/repo-config.ps1`](scripts/repo-config.ps1) because it has no store, and the check honours that
+since #1570** ([#1579](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1579)) — but
+still **do not silence it by seeding a theme id**, which would arm a guard over a revenue-serving theme
+on a number nobody verified. The two are not the same act and the seam exists to keep them apart: the
+declaration says there is no store, an id says there is one and names it. **The session start here stays
+noisy until that plugin change reaches the marketplace clone through a release** — the lag named above,
+where an agent def or a hook takes effect on a `claude plugin marketplace update` and not on a push. The
+seam itself is verified against #1570's own hook rather than against the cached copy: with it the check
+is silent, without it the `[ERROR]` returns.
 
 ### Language
 
