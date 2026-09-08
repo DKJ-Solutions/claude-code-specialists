@@ -41,6 +41,17 @@
                                                                     "cannot determine -- " (regression)
       16 asymmetric gap (b): install has a sha but no version, -> same regression, opposite side
          clone has a version but no HEAD/.gcs-sha
+      17 -Brief on a 'behind' row                             -> one [ERROR] line, action appended
+      18 -Brief on a 'clone-behind' row                       -> [INFO], NEVER [ERROR] -- #1591's own
+                                                                  rule: a stale clone is not an error
+      19 -Brief on an 'indeterminate' row                     -> [INFO], never [ERROR]
+      20 -Brief on 'match' (20a) and 'ver-match' (20b)        -> the whole run is the [SUMMARY] line
+                                                                  alone: an up-to-date plugin is silent
+      21 -Brief with no plugins enabled                       -> one [INFO] line and no [SUMMARY]
+      22 -Brief on a mix of every code                        -> exactly one [SUMMARY], whose counts
+                                                                  partition all the rows
+      23 -Brief suppresses the header, default view unchanged -> an absolute path stays out of a
+                                                                  session start
     Every scenario asserts exit code 0 explicitly (this is a report, not a gate).
 
     Scenarios 12/13 build the "reachable but not an ancestor" state the way a real marketplace clone
@@ -268,7 +279,7 @@ function Write-Admin {
 }
 
 function Invoke-PV {
-    param([Parameter(Mandatory = $true)][string]$Repo, [Parameter(Mandatory = $true)][string]$UserHome)
+    param([Parameter(Mandatory = $true)][string]$Repo, [Parameter(Mandatory = $true)][string]$UserHome, [switch]$Brief)
     # CLAUDE_PROJECT_DIR is pinned to the fixture checkout so the source-repo guard resolves a
     # deterministic root (a dir with no .claude-plugin/marketplace.json -> condition 2 fails -> the
     # guard returns nothing) instead of depending on the ambient env or `git rev-parse`. -RootOverride
@@ -278,6 +289,7 @@ function Invoke-PV {
     try {
         $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Script,
                '-RootOverride', $Repo, '-UserHomeOverride', $UserHome)
+        if ($Brief) { $a += '-Brief' }
         $run = Invoke-NativeCapture -FilePath 'powershell' -Arguments $a -Utf8
         $joined = ($run.Output | ForEach-Object { "$_" }) -join "`n"
         return [pscustomobject]@{
@@ -570,6 +582,124 @@ try {
     Assert-Has  $r 'no version in the install record' '16: names the missing version on the install side'
     Assert-Has  $r 'no HEAD or sha on the clone side' '16: names the missing HEAD/sha on the clone side'
     Assert-Has  $r '-- 1 could not be determined' '16: still counted as indeterminate in the summary tally'
+
+    # --- 17. -Brief: a 'behind' verdict -> "[ERROR] <id>: <verdict> -- <action>" ---------------------
+    Write-Host "17. -Brief: 'behind' -> [ERROR] with the action appended" -ForegroundColor Cyan
+    $c = New-Case 'brief-behind'
+    $shaA = New-Clone -Dir $c.Clone -Version '4.32.0'
+    $shaB = Add-CloneCommit -Dir $c.Clone
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '17: exit 0'
+    Assert-Equal (
+        "[ERROR] ${ID}: the clone is AHEAD of your install (same version string 4.32.0, newer commit) -- $UPD`n" +
+        "[SUMMARY] 1 plugin(s) enabled here: 1 behind, 0 up to date."
+    ) $r.Text.Trim() '17: the whole run is the marker line plus the summary, verbatim'
+
+    # --- 18. -Brief: a 'clone-behind' verdict (stale clone) -> "[INFO]", NEVER "[ERROR]" -------------
+    # THE REGRESSION #1591 NAMES EXPLICITLY: a stale clone is not an error. If this code is ever
+    # promoted to [ERROR], this assert is the one that must fail.
+    Write-Host "18. -Brief: 'clone-behind' -> [INFO], never [ERROR]" -ForegroundColor Cyan
+    $c = New-Case 'brief-clonebehind'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @(
+        (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '18: exit 0'
+    Assert-Has   $r "[INFO] $($ID): your install (deadbeefdead) is not in the clone's history" '18: reported as [INFO]'
+    Assert-Lacks $r '[ERROR]' '18: never promoted to [ERROR] -- the #1591 regression guard'
+    Assert-Has   $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 ahead of a stale clone, 0 up to date.' '18: the summary counts it as a stale clone, not as behind'
+
+    # --- 19. -Brief: an 'indeterminate' verdict (foreign plugin) -> "[INFO]", NEVER "[ERROR]" --------
+    Write-Host "19. -Brief: 'indeterminate' (foreign plugin) -> [INFO], never [ERROR]" -ForegroundColor Cyan
+    $c = New-Case 'brief-indeterminate'
+    New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @('dkj-team-alpha') | Out-Null
+    $foreign = 'foreign-thing@ccs-fixture'
+    Set-Enabled -RepoDir $c.Repo -Ids @($foreign)
+    Write-Admin -Path $c.Admin -Plugins @{ $foreign = @( (New-Rec -ProjectPath $c.Repo -Version '9.9.9' -Sha 'beefbeef') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '19: exit 0'
+    Assert-Has   $r "[INFO] $($foreign): cannot determine -- 'foreign-thing' is not in the clone's marketplace.json" '19: reported as [INFO]'
+    Assert-Lacks $r '[ERROR]' '19: never promoted to [ERROR]'
+    Assert-Has   $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 undetermined, 0 up to date.' '19: the summary counts it as undetermined'
+
+    # --- 17. -Brief: 'match' / 'ver-match' -> nothing printed for that plugin ------------------------
+    # With one plugin enabled, "nothing printed for that plugin" means the ENTIRE run is the
+    # [SUMMARY] line -- the strongest form of "emits nothing" this suite can pin.
+    Write-Host "20a. -Brief: 'match' -> the whole run is just the [SUMMARY] line" -ForegroundColor Cyan
+    $c = New-Case 'brief-match'
+    $head = New-Clone -Dir $c.Clone -Version '4.32.0'
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $head) ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '20a: exit 0'
+    Assert-Equal '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 up to date.' $r.Text.Trim() '20a: match emits nothing but the summary'
+
+    Write-Host "20b. -Brief: 'ver-match' -> the whole run is just the [SUMMARY] line, identically" -ForegroundColor Cyan
+    $c = New-Case 'brief-vermatch'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '20b: exit 0'
+    Assert-Equal '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 up to date.' $r.Text.Trim() '20b: ver-match emits nothing but the summary -- indistinguishable from match, by contract'
+
+    # --- 21. -Brief: no plugins enabled -> a single [INFO] line, no [SUMMARY], exit 0 -----------------
+    Write-Host "21. -Brief: no plugins enabled -> one [INFO] line, no [SUMMARY]" -ForegroundColor Cyan
+    $c = New-Case 'brief-none-enabled'
+    Set-Enabled -RepoDir $c.Repo -Ids @()
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '21: exit 0'
+    Assert-Equal '[INFO] no plugins are enabled for this checkout -- nothing to compare.' $r.Text.Trim() '21: exactly one INFO line and nothing else -- no [SUMMARY] when there is nothing to summarize'
+
+    # --- 22. -Brief: one run mixing every code -> exactly one [SUMMARY] line partitioning all rows ---
+    Write-Host "22. -Brief: a mix of every code -> one [SUMMARY] line, correctly partitioned" -ForegroundColor Cyan
+    $c = New-Case 'brief-mixed'
+    $mixNames = @('plug-behind', 'plug-clonebehind', 'plug-match', 'plug-vermatch')
+    $shaA = New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames $mixNames
+    $shaB = Add-CloneCommit -Dir $c.Clone
+    $foreignMix = 'plug-foreign@ccs-fixture'
+    $ids = @('plug-behind@ccs-fixture', 'plug-clonebehind@ccs-fixture', $foreignMix, 'plug-match@ccs-fixture', 'plug-vermatch@ccs-fixture')
+    Set-Enabled -RepoDir $c.Repo -Ids $ids
+    Write-Admin -Path $c.Admin -Plugins @{
+        'plug-behind@ccs-fixture'      = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) )
+        'plug-clonebehind@ccs-fixture' = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') )
+        $foreignMix                    = @( (New-Rec -ProjectPath $c.Repo -Version '9.9.9' -Sha 'beefbeef') )
+        'plug-match@ccs-fixture'       = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaB) )
+        'plug-vermatch@ccs-fixture'    = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') )
+    }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '22: exit 0'
+    $lines = @($r.Text -split "`n" | ForEach-Object { $_.TrimEnd("`r") })
+    $errLines = @($lines | Where-Object { $_ -match '^\[ERROR\]' })
+    $infoLines = @($lines | Where-Object { $_ -match '^\[INFO\]' })
+    $summaryLines = @($lines | Where-Object { $_ -match '^\[SUMMARY\]' })
+    Assert-Equal 1 $errLines.Count '22: exactly one [ERROR] line (only the behind plugin)'
+    Assert-True  ($errLines[0] -like "*plug-behind@ccs-fixture*") '22: the [ERROR] line names the behind plugin'
+    Assert-Equal 2 $infoLines.Count '22: exactly two [INFO] lines (the stale clone + the foreign plugin)'
+    Assert-True  (($infoLines -join '|') -like '*plug-clonebehind@ccs-fixture*') '22: one [INFO] line is the stale-clone plugin'
+    Assert-True  (($infoLines -join '|') -like '*plug-foreign@ccs-fixture*') '22: the other [INFO] line is the foreign plugin'
+    Assert-Equal 1 $summaryLines.Count '22: exactly one [SUMMARY] line for the whole run'
+    Assert-Equal '[SUMMARY] 5 plugin(s) enabled here: 1 behind, 1 ahead of a stale clone, 1 undetermined, 2 up to date.' $summaryLines[0] '22: the summary partitions all five rows correctly'
+    Assert-Lacks $r 'plug-match@ccs-fixture:'    '22: the match plugin gets no marker line of its own'
+    Assert-Lacks $r 'plug-vermatch@ccs-fixture:' '22: the ver-match plugin gets no marker line of its own'
+
+    # --- 23. -Brief suppresses the header; the default view keeps it, unaffected --------------------
+    Write-Host "23. -Brief has no header; the default (no -Brief) view is unchanged" -ForegroundColor Cyan
+    $c = New-Case 'brief-header'
+    $head = New-Clone -Dir $c.Clone -Version '4.32.0'
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $head) ) }
+    $rDefault = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    $rBrief   = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $rDefault.Code '23: default view exit 0'
+    Assert-Equal 0 $rBrief.Code   '23: brief view exit 0'
+    Assert-Has   $rDefault "plugin-versions -- $($c.Repo)" '23: the default view still prints its header (unchanged)'
+    Assert-Lacks $rDefault '[SUMMARY]' '23: the default view never emits the brief marker vocabulary'
+    Assert-Lacks $rBrief   'plugin-versions--'  '23: -Brief never prints the header line (an absolute path stays out of a session start)'
+    Assert-Has   $rBrief   '[SUMMARY]' '23: -Brief still emits its own summary'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

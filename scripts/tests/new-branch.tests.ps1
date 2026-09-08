@@ -1571,8 +1571,11 @@ Write-Output `$t.Type
 
     # --- (y5) THE REMOTE TIP IS SOMEBODY ELSE'S TEXT, so it is stripped before it is printed (#1439) --
     # THE ONE PIECE OF TEXT THIS SCRIPT EMITS THAT IT DID NOT WRITE. %an and %s are chosen by whoever
-    # pushed the commit, and the check under test prints them to a console -- which nothing else in this
-    # repo does with externally-authored text. The neighbouring adversarial case (a malicious -Title,
+    # pushed the commit, and the check under test prints them to a console. ONE OF THREE SUCH CONSOLES,
+    # not the only one -- ship-pr relays a failing workflow's own annotation (Get-AuthoredFailureNote,
+    # pr-issues-lib.ps1, stripping the same class since #1612) and Get-PasteableRef prints the name it
+    # refused (ref-print-lib.ps1, #1594). pr-issues.tests.ps1 pins all three patterns to each other and
+    # asserts the count. The neighbouring adversarial case (a malicious -Title,
     # section (f) above) asserts the OPPOSITE and is not a precedent: that payload goes into a FILE,
     # where landing fully and unchanged is the correctness property and truncation is the damage.
     #

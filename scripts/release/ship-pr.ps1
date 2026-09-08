@@ -699,12 +699,18 @@ $trunkReturn = if ($wtNow.ExitCode -eq 0) {
     # before this step existed -- stay on the branch and let step 5 decide.
     [pscustomobject]@{ Return = $false; Reason = "'git worktree list' could not be read" }
 }
+# WHAT STEP 2B ACTUALLY DID, recorded rather than assumed (issue #1616). Step 3's go-ahead line used to
+# assert this outcome as a literal, which made it false on every run where either arm below declined --
+# and that line is the one a reader acts on. The answer is only knowable HERE, so it is kept HERE: the
+# checkout is the last thing in the run that moves HEAD before the wait.
+$treeOnTrunk = $false
 if ($trunkReturn.Return) {
     $back = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', 'main')
     if ($back.ExitCode -eq 0) {
         # NOT FAST-FORWARDED HERE, DELIBERATELY. Step 5 fetches and does an explicit ff-only merge of
         # origin/main after the merge lands, which is when there is something to fast-forward TO. Doing
         # it twice would only widen the window in which this tree is ahead of what the PR merged into.
+        $treeOnTrunk = $true
         Write-Host "ship-pr: this checkout is back on 'main' -- the ship runs on PR #$pr from here." -ForegroundColor Green
     } else {
         # NOT FATAL: nothing is merged, the branch is pushed, and step 5 reads HEAD for itself. The one
@@ -1158,12 +1164,17 @@ finished. Compare the two:
 # instruction has to be remembered. The lane keeps the two sessions off one HEAD entirely and is detached
 # at origin/<trunk> rather than standing on it, so it does not take the trunk away from step 5's fold
 # either (#1069).
+#
+# AND THE GO-AHEAD'S TRUNK CLAUSE IS READ FROM STEP 2B RATHER THAN ASSERTED (#1616). It was a literal for
+# three days (#1428, September 5, 2026), so it was false on every run where step 2b declined to move the
+# tree -- in a line whose whole job is to be acted on. Get-TrunkReturnGoAheadLine words both arms, and
+# $treeOnTrunk is set where the answer is actually known.
 $waitBegan = Get-Date
 Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor Cyan
 Write-Host "  Nothing here needs YOU -- background this run and the wait costs nothing." -ForegroundColor DarkGray
 Write-Host "  It does need this session's process: the merge and the fold are still owed, and both run from here (#1428)." -ForegroundColor DarkGray
 Write-Host "  So leave this one running and carry on in a SECOND terminal -- do not quit the harness." -ForegroundColor DarkGray
-Write-Host "  This line is the go-ahead: step 1 is over, the tree is free (#1145), and step 2b already put it back on the trunk (#1073)." -ForegroundColor DarkGray
+Write-Host "  $(Get-TrunkReturnGoAheadLine -Returned $treeOnTrunk -Branch $branch)" -ForegroundColor DarkGray
 Write-Host "  Open that second terminal in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
 # --- THE WATCH BLOCKS ON THE REQUIRED CHECKS ONLY (issue #1602) ----------------------------------
 # WHAT THIS CHANGES, AND WHAT IT DELIBERATELY DOES NOT. The merge below is allowed to go as soon as
@@ -2670,8 +2681,12 @@ if (-not $watchNarrowed) {
     # check' clause is unchanged and is where the tail's real size is stated.
     $tailReport = $null
     if ($tailFactsJson) {
+        # -PostMerge, BECAUSE THE MERGE HAS HAPPENED AND NOTHING HERE GOVERNED IT. Without it this
+        # line reads `'claude-review' finished last and governed the merge (..., NOT required)` about
+        # a merge that went minutes earlier precisely because it no longer waits for that check --
+        # the opposite of what this step exists to report, in the one place the reader meets it.
         $tailReport = Get-CheckWaitReport -ChecksJson $tailFactsJson `
-            -RequiredNamesJson $tailRequiredJson -WaitedSeconds $tailWaitedSec
+            -RequiredNamesJson $tailRequiredJson -WaitedSeconds $tailWaitedSec -PostMerge
     }
     if ($tailReport) {
         Write-Host "  $tailReport" -ForegroundColor DarkGray

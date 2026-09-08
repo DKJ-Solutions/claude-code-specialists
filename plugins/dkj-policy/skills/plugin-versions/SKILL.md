@@ -110,13 +110,48 @@ match normalises both sides.
 
 ## Parameters
 
-Both parameters are **test seams** -- a consumer never types either, and the default view takes no
-arguments.
+The default view takes no arguments. `-Brief` is the one a caller might genuinely pass; the other two
+are **test seams** a consumer never types.
 
 | parameter | what it does |
 |---|---|
+| `-Brief` | emit one marker-prefixed line per plugin that has something to say, plus a `[SUMMARY]` tally, and nothing else -- no header, no per-plugin block, no colour. The shape a SessionStart hook can put in front of a session. |
 | `-RootOverride` | the repo root to resolve the enable state and the install record against. |
 | `-UserHomeOverride` | the home directory `~/.claude` hangs off -- points the enable state's user layer, the install record, and the marketplace clone at one fixture tree. |
+
+### `-Brief`, and who reads it
+
+This is what `connector-sessioncheck` prints on a machine with **no** sibling source checkout, which
+is the ordinary state of a consumer rather than an edge case. The register checks there genuinely
+cannot run -- `check-connectors.ps1` is source-only and is not plugin-carried -- so until
+[#1591](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1591) the hook printed
+*"check skipped"* and a session got no version signal at all.
+
+```text
+[ERROR] dkj-team-ecomm@claude-code-specialists: the clone is AHEAD of your install (4.31.0 -> 4.32.0) -- claude plugin update dkj-team-ecomm@claude-code-specialists --scope project
+[INFO] some-other@another-marketplace: cannot determine -- the clone's marketplace.json could not be read
+[SUMMARY] 7 plugin(s) enabled here: 1 behind, 1 undetermined, 5 up to date.
+```
+
+`claude plugin update <id> --scope project` and `claude plugin marketplace update <marketplace>` both
+appear in this mode and **they are not interchangeable**: the first moves *this checkout* onto what
+the clone already holds, the second moves the *clone* onto what the remote holds. The `[ERROR]` lines
+print the first, because that is the gap a reader closes here and now; the verdicts that print the
+second are the ones this mode deliberately keeps out of `[ERROR]`. Running only the first against a
+stale clone succeeds and reports a plausible version number, which is exactly why the refresh is
+named beside it.
+
+**The marker split is the contract, not cosmetics.** Only an install that is **behind** its clone is
+an `[ERROR]`, because it is the only verdict a reader closes with a command here and now. A stale
+**clone** is real and is deliberately *not* an error: it is the state of a cache this checkout does
+not own, it costs nothing until the next update, and a session start that shouts about it trains the
+reader to skim the marker that matters. Everything undetermined is `[INFO]` for the same reason --
+*"cannot determine"* reports this machine's bookkeeping, not a defect in the plugin.
+
+**A plugin that is up to date emits nothing**, and the `[SUMMARY]` line is what keeps that from being
+ambiguous: it carries the count, so per-plugin silence reads as *up to date* rather than as *not
+examined*. Under lockstep that is most of a normal run, which is the whole cost argument for the mode
+existing.
 
 ## Requirements in the consumer
 

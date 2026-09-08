@@ -288,6 +288,19 @@ The decision itself is `Get-TrunkReturnDecision` in `worktree-lib.ps1`, a pure f
 plus `git status --porcelain`, so it is asserted in `worktree-lib.tests.ps1` rather than only exercised by
 a live ship.
 
+**And the go-ahead line READS that decision rather than asserting an outcome**
+([#1616](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1616)). For three days it carried
+the trunk clause as a literal — `step 2b already put it back on the trunk` printed with no condition on it
+— so on every run where one of the three conditions above declined, the one line a reader is told to act
+on contradicted the line four rows above it. Measured on
+[PR #1615](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1615), September 8, 2026, where
+what declined it was a single unrelated modified file the branch had deliberately left alone. It is
+`Get-TrunkReturnGoAheadLine` now, in the same lib and asserted in the same suite: the yes arm is word for
+word what it was, and the no arm names the branch this checkout is standing on and points at the lane
+instead — a lane is detached at `origin/<trunk>`, so it is unaffected by where the primary happens to
+stand. **Both arms keep the two clauses that are true either way** — step 1 is over, the tree is free —
+because withdrawing those along with the trunk clause would cancel the invitation the line exists to make.
+
 
 **Working in the primary anyway used to cost you your checkout, and no longer does.** Step 5 ran
 `git checkout main` in the tree the script was started from, unconditionally, one line after the merge.
