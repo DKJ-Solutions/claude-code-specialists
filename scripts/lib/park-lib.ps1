@@ -696,7 +696,21 @@ function Invoke-GitPark {
 
     # Push + set upstream tracking, so the branch is reachable (and continuable) from another device.
     # No PR: push != PR (the PR rule stays intact and separate).
-    $pushRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'push', '-u', 'origin', $Branch)
+    #
+    # BOUNDED BY THE SHARED NETWORK TIMEOUT (issue #1641). This was the one git call in this family that
+    # reached the network unbounded, while native-capture-lib's own header names the three that are not --
+    # open-pr's push, ship-pr's fetch, the fold's push -- and park-cycle.ps1's failure-path fetch passes
+    # the same number a few lines further on. THE ASYMMETRY MATTERED MOST HERE: this function is what the
+    # cycle-autopark Stop hook drives, so a stall on a credential prompt nothing can answer hangs a turn,
+    # every turn, in the one caller where no operator is watching a prompt to Ctrl-C.
+    #
+    # THE OUTPUT'S SHAPE CHANGES WITH THE BOUND and both readers below are safe on it: -TimeoutSeconds
+    # routes into the Start-Process arm, which returns an ARRAY OF STRINGS rather than the & operator's
+    # objects. The Write-Host loop is indifferent, and Get-GitPushFailureMessage is handed
+    # ($pushRes.Output | Out-String) -- already flattened, for the array reason the comment below gives.
+    # stderr stays merged (no -DiscardStderr), because git's own words are the answer here (#1143).
+    $pushRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'push', '-u', 'origin', $Branch) `
+                                    -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
     $pushRes.Output | ForEach-Object { Write-Host $_ }
     if ($pushRes.ExitCode -ne 0) {
         # Flattened before it is matched: with stderr merged in (2>&1) the captured output is an ARRAY that
