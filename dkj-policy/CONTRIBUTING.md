@@ -361,7 +361,7 @@ it finishes. The numbers, and why the default was deliberately left alone, are o
 [`open-pr` skill page](../plugins/dkj-policy/skills/open-pr/SKILL.md#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
 
 Its own number because the three gates below fire *here*, at the push, and because what it publishes is fixed
-at this moment: 3.2 is what it puts in the body, and 3.2.4 locks that body against later edits to the
+at this moment: 3.2 is what it puts in the body, and 3.2.5 locks that body against later edits to the
 document.
 
 **One more gate fires here and reads nothing on the branch at all: the PR's label has to exist.** The label
@@ -386,14 +386,48 @@ escapable by not using the scripts. The repo's own lint and test gates are separ
 **And before any of them, one thing that is not a gate: `open-pr.ps1` COMMITS that document if it differs
 from `HEAD`** ([#1269](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1269), September 3, 2026).
 Every reader above reads the working tree; the push ships `HEAD`; and the fold, the DEPLOY lock and the CI
-check in 3.2.5 all read the committed copy. Measured on PR #1267: the run passed every gate against a
+check in 3.2.6 all read the committed copy. Measured on PR #1267: the run passed every gate against a
 filled-in working copy, pushed the empty scaffold, published the filled-in body, and CI failed on arrival.
 It commits that one file and nothing else — never `git add -A`, and anything else you had staged stays
 staged. Why it commits rather than refusing, and why neither the dirty-tree warning nor the backing gate
 covered it, are on the
 [`open-pr` skill page](../plugins/dkj-policy/skills/open-pr/SKILL.md#the-document-commit-what-the-pr-says-is-what-the-branch-carries).
 
-#### 3.2.1. the scaffold gate, on the changelog entry itself
+#### 3.2.1. the entry gate, on whether there is an entry at all
+
+**September 8, 2026 ([#1632](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1632)).** Before any
+of the gates below reads the entry, `open-pr.ps1` asks whether there *is* one:
+`Test-DevelopmentEntryMissing` refuses a `dkj-policy/<branch>.md` whose DEPLOY section is gone.
+
+**It is a separate gate rather than a widened scaffold gate, and that is the part only the code explains.**
+The gate below refuses an entry still carrying the scaffolder's wording — so it works by *matching* strings.
+Delete the section that carried them and there is nothing left to match: `Get-DevelopmentEntryText` falls back
+to the whole document, hands the scaffold gate the guidance **preamble**, and that preamble carries no
+scaffold marker because nobody scaffolded it. **So the scaffold gate passes by ABSENCE**, and the branch ships
+with no entry text whatsoever — with the PR title and description composed out of the guidance. The fallback
+cannot simply be narrowed, either: a legacy entry-only file *is* an entry from its first line, which is why
+this is a second predicate beside it and not a stricter version of it.
+
+**How a document reaches that state is not a deliberate deletion.** It is an edit that anchors on the first
+phase heading as a plain string and truncates the file there. In a document scaffolded before
+[#1654](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1654) that string occurs **twice** —
+once as the real heading, and once inside the guidance blockquote describing it, which comes first — so the
+cut lands on the wrong one and the body glues onto a sentence cut in half. Two documents shipped that way
+(#1632 and #1644) before the gate existed. The guidance names that heading by position now, so a document
+scaffolded since carries it once; every branch open across that change still carries both, which is why the
+gate's own refusal keeps naming the literal as a diagnosis.
+
+**`-Force` is honoured**, matching the scaffold gate below rather than being absolute. There is no document
+this house wants pushed in this state, but the predicate reads a *shape*, and a consumer holding one nobody
+here has seen must have a way past a gate that is wrong about them. The refusal names the file, says the fold
+would otherwise paste the guidance into the changelog as the change description, and points at `new-branch`,
+which is idempotent and restores the section.
+
+**The same predicate runs in CI**, ahead of the same scaffold check in
+[`check-branch-entry.ps1`](../scripts/lint/check-branch-entry.ps1) — one definition in
+[`entry-scaffold-lib.ps1`](../scripts/lib/entry-scaffold-lib.ps1) rather than two free to disagree.
+
+#### 3.2.2. the scaffold gate, on the changelog entry itself
 
 **August 3, 2026.** `open-pr.ps1` refuses to push a branch whose entry still carries the wording
 `new-branch.ps1` scaffolded it with — the placeholder title, the "to do / where I left off" heading, or the
@@ -416,7 +450,7 @@ with those strings right now, and consumers receive the new scripts through a pl
 choosing to. A gate that forgot them would wave exactly those entries through. **Recognise both, write one** —
 the same rule the tier line gets, and the same rule the folder rename got in step 3 below.
 
-#### 3.2.2. the step-list gate, on the branch's own plan
+#### 3.2.3. the step-list gate, on the branch's own plan
 
 **Dave, August 6, 2026.** A branch reaches a PR when its own plan is finished, so `open-pr.ps1` refuses to
 push and `ship-pr.ps1` refuses to merge while the step half of `<branch>.md` has an unresolved step.
@@ -452,7 +486,7 @@ silent direction — a name the branch does not carry reads as *no document at a
 knowing: **a step ticked in the editor and not committed no longer satisfies the merge gate**, which is what
 its own message has always asked for.
 
-#### 3.2.3. the backing gate, on whether anything is behind the plan
+#### 3.2.4. the backing gate, on whether anything is behind the plan
 
 **Dave, issue [#1026](https://github.com/DaveKJohn/claude-code-specialists/issues/1026),
 August 28, 2026.** The step-list gate above asks whether the plan is *finished*. It cannot ask whether
@@ -490,7 +524,7 @@ and reported zero errors. `Get-GateFingerprint` cannot answer this: it hashes th
 *same tree as last time* and never *is this tree HEAD*. A dirty tree mid-flight is ordinary, so it is never
 refused here; what was missing was only the line that stops a green result from being read as proof.
 
-#### 3.2.4. the DEPLOY lock, on the section the PR published
+#### 3.2.5. the DEPLOY lock, on the section the PR published
 
 **Dave, issue [#884](https://github.com/DaveKJohn/claude-code-specialists/issues/884), August 25, 2026.** The
 DEPLOY section travels four times — this document, the PR body, `CHANGELOG.md`, the developer release notes —
@@ -516,11 +550,11 @@ legacy path keeps promoting, because there the H2 genuinely stays behind. The re
 in `pr-body-lib.ps1`. **An unreadable body is not a finding** — `gh` failing says something about the token or
 the network, not about the section, and a gate that refused on that would be refusing on no evidence.
 
-**Which copy of the document it compares is the paragraph at the end of 3.2.2**, and it matters more here than
+**Which copy of the document it compares is the paragraph at the end of 3.2.3**, and it matters more here than
 there: this section is what step 5 folds verbatim into `CHANGELOG.md`, so a lock satisfied by a stray checkout's
 document would be approving the fold of a section it never read.
 
-#### 3.2.5. the CI gate, because the four above are local
+#### 3.2.6. the CI gate, because the five above are local
 
 **August 20, 2026** (inbound
 [#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The gates above live in
@@ -593,7 +627,7 @@ the branch document. Both are recoverable and neither announces itself. Waiting 
 
 **Waiting is the whole mechanism — there is no queue file and no lock.** The PR stays open and green; the
 merge is simply not performed yet. A branch that waits costs nothing, because the DEPLOY lock
-([3.2.4](#324-the-deploy-lock-on-the-section-the-pr-published)) has already fixed what this PR publishes:
+([3.2.5](#325-the-deploy-lock-on-the-section-the-pr-published)) has already fixed what this PR publishes:
 time passing does not change it.
 
 #### 3.3.3. The queue ahead has drained — sync with `main`, then merge
@@ -646,7 +680,7 @@ backgrounding a ship is either a **lane** —
 worktree is where you build and the primary checkout is where you ship — or nothing at all. A close-out that
 reads *"PR #N opened, shipping in the background"* is a finished assignment, not an open point. Anything else
 started in the primary gets `HEAD` pulled out from under it mid-branch, which is the hazard the two gates in
-3.2.2 and 3.2.4 were hardened against and that step 5 was not.
+3.2.3 and 3.2.5 were hardened against and that step 5 was not.
 
 **And "anything else" includes a tidy-up, which is the half that does not read as starting something** (issue
 [#1145](https://github.com/DaveKJohn/claude-code-specialists/issues/1145), August 30, 2026). Step 1 of the

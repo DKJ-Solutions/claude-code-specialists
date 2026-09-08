@@ -5502,8 +5502,26 @@ $script:BranchFileDefaults = [ordered]@{
         ('> level. A section needing its own heading goes in as a `' + $script:BranchCycleSubHashes + '` UNDER whichever of the four owns'),
         '> it. No gate sees a heading, so this one is on you (Dave, August 26, 2026).',
         '>',
-        ('> **AND NOTHING BRANCH-SPECIFIC ABOVE `' + $script:BranchCyclePhaseHashes + ' PLAN`** -- everything between the title and that heading'),
-        '> is this guidance, which is identical in every branch document. A status line, a note about',
+        # THE FIRST PHASE IS NAMED BY POSITION, NOT QUOTED AS A HEADING (#1654, September 8, 2026). This
+        # line used to read '`### PLAN`', which put the exact heading string into every branch document
+        # TWICE -- once as the real heading, and once here in the blockquote ABOVE it. Any edit anchoring
+        # on that heading as a plain string therefore finds the wrong one first, and two documents shipped
+        # through that door: #1632 (reduced to nothing but its truncated guidance, DEPLOY gone) and #1644
+        # (cut mid-sentence at this very line, the body glued on below it).
+        #
+        # 'THE FIRST OF THOSE FOUR' IS NOT THE VAGUER HALF OF THAT TRADE, which is the objection worth
+        # answering because it is what kept the literal here. The bullet directly above names PLAN, CREATE,
+        # TEST and DEPLOY in order, so the antecedent is one line up -- a reader deciding where to put a
+        # paragraph has just read the list. And it is MORE correct than the literal, not merely safer:
+        # StepPhases is a seam, so a consumer who renamed their first phase was being told a rule about a
+        # heading their own documents do not contain.
+        #
+        # THE TWO REFUSAL MESSAGES KEEP THE LITERAL, deliberately (open-pr.ps1's entry gate and
+        # check-branch-entry.ps1's CI copy). There it is a DIAGNOSIS naming the string somebody's tool
+        # matched on, not guidance -- and every document scaffolded BEFORE this change still carries the
+        # collision, so it stays true for exactly the files that need it. Both say so in as many words.
+        '> **AND NOTHING BRANCH-SPECIFIC ABOVE THE FIRST OF THOSE FOUR HEADINGS** -- everything between the',
+        '> title and it is this guidance, which is identical in every branch document. A status line, a note about',
         ('> THIS branch or an instruction to a session belongs under one of the four, normally as a `' + $script:BranchCycleSubHashes + '`'),
         '> in PLAN. Same rule, same reason: no gate reads this region (Dave, August 26, 2026).',
         '>',
@@ -7106,11 +7124,19 @@ function Test-DevelopmentEntryMissing {
 
         HOW IT IS REACHED is what makes it worth a gate rather than a note. Not by hand-deleting a section
         on purpose: by a script edit meant to keep the guidance and replace the body, truncating at
-        '### PLAN' -- which also occurs INSIDE the guidance blockquote, in the line forbidding
-        branch-specific content above it. The cut lands there, the body glues onto that line, and the
-        document comes out with its guidance truncated mid-sentence and no phase headings at all. The
-        failure is silent and the file LOOKS plausible, because the guidance block is long and reads like
-        content.
+        '### PLAN' -- which, in a document scaffolded before #1654, also occurs INSIDE the guidance
+        blockquote, in the line forbidding branch-specific content above it. The cut lands there, the body
+        glues onto that line, and the document comes out with its guidance truncated mid-sentence and no
+        phase headings at all. The failure is silent and the file LOOKS plausible, because the guidance
+        block is long and reads like content.
+
+        #1654 CLOSED THAT DOOR FOR DOCUMENTS SCAFFOLDED SINCE, and this predicate is deliberately unchanged
+        by it. StepsGuidance names the first phase by position now ("the first of those four headings")
+        rather than quoting the heading, so the string occurs once. That removes the CAUSE above from new
+        documents and removes nothing from this gate's job: every branch already open still carries the old
+        wording, an anchor can be wrong for reasons that have nothing to do with a collision, and a hand
+        deletion never needed one. A gate retired on the strength of its best-known cause is a gate that
+        stops catching the causes nobody wrote down.
 
         THE DISCRIMINATOR IS THE PLAN, AND IT READS SHAPE RATHER THAN TEXT -- the same argument #899's
         preamble rule is built on, and it survives translation for the same reason. A development document

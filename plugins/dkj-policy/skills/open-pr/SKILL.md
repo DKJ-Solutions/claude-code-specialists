@@ -56,7 +56,10 @@ The script:
    below. A failed query is treated as "no existing PR" rather than as a blocker.
 2. Runs the **resolves gate**, before the slow gates and before anything has left the machine. See
    [The resolves gate](#the-resolves-gate-which-issues-does-this-pr-close) below.
-3. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
+3. Runs the **entry gate** *first*: the branch's document must still have a DEPLOY section at all. See
+   [The entry gate](#the-entry-gate-is-there-an-entry-at-all) below — it comes before the scaffold gate
+   because the scaffold gate cannot ask this question.
+   Then the **scaffold gate**: the branch's changelog entry must no longer carry the wording
    `new-branch.ps1` scaffolded it with. See
    [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below. On the same read of
    the same file it also runs the **impact gate** and prints the reach and significance it read. See
@@ -315,6 +318,43 @@ after the refusal cannot reuse what the refused one proved.
 tree mid-flight is ordinary. And the backing gate refuses only when this document *is* the whole
 branch: it requires nothing else committed, so a dirty document **alongside** committed code raised
 nothing at all.
+
+## The entry gate: is there an entry at all?
+
+`Test-DevelopmentEntryMissing` refuses to push a `dkj-policy/<branch>.md` whose **DEPLOY section is
+gone**. It runs ahead of the scaffold gate below, and it is a separate gate rather than a stricter version
+of it — which is the whole reason it exists.
+
+**The scaffold gate works by matching strings, so a deleted section defeats it by having none.** Delete the
+DEPLOY section and `Get-DevelopmentEntryText` falls back to the whole document, handing the scaffold gate the
+guidance **preamble** — which carries no scaffold marker, because nobody scaffolded it. **So the scaffold gate
+passes by ABSENCE**: the branch pushes with no entry text whatsoever, and the PR title and description are
+composed out of the guidance. The fallback cannot simply be narrowed either, and that is what forces a second
+predicate: a legacy entry-only file genuinely *is* an entry from its first line, so a stricter fallback would
+refuse documents consumers are carrying right now.
+
+**How a document gets into that state is not a deliberate deletion.** It is an edit that anchors on the first
+phase heading as a plain string and truncates the file there. In a document scaffolded before
+[#1654](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1654), that string occurs **twice** —
+once as the real heading, and once inside the guidance blockquote describing it, which comes *first* — so the
+cut lands on the wrong one. Two documents shipped that way before this gate existed
+([#1632](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1632) and #1644), and the failure is
+silent because the file still *looks* plausible: the guidance block is long and reads like content. The
+guidance names that heading by position now, so a document scaffolded since carries it once — but every branch
+open across that change still carries both, which is why the refusal keeps naming the literal as a diagnosis
+rather than dropping it.
+
+**`-Force` is honoured**, matching the scaffold gate below rather than being absolute. There is no document
+this workflow wants pushed in this state, but the predicate reads a *shape*, and a consumer holding a document
+shape nobody upstream has seen needs a way past a gate that is wrong about them. Under `-Force` it warns and
+says plainly what will happen: the fold will paste the guidance into the changelog as this change's
+description.
+
+**The remedy is `new-branch`, which is idempotent** — run it on the branch and the section is restored, then
+write what the change does. The refusal says so.
+
+**The same predicate runs in CI**, ahead of the same scaffold check in `check-branch-entry.ps1`, so there is
+one definition in `entry-scaffold-lib.ps1` rather than two free to disagree.
 
 ## The scaffold gate: has the entry actually been written?
 
