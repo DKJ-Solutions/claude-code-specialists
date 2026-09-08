@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**12 / 21 minor entries** <!-- pending-tally -->
+**13 / 22 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1601-folded-upstream-diverged-checkout · 20260908-113102
+
+`check-unfolded-entry.ps1` told a checkout that is both ahead of and behind `origin/<trunk>` that its
+unfolded entry had already been folded upstream, and sent it at a `git pull --ff-only` that cannot
+fast-forward. The fold was still owed. It now asks whether the branch's entry is present in
+`CHANGELOG.md` on the remote-tracking ref -- the other half of the same fold commit -- through
+`Test-BranchFoldedOnRef`, a new function in `entry-scaffold-lib.ps1` that reads the changelog at that
+ref via the existing `Get-FoldedEntryForBranch` rather than defining a second idea of what a folded
+entry looks like. The entry's presence has exactly one cause whichever way a checkout has drifted, so
+the gap gate #1585 needed is gone: it was sufficient, never necessary. Nothing changes in CI or for a
+checkout that is merely behind.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The repair is the one #1601 itself named, down to the function's place in the tree -- and the reason
+#1585 named the state instead of guarding it (a second definition of a folded entry) is what shaped
+it: the match stays in the lib, beside the definition it must not disagree with.
+
+The fixture is the part worth reading. `Push-UpstreamFold` had written only the deletion half of the
+fold commit, which was invisible while the check asked about that same half; the moment the check
+asked the other question, the suite could no longer answer it. A fixture that models half a commit
+proves nothing about the other half, and this one had been passing for exactly as long as the check
+was looking the same way it was.
+
+**Score:** 1
+
+#### Pull Request
+
+Read the entry on the ref, not the absent document, in check-unfolded-entry
+
+Plugins: dkj-policy
+
+[PR #1608](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1608)
+
+---
 
 ### DEPLOY: feat/plugin-version-overview-v2 · 20260908-111715
 
