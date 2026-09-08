@@ -43,7 +43,49 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**23 / 45 minor entries** <!-- pending-tally -->
+**23 / 46 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1642-pre-split-entry-shape · 20260908-175640
+
+Four comments in `../scripts/lib/entry-scaffold-lib.ps1` and its guardrail suite described the
+pre-split root changelog entry incompatibly -- an H2 title naming no branch in one place, an H1 title
+with a `**Branch:**` line below it in the other -- and each was the stated reason a piece of live
+behaviour survives. The history settles it: of the **344** pre-split root entries this repo has ever
+had, **0** carry a `**Branch:**` line and **0** open with an H1 (334 open at H3, 10 at H2 in the flat
+window of August 5-6, 2026). The `**Branch:**` shape was never a root entry at all -- it sat below the
+H1 title of the pre-split **per-branch** files, `branch/branch-changelog.md` (`# Branch changelog`) and
+`branch/branch-progress.md` -- and the release cut's root scan is non-recursive, so `branch/` was never
+in its reach either. All four sites now name that file, cite the measurement, and keep the one
+justification that survives it: the fallback's regex is anchored end to end, which is what makes it
+safe to leave un-narrowed. `Test-BranchChangelogIsFilled`'s docstring reads `AT AN ENTRY LEVEL` rather
+than `as an H2`, since it accepts both and both were written. Behaviour is unchanged -- the report had
+already established the code handles each shape correctly, and this measurement agrees -- but the
+guardrail suite gains the H3 assert it never had, which is the shape 334 of those 344 files actually
+have.
+
+The failure this prevents had not happened yet: a maintainer following the un-corrected comments would
+conclude that a root entry declares its branch, therefore that the name test already answers for it,
+therefore that the level test beside it is dead -- and removing it is exactly what would let the
+release cut, whose guard is "no unfolded entry anywhere", cut straight over all 344.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. The corrected text travels to consumers in the `dkj-policy` mirror, but nothing a consumer runs
+changes: this is comment prose and one added assert in the source repo's own suite.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the legacy shape the '**Branch:**' fallback actually answers for
+
+Plugins: dkj-policy
+
+[PR #1657](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1657)
+
+---
 
 ### DEPLOY: fix/1635-fixture-git-judged-siblings · 20260908-173553
 
