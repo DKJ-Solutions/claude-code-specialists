@@ -14,7 +14,7 @@ disable-model-invocation: true
 
 This is the **plugin mirror** of `park-branch.ps1`: the same tested source as in the source repo,
 shared here so consumers do not duplicate it. Background in
-[issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
+[issue #81](https://github.com/DKJ-Solutions/claude-code-specialists/issues/81).
 
 ## What the skill does
 
@@ -116,7 +116,7 @@ turned a day of planned work into a one-line branch deletion.
 
 **A second trap sits the other way round: the plan may be current and the work may not exist.** Measured
 in the source repo on August 27, 2026
-([#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960)). A branch carried three `park:`
+([#960](https://github.com/DKJ-Solutions/claude-code-specialists/issues/960)). A branch carried three `park:`
 commits, eight resolved CREATE steps naming edits to three agent defs, three manuals and two lenses — and
 its **entire** diff against the main branch was the cycle document, 161 insertions, one file. None of the
 named edits were on the branch; none were on the main branch either. They were uncommitted in the other
@@ -143,7 +143,7 @@ thing to automate. Check your own repo's governance before reaching for `git pus
 
 ## park-cycle -- the automatic one, and you do not run it
 
-Since [#900](https://github.com/DaveKJohn/claude-code-specialists/issues/900) a third script sits beside
+Since [#900](https://github.com/DKJ-Solutions/claude-code-specialists/issues/900) a third script sits beside
 this one, and it is here rather than on its own page because the three parking moments are one subject:
 
 ```powershell
@@ -160,14 +160,14 @@ entire history, while the median merged branch sat invisible on `origin` for **2
 365, nine of 38 over half an hour). An opt-in backup is a backup nobody takes.
 
 **It stops the moment a PR exists, and that is not a nicety.** The DEPLOY lock
-([#884](https://github.com/DaveKJohn/claude-code-specialists/issues/884)) refuses the merge once this
+([#884](https://github.com/DKJ-Solutions/claude-code-specialists/issues/884)) refuses the merge once this
 document has diverged from what the PR published, so a pusher that kept running after `open-pr` would block
 **every merge in the repo** -- and the failure would read as the lock misbehaving rather than as the
 pusher. Same reason its fail-safe runs in that direction: when `gh` cannot say whether a PR exists, it does
 **not** push. Being one turn stale is a nuisance; an unmergeable branch is a defect.
 
 **And *exists* means ever, not just right now**
-([#1035](https://github.com/DaveKJohn/claude-code-specialists/issues/1035)). Scoped to *open* PRs, that
+([#1035](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1035)). Scoped to *open* PRs, that
 bound lifted again the moment a PR merged — and on the machine that merged, a pruned `origin/<branch>`
 then reads as absent, absent reads as *"a local commit nobody can see"*, and the next Stop hook pushes the
 branch **back** onto the remote seconds after `deleteBranchOnMerge` deleted it. Measured here: merged at
@@ -228,7 +228,7 @@ is something you ask for:
   until a PR publishes it. The automatic one.
 
 **The commit says which of the two you got**, since
-[#507](https://github.com/DaveKJohn/claude-code-specialists/issues/507): `park: <branch> (all outstanding
+[#507](https://github.com/DKJ-Solutions/claude-code-specialists/issues/507): `park: <branch> (all outstanding
 work)` against `park: <branch> (the branch files only)`. Until August 7, 2026 both wrote the *same*
 subject -- `park: <branch> (work parked for later)` -- so afterwards nothing told you which half of your
 work was safely on origin, which is the one question a park exists to answer. Both now run the same
