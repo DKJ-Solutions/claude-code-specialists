@@ -121,6 +121,20 @@ which is what made the pass a substitution rather than fourteen redesigns.
       working copy anyway, so what is committed is what was tested.
 - [x] `check-plugin-integrity.ps1`: 0 errors, 228 `.ps1` parsed, `[script-ascii]` green over the two new
       files.
+- [x] **CI went red on the first ship, on this branch's own new suite, and the cause was the suite rather
+      than the lib.** `fixture-git-lib.tests.ps1` failed shard 4 with 2 of 15 asserts red -- both the ones
+      matching the *reported command string* in case 5, while the count asserts beside them stayed green,
+      which is what pinned it to the text and not to the behaviour. Case 5 captures `Write-Host` through
+      the information stream, so it goes through PowerShell's formatter, and the formatter hard-wraps at
+      the running host's buffer width. The reported command carries a temp path, so on the runner the
+      wrap landed inside it. That is issue #1512's rule, which this repo already writes in three suites
+      and which this one ignored: those asserts now go through an `Assert-Says` that strips **all**
+      whitespace from both sides.
+- [x] And the repair is verified against a wrap rather than against a green run, because a green run is
+      exactly what it had before: held against a sample broken mid-word, the stripped matcher finds the
+      phrase (`True`) where the old `-match [regex]::Escape(...)` does not (`False`). Normalizing runs of
+      whitespace to one space would not have fixed it either -- the formatter breaks at whatever
+      character sits at the column, inside a word as readily as between two.
 - [~] No separate pre-run of the full test gate: `open-pr.ps1` runs it and refuses to push on a failing
       suite, so a copy set going ahead of it proves nothing that gate would not have caught.
 

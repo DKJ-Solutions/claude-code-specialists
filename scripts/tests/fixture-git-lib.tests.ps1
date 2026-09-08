@@ -43,6 +43,33 @@ function Assert-True {
     else { $script:fail++; Write-Host "  [FAIL] $Label" -ForegroundColor Red }
 }
 
+function Assert-Says {
+    <#
+        Does the captured text contain this phrase, whatever the console did to it?
+
+        STRIPS ALL WHITESPACE FROM BOTH SIDES -- issue #1512's rule, and this suite paid for ignoring it
+        on its first CI run. Case 5 below captures Write-Host through the information stream, which goes
+        through PowerShell's formatter, and the formatter HARD-WRAPS at the buffer width of whatever host
+        is running. Both text asserts there passed locally and failed on the CI runner while the lib was
+        behaving correctly -- the count asserts beside them stayed green, which is what pinned it to the
+        text rather than to the behaviour. The reported command carries a temp path, so the line is long
+        enough for a wrap point to land inside it, and which asserts straddle a break is decided by the
+        width: a green run is not evidence. Normalizing runs of whitespace to one space does not fix it
+        either, because the formatter breaks at whatever character sits at the column, word or not.
+
+        Literal (IndexOf) rather than -match, so a phrase carrying a path separator, a dot or a bracket
+        needs no escaping.
+    #>
+    param([string]$Text, [string]$Phrase, [string]$Label)
+    $haystack = ($Text -replace '\s', '')
+    $needle   = ($Phrase -replace '\s', '')
+    if ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+        $script:pass++; Write-Host "  [PASS] $Label" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Label`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
+    }
+}
+
 Assert-True (Test-Path -LiteralPath $LibPath) 'fixture-git-lib.ps1 exists at its registered source path'
 . $LibPath
 
@@ -95,14 +122,15 @@ try {
     $before = Get-FixtureGitFailureCount
     $out = Invoke-FixtureGitIn $NotARepo branch -D 'no-such-branch' 4>&1 6>&1 | Out-String
     Assert-Equal ($before + 1) (Get-FixtureGitFailureCount) 'the call ran and its failure was counted'
-    # The dir arrives as '-C <dir>' and the flags arrive in order behind the subcommand.
-    Assert-True ($out -match [regex]::Escape("git -C $NotARepo branch -D no-such-branch")) `
+    # The dir arrives as '-C <dir>' and the flags arrive in order behind the subcommand. Through
+    # Assert-Says rather than -match, for the wrap reason written at that function.
+    Assert-Says $out "git -C $NotARepo branch -D no-such-branch" `
         'the reported command is the one that was written -- -D reached git verbatim'
 
     $before = Get-FixtureGitFailureCount
     $out = Invoke-FixtureGitIn $NotARepo commit -q -m 'a message with spaces' 4>&1 6>&1 | Out-String
     Assert-Equal ($before + 1) (Get-FixtureGitFailureCount) '-q -m also reached git rather than being bound'
-    Assert-True ($out -match [regex]::Escape('commit -q -m a message with spaces')) `
+    Assert-Says $out 'commit -q -m a message with spaces' `
         'and a quoted argument stays one argument'
 
     # Called with nothing at all it throws rather than running `git -C` against an empty path, which git
