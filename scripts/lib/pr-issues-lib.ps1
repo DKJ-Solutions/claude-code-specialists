@@ -2461,3 +2461,77 @@ function Get-MergeQueueVerdict {
     }
     return [pscustomobject]@{ Readable = $true; Active = $active }
 }
+
+function Get-RequiredCheckContexts {
+    <#
+    .SYNOPSIS
+        The check contexts a trunk's ruleset REQUIRES, read from the branch-rules payload. Returns
+        Readable (bool) and Names (string[]), sorted and unique. Issue #1602.
+
+    .DESCRIPTION
+        WHY NOT `gh pr checks --required`, WHICH THIS FILE ALREADY READS EVERYWHERE. Because that
+        endpoint answers a different question, and the difference is a RACE. It reports the required
+        checks *that have registered on this PR*, so a required workflow which has not yet created its
+        check run is simply absent from it -- indistinguishable from a ruleset that requires nothing.
+        For the merge verdict that ambiguity is harmless and is resolved conservatively (refuse on the
+        failure path, stay green on the green one). For deciding WHAT TO WAIT FOR it is fatal, because
+        the decision is made at the one moment the answer is least likely to have arrived: seconds
+        after open-pr pushed.
+
+        MEASURED ON THIS CHANGE'S OWN FIRST SHIP, PR #1614 (September 8, 2026). The probe asked
+        `gh pr checks --required` immediately after the registration wait, got nothing back --
+        `branch-entry` and `claude-review` are separate workflows and register faster than ci.yml's
+        jobs -- and the run fell back to watching every check, which is the correct fail-open. But
+        `gh pr checks --watch` picks up checks that register after it starts, so the full watch then
+        ran to completion, the re-entry the #1549 loop provides was never reached, and the narrowing
+        never happened at all. The change was inert on the very first lap it ran.
+
+        THE RULESET HAS NO RACE. It states which contexts are required whether or not anything has
+        registered, and `required_status_checks` being absent is a positive answer: this trunk requires
+        nothing. So this reads the payload ship-pr has ALREADY fetched for the fold-push and
+        merge-queue verdicts -- no extra network call, and available before the wait begins rather
+        than after it.
+
+        READABLE IS SEPARATE FROM EMPTY, and the caller must not collapse the two -- the same
+        distinction Get-MergeQueueVerdict above draws on the same payload, for the same reason.
+        Readable = $false means the question was not answered (no token scope, an older gh, a repo
+        whose rules cannot be read -- all states ship-pr's step 0b already tolerates), and the caller
+        then falls back to the `gh pr checks --required` probe rather than assuming either way.
+        Readable = $true with no names means the trunk genuinely requires nothing, which is the
+        GitHub Free case, and the wait must then watch everything exactly as it always did.
+
+    .PARAMETER BranchRulesJson
+        `gh api repos/<repo>/rules/branches/<trunk>` output. Empty or unparseable -> Readable = $false.
+        An empty JSON array parses to $null in 5.1 and is the legitimate "this trunk has no rules"
+        answer, NOT unreadable -- the trap Get-MergeQueueVerdict documents beside its own parse.
+
+    .OUTPUTS
+        [pscustomobject] Readable (bool) and Names (string[]).
+    #>
+    param([string]$BranchRulesJson)
+
+    $unreadable = [pscustomobject]@{ Readable = $false; Names = @() }
+    if (-not $BranchRulesJson -or -not $BranchRulesJson.Trim()) { return $unreadable }
+    try { $parsed = $BranchRulesJson | ConvertFrom-Json } catch { return $unreadable }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.PSObject.Properties['type'] })
+
+    $names = @()
+    foreach ($r in $records) {
+        if ((([string]$r.type).Trim().ToLowerInvariant()) -ne 'required_status_checks') { continue }
+        if (-not $r.PSObject.Properties['parameters']) { continue }
+        $p = $r.parameters
+        if (-not $p -or -not $p.PSObject.Properties['required_status_checks']) { continue }
+        # Wrapped for the same reason as above: one required check is handed through as the object
+        # itself, and this repo's own ruleset requires exactly one -- so the collapse would be
+        # invisible here and would surface only in a consumer with two.
+        foreach ($c in @(@($p.required_status_checks) | Where-Object { $_ })) {
+            if (-not $c.PSObject.Properties['context']) { continue }
+            $ctx = ([string]$c.context).Trim()
+            if ($ctx) { $names += $ctx }
+        }
+    }
+
+    return [pscustomobject]@{ Readable = $true; Names = @(@($names) | Sort-Object -Unique) }
+}

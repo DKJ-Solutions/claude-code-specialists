@@ -103,7 +103,11 @@
          except for the required list, where unreadable means REFUSE, since a ruleset that requires
          nothing and one whose required checks have not reported look identical from here.
 
-         `--required` SINCE ISSUE #1602, and with no required check known this waits on EVERY check
+         `--required` SINCE ISSUE #1602, and WHICH checks those are is read from the trunk's BRANCH
+         RULES -- the payload step 0b already fetched -- rather than from `gh pr checks --required`,
+         which reports only what has registered and so answered nothing on this change's own first
+         ship (PR #1614), leaving it inert. That probe survives as the fall-back for a token that
+         cannot read the rules. With no required check known this waits on EVERY check
          exactly as it did before, so a repo with no ruleset is untouched. The non-required checks are
          still waited for and still reported -- at step 8, after the fold. What that buys is the LAP,
          not the clock: the trunk goes on moving while this step waits, and a commit landing between
@@ -1093,19 +1097,55 @@ $waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
 # WHAT IS NOT CLAIMED: that the run gets shorter. It does not -- step 8 spends the same seconds this
 # step used to. What is bought is the LAP, by putting the merge on a certificate that is still
 # current, and nothing here shortens CI's own 310-461s window.
-$requiredWaitJson = ''
-try {
-    $requiredWaitProbe = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-        'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
-    if ($requiredWaitProbe.ExitCode -eq 0) { $requiredWaitJson = $requiredWaitProbe.Output -join "`n" }
-} catch {
+# THE SOURCE IS THE RULESET, NOT THE PR'S CHECK LIST -- AND THAT WAS MEASURED ON THIS CHANGE'S OWN
+# FIRST SHIP RATHER THAN REASONED ABOUT (PR #1614, September 8, 2026). This block first asked
+# `gh pr checks --required`, which reports the required checks THAT HAVE REGISTERED. Seconds after
+# open-pr's push it answered nothing -- `branch-entry` and `claude-review` are separate workflows and
+# register faster than ci.yml's jobs -- so the run fell back to watching every check, which is the
+# correct fail-open. But `--watch` picks up checks that register after it starts, so that full watch
+# ran to completion, the #1549 re-entry was never reached, and the narrowing never happened at all.
+#
+# THE CHANGE WAS INERT ON THE FIRST LAP IT RAN, AND SAID OTHERWISE. Every later line still read
+# $requiredWaitNames, which the in-loop refresh had by then filled in from the concluded checks -- so
+# the run printed "every REQUIRED check is green. The rest are still watched" about a wait that had
+# just watched everything. True of the ruleset, false of the wait, and that is the shape a claim takes
+# when it is read off the wrong variable. $watchNarrowed below exists so nothing downstream can make
+# that mistake again: it records what the watch DID, not what the ruleset says.
+#
+# The branch-rules payload has no such race -- it states the required contexts whether or not anything
+# has registered -- and $foldRulesJson is already in hand from step 0b, so this costs no network call.
+# Get-RequiredCheckContexts keeps Readable separate from empty, the same line Get-MergeQueueVerdict
+# draws on the same payload: unreadable falls back to the old probe, while readable-and-empty is a
+# positive answer (GitHub Free requires nothing) and watches everything.
+$requiredWaitNames = @()
+$requiredContexts = Get-RequiredCheckContexts -BranchRulesJson $foldRulesJson
+if ($requiredContexts.Readable) {
+    $requiredWaitNames = @($requiredContexts.Names)
+} else {
+    # THE PROBE IS THE FALL-BACK NOW, not the source. It still answers on a checkout whose token
+    # cannot read the trunk's rules, and it still cannot tell "requires nothing" from "not registered
+    # yet" -- which is exactly why it is second and no longer first.
     $requiredWaitJson = ''
+    try {
+        $requiredWaitProbe = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+            'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
+        if ($requiredWaitProbe.ExitCode -eq 0) { $requiredWaitJson = $requiredWaitProbe.Output -join "`n" }
+    } catch {
+        $requiredWaitJson = ''
+    }
+    $requiredWaitNames = @(Get-RequiredCheckNames -RequiredChecksJson $requiredWaitJson)
 }
-$requiredWaitNames = @(Get-RequiredCheckNames -RequiredChecksJson $requiredWaitJson)
+# WHAT THE WATCH ACTUALLY DID, set per attempt inside the loop below and read by everything after it.
+# $requiredWaitNames answers "what does the ruleset require"; this answers "did the watch that
+# produced $checks leave the non-required checks running". They are different questions and PR #1614
+# is what happens when one variable is asked both.
+$watchNarrowed = $false
 if ($requiredWaitNames.Count -gt 0) {
     Write-Host "  Blocking on the REQUIRED check(s) only: $(Format-CheckNameList -Names $requiredWaitNames). The rest are waited for and reported after the fold (#1602)." -ForegroundColor DarkGray
+} elseif ($requiredContexts.Readable) {
+    Write-Host "  This trunk's ruleset requires no check, so this waits on EVERY check, exactly as before (this is not a finding)." -ForegroundColor DarkGray
 } else {
-    Write-Host "  No required check is known, so this waits on EVERY check, exactly as before (no ruleset, or not registered yet; this is not a finding)." -ForegroundColor DarkGray
+    Write-Host "  The trunk's rules could not be read, so this waits on EVERY check, exactly as before (this is not a finding)." -ForegroundColor DarkGray
 }
 # --watch now blocks until the registered check finishes; exit 0 = all passed, non-zero = SOMETHING
 # failed. WHICH something is the whole question, and the answer is NOT in that exit code (#943). This
@@ -1147,7 +1187,8 @@ while ($true) {
     # had not registered its check run when the probe asked is found on the next attempt, and the
     # watch narrows then instead of staying wide for the rest of the run.
     $watchArgs = @('pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo)
-    if ($requiredWaitNames.Count -gt 0) { $watchArgs += '--required' }
+    $watchNarrowed = ($requiredWaitNames.Count -gt 0)
+    if ($watchNarrowed) { $watchArgs += '--required' }
     $checks = Invoke-NativeCapture -FilePath 'gh' -Arguments $watchArgs
     $checks.Output | ForEach-Object { Write-Host $_ }
 
@@ -1378,7 +1419,7 @@ if ($checks.ExitCode -ne 0) {
     # Write-FailedCheckReasons, above, which carries the argument for the filter this call passes.
     Write-FailedCheckReasons -ChecksJson $checkFactsJson -Repo $repo -OnlyNames $verdict.FailedOther
     Write-Host "  Continuing to step 4. The failing check is still failing; nothing here fixes it." -ForegroundColor Yellow
-} elseif ($requiredWaitNames.Count -gt 0) {
+} elseif ($watchNarrowed) {
     # NOT "CI green" -- SAY WHAT IS ACTUALLY GREEN (issue #1602). The watch blocked on the required
     # checks only, so at this moment the non-required ones may be running, or red. "CI green" would be
     # the exact overclaim this step was careful to avoid everywhere else, and it would be read by the
@@ -1396,7 +1437,7 @@ $waitReport = $null
 # governed anything. The required payload is the honest subject for this line, and #831's own
 # question -- which check governed, and what the non-required tail cost -- is answered in full at
 # step 8, once every check has actually reported.
-if ($requiredWaitNames.Count -gt 0 -and $requiredFactsJson) {
+if ($watchNarrowed -and $requiredFactsJson) {
     $waitReport = Get-CheckWaitReport -ChecksJson $requiredFactsJson `
         -RequiredNamesJson $requiredFactsJson -WaitedSeconds $waitedSec
 } elseif ($checkFactsJson) {
@@ -2028,7 +2069,7 @@ if ($queueActive) {
     # here and no merge to report against, so nothing prints them. The checks themselves are
     # unaffected -- they run, and they are on the PR -- so this is a lost REPORT, not a lost check,
     # which is why one line naming where to read them is the whole repair.
-    if ($requiredWaitNames.Count -gt 0) {
+    if ($watchNarrowed) {
         Write-Host "  The NOT-required checks were not waited for here (#1602). Read them with:" -ForegroundColor DarkGray
         Write-Host "    gh pr checks $pr --repo $repo" -ForegroundColor DarkGray
     }
@@ -2392,7 +2433,7 @@ if ($dbomRes.ExitCode -eq 0) {
 # to wait for and printing a second report would only claim a tail that never existed. That is the
 # same line every other #1602 branch draws, and it keeps a repo with no ruleset out of this step
 # completely.
-if ($requiredWaitNames.Count -eq 0) {
+if (-not $watchNarrowed) {
     # Deliberately silent: step 3 already said which check governed, over the same payload this step
     # would re-read. A line here would be noise on every ship in a repo with no ruleset.
 } else {

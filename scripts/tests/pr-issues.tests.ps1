@@ -844,6 +844,50 @@ Assert-NameSet @('a') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"a"}
 Assert-NameSet @('lint en tests') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"lint en tests"}]') `
     'a name containing a space stays ONE name -- the shape a space-splitting parse silently doubles'
 
+# --- Get-RequiredCheckContexts: the required contexts, off the RULESET (issue #1602) --------------
+# WHY A SECOND READER OF "WHAT IS REQUIRED" EXISTS AT ALL, since Get-RequiredCheckNames above already
+# answers it: they read different sources, and only one of them has a registration race. The PR's
+# check list reports the required checks THAT HAVE REGISTERED; the ruleset states the contexts whether
+# or not anything has. Measured on PR #1614, where the probe ran seconds after open-pr's push, found
+# nothing, and made the whole change inert.
+Write-Host ""
+Write-Host "Get-RequiredCheckContexts -- the required contexts off the trunk's ruleset" -ForegroundColor Cyan
+
+$rulesOne = '[{"type":"pull_request"},{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"lint-en-tests","integration_id":15368}]}}]'
+$ctxOne = Get-RequiredCheckContexts -BranchRulesJson $rulesOne
+Assert-True $ctxOne.Readable 'a readable ruleset says so'
+Assert-NameSet @('lint-en-tests') $ctxOne.Names 'and names the one context this repo''s own ruleset requires'
+
+$rulesTwo = '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"a"},{"context":"b"}]}}]'
+$ctxTwo = Get-RequiredCheckContexts -BranchRulesJson $rulesTwo
+Assert-NameSet @('a','b') $ctxTwo.Names 'TWO contexts: the 5.1 collapse would answer with one bogus string, and this repo cannot produce that shape'
+Assert-Equal 2 (@($ctxTwo.Names)).Count 'and the count is 2 -- the collapse is a count bug before it is a name bug'
+
+# READABLE-AND-EMPTY IS A POSITIVE ANSWER, and it is the whole reason this returns two fields. "This
+# trunk requires nothing" (GitHub Free, or a ruleset with no such rule) must be distinguishable from
+# "the question was not answered", because the caller watches every check in the first case and falls
+# back to the probe in the second.
+$ctxNoRule = Get-RequiredCheckContexts -BranchRulesJson '[{"type":"pull_request"},{"type":"deletion"}]'
+Assert-True $ctxNoRule.Readable 'a ruleset with no required-checks rule is READABLE'
+Assert-Equal 0 (@($ctxNoRule.Names)).Count 'and requires nothing -- a positive answer, not a failure to read'
+$ctxNull = Get-RequiredCheckContexts -BranchRulesJson '[]'
+Assert-True $ctxNull.Readable 'an EMPTY rules array is readable too -- 5.1 parses it to $null, the trap the parse beside it documents'
+Assert-Equal 0 (@($ctxNull.Names)).Count 'and it means the trunk has no rules at all'
+
+foreach ($bad in @('', '   ', 'not json')) {
+    $ctxBad = Get-RequiredCheckContexts -BranchRulesJson $bad
+    Assert-True (-not $ctxBad.Readable) "an unreadable payload ('$bad') reports Readable = false rather than 'requires nothing'"
+    Assert-Equal 0 (@($ctxBad.Names)).Count "and names nothing with it"
+}
+
+# MALFORMED SHAPES FAIL TO 'NO NAMES' WITHOUT CLAIMING UNREADABLE -- the payload parsed, so the
+# question WAS answered; what it answered is that nothing matched.
+Assert-Equal 0 (@((Get-RequiredCheckContexts -BranchRulesJson '[{"type":"required_status_checks"}]').Names)).Count 'a required-checks rule with no parameters names nothing'
+Assert-Equal 0 (@((Get-RequiredCheckContexts -BranchRulesJson '[{"type":"required_status_checks","parameters":{}}]').Names)).Count 'nor one whose parameters carry no check list'
+Assert-Equal 0 (@((Get-RequiredCheckContexts -BranchRulesJson '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"integration_id":1}]}}]').Names)).Count 'nor an entry with no context field -- the field the whole read is about is the one that may be absent'
+Assert-NameSet @('a') (Get-RequiredCheckContexts -BranchRulesJson '[{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"a"},{"context":"  "},{"context":""}]}}]').Names 'blank contexts are dropped rather than watched on'
+Assert-NameSet @('lint-en-tests') (Get-RequiredCheckContexts -BranchRulesJson '[{"type":"REQUIRED_STATUS_CHECKS","parameters":{"required_status_checks":[{"context":"lint-en-tests"}]}}]').Names 'the rule type is matched case-insensitively, as every other read of this payload does'
+
 # AND THE TWO CALLERS THAT SHARE IT MUST AGREE WITH IT, or the refactor moved a bug rather than a
 # duplicate: Get-MergeBlockVerdict reads the same payload for its own verdict, and a payload this
 # function reads as naming nothing is exactly the one the verdict must treat as unreadable.
@@ -2002,20 +2046,36 @@ Assert-True ($shipText -like "*could not read the history of 'origin/main' -- NO
 Write-Host ""
 Write-Host "ship-pr.ps1's step 3 -- required-only wait, non-required reported after the fold (#1602)" -ForegroundColor Cyan
 
-Assert-True ($shipText -like '*if ($requiredWaitNames.Count -gt 0) { $watchArgs += ''--required'' }*') 'the watch narrows to the required checks when the ruleset names any'
+Assert-True ($shipText -like '*if ($watchNarrowed) { $watchArgs += ''--required'' }*') 'the watch narrows to the required checks when the ruleset names any'
 Assert-True ($shipText -like '*$watchArgs = @(''pr'', ''checks'', "$pr", ''--watch'', ''--interval'', "$PollSeconds", ''--repo'', $repo)*') 'and the base arguments are otherwise the ones every ship before this used'
-Assert-True ($shipText -like '*Get-RequiredCheckNames -RequiredChecksJson $requiredWaitJson*') 'the mode is decided from the repo''s OWN ruleset answer, never from a check name in this script'
 Assert-True ($shipText -notlike '*''--watch'', ''--interval'', "$PollSeconds", ''--repo'', $repo, ''--required''*') 'and --required is appended conditionally rather than baked into the call'
 
-# FAIL-OPEN IS THE HALF A CONSUMER FEELS. With no required check known this must behave exactly as
-# every ship did before #1602 -- watch everything -- because "this ruleset requires nothing" and "the
-# required check has not registered yet" are indistinguishable from here.
-Assert-True ($shipText -like '*No required check is known, so this waits on EVERY check, exactly as before*') 'a repo with no ruleset is told the wait is unchanged for it, and that this is not a finding'
-Assert-True ($shipText -like '*if ($requiredWaitNames.Count -eq 0) {*') 'step 8 is branched off the same reading, so the two halves cannot disagree about which mode ran'
+# THE MODE COMES FROM THE RULESET, NOT FROM THE PR'S CHECK LIST -- measured on PR #1614, this change's
+# own first ship, where the registration race made the whole thing inert. These two asserts are the
+# regression: the rules payload is asked FIRST, and the old probe survives only as the fall-back.
+Assert-True ($shipText -like '*Get-RequiredCheckContexts -BranchRulesJson $foldRulesJson*') 'the wait mode is read from the branch-rules payload step 0b already fetched -- no registration race, no extra call'
+Assert-True ($shipText -like '*Get-RequiredCheckNames -RequiredChecksJson $requiredWaitJson*') 'and the PR check list survives as the FALL-BACK, for a checkout that cannot read the trunk''s rules'
+$idxCtx   = $shipText.IndexOf('Get-RequiredCheckContexts -BranchRulesJson $foldRulesJson')
+$idxProbe = $shipText.IndexOf('Get-RequiredCheckNames -RequiredChecksJson $requiredWaitJson')
+Assert-True ($idxCtx -ge 0 -and $idxProbe -gt $idxCtx) 'and the ruleset is asked BEFORE the probe -- the ordering is the fix, not merely having both'
+
+# FAIL-OPEN IS THE HALF A CONSUMER FEELS, and the two reasons for it are now told apart, because the
+# ruleset CAN say "requires nothing" definitively while the probe never could.
+Assert-True ($shipText -like '*This trunk''s ruleset requires no check, so this waits on EVERY check, exactly as before*') 'a trunk that genuinely requires nothing is told so, and that this is not a finding'
+Assert-True ($shipText -like '*The trunk''s rules could not be read, so this waits on EVERY check, exactly as before*') 'and an unreadable ruleset gets a DIFFERENT sentence -- the two states are no longer one message'
+
+# WHAT THE WATCH DID vs WHAT THE RULESET SAYS. PR #1614 printed "every REQUIRED check is green. The
+# rest are still watched" about a wait that had just watched everything, because one variable was
+# asked both questions. $watchNarrowed is the repair, and these asserts are what keep them apart.
+Assert-True ($shipText -like '*$watchNarrowed = ($requiredWaitNames.Count -gt 0)*') 'the flag is set from the names AT THE MOMENT the watch is built, per attempt'
+Assert-True ($shipText -like '*} elseif ($watchNarrowed) {*') 'the "every REQUIRED check is green" line is gated on what the watch DID, not on what the ruleset says'
+Assert-True ($shipText -like '*if ($watchNarrowed -and $requiredFactsJson) {*') 'and so is which payload the pre-merge wait report is handed'
+Assert-True ($shipText -like '*if (-not $watchNarrowed) {*') 'and so is step 8, so it cannot re-report a wait that already covered everything'
+Assert-True ($shipText -notlike '*if ($requiredWaitNames.Count -eq 0) {*') 'nothing downstream reads the ruleset answer as though it were the watch''s behaviour'
 
 # THE MODE MAY NARROW MID-RUN BUT NEVER WIDEN. A required workflow that had not created its check run
-# when the probe asked is found one watch later; an empty re-reading is not evidence that the ruleset
-# requires nothing, and widening on it would undo the fix invisibly.
+# when the ruleset could not be read is found one watch later; an empty re-reading is not evidence
+# that the ruleset requires nothing, and widening on it would undo the fix invisibly.
 Assert-True ($shipText -like '*if ($requiredWaitRefresh.Count -gt 0) { $requiredWaitNames = $requiredWaitRefresh }*') 'the refresh only ever narrows the watch -- an unreadable re-read leaves the earlier names standing'
 
 # THE REPORT IS NOT LOST, IT IS MOVED. This is the assert that would fail if step 8 were ever dropped

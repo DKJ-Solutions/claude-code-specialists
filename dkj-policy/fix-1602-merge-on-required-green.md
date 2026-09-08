@@ -73,6 +73,38 @@ merge as soon as every REQUIRED check is green, and report the non-required ones
       the absence of the old copy -- the claim it was written to make is unchanged.
 - [x] Full suite run and `check-plugin-integrity.ps1`: 0 errors.
 
+
+#### What the first live ship taught, and why the design changed (PR #1614)
+
+The first `ship-pr` run of this change refused at step 3b -- correctly, on `8cfcd4f2` (PR #1613,
+carrying a new test suite), which is the ordinary 25.3% case this branch does not claim to fix. But
+its transcript showed something worse than the refusal:
+
+```
+  No required check is known, so this waits on EVERY check, exactly as before ...
+  ...
+ship-pr: every REQUIRED check is green. The rest are still watched, and reported at step 8.
+```
+
+Both lines, one run. The probe asked `gh pr checks --required` seconds after the push and got nothing
+-- `branch-entry` and `claude-review` are separate workflows and register before ci.yml's jobs -- so
+the watch fell open and covered everything, which is correct. But `--watch` picks up checks that
+register after it starts, so that full watch ran to completion, the #1549 re-entry was never reached,
+and the narrowing never happened. **The change was inert on the first lap it ran, and said otherwise.**
+
+- [x] Read the mode from the trunk's BRANCH RULES instead (`Get-RequiredCheckContexts`), off the
+      payload step 0b already fetches -- no registration race, no extra call, and it can say
+      "requires nothing" definitively where the probe never could. The probe stays as the fall-back.
+- [x] Separate `$watchNarrowed` from `$requiredWaitNames`: the first records what the watch DID, the
+      second what the ruleset SAYS. Every claim after the wait now reads the first. Asking one
+      variable both questions is exactly what produced the two contradictory lines above.
+- [x] Two distinct fall-back sentences, since the ruleset can now tell "requires nothing" from
+      "could not be read".
+- [x] `Get-RequiredCheckContexts` covered, including readable-and-empty as a positive answer and the
+      two-context shape this repo's own ruleset cannot produce.
+- [x] Branch brought forward onto `origin/main` (the gate's own remedy), not shipped with
+      `-SkipStaleCheck`: the voiding commit added `scripts/tests/cycle-autopark.tests.ps1`, which is
+      precisely the hazard #1292 exists for.
 #### The contradictions this change created, both repaired here
 
 - [x] Nolan's lens recorded option C as DECLINED, and named a cost that does not exist: the merge

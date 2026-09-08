@@ -396,7 +396,12 @@ retrying, because branch protection would block it anyway and forcing past a red
 this chain must not do.
 
 **It deliberately does not name a check.** Step 3 watches whichever checks this repo's own ruleset
-requires — read from the repo via `gh pr checks --required`, never from a name written into the script.
+requires — read from the trunk's **branch rules** (`gh api repos/<repo>/rules/branches/<trunk>`, the
+payload step 0b already fetched), never from a name written into the script. `gh pr checks --required`
+is the fall-back for a checkout whose token cannot read those rules, and it is second rather than first
+for a measured reason: it reports the required checks *that have registered*, so asked seconds after
+the push it answers nothing, and cannot tell that from a trunk that requires nothing. The ruleset has
+no such race.
 Naming one here would be a claim about the consumer's CI that this script cannot keep, and it was the
 half of the "this is too repo-specific to share" argument that did not survive being read.
 
