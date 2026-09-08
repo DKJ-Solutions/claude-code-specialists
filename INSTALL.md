@@ -193,7 +193,7 @@ claude plugin update dkj-team-alpha@claude-code-specialists --scope project
 ```
 
 **Before running them, check whether you are behind at all.** Once `dkj-policy` is installed, the
-`plugin-versions` skill answers that per device — one read-only run, no arguments, on any machine. It
+`plugin-versions` skill answers that per checkout — one read-only run, no arguments, on any machine. It
 prints, per enabled plugin, the version and commit this checkout installed against the marketplace
 clone's version and HEAD, then a per-plugin verdict — up to date, update this plugin, or refresh the
 clone — with the command for each. It supersedes the hand-run `installed_plugins.json` query for the

@@ -3,11 +3,10 @@ name: plugin-versions
 description: >-
   Show, per enabled plugin, the version installed IN THIS CHECKOUT against the version the local
   marketplace clone holds, and a verdict on whether a plugin update is due -- so you can tell, on this
-  device, whether to run `claude plugin update` or `claude plugin marketplace update`. Reads only two
-  things every machine already has: the install record for this checkout's path, and the marketplace
-  clone's plugin.json version plus git HEAD. Read-only, no arguments, runs in any checkout on any
-  device. Use it when you are unsure whether this checkout is on the current plugin release, when a
-  session behaves as if it loaded an older plugin, or before deciding to refresh the marketplace.
+  machine, whether to run `claude plugin update` or `claude plugin marketplace update`. Read-only, no
+  arguments, runs in any checkout on any machine. Use it when you are unsure whether this checkout is
+  on the current plugin release, when a session behaves as if it loaded an older plugin, or before
+  deciding to refresh the marketplace.
 ---
 
 # plugin-versions -- installed here vs. the marketplace clone
@@ -78,6 +77,10 @@ dkj-team-alpha@claude-code-specialists
   verdict            the clone is AHEAD of your install (same version string 4.32.0, newer commit)
                      -> claude plugin update dkj-team-alpha@claude-code-specialists --scope project
 ```
+
+**Before pasting this output into a public issue, redact the paths.** The checkout root, the
+install-administration path and the marketplace clone path are absolute, and on Windows they carry
+your OS username -- replace each with a placeholder like the `<path>` above.
 
 ## The verdict, per plugin
 
