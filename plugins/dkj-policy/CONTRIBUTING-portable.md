@@ -339,9 +339,19 @@ race, and every repo running this workflow has it.
 
 **Detect-and-rebase is the answer, and it is the one every repo can run.** `ship-pr` reads the moment the
 run behind your required check was *created*, counts what the trunk gained after it, and **refuses the
-merge** when the answer is not zero — naming the commits, the two commands that bring the branch forward,
+merge** when the answer is not zero — naming the commits, the commands that bring the branch forward,
 and `-SkipStaleCheck` for a window you have judged harmless. It converges by repetition rather than by
 construction: bring the branch forward, CI re-runs against the current trunk, ship again.
+
+**The first of those commands is a `git checkout` back onto the branch, and that is not a courtesy.**
+`ship-pr` hands your tree back to the trunk the moment the PR exists, and this gate fires long after that
+— past the whole CI wait — so by then you are normally standing on the trunk rather than on the branch
+the fetch and the merge are about. (Normally, not always: the hand-back declines on a dirty tree, or
+where another worktree already holds the trunk, and the checkout is then a harmless repeat.) Run the
+other two on the trunk and nothing fails: the merge fast-forwards your local trunk and prints a diffstat
+that reads exactly like the branch moving forward, the push is a no-op, and the next thing to say
+anything is `ship-pr` itself, one full CI cycle later, complaining about the wrong problem. So the
+refusal prints the branch name it read before it moved you.
 
 **It needs a required status check to have a certificate to read.** With none named, `ship-pr` says so and
 skips the step rather than inventing a verdict — which is honest and is also blind, so making one check

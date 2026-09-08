@@ -305,8 +305,10 @@ race is real in every repo, and this part is how you stand against it.
 **Detect-and-rebase is this workflow's answer** (Dave, September 7, 2026,
 [#1546](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1546)). `ship-pr` dates the run
 behind your **required** check, counts what the trunk gained after it, and **refuses the merge** when
-that is not zero -- naming the commits and the two commands that bring the branch forward. It converges
-by repetition rather than by construction, and it runs anywhere.
+that is not zero -- naming the commits and the commands that bring the branch forward, the first of them
+a `git checkout` back onto the branch, because this run returned your tree to the trunk the moment the PR
+opened and the gate fires a whole CI wait later. It converges by repetition rather than by construction,
+and it runs anywhere.
 
 **So the one thing to close here is a required status check.** With none named, `ship-pr` prints *"no
 required check name is known -- not checked"* and the staleness guard is simply **off**. Making one CI
@@ -425,6 +427,14 @@ A red run of that job has **three** entirely different causes, and only the log 
 3. the fold **succeeding** and its push being rejected by the ruleset -- a clean fold above a `GH013`.
 
 **Read the fold step's own last lines before concluding anything** -- once there is a fold step to read.
+
+**One refusal is deliberately not on that list, because it no longer turns the job red** (inbound #1586).
+Where a second merge lands between the job's checkout and the fold, the fold's trunk-freshness guard
+refuses -- correctly, on an entry somebody else has by then already folded -- and the placed runner
+**stands down green** instead: exit code `2` from the fold, which nothing else in that script returns. It
+is lossless because that guard fires in a pre-pass, before a single entry is folded, and because the push
+that moved your trunk queues its own run of the same job behind this one. So a `Stood down:` line in the
+log is the job working, not a fold that went missing -- and every **other** non-zero code still fails.
 
 ### Exit code
 

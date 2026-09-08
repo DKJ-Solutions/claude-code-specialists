@@ -671,6 +671,95 @@ if ($trunkReturn.Return) {
     Write-Host "ship-pr: staying on '$branch' -- $($trunkReturn.Reason)." -ForegroundColor DarkGray
 }
 
+function Get-MissingCheckSuiteRefusalNote {
+    <#
+    .SYNOPSIS
+        The best-effort #1234 / #1247 diagnostic sentence for a PR whose CI check never registered --
+        '' when nothing can be read, so a diagnostic is never the reason a refusal cannot be printed.
+
+    .DESCRIPTION
+        Lifted out of Wait-CheckRegistration's post-timeout branch (issue #1584) so the early
+        CONFLICTING short-circuit can word its refusal from the SAME builder rather than reimplement
+        the sha + check-suites + mergeable reads. Every read is guarded; any failure degrades to ''
+        and the caller falls back to the wording that was already there.
+
+        THE SHA IS READ LOCALLY, for the reason step 4's DEPLOY lock gives for the same read: step 1's
+        open-pr.ps1 pushed $Branch before this point on every path through here, so refs/heads/<branch>
+        IS the PR's head commit, and a gh headRefOid read would say the same thing over the network in
+        a diagnostic that must not need a live token to word a refusal.
+
+    .PARAMETER Mergeable
+        Passed straight to Get-MissingCheckSuiteNote when the caller has already read GitHub's
+        mergeable state (the early exit has); '' means read it here, which is the post-timeout path.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Pr,
+        [Parameter(Mandatory)][string]$Repo,
+        [Parameter(Mandatory)][string]$Branch,
+        [string]$Mergeable = ''
+    )
+    try {
+        $shaRead = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('rev-parse', "refs/heads/$Branch")
+        $sha = if ($shaRead.ExitCode -eq 0) { ($shaRead.Output -join '').Trim() } else { '' }
+        if (-not $sha) { return '' }
+        # -DiscardStderr because this output is PARSED: a gh warning merged into it would break the
+        # parse and cost the note. Nothing here reads anything but an app slug, all ASCII, so the
+        # console code page cannot change the answer and -Utf8 would buy nothing.
+        $suiteFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+            'api', "repos/$Repo/commits/$sha/check-suites")
+        if ($suiteFacts.ExitCode -ne 0) { return '' }
+        # THE ONE CAUSE THAT IS CHECKABLE RATHER THAN GUESSED (#1247). A conflicting PR has no
+        # refs/pull/<n>/merge for a pull_request workflow to run against, so GitHub creates no suite
+        # for it -- ever, and neither a reopen nor a fresh head changes that. Read here only when the
+        # caller has not already; guarded on its own so a failure still leaves the #1234 wording intact.
+        $mergeable = $Mergeable
+        if (-not $mergeable) {
+            try {
+                $mergeRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                    'pr', 'view', "$Pr", '--repo', $Repo, '--json', 'mergeable', '--jq', '.mergeable')
+                if ($mergeRead.ExitCode -eq 0) { $mergeable = ($mergeRead.Output -join '').Trim() }
+            } catch {
+                $mergeable = ''
+            }
+        }
+        return Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$Pr" -Mergeable $mergeable
+    } catch {
+        return ''
+    }
+}
+
+function Test-BranchEntryAlreadyFolded {
+    <#
+    .SYNOPSIS
+        $true when 'main' carries a commit that DELETED this branch's own dkj-policy/<slug>.md -- the
+        signature of an entry that has already folded (issue #1584). $false on any doubt.
+
+    .DESCRIPTION
+        A second PR on a branch whose entry has folded is a permanent delete/modify conflict against
+        the trunk: the fold's own deletion on one side, the branch's still-modified document on the
+        other. Reachable with no concurrency at all -- a UI or queue merge the shipping session never
+        observed, then one more commit on the branch.
+
+        Local reads only, and the safe direction is the only direction: a stale origin/main simply has
+        not seen the fold yet, so the delete-search comes back empty and the caller falls back to the
+        generic conflict wording. It never reports a fold that did not happen. The plain "file on HEAD
+        but not on main" test is NOT usable here -- new-branch writes the document on the branch and
+        never on main, so that test is true for every healthy first PR too; only a DELETE commit in
+        the trunk's history distinguishes a folded branch from a fresh one.
+    #>
+    param([Parameter(Mandatory)][string]$Branch)
+    try {
+        $doc = "dkj-policy/$($Branch -replace '/', '-').md"
+        $onHead = (Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('cat-file', '-e', "HEAD:$doc")).ExitCode -eq 0
+        if (-not $onHead) { return $false }
+        $delLog = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @(
+            'log', 'refs/remotes/origin/main', '--diff-filter=D', '--format=%H', '-n', '1', '--', $doc)
+        return ($delLog.ExitCode -eq 0) -and [bool](($delLog.Output -join '').Trim())
+    } catch {
+        return $false
+    }
+}
+
 function Wait-CheckRegistration {
     <#
     .SYNOPSIS
@@ -705,6 +794,38 @@ function Wait-CheckRegistration {
         [int]$AlreadyWaited = 0
     )
     $waited = $AlreadyWaited
+
+    # EARLY EXIT ON A CONFLICTING PR -- issue #1584. #1247 taught the timeout refusal below that a
+    # CONFLICTING PR has no refs/pull/<n>/merge for a pull_request workflow to run against, so GitHub
+    # creates no check suite for it -- ever. That branch was only ever reached AFTER the full 180s
+    # wait, so every conflicting ship still paid 180s for a state GitHub reports the instant the PR
+    # exists (measured on PR #1582: 180s waited, then #1234's remedy, which cannot work here). Read it
+    # up front: a definitive CONFLICTING refuses now, with the same wording the timeout would have
+    # used. Anything else -- MERGEABLE, or UNKNOWN while GitHub is still computing -- falls through to
+    # the ordinary wait, which still catches a conflict that only resolves later. Best-effort: a gh
+    # read that fails leaves $mergeNow empty and changes nothing.
+    $mergeNow = ''
+    try {
+        $mergeNowRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+            'pr', 'view', "$Pr", '--repo', $Repo, '--json', 'mergeable', '--jq', '.mergeable')
+        if ($mergeNowRead.ExitCode -eq 0) { $mergeNow = ($mergeNowRead.Output -join '').Trim() }
+    } catch {
+        $mergeNow = ''
+    }
+    if ($mergeNow.ToUpperInvariant() -eq 'CONFLICTING') {
+        $conflictNote = Get-MissingCheckSuiteRefusalNote -Pr "$Pr" -Repo $Repo -Branch $Branch -Mergeable 'CONFLICTING'
+        if (-not $conflictNote) {
+            # The suite-list read failed, so the shared builder returned nothing -- but CONFLICTING is
+            # already known, so the mechanism half of its sentence can still be stated on its own.
+            $conflictNote = "GitHub reports this PR as CONFLICTING, and a pull_request workflow runs against the merge commit (refs/pull/<n>/merge) that a conflicting PR has none of -- so no check suite can be created for it at all. Resolve the conflict (merge 'main' in, or rebase) and the ordinary push creates it. A close/reopen does NOT repair this and was measured doing nothing (#1247)."
+        }
+        if (Test-BranchEntryAlreadyFolded -Branch $Branch) {
+            $conflictNote += " AND THIS BRANCH IS SPENT: its changelog entry (dkj-policy/$($Branch -replace '/', '-').md) has already folded on 'main', so the conflict is the fold's deletion against this branch's own copy -- resolving it just re-adds a folded entry. Put the follow-up work on a fresh branch off 'main' (#1584)."
+        }
+        Write-Error "No CI check will register for PR #$Pr -- NOT merged (CONFLICTING). $conflictNote"
+        exit 1
+    }
+
     while ($true) {
         $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$Pr", '--repo', $Repo)
         if (($probe.Output | Out-String) -notmatch 'no checks reported') { return $waited }
@@ -714,45 +835,9 @@ function Wait-CheckRegistration {
             # moves. "Check the workflow" claims the repo's YAML is wrong, and the state that most often
             # produces this has healthy workflows -- GitHub simply created no Actions check suite for the
             # commit. Reading the suite list separates the two, and only the second is about the workflow.
-            #
-            # THE SHA IS READ LOCALLY, for the reason step 4's DEPLOY lock gives for the same read: step 1's
-            # open-pr.ps1 pushed $Branch before this point on every path through here, so refs/heads/<branch>
-            # IS the PR's head commit, and a gh headRefOid read would say the same thing over the network in
-            # a diagnostic that must not need a live token to word a refusal.
-            #
-            # Best-effort by construction, like all three notes below -- the lost watch, the stalled run and
-            # the authored failure: every read is guarded and any failure degrades to the wording that was
-            # already here.
-            $suiteNote = ''
-            try {
-                $shaRead = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('rev-parse', "refs/heads/$Branch")
-                $sha = if ($shaRead.ExitCode -eq 0) { ($shaRead.Output -join '').Trim() } else { '' }
-                if ($sha) {
-                    # -DiscardStderr because this output is PARSED: a gh warning merged into it would break
-                    # the parse and cost the note. Nothing here reads anything but an app slug, all of which
-                    # are ASCII, so the console code page cannot change the answer and -Utf8 would buy nothing.
-                    $suiteFacts = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
-                        'api', "repos/$Repo/commits/$sha/check-suites")
-                    if ($suiteFacts.ExitCode -eq 0) {
-                        # THE ONE CAUSE THAT IS CHECKABLE RATHER THAN GUESSED (#1247). A conflicting PR has no
-                        # refs/pull/<n>/merge for a pull_request workflow to run against, so GitHub creates no
-                        # suite for it -- ever, and neither a reopen nor a fresh head changes that. It is a
-                        # SECOND read because it answers a different question from the suite list, and it is
-                        # guarded on its own so a failure here still leaves the #1234 wording intact.
-                        $mergeable = ''
-                        try {
-                            $mergeRead = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
-                                'pr', 'view', "$Pr", '--repo', $Repo, '--json', 'mergeable', '--jq', '.mergeable')
-                            if ($mergeRead.ExitCode -eq 0) { $mergeable = ($mergeRead.Output -join '').Trim() }
-                        } catch {
-                            $mergeable = ''
-                        }
-                        $suiteNote = Get-MissingCheckSuiteNote -SuitesJson ($suiteFacts.Output -join "`n") -PrNumber "$Pr" -Mergeable $mergeable
-                    }
-                }
-            } catch {
-                $suiteNote = ''
-            }
+            # The read itself is Get-MissingCheckSuiteRefusalNote (above), shared with #1584's early exit;
+            # best-effort by construction, so any failure degrades to the wording that was already here.
+            $suiteNote = Get-MissingCheckSuiteRefusalNote -Pr "$Pr" -Repo $Repo -Branch $Branch
             if ($suiteNote) {
                 Write-Error "No CI check registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. $suiteNote"
             } else {
@@ -1427,6 +1512,27 @@ certificate anyway.
             $exemptClause = if ($staleVerdict.ExemptCount -gt 0) {
                 "`n($($staleVerdict.ExemptCount) further commit(s) landed in the same window and were discounted as folds -- changelog plus a branch document, issue #1592.)"
             } else { '' }
+            # THE REMEDY LEADS WITH A CHECKOUT, BECAUSE THIS RUN HAS ALREADY MOVED THE TREE (#1588).
+            # Step 2b hands the primary checkout back to the trunk the moment the PR exists (#1073), and
+            # this gate fires long after that -- past the whole CI wait. So the operator reading the
+            # refusal is standing on 'main', not on the branch the two git commands are about. WHAT THAT
+            # COSTS IS A SILENT NO-OP, NOT AN ERROR, which is why nothing caught it for five days: on a
+            # trunk behind origin/main, `git merge origin/main` fast-forwards local 'main' and prints a
+            # full diffstat -- reading exactly like the branch being brought forward -- and the push after
+            # it is `Everything up-to-date`. The first thing to say anything is the re-run of ship-pr, one
+            # full CI cycle later, and what it says is `You are on main` -- a message about the wrong
+            # problem. Measured twice: PR #1583 (issue #1579) on September 8, 2026, and PR #1316 on
+            # September 3, recorded as a parenthetical in #1325 and never repaired because that issue
+            # closed on a different axis (CI sharding). THE OPERATOR CANNOT BE THE GUARD HERE: the branch
+            # check fires at the start of an assignment, and this is the middle of one -- re-reading `git
+            # branch` between a refusal and its own prescribed remedy is not a step anything asks for.
+            #
+            # $branch IS THE GATE'S OWN READING rather than a guess -- captured at line 357 before step 2b
+            # ran, so it still names the branch even though HEAD no longer does. It is printed
+            # UNCONDITIONALLY, not gated on the trunk-return decision: where step 2b declined to move (a
+            # dirty tree, another worktree on the trunk) the line is a harmless no-op, and a remedy that
+            # is sometimes missing a step is worse than one that sometimes repeats a checkout you have.
+            # NOT the gate performing the update itself -- that is option 3 in #1325 and a larger decision.
             Write-Error @"
 stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
 started (issue #1292) -- NOT merged.$exemptClause
@@ -1435,8 +1541,11 @@ The required check(s) ($(Format-CheckNameList -Names $staleCheckNames)) tested G
 stood when that run was created; anything landed on 'main' since is untested against this branch. Newest
 first: $shownShas
 
-Bring the branch up to date so CI re-runs against the current 'main', then re-run ship-pr:
+Bring the branch up to date so CI re-runs against the current 'main', then re-run ship-pr. THE
+CHECKOUT IS THE FIRST STEP -- this run already handed the tree back to the trunk (issue #1073), so
+without it the merge below fast-forwards 'main' and leaves the branch untouched, silently (#1588):
 
+  git checkout $branch
   git fetch origin main
   git merge origin/main
   <push, wait for CI to go green again, re-run ship-pr>

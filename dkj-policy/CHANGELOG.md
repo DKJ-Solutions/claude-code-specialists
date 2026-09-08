@@ -43,7 +43,101 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 14 minor entries** <!-- pending-tally -->
+**9 / 17 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1588-stale-ci-remedy-checkout · 20260908-100702
+
+`ship-pr`'s stale-CI refusal now tells you to check the branch out before bringing it forward. It printed
+`git fetch` and `git merge` alone, and by the time it fires the same run has already returned your tree to
+the trunk -- so both commands acted on `main`, silently: the merge fast-forwarded the trunk with a diffstat
+that reads exactly like the branch moving forward, the push was a no-op, and the branch was untouched. The
+cost was a full CI cycle and a re-run complaining about the wrong problem, twice in five days.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service notices. This is a refusal message inside the shipping tooling;
+its reader is whoever is merging a pull request.
+
+**Score:** N/A
+
+#### Pull Request
+
+ship-pr's stale-CI remedy names the branch to check out first
+
+Plugins: dkj-policy
+
+[PR #1596](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1596)
+
+---
+
+### DEPLOY: fix/1584-ship-pr-conflicting-early-exit · 20260908-095109
+
+`ship-pr` now refuses a CONFLICTING pull request the instant it starts waiting for CI, instead of
+after the full 180s check-registration timeout. A conflicting PR has no `refs/pull/<n>/merge` for a
+`pull_request` workflow to run against, so no check suite can ever register for it -- a state GitHub
+reports the moment the PR exists, which made the wait pure cost. The refusal reuses the existing
+#1247 diagnosis (resolve the conflict; a close/reopen was measured doing nothing), and where the
+conflict is a branch whose changelog entry has already folded on `main`, it says the branch is spent
+and the follow-up belongs on a fresh branch off the trunk -- rather than a rebase that just re-adds a
+folded entry.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- internal shipping-workflow tooling; no subscriber of a service is affected.
+
+**Score:** N/A
+
+#### Pull Request
+
+Refuse a CONFLICTING PR up front instead of after the 180s check-registration wait
+
+Plugins: dkj-policy
+
+[PR #1595](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1595)
+
+---
+
+### DEPLOY: fix/1586-fold-on-merge-stale-trunk-deferral · 20260908-094224
+
+The `Fold on merge` CI job no longer goes red when two merges land within seconds of each other. Its
+checkout reads the trunk once, and the fold's trunk-freshness guard measures the same trunk again about
+eleven seconds later -- so a second merge in that gap left the job refusing on an entry another actor
+had already folded. The guard was right and the trunk ended correct; only the red was wrong, and it
+described a state that was gone by the time anybody opened it.
+
+That refusal now carries its own exit code -- `2`, the only thing in `fold-changelog-entry.ps1` that
+returns it -- and the job stands down green on that code alone, naming the reason in the log. Every
+other non-zero code still fails it, so the three real ways the job goes red are untouched. Nothing is
+lost by standing down: the guard fires in a pre-pass before a single entry is folded, and the push that
+moved the trunk queues its own run of the same job behind this one. The consumer template in
+`adopt-merge-queue.ps1` places the same behaviour, and both workflow headers stop claiming -- as
+#1543's repair did -- that `ref: <trunk>` puts that guard out of reach.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer who has adopted the CI floor gets a fold runner that stops crying wolf, and the guidance
+that goes with it: a `Stood down:` line in the log is the job working rather than a fold that went
+missing. `git fetch` + `--ff-only` before the fold was the obvious alternative and is declined in
+writing -- it narrows the window without closing it, which leaves the guardrail red *rarely*, and a
+guardrail that is wrong rarely is the one nobody reads.
+
+**Score:** 2
+
+#### Pull Request
+
+fold-on-merge stands down on a trunk that moved under it, instead of going red
+
+Plugins: dkj-policy
+
+[PR #1593](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1593)
+
+---
 
 ### DEPLOY: docs/1587-staleness-source-of-truth · 20260908-093101
 
