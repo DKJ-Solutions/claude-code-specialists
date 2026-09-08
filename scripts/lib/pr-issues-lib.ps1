@@ -1213,6 +1213,139 @@ function Get-CertifyingRunCreatedAt {
     return (@($timestamps | Sort-Object)[0])
 }
 
+function Test-IsFoldOnlyCommit {
+    <#
+    .SYNOPSIS
+        Whether one commit 'main' gained is a FOLD COMMIT and nothing else -- the changelog plus the
+        removal of a branch document, which is exactly the scope the fold exception is granted at.
+        Issue #1592's narrowing of the staleness predicate below.
+
+    .DESCRIPTION
+        WHY A FOLD IS EXEMPT, AND WHY THAT IS NOT THE PATH FILTER #1292 DECLINED. Get-StaleCertificateVerdict's
+        own docstring turns down filtering on which files a gained commit touched, on the ground that
+        "predicting which file a future test depends on is not this script's to do". That reasoning holds and
+        is untouched: it is about an ARBITRARY commit, whose content this script would have to guess the reach
+        of. A fold is not arbitrary. It is written by fold-changelog-entry.ps1, under a named exception to
+        "never commit directly on main" whose bound is stated as exactly two paths, and enforced by git
+        rather than by care -- 'git commit -- <paths>' with the changelog and the entry files named, so
+        nothing else can ride along. This function re-derives that bound from the commit's OWN diff rather
+        than trusting the subject line, so a commit only reads as a fold if it provably has a fold's shape.
+        The hazard #1292 exists to catch is a TEST BLOCK reaching 'main' that the shipping branch's CI never
+        executed (its instance: PR #1268 removing a completion that a test block landed on 'main' asserts on).
+        A commit carrying no script, no test, no manifest and no agent def cannot be that.
+
+        MEASURED, September 8, 2026 (issue #1592). Shipping PR #1571 took four ship-pr attempts and about an
+        hour, two of them ending at the stale-CI refusal. The three commits that voided those two certificates
+        were 4ea4f31b, 437366a4 and 072bb6bd -- ALL THREE folds, each one 'dkj-policy/CHANGELOG.md' plus the
+        deletion of one branch document, nothing else. Both refusals were therefore on commits that could not
+        have turned the trunk red, and both would have passed with this exemption in place. Over the trunk's
+        own history in that window (07:50Z-09:30Z, 19 first-parent commits) 10 were folds -- and 71 of 169
+        (42%) over the four days to that morning -- so the exemption
+        roughly halves the rate at which the trunk voids a certificate -- which is what decides whether
+        detect-and-rebase converges at all, the certificate's window being about as long as CI itself takes.
+
+        AND THE REPORTED REASON WAS NOT THIS ONE, which is why the repair is here and not at the wait.
+        #1592 attributed the window to ship-pr waiting on the NON-required 'claude-review' check, reading
+        "lint-en-tests finished in 2s" off the check table. That 2s is the AGGREGATOR job's own elapsed:
+        'lint-en-tests' in ci.yml is a needs: [lint, suites] job on ubuntu that compares two strings, so it
+        cannot conclude before the windows legs it waits on. Measured over the last 40 paired pull_request
+        runs, CI itself takes 5-7 minutes and the non-required check governs 8 of 40 (20%, median excess 0s)
+        -- which reconfirms #831's own n=100 finding of 23% rather than overturning it, and leaves the wait
+        exactly where Dave left it. Of the two refusals, attempt 3's first voiding commit landed BEFORE its
+        required check concluded, so it was lost before the certificate was ever valid.
+
+        FAILS CLOSED, EVERY WAY IN. An unreadable diff, a shape with two paths (a rename or a copy, which the
+        fold does not produce), a path outside the entry folder, a changelog that is deleted rather than
+        written, a missing seam, or no branch-document deletion at all: each returns $false, and a commit that
+        does not read as a fold is counted exactly as it was before this function existed. The residual this
+        leaves is named rather than engineered around: a fold's changelog text could link to a path the
+        shipping branch deletes, and the dead-link scan would then go red on the trunk. It is the cheapest
+        class of red there is, it is caught by the trunk's own CI within minutes, and the text was already on
+        'main' -- and already scanned -- inside the branch document the fold moves it out of.
+
+        PURE, like every other verdict in this file: the caller reads the diff (git show --name-status) and
+        hands the lines here.
+
+    .PARAMETER NameStatusLines
+        'git show --name-status --format= <sha>' output for one commit: tab-separated '<status>' and '<path>'
+        lines. Blank entries are dropped; an empty list reads as "not a fold", never as a vacuous yes.
+
+    .PARAMETER ChangelogPath
+        The repo-relative changelog path, as the caller's own seam answers it (Get-ChangelogPath). Empty
+        means the caller could not resolve it, and nothing is exempted.
+
+    .PARAMETER EntryDirectory
+        The folder branch documents live in (Get-BranchFilePaths.Directory). A repo still carrying a
+        pre-rename folder name simply gets no exemption, which is the same refusal it gets today.
+
+    .PARAMETER ReservedNames
+        The folder's own permanent pages (Get-BranchFilePaths.ReservedNames) -- README.md, CONTRIBUTING.md,
+        CHANGELOG.md. A commit touching one of those is not a fold. Matched case-insensitively, for the
+        reason that list itself gives: Windows hands back 'Readme.md' for a file committed as 'README.md'.
+    #>
+    param(
+        [string[]]$NameStatusLines = @(),
+        [string]$ChangelogPath = '',
+        [string]$EntryDirectory = '',
+        [string[]]$ReservedNames = @()
+    )
+
+    if (-not $ChangelogPath -or -not $ChangelogPath.Trim()) { return $false }
+    if (-not $EntryDirectory -or -not $EntryDirectory.Trim()) { return $false }
+
+    # Forward slashes both sides, and no leading or trailing one: git reports its own paths with forward
+    # slashes while a seam on Windows may answer with backslashes, and comparing the two spellings is the
+    # one way this could silently drop a real path out of the fold's bound.
+    $changelog = (([string]$ChangelogPath) -replace '\\', '/').Trim().Trim('/')
+    $entryDir = (([string]$EntryDirectory) -replace '\\', '/').Trim().Trim('/')
+    if (-not $changelog -or -not $entryDir) { return $false }
+    $reserved = @($ReservedNames | Where-Object { $_ } | ForEach-Object { ([string]$_).Trim() })
+
+    $lines = @($NameStatusLines | Where-Object { $_ -and ([string]$_).Trim() })
+    if ($lines.Count -eq 0) { return $false }
+
+    $sawChangelogWrite = $false
+    $sawEntryDeletion = $false
+
+    foreach ($line in $lines) {
+        # Tab-separated, and EXACTLY a status and one path. A rename ('R100') and a copy ('C') both come
+        # back with three fields; the fold produces neither, so they disqualify the commit rather than
+        # being half-read into one of the two buckets below.
+        $fields = @((([string]$line) -split "`t") | Where-Object { $_ -ne '' })
+        if ($fields.Count -ne 2) { return $false }
+        $status = $fields[0].Trim()
+        $path = ($fields[1] -replace '\\', '/').Trim().Trim('/')
+        if (-not $status -or -not $path) { return $false }
+
+        if ($path -ieq $changelog) {
+            # The fold WRITES the changelog: modified normally, added in a repo folding for the first time.
+            # A deleted changelog is not a fold, and reading it as one would exempt the one commit that
+            # could take the file this gate's whole cycle depends on off the trunk.
+            if ($status -notmatch '^(M|A)') { return $false }
+            $sawChangelogWrite = $true
+            continue
+        }
+
+        # A branch document: directly inside the entry folder, markdown, and not one of that folder's own
+        # permanent pages. StartsWith rather than -like, deliberately: a folder name is data here, and
+        # -like would read a '[' in it as a character class.
+        if (-not $path.StartsWith("$entryDir/", [System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+        $leaf = $path.Substring($entryDir.Length + 1)
+        if (-not $leaf -or $leaf.Contains('/')) { return $false }
+        if ($leaf -notmatch '(?i)\.md$') { return $false }
+        if (@($reserved | Where-Object { $_ -ieq $leaf }).Count -gt 0) { return $false }
+
+        # THE DELETION IS THE SIGNATURE, and requiring it is what keeps an ordinary pull request out of this
+        # exemption. A branch that edits the changelog's intro and nothing else would otherwise arrive here
+        # as a changelog-only commit and be waved through -- and this repo's own suites do assert on that
+        # intro, so it is a commit whose reach this function cannot vouch for. Only the fold removes a
+        # branch document, so only the fold has both halves.
+        if ($status -match '^D') { $sawEntryDeletion = $true }
+    }
+
+    return ($sawChangelogWrite -and $sawEntryDeletion)
+}
+
 function Get-StaleCertificateVerdict {
     <#
     .SYNOPSIS
@@ -1246,19 +1379,40 @@ function Get-StaleCertificateVerdict {
         here. Nothing here touches git or gh, so the verdict is asserted without a live remote -- the
         same split Get-MergeBlockVerdict and Get-CheckWaitReport already follow in this file.
 
+        AND ONE CLASS OF COMMIT IS DISCOUNTED SINCE #1592: the fold. Test-IsFoldOnlyCommit above decides
+        that from a commit's own diff, and the caller hands the SHAs it recognised in -ExemptCommits. That
+        is not the path filter the paragraph above declines -- read its header for why a commit written by
+        fold-changelog-entry.ps1 under a two-path bound is a different question from an arbitrary one. The
+        arithmetic here stays deliberately dumb: this function is handed a list and subtracts it, so the
+        judgement lives in one place and this one still asserts without a live remote.
+
     .PARAMETER NewMainCommits
         The SHAs of first-parent commits on 'main' at or after the certifying run's own `created_at`
         (Get-CertifyingRunCreatedAt), newest first (the order `git log` already produces). Empty (not
         $null) means "main has not moved" -- the caller's own read decides that; this only counts what
         it is handed.
+
+    .PARAMETER ExemptCommits
+        The subset of those SHAs that provably cannot void the certificate -- today, the folds
+        (Test-IsFoldOnlyCommit). Omitted, nothing is exempt and the verdict is exactly what it was before
+        #1592. A SHA here that is not in -NewMainCommits is ignored rather than subtracted from the count,
+        so a caller cannot talk the verdict below zero.
     #>
-    param([string[]]$NewMainCommits = @())
+    param(
+        [string[]]$NewMainCommits = @(),
+        [string[]]$ExemptCommits = @()
+    )
 
     $commits = @($NewMainCommits | Where-Object { $_ -and ([string]$_).Trim() } | Select-Object -Unique)
-    if ($commits.Count -eq 0) {
-        return [pscustomobject]@{ Stale = $false; Count = 0; Commits = @() }
+    $exemptAsked = @($ExemptCommits | Where-Object { $_ -and ([string]$_).Trim() } | ForEach-Object { ([string]$_).Trim() })
+    # Compared case-insensitively: a SHA is hex, and the caller reads it back out of two different git
+    # invocations (the log for the list, the diff for the classification) rather than one.
+    $exempt = @($commits | Where-Object { $sha = ([string]$_).Trim(); @($exemptAsked | Where-Object { $_ -ieq $sha }).Count -gt 0 })
+    $remaining = @($commits | Where-Object { $sha = ([string]$_).Trim(); @($exemptAsked | Where-Object { $_ -ieq $sha }).Count -eq 0 })
+    if ($remaining.Count -eq 0) {
+        return [pscustomobject]@{ Stale = $false; Count = 0; Commits = @(); ExemptCount = $exempt.Count; ExemptCommits = $exempt }
     }
-    return [pscustomobject]@{ Stale = $true; Count = $commits.Count; Commits = $commits }
+    return [pscustomobject]@{ Stale = $true; Count = $remaining.Count; Commits = $remaining; ExemptCount = $exempt.Count; ExemptCommits = $exempt }
 }
 
 function Get-FailedCheckRunRefs {
