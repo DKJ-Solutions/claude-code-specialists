@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**17 / 35 minor entries** <!-- pending-tally -->
+**17 / 36 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1622-fixture-git-judged · 20260908-151234
+
+A fixture `git` command that fails while `sync-main.tests.ps1` builds its repos is now named, with its
+exit code and git's own stderr, instead of passing silently. That helper is behind all 24 fixture
+mutations in the suite and discarded both, so a half-built repo produced a block of red asserts with no
+cause printed anywhere -- which is what #1622 met under the 16-lane gate, and why the sighting could not
+be diagnosed.
+
+Two things follow. The run says a broken fixture **before** the verdict, because otherwise the default
+reading of a red suite is that the script regressed -- and here it did not. And a run where every assert
+passed but a fixture command did not now **fails**: a clean sweep over a repo that was never built proves
+less than it appears to, and the failure count is the only thing that knows.
+
+The report's own two hypotheses were checked against the tree first and neither survives: the `net:`
+cases are static scans of the script's source, and fixture roots carry `$PID` as well as a GUID while
+lanes are separate processes. What is genuinely different under thirty lanes is dozens of concurrent
+`git` processes over one temp tree.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a test suite's own diagnosability. No subscriber sees it, and nothing about what the workflow
+does changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+A fixture git command that fails is named, instead of leaving a block of red asserts with no cause
+
+[PR #1640](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1640)
+
+---
 
 ### DEPLOY: fix/1636-gate-keeps-red-capture · 20260908-150234
 
