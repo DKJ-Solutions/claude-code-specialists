@@ -43,7 +43,151 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**15 / 28 minor entries** <!-- pending-tally -->
+**16 / 32 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1609-claude-home-pollution · 20260908-141700
+
+A debug script wrote fixture data into the real `~/.claude` and cost three checkouts their plugin
+install records, with no backup, no error and nothing that reported it -- what a session saw instead was
+every plugin listed as *"not installed in this checkout"*. A new SessionStart check,
+`claude-home-sessioncheck`, now reports a record whose `projectPath` sits under a scratch tree -- the one
+signature no existing reader can see, since the shared reader filters to this repo's path and separately
+skips a path that no longer resolves -- and names any marketplace clone the same fixture left behind. It
+also snapshots `installed_plugins.json` while that file reads healthy, after the verdict and never on a
+finding, so a clobber can be *restored* rather than re-installed, which is what left #1609 unrepaired at
+filing. The guard the report proposed was measured and declined: nothing committed writes under
+`~/.claude`, so a write-helper has no call site to be enforced at, and a command-string guard cannot see
+inside the temp script that did the writing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the first SessionStart check in this family that writes anything, and the exception is stated
+rather than quiet -- bounded to one file it owns, skipped on any finding, and switched off by one flag.
+The rest of the interest is in what was declined: the orphan-marketplace-directory scan that would have
+fired forever on ordinary residue (measured the same day on `claude-plugins-official/`), and the
+heredoc-inspecting guard whose first casualty would have been the fixture that tests it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Detect and recover fixture pollution of the real ~/.claude
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1626](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1626)
+
+---
+
+### DEPLOY: fix/1617-ref-print-display-scope-reason · 20260908-140616
+
+`ref-print-lib.ps1` said git already closes the deceptive-character class for a ref name. It does not:
+`git check-ref-format` enforces `\p{Cc}` and accepts `\p{Cf}`, so U+202E, U+200D, U+200B and U+2066 are
+all legal in a branch name -- creatable, checkout-able, and returned verbatim by `git rev-parse`. Those
+first two are the exact code points #1446 was filed for. The guard itself was always right; only the
+sentence explaining it was wrong, and a reader who is told a class is closed cannot weigh a gap they
+have been told does not exist. All four claim sites now name the two Unicode classes exactly, carry the
+measurement, and say the display axis is left open knowingly. The suite moves the format characters
+into its reachable half, where git's acceptance is asserted as a premise rather than assumed away.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. Nothing a subscriber can observe changes -- no guard loosens or tightens, no printed line differs,
+and the four code points were refused on the paste axis before this branch and are refused after it.
+The correction is to the reasoning a maintainer reads in the lib and its suite.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct ref-print-lib's display-scope reasoning: git accepts format characters in a ref
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1624](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1624)
+
+---
+
+### DEPLOY: fix/1612-relay-sanitise · 20260908-135612
+
+`ship-pr` prints the sentence a failing workflow wrote about itself, and it now strips the control and
+format characters out of that sentence before it reaches your terminal -- the same guard the
+"N commits behind" line has always had on a commit subject. An ANSI or OSC escape in a workflow's own
+`::error title=...::` can no longer repaint the console it is relayed into, and an RTL override can no
+longer make the relayed line read as something other than what it says. The words are kept; only the
+characters that act rather than read are removed. The 500-character cap is unchanged.
+
+Small, because it prevents a failure that has not happened: the author of an annotation is whoever writes
+the repo's own workflows, which is a high-trust surface. It is worth more than a 1 in one specific shape
+that is ordinary practice -- a workflow echoing untrusted input into `::error title=...::`, such as a PR
+title, a branch name or a third-party action's output -- where the relayed text stops being the author's
+own.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+It closes a claim as well as a gap. A page in the tree told readers this workflow printed
+externally-authored text to a console in exactly one place, so nobody had reason to look for the second
+one -- and the comment beside the second one already described itself as guarded. The repair makes three
+statements agree with the code instead of one, and pins the two sanitisers to each other so the next
+reader inherits a checkable arrangement rather than a claim.
+
+**Score:** N/A
+
+#### Pull Request
+
+Strip control and format characters from the relayed annotation, and correct the only-place claim
+
+Plugins: dkj-policy
+
+[PR #1621](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1621)
+
+---
+
+### DEPLOY: feat/1591-consumer-version-verdict · 20260908-134603
+
+A consumer with no source checkout beside it now gets a real answer at session start instead of
+`no verified workshop checkout found -- check skipped`. That machine is the ordinary case, not an
+edge case: the register checks genuinely cannot run there, because `check-connectors.ps1` is
+source-only and is not plugin-carried -- so the hook said nothing at all about versions, and a
+session could load a plugin release behind the one on the machine with no signal of it. It now runs
+the plugin-carried `plugin-versions.ps1` in a new `-Brief` mode, which reports per enabled plugin
+whether the version THIS checkout installed is the one the local marketplace clone holds, and prints
+the command that closes the gap.
+
+Only an install that is BEHIND its clone is reported as a finding. A stale clone is deliberately not
+one -- it is a cache this checkout does not own, and shouting about it teaches the reader to skim the
+marker that matters -- and `[INFO]` lines are kept out of a clean run entirely, because a plugin from
+another marketplace reports "cannot determine" forever and would become permanent session-start
+noise. Every branch says the register checks did not run, so nobody reads a version answer as an
+all-clear for five checks that never happened.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow receives it in the next release, and it closes the blind spot the
+`plugin-versions` skill could only answer when someone thought to ask: a session that has quietly
+loaded a plugin release behind the machine's own now says so at the start, unprompted, on the
+machines where nothing was checking. The signal arrives where the cost of not having it is highest --
+a consumer acting on stale agent defs, skills or hooks without knowing it.
+
+**Score:** 4
+
+#### Pull Request
+
+A real version verdict on a plain consumer, instead of a session start that says nothing
+
+Plugins: dkj-policy
+
+[PR #1611](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1611)
+
+---
 
 ### DEPLOY: fix/1602-step8-report-wording · 20260908-132217
 

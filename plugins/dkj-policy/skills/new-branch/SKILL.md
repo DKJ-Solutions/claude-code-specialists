@@ -241,7 +241,29 @@ is never pushed off the screen.
 **The neighbouring case points the other way, deliberately.** `new-branch` already takes adversarial free
 text -- a malicious `-Title` -- and its rule there is the opposite: land *fully and unchanged*, asserted
 on an exact compare. That text goes into a **file**, where truncation is the damage. A console is not a
-file, and this is the only place this workflow prints externally-authored text to one.
+file, and the rule flips with the destination rather than with the text.
+
+**It is NOT the only console this workflow writes somebody else's words to** -- that claim stood here
+and was false from the day `ship-pr` began relaying the sentence a failing workflow wrote about itself
+(`Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`, #1103). **There are three**, and the count
+is worth stating precisely because the wrong one is what kept the second site unguarded:
+
+1. **This one** -- the remote tip's `%an` and `%s`, printed by `new-branch` and `open-pr`
+   (`Get-RemoteAheadNote`, `scripts/lib/remote-ahead-lib.ps1`, #1439 and #1446). Capped at 120.
+2. **`ship-pr`'s relay** of a failing workflow's own `::error title=...::` annotation
+   (`Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`, #1103). Capped at 500, and stripping
+   the same class since
+   [#1612](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1612).
+3. **The note printed when a branch name is refused for a paste-ready command** (`Get-PasteableRef`,
+   `scripts/lib/ref-print-lib.ps1`, #1594) -- because a guard whose refusal path is itself an injection
+   surface is worse than no guard. Not capped.
+
+The class is hand-typed in all three, on purpose and knowingly: #1594 re-typed it with this site already
+in place and recorded why. The functions share nothing else -- three different bounds, three different
+source processes, and no lib among them is loaded by another's callers -- so what is guarded is that the
+copies cannot DISAGREE, by an assert in `pr-issues.tests.ps1` that compares the patterns themselves and
+pins the count at three. A reader who needs every place this workflow prints foreign text now has the
+list, which is what the retired sentence was for.
 
 **It costs no network call.** The base measurement above already fetches *every* ref (that is what
 `-FetchAllRefs` is for, and #1139 is why), so the remote-tracking ref is on disk and as fresh as this run

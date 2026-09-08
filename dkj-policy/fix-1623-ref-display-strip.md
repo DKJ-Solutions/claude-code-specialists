@@ -53,12 +53,22 @@ four standing-branch rows in `sync-main.ps1` print names that came off `git ls-r
 pushed a branch matching the prefix chose that text -- and the operator reads those rows to decide
 which PR to close.
 
-**And one thing that is not in the tree at all: PR #1624 is open on `fix/1617-ref-print-display-scope-reason`
-and rewrites two of the same prose blocks in `ref-print-lib.ps1`.** This branch shrank its own footprint
-there to the minimum rather than racing it -- the reasoning paragraph is left to #1617, which owns it, and
-what this branch adds is the second function and one appended implementation note. Two small prose hunks
-still conflict; whichever lands second resolves them by keeping the corrected reasoning and saying the
-axis is now closed. Filed as #1630 so it is not discovered at the merge.
+**PR #1624 was open on the same two prose blocks while this branch was written, and it landed first.**
+`fix/1617-ref-print-display-scope-reason` rewrites the `.DESCRIPTION` scope note and the
+`Get-PasteableRef` strip comment -- the two paragraphs #1623's own subject makes stale. This branch
+shrank its footprint there to the minimum rather than racing it: the reasoning is #1617's and was left
+to #1617, and what this branch adds is the second function plus one appended implementation note. The
+collision was filed as **#1630** before it could be discovered at the merge, with the resolution written
+out -- and #1624 merged at 14:09, so this branch is the second one and carried it out:
+
+- #1624's measured account stands verbatim -- the `--branch` exit codes, and the U+202E / U+200D link
+  back to #1446. That is the accurate account of what git does and it is that issue's deliverable.
+- Its **verdict** clause is what changed. *"The display axis is OPEN at the prose sites ... left open
+  knowingly"* was true for a day and is not any more, so it now reads as the gap #1623 closed, and the
+  narrow path it names (a branch created by hand, cloned or fetched) became the argument for why the
+  strip **costs** nothing rather than for why the gap could be weighed and left.
+- `git merge origin/main` reported exactly the two hunks #1630 predicted, in one file plus its two
+  mirrors. Everything else auto-merged.
 
 #### What was scoped out and filed
 
