@@ -166,6 +166,23 @@ non-numeric — a `VUL-IN` left in place, most likely — is read by both the gu
 silence the report while leaving the id half exactly as inert as before. That is the shape this README
 warns about two sections down — a hole with a comment on it.
 
+**A repo with no store says so — and only then does the session check go quiet.** A repo that enables
+this team **without a Shopify store** — the plugin's own source repo, or any repo that turns the team on
+purely to check that its manifests, frontmatter and hooks still resolve — has no truthful theme id to
+give, and a placeholder reads as forgotten. It answers one function instead:
+
+```powershell
+function Get-ShopifyRepoHasNoStore { return $true }
+```
+
+The floor session check then stays silent on the half-armed finding, exactly as it does once a store
+repo has answered the live id — because this is a deliberate, self-authored **declaration**, not
+something the check inferred from the tree (a theme directory, a `shopify.theme.toml`). Everything else
+is unchanged: the guard hook still runs, with the id half of rule 3 inert, which costs nothing when
+there is no store to push to; every other seam behaves as before; and the duplicate-guard finding stays
+independent. **Absent — the ordinary case — still means a store repo**, so no real store is ever
+silenced by it.
+
 ## The one thing to know before you read a `git status` here
 
 **Every pull from live reports files as modified that nobody modified**, and this team's whole safety

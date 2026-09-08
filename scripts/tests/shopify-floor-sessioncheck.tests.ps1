@@ -21,6 +21,12 @@
     THE PLACEHOLDER CASE IS PART OF IT. adopt-shopify-floor writes the seam block with a 'VUL-IN'
     placeholder, so a non-numeric answer is a path a consumer really walks and must count as unanswered.
 
+    THE NO-STORE DECLARATION (inbound #1570). A repo that enables this team without a Shopify store
+    answers Get-ShopifyRepoHasNoStore with $true, and the half-armed finding then stays silent -- the
+    third state the id question has no room for. Pinned here: a truthy answer suppresses that finding
+    and nothing else (the duplicate-guard finding stays independent), a falsy one is not a declaration
+    and changes nothing, and absence -- every store repo -- is unaffected.
+
     Every case runs against a scratch fixture tree via CLAUDE_PROJECT_DIR. Nothing here touches the repo
     it runs in.
 
@@ -45,15 +51,21 @@ function Assert-True {
 }
 
 function New-FixtureRepo {
-    <# A consuming repo. $LiveId $null means no repo-config.ps1 at all; a string is the seam's answer. #>
-    param([string]$Label, $LiveId, [switch]$WithOwnGuard)
+    <# A consuming repo. $LiveId $null AND no other config flag means no repo-config.ps1 at all; a string
+       is the seam's answer. -NoStore appends Get-ShopifyRepoHasNoStore returning $true; -ConfigExtra
+       appends an arbitrary line (e.g. an explicit falsy no-store answer). #>
+    param([string]$Label, $LiveId, [switch]$WithOwnGuard, [switch]$NoStore, [string]$ConfigExtra)
     $root = Join-Path $Fixture "repo-$Label"
     if (Test-Path -LiteralPath $root) { Remove-Item -Recurse -Force -LiteralPath $root }
     New-Item -ItemType Directory -Force -Path (Join-Path $root '.claude') | Out-Null
-    if ($null -ne $LiveId) {
+    $configLines = @()
+    if ($null -ne $LiveId) { $configLines += "function Get-ShopifyLiveThemeId { '$LiveId' }" }
+    if ($NoStore)          { $configLines += 'function Get-ShopifyRepoHasNoStore { $true }' }
+    if ($ConfigExtra)      { $configLines += $ConfigExtra }
+    if ($configLines.Count -gt 0) {
         New-Item -ItemType Directory -Force -Path (Join-Path $root 'scripts') | Out-Null
         [IO.File]::WriteAllText((Join-Path $root 'scripts\repo-config.ps1'),
-            "function Get-ShopifyLiveThemeId { '$LiveId' }`r`n", $Utf8NoBom)
+            (($configLines -join "`r`n") + "`r`n"), $Utf8NoBom)
     }
     if ($WithOwnGuard) {
         $settings = '{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ ' +
@@ -109,6 +121,29 @@ try {
     $r = Invoke-Check -Root (New-FixtureRepo -Label 'numeric' -LiveId '190793613653')
     Assert-True ($r.Out -notmatch 'has not said which theme is live') 'numeric: read as an answer'
 
+
+    # --- a repo with no store declares it -- silent (inbound #1570) --------------------------------
+    # The third state the id question has no room for: not "answered", not "left blank", but "there is
+    # no store to answer for". The source repo enables this team without a store and walks exactly here.
+    Write-Host "Get-ShopifyRepoHasNoStore = true -- the half-armed finding stays quiet" -ForegroundColor Cyan
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'nostore' -LiveId $null -NoStore)
+    Assert-True ($r.Code -eq 0) 'no-store: exit 0'
+    Assert-True ($r.Out -notmatch 'has not said which theme is live') 'no-store: the half-armed [ERROR] is suppressed'
+    Assert-True ([string]::IsNullOrWhiteSpace($r.Out)) 'no-store: silent, exactly like an answered id'
+
+    # the declaration wins even over a VUL-IN placeholder sitting beside it
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'nostore-placeholder' -LiveId 'VUL-IN' -NoStore)
+    Assert-True ($r.Out -notmatch 'has not said which theme is live') 'no-store + VUL-IN: the declaration suppresses the finding the placeholder alone would raise'
+
+    # an explicit falsy answer is NOT a declaration -- a store repo that merely spells the seam out
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'nostore-false' -LiveId 'VUL-IN' -ConfigExtra 'function Get-ShopifyRepoHasNoStore { $false }')
+    Assert-True ($r.Out -match 'has not said which theme is live') 'no-store = $false: still reported -- a falsy answer is not a declaration'
+
+    # the declaration suppresses ONLY the half-armed finding; the duplicate-guard finding is independent
+    Write-Host "no-store declared + a second guard -- half-armed quiet, duplicate still reported" -ForegroundColor Cyan
+    $r = Invoke-Check -Root (New-FixtureRepo -Label 'nostore-dupe' -LiveId $null -NoStore -WithOwnGuard)
+    Assert-True ($r.Out -notmatch 'has not said which theme is live') 'no-store + dupe: half-armed finding suppressed'
+    Assert-True ($r.Out -match 'a second live-theme guard is registered') 'no-store + dupe: the duplicate-guard finding still fires -- independent of the id question'
 
     # --- no duplicate at all: the advice never appears ----------------------------------------------
     # The gate must not leak the convergence message into a repo with one guard, in EITHER seam state.
