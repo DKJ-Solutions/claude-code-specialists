@@ -36,6 +36,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $LibPath  = Join-Path $RepoRoot 'scripts\lib\gate-lib.ps1'
 
 $script:pass = 0
@@ -74,7 +78,11 @@ function Invoke-FixtureGit {
     $prev = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $Dir @GitArgs 2>&1 | Out-Null
+        # THE EXIT CODE IS READ, NOT DISCARDED (issue #1635). It used to go to Out-Null with the output,
+        # so a failed fixture command was indistinguishable from a working one -- and a half-built repo
+        # then makes every assert below it measure the wrong thing.
+        $out = & git -C $Dir @GitArgs 2>&1
+        Assert-FixtureGitOk -Code $LASTEXITCODE -GitArgs (@('-C', $Dir) + @($GitArgs)) -Output $out
     } finally { $ErrorActionPreference = $prev }
 }
 
@@ -610,5 +618,12 @@ try {
 
 Write-Host ''
 Write-Host "Result: $script:pass pass, $script:fail fail." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'gate-lib.ps1'
 if ($script:fail -gt 0) { exit 1 }
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
+    exit 1
+}
 exit 0

@@ -44,6 +44,9 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $RepoRoot 'scripts\lib\sync-rules.ps1')
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -72,15 +75,13 @@ function New-GitTree {
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("syncrules-$PID-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     $script:trees += $dir
-    $prevEap = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        & git -C $dir init --quiet                       | Out-Null
-        & git -C $dir config user.name  'sync-rules test' | Out-Null
-        & git -C $dir config user.email 'sync@test.invalid' | Out-Null
-        & git -C $dir config core.autocrlf false          | Out-Null
-        & git -C $dir config commit.gpgsign false         | Out-Null
-    } finally { $ErrorActionPreference = $prevEap }
+    # Each call is JUDGED rather than piped to Out-Null (issue #1635): the helper keeps the same lowered
+    # EAP for the same reason as before, and now says so when a fixture command fails.
+    Invoke-FixtureGitJudged @('-C', $dir, 'init', '--quiet')
+    Invoke-FixtureGitJudged @('-C', $dir, 'config', 'user.name', 'sync-rules test')
+    Invoke-FixtureGitJudged @('-C', $dir, 'config', 'user.email', 'sync@test.invalid')
+    Invoke-FixtureGitJudged @('-C', $dir, 'config', 'core.autocrlf', 'false')
+    Invoke-FixtureGitJudged @('-C', $dir, 'config', 'commit.gpgsign', 'false')
     return $dir
 }
 
@@ -101,12 +102,8 @@ function Add-Commit {
         $target = Join-Path $Dir $rel
         if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
     }
-    $prevEap = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        & git -C $Dir add -A                     | Out-Null
-        & git -C $Dir commit -q -m $Message       | Out-Null
-    } finally { $ErrorActionPreference = $prevEap }
+    Invoke-FixtureGitJudged @('-C', $Dir, 'add', '-A')
+    Invoke-FixtureGitJudged @('-C', $Dir, 'commit', '-q', '-m', $Message)
     return ([string](& git -C $Dir rev-parse HEAD)).Trim()
 }
 
@@ -173,17 +170,17 @@ try {
     try {
         $ErrorActionPreference = 'Continue'
         $trunkName = ([string](& git -C $merged rev-parse --abbrev-ref HEAD)).Trim()
-        & git -C $merged checkout -q -b 'sync/live-2026-08-20' | Out-Null
     } finally { $ErrorActionPreference = $prevEap }
+    Invoke-FixtureGitJudged @('-C', $merged, 'checkout', '-q', '-b', 'sync/live-2026-08-20')
     $syncOnBranch = Add-Commit -Dir $merged -Message 'sync: mirror in-flight third-party edits from live (2 file(s))' -Write @{ 'b.txt' = 'b1' }
+    Invoke-FixtureGitJudged @('-C', $merged, 'checkout', '-q', $trunkName)
+    # Two -m flags: the first is the subject, the second the body -- the shape gh writes for a merge.
+    Invoke-FixtureGitJudged @('-C', $merged, 'merge', '--no-ff', '-q', 'sync/live-2026-08-20',
+        '-m', 'merge: sync/live-2026-08-20 (#27)',
+        '-m', 'sync: mirror in-flight third-party edits from live (2 file(s))')
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $merged checkout -q $trunkName | Out-Null
-        # Two -m flags: the first is the subject, the second the body -- the shape gh writes for a merge.
-        & git -C $merged merge --no-ff -q 'sync/live-2026-08-20' `
-            -m 'merge: sync/live-2026-08-20 (#27)' `
-            -m 'sync: mirror in-flight third-party edits from live (2 file(s))' | Out-Null
         $mergeSha = ([string](& git -C $merged rev-parse HEAD)).Trim()
     } finally { $ErrorActionPreference = $prevEap }
 
@@ -242,8 +239,7 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
     # No sync commit, but a tag: a wider window, and worth reporting as such.
     $tagged = New-GitTree -Label 'tagged'
     Add-Commit -Dir $tagged -Message 'initial' -Write @{ 'a.txt' = 'a1' } | Out-Null
-    $prevEap = $ErrorActionPreference
-    try { $ErrorActionPreference = 'Continue'; & git -C $tagged tag 'v1.0.0' | Out-Null } finally { $ErrorActionPreference = $prevEap }
+    Invoke-FixtureGitJudged @('-C', $tagged, 'tag', 'v1.0.0')
     Add-Commit -Dir $tagged -Message 'feat: after the tag' -Write @{ 'b.txt' = 'b1' } | Out-Null
     Push-Location -LiteralPath $tagged
     try {
@@ -369,7 +365,7 @@ sync-main.tests.ps1 goes from 20 to 32 asserts. One earns its place twice: the
 
         # NO TAG FALLBACK, and this is the assert that keeps it. A tag says nothing about agreement with
         # live, so reading one as a per-path base would reintroduce this defect by a second route.
-        & git -C $perPath tag 'v9.9.9' | Out-Null
+        Invoke-FixtureGitJudged @('-C', $perPath, 'tag', 'v9.9.9')
         Assert-True ($null -eq (Get-SyncPathReferencePoint -Path 'locales/nl.json')) `
             'perpath/no-tag: a tag is not an agreement point -- it must not become one path''s base'
         Assert-Equal 'sync' (Get-SyncReferencePoint).Kind `
@@ -831,8 +827,15 @@ finally {
 }
 
 Write-Host ''
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'sync-rules.ps1'
 if ($script:fail -gt 0) {
     Write-Host "FAILED: $($script:fail) of $($script:pass + $script:fail) asserts." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green
