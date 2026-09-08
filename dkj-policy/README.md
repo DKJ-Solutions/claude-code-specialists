@@ -29,9 +29,10 @@ document the contribution cycle produces or governs, and the seam answers below 
 computed defaults doing it silently. Nothing about a consumer changed: those defaults have pointed here
 since #885, and this repo was the one holdout.
 
-**This page also carries the folder's two index sections**, below the divider: the seam table — this repo's
-answer to every question the portable half leaves open — and the pointer list saying where the rest lives.
-Both sat on `CONTRIBUTING.md` until August 26, 2026, where they were two `##` sections that were not steps.
+**This page also carries the folder's index sections**, below the divider: the seam table — this repo's
+answer to every question the portable half leaves open — then how to update the plugins in another
+checkout of this repo, and the pointer list saying where the rest lives. The first and the last sat on
+`CONTRIBUTING.md` until August 26, 2026, where they were two `##` sections that were not steps.
 
 ---
 
@@ -64,6 +65,52 @@ five since `1. NEW ISSUE / TASK` was written ahead of them on August 29, 2026.
 All of them live in [`scripts/repo-config.ps1`](../scripts/repo-config.ps1) except the prefix table, which is
 its own repo-owned lib. Where the table says *no override defined*, this repo deliberately runs on the shared
 default — that is an answer, not an omission.
+
+## Updating the plugins — in every other checkout of this repo
+
+**This repo consumes itself**, so the workflow a session here runs is the *installed* copy, not the tree
+you are standing in. Via [`.claude/settings.json`](../.claude/settings.json) it enables `dkj-team-alpha`
+and `dkj-policy` from the `github` marketplace source `DKJ-Solutions/claude-code-specialists` — itself.
+That is what makes the update a step of its own rather than something a merge does for you, and the whole
+reason this section sits in the folder index instead of only in the plugin's own
+[README](../plugins/dkj-policy/README.md).
+
+Two commands, from the root of the checkout you want to move, once per plugin:
+
+```powershell
+claude plugin marketplace update claude-code-specialists                        # 1. refresh the clone
+claude plugin update dkj-policy@claude-code-specialists --scope project         # 2. then update, per plugin
+claude plugin update dkj-team-alpha@claude-code-specialists --scope project
+```
+
+Then **restart the session** — a skill or a hook that arrived with the update is not in a session that
+started before it.
+
+**A push does not do it, and neither does a merge.** A session reads the plugins from the **local
+marketplace clone**, which advances on that first command and on nothing else. So an agent def, a skill
+or a script you merged here takes effect after merge, push *and* that refresh — and **between two
+releases no version check can tell you the clone is behind**, because `version` only moves at a cut. The
+[root `CLAUDE.md`](../CLAUDE.md#specific-to-this-repo-claude-code-specialists) states both halves; this
+is the procedure they imply.
+
+**Everything the second command touches is per-checkout state, which is why every machine runs it
+itself.** The install record is keyed on the checkout's **folder path**, so renaming or moving a checkout
+unlinks the plugin there with no error, and a machine that never ran `claude plugin install … --scope
+project` carries no record at all — nothing to unlink and nothing to update
+([#1449](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1449)).
+
+**What tells you a machine is behind is the connector register, not that machine.** Each registered
+consumer's manifest in [`connectors/`](../connectors/README.md) carries the version its record was last
+seen on, and `connector-sessioncheck` reports every one that lags the source at session start —
+`scripts/sync/check-connectors.ps1` is the deliberate full run. That is the only place the answer exists,
+because the lagging checkout itself reports a plausible version and works.
+
+**And two things can need catching up after the update.** `script-contract-sessioncheck` reports a
+repo-owned seam function the newer shared scripts call and this checkout has never had; a specialist that
+arrived with the update needs a roster row and a lens, which `sync-roster` stages — and which the repo
+owner types, because that skill is reserved for explicit invocation. The measurements behind the two
+commands, and why the version number is not the code you are running, are in
+[`INSTALL.md`](../INSTALL.md#staying-up-to-date) rather than repeated here.
 
 ## Where the rest lives
 

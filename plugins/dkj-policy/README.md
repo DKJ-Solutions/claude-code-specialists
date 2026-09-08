@@ -17,9 +17,9 @@ and its own opt-in, so it is never enabled by enabling this one; nesting states 
 bundle. Until September 5, 2026 this directory was `plugins/workflows/` and carried a README of its own
 about the *kind*; that page is folded into this one, and what remains of it — the naming and directory
 rule the lint gate enforces — is one level up in
-[`../README.md`](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/README.md),
+[`../README.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/plugins/README.md),
 beside the same rule for teams
-([#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467)).
+([#1467](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1467)).
 
 ## What it is, in one paragraph
 
@@ -36,7 +36,7 @@ seam wherever your repo owns the answer instead of asserting one repo's answer a
 `## Specific to this repo` section on whichever page carries your floor -- normally your root
 `CONTRIBUTING.md`, and see that page's closing section for when it is not -- holding your values; the source
 repo's
-[own answers](https://github.com/DaveKJohn/claude-code-specialists/blob/main/dkj-policy/CONTRIBUTING.md)
+[own answers](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/dkj-policy/CONTRIBUTING.md)
 are a worked example of that half.
 
 **That link moved on August 27, 2026, and the old one is why this sentence is worth reading twice.** It
@@ -54,7 +54,7 @@ they come from one repo and one day, which the section says out loud.
 **It was a fourth portable page, `TICKETWORK-portable.md`, until August 30, 2026.** What retired it was not
 its size but its reach: the cycle document began at the branch and never mentioned it, so a reader following
 that cycle end to end met neither the section nor the step it described
-([#1123](https://github.com/DaveKJohn/claude-code-specialists/issues/1123)).
+([#1123](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1123)).
 
 The full reasoning — the tier model, why the fold rewrites nothing, what a release must earn — ships with
 this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release workflow and
@@ -74,7 +74,7 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 | [`blueprint/`](blueprint/) | the source's own answers to the repo-owned seam, with the reasoning behind each — read by the `adopt-dkj-policy` skill's Part 2 |
 | [`templates/`](templates/) | the one file in this cycle that has to be **copied** rather than imported: `pull_request_template.md`. GitHub reads a PR template only from `.github/` in your own repo, so what ships here is the reference to copy and to diff against — see the [`open-pr` skill](skills/open-pr/SKILL.md) for the one promise it makes: the placeholder line |
 
-| [`dkj-policy-bwj/`](dkj-policy-bwj/) | **not this plugin's payload — a ministry under it.** BWJ's codex: the binding rules its two Shopify store repos (smartwatchbanden, xoxowildhearts) operate under, in two chapters. **Ticket handling** — file on GitHub first, mirror to Asana as a colleague-friendly variant; closing the GitHub issue only makes a CI template post that the work is ready to test and move the card to `ReadyToTest`, and never resolves the task itself. **The sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead ([#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382)). Two skills, no specialists, no hooks. Separately published and separately enabled; it has [its own README](dkj-policy-bwj/README.md) |
+| [`dkj-policy-bwj/`](dkj-policy-bwj/) | **not this plugin's payload — a ministry under it.** BWJ's codex: the binding rules its two Shopify store repos (smartwatchbanden, xoxowildhearts) operate under, in two chapters. **Ticket handling** — file on GitHub first, mirror to Asana as a colleague-friendly variant; closing the GitHub issue only makes a CI template post that the work is ready to test and move the card to `ReadyToTest`, and never resolves the task itself. **The sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead ([#1382](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1382)). Two skills, no specialists, no hooks. Separately published and separately enabled; it has [its own README](dkj-policy-bwj/README.md) |
 
 **No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
@@ -88,13 +88,13 @@ like a decision:
 
 - nine rows under the heading "The nine skills" while the directory held twelve — `lock`, `handover` and
   `prompt` had each arrived without one (all three are gone now:
-  [#882](https://github.com/DaveKJohn/claude-code-specialists/issues/882) retired `prompt` and
-  [#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957) the other two, both Dave's);
+  [#882](https://github.com/DKJ-Solutions/claude-code-specialists/issues/882) retired `prompt` and
+  [#957](https://github.com/DKJ-Solutions/claude-code-specialists/issues/957) the other two, both Dave's);
 - thirteen rows against fourteen directories — `check-branch-entry` had shipped without a row and stayed
   missing until August 21, 2026, when `prune-merged` was added and the set was recounted;
 - fourteen rows against sixteen directories, under a heading still reading twelve — `measure-skill` and
   `worktree-lane` both absent, repaired here
-  ([#873](https://github.com/DaveKJohn/claude-code-specialists/issues/873), August 26, 2026).
+  ([#873](https://github.com/DKJ-Solutions/claude-code-specialists/issues/873), August 26, 2026).
 
 **Dropping the count is the cheaper half of the repair, and it has been tried on its own before — it did
 not stop the drift, it only made it quieter.** So it is gone from the heading and from the layout table
@@ -114,7 +114,7 @@ of `scripts/lint/check-plugin-integrity.ps1`) could not serve here on two counts
   flag in their second column.
 
 The `skills:plugin` span (`[skill-list-plugin]`, check 29) is the plugin-scoped sibling that answers both
-([#920](https://github.com/DaveKJohn/claude-code-specialists/issues/920)). It resolves the plugin from the
+([#920](https://github.com/DKJ-Solutions/claude-code-specialists/issues/920)). It resolves the plugin from the
 **document's own path** rather than from anything written in the marker, and it reads each row's **link
 target** — `skills/<name>/SKILL.md` — instead of its backticks, so prose and backticked paths anywhere else
 in a row cost nothing. Adding a skill to this plugin without adding a row now turns the source repo's
@@ -175,7 +175,7 @@ existed: this plugin and `workflow-default` genuinely disagreed, by design, abou
 an entry at all.
 
 **Both the sibling and the guard were retired on August 26, 2026**
-([#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886)). The `workflow-sessioncheck`
+([#886](https://github.com/DKJ-Solutions/claude-code-specialists/issues/886)). The `workflow-sessioncheck`
 hook that counted enabled ids beginning with `workflow-` is gone, along with the plugin whose existence
 made two of them reachable. Nothing counts them now, so adding a second workflow to this family means
 answering the question above again rather than trusting a check that is no longer there.
@@ -202,3 +202,55 @@ Part of the adoption path in [`INSTALL.md`](https://github.com/DKJ-Solutions/cla
 [`UNINSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/UNINSTALL.md) is the mirror. It requires the core team `dkj-team-alpha`, which
 every consuming repo enables anyway. Enabling or disabling it is an ordinary plugin change rather than a
 migration, and there is no second one to switch between: the two directions are **on** and **off**.
+
+## Updating it
+
+**A release *announces* a new version of this plugin; nothing delivers it.** Getting one is two
+commands, run from the root of the repo that consumes it:
+
+```powershell
+claude plugin marketplace update claude-code-specialists                   # 1. refresh the cache first
+claude plugin update dkj-policy@claude-code-specialists --scope project    # 2. then update, per plugin
+```
+
+Then **restart the session** — a skill or a hook that arrived with the update is not in a session that
+started before it. If you also run the ministry, the same pair updates it, with `dkj-policy-bwj` in
+place of `dkj-policy`: it is separately published and separately installed, so updating this plugin
+leaves it exactly where it was.
+
+**Both things those commands touch are per-machine state, and that is the whole reason this section
+exists.** The marketplace is a cached git clone under `~/.claude/plugins/marketplaces/`, and the install
+record is a per-machine file keyed on the **folder path** of the checkout the install was run in. So a
+version you picked up on one machine changes nothing on the next one — your other laptop, a colleague's
+clone of the same repo, a second checkout of it beside the first — and nothing in a session tells you:
+the workflow keeps working, at whatever version that machine last installed. **Every machine runs the
+pair itself**, in every checkout it holds. A checkout that is renamed or moved loses its install record
+the same silent way
+([#1449](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1449)).
+
+**Neither part of the pair is optional, and only one of them is load-bearing for `update`.** Skip line 1
+and `install` was measured serving the *previous* version, twice — while `update` was measured refreshing
+the clone for itself, so keeping line 1 in front of it is insurance rather than a repair, because a stale
+cache is invisible by construction. Line 2 is where the flag matters: drop `--scope project` and the
+command looks in user scope and does not act on a project-scoped install at all. Both measurements — and
+why the version number is not the code you are running — are in the family's
+[Staying up to date](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/INSTALL.md#staying-up-to-date),
+which is the page to read; they are not restated here.
+
+**What can need catching up afterwards, and what tells you.** The shared scripts this plugin ships
+dot-source the two **repo-owned** libs named in [the seam](#what-it-expects-from-your-repo--the-seam),
+so a newer version can call a function your checkout has never had. That is the incident
+`script-contract-sessioncheck` exists for
+([#147](https://github.com/DKJ-Solutions/claude-code-specialists/issues/147): the first `new-branch` run
+after an update crashed on `The term 'Test-BranchName' is not recognized`), and it names the missing
+functions at the next session start; the [`adopt-dkj-policy`](skills/adopt-dkj-policy/SKILL.md) skill's
+**Part 2** fills them in, and its **Part 1** is the same catch-up one level up, for a folder document or
+the CI gate a newer version scaffolds. Both are additive and dry-run by default, so running them again
+in an already-adopted repo is safe.
+
+**What an update never touches is your own `dkj-policy/` folder** — your changelog, the documents of the
+branches you have open, your answers to the seam. Those are your repo's files: this plugin carries the
+conventions, never your answers to them, which is also why disabling it leaves all of them in place. So
+an update cannot lose work in flight. The one thing worth timing is the script contract above: the
+scripts a branch runs come out of the cache, so the quiet moment to update is between branches rather
+than under an open one.
