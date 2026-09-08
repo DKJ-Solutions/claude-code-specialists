@@ -43,7 +43,34 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**15 / 27 minor entries** <!-- pending-tally -->
+**15 / 28 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1602-step8-report-wording · 20260908-132217
+
+`ship-pr`'s step 8 no longer reports that a check "governed the merge" after the merge has already
+happened. Since #1602 that report is printed after the fold, once the non-required checks have
+finally reported -- and on the laps that change is actually about, the check finishing last is the
+non-required one, so the line stated the exact opposite of what occurred: the merge went minutes
+earlier *because* it no longer waits for that check. The line now names which check finished last and
+keeps everything else, including the excess clause that sizes the tail.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- one sentence of `ship-pr`'s own console output, read by whoever ships a branch.
+
+**Score:** N/A
+
+#### Pull Request
+
+step 8's report no longer says a check governed a merge that already happened
+
+Plugins: dkj-policy
+
+[PR #1619](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1619)
+
+---
 
 ### DEPLOY: fix/1616-go-ahead-trunk-claim · 20260908-131115
 
