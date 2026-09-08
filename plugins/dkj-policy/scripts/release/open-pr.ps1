@@ -787,6 +787,43 @@ keep it in the gitignored sibling of the file it belongs to, where one exists
 # no gh and no subprocess, and refusing it is a content decision rather than a tooling one. -Force is
 # the escape valve, for the rare entry that legitimately quotes the wording outside a fence.
 if (Test-Path -LiteralPath $entryPath) {
+    # AND "IS THERE AN ENTRY AT ALL" COMES FIRST (issue #1632), because the gate below cannot ask it. A
+    # document whose DEPLOY SECTION HAS BEEN DELETED reaches Get-EntryScaffoldFindings as the guidance
+    # PREAMBLE -- Get-DevelopmentEntryText's fallback, load-bearing for a legacy entry file and wrong here
+    # -- and that preamble carries no scaffold marker, because nobody scaffolded it. So the scaffold gate
+    # passes by ABSENCE and this script pushes a branch with no entry text whatsoever, having composed the
+    # PR title and description out of the guidance a few hundred lines above.
+    #
+    # THE PREDICATE IS THE LIB'S, shared with check-branch-entry.ps1's CI copy of this refusal -- the
+    # reasoning it reads by (a guidance blockquote under the title, or the named phases) belongs beside the
+    # splitter it bounds, not in two scripts free to disagree. Its header carries the measurement.
+    #
+    # -Force HONOURED, MATCHING ITS SIBLING BELOW rather than being absolute. There is no document this
+    # house wants pushed in this state, but the predicate reads a shape, and a consumer holding one nobody
+    # here has seen must have a way through a gate that is wrong about them. Loud, named, and escapable.
+    if (Test-DevelopmentEntryMissing -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))) {
+        $missingRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
+        if ($Force) {
+            Write-Warning "entry gate: $missingRel has no DEPLOY section at all, but -Force was given -- the fold will paste its guidance into the changelog."
+        } else {
+            Write-Error @"
+entry gate: $missingRel has no entry at all - its DEPLOY section is gone. Nothing pushed, no PR opened.
+
+The document carries a plan - its guidance block, its phases, or both - but no DEPLOY heading, so there is
+nothing for the fold to move into the changelog. Left as it is, the fold would paste the GUIDANCE into it as
+this change's description, and the scaffold gate below cannot see that: it looks for the wording the
+scaffolder left, and a deleted section carries none of it.
+
+The usual cause is not a deliberate deletion. It is an edit that truncated the file at '### PLAN' - a string
+that also occurs INSIDE the guidance blockquote, in the line forbidding branch-specific content above it.
+
+The new-branch skill is idempotent: run it on this branch to restore the section, then write what the change
+does. Shipping it as it stands is -Force.
+"@
+            exit 1
+        }
+    }
+
     # The DEPLOY section only, for the reason stated at the first read of this file above: the plan sitting
     # over it would be accused of being an unfinished entry.
     $entryText = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))

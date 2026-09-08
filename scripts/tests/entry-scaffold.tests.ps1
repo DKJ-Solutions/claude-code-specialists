@@ -2808,6 +2808,54 @@ $tallyCutSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\relea
 Assert-True ($tallyCutSrc -match '(?s)Convert-ChangelogForRelease -Content \$changelogRaw.*?\$changelogNew = Set-ChangelogPendingSummary -Content \$changelogNew') `
     'tally: and the cut resets it on the emptied document, so no released changelog carries a stale count'
 
+
+# --- Test-DevelopmentEntryMissing: the fourth state, and the legacy shapes it must NOT claim (#1632) ---
+# THE DEFECT IT CLOSES is that Get-DevelopmentEntryText's fallback cannot tell "there is no DEPLOY section"
+# from "the DEPLOY section says this". The fallback is load-bearing -- a legacy entry file IS an entry from
+# its first line -- so the two states are separated by a predicate beside it rather than by narrowing it,
+# and that makes the FALSE-REFUSAL asserts the load-bearing half of this block: every shape below that
+# expects $false is a file somebody's branch is carrying right now, in this repo or in a consumer.
+Write-Host ''
+Write-Host 'Test-DevelopmentEntryMissing (#1632)'
+
+$missingWhole = (Format-Development -Branch 'feat/no-entry') -join "`n"
+Assert-True (-not (Test-DevelopmentEntryMissing -Text $missingWhole)) 'entry-missing: the document the scaffolder writes has its entry -- the case that must never refuse'
+
+# THE MEASURED CUT, reproduced rather than hand-written: the truncation point was the first phase heading,
+# a string that also occurs INSIDE the guidance blockquote. That is what makes this reachable by an edit
+# meant to keep the guidance and replace the body, which is how the measured instance was produced.
+$missingLines = @($missingWhole -split '\r?\n')
+$missingPhase = ('#' * (Get-BranchCycleSectionLevel)) + ' ' + @((Get-BranchFileWording).StepPhases)[0]
+$missingCut = 0
+for ($mi = 0; $mi -lt $missingLines.Count; $mi++) {
+    if ($missingLines[$mi] -match [regex]::Escape($missingPhase)) { $missingCut = $mi; break }
+}
+Assert-True ($missingCut -gt 0) 'entry-missing: (the phase heading really occurs inside the guidance block, which is what makes the cut reachable)'
+Assert-True (Test-DevelopmentEntryMissing -Text (($missingLines[0..($missingCut - 1)]) -join "`n")) 'entry-missing: a document reduced to its guidance block has no entry -- the state every gate passed'
+Assert-True (Test-DevelopmentEntryMissing -Text "## feat/x`n`n### PLAN`n`n### CREATE`n`n- [x] done`n`n### TEST`n") 'entry-missing: and so has one whose phases survived but whose DEPLOY section did not'
+
+# THE FALSE-REFUSAL SURFACE. Each of these has no DEPLOY heading of its own to find, so each reaches the
+# predicate through the same arm as the two above and must come back the other way.
+Assert-True (-not (Test-DevelopmentEntryMissing -Text ((Format-EntryBlock -Branch 'feat/thing' -Type 'Feat' -Description 'd' -Body 'b') -join "`n"))) 'entry-missing: an entry block on its own is an entry, not a document that lost one'
+Assert-True (-not (Test-DevelopmentEntryMissing -Text ((Format-Development -Branch '') -join "`n"))) 'entry-missing: the reset state is not this defect -- Test-BranchChangelogIsFilled owns that verdict'
+Assert-True (-not (Test-DevelopmentEntryMissing -Text "## Fix: something broke`n`n#### Description`n`nIt broke.`n")) 'entry-missing: a pre-split root entry carries no plan, so the whole-text fallback stands'
+Assert-True (-not (Test-DevelopmentEntryMissing -Text "# Some title`n`n**Branch:** ``feat/thing```n`n## Fix: x`n`nbody`n")) 'entry-missing: nor is the declared branch the discriminator -- the un-narrowed **Branch:** fallback answers for a legacy entry too'
+Assert-True (-not (Test-DevelopmentEntryMissing -Text "### Fix: x`n`n#### Description`n`n> quoted prose`n`nbody`n")) 'entry-missing: a blockquote in an entry BODY is a quotation, not guidance -- the arm is anchored to the title'
+Assert-True (-not (Test-DevelopmentEntryMissing -Text '')) 'entry-missing: and empty text is not a document that lost its entry'
+
+# FENCE-AWARE, like every reader of this format. A document explaining this mechanism quotes the guidance
+# block, and a predicate that fired on the quote would refuse the file documenting it.
+Assert-True (-not (Test-DevelopmentEntryMissing -Text "### Fix: x`n`n#### Description`n`n``````text`n> **How this file is read.**`n``````n`nbody`n")) 'entry-missing: a guidance block quoted inside a fence is illustration, not a plan'
+
+# THE TWO CALL SITES. Everything above proves the predicate; these prove somebody asks it -- and both must,
+# because the CI gate exists precisely for the branch that never ran open-pr.
+$missingGateSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\lint\check-branch-entry.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($missingGateSrc -match '(?s)Test-DevelopmentEntryMissing.*?Get-EntryScaffoldFindings') `
+    'entry-missing: the CI gate asks it BEFORE the scaffold check -- the check it passes by absence'
+$missingPrSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\open-pr.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($missingPrSrc -match '(?s)Test-DevelopmentEntryMissing.*?Get-EntryScaffoldFindings') `
+    'entry-missing: and so does open-pr, ahead of its own scaffold gate -- the local half of the same refusal'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
