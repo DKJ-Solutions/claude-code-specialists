@@ -199,6 +199,13 @@ Assert-True ($cfgText -match 'function Get-MachineLocalPaths') 'repo-config.ps1 
 . (Join-Path $RepoRoot 'scripts\repo-config.ps1')
 $seam = @(Get-MachineLocalPaths)
 Assert-True ($seam -contains '.claude/settings.json') "this repo watches .claude/settings.json"
+# WATCHED IS NOT THE SAME AS MACHINE-LOCAL (#1574). The file is a shared, tracked declaration, and a
+# branch whose subject IS that declaration is the happy path this gate fires on -- so the seam has to
+# keep saying which of the two cases the settings.local.json move belongs to. It said the opposite
+# until #1574: "machine-local plugin enablement belongs in .claude/settings.local.json", read as a
+# blanket rule about the file, on a run whose branch was deliberately changing the enabled set.
+Assert-True ($cfgText -match 'NOT MACHINE-LOCAL') 'the seam comment says the watched file is not itself machine-local'
+Assert-True ($cfgText -match 'for that case and no other') 'and scopes the settings.local.json move to the clone-own case'
 
 # --- 7. open-pr.ps1 wires it in, as an advisory note ----------------------------------------------
 Write-Host "`n== 7. open-pr.ps1 reaches the gate and only warns ==" -ForegroundColor Cyan
@@ -212,6 +219,14 @@ $mlBlock = [regex]::Match($openPr, "(?s)if \(Get-Command -Name Get-MachineLocalP
 Assert-True ([bool]$mlBlock) 'the gate block is findable'
 Assert-True ($mlBlock -match 'Write-Warning \$machineLocalNote') 'the block warns'
 Assert-Equal 0 ([regex]::Matches($mlBlock, 'exit 1').Count) 'the block never refuses -- no exit'
+# TWO CASES, NOT ONE REMEDY (#1574). The note fires on the intended happy path -- a branch whose
+# subject is a deliberate change to the shared file -- so it must say so there rather than telling
+# the author to move the change somewhere gitignored. A warning that prescribes the wrong remedy on
+# the path it fires on is one that gets scrolled past, and then it is scrolled past on the day it is
+# right. This text ships to every consumer through the plugin mirror, so it is asserted here.
+Assert-True ($mlBlock -match 'Two cases') 'the note states both cases rather than one remedy'
+Assert-True ($mlBlock -match "only THIS clone's own") 'the move is prescribed only for the clone-own edit'
+Assert-Equal 0 ([regex]::Matches($mlBlock, 'machine-local plugin enablement belongs in').Count) 'the retired blanket remedy is gone'
 # said twice: the note variable is re-emitted at both run ends
 Assert-Equal 3 ([regex]::Matches($openPr, 'Write-Warning \$machineLocalNote').Count) 'the note is emitted once at the gate and once from each run end'
 # placement: before the scaffold gate and before the push

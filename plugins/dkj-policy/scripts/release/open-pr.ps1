@@ -758,9 +758,11 @@ That path is on this repo's machine-local list (Get-MachineLocalPaths) -- a trac
 usually belong to a clone, not the tree. A 'git add -A' sweeps such a file into the branch, where no
 other gate reads it: on PR #1557 a locally-enabled plugin set reached the merge queue that way.
 
-If this change is deliberate, nothing to do -- this is a note, not a refusal. If it is not, drop it
-from the branch (machine-local plugin enablement belongs in .claude/settings.local.json, which is
-gitignored) and run again.
+Two cases, and only the author can tell them apart. If this branch deliberately changes what the
+TREE declares -- the shared, tracked answer every clone inherits -- there is nothing to do: this is
+a note, not a refusal. If instead the edit is only THIS clone's own, drop it from the branch and
+keep it in that file's gitignored sibling where one exists (.claude/settings.local.json for the
+harness settings), then run again.
 "@
             Write-Warning $machineLocalNote
         }
