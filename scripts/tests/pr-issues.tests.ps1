@@ -1075,7 +1075,9 @@ Assert-True ($idxFacts -gt $idxWatchCall -and $idxFacts -lt $idxLost) 'and the c
 # script-local and dot-sourcing ship-pr.ps1 to reach it would run the whole ship.
 Write-Host "ship-pr.ps1 -- the watch re-enters the registration wait when it starts too early (#1350)" -ForegroundColor Cyan
 Assert-True ($shipText -like '*function Wait-CheckRegistration*') 'step 3''s registration wait is a function, so it can be re-entered (#1350)'
-Assert-True ($shipText -like "*-notmatch 'no checks reported'*") 'and it still breaks out on the TEXT, not the exit code, exactly as the inline loop did'
+# THE WORDING WIDENED AT #1602 (gh says `no required checks reported` on a narrowed watch), and the
+# claim is unchanged: the poll breaks out on the TEXT, not on the exit code.
+Assert-True ($shipText -like "*-notmatch 'no (required )?checks reported'*") 'and it still breaks out on the TEXT, not the exit code, exactly as the inline loop did'
 $idxFn       = $shipText.IndexOf('function Wait-CheckRegistration')
 $idxFirstUse = $shipText.IndexOf('Wait-CheckRegistration -Pr')
 $idxReentry  = $shipText.LastIndexOf('Wait-CheckRegistration -Pr')
@@ -1083,7 +1085,7 @@ Assert-True ($idxFn -ge 0 -and $idxFirstUse -gt $idxFn) 'the function is defined
 Assert-True ($idxFirstUse -lt $idxWatchCall) 'step 3 runs the wait before the --watch call, as the inline loop did'
 Assert-True ($idxReentry -gt $idxWatchCall) 'and the watch loop re-enters that SAME wait after --watch (#1350)'
 Assert-True ($shipText -like '*back to the registration wait (#1350)*') 'the fallback says what it is doing, rather than wording the transient as a CI failure'
-$idxGuard = $shipText.IndexOf("-match 'no checks reported'")
+$idxGuard = $shipText.IndexOf("-match 'no (required )?checks reported'")
 Assert-True ($idxGuard -gt $idxWatchCall -and $idxGuard -lt $idxReentry) 'the re-entry is guarded by the watch''s own no-checks output -- a real red check (a table, not that phrase) still falls through to the verdict'
 Assert-True ($shipText -like '*-AlreadyWaited $waited*') 'and it shares the 180s budget rather than restarting it, so a race that will not settle still ends in the #1234 refusal'
 $countSuiteNote = ([regex]::Matches($shipText, 'Get-MissingCheckSuiteNote -SuitesJson')).Count
@@ -2077,6 +2079,42 @@ Assert-True ($shipText -notlike '*if ($requiredWaitNames.Count -eq 0) {*') 'noth
 # when the ruleset could not be read is found one watch later; an empty re-reading is not evidence
 # that the ruleset requires nothing, and widening on it would undo the fix invisibly.
 Assert-True ($shipText -like '*if ($requiredWaitRefresh.Count -gt 0) { $requiredWaitNames = $requiredWaitRefresh }*') 'the refresh only ever narrows the watch -- an unreadable re-read leaves the earlier names standing'
+
+# --- the narrowed wait waits for a REQUIRED check, and gh has two wordings for "none" (#1602) ------
+# BOTH HALVES MEASURED ON PR #1614, the second live ship of this change. `--watch --required` does NOT
+# wait for a required check to appear: it reports `no required checks reported` and exits non-zero the
+# moment it finds none. The registration wait had been satisfied by any check at all -- `branch-entry`
+# and `claude-review` register before ci.yml's jobs -- and the loop's #1350 branch matched only the
+# other wording, so this arrived as a DROPPED SOCKET: three attempts, then a refusal saying CI was
+# still running about a run that was perfectly healthy.
+Write-Host ""
+Write-Host "ship-pr.ps1 -- the narrowed wait waits for a REQUIRED check (#1602, measured on PR #1614)" -ForegroundColor Cyan
+
+Assert-True ($shipText -like "*-notmatch 'no (required )?checks reported'*") 'the registration poll accepts BOTH of gh''s wordings for "nothing is registered"'
+Assert-True ($shipText -like "*-match 'no (required )?checks reported'*") 'and so does the watch loop''s #1350 branch, which is where the misclassification happened'
+Assert-True ($shipText -notlike "*-match 'no checks reported'*") 'the narrow match that cost PR #1614 three watch attempts is gone'
+Assert-True ($shipText -notlike "*-notmatch 'no checks reported'*") 'from the poll as well as from the loop'
+
+Assert-True ($shipText -like '*if ($waitNarrowed) { $probeArgs += ''--required'' }*') 'the poll itself narrows, so it waits for the check the watch will block on rather than for any check'
+# .Contains RATHER THAN -like, and this suite walked into it: a `[` in a -like pattern opens a
+# CHARACTER CLASS, so '*[string[]]$RequiredNames*' matches a single character out of {s,t,r,i,n,g,[}
+# and never the literal type accelerator. The same trap Test-IsFoldOnlyCommit documents beside its own
+# StartsWith, met from the other side.
+Assert-True ($shipText.Contains('[string[]]$RequiredNames = @()')) 'Wait-CheckRegistration takes the required names -- empty leaves it the wait every ship made before #1602'
+Assert-True ($shipText -like '*-MaxWaitSec $maxWaitSec -RequiredNames $requiredWaitNames*') 'and the first call passes them'
+Assert-True ($shipText -like '*-RequiredNames $requiredWaitNames*') 'as does the #1350 re-entry -- a re-entry that widened would reintroduce the bug on the retry'
+
+# ORDER IS THE REPAIR, not tidiness: the wait cannot wait for the right thing before the mode is
+# known. Asserted by offset, since that is the actual claim.
+$idxMode = $shipText.IndexOf('Get-RequiredCheckContexts -BranchRulesJson $foldRulesJson')
+$idxWait = $shipText.IndexOf('$waited = Wait-CheckRegistration -Pr')
+Assert-True ($idxMode -ge 0 -and $idxWait -gt $idxMode) 'the mode is decided BEFORE the registration wait runs, so the wait knows what to wait for'
+
+# AND THE REFUSAL AND PROGRESS LINES NAME WHAT THEY WAITED FOR, so a timeout on a narrowed wait does
+# not read as "no CI at all" when the advisory checks were running the whole time.
+Assert-True ($shipText -like '*$subject = if ($waitNarrowed) { ''required check'' } else { ''check'' }*') 'the wait names its own subject'
+Assert-True ($shipText -like '*No CI $subject registered for PR #$Pr*') 'and the timeout refusal uses it'
+Assert-True ($shipText -like '*(no $subject registered yet -- waited*') 'as does the progress line'
 
 # THE REPORT IS NOT LOST, IT IS MOVED. This is the assert that would fail if step 8 were ever dropped
 # as "the merge already happened": #831's whole finding was that an invisible wait turns two anecdotes

@@ -874,6 +874,28 @@ function Wait-CheckRegistration {
     .PARAMETER AlreadyWaited
         Seconds a previous call (the initial probe) has already spent, so the 180s budget is shared
         across the probe and any watch fallback rather than restarting from zero on the fallback.
+    .PARAMETER RequiredNames
+        The checks the ruleset requires, when step 3's watch is narrowed to them (issue #1602). Given
+        any, this waits for a REQUIRED check to register rather than for any check at all -- and that
+        distinction is the whole reason the parameter exists.
+
+        MEASURED ON PR #1614, the second live ship of #1602's own change. This wait polls
+        `gh pr checks`, which is satisfied by ANY registered check -- and `branch-entry` and
+        `claude-review` are separate workflows that register before ci.yml's jobs do. So it returned
+        happy, and the narrowed watch that followed found no required check to watch:
+
+            gh pr checks 1614 --watch --required
+            no required checks reported on the '...' branch      <- exit non-zero, immediately
+
+        `--watch --required` does NOT wait for a required check to appear. It reports that none is
+        registered and exits, which the loop below then had to classify -- and its #1350 branch matched
+        only the wording `no checks reported`, so this arrived as a DROPPED WATCH instead: three
+        attempts, then a refusal saying CI was still running. Nothing was wrong with CI, and nothing
+        was wrong with the branch.
+
+        So the two halves are repaired together: this waits for the right thing, and the loop's #1350
+        match now reads both of gh's wordings. Empty (the fall-back and the no-ruleset cases) leaves
+        this byte-for-byte the wait every ship made before #1602.
     #>
     param(
         [Parameter(Mandatory)][string]$Pr,
@@ -881,7 +903,8 @@ function Wait-CheckRegistration {
         [Parameter(Mandatory)][string]$Branch,
         [int]$PollSeconds = 15,
         [int]$MaxWaitSec = 180,
-        [int]$AlreadyWaited = 0
+        [int]$AlreadyWaited = 0,
+        [string[]]$RequiredNames = @()
     )
     $waited = $AlreadyWaited
 
@@ -916,9 +939,19 @@ function Wait-CheckRegistration {
         exit 1
     }
 
+    # WAIT FOR THE THING THE WATCH WILL WATCH, not for anything at all (issue #1602). With names given
+    # the probe carries `--required`, so a repo whose fast advisory workflows register first no longer
+    # satisfies a wait whose whole job is to guarantee the NARROWED watch has something to block on.
+    $waitNarrowed = @($RequiredNames | Where-Object { $_ -and ([string]$_).Trim() }).Count -gt 0
+    $probeArgs = @('pr', 'checks', "$Pr", '--repo', $Repo)
+    if ($waitNarrowed) { $probeArgs += '--required' }
+    $subject = if ($waitNarrowed) { 'required check' } else { 'check' }
     while ($true) {
-        $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$Pr", '--repo', $Repo)
-        if (($probe.Output | Out-String) -notmatch 'no checks reported') { return $waited }
+        $probe = Invoke-NativeCapture -FilePath 'gh' -Arguments $probeArgs
+        # BOTH OF GH'S WORDINGS. `--required` says `no required checks reported`, the plain call says
+        # `no checks reported`, and matching only the second is what cost PR #1614 three watch attempts
+        # and a refusal about a CI run that was perfectly healthy.
+        if (($probe.Output | Out-String) -notmatch 'no (required )?checks reported') { return $waited }
         if ($waited -ge $MaxWaitSec) {
             # WHICH REFUSAL THIS IS -- issue #1234, and the same move #1044 and #1219 made one step later in
             # this file. The refusal is unchanged and cannot let a merge through; only the sentence beside it
@@ -929,13 +962,13 @@ function Wait-CheckRegistration {
             # best-effort by construction, so any failure degrades to the wording that was already here.
             $suiteNote = Get-MissingCheckSuiteRefusalNote -Pr "$Pr" -Repo $Repo -Branch $Branch
             if ($suiteNote) {
-                Write-Error "No CI check registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. $suiteNote"
+                Write-Error "No CI $subject registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. $suiteNote"
             } else {
-                Write-Error "No CI check registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
+                Write-Error "No CI $subject registered for PR #$Pr after ${MaxWaitSec}s -- NOT merged. Check the workflow, or merge manually once it is green."
             }
             exit 1
         }
-        Write-Host "  (no check registered yet -- waited ${waited}s/${MaxWaitSec}s)" -ForegroundColor DarkYellow
+        Write-Host "  (no $subject registered yet -- waited ${waited}s/${MaxWaitSec}s)" -ForegroundColor DarkYellow
         Start-Sleep -Seconds $PollSeconds
         $waited += $PollSeconds
     }
@@ -1044,14 +1077,6 @@ Write-Host "  It does need this session's process: the merge and the fold are st
 Write-Host "  So leave this one running and carry on in a SECOND terminal -- do not quit the harness." -ForegroundColor DarkGray
 Write-Host "  This line is the go-ahead: step 1 is over, the tree is free (#1145), and step 2b already put it back on the trunk (#1073)." -ForegroundColor DarkGray
 Write-Host "  Open that second terminal in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
-# The wait itself is Wait-CheckRegistration (defined above), so the watch loop below can re-enter the
-# SAME wait when `--watch` starts before the checks register (#1350). $maxWaitSec stays a script
-# variable because that re-entry passes it, and $waited carries the seconds already spent so the 180s
-# budget is shared across the probe and any fallback rather than restarting.
-$maxWaitSec = 180
-$waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
-    -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec
-
 # --- THE WATCH BLOCKS ON THE REQUIRED CHECKS ONLY (issue #1602) ----------------------------------
 # WHAT THIS CHANGES, AND WHAT IT DELIBERATELY DOES NOT. The merge below is allowed to go as soon as
 # every check the ruleset REQUIRES is green; the non-required ones are still waited for and still
@@ -1147,6 +1172,19 @@ if ($requiredWaitNames.Count -gt 0) {
 } else {
     Write-Host "  The trunk's rules could not be read, so this waits on EVERY check, exactly as before (this is not a finding)." -ForegroundColor DarkGray
 }
+
+# THE REGISTRATION WAIT COMES AFTER THE MODE, and the order is the repair rather than tidiness
+# (issue #1602, measured on PR #1614). It ran FIRST, so it waited for any check at all -- satisfied
+# by `branch-entry` and `claude-review`, which are separate workflows and register before ci.yml's
+# jobs -- and the narrowed watch that followed found no required check to watch, said so, and exited
+# non-zero. Asked in this order the wait knows what the watch will block on and waits for THAT.
+# The wait itself is Wait-CheckRegistration (defined above), so the watch loop below can re-enter the
+# SAME wait when `--watch` starts before the checks register (#1350). $maxWaitSec stays a script
+# variable because that re-entry passes it, and $waited carries the seconds already spent so the 180s
+# budget is shared across the probe and any fallback rather than restarting.
+$maxWaitSec = 180
+$waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
+    -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec -RequiredNames $requiredWaitNames
 # --watch now blocks until the registered check finishes; exit 0 = all passed, non-zero = SOMETHING
 # failed. WHICH something is the whole question, and the answer is NOT in that exit code (#943). This
 # line used to read "branch protection blocks the merge until green, so a non-zero here means we must
@@ -1207,12 +1245,19 @@ while ($true) {
     # timeout refusal (#1234 / #1247), so a race that will not settle ends in that refusal rather than
     # in this loop. Placed BEFORE the fact-pair reads below because with no checks there is nothing for
     # them to read -- two gh calls saved on every fallback spin.
-    if ($checks.ExitCode -ne 0 -and (($checks.Output | Out-String) -match 'no checks reported')) {
+    # BOTH OF GH'S WORDINGS SINCE #1602. A narrowed watch reports `no required checks reported` and
+    # exits non-zero the moment it finds none registered -- `--watch --required` does NOT wait for one
+    # to appear. Matching only `no checks reported` sent that straight past this branch and into
+    # Get-LostWatchNote, which classified it as a dropped socket: three attempts, then a refusal saying
+    # CI was still running. Measured on PR #1614, the second live ship of this very change; nothing was
+    # wrong with CI and nothing was wrong with the branch.
+    if ($checks.ExitCode -ne 0 -and (($checks.Output | Out-String) -match 'no (required )?checks reported')) {
         Write-Host "ship-pr: the watch started before the checks registered -- back to the registration wait (#1350)." -ForegroundColor DarkYellow
         Start-Sleep -Seconds $PollSeconds
         $waited += $PollSeconds
         $waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
-            -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec -AlreadyWaited $waited
+            -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec -AlreadyWaited $waited `
+            -RequiredNames $requiredWaitNames
         continue
     }
 

@@ -105,6 +105,39 @@ and the narrowing never happened. **The change was inert on the first lap it ran
 - [x] Branch brought forward onto `origin/main` (the gate's own remedy), not shipped with
       `-SkipStaleCheck`: the voiding commit added `scripts/tests/cycle-autopark.tests.ps1`, which is
       precisely the hazard #1292 exists for.
+
+#### And the SECOND live ship found the other half (PR #1614, attempt 2)
+
+With the mode now read from the ruleset, the run correctly printed
+`Blocking on the REQUIRED check(s) only: 'lint-en-tests'` -- and then refused after three watch
+attempts, saying CI was still running. It was not:
+
+```
+  Blocking on the REQUIRED check(s) only: 'lint-en-tests'. ...
+no required checks reported on the 'fix/1602-merge-on-required-green' branch
+ship-pr: the WATCH dropped, not the run -- re-entering the wait (attempt 2 of 3).
+```
+
+Two defects, both mine, both only reachable on a real lap:
+
+- `gh pr checks --watch --required` does **not** wait for a required check to appear. It reports
+  `no required checks reported` and exits non-zero the moment it finds none registered.
+- The registration wait polled `gh pr checks`, satisfied by ANY check -- and `branch-entry` and
+  `claude-review` are separate workflows that register before ci.yml's jobs. So it returned happy
+  while the required check was still absent. The loop's #1350 branch then matched only the wording
+  `no checks reported`, so this arrived as a dropped socket rather than as a registration race.
+
+- [x] `Wait-CheckRegistration` takes `-RequiredNames` and polls `--required` when given any, so it
+      waits for the check the watch will actually block on. Empty leaves it byte-for-byte the old wait.
+- [x] Both of gh's wordings matched, in the poll AND in the loop's #1350 branch (`no (required )?checks
+      reported`). The two pre-existing asserts that pinned the narrow spelling now pin the wide one.
+- [x] The mode is decided BEFORE the registration wait, since the wait cannot wait for the right
+      thing before it knows what that is. Asserted by offset, because that is the actual claim.
+- [x] The wait names its own subject, so a timeout on a narrowed wait does not read as "no CI at all"
+      while the advisory checks were running the whole time.
+- [x] One assert of my own was passing vacuously: `-like '*[string[]]$RequiredNames*'` opens a
+      character class on `[`, so it matched a single character and never the type accelerator. Now
+      `.Contains`, which is the trap this repo already documents from the other side.
 #### The contradictions this change created, both repaired here
 
 - [x] Nolan's lens recorded option C as DECLINED, and named a cost that does not exist: the merge
