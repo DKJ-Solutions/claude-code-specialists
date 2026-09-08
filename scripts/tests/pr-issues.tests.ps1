@@ -1112,6 +1112,37 @@ $idxWatchArg  = $shipText.IndexOf("'--watch'")
 Assert-True ($idxSuiteNote -ge 0 -and $idxSuiteNote -lt $idxWatchArg) 'the read sits in the PRE-watch probe it diagnoses, not beside the post-watch notes'
 
 
+# --- issue #1584: a CONFLICTING PR is refused BEFORE the 180s wait, not inside its timeout ---------
+# Measured on PR #1582: ship-pr waited the full 180s and then handed #1234's close/reopen remedy for a
+# PR whose mergeStateStatus was DIRTY -- a conflict, which reopening cannot fix and which #1247's
+# branch of Get-MissingCheckSuiteNote already words correctly. The conflict is knowable the instant the
+# PR exists, so the wait itself was avoidable. The #1234 / #1247 note-building block moved into a
+# shared function (Get-MissingCheckSuiteRefusalNote) so the early exit and the timeout refusal word
+# from the same builder; text asserts, like every other call-site pin in this suite.
+Write-Host "ship-pr.ps1 -- a CONFLICTING PR is refused up front, not after 180s (#1584)" -ForegroundColor Cyan
+$idxWaitFn   = $shipText.IndexOf('function Wait-CheckRegistration')
+$idxWaitLoop = $shipText.IndexOf('while ($true) {', $idxWaitFn)
+Assert-True ($idxWaitFn -ge 0 -and $idxWaitLoop -gt $idxWaitFn) 'the registration poll loop is found inside Wait-CheckRegistration'
+
+Assert-True ($shipText -like '*function Get-MissingCheckSuiteRefusalNote*') 'the #1234 / #1247 note-building read is a function now, shared by the early exit and the timeout'
+$countRefusalBuilder = ([regex]::Matches($shipText, 'Get-MissingCheckSuiteRefusalNote -Pr')).Count
+Assert-Equal 2 $countRefusalBuilder 'and it is CALLED twice -- once before the wait on a known conflict, once inside the timeout as before'
+
+$idxEarlyBlock = $shipText.IndexOf('EARLY EXIT ON A CONFLICTING PR -- issue #1584')
+Assert-True ($idxEarlyBlock -ge 0 -and $idxEarlyBlock -lt $idxWaitLoop) 'ship-pr reads the mergeable state BEFORE the poll loop, so a conflict never costs a poll interval'
+Assert-True ($shipText -like "*`$mergeNow.ToUpperInvariant() -eq 'CONFLICTING'*") 'only a definitive CONFLICTING short-circuits -- UNKNOWN (GitHub still computing) falls through to the wait'
+$idxConflictExit = $shipText.IndexOf('NOT merged (CONFLICTING).')
+Assert-True ($idxConflictExit -ge 0 -and $idxConflictExit -lt $idxWaitLoop) 'and the refusal is written before the loop, not from inside its 180s timeout'
+
+# The folded-entry sub-case: the reporter's PR #1582 conflicted because its branch entry had already
+# folded (deleting dkj-policy/<branch>.md on main), which "resolve the conflict / rebase" does not fix.
+Assert-True ($shipText -like '*function Test-BranchEntryAlreadyFolded*') 'ship-pr can tell the folded-entry conflict from an ordinary one'
+Assert-True (($shipText -like '*--diff-filter=D*') -and ($shipText -like '*refs/remotes/origin/main*')) 'and it decides that on a DELETE commit in the trunk history, not on "file absent from main" (true for every fresh branch)'
+Assert-True ($shipText -match "fresh branch off 'main' \(#1584\)") 'so a spent branch is told to move the follow-up work, not to resolve an unresolvable conflict'
+$idxFoldedTest = $shipText.IndexOf('Test-BranchEntryAlreadyFolded -Branch')
+Assert-True ($idxFoldedTest -gt $idxEarlyBlock -and $idxFoldedTest -lt $idxWaitLoop) 'the folded-entry note augments the early conflict refusal -- it is not a second code path'
+
+
 # --- Get-PrCreateFailureReason: gh's own answer, not a guess (inbound #1077) -----------------------
 # open-pr replaced gh's message with "Creating the PR failed (is gh logged in?)" on a run where gh had
 # just listed PRs, pushed and read the issue list -- so the loudest line on screen named the one thing
