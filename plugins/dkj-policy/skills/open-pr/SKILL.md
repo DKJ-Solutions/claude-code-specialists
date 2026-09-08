@@ -59,15 +59,22 @@ The script:
 3. Runs the **scaffold gate**: the branch's changelog entry must no longer carry the wording
    `new-branch.ps1` scaffolded it with. See
    [The scaffold gate](#the-scaffold-gate-has-the-entry-actually-been-written) below. On the same read of
-   the same file it also runs the **impact gate** and prints the reach and significance it read. See
+   the same file it runs the **shape gate**: the document *around* the entry must still hold its form — its
+   phase headings present, and nothing branch-specific in the generic block above the first one. See
+   [The shape gate](#the-shape-gate-does-the-document-around-the-entry-still-hold-its-form) below.
+   Then the **step-list gate**: the branch's own plan must be finished. See
+   [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
+   Then the **impact gate**, which prints the reach and significance it read. See
    [The impact gate](#the-impact-gate-how-far-does-this-change-reach-and-how-much-does-it-weigh) below.
    And the **link gate**: a relative link in the entry must resolve from the **repo root**, because that
    is where the entry's text lands. See
    [The link gate](#the-link-gate-do-the-entrys-links-survive-the-fold) below.
-   Then the **step-list gate**: the branch's own plan must be finished. See
-   [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
-   And the **label gate**: the label this PR would be given has to exist in your repository. See
+   And last the **label gate**: the label this PR would be given has to exist in your repository. See
    [The label gate](#the-label-gate-does-the-label-your-seam-names-still-exist) below.
+   **This list is the order they actually run in, and it is not the whole set** — the run also carries an
+   entry gate, a backing gate and a title gate, each of which refuses and none of which has a section on
+   this page yet. Their refusals name themselves, so a message you meet here and cannot find above is one
+   of those three rather than something undocumented in the script.
 4. **Commits your development document**, if it differs from `HEAD` — that one file and nothing else.
    See [The document commit](#the-document-commit-what-the-pr-says-is-what-the-branch-carries) below.
 5. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all
@@ -339,6 +346,43 @@ the script that writes the scaffold read it from the same shared library, so the
 - **`-Force` ships anyway** (a warning instead of a block), for the rare entry that legitimately quotes
   the wording outside a fence. Deliberately separate from `-SkipLint`/`-SkipTests`: those skip a tool,
   this overrules a judgement about content.
+
+## The shape gate: does the document around the entry still hold its form?
+
+The gate above reads the entry. This one reads the **document it sits in**: the phases that carry the step
+list, and the generic block between the title and the first of them.
+
+Two rules, and they are scoped differently on purpose:
+
+- **Branch content above the first phase heading is refused, in every repo.** That region is the
+  scaffolder's guidance and is meant to be identical in every branch document in every repo, so a status
+  note there reads as guidance — and a reader who finds one branch's state inside it learns to distrust the
+  whole region, including the rules that *do* apply everywhere. The check reads the **shape** and not the
+  words: guidance is a blockquote in whatever language you translated it into, so a translated block passes
+  and your own paragraph does not.
+- **An extra heading at the phase level is refused only in the repo that authors this workflow.** Your
+  repo's guarantee is the opposite one — the step gate reads step marks only, so a heading of any level is
+  invisible to it — and refusing a heading you deliberately keep would break a document that worked
+  yesterday. So this half never fires here.
+
+**The level is read off your document, not pinned.** The first heading is the title and the phases sit
+exactly one under it, so a document written before the levels shifted is judged by its own levels rather
+than refused, and every finding quotes the level it actually read.
+
+**Why it is a gate here and not only in CI** (source repo
+[#1650](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650), September 8, 2026). Both
+rules used to live only in `check-branch-entry.ps1`, which **reports** rather than refuses. A document that
+had lost its first phase heading — to an edit that anchored on the string `### PLAN`, which occurs inside
+the guidance blockquote as well — then shipped through push, the required check, the merge and the fold,
+with every other gate correctly green. And the fold **removes** `dkj-policy/<branch>.md` on success, so
+afterwards the red check pointed at a path that no longer existed. Here the refusal lands while the file is
+still on disk.
+
+- **Fenced code is excluded**, so a document that quotes a phase heading is not accused of writing one.
+- **`-Force` ships anyway** (a warning instead of a block), like the scaffold gate above: the check reads a
+  shape, and a document nobody upstream has seen must have a way through a gate that is wrong about it.
+- **The most common cause is not a hand-edit.** It is a tool or a splice that anchors on the first phase
+  heading as a string. If you write one, anchor on the heading at the **start of a line**.
 
 ## The link gate: do the entry's links survive the fold?
 

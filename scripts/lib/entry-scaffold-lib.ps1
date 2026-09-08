@@ -34,8 +34,22 @@
     (Get-EntryFallbackType is deliberately NOT here: it is a changelog TYPE, not scaffold prose --
     'Chore' is a legitimate final value, so it can never be evidence of an unedited entry.)
 
+    No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script. Depends on
+    Get-DisplayRef (ref-print-lib.ps1), which it loads itself -- see the dot-source below.
+
     Pure ASCII (repo convention for .ps1).
 #>
+
+# THE STRIP HAS ONE DEFINITION, AND IT IS NOT HERE (issue #1623 settled that, #1650 brought the third
+# caller). Get-DevelopmentShapeFindings prints a line of somebody's branch document back to a console and to
+# a public CI log, which is the one kind of text this repo treats as an injection surface rather than a
+# display question: an ANSI or OSC escape in it repaints the terminal it lands in, and a zero-width run
+# makes the printed line read as something other than what it says -- by the very line that exists to tell
+# the reader what is wrong. Unconditional, and $PSScriptRoot-relative rather than repo-relative, so it
+# resolves in the plugin mirror as well as here; remote-ahead-lib.ps1 and release-lib.ps1 load their
+# siblings the same way. ref-print-lib.ps1 is a leaf with no dependencies of its own, which is what makes
+# it safe to load first.
+. (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
 
 # The English fallbacks, and the ONLY copy of them. new-branch.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
@@ -5500,12 +5514,15 @@ $script:BranchFileDefaults = [ordered]@{
         # and why the scaffold suite now asserts that no generated element is a bare marker.
         ('> **FOUR `' + $script:BranchCyclePhaseHashes + '` HEADINGS, AND NEVER A FIFTH** -- PLAN, CREATE, TEST, DEPLOY are the whole top'),
         ('> level. A section needing its own heading goes in as a `' + $script:BranchCycleSubHashes + '` UNDER whichever of the four owns'),
-        '> it. No gate sees a heading, so this one is on you (Dave, August 26, 2026).',
+        '> it. No gate in YOUR repo reads a heading, so this half is on you -- only the repo that authors',
+        '> this workflow refuses a fifth (Dave, August 26, 2026).',
         '>',
         ('> **AND NOTHING BRANCH-SPECIFIC ABOVE `' + $script:BranchCyclePhaseHashes + ' PLAN`** -- everything between the title and that heading'),
         '> is this guidance, which is identical in every branch document. A status line, a note about',
         ('> THIS branch or an instruction to a session belongs under one of the four, normally as a `' + $script:BranchCycleSubHashes + '`'),
-        '> in PLAN. Same rule, same reason: no gate reads this region (Dave, August 26, 2026).',
+        '> in PLAN. THIS half open-pr refuses, in every repo, before the push -- it reads the shape, so a',
+        '> guidance block in your own language passes and your own paragraph here does not (Dave,',
+        '> August 26, 2026; refused since #1650).',
         '>',
         '> **DEPLOY takes no steps of its own, and it is WRITTEN LAST** -- it is what the branch DID, once',
         '> TEST says so. Written while steps above it are still open it states an INTENTION, and no gate',
@@ -7149,10 +7166,10 @@ function Test-DevelopmentEntryMissing {
         because what makes the discriminator unsafe is that the fallback answers at all, not which file
         taught it to.
 
-        THE GUIDANCE ARM IS ANCHORED TO THE TITLE, not merely 'somewhere before the second heading'. An
-        entry BODY may legitimately quote something, and a blockquote in a legacy entry's prose must not
-        read as guidance. The scaffolder writes the block directly under the document's own heading, so
-        that is where this looks: blank lines are skipped, anything else ends the region.
+        THE PLAN TEST ITSELF LIVES NEXT DOOR, in Test-DevelopmentHasPlan, since September 8, 2026 (#1650):
+        the shape rules need the same question, and asking it twice in two spellings is the drift this file
+        exists to prevent. Its header carries the anchoring, the fence-awareness and what the extraction
+        was measured against.
 
         AND IT ERRS TOWARD UNDER-REFUSAL. A document whose guidance AND phases have both gone along with
         its DEPLOY section is not recognised here, and that is the safe direction for a gate: a missed
@@ -7161,6 +7178,43 @@ function Test-DevelopmentEntryMissing {
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     if ((Split-Development -Text $Text).Found) { return $false }
+    return (Test-DevelopmentHasPlan -Text $Text)
+}
+
+function Test-DevelopmentHasPlan {
+    <#
+        Pure: does this text carry a development document's PLAN -- the scaffolder's guidance block under
+        the title, or the named phases that hold the step list, or both?
+
+        THE DISCRIMINATOR BETWEEN A DEVELOPMENT DOCUMENT AND A LEGACY ENTRY-ONLY FILE, and it was the arm
+        inside Test-DevelopmentEntryMissing until September 8, 2026. It came out because the shape rules
+        need exactly the same question (issue #1650): a legacy entry file IS an entry from its first line,
+        so it has no document AROUND the entry to judge -- its own sub-sections would read as phases and
+        its prose as a preamble stray. Asking that question twice, in two spellings, is the drift this file
+        exists to prevent, and the two answers disagreeing would mean one gate refusing a file the other
+        calls legitimate.
+
+        IT READS SHAPE RATHER THAN TEXT, which is what makes it survive translation. The guidance block is
+        BLOCKQUOTED in whatever language a consumer translated it into, and the phases come from the wording
+        seam the scaffolder writes them from. A byte comparison against StepsGuidance could not: it carries
+        a '{0}' seam the consumer answers themselves, and inbound #562 is the measured consumer who
+        translated the block around it.
+
+        THE GUIDANCE ARM IS ANCHORED TO THE TITLE, not merely 'somewhere before the second heading'. An
+        entry BODY may legitimately quote something, and a blockquote in a legacy entry's prose must not
+        read as guidance. The scaffolder writes the block directly under the document's own heading, so
+        that is where this looks: blank lines are skipped, anything else ends the region.
+
+        FENCE-AWARE, like every reader of this format: a document explaining this mechanism quotes the
+        guidance block, and a predicate that fired on the quote would answer for the file documenting it.
+
+        MEASURED THE DAY IT WAS EXTRACTED, and it is why this is a guard rather than a note. The shape
+        rules shipped without it for one run of the test gate: seven suites went red, because the open-pr
+        fixture in shared-scripts.tests.ps1 writes exactly this legacy shape -- '### <title> - Feat -
+        <date>' and a paragraph -- and the shape gate refused it. The lib header had already written that
+        misread down as a risk that had not bitten. It bit within the hour.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     $lines  = @($Text -split '\r?\n')
     $fenced = @(Get-FencedLineFlags -Lines $lines)
@@ -7195,6 +7249,207 @@ function Test-DevelopmentEntryMissing {
         }
     }
     return $false
+}
+
+function Get-DevelopmentShapeFindings {
+    <#
+        Pure: does this development document keep its SHAPE -- exactly the named phases and nothing else at
+        that level, and nothing but generic guidance above the first of them?
+
+        TWO RULES DAVE ENFORCED BY READING, on a document a session writes, with no signal in between. Both
+        were caught by eye on August 26, 2026, on the same document, within one afternoon -- and the second
+        one had been introduced by the session before, in the same position, which is what makes it a shape
+        the document invites rather than a slip.
+
+        THEY ARE SCOPED DIFFERENTLY, AND THAT ASYMMETRY IS THE DESIGN rather than an inconsistency. It is
+        why the arc sits behind -EnforcePhaseArc and the preamble rule does not:
+
+          #898, the heading count, is the SOURCE REPO's rule. DEVELOPMENT-portable.md states
+          heading-blindness as a FEATURE -- "the gate reads step marks only, so a heading of any level is
+          invisible to it" -- and the reason it is a feature is that a consumer may keep headings of their
+          own in a document they adopted. Refusing those everywhere would break correct files in somebody
+          else's repo, which is the shape this house declined once already at 124 findings, all false. The
+          CALLER answers which repo this is (Test-IsWorkflowSourceRepo, in seam-lib.ps1) and passes the
+          switch: this function is handed a text and has no repo root to ask the question with.
+
+          #899, the preamble, holds EVERYWHERE, because it reads the SHAPE and not the text. The region
+          between the title and the first phase heading is the scaffolder's guidance, which is blockquoted
+          whatever language it has been translated into -- so "a non-blank line that does not start with
+          '>'" survives translation. A byte comparison against StepsGuidance could not: it carries a '{0}'
+          seam the consumer answers themselves, and inbound #562 is the measured consumer who translated
+          the block around it.
+
+        WHY THE PREAMBLE ONE IS NOT MERELY TIDINESS. The measured paragraph sat flush under the guidance
+        with no heading between them, so it READ as guidance -- and guidance is generic by construction. A
+        reader who finds one branch's status inside it learns to distrust the whole region, including the
+        rules that do apply everywhere.
+
+        A SHARED FUNCTION SINCE SEPTEMBER 8, 2026 (issue #1650), AND THAT MOVE IS THE WHOLE REPAIR. Both
+        rules were inline in check-branch-entry.ps1, which runs in CI and only ADVISORILY, so nothing
+        refused a malformed document before the push. PR #1644 shipped through push, the required check,
+        the merge and the fold with its first phase heading and most of its guidance block gone; the one
+        red check was this rule, and the fold then DELETED the file that check names. An advisory finding
+        pointing at a path that no longer exists is a far weaker signal than an ordinary red, because
+        there is nothing left to look at. As a function it is refused by open-pr.ps1 before the push --
+        while the file still exists and the author is still holding it -- and CI reports exactly what it
+        reported before, on the same text, from the same code.
+
+        IT RE-DERIVES NOTHING, which is the reason it can be shared at all. Split-Development is not
+        consulted because the scan walks the whole text: the entry's own sections sit one level below the
+        phases and its own heading is one of them, so there is no boundary to find. The levels are read
+        off the document (below), and the phase names come from the same wording seam the scaffolder
+        writes them from, so a repo that renamed a phase is judged by its own names.
+
+        A LEGACY ENTRY-ONLY FILE IS REFUSED ENTRY AT THE DOOR, by Test-DevelopmentHasPlan, and the first
+        draft of this function did not do that. It read the misread correctly -- such a file IS an entry
+        from its first line, so its own sub-sections read as phases and its prose as a preamble stray --
+        and then declined to guard against it, on the ground that CI had reported on this text since
+        August 26, 2026 without meeting one, which made it a risk that had not bitten. It bit on the first
+        run of the test gate: SEVEN suites red, because the open-pr fixture in shared-scripts.tests.ps1
+        writes exactly that shape. The lesson is not that the no-pre-emptive-fixes rule is wrong; it is
+        that "has not bitten" was a claim about CI, where the rule only ever REPORTED, and this branch was
+        turning it into a refusal. Widening what a check does resets its evidence.
+
+        RETURNS the finding lines ready to print (empty when the document is sound), plus what was
+        actually READ: PhaseCount, PhaseMark and SubMark. A caller reporting coverage quotes those rather
+        than composing a level a second time -- see the [OK] line in check-branch-entry.ps1 for the day
+        that cost. Every fragment of the DOCUMENT quoted in a finding is passed through Get-DisplayRef
+        first -- the reason is at the dot-source at the top of this file -- while the structured members
+        (PreambleStrays, StrayHeadings) carry the text as it stands, because a caller matching on it is
+        reading and not printing.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
+        [switch]$EnforcePhaseArc
+    )
+
+    # A DOCUMENT WITH NO PLAN HAS NO SHAPE TO JUDGE, and this is the first question rather than a special
+    # case. Both rules are about the document AROUND the entry; a legacy entry-only file IS an entry from
+    # its first line, so its own sub-sections would read as phases and its prose as a preamble stray. The
+    # predicate is Test-DevelopmentEntryMissing's own, shared rather than re-derived -- its header carries
+    # the measurement, including the seven suites that went red the one run this guard was missing.
+    if (-not (Test-DevelopmentHasPlan -Text $Text)) {
+        return [pscustomobject]@{
+            Findings       = @()
+            PhaseCount     = 0
+            PhaseMark      = '#' * ((Get-BranchCycleHeadingLevel) + 1)
+            SubMark        = '#' * ((Get-BranchCycleHeadingLevel) + 2)
+            PhaseHeadings  = @()
+            StrayHeadings  = @()
+            PreambleStrays = @()
+        }
+    }
+
+    # THE LEVELS ARE READ OFF THE DOCUMENT, NOT PINNED, and a range would be wrong rather than merely loose
+    # (August 26, 2026). Both levels shifted one down that day: the title went H1 -> H2 and the phases
+    # H2 -> H3. So the new TITLE level and the old PHASE level are the same number, and a gate accepting
+    # '^#{2,3}' as a phase would read a post-shift title as a fifth phase -- refusing a correct document,
+    # which is the one failure mode this must not have. Reading the first heading as the title and the
+    # phases as exactly one level under it needs no era flag and no list of levels to maintain: it is the
+    # invariant the format has always had, and the one the suite already asserts as "the sections sit
+    # exactly one level under the title".
+    #
+    # Fence tracking throughout, so a quoted heading is illustration rather than a phase. Same rule check 4
+    # of the lint gate argues for links and check 28 for imports.
+    $titleLevel = 0
+    $inTitleProbe = $false
+    foreach ($probeLine in [regex]::Split($Text, '\r?\n')) {
+        if ($probeLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $inTitleProbe = -not $inTitleProbe; continue }
+        if ($inTitleProbe) { continue }
+        if ($probeLine -match '^(#{1,6})\s+\S') { $titleLevel = $Matches[1].Length; break }
+    }
+    # No heading at all: fall back to the written pair, so a malformed document is judged by today's shape
+    # rather than skipping the check entirely.
+    if ($titleLevel -le 0) { $titleLevel = Get-BranchCycleHeadingLevel }
+    $phaseLevel = $titleLevel + 1
+    $phaseRx    = '^#{' + $phaseLevel + '}\s+(\S.*)$'
+    $titleRx    = '^#{1,' + $titleLevel + '}\s'
+    # AND EVERY FINDING BELOW QUOTES THESE INSTEAD OF TYPING A LEVEL (#924, August 26, 2026). The reasoning
+    # is the one at check-branch-entry.ps1's [OK] line -- "the level in this line is the one that was
+    # actually READ, not a literal" -- and it held for that one line only. Six markers on the FAILURE path
+    # were typed, so on the day the shape shifted one level down the gate refused a document for the new
+    # levels while reporting the old ones: it told a reader to demote a '###' to a '###', and pointed at
+    # "the first '##'" in a document whose phases are '###'. That is the worse way round of the two,
+    # because the failure message is the one somebody reads while they cannot yet see what is wrong.
+    $phaseMark = '#' * $phaseLevel
+    $subMark   = '#' * ($phaseLevel + 1)
+
+    $inShapeFence = $false
+    $shapeLineNo = 0
+    $topHeadings = @()
+    $preambleStrays = @()
+    $seenFirstTop = $false
+    foreach ($shapeLine in [regex]::Split($Text, '\r?\n')) {
+        $shapeLineNo++
+        if ($shapeLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $inShapeFence = -not $inShapeFence; continue }
+        if ($inShapeFence) { continue }
+        if ($shapeLine -match $phaseRx) {
+            $seenFirstTop = $true
+            $topHeadings += [pscustomobject]@{ Line = $shapeLineNo; Text = $Matches[1].Trim() }
+            continue
+        }
+        if ($shapeLine -match $titleRx) { continue }
+        # The preamble region: everything after the title and before the first phase heading. Blank lines and
+        # blockquote lines are the guidance block; anything else is this branch's own content, sitting where
+        # the text is supposed to be identical in every branch document in every repo.
+        if (-not $seenFirstTop -and $shapeLine.Trim() -ne '' -and $shapeLine -notmatch '^\s*>') {
+            $preambleStrays += [pscustomobject]@{ Line = $shapeLineNo; Text = $shapeLine.Trim() }
+        }
+    }
+
+    # The arc is PLAN / CREATE / TEST / DEPLOY. Held only where the caller says so -- see the header.
+    #
+    # THE PHASES ARE NAMED, NOT COUNTED, and the first draft of this check got that wrong in a way worth
+    # recording: it reported "everything past the fourth heading", which named the DEPLOY heading as the
+    # extra the moment the stray sat ABOVE the first phase -- which is exactly where both measured
+    # instances sat. A count cannot say WHICH heading does not belong; only the names can.
+    #
+    # Read from Get-BranchFileWording, the same source the scaffolder writes them from, with #927's
+    # fail-safe under it: an override present but leaving nothing usable behind falls back to the defaults,
+    # because a phase list that came back empty would report every phase in the document as a stray. Those
+    # are the same two lines Test-DevelopmentEntryMissing resolves its arc with, rather than a third list
+    # of literals typed here.
+    $knownPhases = @((Get-BranchFileWording).StepPhases | Where-Object { $_ })
+    if ($knownPhases.Count -eq 0) { $knownPhases = @($script:BranchFileDefaults.StepPhases | Where-Object { $_ }) }
+
+    # DEPLOY is matched on its PREFIX, because its heading carries the branch name (DEPLOY: feat/x).
+    $strayHeadings = @($topHeadings | Where-Object {
+        ($knownPhases -notcontains $_.Text) -and ($_.Text -notmatch '^DEPLOY\b')
+    })
+
+    # EVERY QUOTED FRAGMENT BELOW GOES THROUGH Get-DisplayRef FIRST, and the reason is at the dot-source at
+    # the top of this file: these are the only lines here made of text somebody else wrote, and they are
+    # printed to a console and to a public CI log. STRIPPED BEFORE TRUNCATED, deliberately -- cutting at 72
+    # characters can halve an escape sequence, so a strip afterwards would be working on a fragment.
+    $findings = @()
+    if ($strayHeadings.Count -gt 0 -and $EnforcePhaseArc) {
+        $findings += "carries $($topHeadings.Count) '$phaseMark' headings, and the arc is $($knownPhases -join ' / ') / DEPLOY -- four, never a fifth."
+        foreach ($h in $strayHeadings) {
+            $findings += "  extra heading, line $($h.Line): '$phaseMark $(Get-DisplayRef -Ref $h.Text)'"
+        }
+        $findings += "  Demote it to '$subMark' under whichever of the four it belongs to."
+    }
+
+    if ($preambleStrays.Count -gt 0) {
+        $findings += "carries branch content above the first '$phaseMark', where the block is generic guidance:"
+        foreach ($s in $preambleStrays) {
+            $shown = Get-DisplayRef -Ref $s.Text
+            $trimmed = if ($shown.Length -gt 72) { $shown.Substring(0, 72) + '...' } else { $shown }
+            $findings += "  line $($s.Line): $trimmed"
+        }
+        $findings += '  That region is identical in every branch document in every repo, so a status note'
+        $findings += "  there reads as guidance. Move it under one of the '$phaseMark' phases, as a '$subMark'."
+    }
+
+    return [pscustomobject]@{
+        Findings       = @($findings)
+        PhaseCount     = $topHeadings.Count
+        PhaseMark      = $phaseMark
+        SubMark        = $subMark
+        PhaseHeadings  = @($topHeadings)
+        StrayHeadings  = @($strayHeadings)
+        PreambleStrays = @($preambleStrays)
+    }
 }
 
 function Test-BranchChangelogIsFilled {
