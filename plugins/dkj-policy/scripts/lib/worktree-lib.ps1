@@ -237,6 +237,14 @@ function Get-TrunkReturnDecision {
 # THE BRANCH NAME IS OPTIONAL because it is the caller's variable rather than something this function can
 # read, and a go-ahead that cannot be worded is worse than one that names the branch less precisely. Empty
 # gives "on its branch", which is still true and still points at the lane.
+#
+# AND IT IS INTERPOLATED RAW ON PURPOSE, which is the question a reader of this function asks next. A ref
+# name quoted inside a prose sentence is not a paste-ready command, and #1594 decided that axis
+# deliberately hours before this function existed: ref-print-lib.ps1 guards the PASTE sites with an
+# allowlist and scopes display out by name, so sanitising here would treat one prose site differently from
+# the nine others ship-pr.ps1 already prints, step 2b's own reason line among them. What is NOT settled is
+# that scope note's reasoning -- git rejects the ASCII control characters and accepts U+202E and U+200D
+# (measured, exit 0) -- and that residual is #1617's, for the whole class rather than for this line.
 function Get-TrunkReturnGoAheadLine {
     param(
         [Parameter(Mandatory = $true)][bool]$Returned,

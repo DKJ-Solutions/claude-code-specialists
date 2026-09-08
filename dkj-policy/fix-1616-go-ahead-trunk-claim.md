@@ -61,6 +61,21 @@ silent about the one thing the reader is deciding.
 - [x] `scripts/tests/worktree-lib.tests.ps1`: section 7 -- the no arm never claims the trunk
       (the one assert the old literal could not pass), both arms keep the two true clauses, and a
       missing branch name still words a printable line. 57 asserts pass.
+- [x] Review: Victor and Edith reported no findings. Sebastian reported the raw branch-name
+      interpolation as blocking, citing `new-branch`'s tip sanitiser as the precedent. **Checked
+      before acting on it, and it does not stand**: #1594 merged hours earlier and decided this exact
+      axis, `ref-print-lib.ps1` scoping display out by name, and the sanitiser he cites interpolates
+      its own `$BranchLabel` raw in the very string it strips a commit subject in. Sanitising here
+      would have treated one prose site differently from the nine `ship-pr.ps1` already prints. His
+      advisory item was already open as #1612. Recorded at the seam so the next reader does not
+      re-litigate it.
+- [x] Checking that reason turned up a real gap in it: #1594's scope note says git rejects the
+      control characters that would make prose deceptive, and `git check-ref-format --branch` accepts
+      U+202E and U+200D (exit 0, measured) -- the two code points #1446 exists for. Filed as #1617
+      for the whole class rather than repaired on this branch.
+- [x] Base was behind: `origin/main` gained #1594's seven-site repair mid-review. `origin/main`
+      merged in, both mirrors byte-identical again, `worktree-lib` (57) and `ref-print-lib` (240)
+      green on the merged tree.
 
 ### DEPLOY: fix/1616-go-ahead-trunk-claim
 
