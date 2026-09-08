@@ -42,6 +42,24 @@ checkout's path against the marketplace clone's `plugin.json` version + git HEAD
 per plugin. Read-only; nothing persisted (the removed `syncedVersion` bookkeeping is not
 reintroduced).
 
+#### Handoff -- 2026-09-08 (session stopped on usage, another device takes over)
+
+Build + docs + tests are committed and pushed (`67633df8`, six commits on top of `main`). What is
+DONE: Sylvester built the skill + script + `Get-InstallRecord` `GitCommitSha` field + registry pair
+(`66ac5ed7`, `09ffd787`); Tessa added the update-doc pointers (`af1ba220`) and Sylvester the
+scaffolded-section pointer in `adopt-workflow-folder.ps1` (`71e38da8`); Tycho added
+`scripts/tests/plugin-versions.tests.ps1` -- 59 asserts green, no bug found (`67633df8`).
+
+What is NOT done -- the pre-PR review. Victor (code), Edith (copy edit) and Sebastian (security) were
+launched in parallel on `main..HEAD` and the session ended before any reported, so their results are
+lost. **Re-run that review on pickup before `open-pr`.** Sebastian's brief flags one real question:
+does `plugin-versions.ps1` print absolute machine paths / usernames to stdout (this repo is public)?
+Then Derek: PR + merge; Rendall: fold.
+
+Filed alongside, out of scope for this branch: #1587 (`dkj-policy/README.md:102-106` describes a
+non-existent connector-manifest version field) and #1591 (the `connector-sessioncheck` "check
+skipped" fallback -- the session-start half, deferred here to keep the branch focused).
+
 ### CREATE
 
 - [x] `scripts/task/plugin-versions.ps1` -- the canonical script. Dual-context repo root, source-repo
