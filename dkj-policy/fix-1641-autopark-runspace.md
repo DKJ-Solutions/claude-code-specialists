@@ -52,6 +52,3 @@ Runspace replaces the child spawn (measured 220 ms -> 150 ms per turn); Invoke-G
 #### Pull Request
 
 cycle-autopark runs park-cycle in a runspace instead of a second interpreter
-
-
-<!-- smoke -->
