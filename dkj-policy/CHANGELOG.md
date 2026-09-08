@@ -43,7 +43,56 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 12 minor entries** <!-- pending-tally -->
+**8 / 13 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1566-truncated-plugin-links · 20260908-092431
+
+Sixteen links in the plugin payload named a file and pointed at the repository front page. A consumer
+reading `specialists-init` -- the first page a new adopter opens -- was told to read `INSTALL.md` and
+landed on the repo's home page to find it themselves. All sixteen now carry the path they name, and the
+six that named a section carry its anchor.
+
+Nothing could have caught them. GitHub answers `.../blob/main/` with the repo root, so all sixteen
+returned 200 and were never dead links; the dead-link scan skips absolute targets, and `[plugin-link]`
+skipped them too, because its subject is a *relative* target escaping the plugin root. The defect sat
+in the gap between "not dead" and "not relative".
+
+So the check that produced the shape now holds it. `[plugin-link]`'s suggestion hands the author the
+absolute form of an escaping link, anchor included; sixteen base-only links against the seventeen
+repairs that suggestion was written for is close enough to name the mechanism -- the advice was right,
+and nothing held the *result* of taking it. The new half reports an absolute link that is this repo's
+blob/tree base with nothing after it: the one absolute shape that is provably not what the author
+meant, since the link text always names something more specific. Absolute links stay otherwise out of
+scope. It keys on `Get-RepoBlobUrl`, so it cannot disagree with the suggestion about which URL counts
+as this repo's -- and in a repo without that seam it does not run and the coverage line says so.
+
+That keying has one named cost: a base-only link written on the *previous* owner name is out of reach,
+which is where all sixteen of these were. Widening to reach it was declined -- recognising a retired
+owner path would bless a spelling the repo-citation rule is retiring -- and there is no instance left to
+justify it: zero base-only links on either owner remain anywhere in the tree, and every future one comes
+from the suggestion, which writes the current base. A test pins the pass, so reaching for it later has to
+be a deliberate edit.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A gate whose own advice creates a defect class it cannot see is the shape this repo keeps paying for,
+and the reach is a consumer's first read rather than an internal document. Not a required migration and
+nothing breaks, so it stops short of 4: a reader who never clicked those links loses nothing, and one
+who did now lands where the text said.
+
+**Score:** 3
+
+#### Pull Request
+
+Give the 16 truncated absolute plugin links their real paths, and gate the shape
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1571](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1571)
+
+---
 
 ### DEPLOY: fix/machine-local-note-review-findings · 20260908-091324
 
