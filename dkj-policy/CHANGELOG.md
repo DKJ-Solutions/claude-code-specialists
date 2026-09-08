@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 11 minor entries** <!-- pending-tally -->
+**7 / 12 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/machine-local-note-review-findings · 20260908-091324
+
+Five review findings on the machine-local note reached `main` after the change they were about. The
+gate's reworded note (#1574) merged from a parked commit while the reviews on it were still running, so
+the text that shipped still said to keep a swept-in edit in "that file's gitignored sibling" -- singular,
+against a note whose first line lists however many paths the repo watches. A consumer with two entries
+in `Get-MachineLocalPaths` read advice with no antecedent. That is corrected here, along with a seam
+comment that called PR #1573 a branch whose "entire subject" was one hunk of a fifteen-file diff, and
+three defects in the folded changelog entry: it credited #1557 with founding the gate where #1559 did,
+used "misfires" transitively where the two neighbouring restatements do not, and switched the referent
+of "it" mid-paragraph. Nothing about when the gate fires changed, and it still only warns.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The note is printed by a shared script that travels in the plugin mirror, so its wording is what every
+consumer reads at `open-pr`. The correction matters most in the repo this text was NOT written in: one
+watched path is this repo's answer, and the sentence only breaks where somebody has configured two.
+
+**Score:** 1
+
+
+#### Pull Request
+
+Land the review findings the queue merged past on the machine-local note
+
+Plugins: dkj-policy
+
+[PR #1589](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1589)
+
+---
 
 ### DEPLOY: fix/1579-shopify-no-store-seam · 20260908-090100
 
@@ -197,15 +230,15 @@ The machine-local path gate stops giving wrong advice on the path it fires on. I
 branch's commits touch a tracked file that usually belongs to a clone -- `.claude/settings.json` here
 -- and its remedy sentence said, flatly, to drop the change from the branch because "machine-local
 plugin enablement belongs in `.claude/settings.local.json`". That is right for a machine's own extra
-enable, which is the sweep the gate was built for (#1557), and wrong for the other case the same file
-carries: a branch whose subject IS the declared, tracked set every clone inherits. Measured on PR
+enable, the sweep the gate was built for (#1559, measured on PR #1557), and wrong for the other case
+the same file carries: a branch whose subject IS the declared, tracked set every clone inherits. Measured on PR
 #1573, where the gate fired on a branch that existed to change exactly that. The note now names both
 cases and prescribes the move only for the clone's own edit; the seam comment in `repo-config.ps1`
 records which half of the advice belongs where, and the suite asserts it. Nothing about when the gate
 fires changed, and it still only warns -- what changed is that the sentence a reader acts on is true on
-both paths. The cost of leaving it was not a broken branch but a decaying reader: a warning that
-misfires advice on the intended happy path is one that gets scrolled past, and it is then scrolled past
-on the day it is right.
+both paths. The cost of leaving it was not a broken branch but a decaying reader: a warning that gives
+the wrong advice on the path it fires on is one that gets scrolled past, and it is then scrolled past on
+the day it is right.
 
 **Score:** 2
 
@@ -214,7 +247,8 @@ on the day it is right.
 The note is emitted by a shared script that travels in the plugin mirror, so every consumer running
 `open-pr` reads this text. A consumer branch that legitimately changes its own shared harness settings
 now gets advice it can follow instead of being told to move the change somewhere gitignored. Small --
-it is three sentences on a rare path -- but it is advice the reader was previously right to ignore.
+three sentences on a rare path -- but until now following that advice was the wrong move, and only a
+reader who already distrusted it came out right.
 
 **Score:** 2
 
