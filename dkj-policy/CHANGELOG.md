@@ -43,7 +43,70 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**27 / 55 minor entries** <!-- pending-tally -->
+**27 / 56 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1670-fanout-shrinkage-detection · 20260908-222347
+
+A dispatched fan-out can no longer discard this session's uncommitted work invisibly. `#1665` measured
+a review specialist running `git stash` and then `git checkout HEAD -- <file>` in the orchestrator's
+checkout, taking three files of uncommitted work with it: no error, no notice, no refusal, and a clean
+`git status` afterwards -- which the review's own report cited as proof it had changed nothing. It was
+found days later, by accident, when a `grep` showed old text where new text had been verified minutes
+earlier. That was repaired with an instruction; `#1670`'s point was that **nothing anywhere detected
+it**, so a repeat would be exactly as invisible as the first, and less conspicuous whenever what gets
+discarded is a config value rather than a paragraph somebody later reads.
+
+The new `check-fanout` skill takes a reading of the working copy before a dispatch and compares it
+after, and what it reports is **shrinkage only** -- a path that was changed and is not any more, a
+worktree edit reverted under a path that remains, or a stash entry gone by its own id. That asymmetry
+is the whole design: a subagent legitimately writing files makes the list **grow**, which is expected
+and never reported, so the detector has nothing to say on an ordinary fan-out. Five false positives are
+answered rather than tolerated -- the orchestrator's own commits (their paths are excluded), a rewritten
+history and a branch change (both refuse to difference at all, because a wrong list is worse than none),
+`git reset`, which moves a change from the index to the worktree and destroys nothing, and a `git mv`,
+which the comparison follows rather than exempts, so a loss on the far side of a rename is still caught.
+
+**Three answers, not two, and the third is the one worth knowing.** Exit 0 means the comparison was
+made and nothing shrank; exit 1 that something did; exit **3** that the comparison could not be made at
+all -- a branch change, a rewritten history, or a git read that failed. That last is the likeliest
+outcome in this tool's own scenario, where dispatched agents run `git` concurrently in one checkout and
+a `git status` can lose a race for `.git/index.lock`, and an incomplete answer now keeps the baseline
+instead of spending it, because a retry is exactly the right next move.
+
+**It goes further than the issue asked in one place, and admits a weakness in another.** `#1670`
+proposed counting stash entries and said a count is enough; it is not, and a subagent that pops one
+entry while the orchestrator pushes another leaves the count unchanged -- so entries are compared by
+their own commit ids and that case is pinned in the suite. The weakness is that the baseline has to be
+taken by somebody: this is an invoked step, not a hook, because a `Pre`/`PostToolUse` pair around the
+dispatch rests on the matcher name of the dispatch tool and that has not been measured. Nothing here
+rests on anything unmeasured, the hook variant stays open on `#1670`, and it is cheap to add because
+the judgement it would need is already the shared function rather than anything in the script.
+
+**And it reports rather than restores, which is a property of the damage and not a choice.** Content
+discarded by `git checkout HEAD -- <path>` was never committed and sits in no reflog, so there is
+nothing to restore it from -- which is precisely why the detection gap was the one worth closing. What
+a finding buys is knowing which file to write again, so it names the path, unlike `park-lib`'s
+counts-only figure that ends up in a public commit.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This repo is not a service anyone subscribes to; the reader here is a developer maintaining it or
+consuming the plugins, and what they get is scored above. It reaches a consuming repo through a release
+like any other shared script.
+
+**Score:** N/A
+
+#### Pull Request
+
+A dispatched fan-out's working-copy losses are detected instead of found by accident
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1683](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1683)
+
+---
 
 ### DEPLOY: fix/1676-remote-ahead-tip-short-read · 20260908-220203
 
