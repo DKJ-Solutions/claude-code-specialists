@@ -80,11 +80,30 @@
 
     THE MATCHER IS STILL RIGHT AND MUST NOT BE NARROWED TO PAY FOR IT. Dropping 'compact' would buy
     back that cost per compaction and reintroduce exactly the silence the note above describes -- for
-    the new branch too, on every machine that has no source checkout, which is most of them. The
-    answer to the cost is a cache: nothing the fallback reads changes for the life of a session (the
-    install record and the clone are static, which is why the branch's own closing line tells the
-    reader to restart), so a session with four compactions pays it five times for one answer. Filed
-    as #1605 rather than built here, to keep #1591 to the signal it was about.
+    the fallback too, on every machine that has no source checkout, which is most of them.
+
+    SO THE FALLBACK PAYS IT ONCE PER SESSION INSTEAD (#1605, September 8, 2026). Nothing it reads
+    changes for the life of a session -- the install record and the marketplace clone are static,
+    which is why this hook's own closing line tells the reader to restart after an update -- and a
+    session with four compactions was paying the spawn five times for one answer. The engine's output
+    is now held in session-cache-lib.ps1 against the harness's own session_id, taken from the payload
+    the harness writes to this hook's stdin, and every verdict below is rendered from the cached lines
+    exactly as from measured ones. The id is the whole key on purpose: a compaction keeps it and
+    replays, a startup and a /clear arrive with a new one and re-measure, so this file never has to
+    read the payload's 'source' field or decide which kinds of firing may trust a cache. Three things
+    invalidate an entry without anybody arranging it -- a new session id, a different engine path (a
+    consumer's cache carries the plugin version in that path, so a plugin update misses by itself),
+    and a different checkout. A resume is the one case the id cannot bound, since it reuses the id, so
+    a replay is additionally bounded by age; the lib's header carries that reasoning and the bound.
+    The cache is advisory in both directions: no session id, an unwritable temp directory or a corrupt
+    entry all fall back to measuring, which is what this branch did before it existed.
+
+    WHAT IT SAVED, measured on a five-plugin consumer fixture on 2026-09-08, five pairs of firings:
+    a median of 1,288 ms measuring against 439 ms replaying -- about 850 ms per compaction, and the
+    439 ms that remain are this hook's own interpreter bring-up rather than anything it chose to do.
+    A session with four compactions therefore pays 1.3s once instead of 6.5s in total. The saving is
+    near-flat in the number of enabled plugins for the reason the figures above give: what is skipped
+    is the spawn, not the per-plugin git calls.
 
 .PARAMETER WorkshopPathOverride
     (Optional, for tests) Skip the candidate search and use this path as the candidate
@@ -257,22 +276,74 @@ try {
             exit 0
         }
 
-        # BOUNDED, because a hook's try/catch cannot save it from a hang: a blocking call never
-        # throws, it just blocks. The work is local and read-only -- two JSON reads and git inside a
-        # clone -- and measured at roughly 1.1-1.8s, so 30s sits far outside the normal range while still
-        # bounding a stalled filesystem, an fsmonitor daemon or an antivirus interception.
-        # hooks.json's own 120s timeout is the harness's backstop, not something this code arranged;
-        # Invoke-NativeCapture is what this repo already uses to arrange it (Victor, on #1591), and
-        # the fallback keeps an older mirror that lacks the lib working exactly as before.
-        $capture = Join-Path $PSScriptRoot '..\scripts\lib\native-capture-lib.ps1'
-        if (Test-Path -LiteralPath $capture -PathType Leaf) {
-            . $capture
-            $cap = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $engine, '-Brief') -DiscardStderr -TimeoutSeconds 30
-            $vout = @($cap.Output)
-            $vcode = $cap.ExitCode
+        # ONCE PER SESSION, NOT ONCE PER FIRING (#1605). The matcher below this file's docstring is
+        # 'startup|resume|clear|compact' and must stay that way -- narrowing it is what makes the
+        # report go silent after the first compaction -- so the cost of the spawn is paid again at
+        # every compaction for an answer that cannot have changed. session-cache-lib holds that
+        # answer against the harness's own session_id, which is the only thing that expresses the
+        # invariant exactly: a compaction keeps the id and replays, a startup or a /clear brings a new
+        # one and re-measures, and nothing here has to know which kind of firing this is.
+        #
+        # GUARDED DOT-SOURCE, unlike hook-check-lib.ps1's further down. That one must fail at load if
+        # it is missing, because a payload without it would run the check some other way. This one is
+        # a cache: absent, unreadable or broken, the right answer is to measure exactly as before, so
+        # its absence degrades to $sessionId = '' rather than to the outer catch's "skipped due to an
+        # error", which would take out the whole branch for a file it does not need.
+        $sessionId = ''
+        $cacheLib = Join-Path $PSScriptRoot '..\scripts\lib\session-cache-lib.ps1'
+        if (Test-Path -LiteralPath $cacheLib -PathType Leaf) {
+            try {
+                . $cacheLib
+                $sessionId = Get-HookSessionId
+            } catch {
+                $sessionId = ''
+            }
+        }
+
+        # WHAT THE VERDICT DEPENDS ON BESIDES THE SESSION, so a change to either is a miss rather than
+        # a stale replay: the engine that produced it -- whose path carries the plugin's own version
+        # directory in a consumer's cache, so a plugin update invalidates this by itself -- and the
+        # checkout whose enabled plugins it read.
+        $cacheKey = 'connector-sessioncheck/version-fallback|' + $engine + '|' +
+                    $(if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $cwd })
+        $cached = $null
+        if ($sessionId) { $cached = Get-SessionCacheEntry -SessionId $sessionId -Key $cacheKey }
+
+        if ($cached) {
+            # The engine's own lines, replayed. Everything below this branch -- the marker filtering,
+            # the summary pick, the four verdicts -- runs on them unchanged, so a replayed session
+            # start reads identically to the one that measured. That is the property the suite pins.
+            $vout  = @($cached.Output)
+            $vcode = [int]$cached.ExitCode
         } else {
-            $vout = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $engine -Brief)
-            $vcode = $LASTEXITCODE
+            # BOUNDED, because a hook's try/catch cannot save it from a hang: a blocking call never
+            # throws, it just blocks. The work is local and read-only -- two JSON reads and git inside a
+            # clone -- and measured at roughly 1.1-1.8s, so 30s sits far outside the normal range while still
+            # bounding a stalled filesystem, an fsmonitor daemon or an antivirus interception.
+            # hooks.json's own 120s timeout is the harness's backstop, not something this code arranged;
+            # Invoke-NativeCapture is what this repo already uses to arrange it (Victor, on #1591), and
+            # the fallback keeps an older mirror that lacks the lib working exactly as before.
+            $capture = Join-Path $PSScriptRoot '..\scripts\lib\native-capture-lib.ps1'
+            if (Test-Path -LiteralPath $capture -PathType Leaf) {
+                . $capture
+                $cap = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $engine, '-Brief') -DiscardStderr -TimeoutSeconds 30
+                $vout = @($cap.Output)
+                $vcode = $cap.ExitCode
+            } else {
+                $vout = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $engine -Brief)
+                $vcode = $LASTEXITCODE
+            }
+
+            # STORED EVEN WHEN THE ENGINE SAID SOMETHING UNUSABLE, and that is deliberate: branch 3
+            # below (no recognisable marker at all) is a broken install or a shape change, which is
+            # exactly as static within a session as a clean answer and exactly as expensive to
+            # re-measure. What must not be cached is a run that did not happen, and there is no such
+            # case here -- this arm is only reached after the engine returned.
+            if ($sessionId) {
+                $storeCode = $(if ($null -ne $vcode) { [int]$vcode } else { 0 })
+                Set-SessionCacheEntry -SessionId $sessionId -Key $cacheKey `
+                    -Output @($vout | ForEach-Object { [string]$_ }) -ExitCode $storeCode | Out-Null
+            }
         }
         $vsignals = @($vout | Where-Object { $_ -cmatch '^\s*\[ERROR\]' })
         $vnotices = @($vout | Where-Object { $_ -cmatch '^\s*\[INFO\]' })

@@ -37,9 +37,16 @@ Cache the plugin-versions -Brief verdict for the life of a session, keyed on the
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] `scripts/lib/session-cache-lib.ps1`: the bounded read of a SessionStart hook's own stdin payload, the session-id shape check, and a per-session verdict cache under temp (read, write, reap)
+- [ ] `connector-sessioncheck.ps1`: the #1591 fallback asks that cache before it spawns the engine, and stores what it measured -- the matcher stays `startup|resume|clear|compact`
+- [ ] `shared-scripts-lib.ps1`: register the lib as a `dkj-policy` LibOnly pair and generate the mirror, so a consumer's hook does not dot-source a file its payload lacks
+- [ ] the hook's docstring: the paragraph that says the cache was "filed as #1605 rather than built here" now describes what it does, and what invalidates it
 
 ### TEST
+
+- [ ] `scripts/tests/session-cache-lib.tests.ps1`: the shape check, the age bound, a corrupt entry, the reap, and the key
+- [ ] `connector-sessioncheck.tests.ps1`: a second firing under the same session id spawns the engine ZERO times and prints the identical line; a different id re-measures; no payload means no cache
+- [ ] the lint gate and every suite green (`check-plugin-integrity.ps1` + `scripts/tests/*.tests.ps1`)
 
 ### DEPLOY: feat/1605-sessioncheck-version-cache
 

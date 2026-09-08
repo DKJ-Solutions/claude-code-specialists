@@ -69,6 +69,15 @@
         itself into an isolated fixture tree with no such sibling, the same "stub" technique
         connectors.tests.ps1 already uses for check-connectors.ps1.
 
+    THE FIFTH GROUP IS NOT A FIFTH BRANCH -- IT IS HOW OFTEN THE FOUR ARE REACHED (#1605). The
+    matcher is 'startup|resume|clear|compact', so every scenario above used to be paid again at every
+    compaction, and the engine spawn is 1.1-1.8s of it. Group 5 counts the spawns on disk (the fake
+    engine appends a line to a counter file before printing its verdict) and asserts the property
+    that makes a cache safe rather than merely cheap: a replayed firing prints EXACTLY what the
+    measured one printed. Its four cases are the whole contract -- same id replays, a new id
+    re-measures, a payload with no id never caches, and a payload predating the lib degrades to the
+    pre-#1605 behaviour rather than to an error.
+
     Every scenario asserts exit code 0 explicitly: a SessionStart hook must never fail a session.
     -WorkshopPathOverride always points at a path that does not exist, so every scenario enters the
     "no verified workshop checkout" branch deliberately, never by accident of the real machine.
@@ -283,6 +292,84 @@ function Invoke-IsolatedHookNoEngine {
     }
 }
 
+function Invoke-CountedHook {
+    <#
+        Group 5 (#1605): how many times does the engine actually get SPAWNED?
+
+        Branch 3's isolated-copy technique with three additions, and each one is what makes the
+        question answerable:
+
+          * the fake engine APPENDS A LINE TO A COUNTER FILE before printing its verdict, so the
+            number of spawns is a fact on disk rather than an inference from wall-clock;
+          * session-cache-lib.ps1 is copied to the hook copy's own ..\scripts\lib\ sibling, because
+            that is where the hook resolves it from -- a fixture without it exercises the "no lib, so
+            no cache" degradation instead, which group 5c uses deliberately;
+          * TEMP and TMP are pointed at the fixture, so the cache lands inside the scenario's own
+            tree and can be asserted on. That is not a knob added for the suite: the lib composes its
+            root with [System.IO.Path]::GetTempPath(), which reads exactly those two variables, so
+            this is the seam that already existed.
+
+        THE PAYLOAD IS PIPED INTO THE CHILD'S STDIN, which is how the harness sends it to a
+        SessionStart hook. Passing '' pipes an empty one, which is the honest way to reach the
+        no-session-id path -- NOT piping at all would leave the child inheriting whatever stdin this
+        suite was launched with, which is a different answer on a terminal than in CI.
+    #>
+    param(
+        [string]$CaseDir,
+        [string]$RepoDir,
+        [string]$HomeDir,
+        [string]$Payload,
+        [string]$Summary = '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 up to date.'
+    )
+    $hookCopy = Join-Path $CaseDir 'hooks\connector-sessioncheck.ps1'
+    $counter  = Join-Path $CaseDir 'spawns.log'
+    $tempDir  = Join-Path $CaseDir 'temp'
+    if (-not (Test-Path -LiteralPath $hookCopy)) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $hookCopy) -Force | Out-Null
+        Copy-Item -LiteralPath $Hook -Destination $hookCopy -Force
+        New-Item -ItemType Directory -Path (Join-Path $CaseDir 'scripts\task') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $CaseDir 'scripts\lib') -Force | Out-Null
+        New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+        $fake = "Add-Content -LiteralPath '$counter' -Value 'spawn'`r`nWrite-Host '$Summary'`r`nexit 0`r`n"
+        [System.IO.File]::WriteAllText((Join-Path $CaseDir 'scripts\task\plugin-versions.ps1'), $fake, $Utf8)
+        Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\session-cache-lib.ps1') `
+                  -Destination (Join-Path $CaseDir 'scripts\lib\session-cache-lib.ps1') -Force
+    }
+    $prevP = $env:CLAUDE_PROJECT_DIR
+    $prevU = $env:USERPROFILE
+    $prevT = $env:TEMP
+    $prevM = $env:TMP
+    $env:CLAUDE_PROJECT_DIR = $RepoDir
+    $env:USERPROFILE = $HomeDir
+    $env:TEMP = $tempDir
+    $env:TMP  = $tempDir
+    Push-Location $CaseDir
+    try {
+        $out = $Payload | & powershell -NoProfile -ExecutionPolicy Bypass -File $hookCopy -WorkshopPathOverride (Join-Path $CaseDir 'nowhere')
+        $spawns = 0
+        if (Test-Path -LiteralPath $counter) { $spawns = @(Get-Content -LiteralPath $counter).Count }
+        return [pscustomobject]@{
+            Code    = $LASTEXITCODE
+            Lines   = @($out)
+            Text    = ($out -join "`n")
+            Spawns  = $spawns
+            TempDir = $tempDir
+        }
+    } finally {
+        Pop-Location
+        $env:CLAUDE_PROJECT_DIR = $prevP
+        $env:USERPROFILE = $prevU
+        $env:TEMP = $prevT
+        $env:TMP  = $prevM
+    }
+}
+
+function New-Payload {
+    param([string]$SessionId, [string]$Source = 'compact')
+    if (-not $SessionId) { return (@{ source = $Source } | ConvertTo-Json -Compress) }
+    return (@{ session_id = $SessionId; source = $Source; cwd = 'C:\somewhere' } | ConvertTo-Json -Compress)
+}
+
 $REGISTER_PHRASE = 'the register checks (consumer registration, lens inventory, agent-def drift) did not run'
 
 try {
@@ -373,6 +460,57 @@ try {
     # assert below is the whole point of pinning the four branches independently rather than trusting
     # that claim -- it is what turns "every branch says it" from a comment into a measurement.
     Assert-Has $r $REGISTER_PHRASE '4: #1606 -- this branch carries the register-checks phrase too, like its three siblings'
+
+    # --- 5. the spawn happens ONCE PER SESSION, not once per firing (#1605) -------------------------
+    # The matcher is 'startup|resume|clear|compact', so this branch used to re-run two nested
+    # powershell bring-ups plus git at every compaction for an answer that cannot change within a
+    # session. What is asserted here is the COUNT, on disk, plus the property that makes the cache
+    # safe to have at all: a replayed firing prints exactly what the measured one printed.
+    Write-Host '5a. two firings, same session id -> the engine is spawned ONCE and the line is identical' -ForegroundColor Cyan
+    $c = New-Case 'branch5a'
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    $case = Join-Path $Fixture 'branch5a\case'
+    $sid  = "a1b2c3d4-e5f6-4789-abcd-$PID"
+    $r1 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId $sid -Source 'startup')
+    Assert-Equal 0 $r1.Code '5a: exit 0 on the measuring firing'
+    Assert-Equal 1 $r1.Spawns '5a: the first firing spawns the engine'
+    Assert-Equal "connector-sessioncheck: no source checkout on this machine, so $REGISTER_PHRASE. Version check: 1 plugin(s) enabled here: 0 behind, 1 up to date." $r1.Lines[0] '5a: and prints the ordinary one-line verdict'
+    $r2 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId $sid -Source 'compact')
+    Assert-Equal 0 $r2.Code '5a: exit 0 on the replaying firing'
+    Assert-Equal 1 $r2.Spawns '5a: the second firing spawns NOTHING -- the whole point of #1605'
+    Assert-Equal $r1.Text $r2.Text '5a: and a replayed session start reads identically to the measured one, line for line'
+    Assert-Equal 1 @(Get-ChildItem -LiteralPath (Join-Path $r2.TempDir 'dkj-session-cache') -Filter '*.json').Count '5a: exactly one cache entry, and it sits under temp -- not in the repo, not in ~/.claude'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c.Repo 'dkj-session-cache'))) '5a: nothing is written into the checkout'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c.Home '.claude\dkj-session-cache'))) '5a: and nothing into the plugin administration these checks read'
+
+    Write-Host '5b. a different session id -> re-measured, which is what a startup and a /clear are' -ForegroundColor Cyan
+    $r3 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId "b9c8d7e6-f5a4-4321-dcba-$PID" -Source 'startup')
+    Assert-Equal 2 $r3.Spawns '5b: a new session id misses and spawns again -- no source field is read to decide it'
+    Assert-Equal $r1.Text $r3.Text '5b: and says the same thing, because nothing about the machine changed'
+
+    Write-Host '5c. a payload with no usable session id -> no cache at all, exactly as before #1605' -ForegroundColor Cyan
+    $c = New-Case 'branch5c'
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    $case = Join-Path $Fixture 'branch5c\case'
+    $n1 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId '')
+    $n2 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId '')
+    Assert-Equal 2 $n2.Spawns '5c: without an id every firing measures -- the cache fails towards MEASURING, never towards silence'
+    Assert-Equal 0 $n2.Code '5c: and the hook still exits 0'
+    Assert-Equal $n1.Text $n2.Text '5c: with the verdict unchanged, so a harness that sends no id loses nothing but the saving'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $n2.TempDir 'dkj-session-cache'))) '5c: and no cache directory is created at all'
+
+    Write-Host '5d. no session-cache-lib beside the hook -> the pre-#1605 behaviour, not an error' -ForegroundColor Cyan
+    # A plugin payload predating the lib, which is the same degradation branch 4 covers for the
+    # engine: the dot-source is guarded precisely so a missing cache cannot take out the verdict.
+    $c = New-Case 'branch5d'
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    $case = Join-Path $Fixture 'branch5d\case'
+    $r4 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId "c1c2c3c4-d5d6-4789-abcd-$PID")
+    Remove-Item -LiteralPath (Join-Path $case 'scripts\lib\session-cache-lib.ps1') -Force
+    $r5 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId "c1c2c3c4-d5d6-4789-abcd-$PID")
+    Assert-Equal 0 $r5.Code '5d: exit 0 with the lib gone'
+    Assert-Equal 2 $r5.Spawns '5d: it measures rather than replaying, because there is nothing to ask'
+    Assert-Equal $r4.Text $r5.Text '5d: and the verdict is the one it always printed'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -447,6 +447,26 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE OTHER HALF OF THE SAME COST (issue #1605, September 8, 2026). hook-check-lib above
+            # removed the second interpreter a hook starts; this one removes the REPEAT -- the
+            # 'startup|resume|clear|compact' matcher means a session with four compactions runs every
+            # check five times, and connector-sessioncheck's #1591 fallback cannot be run in-process
+            # at all (it is bounded by a 30 s timeout, which an in-process call cannot be abandoned
+            # under). So its verdict is held for the life of the session instead, keyed on the
+            # session_id the harness writes to the hook's stdin.
+            #
+            # MIRRORED INTO dkj-policy ONLY, and only that, because connector-sessioncheck.ps1 is its
+            # one caller and ships there. A consumer's hook dot-sources it as a $PSScriptRoot sibling,
+            # so a payload without it would find nothing -- which the hook handles by measuring, the
+            # same way it did before this lib existed, but the pair is registered so that never
+            # becomes the normal case. No contract row follows: nothing in it is repo-owned. It reads
+            # a payload the harness sends and writes under temp.
+            Name    = 'session-cache-lib'
+            Source  = 'scripts\lib\session-cache-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
             # THE MERGED-PR PROOF (issue #1194, September 1, 2026) -- was THIS ref merged, or only a
             # branch that once wore its name? A THIRD lib with a reader in more than one plugin, and it
             # arrived the way the argument for sharing is usually only made in hindsight: the same
