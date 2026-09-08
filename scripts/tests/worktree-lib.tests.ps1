@@ -396,6 +396,27 @@ Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines @('garbage') -Primar
 Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines $PorcelainAgentWorktree -PrimaryRoot '').Count)" `
     'an unreadable primary root answers no findings rather than matching every worktree'
 
+# TWO NESTED WORKTREES AT ONCE, because the caller loops over whatever this returns and the harness has no
+# rule against a second dispatch while a first is standing. The implementation accumulates rather than
+# returning on the first hit, and this is what holds it to that -- a single-finding regression would still
+# pass every assert above, since each of those has exactly one nested tree to find.
+$PorcelainTwoNested = @(
+    'worktree C:/repo',
+    'HEAD aaaa',
+    'branch refs/heads/main',
+    '',
+    'worktree C:/repo/.claude/worktrees/agent-1',
+    'HEAD bbbb',
+    'detached',
+    '',
+    'worktree C:/repo/.claude/worktrees/agent-2',
+    'HEAD cccc',
+    'detached',
+    ''
+)
+Assert-Equal '2' "$((Get-NestedWorktreePath -PorcelainLines $PorcelainTwoNested -PrimaryRoot 'C:/repo').Count)" `
+    'two worktrees standing inside the primary root are both reported, not just the first'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

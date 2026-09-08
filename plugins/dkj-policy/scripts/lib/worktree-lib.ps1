@@ -225,8 +225,9 @@ function Get-TrunkReturnDecision {
 #
 # THE HARNESS PLACES ITS OWN WORKTREE INSIDE THE REPO, at .claude/worktrees/agent-<id>, and nothing
 # ignores that path. worktree-lane.ps1's own header already states the alternative this repo takes for
-# ITS worktrees -- a lane sits in a SIBLING '<repo>-lanes/' directory, outside the tree, "because a
-# worktree inside the tree would be walked by the lint gate's link scan and by the test suites." The
+# ITS worktrees -- a lane sits in a SIBLING '<repo>-lanes/' directory, outside the tree, and its own
+# header says why: "a worktree inside the tree would be walked by the lint gate's link scan and by the
+# test suites, which would report a second copy of the whole repo as findings." The
 # harness does not get that choice, so the tree-walking checks have to be told rather than left to find
 # out the hard way: every count check-plugin-integrity.ps1 and its test suites take by walking
 # $RepoRoot -Recurse doubles while a nested worktree stands, because it is a second, complete copy of
