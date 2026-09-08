@@ -34,8 +34,22 @@
     (Get-EntryFallbackType is deliberately NOT here: it is a changelog TYPE, not scaffold prose --
     'Chore' is a legitimate final value, so it can never be evidence of an unedited entry.)
 
+    No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script. Depends on
+    Get-DisplayRef (ref-print-lib.ps1), which it loads itself -- see the dot-source below.
+
     Pure ASCII (repo convention for .ps1).
 #>
+
+# THE STRIP HAS ONE DEFINITION, AND IT IS NOT HERE (issue #1623 settled that, #1650 brought the third
+# caller). Get-DevelopmentShapeFindings prints a line of somebody's branch document back to a console and to
+# a public CI log, which is the one kind of text this repo treats as an injection surface rather than a
+# display question: an ANSI or OSC escape in it repaints the terminal it lands in, and a zero-width run
+# makes the printed line read as something other than what it says -- by the very line that exists to tell
+# the reader what is wrong. Unconditional, and $PSScriptRoot-relative rather than repo-relative, so it
+# resolves in the plugin mirror as well as here; remote-ahead-lib.ps1 and release-lib.ps1 load their
+# siblings the same way. ref-print-lib.ps1 is a leaf with no dependencies of its own, which is what makes
+# it safe to load first.
+. (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
 
 # The English fallbacks, and the ONLY copy of them. new-branch.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
@@ -7241,7 +7255,10 @@ function Get-DevelopmentShapeFindings {
         RETURNS the finding lines ready to print (empty when the document is sound), plus what was
         actually READ: PhaseCount, PhaseMark and SubMark. A caller reporting coverage quotes those rather
         than composing a level a second time -- see the [OK] line in check-branch-entry.ps1 for the day
-        that cost.
+        that cost. Every fragment of the DOCUMENT quoted in a finding is passed through Get-DisplayRef
+        first -- the reason is at the dot-source at the top of this file -- while the structured members
+        (PreambleStrays, StrayHeadings) carry the text as it stands, because a caller matching on it is
+        reading and not printing.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
@@ -7325,11 +7342,15 @@ function Get-DevelopmentShapeFindings {
         ($knownPhases -notcontains $_.Text) -and ($_.Text -notmatch '^DEPLOY\b')
     })
 
+    # EVERY QUOTED FRAGMENT BELOW GOES THROUGH Get-DisplayRef FIRST, and the reason is at the dot-source at
+    # the top of this file: these are the only lines here made of text somebody else wrote, and they are
+    # printed to a console and to a public CI log. STRIPPED BEFORE TRUNCATED, deliberately -- cutting at 72
+    # characters can halve an escape sequence, so a strip afterwards would be working on a fragment.
     $findings = @()
     if ($strayHeadings.Count -gt 0 -and $EnforcePhaseArc) {
         $findings += "carries $($topHeadings.Count) '$phaseMark' headings, and the arc is $($knownPhases -join ' / ') / DEPLOY -- four, never a fifth."
         foreach ($h in $strayHeadings) {
-            $findings += "  extra heading, line $($h.Line): '$phaseMark $($h.Text)'"
+            $findings += "  extra heading, line $($h.Line): '$phaseMark $(Get-DisplayRef -Ref $h.Text)'"
         }
         $findings += "  Demote it to '$subMark' under whichever of the four it belongs to."
     }
@@ -7337,7 +7358,8 @@ function Get-DevelopmentShapeFindings {
     if ($preambleStrays.Count -gt 0) {
         $findings += "carries branch content above the first '$phaseMark', where the block is generic guidance:"
         foreach ($s in $preambleStrays) {
-            $trimmed = if ($s.Text.Length -gt 72) { $s.Text.Substring(0, 72) + '...' } else { $s.Text }
+            $shown = Get-DisplayRef -Ref $s.Text
+            $trimmed = if ($shown.Length -gt 72) { $shown.Substring(0, 72) + '...' } else { $shown }
             $findings += "  line $($s.Line): $trimmed"
         }
         $findings += '  That region is identical in every branch document in every repo, so a status note'

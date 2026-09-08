@@ -2928,6 +2928,23 @@ Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text $shapeFenced -EnforcePhaseA
 # AND EMPTY TEXT IS NOT A DEFECT, for the same reason it is not one for the predicate above.
 Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text '' -EnforcePhaseArc).Findings).Count 'shape: empty text raises nothing'
 
+# THE QUOTED FRAGMENTS ARE STRIPPED, because they are the only text here that somebody else wrote and they
+# are printed to a console and to a public CI log. Same treatment, same one definition, as a commit subject
+# from another session (#1623) -- an ANSI escape repaints the terminal and a zero-width run makes the line
+# read as something other than what it says, by the very line that exists to say what is wrong.
+$shapeHostile = "## feat/x`n`n> guidance`n`nParked" + [char]0x1B + "[31m" + [char]0x200B + "note`n`n" +
+    (('#' * (Get-BranchCycleSectionLevel)) + " DEPLOY: feat/x`n`nbody`n")
+$shapeHostileFindings = @((Get-DevelopmentShapeFindings -Text $shapeHostile).Findings) -join "`n"
+Assert-True ($shapeHostileFindings -notmatch [regex]::Escape([string][char]0x1B)) 'shape: an escape character in the quoted line does not reach the console'
+Assert-True ($shapeHostileFindings -notmatch [regex]::Escape([string][char]0x200B)) 'shape: nor does a zero-width run, which would weld two words into a third'
+Assert-True ($shapeHostileFindings -match 'Parked') 'shape: and the words survive -- the reader still has to recognise the line'
+# AND THE STRUCTURED MEMBER IS NOT STRIPPED: a caller matching on it is reading, not printing, and a
+# silently altered text would make its match answer a different question.
+$shapeHostileRaw = @((Get-DevelopmentShapeFindings -Text $shapeHostile).PreambleStrays)
+Assert-True ($shapeHostileRaw[0].Text -match [regex]::Escape([string][char]0x1B)) 'shape: PreambleStrays carries the line as it stands, for a caller that reads rather than prints'
+$shapeHeadingHostile = $shapeWhole -replace ('(?m)^' + [regex]::Escape($shapePhase)), (('#' * (Get-BranchCycleSectionLevel)) + ' Notes' + [char]0x1B + "[0m`n`n" + $shapePhase)
+Assert-True ((@((Get-DevelopmentShapeFindings -Text $shapeHeadingHostile -EnforcePhaseArc).Findings) -join "`n") -notmatch [regex]::Escape([string][char]0x1B)) 'shape: the extra-heading finding is stripped too -- same provenance, same treatment'
+
 # THE TWO CALL SITES, which is the half #1650 was actually filed about. CI must still ask -- it is the gate
 # for the branch that never ran open-pr -- and open-pr must ask and REFUSE, before the push.
 $shapeGateSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\lint\check-branch-entry.ps1'), [System.Text.Encoding]::UTF8)
