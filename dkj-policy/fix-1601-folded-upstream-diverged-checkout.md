@@ -124,3 +124,7 @@ was looking the same way it was.
 **Score:** 1
 
 #### Pull Request
+
+Read the entry on the ref, not the absent document, in check-unfolded-entry
+
+Plugins: dkj-policy
