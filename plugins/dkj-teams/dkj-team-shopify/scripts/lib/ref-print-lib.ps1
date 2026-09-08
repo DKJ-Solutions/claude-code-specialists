@@ -9,10 +9,12 @@
     branch name into a command line meant to be copied and run verbatim, unquoted. git's own ref rules
     do not forbid the characters that matter: `git check-ref-format --branch` accepts every one of
     `fix/evil;touch`, `fix/evil&touch`, `fix/evil|touch`, `fix/evil$(touch)`, `` fix/evil`touch` `` and
-    `fix/it's-fine` (exit 0, measured). What it DOES reject is ASCII control characters and the space
-    (exit 128), which is why the ANSI/OSC-repaint class remote-ahead-lib.ps1's sanitiser exists for
-    (#1439, #1446) is already closed for a ref name, and why this is a different hole in the same wall:
-    not display deception, but a command a reader is invited to run.
+    `fix/it's-fine` (exit 0, measured). What it DOES reject is ASCII control characters (\p{Cc}) and the
+    space (exit 128) -- NOT the whole of the ANSI/OSC-repaint class remote-ahead-lib.ps1's sanitiser
+    exists for (#1439, #1446), because that class is `[\p{Cc}\p{Cf}]` and git enforces only the first
+    half. A `\p{Cf}` run is accepted in a ref name and is a live display hazard; see the scope note at
+    the foot of this block. What THIS lib is about is a different hole in the same wall: not display
+    deception, but a command a reader is invited to run.
 
     WHY QUOTING IS NOT THE FIX, WHICH IS THE PART WORTH RECORDING. The obvious repair -- wrap the value
     in quotes -- fails in both spellings, and it fails in both shells this workflow's readers actually
@@ -40,9 +42,20 @@
     repo has ever had match the pattern, so the rule refuses nothing anybody here has wanted. That is
     the whole argument for an allowlist this narrow -- it costs nothing real.
 
-    WHAT THIS LIB DOES NOT DO. It does not sanitise for DISPLAY: `'$branch'` quoted inside a prose
-    sentence ("this checkout is still on 'x;y'") is not a command and is left alone, because git already
-    rejects the control characters that would make prose deceptive. And it is not the creation-side
+    WHAT THIS LIB DOES NOT DO, AND THE GAP THAT LEAVES OPEN. It does not sanitise for DISPLAY:
+    `'$branch'` quoted inside a prose sentence ("this checkout is still on 'x;y'") is not a command, and
+    the shell metacharacters this lib refuses are inert there. THAT IS NOT THE SAME AS SAFE (#1617).
+    The deceptive class is `[\p{Cc}\p{Cf}]` and `git check-ref-format` enforces only the `\p{Cc}` half,
+    so a ref carrying a `\p{Cf}` character is accepted, creatable and checkout-able, and `git rev-parse
+    --abbrev-ref HEAD` hands it back verbatim. Measured, September 8, 2026, `--branch` exit codes:
+    U+202E RIGHT-TO-LEFT OVERRIDE 0, U+200D ZERO WIDTH JOINER 0, U+200B ZERO WIDTH SPACE 0, U+2066
+    LEFT-TO-RIGHT ISOLATE 0 -- against 128 for BEL and ESC. Those first two are the exact code points
+    #1446 was filed for, where they bypassed the #1439 tip sanitiser, which is why
+    remote-ahead-lib.ps1 strips `\p{Cf}` deliberately and this lib's own refusal note (below) does the
+    same. So the display axis is OPEN at the prose sites, on a narrow path -- Test-BranchName refuses
+    these at creation, so it takes a branch created by hand, cloned or fetched -- and it is left open
+    knowingly rather than closed by git. A reader who knows the gap can weigh it. And it is not the
+    creation-side
     guard -- Test-BranchName in the repo-owned scripts\lib\branch-info.ps1 holds the same allowlist so a
     branch this workflow CREATES is safe by construction. Neither half closes the hole alone: that file
     is repo-owned and per-consumer, and a branch cloned, fetched or created by hand reaches these print
@@ -87,9 +100,11 @@ function Get-PasteableRef {
         THE NOTE NAMES THE BRANCH RATHER THAN HIDING IT. A remedy that says only "your branch name is
         unsafe" leaves the reader unable to act at all, which is a worse failure than the one this
         guards: they are standing on that branch and need it in the command. So the name is printed --
-        as prose, where git's own rejection of control and whitespace characters means it cannot repaint
-        a terminal -- together with what the reader has to do about it, which is quote it for whichever
-        shell they are actually in.
+        as prose, where the shell metacharacters are inert, and STRIPPED OF `[\p{Cc}\p{Cf}]` on the way
+        (see the implementation note below) so that it cannot repaint a terminal. The strip is what
+        makes that safe, NOT git's own rules: git rejects only the `\p{Cc}` half and accepts a
+        `\p{Cf}` run in a ref name (#1617). Printed with it is what the reader has to do about the
+        name, which is quote it for whichever shell they are actually in.
     #>
     param(
         [AllowEmptyString()][AllowNull()][string]$Ref,
@@ -105,12 +120,14 @@ function Get-PasteableRef {
     # and a note reading "the branch name is: ." tells the reader nothing.
     #
     # AND IT IS STRIPPED OF CONTROL AND FORMAT CHARACTERS FIRST, which is remote-ahead-lib.ps1's
-    # sanitiser applied to this lib's own output. For a name that came from `git rev-parse` this is
-    # belt-and-braces -- git rejects those characters in a ref -- but Get-PasteableRef takes a STRING,
-    # and sync-main.ps1 hands it one built from a seam answer a consumer wrote, which git has never
-    # seen. Without this, the one place this lib prints is a place an ANSI/OSC escape could repaint a
-    # terminal or wear this workflow's own warning prefix, and a guard whose refusal path is itself an
-    # injection surface is worse than no guard. The same reasoning as #1439 and #1446, at a new site.
+    # sanitiser applied to this lib's own output. IT IS LOAD-BEARING ON BOTH INPUTS, not belt-and-braces
+    # on either (#1617). git rejects only `\p{Cc}` in a ref, so a name straight from `git rev-parse` can
+    # still carry a `\p{Cf}` character -- U+202E and U+200D among them, the two #1446 was filed for --
+    # and Get-PasteableRef additionally takes a STRING, which sync-main.ps1 builds from a seam answer a
+    # consumer wrote and git has never seen. Without this, the one place this lib prints is a place an
+    # ANSI/OSC escape or an RTL override could repaint a terminal or wear this workflow's own warning
+    # prefix, and a guard whose refusal path is itself an injection surface is worse than no guard. The
+    # same reasoning as #1439 and #1446, at a new site.
     $shown = if ([string]::IsNullOrEmpty($Ref)) {
         '(this run could not read it)'
     } else {
