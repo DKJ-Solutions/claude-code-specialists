@@ -19,6 +19,10 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\sync\check-connectors.ps1'
 $Hook     = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\connector-sessioncheck.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-test-fixture-$PID"
+# A scratch '~/.claude' for the isolated hook calls (9a/9e) -- no marketplace clone, no install
+# administration, so plugin-versions.ps1's fallback lands deterministically on "indeterminate"
+# regardless of what this machine's real install/clone actually look like.
+$HookHome = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-hook-home-$PID"
 
 $script:pass = 0
 $script:fail = 0
@@ -54,6 +58,27 @@ function Invoke-Ps {
     param([string]$Path, [string[]]$ScriptArgs)
     $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Path @ScriptArgs
     return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($out -join "`n") }
+}
+
+# Runs the hook with CLAUDE_PROJECT_DIR and USERPROFILE pinned to a scratch repo/home for the
+# child process (Get-InstallRecord's own docstring endorses redirecting USERPROFILE this way).
+# NEEDED SINCE #1591: when no workshop is found, the hook now falls back to running
+# plugin-versions.ps1 -Brief using the AMBIENT environment (it takes no -RootOverride/
+# -UserHomeOverride of its own) -- so a call to Invoke-Ps alone reads THIS machine's real install
+# administration and marketplace clone, which is why 9a/9e stopped being deterministic the moment
+# that fallback was added.
+function Invoke-HookIsolated {
+    param([string]$RepoDir, [string]$HomeDir, [string[]]$ScriptArgs)
+    $prevP = $env:CLAUDE_PROJECT_DIR
+    $prevU = $env:USERPROFILE
+    $env:CLAUDE_PROJECT_DIR = $RepoDir
+    $env:USERPROFILE = $HomeDir
+    try {
+        return Invoke-Ps $Hook $ScriptArgs
+    } finally {
+        $env:CLAUDE_PROJECT_DIR = $prevP
+        $env:USERPROFILE = $prevU
+    }
 }
 
 # Builds a fixture consumer with settings.json + given extensions. -Layout chooses where the
@@ -468,10 +493,19 @@ try {
 
     # --- 9. SessionStart hook (connector-sessioncheck.ps1) ---------------------------------------
     # 9a. No workshop checkout findable -> soft message, exit 0 (never block a session).
+    #     SINCE #1591 this is no longer the literal 'check skipped' string: the hook now finds its
+    #     own plugin-versions.ps1 mirror (this repo IS the workshop, so it always has one) and runs
+    #     it -Brief instead of giving up. That branch reads the AMBIENT environment (no
+    #     -RootOverride/-UserHomeOverride of its own), so Invoke-HookIsolated pins CLAUDE_PROJECT_DIR
+    #     and USERPROFILE to scratch fixtures -- otherwise this assertion would depend on whatever
+    #     this machine's own install record and marketplace clone happen to say (measured: it does,
+    #     and un-pinned it read this dev checkout's real "behind" state).
+    New-Item -ItemType Directory -Force -Path (Join-Path $HookHome '.claude\plugins') | Out-Null
     New-FixtureConsumer -ExtensionIds @('06-16')
-    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', (Join-Path $Fixture 'does-not-exist'))
+    $r = Invoke-HookIsolated -RepoDir $Fixture -HomeDir $HookHome -ScriptArgs @('-WorkshopPathOverride', (Join-Path $Fixture 'does-not-exist'))
     Assert-Equal 0 $r.Code 'hook without a workshop: exit code 0'
-    Assert-Match 'check skipped' $r.Out 'hook without a workshop: skipped message'
+    Assert-Match 'register checks \(consumer registration, lens inventory, agent-def drift\) did not run' $r.Out 'hook without a workshop: the [UNREGISTERED] lesson of 2026-07-28 -- says the register checks did not run'
+    Assert-Match 'Version check: 1 plugin\(s\) enabled here: 0 behind, 1 undetermined, 0 up to date\.' $r.Out 'hook without a workshop: falls back to the plugin-versions -Brief summary (no clone at all here -> undetermined, not an error)'
 
     # 9b. With the real workshop: integration smoke. Which branch (in-sync or signals) fires depends
     #     on the repo's current register state (e.g. manifests not yet updated after a release
@@ -763,12 +797,15 @@ try {
     Assert-NotMatch 'rev-parse' $r.Out 'no-stamp stub: and no advice to check a stamp that is not there'
 
     # 9e. Marker check (Sean guardrail): a candidate path without a valid marker is NOT executed.
+    #     Same #1591 fallback as 9a applies here too (a bad marker also leaves $workshop unset), so
+    #     this is isolated the same way; what this scenario actually pins is that the fake script's
+    #     own output never reaches the session, not the exact wording of the fallback.
     $stub = New-StubWorkshop -Name 'stub-fake' -ExitCode 0 -ValidMarker $false -OutputLines @(
         'FAKE-EXECUTED'
     )
-    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    $r = Invoke-HookIsolated -RepoDir $Fixture -HomeDir $HookHome -ScriptArgs @('-WorkshopPathOverride', $stub)
     Assert-Equal 0 $r.Code 'fake workshop: exit code 0'
-    Assert-Match 'check skipped' $r.Out 'fake workshop: rejected as a workshop'
+    Assert-Match 'register checks \(consumer registration, lens inventory, agent-def drift\) did not run' $r.Out 'fake workshop: rejected as a workshop -- register checks did not run'
     Assert-NotMatch 'FAKE-EXECUTED' $r.Out 'fake workshop: script was NOT executed'
 
     # --- 10. A plugin id the marketplace no longer declares --------------------------------------------
@@ -802,6 +839,7 @@ try {
     Assert-Match 'invalid or unknown plugin field' $r.Out 'malformed id: and keeps its own wording'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    if (Test-Path -LiteralPath $HookHome) { Remove-Item -Recurse -Force -LiteralPath $HookHome -ErrorAction SilentlyContinue }
 }
 
 Write-Host "`nResult: $($script:pass) pass, $($script:fail) fail." -ForegroundColor $(if ($script:fail -gt 0) { 'Red' } else { 'Green' })
