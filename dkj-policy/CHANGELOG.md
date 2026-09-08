@@ -43,7 +43,82 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**16 / 31 minor entries** <!-- pending-tally -->
+**16 / 33 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1623-ref-display-strip · 20260908-143357
+
+A branch name this workflow prints in a sentence can no longer read as a different branch. `git
+check-ref-format` enforces `\p{Cc}` and **accepts** `\p{Cf}`, so a branch carrying U+202E, U+200B,
+U+200D or U+2066 is creatable, checkout-able and returned verbatim by `git rev-parse` -- and
+thirty-two printed sentences across `ship-pr.ps1`, `sync-main.ps1`, `remote-ahead-lib.ps1` and
+`worktree-lib.ps1` put that name straight into a console. `Get-DisplayRef`, one definition in
+`ref-print-lib.ps1`, now replaces every control and format character with a space, collapses the
+runs and trims; the words stay, because a reader standing on that branch has to recognise it. The
+paste axis is unchanged and stays distinct: a command gets a placeholder, a sentence gets a strip.
+
+Two of the thirty-two are worth naming on their own. `ship-pr.ps1`'s go-ahead line is the one line
+the ship documents as safe to act on. And `sync-main.ps1`'s standing-predecessor rows print names
+that came off `git ls-remote` -- text chosen by whoever pushed the branch, read by an operator
+deciding which pull request to close.
+
+The same movement retired the tree's second copy of the strip pattern: `remote-ahead-lib.ps1` had
+been sanitising a commit subject and printing the branch label beside it raw, which is the sharpest
+instance the report found.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a subscriber. It changes what a console prints to whoever runs the
+workflow's own scripts, and only for a branch name no ordinary repo has.
+
+**Score:** N/A
+
+#### Pull Request
+
+A ref name printed as prose is stripped of control and format characters
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1631](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1631)
+
+---
+
+### DEPLOY: fix/1609-claude-home-pollution · 20260908-141700
+
+A debug script wrote fixture data into the real `~/.claude` and cost three checkouts their plugin
+install records, with no backup, no error and nothing that reported it -- what a session saw instead was
+every plugin listed as *"not installed in this checkout"*. A new SessionStart check,
+`claude-home-sessioncheck`, now reports a record whose `projectPath` sits under a scratch tree -- the one
+signature no existing reader can see, since the shared reader filters to this repo's path and separately
+skips a path that no longer resolves -- and names any marketplace clone the same fixture left behind. It
+also snapshots `installed_plugins.json` while that file reads healthy, after the verdict and never on a
+finding, so a clobber can be *restored* rather than re-installed, which is what left #1609 unrepaired at
+filing. The guard the report proposed was measured and declined: nothing committed writes under
+`~/.claude`, so a write-helper has no call site to be enforced at, and a command-string guard cannot see
+inside the temp script that did the writing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It is the first SessionStart check in this family that writes anything, and the exception is stated
+rather than quiet -- bounded to one file it owns, skipped on any finding, and switched off by one flag.
+The rest of the interest is in what was declined: the orphan-marketplace-directory scan that would have
+fired forever on ordinary residue (measured the same day on `claude-plugins-official/`), and the
+heredoc-inspecting guard whose first casualty would have been the fixture that tests it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Detect and recover fixture pollution of the real ~/.claude
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1626](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1626)
+
+---
 
 ### DEPLOY: fix/1617-ref-print-display-scope-reason · 20260908-140616
 

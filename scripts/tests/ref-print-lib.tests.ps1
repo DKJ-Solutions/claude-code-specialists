@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-    Tests for scripts/lib/ref-print-lib.ps1 -- the paste-safety verdict on a ref name that is about to be
-    interpolated into a printed command (issue #1594).
+    Tests for scripts/lib/ref-print-lib.ps1 -- the two verdicts on a ref name about to be printed: may it
+    be interpolated into a paste-ready COMMAND (issue #1594), and what does it look like as PROSE (issue
+    #1623).
 
 .DESCRIPTION
     THE HOSTILE NAMES ARE SPLIT ON GIT'S OWN ACCEPTANCE, measured rather than assumed, because the two
@@ -239,6 +240,59 @@ $custom = Get-PasteableRef -Ref 'fix/evil;touch' -Placeholder '<your branch>'
 Assert-Equal '<your branch>' $custom.Token 'a caller may choose the placeholder'
 Assert-True ($custom.Note -like '*<your branch>*') 'and the note quotes the placeholder it actually used, so the two agree'
 
+# --- the DISPLAY axis: Get-DisplayRef (issue #1623) -----------------------------------------------
+# THE SECOND HALF OF THE SAME WALL. #1594 scoped display out because "git already rejects the control
+# characters that would make prose deceptive"; #1617 measured that git rejects \p{Cc} and ACCEPTS \p{Cf},
+# which is the half that deceives. So these cases assert git's acceptance as an explicit premise, exactly
+# as the paste half above does: if a future git tightened its ref rules, THAT assert is the one that
+# should go red, because the case has then stopped testing anything real.
+Write-Host ''
+Write-Host 'Get-DisplayRef -- the prose strip, on names git itself accepts' -ForegroundColor Cyan
+
+foreach ($cf in @(
+    @{ Cp = 0x202E; Name = 'U+202E RIGHT-TO-LEFT OVERRIDE' },
+    @{ Cp = 0x200D; Name = 'U+200D ZERO WIDTH JOINER' },
+    @{ Cp = 0x200B; Name = 'U+200B ZERO WIDTH SPACE' },
+    @{ Cp = 0x2066; Name = 'U+2066 LEFT-TO-RIGHT ISOLATE' }
+)) {
+    $ref = 'fix/a' + [char]$cf.Cp + 'b'
+    Assert-True (Test-GitAcceptsRef -Ref $ref) "premise: git accepts a branch carrying $($cf.Name)"
+    Assert-Equal 'fix/a b' (Get-DisplayRef -Ref $ref) "and the prose strip turns it into a visible space -- $($cf.Name)"
+}
+
+# THE CONTROL CLASS IS ASSERTED TOO, and not as padding. git refuses these in a ref, but Get-DisplayRef
+# takes a STRING: sync-main.ps1 hands it a name built from a seam answer a consumer wrote, and this lib's
+# own refusal note hands it whatever Get-PasteableRef was called with. The guard must be a property of the
+# string rather than an inference from git's rules.
+foreach ($cc in @(0x1B, 0x0D, 0x07, 0x00)) {
+    $ref = 'fix/a' + [char]$cc + 'b'
+    Assert-Equal 'fix/a b' (Get-DisplayRef -Ref $ref) "a control character is stripped too: 0x$('{0:X2}' -f $cc)"
+}
+
+# A SPACE RATHER THAN NOTHING, which is the case the choice was made for: deleting a zero-width joiner
+# welds 'fix/relea' + 'se' into 'fix/release', a legitimate name that is not the branch you are on.
+Assert-Equal 'fix/relea se' (Get-DisplayRef -Ref ('fix/relea' + [char]0x200D + 'se')) 'a zero-width joiner does not weld two halves into a different legitimate name'
+
+# RUNS COLLAPSE AND THE RESULT IS TRIMMED, so a long invisible run does not become a long visible gap and
+# a name that was ENTIRELY invisible comes back as '' rather than as a cloud of blanks.
+Assert-Equal 'fix/a b' (Get-DisplayRef -Ref ('fix/a' + [char]0x200B + [char]0x200B + [char]0x202E + 'b')) 'a run of format characters collapses to one space'
+Assert-Equal '' (Get-DisplayRef -Ref ([char]0x200B + [char]0x200D + [char]0x2066)) 'a name made entirely of format characters has no display at all'
+Assert-Equal '' (Get-DisplayRef -Ref '') 'the empty name stays empty'
+Assert-Equal '' (Get-DisplayRef -Ref $null) 'a null name is the empty name'
+
+# AND A NAME THIS WORKFLOW ACTUALLY USES IS RETURNED UNTOUCHED, which is the assert that would catch a
+# strip pattern widened by accident into the ordinary case.
+foreach ($ok in @('main', 'fix/1623-ref-display-strip', 'feat/x_y.z-2', 'sync/live-2026-09-08-2')) {
+    Assert-Equal $ok (Get-DisplayRef -Ref $ok) "an ordinary branch name is returned unchanged: '$ok'"
+}
+
+# THE REFUSAL NOTE READS THE SAME WAY FOR AN ALL-INVISIBLE NAME AS FOR NO NAME AT ALL. Before #1623 this
+# produced a note saying "The branch is:" with blanks after it -- the "tells the reader nothing" failure
+# the note's own comment warns about, arriving through the strip rather than through the empty case.
+$invisible = Get-PasteableRef -Ref ([char]0x200B + [char]0x200D)
+Assert-Equal '<branch>' $invisible.Token 'a name made entirely of format characters is not paste-safe either'
+Assert-True ($invisible.Note -like '*could not read it*') 'and its note falls through to the empty wording rather than printing blanks'
+
 # --- the seven call sites #1594 measured ----------------------------------------------------------
 Write-Host ''
 Write-Host 'The call sites -- the lib is unreachable if one still interpolates the raw ref' -ForegroundColor Cyan
@@ -278,9 +332,10 @@ Assert-True (([regex]::Matches($syncText, [regex]::Escape('$branchPaste.Note')))
 
 # THE EIGHTH SITE, WHICH IS THE ONE THIS ASSERT EXISTS FOR. #1594 reported three of seven, so the guard
 # against the next one is a scan rather than a list: no printed line in either script may put the raw
-# $branch straight after a command word. Prose that merely QUOTES the name ('$branch' inside a sentence)
-# is deliberately not a subject -- git rejects the control characters that would make prose deceptive,
-# and remote-ahead-lib.ps1 owns that half.
+# $branch straight after a command word. Prose that merely QUOTES the name is a subject too since #1623 --
+# it was scoped out here on the ground that git rejects the characters that make prose deceptive, and it
+# rejects only half of them -- but it is a DIFFERENT subject with a different answer, so it has its own
+# block below rather than being folded into this scan.
 Write-Host ''
 Write-Host 'No raw ref left in a printed command, in either script' -ForegroundColor Cyan
 
@@ -297,6 +352,77 @@ foreach ($raw in $rawInCommand) {
     Assert-True (-not $syncText.Contains($raw)) "sync-main.ps1 no longer carries the raw interpolation: '$raw'"
 }
 
+# --- the prose sites (issue #1623) ----------------------------------------------------------------
+# THE SAME STRUCTURAL ARGUMENT AS THE PASTE HALF: the function is correct and unreachable if a call site
+# still interpolates the raw ref. And the same failure mode too -- #1594 reported three of seven sites and
+# #1623 reported eighteen of the thirty-one these asserts now hold, so the guard is a scan and a
+# judged-once assert rather than a list of sentences somebody has to keep current.
+Write-Host ''
+Write-Host 'The prose sites -- judged once, beside the read that produced the name' -ForegroundColor Cyan
+
+Assert-True ($shipText -match [regex]::Escape('$branchShown = Get-DisplayRef -Ref $branch')) 'ship-pr.ps1 strips the branch once, beside the read that produced it'
+Assert-True ($syncText -match [regex]::Escape('$branchShown = Get-DisplayRef -Ref $branch')) 'sync-main.ps1 strips the branch once, beside the composition that produced it'
+Assert-True ($syncText -match [regex]::Escape('$trunkShown   = Get-DisplayRef -Ref $trunk')) 'sync-main.ps1 strips the trunk name too -- same seam, and it is printed in nine sentences'
+
+# NOT A SINGLE QUOTED RAW REF LEFT IN EITHER SCRIPT. Every prose site in both files wraps the name in
+# single quotes or drops it bare into a sentence; the quoted form is the one a scan can hold without false
+# positives, because `$branch` on its own is also every git and gh argument -- which must stay raw.
+Assert-True (-not $shipText.Contains("'`$branch'")) 'ship-pr.ps1 carries no quoted raw $branch in a printed sentence'
+Assert-True (-not $syncText.Contains("'`$branch'")) 'sync-main.ps1 carries no quoted raw $branch in a printed sentence'
+
+# THE GO-AHEAD LINE IS THE ONE THAT MATTERS MOST (#1616), and it is composed in a lib, so ship-pr can only
+# be asserted to hand it the stripped name -- worktree-lib's own suite asserts the strip itself.
+Assert-True ($shipText -match [regex]::Escape('Get-TrunkReturnGoAheadLine -Returned $treeOnTrunk -Branch $branchShown')) 'ship-pr.ps1 hands the go-ahead line a stripped name'
+
+# THE TWO BRANCH-DERIVED PATHS IN ship-pr's REFUSALS. Both are built from $branch, so both are prose
+# carrying a ref name; the raw pair stays raw because one is a git ref and the other is a file this script
+# actually opens.
+Assert-True ($shipText -match [regex]::Escape('$shipCycleRefShown    = Get-DisplayRef -Ref $shipCycleRef')) 'ship-pr.ps1 strips the branch ref it prints in the step-list and DEPLOY refusals'
+Assert-True ($shipText -match [regex]::Escape('$shipProgressRelShown = Get-DisplayRef -Ref $shipProgressRel')) 'ship-pr.ps1 strips the branch document path it prints beside it'
+
+# AND THE MOST EXTERNALLY-AUTHORED NAME OF ALL: sync-main's standing-predecessor rows come off
+# `git ls-remote`, so whoever pushed a branch matching the prefix chose the text printed there.
+Assert-True ($syncText -match [regex]::Escape('$branchRow = Get-DisplayRef -Ref ([string]$r.Branch)')) 'sync-main.ps1 strips the ls-remote branch names in its predecessor rows'
+Assert-True ($syncText -match [regex]::Escape('STILL STANDING: $(Get-DisplayRef -Ref ([string]$s.Branch))')) 'and the standing-branch line the operator reads first, which prints the same names'
+
+# EVERY DISPLAY VARIABLE IS ASSIGNED ABOVE ITS FIRST USE, and this assert exists because the branch that
+# added them got it wrong. Both scripts run under `Set-StrictMode -Version Latest`, where reading an
+# unassigned variable does not print an empty string -- it THROWS, and the run dies at whatever line it
+# reached. sync-main's own suite caught it at 50 failed asserts; ship-pr.ps1 has no suite at all, so the
+# same slip there would only surface in a live ship, mid-merge. A textual index comparison is enough:
+# both are straight-line scripts, and the sites in question are top-level statements.
+# READ LINE BY LINE, AND COMMENTS SKIPPED, because the obvious spelling does not work. Comparing
+# IndexOf('$branchShown =') against IndexOf('$branchShown') finds the assignment first whenever the
+# earlier USE has no space after the name -- which is exactly how it is spelled inside a string
+# ("      $branchShown"), i.e. precisely the case this assert exists for. Verified against the broken
+# ordering before it was repaired: the index spelling passed, this one fails.
+function Get-FirstMentionLine {
+    param([string]$Text, [string]$Var)
+    $i = 0
+    foreach ($line in ($Text -split "`r?`n")) {
+        $i++
+        $t = $line.TrimStart()
+        if ($t.StartsWith('#')) { continue }
+        if ($line.Contains($Var)) { return [pscustomobject]@{ Number = $i; Text = $line } }
+    }
+    return $null
+}
+
+foreach ($v in @(
+    @{ Text = $shipText; Var = '$branchShown';          Label = 'ship-pr: $branchShown' },
+    @{ Text = $shipText; Var = '$shipCycleRefShown';    Label = 'ship-pr: $shipCycleRefShown' },
+    @{ Text = $shipText; Var = '$shipProgressRelShown'; Label = 'ship-pr: $shipProgressRelShown' },
+    @{ Text = $syncText; Var = '$branchShown';          Label = 'sync-main: $branchShown' },
+    @{ Text = $syncText; Var = '$trunkShown';           Label = 'sync-main: $trunkShown' }
+)) {
+    $first = Get-FirstMentionLine -Text $v.Text -Var $v.Var
+    Assert-True ($null -ne $first) "mentioned outside a comment at all -- $($v.Label)"
+    if ($first) {
+        Assert-True ($first.Text -match ([regex]::Escape($v.Var) + '\s*=\s*Get-DisplayRef')) `
+            "the FIRST line naming it is its assignment, not a use -- strict mode makes the other order fatal rather than empty, line $($first.Number) -- $($v.Label)"
+    }
+}
+
 # --- the mirrors carry it too --------------------------------------------------------------------
 # A CONSUMER RUNS THE MIRROR, so a repair present only in the root copy is a repair no consumer has. The
 # drift lint proves the copies match; these asserts prove the lib was REGISTERED in the first place,
@@ -311,7 +437,9 @@ foreach ($m in @(
     $full = Join-Path $RepoRoot $m.Path
     Assert-True (Test-Path -LiteralPath $full) "the lib is mirrored into $($m.Label)"
     if (Test-Path -LiteralPath $full) {
-        Assert-True (([System.IO.File]::ReadAllText($full)) -match 'function Get-PasteableRef') "...and that mirror carries the function: $($m.Label)"
+        $mirrorText = [System.IO.File]::ReadAllText($full)
+        Assert-True ($mirrorText -match 'function Get-PasteableRef') "...and that mirror carries the paste verdict: $($m.Label)"
+        Assert-True ($mirrorText -match 'function Get-DisplayRef') "...and the prose strip as well, which two other libs now dot-source: $($m.Label)"
     }
 }
 

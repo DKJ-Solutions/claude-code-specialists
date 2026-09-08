@@ -42,20 +42,29 @@
     repo has ever had match the pattern, so the rule refuses nothing anybody here has wanted. That is
     the whole argument for an allowlist this narrow -- it costs nothing real.
 
-    WHAT THIS LIB DOES NOT DO, AND THE GAP THAT LEAVES OPEN. It does not sanitise for DISPLAY:
-    `'$branch'` quoted inside a prose sentence ("this checkout is still on 'x;y'") is not a command, and
-    the shell metacharacters this lib refuses are inert there. THAT IS NOT THE SAME AS SAFE (#1617).
-    The deceptive class is `[\p{Cc}\p{Cf}]` and `git check-ref-format` enforces only the `\p{Cc}` half,
-    so a ref carrying a `\p{Cf}` character is accepted, creatable and checkout-able, and `git rev-parse
+    THE DISPLAY AXIS, AND WHY IT IS A SECOND FUNCTION RATHER THAN A WIDER ALLOWLIST. `'$branch'` quoted
+    inside a prose sentence ("this checkout is still on 'x;y'") is not a command, and the shell
+    metacharacters this lib refuses are inert there. THAT IS NOT THE SAME AS SAFE (#1617). The deceptive
+    class is `[\p{Cc}\p{Cf}]` and `git check-ref-format` enforces only the `\p{Cc}` half, so a ref
+    carrying a `\p{Cf}` character is accepted, creatable and checkout-able, and `git rev-parse
     --abbrev-ref HEAD` hands it back verbatim. Measured, September 8, 2026, `--branch` exit codes:
     U+202E RIGHT-TO-LEFT OVERRIDE 0, U+200D ZERO WIDTH JOINER 0, U+200B ZERO WIDTH SPACE 0, U+2066
     LEFT-TO-RIGHT ISOLATE 0 -- against 128 for BEL and ESC. Those first two are the exact code points
     #1446 was filed for, where they bypassed the #1439 tip sanitiser, which is why
     remote-ahead-lib.ps1 strips `\p{Cf}` deliberately and this lib's own refusal note (below) does the
-    same. So the display axis is OPEN at the prose sites, on a narrow path -- Test-BranchName refuses
-    these at creation, so it takes a branch created by hand, cloned or fetched -- and it is left open
-    knowingly rather than closed by git. A reader who knows the gap can weigh it. And it is not the
-    creation-side
+    same.
+
+    THAT GAP WAS LEFT OPEN KNOWINGLY FOR A DAY, AND #1623 CLOSED IT. Get-DisplayRef below is the one
+    definition of the strip, and the thirty-two prose sites across ship-pr.ps1, sync-main.ps1,
+    remote-ahead-lib.ps1 and worktree-lib.ps1 go through it. The two axes stay distinct because the
+    right answer differs: a name refused for PASTE is replaced by a placeholder, because a command
+    carrying it would RUN, while a name printed as PROSE is stripped and still reads, because the reader
+    is standing on that branch and has to recognise it -- a sentence that will not name the branch has
+    nothing left to say. The narrow path the measurement above names (Test-BranchName refuses these at
+    creation, so it takes a branch created by hand, cloned or fetched) is now the argument for why the
+    strip COSTS nothing rather than for why the gap could be weighed and left.
+
+    WHAT THIS LIB DOES NOT DO. It is not the creation-side
     guard -- Test-BranchName in the repo-owned scripts\lib\branch-info.ps1 holds the same allowlist so a
     branch this workflow CREATES is safe by construction. Neither half closes the hole alone: that file
     is repo-owned and per-consumer, and a branch cloned, fetched or created by hand reaches these print
@@ -80,6 +89,34 @@ function Test-RefPasteSafe {
 
     if ([string]::IsNullOrEmpty($Ref)) { return $false }
     return [bool]($Ref -match $script:RefPasteSafePattern)
+}
+
+function Get-DisplayRef {
+    <#
+        Ref -- the ref name, or any other single-line label, about to be printed as PROSE.
+
+        Returns that name with every control and format character replaced by a space, runs of spaces
+        collapsed, and the result trimmed. Nothing is refused and nothing is quoted: the words stay,
+        because a reader has to recognise the branch they are standing on, and only the characters that
+        make the printed line say something other than what it is are removed.
+
+        WHY A SPACE RATHER THAN NOTHING. Deleting a zero-width joiner silently welds the two halves of a
+        name into one word that reads as a different, legitimate branch -- which is the deception rather
+        than the repair. A space cannot do that, and git forbids one in a ref, so a space in the output
+        is itself the signal that something was taken out.
+
+        WHY IT TRIMS, AND WHAT AN EMPTY RETURN MEANS. A name made ENTIRELY of format characters strips to
+        blanks and comes back as ''. That is the honest answer -- the name has no display at all -- and it
+        hands callers that already word an empty name ("on its branch", "this run could not read it") the
+        wording they have rather than a pair of quotes around nothing.
+
+        THE SAME CALL THIS REPO ALREADY MADE FOR A COMMIT SUBJECT, at #1439 and #1446, now stated once:
+        remote-ahead-lib.ps1 carried the second copy of this pattern until #1623 and reads it from here.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Ref)
+
+    if ([string]::IsNullOrEmpty($Ref)) { return '' }
+    return ((($Ref -replace '[\p{Cc}\p{Cf}]', ' ') -replace ' {2,}', ' ').Trim())
 }
 
 function Get-PasteableRef {
@@ -128,11 +165,17 @@ function Get-PasteableRef {
     # ANSI/OSC escape or an RTL override could repaint a terminal or wear this workflow's own warning
     # prefix, and a guard whose refusal path is itself an injection surface is worse than no guard. The
     # same reasoning as #1439 and #1446, at a new site.
-    $shown = if ([string]::IsNullOrEmpty($Ref)) {
-        '(this run could not read it)'
-    } else {
-        ($Ref -replace '[\p{Cc}\p{Cf}]', ' ')
-    }
+    #
+    # THE STRIP ITSELF MOVED TO Get-DisplayRef (issue #1623) -- it was written out here, which made this
+    # the tree's third copy of one pattern. Two things followed. The wording above is now the WHY and the
+    # function is the WHAT, so a future correction to either lands in one place; and a case this line got
+    # wrong is repaired, because Get-DisplayRef trims: a name made ENTIRELY of format characters used to
+    # strip to blanks and produce a note reading "The branch is:" with nothing after it, which is the
+    # "tells the reader nothing" failure the paragraph above exists to prevent, arriving through the
+    # strip instead of through the empty case. It now falls through to the empty wording, which is what
+    # it is once the invisible characters are gone.
+    $shown = Get-DisplayRef -Ref $Ref
+    if (-not $shown) { $shown = '(this run could not read it)' }
 
     $note = @"
   NOTE: the branch name is not safe to paste into the line above, so it reads '$Placeholder' instead.

@@ -39,6 +39,9 @@ $PrIssuesSrc      = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
 # Added by #1600: the failure arm composes its divergence sentence with Get-RemoteAheadNote rather than
 # a fourth hand-typed copy, so the fixture needs the lib new-branch and open-pr already share.
 $RemoteAheadSrc   = Join-Path $RepoRoot 'scripts\lib\remote-ahead-lib.ps1'
+# remote-ahead-lib.ps1 dot-sources this for Get-DisplayRef (issue #1623), so a fixture that copies the one
+# without the other builds a repo whose scripts die on a missing function.
+$RefPrintSrc      = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 
 # The cycle path and the scope phrases are read from the shared libs rather than retyped, so a rename
 # stays a one-place change -- the same discipline new-branch.tests.ps1 and park-branch.tests.ps1 follow.
@@ -142,6 +145,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')           -Force
     Copy-Item -LiteralPath $PrIssuesSrc      -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')      -Force
     Copy-Item -LiteralPath $RemoteAheadSrc   -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')   -Force
+    Copy-Item -LiteralPath $RefPrintSrc      -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')      -Force
 
     # A .cmd rather than a .ps1: Invoke-NativeCapture resolves 'gh' as a native command, and only an
     # executable extension on PATHEXT is found that way.

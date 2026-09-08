@@ -896,6 +896,38 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # The fixture-pollution check (issue #1609). A throwaway debug script ran without
+            # redirecting $env:USERPROFILE and overwrote ~/.claude/plugins/installed_plugins.json with
+            # two fixture records, losing the install record of this checkout and both registered
+            # consumers -- with no backup, no error, and nothing anywhere that reported it. Its one
+            # automatic caller is the SessionStart hook claude-home-sessioncheck.ps1.
+            #
+            # IT TRAVELS IN dkj-policy with the other machine-fact session checks, and not in the team
+            # plugin whose roster check the damage actually broke. The subject is the plugin
+            # administration itself, which is harness state rather than a roster: plugin-versions.ps1
+            # -- the other script that reads it as its whole subject -- ships here too.
+            #
+            # ADVISORY, AND DELIBERATELY IN NO GATE, for the reason check-git-identity gives above: a
+            # CI runner has no plugin administration at all, so a workflow leg would report the empty
+            # state on every push.
+            #
+            # NO SKILL, on the same reasoning the three entries above give: the caller is automatic and
+            # nobody invokes it as a procedure. One command in its .SYNOPSIS answers it early.
+            Name   = 'check-claude-home'
+            Source = 'scripts\lint\check-claude-home.ps1'
+            Plugin = 'dkj-policy'
+            Skill  = ''
+            # The fixture home and the fixture's definition of "scratch", both of which the suite MUST
+            # pass -- a suite for this check that used the real home would be the defect under test.
+            # -NoSnapshot is exempt for the same reason: it exists so a case that is not about the
+            # snapshot writes nothing at all.
+            SkillParamsExempt = @('HomeOverride', 'ScratchRootOverride', 'NoSnapshot')
+            # NO MeasureArgs, and that is a declaration rather than an omission: the no-argument form
+            # reads the REAL administration and may refresh the snapshot beside it. A timing harness
+            # must not write to the user's plugin administration as a side effect of measuring, and
+            # this is the one check in the family that could.
+        },
+        @{
             # THE CLAIM ITSELF -- the step both always-on documents prescribe and neither performs. The
             # claim rule has been written down since Chris's persona body carried it and enforced by
             # nothing: `gh issue edit <n> --add-assignee @me`, left to a session to remember, to type,
