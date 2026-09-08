@@ -31,6 +31,18 @@
     file, and a repo that has not run it already gets the one message naming its actual state. Adding
     a second would be noise on top of it.
 
+    THE THIRD STATE: A REPO WITH NO STORE (inbound #1570). A repo can enable this team WITHOUT a Shopify
+    store -- the plugin's own source repo does, and so does any repo that turns the team on only to
+    validate that its manifests, frontmatter and hooks still resolve. Such a repo has no truthful theme
+    id to give: seeding one would arm the guard over a live theme on a number nobody verified, and a
+    VUL-IN placeholder reads as forgotten (above). So it answers Get-ShopifyRepoHasNoStore instead,
+    returning $true, and this check then stays silent on the half-armed finding -- exactly as it does for
+    a repo that HAS answered the id. That silence is safe here for the same reason it is safe there: it
+    follows a deliberate, self-authored DECLARATION, never an inference this check drew from the tree
+    (a theme directory, a shopify.theme.toml), which is the failure mode the paragraph above argues
+    against. Absent -- the overwhelmingly common case -- is unchanged and still means a store repo. The
+    declaration suppresses ONLY the first finding; the duplicate-guard finding below is independent.
+
     THE SECOND FINDING: TWO GUARDS DOING ONE JOB (inbound #777). Both consumers of this plugin wrote
     this guard themselves before it shipped here, and a plugin refresh does not replace a repo's own
     file -- it registers a second hook beside it. So a repo that did the right thing by inbound #769
@@ -58,14 +70,20 @@ $hasConfig = Test-Path -LiteralPath $configPath -PathType Leaf
 # StrictMode OFF in a child scope, exactly as the guard reads it -- a consumer's config is written on
 # the assumption that its runtime callers do not set it, and this check must not be the one that
 # disagrees with the guard about what the repo answered.
-$liveId = ''
+$liveId  = ''
+$noStore = $false
 if ($hasConfig) {
-    $liveId = & {
+    $answers = & {
         Set-StrictMode -Off
-        try { . $args[0] } catch { return '' }
-        if (Get-Command Get-ShopifyLiveThemeId -ErrorAction SilentlyContinue) { return [string](Get-ShopifyLiveThemeId) }
-        return ''
+        try { . $args[0] } catch { return @{ LiveId = ''; NoStore = $false } }
+        $id = if (Get-Command Get-ShopifyLiveThemeId   -ErrorAction SilentlyContinue) { [string](Get-ShopifyLiveThemeId) } else { '' }
+        # A no-store repo declares itself here (inbound #1570). Read defensively: any truthy answer means
+        # "no store", so a repo that never defines the function -- every store repo -- is unaffected.
+        $ns = if (Get-Command Get-ShopifyRepoHasNoStore -ErrorAction SilentlyContinue) { [bool](Get-ShopifyRepoHasNoStore) } else { $false }
+        return @{ LiveId = $id; NoStore = $ns }
     } $configPath
+    $liveId  = [string]$answers.LiveId
+    $noStore = [bool]$answers.NoStore
 }
 
 $liveId = ([string]$liveId).Trim()
@@ -77,7 +95,12 @@ $liveId = ([string]$liveId).Trim()
 # with a 'VUL-IN' placeholder in it, that is a path a consumer can actually walk.
 if ($liveId -and $liveId -notmatch '^\d+$') { $liveId = '' }
 
-if ($hasConfig -and -not $liveId) {
+# THE NO-STORE DECLARATION SUPPRESSES ONLY THIS FINDING (inbound #1570). The duplicate-guard finding
+# below is independent -- a no-store repo would not carry a hand-written guard, but if it somehow does,
+# reporting it is still correct. The guard beside this file is left untouched on purpose: with no store
+# there is nothing to push to, so its id rule staying inert costs nothing, and widening the guard's
+# contract for a repo that never invokes it would be change for its own sake.
+if ($hasConfig -and -not $liveId -and -not $noStore) {
     Write-Host ("[ERROR] dkj-team-shopify: the live-theme guard is armed for publish, delete and an " +
         "'--allow-live' push, but this repo has not said which theme is live -- so a push aimed at live " +
         "BY ID is not recognised and passes. Add Get-ShopifyLiveThemeId to scripts/repo-config.ps1, " +
