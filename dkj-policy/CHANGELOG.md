@@ -43,7 +43,35 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**14 / 25 minor entries** <!-- pending-tally -->
+**14 / 26 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1602-merge-on-required-green · 20260908-125722
+
+`ship-pr` no longer holds the merge behind checks the ruleset does not require. Step 3 blocks on the
+required checks only; the rest are waited for and reported at a new step 8, after the fold. That
+stops the trunk from voiding a valid certificate during a wait nothing was gated on -- measured at
+5.1% of 99 laps, and 62.5% of the tail-governed laps on the busiest day in the sample, each one
+costing a whole further CI cycle. With no required check known the wait is byte-for-byte the old
+one, so a repo without a ruleset is untouched.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- `ship-pr` is the maintainer's shipping tool. No subscriber of anything reaches it, and the
+consuming repos that do run it meet it as the same command with a shorter path to the merge.
+
+**Score:** N/A
+
+#### Pull Request
+
+ship-pr merges as soon as every required check is green
+
+Plugins: dkj-policy
+
+[PR #1614](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1614)
+
+---
 
 ### DEPLOY: fix/1594-printed-command-ref-safety · 20260908-123649
 
