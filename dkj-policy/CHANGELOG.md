@@ -43,7 +43,43 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**11 / 20 minor entries** <!-- pending-tally -->
+**12 / 21 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/plugin-version-overview-v2 · 20260908-111715
+
+A second pre-PR review pass on `plugin-versions.ps1` repairs the one defect its first pass shipped
+with the trunk still carrying: where an install's recorded commit is reachable in the marketplace
+clone but not an ancestor of its HEAD -- the state a history rewrite in the clone leaves behind -- the
+verdict skipped the version-string tiebreaker its own sibling branch already used, and concluded
+unconditionally that the install was ahead. The consequence was a wrong instruction:
+`claude plugin marketplace update` printed where `claude plugin update` was the one that would have
+closed the gap. Alongside it: four smaller output defects in the same script (a stray blank, a
+wrongly-printed `HEAD`, a missing-sha line blaming the wrong side, and two culture-aware sorts brought
+onto this project's ordinal-sort invariant), input sanitising on the sha before it reaches `git`, the
+test coverage that closes the gap which let the original bug ship unnoticed, a token cut to the
+skill's always-on frontmatter, and two small wording fixes.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer of the `dkj-policy` workflow whose marketplace clone has been through a history rewrite
+stops being told to run the wrong command. Every consumer with `dkj-policy` enabled also pays a
+slightly cheaper always-on cost for this skill, and reads clearer wording on its page. Bounded
+reach: the wrong-instruction bug only fires on a clone that has actually been rebased or force-pushed
+since the install was recorded, which is not the common case.
+
+**Score:** 2
+
+#### Pull Request
+
+Second pre-PR review pass on plugin-versions
+
+Plugins: dkj-policy
+
+[PR #1604](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1604)
+
+---
 
 ### DEPLOY: fix/1592-fold-commits-void-certificate · 20260908-105846
 
