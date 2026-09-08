@@ -40,21 +40,46 @@
     refusal, and this script is in no gate.
 
     SHRINKAGE ONLY. A subagent legitimately writing files makes the changed-path list GROW, which is
-    expected and never reported. The four false positives this answers -- the orchestrator's own
-    commits, a rewritten history, a branch change, and `git reset` moving a change from the index to
-    the worktree -- are documented in scripts\lib\fanout-lib.ps1, which holds the whole judgement.
+    expected and never reported. The five false positives this answers -- the orchestrator's own
+    commits, a rewritten history, a branch change, `git reset` moving a change from the index to the
+    worktree, and a `git mv` moving the file itself -- are documented in scripts\lib\fanout-lib.ps1,
+    which holds the whole judgement.
 
     THE BASELINE PATH IS UNPREDICTABLE, via New-ScratchPath (#1659), and -Capture PRINTS it rather
     than composing a name both runs can guess. That is the same rule every other shipping script here
     follows, and it costs nothing: the caller is a session that has the printed path in front of it.
 
     A SPENT BASELINE IS REMOVED, and one that could not be used is kept. After a comparison that
-    reached a verdict the file has served its purpose and is deleted; where the two snapshots turned
-    out not to be comparable (a branch change, a rewritten history) it stays, because the sensible next
-    move is to get back to that state and compare again.
+    reached a verdict the file has served its purpose and is deleted; where the comparison did NOT
+    happen -- a branch change, a rewritten history, or a git read that failed -- it stays, because the
+    sensible next move is to get back to that state and compare again.
 
-    Exit codes: 0 = nothing shrank (or nothing comparable to say), 1 = something shrank, 2 = the
-    invocation itself was wrong (no mode, both modes, an unreadable baseline).
+    Exit codes: 0 = the comparison was made and nothing shrank; 1 = something shrank; 2 = the
+    invocation itself was wrong (no mode, both modes, a baseline that is missing or not one of ours);
+    3 = the comparison could NOT be made, so the answer is unknown.
+
+    THREE IS NOT ZERO, and separating them is the whole point of having it. 'Nothing shrank' and 'this
+    could not be established' are different answers, and a caller branching on the exit code -- which
+    these docs invite -- has no other way to tell them apart. They used to share exit 0 under the
+    reading that both mean "nothing to report", which is true of the printed lines and false of the
+    guarantee: the second one carries none.
+
+    THE -Compare PATH IS CONFINED to the temp directory and to the leaf shape -Capture writes, and it
+    is refused otherwise. Two things that buys, both cheap: a UNC path handed to Test-Path/Get-Content
+    opens an outbound SMB connection and authenticates before a single byte is validated, and a stale
+    or mistyped path that happens to name somebody else's live baseline would otherwise be DELETED as
+    spent. -Capture's own name is unguessable (#1659) and that protects the write; it buys nothing here,
+    because -Compare's caller is told the path on purpose. Where the confinement stops is stated rather
+    than implied: a process that can already write this user's temp directory can rewrite a baseline in
+    place, and this script would compare against it and believe it. That is outside what a detector
+    built for accidents can answer, and it is the reason the guarantee is worded as detection rather
+    than proof.
+
+    AND A BASELINE NOBODY COMPARES IS NEVER REAPED. -Capture writes a file naming the paths that were
+    mid-edit; only a -Compare that reaches a verdict removes it, so a crashed or abandoned session
+    leaves one behind in the temp directory. Deliberately not swept: the leaf carries the capturing
+    process's own id, so a sweep would have to decide whether another run's baseline is dead -- which
+    is the very judgement the confinement above exists to keep this script out of.
 
     Pure ASCII (repo convention for .ps1): Windows PowerShell 5.1 reads a BOM-less script as ANSI.
     Tested by scripts/tests/fanout-lib.tests.ps1 in the source repo -- change one, run the other.
@@ -122,6 +147,31 @@ if ($Capture) {
 }
 
 # --- -Compare -------------------------------------------------------------------------------------
+# THE CONFINEMENT, BEFORE ANYTHING TOUCHES THE PATH. Both the read and the eventual delete act on a
+# string a caller composed, so this runs first: a UNC path would otherwise make Test-Path open an
+# outbound SMB connection and authenticate before a byte is validated, and a mistyped path naming
+# somebody else's live baseline would be deleted as spent.
+#
+# THE TEMP ROOT IS ASKED OF THE COMPOSER rather than named here, and that is not indirection for its
+# own sake: a line of a shipping script that names a temp root needs an explicit exemption from this
+# repo's own scan, and a line that composes nothing should not be spending one. New-ScratchPath
+# creates nothing without -Directory, so asking it where it WOULD have written costs a guid.
+$tempRoot = (Split-Path -Parent (New-ScratchPath -Label 'fanout-probe')).TrimEnd('\', '/')
+$fullCompare = ''
+try { $fullCompare = [System.IO.Path]::GetFullPath($Compare) } catch { $fullCompare = '' }
+$compareParent = if ($fullCompare) { (Split-Path -Parent $fullCompare).TrimEnd('\', '/') } else { '' }
+$compareLeaf = if ($fullCompare) { Split-Path -Leaf $fullCompare } else { '' }
+# The leaf shape is New-ScratchPath's own: '<label>-<pid>-<32 hex>'. Pinned as a pattern rather than
+# trusted, so nothing but a baseline this script wrote can reach the delete.
+if (-not $fullCompare -or $compareParent -ine $tempRoot -or $compareLeaf -notmatch '^fanout-baseline-\d+-[0-9a-f]{32}\.json$') {
+    Write-Host "check-fanout: '$Compare' is not a baseline this script wrote." -ForegroundColor Red
+    Write-Host "  A baseline is a 'fanout-baseline-<pid>-<guid>.json' sitting directly in the temp directory," -ForegroundColor Red
+    Write-Host "  which is what -Capture prints. This step both READS and DELETES what it is given, so it" -ForegroundColor Red
+    Write-Host "  refuses anything else rather than trusting the path -- run -Capture and paste its line." -ForegroundColor Red
+    exit 2
+}
+$Compare = $fullCompare
+
 if (-not (Test-Path -LiteralPath $Compare -PathType Leaf)) {
     Write-Host "check-fanout: no baseline at '$Compare'. Nothing can be said about a window with no beginning -- take one with -Capture before the next fan-out." -ForegroundColor Red
     exit 2
@@ -186,11 +236,19 @@ foreach ($line in @(Format-WorkingCopyShrinkage -Findings $findings)) {
 }
 
 $alarms = @($findings | Where-Object { $_.Kind -eq 'Vanished' -or $_.Kind -eq 'WorktreeCleared' -or $_.Kind -eq 'StashGone' })
-$untrusted = @($findings | Where-Object { $_.Kind -eq 'BranchChanged' -or $_.Kind -eq 'HistoryRewritten' })
+# THE THREE KINDS THAT MEAN "NO ANSWER", TOGETHER, and NotMeasured belongs with the other two rather
+# than with silence. All three say the comparison did not happen -- a branch change and a rewritten
+# history because differencing across them would be wrong, a failed read because there was nothing to
+# difference. Treating the third as clean is the failure this grouping exists to prevent: a
+# `git status` that lost a race for .git/index.lock is the MOST likely read failure in this script's
+# own scenario, where dispatched agents are running git concurrently in the same checkout, and it used
+# to exit 0 and delete the baseline -- so a transient hiccup destroyed the one artefact a retry needs,
+# in exactly the case where retrying is the right move.
+$incomplete = @($findings | Where-Object { $_.Kind -eq 'BranchChanged' -or $_.Kind -eq 'HistoryRewritten' -or $_.Kind -eq 'NotMeasured' })
 
-if ($untrusted.Count -gt 0) {
+if ($incomplete.Count -gt 0) {
     Write-Host "  baseline kept at: $Compare" -ForegroundColor Gray
-    Write-Host "  (it was not spent -- get back to the state it was taken in and compare again.)" -ForegroundColor Gray
+    Write-Host "  (it was not spent -- nothing above was compared against it, so a retry can still use it.)" -ForegroundColor Gray
 } else {
     Remove-Item -LiteralPath $Compare -Force -ErrorAction SilentlyContinue
 }
@@ -200,6 +258,13 @@ if ($alarms.Count -gt 0) {
     Write-Host "This is a report, not a refusal, and the content is NOT recoverable: nothing above was" -ForegroundColor Yellow
     Write-Host "ever committed, so no reflog holds it. What is actionable is which file to write again." -ForegroundColor Yellow
     exit 1
+}
+
+if ($incomplete.Count -gt 0) {
+    Write-Host ""
+    Write-Host "NOT a clean bill of health: the comparison could not be made. Exit 3 says 'unknown'," -ForegroundColor Yellow
+    Write-Host "which is a different answer from exit 0's 'nothing shrank' -- do not read one as the other." -ForegroundColor Yellow
+    exit 3
 }
 
 exit 0

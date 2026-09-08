@@ -75,8 +75,9 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
   and stays silent, so a subagent legitimately writing files never trips it. Where the workflow plugin
   is installed the step is the `check-fanout` skill (`-Capture` before, `-Compare <path>` after); where
   it is not, the same reading by hand is `git status --porcelain --untracked-files=all` plus
-  `git stash list --format=%H`, kept and diffed — **and remember to exclude the paths your own commits
-  carried in the meantime**, which is the one false positive the hand-rolled version gets wrong.
+  `git stash list --format=%H`, kept and diffed — **and two things a hand diff gets wrong**: a path that
+  left the list because *you* committed it, and one that left because it was renamed, where the edit is
+  intact under the new name.
   It **reports and cannot restore**: uncommitted content that was discarded is in no reflog, so what
   the finding buys you is knowing which file to write again.
 - Fanning out **read-only** work in parallel is fine as far as the *deliverable* goes — nobody is

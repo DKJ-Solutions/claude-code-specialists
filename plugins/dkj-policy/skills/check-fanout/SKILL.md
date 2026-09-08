@@ -83,10 +83,14 @@ list **grow**, which is expected and never reported. What is reported is the lis
 | `[INFO]` not comparable | the two readings are on different branches, or the second HEAD is not a descendant of the first. Reported *instead of* a comparison. |
 | `[INFO]` not measured | one of the git reads failed, so a figure is unknown rather than zero. |
 
-**Exit 0 when nothing shrank, 1 when something did.** The non-zero exit is so a caller can branch on
-it; this script is in **no gate** and refuses nothing.
+**Exit 0 when the comparison was made and nothing shrank, 1 when something shrank, 3 when the
+comparison could not be made at all.** That third code is the one worth knowing: *"nothing shrank"* and
+*"this could not be established"* are different answers, and a caller branching on the exit code has no
+other way to tell them apart. The most likely cause is the ordinary one — a `git status` losing a race
+for `.git/index.lock` while dispatched agents run `git` in the same checkout — and in that case the
+baseline is **kept**, not spent, because a retry is exactly the right next move.
 
-### The four false positives it answers
+### The five false positives it answers
 
 Each of these would otherwise fire on ordinary work, and a detector that cries wolf is one somebody
 switches off:
@@ -101,6 +105,32 @@ switches off:
    branches answer different questions.
 4. **`git reset`.** Unstaging moves a change from the index to the worktree and destroys nothing, so
    the index half going clean is **not** reported. Only the worktree half is.
+5. **`git mv`.** A rename takes the baseline's name out of the list while the edit sits intact under
+   the new one, so the rename pairing is kept and the comparison **follows** the file — in both
+   directions, since a baseline taken with a rename already staged can equally be unstaged inside the
+   window. Following it is better than exempting it: the worktree-half rule then still reaches a real
+   loss that happens on the far side of the rename, and the finding is reported under the name the file
+   has *now* with the old one named beside it.
+
+### Paste the printed line -- `-Compare` refuses anything else
+
+This step both **reads** and **deletes** what it is given, so it accepts only a
+`fanout-baseline-<pid>-<guid>.json` sitting directly in the temp directory — which is exactly what
+`-Capture` prints. Anything else is **exit 2** and is left untouched. Two things that buys: a UNC path
+handed to a file read opens an outbound SMB connection and authenticates before a byte is validated,
+and a stale or mistyped path that happened to name somebody else's live baseline would otherwise be
+deleted as spent.
+
+Where the confinement stops is worth stating plainly rather than leaving implied: a process that can
+already write your temp directory can rewrite a baseline in place, and this step would compare against
+it and believe it. That is outside what a detector built for **accidents** can answer, and it is why
+the guarantee is worded as detection rather than proof.
+
+**And a baseline nobody compares is never reaped.** Only a `-Compare` that reaches a verdict removes
+the file, so a crashed or abandoned session leaves one behind in the temp directory, naming the paths
+that were mid-edit when it was taken. Deliberately not swept: the leaf carries the capturing process's
+own id, and deciding whether another run's baseline is dead is the judgement the confinement above
+exists to keep this step out of.
 
 ### And a stash entry is identified, not counted
 

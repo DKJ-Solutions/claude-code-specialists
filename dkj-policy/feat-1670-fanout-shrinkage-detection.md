@@ -82,9 +82,9 @@ judgement it needs is already `Compare-WorkingCopySnapshot` rather than anything
 
 ### TEST
 
-- [x] `scripts/tests/fanout-lib.tests.ps1` -- 67 asserts, 0 fail. The judgement is tested against
-      hand-built snapshots (three lines a case) and the two git-touching functions against a fixture
-      repo.
+- [x] `scripts/tests/fanout-lib.tests.ps1` -- 86 asserts over 21 cases, 0 fail. The judgement is tested
+      against hand-built snapshots (three lines a case) and the two git-touching functions against a
+      fixture repo.
 - [x] Every exemption has a counter-case, the rule `guard-live-theme.tests.ps1` states: growth silent
       **and** shrinkage reported; a committed path excluded **and** an uncommitted one named; the index
       half ignored **and** the mirror-image worktree clear caught.
@@ -95,6 +95,42 @@ judgement it needs is already `Compare-WorkingCopySnapshot` rather than anything
 - [x] The stash case a COUNT cannot see -- one entry popped while another is pushed -- is pinned,
       because that is where this deliberately goes further than the issue asked.
 - [x] Full local gate: `check-plugin-integrity.ps1` plus every suite, via `open-pr.ps1`.
+
+#### The review round, and the three repairs it produced
+
+Victor, Edith and Sebastian ran in parallel on the committed diff. The fan-out was itself reconciled
+with the tool this branch adds -- baseline before the dispatch, `-Compare` after -- which reported
+clean: both pre-existing stash entries survived and no path lost a change.
+
+- [x] **A `git mv` inside the window read as a loss** (Victor, and reproduced against the lib before
+      repairing it: a file at `' M'`, renamed, reported `Vanished`). The parse discarded the old half of
+      a porcelain rename line, so the baseline's key simply disappeared. It is kept now and the
+      comparison FOLLOWS the file -- in both directions, since a baseline taken with a rename already
+      staged can be unstaged inside the window. Following beats exempting: the worktree-half rule still
+      reaches a loss on the far side of a rename, which an exemption would have hidden. Both cases and
+      the far-side loss are pinned.
+- [x] **A failed git read exited 0 and deleted the baseline** (Victor). `NotMeasured` was in neither the
+      alarm set nor the untrusted set, so the likeliest read failure in this script's own scenario -- a
+      `git status` losing a race for `.git/index.lock` while dispatched agents run git in the same
+      checkout -- reported as clean and destroyed the artefact a retry needs. There is an exit **3**
+      now, meaning "the comparison could not be made", and every incomplete outcome keeps the baseline.
+- [x] **`-Compare` accepted any path for both the read and the delete** (Sebastian). It is confined to
+      the temp directory and to the leaf shape `-Capture` writes: a UNC path authenticated outbound
+      before anything was validated, and a stale path naming somebody else's live baseline would have
+      been deleted as spent. The temp root is asked of `New-ScratchPath` rather than named, so no line
+      here spends an exemption from this repo's own temp-path scan.
+- [x] **A missing table row** (Edith), verified before repairing: the root `scripts/README.md`
+      entry-points table carries no machine-checked span, so nothing would have caught it.
+- [x] Two docstring corrections and two residual limits stated rather than left implied -- the
+      `--abbrev-ref` comment named a command the code does not call, non-ASCII paths report in git's
+      C-quoted form, and an abandoned baseline is never reaped.
+- [~] **The duplicated porcelain parse** (Victor's reuse finding) is NOT repaired here and is filed as
+      [#1682](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1682) instead: the
+      low-level line parse is near-verbatim in `park-lib.ps1`, and factoring it out means changing the
+      one implementation behind all three parking entry points -- a different subject from this
+      branch's. The divergence is already real rather than hypothetical: this branch repaired the
+      rename half of its own copy, and `park-lib`'s still discards the old path (correct for a count,
+      wrong for anything that follows a file).
 
 ### DEPLOY: feat/1670-fanout-shrinkage-detection
 
@@ -111,10 +147,18 @@ The new `check-fanout` skill takes a reading of the working copy before a dispat
 after, and what it reports is **shrinkage only** -- a path that was changed and is not any more, a
 worktree edit reverted under a path that remains, or a stash entry gone by its own id. That asymmetry
 is the whole design: a subagent legitimately writing files makes the list **grow**, which is expected
-and never reported, so the detector has nothing to say on an ordinary fan-out. Four false positives are
+and never reported, so the detector has nothing to say on an ordinary fan-out. Five false positives are
 answered rather than tolerated -- the orchestrator's own commits (their paths are excluded), a rewritten
 history and a branch change (both refuse to difference at all, because a wrong list is worse than none),
-and `git reset`, which moves a change from the index to the worktree and destroys nothing.
+`git reset`, which moves a change from the index to the worktree and destroys nothing, and a `git mv`,
+which the comparison follows rather than exempts, so a loss on the far side of a rename is still caught.
+
+**Three answers, not two, and the third is the one worth knowing.** Exit 0 means the comparison was
+made and nothing shrank; exit 1 that something did; exit **3** that the comparison could not be made at
+all -- a branch change, a rewritten history, or a git read that failed. That last is the likeliest
+outcome in this tool's own scenario, where dispatched agents run `git` concurrently in one checkout and
+a `git status` can lose a race for `.git/index.lock`, and an incomplete answer now keeps the baseline
+instead of spending it, because a retry is exactly the right next move.
 
 **It goes further than the issue asked in one place, and admits a weakness in another.** `#1670`
 proposed counting stash entries and said a count is enough; it is not, and a subagent that pops one

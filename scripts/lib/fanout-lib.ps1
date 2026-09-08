@@ -39,7 +39,7 @@
     nothing to restore it FROM. Detection is the whole available remedy, which is exactly why its
     absence mattered.
 
-    THE FOUR FALSE POSITIVES IT ANSWERS, because a detector that cries wolf is one somebody switches
+    THE FIVE FALSE POSITIVES IT ANSWERS, because a detector that cries wolf is one somebody switches
     off:
 
       1. THE ORCHESTRATOR COMMITTED. It is told to keep working while the fan-out runs, so a path may
@@ -53,6 +53,20 @@
       4. THE INDEX HALF ALONE WENT CLEAN. `git reset` unstages a change and keeps its content, so a
          staged-to-unstaged transition is not a loss and is deliberately NOT reported. Only the
          WORKTREE half going clean is, because that is what `git checkout -- <path>` does.
+      5. THE FILE WAS RENAMED. A `git mv` inside the window takes the baseline's key out of the list
+         while the edit sits intact under the new name, so the rename pairing is kept and the
+         comparison FOLLOWS the file -- in both directions, since a baseline taken with a rename
+         already staged can equally be unstaged inside the window. Following it is not merely a way
+         to stay quiet: the worktree-half rule then still reaches a real loss that happens on the far
+         side of the rename, which a simple exemption would have hidden.
+
+    THE RESIDUAL LIMIT, STATED RATHER THAN HIDDEN. `core.quotePath=true` is what makes the two
+    readings comparable whatever console code page each ran under, and it is never undone -- so a path
+    holding a non-ASCII character is reported in git's own C-quoted form rather than as the readable
+    filename. That is correct for the comparison and poor for the reader, and the trade is deliberate:
+    a mis-decoded path compares wrong (a silent miss, or a false alarm), while an escaped one is
+    merely ugly to read. park-lib.ps1 makes the same trade and never feels it, because its figure is a
+    count that is never displayed.
 
     A READ THAT FAILED REPORTS UNKNOWN, NEVER ZERO -- park-lib.ps1's Get-GitParkBacking states the
     same rule for the same reason: zero is an answer ("nothing was lost", the reassuring one), and
@@ -119,9 +133,13 @@ function Get-WorkingCopySnapshot {
         if ($head) { $head = $head.Trim(); $headKnown = $true }
     }
 
-    # --show-current is EMPTY on a detached HEAD, which is a real answer rather than a failure: two
-    # snapshots both taken detached are comparable, and one of each is exactly the branch change the
-    # comparison refuses to difference across.
+    # --abbrev-ref, WHICH ANSWERS 'HEAD' ON A DETACHED HEAD rather than the empty string --show-current
+    # would give. Either is a constant, so the comparison's equality test behaves the same and the
+    # branch-change refusal still fires between a detached reading and an on-branch one. It is named
+    # here because the two commands are NOT interchangeable and nothing in the suite would notice the
+    # swap: a future tidy-up towards --show-current would silently change what an empty answer means.
+    # Two readings taken at DIFFERENT detached commits both read 'HEAD' and are not caught here at
+    # all -- the ancestry check in the caller's bridge is what covers that case.
     $branchRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--abbrev-ref', 'HEAD') -DiscardStderr
     $branch = ''
     $branchKnown = $false
@@ -139,16 +157,27 @@ function Get-WorkingCopySnapshot {
             if ($line.Length -lt 4) { continue }
             $index = $line.Substring(0, 1)
             $worktree = $line.Substring(1, 1)
-            $path = $line.Substring(3)
-            # A rename reads 'old -> new'; the new path is the one that exists on disk, and it is the
-            # one a later snapshot will report.
-            $arrow = $path.IndexOf(' -> ')
-            if ($arrow -ge 0) { $path = $path.Substring($arrow + 4) }
-            $path = $path.Trim().Trim('"')
+            $raw = $line.Substring(3)
+            # A rename reads 'old -> new'. The new path is the one that exists on disk and is the key;
+            # THE OLD ONE IS KEPT RATHER THAN DISCARDED, and that is a repair rather than a nicety.
+            # Discarding it made an ordinary `git mv` during the window look exactly like a loss: the
+            # baseline's key disappeared, no commit carried it, and the comparison reported the edit
+            # gone while it sat intact under the new name. Measured on this lib before it shipped --
+            # a file at ' M', renamed, reported as Vanished. Keeping the pair lets the comparison
+            # follow the file instead, which ALSO means the worktree-half rule still reaches a real
+            # loss that happens on the far side of a rename.
+            $from = ''
+            $arrow = $raw.IndexOf(' -> ')
+            if ($arrow -ge 0) {
+                $from = $raw.Substring(0, $arrow).Trim().Trim('"')
+                $raw = $raw.Substring($arrow + 4)
+            }
+            $path = $raw.Trim().Trim('"')
             if (-not $path) { continue }
             $entries[($path -replace '\\', '/')] = [pscustomobject]@{
                 Index    = $index
                 Worktree = $worktree
+                From     = if ($from) { ($from -replace '\\', '/') } else { '' }
             }
         }
     }
@@ -176,6 +205,23 @@ function Get-WorkingCopySnapshot {
     }
 }
 
+function Get-WorkingCopyEntryFrom {
+    <#
+        One entry's rename origin, or '' -- read DEFENSIVELY rather than as a property access.
+
+        Three kinds of object reach the comparison and only two of them are this lib's own: a snapshot
+        taken here, a baseline rehydrated from JSON, and an entry a caller (or a suite) built by hand.
+        A hand-built one predating the rename pairing has no From at all, and under StrictMode a bare
+        $e.From on it is a terminating error rather than a blank -- which would take the whole
+        comparison down over a field whose absence has a perfectly good meaning: not a rename.
+    #>
+    param([AllowNull()][object]$Entry)
+    if ($null -eq $Entry) { return '' }
+    if (-not ($Entry.PSObject.Properties.Name -contains 'From')) { return '' }
+    if ($null -eq $Entry.From) { return '' }
+    return [string]$Entry.From
+}
+
 function Get-WorkingCopySnapshotFormat {
     <# The baseline file's own shape version. Bumped when the serialised shape changes, so a baseline
        written by an older copy is REFUSED rather than half-read -- a snapshot whose Entries arrive
@@ -198,10 +244,16 @@ function ConvertTo-WorkingCopySnapshotJson {
 
     $entries = @()
     foreach ($path in @($Snapshot.Entries.Keys | Sort-Object)) {
+        $e = $Snapshot.Entries[$path]
         $entries += [pscustomobject]@{
             Path     = $path
-            Index    = $Snapshot.Entries[$path].Index
-            Worktree = $Snapshot.Entries[$path].Worktree
+            Index    = $e.Index
+            Worktree = $e.Worktree
+            # Carried through the file for the same reason it is captured at all: without it a rename
+            # that straddles the baseline reads as a loss on the far side of the round trip, which is
+            # the exact defect the parse was repaired for -- and a baseline read from disk is the
+            # commonest way the comparison actually runs.
+            From     = if ($e.PSObject.Properties.Name -contains 'From') { [string]$e.From } else { '' }
         }
     }
 
@@ -236,7 +288,14 @@ function ConvertFrom-WorkingCopySnapshotJson {
     $entries = @{}
     foreach ($e in @($o.Entries)) {
         if (-not $e -or -not $e.Path) { continue }
-        $entries[[string]$e.Path] = [pscustomobject]@{ Index = [string]$e.Index; Worktree = [string]$e.Worktree }
+        $entries[[string]$e.Path] = [pscustomobject]@{
+            Index    = [string]$e.Index
+            Worktree = [string]$e.Worktree
+            # A baseline written before the rename pairing existed carries no From at all. It reads as
+            # '' -- which is what a non-rename says too, so an old file degrades to the pre-repair
+            # behaviour for renames only, rather than throwing on load.
+            From     = if ($e.PSObject.Properties.Name -contains 'From') { [string]$e.From } else { '' }
+        }
     }
 
     return [pscustomobject]@{
@@ -339,9 +398,36 @@ function Compare-WorkingCopySnapshot {
             if ($p) { $committed[([string]$p -replace '\\', '/')] = $true }
         }
 
+        # WHERE A RENAME MOVED A BASELINE PATH TO, built once from the second reading. An entry whose
+        # From is set says "this file used to be called that", and that is what lets the comparison
+        # FOLLOW a file rather than report the name it no longer has.
+        $renamedTo = @{}
+        foreach ($p in @($After.Entries.Keys)) {
+            $from = Get-WorkingCopyEntryFrom -Entry $After.Entries[$p]
+            if ($from) { $renamedTo[[string]$from] = $p }
+        }
+
         foreach ($path in @($Before.Entries.Keys | Sort-Object)) {
             $was = $Before.Entries[$path]
-            if (-not $After.Entries.ContainsKey($path)) {
+            $nowPath = $path
+            $now = $null
+
+            if ($After.Entries.ContainsKey($path)) {
+                $now = $After.Entries[$path]
+            } elseif ($renamedTo.ContainsKey($path)) {
+                # Renamed inside the window. Follow it, and report any real loss under the name the
+                # file carries NOW -- that is the name a reader has to act on.
+                $nowPath = $renamedTo[$path]
+                $now = $After.Entries[$nowPath]
+            } elseif ((Get-WorkingCopyEntryFrom -Entry $was) -and $After.Entries.ContainsKey((Get-WorkingCopyEntryFrom -Entry $was))) {
+                # THE MIRROR IMAGE, and it needs its own arm: the baseline was taken with a rename
+                # already staged and the window UNSTAGED it, so the file is back under its old name
+                # with its content intact. That is an index-half move, which false positive 4 covers --
+                # but the KEY changed, so the same-key arm above cannot see it.
+                continue
+            }
+
+            if ($null -eq $now) {
                 if ($committed.ContainsKey($path)) { continue }
                 # THE ONE HONEST HEDGE IN HERE. Where the committed-path list could not be read, a
                 # vanished path is still reported -- but the report says the innocent explanation could
@@ -355,17 +441,19 @@ function Compare-WorkingCopySnapshot {
                 continue
             }
 
-            $now = $After.Entries[$path]
             # The worktree half only. See the header's false positive 4: the index half going clean is
             # `git reset`, which keeps the content.
             if ($was.Worktree -ne ' ' -and $was.Worktree -ne '?' -and $now.Worktree -eq ' ') {
                 $findings += [pscustomobject]@{
                     Kind   = 'WorktreeCleared'
-                    Path   = $path
+                    # The name the file has NOW, which is the one a reader has to act on. Where a
+                    # rename was followed to get here, the detail says so and names the old one.
+                    Path   = $nowPath
                     # NO BACKTICKS IN A DOUBLE-QUOTED STRING: PowerShell reads one as an escape, so a
                     # markdown-style quote around the command name would be swallowed silently and the
                     # reader would never know the sentence had been edited by the parser.
-                    Detail = "its worktree change ('$($was.Worktree)') is gone while the path is still listed -- what a 'git checkout -- <path>' leaves behind"
+                    Detail = ("its worktree change ('$($was.Worktree)') is gone while the path is still listed -- what a 'git checkout -- <path>' leaves behind" +
+                              $(if ($nowPath -ne $path) { " (renamed from '$path' inside the window, and the loss is on this side of the rename)" } else { '' }))
                 }
             }
         }

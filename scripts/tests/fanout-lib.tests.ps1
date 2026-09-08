@@ -55,6 +55,9 @@ function Assert-True {
 function New-Snap {
     param(
         [hashtable]$Entries = @{},
+        # Rename pairings, keyed on the NEW path: @{ 'b.txt' = 'a.txt' } is "b.txt used to be a.txt",
+        # which is what a porcelain 'R  a.txt -> b.txt' line means.
+        [hashtable]$From = @{},
         [string[]]$Stash = @(),
         [string]$Head = 'aaaaaaa',
         [string]$Branch = 'main',
@@ -66,7 +69,11 @@ function New-Snap {
     $e = @{}
     foreach ($k in $Entries.Keys) {
         $code = [string]$Entries[$k]
-        $e[$k] = [pscustomobject]@{ Index = $code.Substring(0, 1); Worktree = $code.Substring(1, 1) }
+        $e[$k] = [pscustomobject]@{
+            Index    = $code.Substring(0, 1)
+            Worktree = $code.Substring(1, 1)
+            From     = if ($From.ContainsKey($k)) { [string]$From[$k] } else { '' }
+        }
     }
     return [pscustomobject]@{
         Head = $Head; HeadKnown = $HeadKnown
@@ -170,6 +177,37 @@ try {
     Assert-Equal 0 $f.Count '8: a git add on that file is not a loss'
 
     Write-Host ''
+    Write-Host '8b. A RENAME inside the window is followed, not reported (false positive 5)' -ForegroundColor Cyan
+    # The defect this pins: an ordinary `git mv` on a file that already carried an edit took the
+    # baseline's key out of the list, and the comparison called the edit lost while it sat intact under
+    # the new name. Measured on this lib before it shipped -- ' M' on a.txt, renamed, reported Vanished.
+    $before = New-Snap -Entries @{ 'a.txt' = ' M' }
+    $after  = New-Snap -Entries @{ 'b.txt' = 'RM' } -From @{ 'b.txt' = 'a.txt' }
+    $f = @(Compare-WorkingCopySnapshot -Before $before -After $after -Bridge (New-Bridge))
+    Assert-Equal 0 $f.Count '8b: a git mv is not a loss -- the edit moved with the file'
+    # FOLLOWING IT IS NOT THE SAME AS EXEMPTING IT, and this is the case that proves the difference:
+    # the rename happened AND then the worktree edit was discarded on the far side of it.
+    $after2 = New-Snap -Entries @{ 'b.txt' = 'R ' } -From @{ 'b.txt' = 'a.txt' }
+    $f = @(Compare-WorkingCopySnapshot -Before $before -After $after2 -Bridge (New-Bridge))
+    Assert-Equal 'WorktreeCleared' (Get-Kinds $f) '8b: a loss ACROSS the rename is still caught -- an exemption would have hidden it'
+    Assert-Equal 'b.txt' $f[0].Path '8b: reported under the name the file has now'
+    Assert-True ($f[0].Detail -match "renamed from 'a\.txt'") '8b: and the detail names the old one, so the reader can find it'
+    # THE MIRROR IMAGE: the baseline was taken with the rename already staged, and the window unstaged
+    # it. The content is back under the old name, so nothing is lost -- and the KEY changed, which is
+    # why the same-key arm cannot see this one.
+    $before2 = New-Snap -Entries @{ 'b.txt' = 'R ' } -From @{ 'b.txt' = 'a.txt' }
+    $after3  = New-Snap -Entries @{ 'a.txt' = ' M' }
+    $f = @(Compare-WorkingCopySnapshot -Before $before2 -After $after3 -Bridge (New-Bridge))
+    Assert-Equal 0 $f.Count '8b: and un-staging a rename is not a loss either'
+    # An entry object with no From at all -- a hand-built one, or a baseline written before the pairing
+    # existed -- must not take the comparison down under StrictMode.
+    $legacy = [pscustomobject]@{ Head = 'aaaaaaa'; HeadKnown = $true; Branch = 'main'; BranchKnown = $true
+                                 Entries = @{ 'a.txt' = [pscustomobject]@{ Index = ' '; Worktree = 'M' } }
+                                 EntriesKnown = $true; Stash = @(); StashKnown = $true; TakenUtc = 'x' }
+    $f = @(Compare-WorkingCopySnapshot -Before $legacy -After (New-Snap) -Bridge (New-Bridge))
+    Assert-Equal 'Vanished' (Get-Kinds $f) '8b: an entry with no From field is read as "not a rename" rather than throwing'
+
+    Write-Host ''
     Write-Host '9. The two refusals return INSTEAD of a comparison, never beside one' -ForegroundColor Cyan
     $before = New-Snap -Entries @{ 'a.txt' = ' M' } -Branch 'feat/x'
     $after  = New-Snap -Entries @{} -Branch 'main'
@@ -210,6 +248,13 @@ try {
     Assert-Equal 'deadbeef' $back.Head '12: HEAD survives'
     Assert-Equal 'feat/x' $back.Branch '12: the branch survives'
     Assert-Equal 's1,s2' (@($back.Stash) -join ',') '12: and every stash id, in order'
+    # The rename pairing has to survive the file too: a baseline read from disk is the commonest way
+    # the comparison runs, so losing From here would restore the false alarm on exactly that path.
+    $backR = ConvertFrom-WorkingCopySnapshotJson -Json (ConvertTo-WorkingCopySnapshotJson -Snapshot (New-Snap -Entries @{ 'b.txt' = 'RM' } -From @{ 'b.txt' = 'a.txt' }))
+    Assert-Equal 'a.txt' $backR.Entries['b.txt'].From '12: a rename pairing survives the round trip'
+    Assert-Equal '' $backR.Entries['b.txt'].From.Replace('a.txt', '') '12: and it is a plain string, not a wrapped object'
+    $backN = ConvertFrom-WorkingCopySnapshotJson -Json (ConvertTo-WorkingCopySnapshotJson -Snapshot (New-Snap -Entries @{ 'a.txt' = ' M' }))
+    Assert-Equal '' $backN.Entries['a.txt'].From '12: a non-rename round-trips as an empty From, not as null'
     # A single-entry stash must not arrive as a bare string: ConvertTo-Json unwraps a one-element array,
     # and a string would then compare character by character against the second snapshot's ids.
     $back1 = ConvertFrom-WorkingCopySnapshotJson -Json (ConvertTo-WorkingCopySnapshotJson -Snapshot (New-Snap -Stash @('only')))
@@ -312,8 +357,61 @@ try {
     Assert-Equal 2 $LASTEXITCODE '18: no mode at all is exit 2, not exit 0'
     & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Capture -Compare 'x' -RootOverride $repo *> $null
     Assert-Equal 2 $LASTEXITCODE '18: both modes at once is refused rather than guessed at'
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Compare (Join-Path $Fixture 'no-such-baseline.json') -RootOverride $repo *> $null
+    # A WELL-SHAPED baseline that does not exist: refused by the existence check, not the confinement.
+    $missing = New-ScratchPath -Label 'fanout-baseline' -Extension '.json'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Compare $missing -RootOverride $repo *> $null
     Assert-Equal 2 $LASTEXITCODE '18: a missing baseline is exit 2 -- a window with no beginning says nothing'
+
+    Write-Host ''
+    Write-Host '19. The -Compare path is CONFINED, because this step both reads and DELETES it' -ForegroundColor Cyan
+    # A path outside the temp directory. Left as its own case because the two refusals it prevents are
+    # different: a UNC path authenticates outbound before anything is validated, and a stale path
+    # naming somebody else's live baseline would be deleted as spent.
+    $outside = Join-Path $Fixture 'fanout-baseline-1-00000000000000000000000000000000.json'
+    Set-Content -LiteralPath $outside -Value '{}' -Encoding ascii
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Compare $outside -RootOverride $repo *> $null
+    Assert-Equal 2 $LASTEXITCODE '19: a correctly-named baseline OUTSIDE the temp directory is refused'
+    Assert-True (Test-Path -LiteralPath $outside) '19: and it is still there -- a refused path is never deleted'
+    # And the leaf shape, inside the temp directory: a file this script did not write.
+    $wrongLeaf = New-ScratchPath -Label 'not-a-baseline' -Extension '.json'
+    Set-Content -LiteralPath $wrongLeaf -Value '{}' -Encoding ascii
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Compare $wrongLeaf -RootOverride $repo *> $null
+        Assert-Equal 2 $LASTEXITCODE '19: a file in the temp directory that is not shaped like a baseline is refused'
+        Assert-True (Test-Path -LiteralPath $wrongLeaf) '19: and survives, for the same reason'
+    } finally { Remove-Item -LiteralPath $wrongLeaf -Force -ErrorAction SilentlyContinue }
+
+    Write-Host ''
+    Write-Host '20. End to end: a git mv during the window is not reported (false positive 5)' -ForegroundColor Cyan
+    Set-Content -LiteralPath (Join-Path $repo 'tracked.txt') -Value 'an edit that will be renamed' -Encoding ascii
+    $capture = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Capture -RootOverride $repo 2>&1
+    $baseline = ([regex]::Match((($capture | Out-String)), '-Compare "([^"]+)"')).Groups[1].Value
+    Invoke-FixtureGitIn $repo mv tracked.txt renamed.txt
+    $compare = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Compare $baseline -RootOverride $repo 2>&1
+    $code = $LASTEXITCODE
+    Assert-Equal 0 $code '20: exit 0 -- the edit moved with the file rather than being lost'
+    Assert-True ((($compare | Out-String)) -match '\[OK\]') '20: and it reads as clean'
+
+    Write-Host ''
+    Write-Host '21. A FAILED read is exit 3 and KEEPS the baseline -- never exit 0 (Victor, #1670 review)' -ForegroundColor Cyan
+    # The most likely read failure in this script's own scenario is a `git status` losing a race for
+    # .git/index.lock while dispatched agents run git in the same checkout. A directory that is not a
+    # repo at all reproduces the same state deterministically: every read fails, so nothing can be
+    # compared. It used to exit 0 and delete the baseline, destroying the one artefact a retry needs.
+    Set-Content -LiteralPath (Join-Path $repo 'renamed.txt') -Value 'another edit' -Encoding ascii
+    $capture = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Capture -RootOverride $repo 2>&1
+    $baseline = ([regex]::Match((($capture | Out-String)), '-Compare "([^"]+)"')).Groups[1].Value
+    $notARepo = Join-Path $Fixture 'not-a-repo'
+    New-Item -ItemType Directory -Path $notARepo -Force | Out-Null
+    try {
+        $compare = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -Compare $baseline -RootOverride $notARepo 2>&1
+        $code = $LASTEXITCODE
+        $compareText = ($compare | Out-String)
+        Assert-Equal 3 $code '21: exit 3 -- unknown, which is a different answer from exit 0'
+        Assert-True ($compareText -match 'not measured') '21: and the report says so rather than printing an [OK]'
+        Assert-True ($compareText -notmatch '\[OK\]') '21: no clean bill of health is printed'
+        Assert-True (Test-Path -LiteralPath $baseline) '21: the baseline is KEPT -- nothing was compared against it, so a retry can still use it'
+    } finally { Remove-Item -LiteralPath $baseline -Force -ErrorAction SilentlyContinue }
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
