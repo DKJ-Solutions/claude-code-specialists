@@ -18,8 +18,8 @@ disable-model-invocation: true
 This is the **plugin mirror** of `prune-merged.ps1`: the same tested source as in the source repo,
 shared here so consumers do not duplicate it. It exists because two consumers had each written their
 own copy and the plugin had none — the same argument as
-[issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81), reported as
-[#815](https://github.com/DaveKJohn/claude-code-specialists/issues/815).
+[issue #81](https://github.com/DKJ-Solutions/claude-code-specialists/issues/81), reported as
+[#815](https://github.com/DKJ-Solutions/claude-code-specialists/issues/815).
 
 ## Branch cleanup has two halves, and only one of them is this script
 
@@ -70,12 +70,22 @@ report-only remote pass described in the next section.
 
 The script:
 
-1. **Refuses on a dirty working tree.** A run can still have to step off the branch you are standing
-   on (4c), and doing that with uncommitted work either fails halfway or drags the work across.
-   Commit, `park`, or stash first.
+1. **Refuses on a dirty working tree — where the step-off is reachable.** A run can still have to step
+   off the branch you are standing on (4c), and doing that with uncommitted work either fails halfway
+   or drags the work across. Commit, `park`, or stash first — **or rerun with `-DryRun`**, which
+   deletes nothing and therefore never steps off, and still prints the whole classification.
+
+   **Three states put 4c out of reach for the entire run, and there a dirty tree is reported rather
+   than refused** ([#1575](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1575)):
+   standing on the **trunk**, which the candidate list excludes and which is therefore never something
+   this run can step off; a **detached** `HEAD`, for the same reason; and **`-DryRun`**, which
+   `continue`s above 4c on every candidate. The guard used to fire on all of them, which mattered
+   because this is the command a session is instructed to run *mid-assignment* — exactly when a
+   checkout has uncommitted work in it. The line it prints instead names which of the three made the
+   tree harmless, so an absent refusal is never read as an absent guard.
 2. **Fast-forwards the trunk without checking it out** — `git fetch <remote> <trunk>:<trunk>`, which
    writes a local branch ref that `HEAD` is not on and moves no working tree at all
-   ([#1147](https://github.com/DaveKJohn/claude-code-specialists/issues/1147)). **Fast-forward only**
+   ([#1147](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1147)). **Fast-forward only**
    — git refuses a non-ff update into `refs/heads/` unless the refspec carries a leading `+`, and this
    one does not, so the guarantee is git's rather than a flag's. A non-fast-forward is a warning, not
    a stop: the deletions are then judged against the older trunk, which errs towards keeping branches.
@@ -84,7 +94,7 @@ The script:
    And if a **second worktree is standing on the trunk**, git will not write that ref either. That
    used to make the run impossible clone-wide; since #1147 it costs only the fast-forward, and the
    warning still names the directory and how to release it
-   ([#1069](https://github.com/DaveKJohn/claude-code-specialists/issues/1069)) rather than relaying
+   ([#1069](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1069)) rather than relaying
    git's own message — this script is what a session runs *instead of* hand-reading `git ls-remote`,
    so it was unavailable in exactly the situation that produces stray branches.
 3. `git fetch --prune` — drops remote-tracking refs whose remote branch is gone.
@@ -92,13 +102,13 @@ The script:
    the one you are **standing on**, steps off it onto the trunk first, because `git branch -d` can
    never delete the branch `HEAD` is on.
 5. Says where the run ended as its closing line
-   ([#1071](https://github.com/DaveKJohn/claude-code-specialists/issues/1071)) — which, on every run
+   ([#1071](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1071)) — which, on every run
    that did not reap the branch underneath itself, is exactly where it started.
 
 **It does not borrow the checkout, and since #1147 it does not take one.** Step 2 used to switch to the
 trunk and switch back; a borrow returned within the second is still a tree that moves under whatever
 else is running in the same checkout, which is the collision measured in
-[#1145](https://github.com/DaveKJohn/claude-code-specialists/issues/1145) — a `ship-pr` gate reading the
+[#1145](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1145) — a `ship-pr` gate reading the
 working tree for a minute while this command ran beside it. The one move left is step 4c, and it can
 only happen on a branch that has just been **proven merged**: a branch under a running gate is unmerged
 by definition, so it never reaches that line. There is nothing to hand back once the branch is gone, so
@@ -124,7 +134,7 @@ nothing moves `HEAD` unless the branch it was on has been deleted.
   unfinished work, or a branch pushed from another machine has neither proof, so none of them can be
   lost by this script.
 
-### The proof is the PR's head commit, never its branch name (inbound [#1191](https://github.com/DaveKJohn/claude-code-specialists/issues/1191))
+### The proof is the PR's head commit, never its branch name (inbound [#1191](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1191))
 
 A branch **name** proves nothing about which commits were merged under it, and this workflow recycles
 names on purpose. `deleteBranchOnMerge` — the setting the remote half of this script leans on — frees the

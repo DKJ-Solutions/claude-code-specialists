@@ -20,9 +20,11 @@
 
     THE STEPS, IN ORDER:
 
-      1. Refuse on a dirty tree. A run can still have to step off the branch you are standing on
-         (4c below), and doing that with uncommitted work either fails halfway or drags the work
-         across; both are worse than stopping with a sentence.
+      1. Refuse on a dirty tree WHERE THE STEP-OFF IS REACHABLE -- that is, where HEAD is on a branch
+         this run could reap (4c below), because doing that with uncommitted work either fails halfway
+         or drags the work across; both are worse than stopping with a sentence. Standing on the trunk,
+         on a detached HEAD, or under -DryRun, 4c cannot be reached at all, so a dirty tree is reported
+         and the run proceeds (issue #1575 -- see "THE GUARD IS ABOUT THE STEP-OFF" below).
       2. Fast-forward the trunk WITHOUT CHECKING IT OUT -- `git fetch <remote> <trunk>:<trunk>`,
          which advances a local branch ref that HEAD is not on and moves no working tree at all.
          Fast-forward ONLY: git refuses a non-ff into a local branch ref unless the refspec carries a
@@ -99,6 +101,30 @@
     UNMERGED by definition, so it never reaches that line; the move can only happen on work that is
     already finished.
 
+    THE GUARD IS ABOUT THE STEP-OFF, SO IT ASKS WHETHER THE STEP-OFF IS REACHABLE (issue #1575,
+    September 8, 2026). Step 1's dirty-tree refusal was unconditional, and its own sentence named a
+    state that on most runs cannot occur: run from a clean trunk checkout holding one unrelated
+    uncommitted file, it refused on the grounds of "reaping the branch you are standing on" -- while
+    standing on the trunk, which is never a reap candidate. The rest of the run had been read-only
+    since #1147, so the refusal was the only thing left that behaved as though the tree were at risk.
+
+    THAT MATTERED BECAUSE OF WHERE THIS SCRIPT IS PRESCRIBED. The orchestrator's lens tells a session to
+    run `-IncludeRemote` MID-ASSIGNMENT rather than classify `git ls-remote` output by hand, on the
+    stated ground that it touches nothing -- and mid-assignment is precisely when a checkout has
+    uncommitted work in it. The lens sentence and the refusal could not both be right about one run: one
+    said the tree is never moved, the other refused on the possibility that it is. The ways out the
+    refusal offered were the wrong price for a REPORT -- parking commits to a branch, stashing touches a
+    file the session was told to leave alone.
+
+    SO THE CONDITION IS NOW EXACTLY 4c's OWN REACHABILITY: not -DryRun (which `continue`s above 4c on
+    every candidate), and HEAD on a branch that is a reap candidate -- neither the trunk, which the
+    candidate list excludes, nor a detached HEAD, which reads as the literal 'HEAD' and is a name git
+    refuses. Everything the guard protected it still protects: a dirty checkout standing on a non-trunk
+    branch refuses exactly as before, because that branch can be squash-merged while the work is
+    uncommitted, and that is the case where the step-off drags it onto the trunk. What changed is only
+    that the other runs stopped paying for it -- and a dirty tree they proceed through is REPORTED, with
+    which of the three reasons made it harmless, so an absent refusal is never read as an absent guard.
+
     THE EXIT CONTRACT IS STILL DELIBERATELY NOT ship-pr's. That script ends on the trunk on purpose --
     it closes a FINISHED assignment, and ending there is what makes the session safe to clear. This one
     closes nothing: it is a maintenance command run mid-assignment, and the branch you were standing on
@@ -133,7 +159,8 @@
     (Optional switch) report what would be deleted and delete nothing. Steps 2 and 3 -- the
     fast-forward and the prune of remote-tracking refs -- still run: neither loses anything, neither
     touches a working tree, and without them the branch list this reports on is the stale one. Step 4c
-    does NOT run: a look-first run deletes nothing, so it never has to step off anything.
+    does NOT run: a look-first run deletes nothing, so it never has to step off anything -- which is
+    also why a dirty tree never refuses a dry run (issue #1575).
 
 .PARAMETER IncludeRemote
     (Optional switch) additionally read `git ls-remote --heads <remote>` and classify every head that
@@ -277,22 +304,60 @@ if ($trunkRes.ExitCode -ne 0) {
     exit 1
 }
 
+# READ BEFORE THE DIRTY GUARD, BECAUSE THE GUARD IS ABOUT WHERE YOU ARE STANDING (issue #1575). It is
+# used from step 2 onward for the fast-forward route and the step-off; the guard below is simply the
+# first reader of it now.
+$startBranch = ($headRes.Output | Out-String).Trim()
+
+# CAN THIS RUN STEP OFF AT ALL? That is the whole question the dirty guard asks, and step 4c is the one
+# place that answers it -- `if ($branch -eq $startBranch)`, reached only for a branch that IS a reap
+# candidate. Two states put it out of reach for the entire run, and both are decided here:
+#
+#   - HEAD IS THE TRUNK, or detached. The candidate list is `refs/heads` minus the trunk, so the trunk
+#     is never in it; a detached HEAD reads as the literal 'HEAD', which git refuses as a branch name,
+#     so it is never in it either. 4c cannot match, and nothing in the run moves a tree.
+#   - -DryRun. The loop `continue`s above 4c on every candidate: a look-first run deletes nothing, so
+#     the one reason to move HEAD never arises.
+$couldStepOff = (-not $DryRun) -and $startBranch -and $startBranch -ne $trunk -and $startBranch -ne 'HEAD'
+
 # A dirty tree is refused BEFORE anything is touched, not discovered by a failing step-off halfway
 # through: at that point the fetch and some of the deletions have already run, and the reader has to
 # work out what did and did not happen.
+#
+# AND IT IS REFUSED ONLY WHERE THE STEP-OFF IS REACHABLE (issue #1575, September 8, 2026). The guard
+# used to be unconditional, so it refused the state it names in the same breath as describing it: run
+# from a clean trunk checkout with one unrelated uncommitted file, it declined on the grounds of
+# "reaping the branch you are standing on" -- which, standing on the trunk, this run can never do. That
+# is not a cosmetic over-refusal. This is the command the orchestrator's lens instructs a session to run
+# MID-ASSIGNMENT, in place of classifying `git ls-remote` output by hand, and mid-assignment is exactly
+# when a checkout has uncommitted work in it: the guard blocked the report in the state the advice was
+# written for. The two ways out it offers are the wrong price for a read -- parking commits to a branch,
+# and stashing touches a file the session was told to leave alone.
+#
+# WHAT IS NOT NARROWED: standing on a non-trunk branch with uncommitted work still refuses, and must.
+# Whether that branch is reapable cannot be known here -- the ancestry and the merged-PR proof are both
+# steps away -- and a branch CAN be squash-merged while its checkout still holds uncommitted work, which
+# is the case where the step-off drags that work onto the trunk. The guard keeps exactly that case; it
+# simply no longer charges every other run for it.
 $statusRes = Invoke-Git -Arguments @('status', '--porcelain')
 if ($statusRes.ExitCode -ne 0) {
     Write-Error "prune-merged cannot read the working tree state in $repoRoot."
     exit 1
 }
 $dirty = @(($statusRes.Output | Out-String) -split '\r?\n' | Where-Object { $_.Trim() })
-if ($dirty.Count -gt 0) {
-    Write-Error "prune-merged refuses on a dirty working tree ($($dirty.Count) change(s)). Reaping the branch you are standing on means stepping off it onto '$trunk', which would either fail halfway or drag the work across. Commit, park (scripts\task\park-branch.ps1) or stash first."
+if ($dirty.Count -gt 0 -and $couldStepOff) {
+    Write-Error "prune-merged refuses on a dirty working tree ($($dirty.Count) change(s)) while you are standing on '$startBranch'. Reaping that branch means stepping off it onto '$trunk', which would either fail halfway or drag the work across. Commit, park (scripts\task\park-branch.ps1) or stash first -- or rerun with -DryRun, which deletes nothing and therefore never steps off."
     exit 1
+}
+if ($dirty.Count -gt 0) {
+    # SAID OUT LOUD RATHER THAN PASSED OVER IN SILENCE. A dirty tree is still worth a reader knowing
+    # about -- it is simply not this run's business, and the line says which of the two reasons made it
+    # harmless so nobody reads the absent refusal as the guard having been removed.
+    $why = if ($DryRun) { '-DryRun deletes nothing' } elseif ($startBranch -eq 'HEAD') { 'HEAD is detached' } else { "you are standing on '$trunk'" }
+    Write-Host "Working tree has $($dirty.Count) uncommitted change(s) -- untouched: $why, so this run has no branch to step off." -ForegroundColor DarkGray
 }
 
 # --- 2. The trunk, fast-forwarded WITHOUT being checked out (issue #1147) ---------------------------
-$startBranch = ($headRes.Output | Out-String).Trim()
 
 # THE SHA AS WELL AS THE NAME, read before anything can move. It is the whole answer in the one case
 # the hand-back cannot serve -- a start branch this run reaps -- and it costs one rev-parse.

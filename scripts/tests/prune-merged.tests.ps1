@@ -365,18 +365,72 @@ try {
     Assert-True ($rC.Out -match 'Would delete fix/landed-too') '-DryRun: and it says what it would have done'
     Assert-True ($rC.Out -match 'Nothing was deleted') '-DryRun: with the line that makes the run unmistakable for the real one'
 
-    # --- (d) A dirty tree is refused before anything is touched ------------------------------------
+    # --- (d) A dirty tree IS refused where the step-off is reachable -------------------------------
     #     Refused UP FRONT rather than discovered by a failing checkout halfway through: at that point
     #     the fetch may already have run, and the reader has to work out what did and did not happen.
-    Write-Host "prune-merged.ps1 -- refuses on a dirty tree" -ForegroundColor Cyan
+    #
+    #     AND IT IS STANDING ON A BRANCH, WHICH IS THE WHOLE POINT OF THE CASE (issue #1575). This case
+    #     ran from the trunk until September 8, 2026 -- New-MergedBranch ends with `checkout main`, so
+    #     it did so silently -- which meant the one assert in the suite for this guard was pinning the
+    #     state the guard should never have refused. The branch here is UNMERGED and never reaped; what
+    #     is asserted is that the refusal arrives before anything is touched, and the reason it must is
+    #     that this checkout's own branch COULD turn out to be reapable, which is unknowable at step 1.
+    Write-Host "prune-merged.ps1 -- refuses on a dirty tree, standing on a branch" -ForegroundColor Cyan
     $dirD = New-Fixture -Label 'd'
-    New-MergedBranch -Dir $dirD -Name 'feat/would-have-gone'
+    New-MergedBranch   -Dir $dirD -Name 'feat/would-have-gone'
+    New-UnmergedBranch -Dir $dirD -Name 'feat/standing-here'
+    Invoke-FixtureGit -Arguments @('-C', $dirD, 'checkout', '-q', 'feat/standing-here')
     [System.IO.File]::WriteAllText((Join-Path $dirD 'uncommitted.txt'), "in progress`n", (New-Object System.Text.UTF8Encoding $false))
     $rD = Invoke-PruneMerged -Dir $dirD
-    Assert-Equal 1 $rD.Code 'dirty: exit 1'
-    Assert-True ($rD.Out -match 'dirty working tree') 'dirty: the refusal names what is wrong'
-    Assert-True ($rD.Out -match 'park-branch') 'dirty: and points at the ways out rather than only refusing'
-    Assert-True ((Get-LocalBranches -Dir $dirD) -contains 'feat/would-have-gone') 'dirty: NOTHING was deleted -- a branch that was reapable a line earlier is untouched'
+    Assert-Equal 1 $rD.Code 'dirty on a branch: exit 1'
+    Assert-True ($rD.Out -match 'dirty working tree') 'dirty on a branch: the refusal names what is wrong'
+    Assert-True ($rD.Out -match 'feat/standing-here') 'dirty on a branch: and names the branch that makes the step-off reachable, which is the whole ground of the refusal'
+    Assert-True ($rD.Out -match 'park-branch') 'dirty on a branch: and points at the ways out rather than only refusing'
+    Assert-True ($rD.Out -match '-DryRun') 'dirty on a branch: including the read-only way out, which costs the caller nothing'
+    Assert-True ((Get-LocalBranches -Dir $dirD) -contains 'feat/would-have-gone') 'dirty on a branch: NOTHING was deleted -- a branch that was reapable a line earlier is untouched'
+    Assert-Equal 'feat/standing-here' (Get-HeadName -Dir $dirD) 'dirty on a branch: and the caller is left exactly where the refusal found them'
+
+    # --- (d2) A dirty tree on the TRUNK does not refuse -- it reports (issue #1575) -----------------
+    #     THE CASE THE GUARD USED TO GET WRONG. The refusal's stated ground is stepping off the branch
+    #     you are standing on; the candidate list is `refs/heads` minus the trunk, so standing on the
+    #     trunk there is nothing to step off and step 4c is unreachable for the whole run. Measured on
+    #     September 8, 2026 with one unrelated uncommitted file in a clean trunk checkout: refused.
+    #
+    #     IT MATTERS BECAUSE THIS IS THE PRESCRIBED MID-ASSIGNMENT COMMAND. The orchestrator's lens
+    #     sends a session here instead of classifying `git ls-remote` output by hand, and mid-assignment
+    #     is exactly when a checkout is dirty -- so the guard blocked the report in the state the advice
+    #     was written for. The asserts are in three parts, because "did not refuse" is the weakest of
+    #     them: the run must reach its work (the merged branch is actually reaped), and it must SAY the
+    #     tree was dirty, so an absent refusal is never read as an absent guard.
+    Write-Host "prune-merged.ps1 -- dirty tree on the trunk reports and proceeds" -ForegroundColor Cyan
+    $dirD2 = New-Fixture -Label 'd2'
+    New-MergedBranch -Dir $dirD2 -Name 'feat/landed-anyway'
+    [System.IO.File]::WriteAllText((Join-Path $dirD2 'uncommitted.txt'), "in progress`n", (New-Object System.Text.UTF8Encoding $false))
+    $rD2 = Invoke-PruneMerged -Dir $dirD2
+    Assert-Equal 0 $rD2.Code 'dirty on the trunk: exit 0 -- the step-off it would refuse for is unreachable from here'
+    Assert-True ($rD2.Out -notmatch 'refuses on a dirty working tree') 'dirty on the trunk: no refusal'
+    Assert-True ($rD2.Out -match 'uncommitted change') 'dirty on the trunk: the dirty tree is REPORTED, not passed over in silence'
+    Assert-True ($rD2.Out -match 'no branch to step off') 'dirty on the trunk: with the reason it was harmless, so the guard does not read as removed'
+    Assert-True (-not ((Get-LocalBranches -Dir $dirD2) -contains 'feat/landed-anyway')) 'dirty on the trunk: and the run did its actual work'
+    Assert-True ([System.IO.File]::ReadAllText((Join-Path $dirD2 'uncommitted.txt')) -match 'in progress') 'dirty on the trunk: the uncommitted file is untouched -- the run never went near it'
+
+    # --- (d3) A dirty tree under -DryRun does not refuse either (issue #1575) ----------------------
+    #     The second unreachable state, and a separate arm because it holds even ON a branch: the
+    #     per-branch loop `continue`s above 4c on every candidate, so a look-first run has no step-off
+    #     to protect. This is the cheapest way for a session with uncommitted work to get the report.
+    Write-Host "prune-merged.ps1 -- dirty tree under -DryRun reports and proceeds" -ForegroundColor Cyan
+    $dirD3 = New-Fixture -Label 'd3'
+    New-MergedBranch   -Dir $dirD3 -Name 'feat/would-be-reaped'
+    New-UnmergedBranch -Dir $dirD3 -Name 'feat/standing-here-too'
+    Invoke-FixtureGit -Arguments @('-C', $dirD3, 'checkout', '-q', 'feat/standing-here-too')
+    [System.IO.File]::WriteAllText((Join-Path $dirD3 'uncommitted.txt'), "in progress`n", (New-Object System.Text.UTF8Encoding $false))
+    $rD3 = Invoke-PruneMerged -Dir $dirD3 -DryRun
+    Assert-Equal 0 $rD3.Code 'dirty under -DryRun: exit 0 -- on a branch, where the same run without -DryRun refuses'
+    Assert-True ($rD3.Out -notmatch 'refuses on a dirty working tree') 'dirty under -DryRun: no refusal'
+    Assert-True ($rD3.Out -match 'DryRun deletes nothing') 'dirty under -DryRun: and it says which of the reasons made the tree its own business'
+    Assert-True ($rD3.Out -match 'Would delete feat/would-be-reaped') 'dirty under -DryRun: the report the caller came for is actually produced'
+    Assert-True ((Get-LocalBranches -Dir $dirD3) -contains 'feat/would-be-reaped') 'dirty under -DryRun: and nothing was deleted'
+    Assert-Equal 'feat/standing-here-too' (Get-HeadName -Dir $dirD3) 'dirty under -DryRun: the checkout never moved'
 
     # --- (e) A clone without the declared trunk refuses rather than guessing ------------------------
     #     The safe direction, and asserted because it is the one case where a wrong answer would delete

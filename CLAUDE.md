@@ -167,9 +167,11 @@ stack of teams plus one opt-in workflow — and a consumer running `dkj-team-alp
 needs matching versions. What was wrong was never the lockstep but housing unrelated products in a
 single release train, and that dissolved with the reorganisation rather than needing a fix.
 
-**The repo consumes itself.** Via [`.claude/settings.json`](.claude/settings.json) this repo enables
-its own `dkj-team-alpha` plugin (the core team), with the `github` marketplace source
-`DKJ-Solutions/claude-code-specialists` — so the repo points at itself. That way work here runs against
+**The repo consumes itself — and it enables EVERY plugin in the marketplace** (Dave,
+September 8, 2026). Via [`.claude/settings.json`](.claude/settings.json) all six are switched on —
+`dkj-team-alpha`, `dkj-team-ecomm`, `dkj-team-lifehub`, `dkj-team-shopify`, `dkj-policy` and
+`dkj-policy-bwj` — with the `github` marketplace source `DKJ-Solutions/claude-code-specialists`, so the
+repo points at itself. That way work here runs against
 exactly the product it maintains. One consequence to be aware of: a session reads the plugins from the
 **local marketplace clone**, and that clone advances on a `claude plugin marketplace update` — **not on
 a push**. So an agent def you modify on a branch takes effect after merge, push *and* that refresh, and
@@ -181,6 +183,24 @@ such record and has nothing to unlink — the record is per-machine state, not a
 repo (inbound [#1449](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1449)). Both measured
 instances, and why detection is deliberately left alone, are in
 [the system-administration lens](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
+
+**Only two of the six describe this repo, and the other four are on anyway, deliberately.** The core team
+and `dkj-policy` are the two with real work here; the three add-on teams and `dkj-policy-bwj` have none —
+this repo is not a webshop, not a Shopify store, not a personal-life repo and not a BWJ store. They are
+enabled so that **the repo that ships a plugin is also a repo that loads it**: an agent def, a manifest, a
+frontmatter or a hook that stops resolving then surfaces at this repo's own session start instead of in
+somebody else's. Validation is the whole reason — none of those four is used for work here, and none is
+expected to be, which is why an empty lens under one of them is not a gap.
+
+**What that costs, so nobody reads the noise as breakage.** Two things, both known, neither a defect of
+this repo. First, every specialist an enabled plugin ships needs a roster row and a repo lens —
+[`SPECIALISTS.md`](.claude/specialists/SPECIALISTS.md) says so without exception — so eleven of them hold
+an empty `VUL-IN` scaffold here, which is the intended state rather than a backlog item. Second,
+`dkj-team-shopify`'s floor check reports an `[ERROR]` at every session start: it asks which theme is live,
+a repo with no store has no truthful answer, and the check has no third state to be told that in. That is
+a gap in the check ([#1570](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1570)), not a
+configuration this repo has neglected — **do not silence it by seeding a theme id**, which would arm a
+guard over a revenue-serving theme on a number nobody verified.
 
 ### Language
 

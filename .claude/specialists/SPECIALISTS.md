@@ -120,9 +120,15 @@ the repo slot.
 
 
 
-Small and maintenance-focused. The portable playbooks come from the `dkj-team-alpha` plugin; each
+Small and maintenance-focused — and **every plugin in the marketplace is enabled here**, the three
 
-specialist's repo lens lives in [`.claude/specialists/lenses/`](lenses/).
+add-on teams included, so that the repo which ships a plugin is also a repo that loads it. Those three
+
+have no work here and are not expected to; that is validation, not a roster, and the repo slot in
+
+[`CLAUDE.md`](../../CLAUDE.md) states what it costs. The portable playbooks come from the four team
+
+plugins; each specialist's repo lens lives in [`.claude/specialists/lenses/`](lenses/).
 
 
 
@@ -154,9 +160,15 @@ plugin's into every session, so repeating them here only cost tokens (~750/sessi
 
 
 
-The subagents of the enabled `dkj-team-alpha` plugin, by id — their descriptions are already in context,
+The subagents of the enabled plugins, by id — their descriptions are already in context, so these lines
 
-so this line is for **you** and for the roster-sync check:
+are for **you** and for the roster-sync check. They are grouped by plugin, because which plugin a
+
+specialist arrives with is the one thing the id does not say:
+
+
+
+**`dkj-team-alpha`** (the core team — the only one of the four with real work here):
 
 
 
@@ -174,9 +186,43 @@ Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Enginee
 
 
 
-Each has a repo lens at `.claude/specialists/lenses/<g>-<id>-extension.md`. For a
+**`dkj-team-ecomm`** (a commercial webshop, platform-independent — enabled here for validation only):
 
-full description, run `claude plugin details dkj-team-alpha@claude-code-specialists` or read their manual.
+
+
+`06-26` Sergio (SEO) · `06-27` Craig (CRO) · `06-28` Sean (Performance / SEA)
+
+
+
+**`dkj-team-lifehub`** (a personal-life repo — enabled here for validation only):
+
+
+
+`02-10` Astrid (Personal Assistant) · `03-08` Fiona (Financial Planner) · `03-14` Hugo (Lifestyle
+
+Coach) · `04-03` Ian (Information Architect) · `04-04` Onyx (Ontologist)
+
+
+
+**`dkj-team-shopify`** (a Shopify store repo — enabled here for validation only):
+
+
+
+`04-20` Liam (Liquid Developer) · `05-21` Sandra (Store Manager) · `05-22` Steven (Configuration
+
+Manager)
+
+
+
+`dkj-policy` and `dkj-policy-bwj` are the other two enabled plugins and ship **no** agents at all — they
+
+carry skills, hooks and scripts — so the roster check skips them by design rather than for want of a row.
+
+
+
+Each specialist has a repo lens at `.claude/specialists/lenses/<g>-<id>-extension.md`. For a
+
+full description, run `claude plugin details <plugin>@claude-code-specialists` or read their manual.
 
 
 
@@ -189,6 +235,18 @@ Gwen's visuals, Cody's application code, Auden's long-form writing), and their r
 an empty `VUL-IN` scaffold. **That is the intended state, not a backlog item.** A lens waits, filled in
 
 on the day that specialist first has work here.
+
+
+
+**For the eleven specialists of the three add-on teams the empty lens is not incidental but structural,
+
+and it will stay empty.** They were adopted because their plugin is enabled and the rule above admits no
+
+exception — not because a Liquid developer, an SEO specialist or an ontologist has anything to do in a
+
+marketplace repo. Nothing here is waiting for them, so **do not treat those eleven lenses as a backlog to
+
+work through**; a filled-in lens for one of them would describe work this repo does not have.
 
 
 
