@@ -614,6 +614,112 @@ try {
     Assert-True ((Invoke-Integrity -FixtureRoot $Fixture).Out -notmatch '\[script-ascii\] \.') `
         'script-ascii: the fixture is clean again once both probes are gone'
 
+    # --- check 35: a test fixture's own git command is judged -----------------------------------------
+    # 76-84. WHAT THE CHECK IS FOR (issue #1655). A suite in scripts/tests/ builds its fixture with git,
+    #        and the house idiom discarded the exit code along with the output -- so a git that FAILED
+    #        read exactly like one that worked, and the asserts below it then measured a repo that was
+    #        never built, attributing the failure to the script under test. #1635 converted seventeen
+    #        suites and left nothing that refuses the next copy of the idiom.
+    #
+    #        THE SCENARIOS BELOW PIN THE BOUNDARY, NOT JUST THE FINDING, and that is the whole reason
+    #        the check took a measurement before it was written: the false-positive class here is a git
+    #        QUESTION whose non-zero exit IS the answer. The silent run below is the one that gives the
+    #        check its meaning -- without it, flagging every discarded git call would pass every other
+    #        assert here.
+    #
+    #        THREE GATE INVOCATIONS, NOT ONE PER SHAPE, and that is a cost decision with numbers behind
+    #        it. Each Invoke-Integrity spawns a fresh powershell over the ~4,000-line gate: ~1.1s of
+    #        interpreter start and parse, whatever the scenario asserts. Written the obvious way -- one
+    #        rewrite-and-reinvoke per shape -- this block cost 12 invocations and took the suite from
+    #        54.5s to 63.7s (+9.2s, +17%), on a file that runs on every push and again in CI. The shapes
+    #        are independent, so they are batched by EXPECTED VERDICT instead: every shape that must fire
+    #        in one run, every shape that must stay silent in the next. Same asserts, 3 invocations,
+    #        57.3s (+2.8s, +5%) -- measured, 3 runs each side.
+    #
+    #        WHAT PAYS FOR THAT is that each probe carries its shape in its FILE NAME, so a single run's
+    #        output still says which shape failed. Batching scenarios that could not be told apart in the
+    #        output would trade a real diagnostic for the seconds, and that is not the trade being made.
+    Write-Host '  check 35: a test fixture git command is judged' -ForegroundColor DarkCyan
+    $fgDir  = Join-Path $Fixture 'scripts\tests'
+    New-Item -ItemType Directory -Path $fgDir -Force | Out-Null
+    $fgHead = "# A probe suite. Pure ASCII (repo convention for .ps1).`n`$dir = 'C:\nowhere'`n"
+    function Write-FgProbe {
+        param([string]$Name, [string]$Body)
+        [System.IO.File]::WriteAllText((Join-Path $fgDir "$Name.tests.ps1"), ($fgHead + $Body + "`n"), $Utf8NoBom)
+    }
+
+    # 76-81. EVERY SHAPE THAT MUST FIRE, in one run. The first is the measured defect in the exact
+    #        spelling it shipped in for as long as this directory has existed. The rest are the ways an
+    #        author can write the same thing: a second INVOCATION spelling (source-repo-guard's
+    #        scriptblock over Invoke-NativeCapture, nine calls the #1635 search never reached), and all
+    #        three DISCARD spellings, two of them also in a parenthesised form -- because the check was
+    #        first built with only the [void] arm climbing out of '(...)', so one pair of brackets was an
+    #        escape hatch for the other two. A check whose arms disagree about wrapping teaches whichever
+    #        shape the weakest arm accepts.
+    Write-FgProbe 'fg-idiom'      '& git -C $dir init -q 2>$null | Out-Null'
+    Write-FgProbe 'fg-varspell'   ('$git = { param([string[]]$a) & git @a }' + "`n" + '& $git @(''-C'', $dir, ''init'', ''-q'') | Out-Null')
+    Write-FgProbe 'fg-nullassign' '$null = git -C $dir add -A'
+    Write-FgProbe 'fg-voidcast'   '[void](& git -C $dir add -A)'
+    Write-FgProbe 'fg-parennull'  '$null = (& git -C $dir init -q)'
+    Write-FgProbe 'fg-parenout'   '(& git -C $dir add -A) | Out-Null'
+    # AND THE CLEARING CONDITION READS THE AST, NOT THE LINE. This one belongs with the firing shapes
+    # because it is a finding a text match would have wrongly CLEARED -- and a wrongly cleared miss leaves
+    # nothing behind to notice, which is why it matters more here than anywhere else in the check.
+    Write-FgProbe 'fg-litmention' ('& git -C $dir tag t | Out-Null' + "`n" + 'Write-Host ''mentions $LASTEXITCODE in a literal only''')
+    $fgFire = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($fgFire.Out -match '\[fixture-git\].*fg-idiom\.tests\.ps1:3') `
+        'fixture-git: the unjudged fixture idiom is reported, with the file and the line'
+    Assert-True ($fgFire.Out -match 'Invoke-FixtureGitIn') `
+        'fixture-git: and the finding hands over the shared lib, so the repair needs no source reading'
+    Assert-True ($fgFire.Code -ne 0) `
+        'fixture-git: and it fails the gate -- an unbuilt fixture makes every assert below it meaningless'
+    Assert-True ($fgFire.Out -match '\[fixture-git\].*fg-varspell\.tests\.ps1:4') `
+        'fixture-git: a call through a variable named exactly $git is in scope too'
+    Assert-True ($fgFire.Out -match '\[fixture-git\].*fg-nullassign') `
+        'fixture-git: $null = <git call> discards the result the same way and is a finding too'
+    Assert-True ($fgFire.Out -match '\[fixture-git\].*fg-voidcast') `
+        'fixture-git: a [void] cast is the third discard spelling and is a finding too'
+    Assert-True ($fgFire.Out -match '\[fixture-git\].*fg-parennull') `
+        'fixture-git: $null = (<git call>) -- parenthesised, still a finding'
+    Assert-True ($fgFire.Out -match '\[fixture-git\].*fg-parenout') `
+        'fixture-git: (<git call>) | Out-Null -- parenthesised, still a finding'
+    Assert-True ($fgFire.Out -match '\[fixture-git\].*fg-litmention') `
+        'fixture-git: $LASTEXITCODE inside a single-quoted string does not clear a finding -- it is not a read'
+    Get-ChildItem -Path $fgDir -Filter 'fg-*.tests.ps1' -File | Remove-Item -Force
+
+    # 82-84. EVERY SHAPE THAT MUST STAY SILENT, in one run. The QUESTION is the assert that gives this
+    #        check its meaning: a 'rev-parse --verify --quiet' on a ref EXPECTED to be absent answers with
+    #        exit 1 and is judged on the very next line, and #1635's own conversion hit that class twice.
+    #        The CONVERTED form must be silent or the check could be satisfied by deleting a call rather
+    #        than judging it, leaving its own advice untested. The BARE statement pipeline is a measured
+    #        bound rather than an assumption -- widening to it yields 20 findings on this repo's tree and
+    #        all 20 are value-returning questions.
+    Write-FgProbe 'fg-question'  ('& git -C $dir rev-parse --verify --quiet refs/heads/main | Out-Null' + "`n" + 'if ($LASTEXITCODE -eq 0) { Write-Host ''present'' }')
+    Write-FgProbe 'fg-converted' 'Invoke-FixtureGitIn $dir init -q'
+    Write-FgProbe 'fg-barepipe'  '& git -C $dir log --oneline'
+    # AND THE SCOPE, asserted from the outside. Production code that ignores a failed git usually goes on
+    # to fail visibly; a fixture that ignores one produces a repo that is plausible and wrong. So the same
+    # idiom under scripts/task/ is not this check's business, and a check quietly widened past its stated
+    # set would break every caller relying on the boundary.
+    $fgOutside = Join-Path $Fixture 'scripts\task\fg-outside.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $fgOutside) -Force | Out-Null
+    [System.IO.File]::WriteAllText($fgOutside, ($fgHead + '& git -C $dir init -q 2>$null | Out-Null' + "`n"), $Utf8NoBom)
+    $fgSilent = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($fgSilent.Out -match '\[fixture-git\].*fg-question')) `
+        'fixture-git: a git QUESTION judged on the next statement is not a finding -- exit 1 is its answer'
+    Assert-True ($fgSilent.Out -match '\[fixture-git\] checked [1-9]') `
+        'fixture-git: and that pass is not an empty scan'
+    Assert-True (-not ($fgSilent.Out -match '\[fixture-git\].*fg-converted')) `
+        'fixture-git: the shared-lib form is not a finding -- that is the repair the message asks for'
+    Assert-True (-not ($fgSilent.Out -match '\[fixture-git\].*fg-barepipe')) `
+        'fixture-git: a bare statement pipeline is not a subject -- its output is the return value'
+    Assert-True (-not ($fgSilent.Out -match '\[fixture-git\].*fg-outside')) `
+        'fixture-git: the same idiom OUTSIDE scripts/tests/ is not a subject -- the set is stated and held to'
+    Get-ChildItem -Path $fgDir -Filter 'fg-*.tests.ps1' -File | Remove-Item -Force
+    Remove-Item -LiteralPath $fgOutside -Force
+    Assert-True ((Invoke-Integrity -FixtureRoot $Fixture).Out -notmatch '\[fixture-git\] \.') `
+        'fixture-git: the fixture is clean again once every probe is gone'
+
     # --- Scenario 55: A MARKETPLACE THAT DOES NOT PARSE STILL LEAVES A REPORTING GATE ----------------
     # 55. The lint reads the plugin set from marketplace.json now, and the whole point of doing that
     #     inside a swallowing try/catch is that the file it reads can be broken. Measured while this was

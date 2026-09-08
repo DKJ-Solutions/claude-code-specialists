@@ -49,6 +49,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+# JUDGING THIS SCRIPT'S OWN FIXTURE git CALL -- issue #1635. The stake is the same one the lib describes
+# for a suite, and arguably plainer here: this script MEASURES a fresh consumer, so a fixture repo that
+# was never built yields a measurement of something other than what the run claims to have measured.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
+
 # Repo root -- same dual-context resolution the shared scripts use.
 $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 if (-not $PluginRoot) {
@@ -92,7 +97,7 @@ A perfectly ordinary project. Build with `npm run build`, test with `npm test`.
 '@ | Set-Content -LiteralPath (Join-Path $FixtureRoot 'CLAUDE.md') -Encoding utf8
 
 Push-Location $FixtureRoot
-try { & git init -q 2>&1 | Out-Null } finally { Pop-Location }
+try { Invoke-FixtureGitJudged @('init', '-q') } finally { Pop-Location }
 
 $state = if ($WithBootstrap) { 'AFTER bootstrap (the happy path)' } else { 'BEFORE bootstrap (plugin enabled, restarted, nothing else)' }
 Write-Host "== fresh-consumer measurement -- $state ==" -ForegroundColor Cyan
@@ -153,6 +158,10 @@ try {
     }
 
     Write-Host "`n== summary ==" -ForegroundColor Cyan
+    # ABOVE THE NUMBERS, so a reader never takes a figure from a half-built fixture (issue #1635).
+    # This script prints rather than exits on a count: it is a measurement, not a gate, and the honest
+    # answer to a broken fixture here is to say the figures below are not about a fresh consumer.
+    Write-FixtureGitSummary -Subject 'a fresh consumer' | Out-Null
     Write-Host "  [ERROR] lines a session start shows: $totalErrors"
     Write-Host "  lines naming 'specialists-init':     $mentions"
     if ($mentions -eq 0 -and $totalErrors -gt 0) {
