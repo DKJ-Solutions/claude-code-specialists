@@ -43,7 +43,64 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**26 / 53 minor entries** <!-- pending-tally -->
+**26 / 54 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1605-sessioncheck-version-cache · 20260908-204605
+
+A session start on a machine with no source checkout stops paying for its version verdict twice.
+`connector-sessioncheck`'s consumer fallback ran `plugin-versions.ps1 -Brief` -- two nested
+powershell bring-ups plus git in the marketplace clone -- at every firing of the
+`startup|resume|clear|compact` matcher, so a session with four compactions measured five times for an
+answer that had not changed. The matcher stays exactly as it is; narrowing it is what makes the whole
+report go silent after the first `/compact`. Instead the engine's output is now held for the life of
+the session, keyed on the `session_id` the harness writes to the hook's stdin: a compaction keeps
+that id and replays, a startup and a `/clear` bring a new one and re-measure, so nothing has to read
+the payload's `source` field or decide which kinds of firing may trust a cache. Measured over five
+measure-then-replay pairs against a synthetic five-plugin consumer fixture: a median of 1,288 ms
+against 439 ms, about 850 ms back per compaction.
+
+What a replay guarantees is a **bound, not an invariant**, and that is the one place this branch
+disagrees with the issue that asked for it. #1605 argued the cached answer cannot go stale within a
+session, citing the hook's own "restart the session" line -- but that line is about a hook's *code*
+being pinned, while the verdict is about two ordinary mutable files, and a sibling terminal running
+`claude plugin update` moves them with no restart involved. So a replay is bounded by age at one hour
+rather than the four this started with, the reasoning is written into the lib's header instead of the
+citation that does not carry it, and the direction a reader acts on self-heals: acting on "you are
+behind" means an update, after which this hook says to restart -- which is a new id and a bypass.
+
+Everything about it fails towards measuring. No session id, an unwritable cache directory, a corrupt
+entry, a plugin payload predating the lib: each falls back to the spawn this branch exists to avoid,
+which is exactly what the hook did before. The suite counts engine spawns on disk rather than
+inferring them from wall-clock, so "the second firing spawns nothing" is a measurement.
+
+**The cache does not live under the shared temp root**, and that answers #1666, which landed while
+this branch was open: every temp path in this layer is now composed per run with a guid, so nothing
+can be pre-planted at a name that does not exist yet. A cache is the one thing that cannot take that
+shape -- a later process has to find what an earlier one wrote, and a guid is what a later process
+cannot re-derive. So instead of a third exemption from that gate it leaves the shared root
+altogether, for the per-user cache directory (`LOCALAPPDATA`, else `XDG_CACHE_HOME`, else
+`~/.cache`), where a stable name sits in a directory only this user can write. Not under `~/.claude`
+either: that tree is what these checks READ, and one of them snapshots it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This repo is not a service anyone subscribes to; the reader here is a developer maintaining it,
+and what they get is already scored above. The saving lands in every consuming repo through a
+release, but a consumer of this product is a developer too.
+
+**Score:** N/A
+
+#### Pull Request
+
+connector-sessioncheck measures the version verdict once per session instead of on every compaction
+
+Plugins: dkj-policy
+
+[PR #1672](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1672)
+
+---
 
 ### DEPLOY: docs/1667-review-dispatch-worktree · 20260908-204043
 
