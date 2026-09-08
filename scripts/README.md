@@ -69,16 +69,43 @@ cache holds a release and this directory is by definition ahead of it between re
 | [`sync/`](sync/) | keeping the generated artefacts and the connected repos honest |
 | [`agents/`](agents/) | the agent-def generator that fills in the shared blocks |
 | [`maintenance/`](maintenance/) | run by hand, on demand rather than on a schedule: the one-off repairs, and the **measurements** — what a skill costs, what the always-on document path costs. None of it is a gate, and none of it should become one |
-| [`tests/`](tests/) | the suites CI runs, one per subject. **A new suite's temp fixture path carries `$PID`** — see below |
+| [`tests/`](tests/) | the suites CI runs, one per subject. **A new suite's temp fixture path carries `$PID` *and* a fresh guid** — see below |
 
-**Writing a new suite: put `$PID` in its temp fixture path.** The test gate is a throttled *parallel*
-scheduler, so two runs overlapping is ordinary rather than exotic — a gate run beside a developer running
-one suite by hand is enough. Two runs that build a fixture at the same fixed temp path tear down each
-other's tree mid-assert, and the visible result is a red gate naming a subject that is perfectly fine.
-Measured on August 11, 2026: `connectors.tests.ps1` passes alone and reported **two** failures when run
-twice at once. `$PID` (or a fresh GUID, where one file per child invocation is created) is enough; a
-per-case `$Label` is not, because it repeats across runs. `test-suite-gate.tests.ps1` enforces this and
-names the offending `file:line`.
+**Writing a new suite: its temp fixture path carries `$PID` and a fresh guid — both.** The two halves
+answer two different questions, and for a month only the first was asked.
+
+*The guid is what makes the path safe.* A composed leaf like `<label>-$PID` is a name somebody else can
+reach first: `$PID` is neither secret nor large, and `New-Item -ItemType Directory -Force` and
+`Remove-Item -Recurse -Force` both follow a symlink or junction, so a link pre-planted at that exact path
+redirects the write **and** the teardown. Nothing can be pre-planted at a name that does not exist until
+the moment it is used. Measured September 8, 2026
+([#1664](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1664)): **100** guid-less
+composed paths across these suites, with **116** recursive deletes standing at one of them across 50
+files — the same class [#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659)
+closed in the shipping layer, and far more of the delete half than that issue had.
+
+*`$PID` is what makes a leftover readable*, in front of the guid, exactly as `New-ScratchPath` composes
+it. It buys nothing against an attacker; it is what attributes a stray directory to a run that is still
+alive, which is what the retained-capture note prints and what the gate's own capture lookup globs on
+(`<label>-<pid>-*`). It is also still the answer to the *collision* question the rule started as: the
+test gate is a throttled *parallel* scheduler, so two runs overlapping is ordinary rather than exotic —
+a gate run beside a developer running one suite by hand is enough — and two runs sharing a fixed path
+tear down each other's tree mid-assert, producing a red gate that names a subject which is perfectly
+fine. Measured August 11, 2026: `connectors.tests.ps1` passes alone and reported **two** failures when
+run twice at once.
+
+The spelling is `"<label>-$PID-$([guid]::NewGuid().ToString('n'))"`, with any extension kept at the end.
+A variable holding a fresh guid (`$tag`, `$Guid`) also passes, for the suites that need one path per
+*child invocation* where `$PID` is the same for all of them — and `test-suite-gate.tests.ps1` pins those
+two names to a real guid, so the allowance cannot decay into a fixed value. A per-case `$Label` alone is
+not enough, because it repeats across runs. That suite enforces all of this and names the offending
+`file:line`.
+
+**Do not reach for `New-ScratchPath` here.** It is the right answer one layer up (below) and the wrong
+instrument for a fixture: 28 of these suites would need a new dot-source of a 1406-line lib, and
+`-Directory` creates *without* `-Force` and throws on an existing item — so routing the fixtures through
+it would change every suite's setup and teardown shape rather than just its path composition. Measured
+and declined on #1664.
 
 **Writing a shipping script: do not compose a temp path at all — call `New-ScratchPath`**
 ([`lib/native-capture-lib.ps1`](lib/native-capture-lib.ps1)). It returns
@@ -93,10 +120,12 @@ class as one): **seven** sites composed `<label>-$PID` by hand, the test gate's 
 them. A guid removes the target instead of checking for one — a reparse-point check is a check-then-write
 with a window, and it cannot be applied to the temp root at all, because on macOS `/tmp` *is* a symlink.
 `native-capture.tests.ps1` enforces this over `scripts/**` outside `tests/` and names the offending
-`file:line`. The `$PID` convention above is the sibling rule for **fixtures**, and it answers a different
-question — two concurrent runs, not a hostile neighbour — which is why it leaves that exposure standing
-in `tests/`: 108 predictable fixture paths across 66 files, 53 of them opening with a recursive delete,
-[#1664](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1664).
+`file:line`. **`tests/` is excluded because it has its own, now equally strict rule** — the fixture
+convention above, enforced by `test-suite-gate.tests.ps1`. The two rules ask for the same guid and differ
+only in the instrument: a shipping script calls `New-ScratchPath`, a suite composes the guid inline, for
+the dot-source and `-Directory` reasons given there. Until #1664 the fixture rule accepted `$PID` alone
+and so left the exposure standing across 50 files; the exclusion is now a division of enforcement rather
+than a gap in it.
 
 `repo-config.ps1` sits at the top level rather than in a directory, deliberately: it is **not machinery
 but data** — this repo's own answers to the seam the shared scripts read (the trunk name, the lint script,

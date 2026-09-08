@@ -18,11 +18,11 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\sync\check-connectors.ps1'
 $Hook     = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\connector-sessioncheck.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-test-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 # A scratch '~/.claude' for the isolated hook calls (9a/9e) -- no marketplace clone, no install
 # administration, so plugin-versions.ps1's fallback lands deterministically on "indeterminate"
 # regardless of what this machine's real install/clone actually look like.
-$HookHome = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-hook-home-$PID"
+$HookHome = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-hook-home-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $script:pass = 0
 $script:fail = 0

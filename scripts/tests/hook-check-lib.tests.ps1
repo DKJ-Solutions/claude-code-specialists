@@ -30,7 +30,7 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Lib      = Join-Path $RepoRoot 'scripts\lib\hook-check-lib.ps1'
 # $PID in the fixture path: the gate is a throttled PARALLEL scheduler, so two runs at one fixed temp
 # path tear down each other's tree mid-assert. Same reasoning as the hook suites.
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "hook-check-lib-tests-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "hook-check-lib-tests-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $Ascii = New-Object System.Text.ASCIIEncoding
 $script:pass = 0

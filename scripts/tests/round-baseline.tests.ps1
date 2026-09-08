@@ -78,7 +78,7 @@ function New-BaselineRepo {
         [string]$FileName = 'README.md',
         [switch]$Crlf
     )
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("baseline-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("baseline-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     $script:fixtures += $dir
@@ -259,12 +259,12 @@ Assert-True (@($r1.Output | Where-Object { $_ -match 'differs from its content i
 
 # ---------------------------------------------------------------------------------------------------
 Write-Host 'Bad input fails with a pointer instead of a stack trace' -ForegroundColor Cyan
-$r5 = Invoke-Measure -Dir (Join-Path ([System.IO.Path]::GetTempPath()) "baseline-nope-$PID")
+$r5 = Invoke-Measure -Dir (Join-Path ([System.IO.Path]::GetTempPath()) "baseline-nope-$PID-$([guid]::NewGuid().ToString('n'))")
 Assert-True ($r5.ExitCode -ne 0)                                        'missing checkout: non-zero exit'
 Assert-True (@($r5.Output | Where-Object { $_ -match 'No such checkout' }).Count -ge 1) `
                                                                         'missing checkout: named as such'
 
-$plain = Join-Path ([System.IO.Path]::GetTempPath()) "baseline-plain-$PID"
+$plain = Join-Path ([System.IO.Path]::GetTempPath()) "baseline-plain-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $plain) { Remove-Item -Recurse -Force -LiteralPath $plain }
 New-Item -ItemType Directory -Path $plain -Force | Out-Null
 $script:fixtures += $plain
@@ -302,7 +302,7 @@ Assert-True ($second8.Count -eq 1 -and $second8[0] -match '\*\*3\*\*')  'two fil
 Write-Host 'A shallow clone is reported rather than counted as history' -ForegroundColor Cyan
 #      The commit count is the one row a shallow clone silently falsifies -- v12's table names
 #      'a non-shallow clone' in its how-measured cell precisely because of that.
-$shallow = Join-Path ([System.IO.Path]::GetTempPath()) "baseline-shallow-$PID"
+$shallow = Join-Path ([System.IO.Path]::GetTempPath()) "baseline-shallow-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $shallow) { Remove-Item -Recurse -Force -LiteralPath $shallow }
 $src     = ($dir8 -replace '\\', '/')
 $cloned  = Invoke-Native -FilePath 'git' -Arguments @('clone', '-q', '--depth', '1', "file:///$src", $shallow)

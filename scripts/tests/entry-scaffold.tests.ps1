@@ -190,7 +190,7 @@ Write-Host "the round trip (new-branch writes what the gate refuses)" -Foregroun
 # THE ASSERT THIS SUITE EXISTS FOR. Both scripts read the wording from the lib, so they cannot disagree
 # -- but "cannot" is a claim about code, and this measures it by running the real writer and handing its
 # output to the real matcher. If someone reintroduces a literal in either place, this goes red.
-$fixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-scaffold-test-$PID"
+$fixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-scaffold-test-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $fixture) { Remove-Item -Recurse -Force -LiteralPath $fixture }
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\task') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\lib') -Force | Out-Null
@@ -1686,7 +1686,7 @@ Assert-True ($bfp.ContribFolderFile.EndsWith('contributing-davekjohn/development
 # beside the pair holding its real work. A resolver keyed on Test-Path would hand that branch the empty
 # document and call its entry missing. So the scenario below is the one that would have gone wrong:
 # both present, and the OLD one is the one that names this branch.
-$resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID"
+$resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $resolveFx) { Remove-Item -Recurse -Force -LiteralPath $resolveFx }
 New-Item -ItemType Directory -Path (Join-Path $resolveFx ($bfp.Directory -replace '/', '\')) -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $resolveFx 'dkj-policy\branch') -Force | Out-Null
@@ -2387,7 +2387,7 @@ Write-Host "Get-EntryLinkFindings -DestDirRel -- the base follows the CHANGELOG,
 # BOTH bases. The first draft used CONTRIBUTING.md, which sits at the root AND in the workflow folder here,
 # so the root case reported nothing and read as a broken repair rather than a badly chosen fixture. This
 # tree states exactly which file is where, and it does not move when the repo's layout does.
-$linkFixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-link-dest-$PID"
+$linkFixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-link-dest-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $linkFixture) { Remove-Item -Recurse -Force -LiteralPath $linkFixture }
 $folderRel = (Get-BranchFilePaths).Directory
 New-Item -ItemType Directory -Path (Join-Path $linkFixture $folderRel) -Force | Out-Null

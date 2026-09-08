@@ -61,7 +61,7 @@ function Assert-Equal {
 #             what the CLI does under Claude Code. TWO LINES, one with text and one EMPTY, because the
 #             empty one is where an ErrorRecord's ToString() stops agreeing with the line it carries --
 #             see Get-ShopifyLineText, and the case below that pins it
-$stubDir = Join-Path ([System.IO.Path]::GetTempPath()) "shopify-cli-tests-$PID"
+$stubDir = Join-Path ([System.IO.Path]::GetTempPath()) "shopify-cli-tests-$PID-$([guid]::NewGuid().ToString('n'))"
 New-Item -ItemType Directory -Path $stubDir -Force | Out-Null
 $stub = @'
 $mode = if ($args.Count -gt 1) { [string]$args[1] } else { 'plain' }

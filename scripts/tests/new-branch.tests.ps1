@@ -208,7 +208,7 @@ function New-Fixture {
         touch the own working copy.
     #>
     param([Parameter(Mandatory = $true)][string]$Label)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\task')    -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
@@ -254,7 +254,7 @@ function New-BareOrigin {
         [Parameter(Mandatory = $true)][string]$Dir,
         [Parameter(Mandatory = $true)][string]$Label
     )
-    $bare = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-origin.git")
+    $bare = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-origin-$([guid]::NewGuid().ToString('n')).git")
     if (Test-Path -LiteralPath $bare) { Remove-Item -Recurse -Force -LiteralPath $bare }
     $script:fixtures += $bare
     $prevEap = $ErrorActionPreference
@@ -313,7 +313,7 @@ function Add-OriginCommits {
         [Parameter(Mandatory = $true)][string]$Label,
         [Parameter(Mandatory = $true)][int]$Count
     )
-    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-other.git")
+    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-other-$([guid]::NewGuid().ToString('n')).git")
     if (Test-Path -LiteralPath $clone) { Remove-Item -Recurse -Force -LiteralPath $clone }
     $script:fixtures += $clone
     $prevEap = $ErrorActionPreference
@@ -355,7 +355,7 @@ function Add-OriginBranch {
         [Parameter(Mandatory = $true)][string]$Branch,
         [Parameter(Mandatory = $true)][string]$MarkerFile
     )
-    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-parked.git")
+    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-parked-$([guid]::NewGuid().ToString('n')).git")
     if (Test-Path -LiteralPath $clone) { Remove-Item -Recurse -Force -LiteralPath $clone }
     $script:fixtures += $clone
     $prevEap = $ErrorActionPreference
@@ -398,7 +398,7 @@ function Add-OriginBranchCommits {
         [Parameter(Mandatory = $true)][string]$Author,
         [Parameter(Mandatory = $true)][string]$Subject
     )
-    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-ahead.git")
+    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("new-branch-test-$PID-$Label-ahead-$([guid]::NewGuid().ToString('n')).git")
     if (Test-Path -LiteralPath $clone) { Remove-Item -Recurse -Force -LiteralPath $clone }
     $script:fixtures += $clone
     $prevEap = $ErrorActionPreference
@@ -1678,8 +1678,8 @@ Write-Output `$t.Type
     # with its own try/finally so a PATH/env mutation here cannot leak into any fixture above or below it.
     Write-Host "new-branch.ps1 -- -Resolves warns before the checkout when the target issue is already done (#1409)" -ForegroundColor Cyan
 
-    $xBin     = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-test-$PID-x-bin"
-    $xCallLog = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-test-$PID-x-calls.log"
+    $xBin     = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-test-$PID-x-bin-$([guid]::NewGuid().ToString('n'))"
+    $xCallLog = Join-Path ([System.IO.Path]::GetTempPath()) "new-branch-test-$PID-x-calls-$([guid]::NewGuid().ToString('n')).log"
     $prevPathX = $env:PATH
     try {
         New-Item -ItemType Directory -Path $xBin -Force | Out-Null

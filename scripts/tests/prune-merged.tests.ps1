@@ -145,7 +145,7 @@ function New-Fixture {
         fetch --prune have a real remote to succeed against with no auth or network.
     #>
     param([Parameter(Mandatory = $true)][string]$Label)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("prune-merged-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("prune-merged-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\task') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')  -Force | Out-Null

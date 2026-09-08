@@ -38,7 +38,7 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Hook     = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-shopify\hooks\shopify-floor-sessioncheck.ps1'
 # $PID in the fixture path: the test gate is a throttled PARALLEL scheduler, so two runs at one fixed
 # temp path tear down each other's tree mid-assert. Same reasoning as adopt-shopify-floor.tests.ps1.
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "shopify-floor-sessioncheck-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "shopify-floor-sessioncheck-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $script:pass = 0

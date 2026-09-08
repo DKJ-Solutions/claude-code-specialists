@@ -69,7 +69,7 @@ function Assert-True {
     }
 }
 
-$sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ("native-capture-tests-$PID")
+$sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ("native-capture-tests-$PID-$([guid]::NewGuid().ToString('n'))")
 if (Test-Path -LiteralPath $sandbox) { Remove-Item -Recurse -Force -LiteralPath $sandbox }
 New-Item -ItemType Directory -Path $sandbox -Force | Out-Null
 
@@ -595,11 +595,16 @@ Write-Host 'Every temp path the SHIPPING scripts compose carries a guid (#1659)'
 # the scan against its own composer. '# temp-path-exempt:' says so where a reader and a diff both see
 # it, and the count below is what stops a third appearing quietly.
 #
-# scripts/tests/ is out of scope: fixtures have their own rule (test-suite-gate.tests.ps1 requires $PID
-# or a guid) and it answers a DIFFERENT question -- two concurrent runs tearing down each other's tree,
-# not a hostile neighbour -- so it leaves the exposure standing there. Measured September 8, 2026: 108
-# predictable fixture paths across 66 files, 53 of them opening with a recursive delete at that path.
-# Pre-existing, larger than the half this scan closes, and filed as #1664 rather than swept in with it.
+# scripts/tests/ is out of scope because it is enforced NEXT DOOR, not because it is unenforced:
+# test-suite-gate.tests.ps1 requires a fresh guid in every fixture path, which is the same bar this scan
+# applies here. That was not true when this exclusion was written -- the fixture rule then accepted $PID
+# ALONE, on the ground that it answered a different question (two concurrent runs tearing down each
+# other's tree, not a hostile neighbour), and the measurement was 108 predictable fixture paths across 66
+# files with 53 recursive deletes among them. #1664 closed that: 96 sites rewritten, the rule tightened to
+# require the guid, and the exclusion is now a division of labour between two guards rather than the edge
+# of what is guarded. Do NOT read it as scope this scan should grow into -- a fixture composes its guid
+# inline rather than calling New-ScratchPath, for reasons #1664 measured, so extending this scan over
+# tests/ would report every one of them.
 # Built from fragments so this pattern does not itself read as one of the tokens it hunts -- see the
 # paragraph above about a guard's prose living inside the tree its sibling guard measures.
 $tempRootPattern = 'Get' + 'TempPath' + '|\$env:TEMP\b|\$env:TMP\b'
