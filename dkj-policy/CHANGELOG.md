@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**16 / 30 minor entries** <!-- pending-tally -->
+**16 / 31 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1617-ref-print-display-scope-reason · 20260908-140616
+
+`ref-print-lib.ps1` said git already closes the deceptive-character class for a ref name. It does not:
+`git check-ref-format` enforces `\p{Cc}` and accepts `\p{Cf}`, so U+202E, U+200D, U+200B and U+2066 are
+all legal in a branch name -- creatable, checkout-able, and returned verbatim by `git rev-parse`. Those
+first two are the exact code points #1446 was filed for. The guard itself was always right; only the
+sentence explaining it was wrong, and a reader who is told a class is closed cannot weigh a gap they
+have been told does not exist. All four claim sites now name the two Unicode classes exactly, carry the
+measurement, and say the display axis is left open knowingly. The suite moves the format characters
+into its reachable half, where git's acceptance is asserted as a premise rather than assumed away.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. Nothing a subscriber can observe changes -- no guard loosens or tightens, no printed line differs,
+and the four code points were refused on the paste axis before this branch and are refused after it.
+The correction is to the reasoning a maintainer reads in the lib and its suite.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct ref-print-lib's display-scope reasoning: git accepts format characters in a ref
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1624](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1624)
+
+---
 
 ### DEPLOY: fix/1612-relay-sanitise · 20260908-135612
 
