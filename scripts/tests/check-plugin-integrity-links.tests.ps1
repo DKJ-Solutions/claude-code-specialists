@@ -1053,6 +1053,101 @@ try {
     $q41b = Invoke-Integrity -FixtureRoot $Fixture
     Assert-True (-not ($q41b.Out -match $PluginLinkFindingPattern)) 'scenario 41: the fixture is clean again once the notes file is gone'
 
+    # --- Check 30, the truncation half: an absolute link holding only this repo's base (#1566) ------
+    #
+    # WHY THESE SIT HERE AND NOT IN A SUITE OF THEIR OWN. The rule is check 30's, and deliberately so:
+    # the shape it catches is check 30's OWN suggestion pasted without its tail. Sixteen such links were
+    # measured across four plugin pages on September 8, 2026, every one of them returning 200 -- GitHub
+    # answers '<base>/' with the repo front page -- so check 4 was right to stay silent and check 30 was
+    # skipping them along with every other absolute target.
+    #
+    # THE SEAM IS THE VERDICT HERE, WHICH IS NEW FOR THIS CHECK, and 41t1 pins the honest gap that
+    # creates: scenario 36 above proves a missing repo-config costs only the SUGGESTION, while below it
+    # costs this half entirely. That has to be asserted rather than assumed, because a check that goes
+    # quiet without saying so is the failure class this suite exists for -- hence the coverage assert
+    # beside the absence one, on the sentence that admits it.
+    $plTruncBase = 'https://github.com/Fixture-Owner/fixture-repo'
+    $p41tLines = @(
+        '# dkj-team-alpha notes'
+        ''
+        "Read [the install page]($plTruncBase/blob/main/) before you start."
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p41tLines -join "`n") + "`n"), $Utf8NoBom)
+
+    Write-Host "check 30 -- without the seam the truncation half does not run, and SAYS so" -ForegroundColor Cyan
+    $q41t1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q41t1.Out -match $PluginLinkFindingPattern)) 'scenario 41t: with no repo-config there is no base to compare against, so a truncated link is not reported'
+    Assert-True ($q41t1.Out -match 'The truncation half did NOT run') 'scenario 41t: and the coverage line admits the gap instead of reporting a clean sweep'
+
+    # From here on the fixture HAS a base -- deliberately a different owner/name than this repo's, so a
+    # rule that hardcoded 'DKJ-Solutions/claude-code-specialists' would pass 41t2 and fail 41t4.
+    $plTruncCfg = Join-Path $Fixture 'scripts\repo-config.ps1'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $plTruncCfg) -Force | Out-Null
+    [System.IO.File]::WriteAllText($plTruncCfg,
+        "function Get-RepoBlobUrl { return '$plTruncBase/blob/main/' }`n", $Utf8NoBom)
+
+    Write-Host "check 30 -- with the seam, a base-only absolute link is a finding at the right line" -ForegroundColor Cyan
+    $q41t2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($q41t2.Out -match $PluginLinkFindingPattern) 'scenario 41t: a link holding nothing but the repo base is reported'
+    Assert-True ($q41t2.Out -match 'NOTES\.md:3 ') 'scenario 41t: the finding names the line the link is on'
+    Assert-True ($q41t2.Out -match 'resolves to the repository FRONT PAGE') 'scenario 41t: the message says what the reader actually lands on, which is why no dead-link check can see it'
+    Assert-True ($q41t2.Out -match '1 of them carry that base and nothing after it') 'scenario 41t: and the coverage line counts it'
+
+    Write-Host "check 30 -- every spelling of the bare base counts, and a fence still hides one" -ForegroundColor Cyan
+    # The four live shapes are one rule, not four: blob and tree (the suggestion swaps them for a
+    # directory target), with and without the trailing slash, and the anchor-only form -- '<base>/#x' is
+    # the front page with the whole path still missing, which is the shape that looks most like a
+    # working link. The fenced fifth proves the branch sits inside the same masked scan as the rest of
+    # the check rather than reading the raw text.
+    $p41t3Lines = @(
+        '# dkj-team-alpha notes'
+        ''
+        "A [tree form]($plTruncBase/tree/main/) points at the root too."
+        ''
+        "So does [no trailing slash]($plTruncBase/blob/main)."
+        ''
+        "And [anchor only]($plTruncBase/blob/main/#the-seam-specified), which looks most like a real link."
+        ''
+        '```'
+        "An [illustration]($plTruncBase/blob/main/) inside a fence is not a link."
+        '```'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p41t3Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q41t3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 3 ([regex]::Matches($q41t3.Out, $PluginLinkFindingPattern).Count) 'scenario 41t: blob, tree, slashless and anchor-only all count as the bare base -- and the fenced fifth is masked'
+    Assert-True ($q41t3.Out -match '3 of them carry that base') 'scenario 41t: the coverage count agrees with the findings'
+
+    Write-Host "check 30 -- the rule stays narrow: a real path passes, another repo's root passes" -ForegroundColor Cyan
+    # Absolute links are correctly out of this check's scope. The finding is not "an absolute link" but
+    # "this repo's base with the author's own target dropped", and both halves of that have to hold: a
+    # base WITH a path is the repair the check asks for, and a bare root belonging to some other
+    # repository is somebody else's front page, which may well be exactly what the text names.
+    #
+    # THE FOURTH LINE PINS THE NAMED COST, not an accident: same repo NAME, previous OWNER. It passes,
+    # and it is asserted so that widening the rule to reach it has to be a deliberate edit to this
+    # scenario rather than a silent change of behaviour. The reasoning for leaving it -- recognising a
+    # retired owner path would bless a spelling the repo-citation rule is retiring -- is above the check.
+    $p41t4Lines = @(
+        '# dkj-team-alpha notes'
+        ''
+        "The repair is [the install page]($plTruncBase/blob/main/INSTALL.md#staying-up-to-date)."
+        ''
+        'And [another project](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/) is its own front page.'
+        ''
+        'So is [a bare host](https://github.com/).'
+        ''
+        'And [the previous owner of this same repo](https://github.com/Previous-Owner/fixture-repo/blob/main/) is out of reach by design.'
+    )
+    [System.IO.File]::WriteAllText($plNotes, (($p41t4Lines -join "`n") + "`n"), $Utf8NoBom)
+    $q41t4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q41t4.Out -match $PluginLinkFindingPattern)) 'scenario 41t: a base plus a real path, another repo bare root, a bare host and this repo under a PREVIOUS owner are all passed over'
+    Assert-True ($q41t4.Out -match '0 of them carry that base') 'scenario 41t: and the coverage line reports zero rather than going silent'
+
+    Remove-Item -LiteralPath $plTruncCfg -Force
+    Remove-Item -LiteralPath $plNotes -Force
+    $q41t5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($q41t5.Out -match $PluginLinkFindingPattern)) 'scenario 41t: the fixture is clean again once the notes file and the seam are gone'
+
     # === check 32: a mirror table's rows against the shared-scripts registry ============================
     # 42-49. WHY THESE SIT BESIDE CHECKS 10 AND 29 (issue #1491): the third opt-in span in this file, and
     #        since this branch all three run the SAME walk -- Invoke-MarkedSpanWalk. The marker mechanics
