@@ -90,11 +90,35 @@
         first two statements, so the inherited values are overwritten before any of its code runs.
         A future check that does not set them is the one case a caller has to think about.
 
-    WHAT IS DELIBERATELY NOT DONE HERE: stderr is not merged in. A '-File' child's stderr never
-    reached these callers either (it went to the hook's own stderr), and merging it would put lines
-    the check never meant as findings in front of the hooks' [ERROR] filter. In-process, a
-    terminating error surfaces as an exception instead, which every one of these hooks already wraps
-    in a try/catch that reports the check as skipped.
+    STDERR IS NOT MERGED BY DEFAULT, AND -MergeAllStreams IS THE OPT-IN (issue #1641). A '-File'
+    child's stderr never reached the SESSION-CHECK callers either -- it went to the hook's own stderr
+    -- and merging it for them would put lines the check never meant as findings in front of their
+    [ERROR] filter. In-process, a terminating error surfaces as an exception instead, which every one
+    of those hooks wraps in a try/catch that reports the check as skipped.
+
+    THAT REASON IS ABOUT A FILTER, AND ONE CALLER HAS NONE. cycle-autopark is a Stop hook that relays
+    whatever park-cycle says, verbatim -- it has no [ERROR] filter for a stray line to get in front
+    of, and its child was ALREADY captured with '2>&1' on purpose (#1600): a refused push is this
+    workflow's earliest signal that a second session is on the same branch, and the sentence naming
+    that is written through Write-Error. So the default's reason does not apply to it, which is what
+    makes this a switch rather than a second function: everything else here -- the hashtable splat,
+    the newline split, the $LASTEXITCODE reset, the return shape -- is identical, and all three traps
+    above fail SILENTLY, so a second copy is exactly the drift this lib exists to prevent.
+
+    IT MERGES EVERY STREAM ('*>&1'), NOT ONLY STDERR, and the widening is deliberate: the point of
+    that capture is that no future line of the callee's can be lost to the stream it happened to
+    choose. Order across streams is preserved, which is why this is one redirect and not several
+    buckets read afterwards.
+
+    PARTIAL OUTPUT, AND WHY -OutputTo EXISTS (also #1641). A child process had already PRINTED its
+    early lines before it died; in-process, a check that throws halfway leaves the caller with no
+    return value at all, so those lines are gone. For the six session checks that is the right answer
+    -- a crashed check should not have half its output forwarded past their [ERROR] filter -- and it
+    is why this function still lets the exception propagate rather than swallowing it. For a caller
+    that RELAYS, the lines a check managed to write before falling over are the diagnosis. -OutputTo
+    hands such a caller a list that is appended to as the lines stream past, readable from its own
+    catch. Nothing changes for a caller that omits it, and the throw contract above is untouched
+    either way.
 
     NOT A REPLACEMENT FOR Invoke-NativeCapture. That lib bounds a child process with a timeout,
     which is the right tool when the callee may HANG -- a hook's try/catch cannot save it from a
@@ -130,24 +154,58 @@ function Invoke-CheckScript {
     .PARAMETER Arguments
         The check's parameters as a HASHTABLE, splatted by name. Never an array: see trap 1 in this
         file's header. Omit for a check that takes none.
+
+    .PARAMETER MergeAllStreams
+        Capture EVERY stream the callee writes to -- error, warning, verbose and debug alongside
+        Write-Host and the pipeline -- instead of Write-Host and the pipeline alone. For a caller that
+        relays its callee verbatim rather than filtering it; see the header for why the default runs
+        the other way and which caller needs this.
+
+    .PARAMETER OutputTo
+        A list this function appends each captured line to AS IT IS PRODUCED, so a caller can still
+        read what the check managed to say when the check then THROWS -- at which point there is no
+        return value to read. Optional, and nothing changes for a caller that omits it: the returned
+        Output holds the same lines. See "PARTIAL OUTPUT" in this file's header.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [hashtable]$Arguments = @{}
+        [hashtable]$Arguments = @{},
+        [switch]$MergeAllStreams,
+        [System.Collections.Generic.List[string]]$OutputTo = $null
     )
 
     # Reset, so "the check returned without an exit statement" reads as 0 rather than as whatever the
     # last native call in this hook left behind. See the header.
     $global:LASTEXITCODE = 0
 
-    # 6>&1 captures Write-Host (trap 2); the split makes one multi-line record into the several lines
-    # the spawn produced (trap 3); @Arguments splats a hashtable by name (trap 1).
-    $lines = @(& $Path @Arguments 6>&1 |
-        ForEach-Object { [string]$_ } |
-        ForEach-Object { $_ -split "`r?`n" })
+    # TWO STATEMENTS, NOT '$collected = if (...) { $OutputTo } else { ... }'. A block's output goes
+    # through the pipeline, which UNROLLS a collection -- and an empty List unrolls to nothing, so that
+    # spelling assigns $null and every Add() below fails on a null reference. Silent in the shape that
+    # matters: the check still runs, and the caller gets an empty report. Measured while writing this.
+    $collected = $OutputTo
+    if ($null -eq $collected) { $collected = New-Object System.Collections.Generic.List[string] }
+
+    # 6>&1 captures Write-Host (trap 2); *>&1 additionally captures error, warning, verbose and debug
+    # for a caller that relays rather than filters. The split makes one multi-line record into the
+    # several lines the spawn produced (trap 3); @Arguments splats a hashtable by name (trap 1).
+    #
+    # TWO REDIRECTS, NOT ONE COMPOSED AT RUNTIME: a redirection operator is parsed, so it cannot come
+    # from a variable, and the alternative -- building the call as a string for Invoke-Expression --
+    # would hand this lib's own callee path to the parser. Two literal pipelines is the cheap answer.
+    #
+    # APPENDED INSIDE THE PIPELINE, not assigned from it, which is what makes $OutputTo work at all: a
+    # throw halfway leaves an ASSIGNMENT unmade -- the variable is never set and every line already
+    # produced is gone -- while lines added as they stream past are already in the list. Measured both
+    # ways: 0 lines recovered from the assignment, 2 from the list, on a check that printed twice and
+    # then threw.
+    if ($MergeAllStreams) {
+        & $Path @Arguments *>&1 | ForEach-Object { foreach ($l in ([string]$_ -split "`r?`n")) { $collected.Add($l) } }
+    } else {
+        & $Path @Arguments 6>&1 | ForEach-Object { foreach ($l in ([string]$_ -split "`r?`n")) { $collected.Add($l) } }
+    }
 
     return @{
-        Output   = $lines
+        Output   = @($collected)
         ExitCode = [int]$LASTEXITCODE
     }
 }
