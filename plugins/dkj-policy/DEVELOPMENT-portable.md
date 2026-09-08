@@ -125,8 +125,10 @@ mechanism rather than inside it.
 **A phase with nothing under it is not a finding**: a branch that had nothing to test says so by leaving
 that heading bare, exactly as a branch with no step list at all is permitted.
 
-**Two shape rules, and only one of them is checked in your repo.** `check-branch-entry.ps1` refuses a
-document whose region between the title and the first `###` carries anything but the guidance block — that
+**Two shape rules, and only one of them is checked in your repo.** `open-pr.ps1` **refuses** a
+document whose region between the title and the first `###` carries anything but the guidance block —
+before the push, since source-repo issue #1650; `check-branch-entry.ps1` **reports** the same finding in
+CI, from the same function, because that gate names things rather than blocking them — that
 one holds **everywhere**, because it reads the shape rather than the text: guidance is blockquoted
 whatever language it has been translated into, so a `>`-less paragraph there is this branch's own content
 sitting where every branch document is identical. The **heading count** is refused only in the repo that

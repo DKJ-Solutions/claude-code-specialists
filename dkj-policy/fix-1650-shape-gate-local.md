@@ -68,6 +68,11 @@ whether there are strays without calling), and moving the decision out to the ca
 composition -- which quotes the phase names and the level it read -- in two places, which is the drift the
 lib exists to prevent.
 
+**Measured rather than assumed** (Nolan, on the review of this branch): **1.35 ms per call** over 200
+iterations, and `check-branch-entry.ps1` end to end is **~1.0 s on both sides**, indistinguishable within
+noise. In the other direction the same movement collapsed three `ReadAllText` calls on one file into one,
+so `open-pr`'s file I/O is slightly *cheaper* than before.
+
 ### CREATE
 
 - [x] `Get-DevelopmentShapeFindings` in `scripts/lib/entry-scaffold-lib.ps1` -- both rules, verbatim from
@@ -103,6 +108,13 @@ lib exists to prevent.
       preserved CI's behaviour, since every #898/#899/#915/#924/#908 scenario runs against the lib now.
 - [x] `entry-scaffold.tests.ps1` green: 784 asserts.
 - [x] The lint gate green: 0 errors, 344 links and 230 scripts.
+- [x] Four reviewers on the diff in parallel, and three of them found something that got built:
+      Sebastian's control-character strip, Victor's two stale counts plus the branch document's own wrong
+      record of where the gate sits, and Edith's seven-document sweep -- including the one that mattered
+      most, the **guidance block in every branch document** still telling its reader *"no gate reads this
+      region"* over a gate that now refuses on it. Nolan's measurement took ~215 B of narrative back off
+      the always-on path; `CLAUDE.md` is +481 B against `main` rather than +696 B, and the story it used to
+      carry is in the two path-scoped pages that already told it.
 - [x] Full suite via `open-pr.ps1`'s own test gate.
 
 ### DEPLOY: fix/1650-shape-gate-local

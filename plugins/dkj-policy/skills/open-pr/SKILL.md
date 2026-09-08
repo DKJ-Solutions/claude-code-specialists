@@ -62,15 +62,19 @@ The script:
    the same file it runs the **shape gate**: the document *around* the entry must still hold its form — its
    phase headings present, and nothing branch-specific in the generic block above the first one. See
    [The shape gate](#the-shape-gate-does-the-document-around-the-entry-still-hold-its-form) below.
-   It also runs the **impact gate** and prints the reach and significance it read. See
+   Then the **step-list gate**: the branch's own plan must be finished. See
+   [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
+   Then the **impact gate**, which prints the reach and significance it read. See
    [The impact gate](#the-impact-gate-how-far-does-this-change-reach-and-how-much-does-it-weigh) below.
    And the **link gate**: a relative link in the entry must resolve from the **repo root**, because that
    is where the entry's text lands. See
    [The link gate](#the-link-gate-do-the-entrys-links-survive-the-fold) below.
-   Then the **step-list gate**: the branch's own plan must be finished. See
-   [The step-list gate](#the-step-list-gate-is-the-branchs-own-plan-finished) below.
-   And the **label gate**: the label this PR would be given has to exist in your repository. See
+   And last the **label gate**: the label this PR would be given has to exist in your repository. See
    [The label gate](#the-label-gate-does-the-label-your-seam-names-still-exist) below.
+   **This list is the order they actually run in, and it is not the whole set** — the run also carries an
+   entry gate, a backing gate and a title gate, each of which refuses and none of which has a section on
+   this page yet. Their refusals name themselves, so a message you meet here and cannot find above is one
+   of those three rather than something undocumented in the script.
 4. **Commits your development document**, if it differs from `HEAD` — that one file and nothing else.
    See [The document commit](#the-document-commit-what-the-pr-says-is-what-the-branch-carries) below.
 5. Runs the **repo's own lint gate** (via `Get-LintScript` from `repo-config`) and then **all

@@ -62,7 +62,7 @@ So the script's output is an **agenda**, not a verdict. It ends by printing exac
 
 #1380 recorded two greps as proportionate, and both shipped. The report **echoes** them by calling the
 same two functions rather than rebuilding either -- one definition each, the way `check-branch-entry`
-calls `open-pr`'s own two:
+calls `open-pr`'s own:
 
 | check | what it reads | its caller |
 |---|---|---|

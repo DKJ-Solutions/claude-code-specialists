@@ -27,8 +27,8 @@ A branch is never entry-less: creating one writes the two files it works in — 
 list — and the branch cannot reach a PR until both are answered. The entry declares **how far the change
 reaches** (a tier) and **what it weighs** for each audience (a score), and that pair decides where it lands
 in `CHANGELOG.md` and which release documents it appears in. The merge folds the entry into the changelog;
-a release empties the changelog into dated notes and moves a tag. Four gates hold the whole thing together,
-and none of them is advisory.
+a release empties the changelog into dated notes and moves a tag. The local gates on the branch dossier
+hold the whole thing together, and none of them is advisory.
 
 **The cycle itself is written out in [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md), beside this
 file.** That is the page to read — and the page to point your own contributors at — because it names the
