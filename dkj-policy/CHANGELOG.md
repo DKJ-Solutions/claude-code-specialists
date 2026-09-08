@@ -43,7 +43,36 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**10 / 18 minor entries** <!-- pending-tally -->
+**11 / 19 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1585-unfolded-entry-stale-checkout · 20260908-104546
+
+The skipped-fold check no longer reports a landed fold as a missing one. A checkout that is merely
+behind `origin/<trunk>` now gets a `[WARN]` naming the gap and `git pull --ff-only`, instead of an
+`[ERROR]` pointing at a fold that would refuse on that same stale trunk; where a fold really is owed the
+report is unchanged, and now also says to pull first. The extra question costs no network and is asked
+only at a non-zero gap, so CI and an offline session both behave exactly as before.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer's session start stops raising a red `[ERROR]` for the ordinary state of being a few commits
+behind, and the one line it prints instead is the command that fixes it. That noise was
+indistinguishable from the real skipped-fold state the check exists to catch, which is what made it
+worth repairing rather than tolerating.
+
+**Score:** 3
+
+#### Pull Request
+
+Tell a stale checkout apart from a skipped fold in check-unfolded-entry
+
+Plugins: dkj-policy
+
+[PR #1603](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1603)
+
+---
 
 ### DEPLOY: feat/plugin-version-overview · 20260908-102335
 

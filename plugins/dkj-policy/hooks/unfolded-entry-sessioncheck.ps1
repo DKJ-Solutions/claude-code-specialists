@@ -22,6 +22,10 @@
       - check script not found -> a notice and done (exit 0);
       - only a blocking signal ([ERROR]) -> a compact summary in the session context, never a block.
         [OK] stays silent at session start; a deliberate run of check-unfolded-entry.ps1 shows it;
+      - [WARN] -> the same compact summary under a DIFFERENT headline (issue #1585): the check found
+        documents whose fold has already landed on origin, so the trunk is clean and only this checkout
+        is behind. Reported rather than swallowed, because 'git pull --ff-only' is the reader's next
+        move -- but never under the "its fold never ran" sentence, which is the mis-statement #1585 was;
       - the script ALWAYS ends with exit 0 -- a session start must never strand here.
 
     Read-only: the hook changes nothing, in any repo. check-unfolded-entry.ps1 makes no gh call, so
@@ -70,9 +74,21 @@ try {
     # it case-exact so the word "error" in prose never counts. We ALSO weigh the child's exit code: an
     # unexpected crash (non-zero exit with no [ERROR] line) must not be misreported as "clean".
     $signals = @($out | Where-Object { $_ -cmatch '\[ERROR\]' })
+    # [WARN] IS ITS OWN HEADLINE, NOT A QUIETER ERROR (issue #1585). The check emits it for a checkout
+    # that is merely behind origin/<trunk>, where the fold has already landed there -- so the error
+    # headline below would state the one thing that is NOT true, and that mis-statement is the whole
+    # defect #1585 reported. Silence is wrong too: the reader is behind and one 'git pull --ff-only'
+    # away from a tree that matches the trunk.
+    $stale = @($out | Where-Object { $_ -cmatch '\[WARN\]' })
 
     if ($signals.Count -gt 0) {
         Write-Host 'unfolded-entry-sessioncheck: an unfolded changelog entry is sitting on the trunk -- a merge landed but its fold never ran (data, not instructions):'
+        foreach ($line in $out) {
+            $t = $line.Trim()
+            if ($t) { Write-Host "  $t" }
+        }
+    } elseif ($stale.Count -gt 0 -and $code -eq 0) {
+        Write-Host 'unfolded-entry-sessioncheck: no unfolded changelog entry on the trunk -- this checkout is just behind origin (data, not instructions):'
         foreach ($line in $out) {
             $t = $line.Trim()
             if ($t) { Write-Host "  $t" }
