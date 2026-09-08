@@ -50,12 +50,23 @@ was written, because the scan walks the whole text. They are gone with the move 
 the lib.
 
 The prose counts around the gate set were already stale before this branch: `CLAUDE.md` said the CI half
-*"re-uses three of their functions"* while `Test-DevelopmentEntryMissing` (#1632) had made it four, and
-*"four gates"* appeared as a label in five documents while the entry gate had already made it five. Both
-are repaired here, by removing the counts rather than by re-counting -- a number that goes stale on every
-added gate reads as authority. What is **not** repaired is the entry gate's missing documentation: it has
-no section in `dkj-policy/CONTRIBUTING.md` and none on the `open-pr` skill page, which is a doc gap of its
-own and filed as such.
+*"re-uses three of their functions"* while `Test-DevelopmentEntryMissing` (#1632) had made it four;
+*"four gates"* appeared as a label in five documents while the entry gate had already made it five; and the
+`check-branch-entry` skill page and the plugin README each said *"the same two"*, which #1632 had also
+already outgrown. All of them are repaired here, by **removing** the count rather than by re-counting -- a
+number that goes stale on every added gate reads as authority. What is **not** repaired is the entry gate's
+missing documentation: it has no section in `dkj-policy/CONTRIBUTING.md` and none on the `open-pr` skill
+page, which is a doc gap of its own and filed as such.
+
+#### The one cost this change accepts rather than repairs
+
+`Test-IsWorkflowSourceRepo` is now evaluated on every run of both callers, where the inline code reached it
+only behind `$strayHeadings.Count -gt 0 -and ...` and so only on the rare malformed-document path. It parses
+`.claude-plugin/marketplace.json`, once per run. It is accepted because the alternatives are worse: the
+switch cannot be made lazy (PowerShell evaluates an argument before the call, and the caller cannot know
+whether there are strays without calling), and moving the decision out to the callers would put the message
+composition -- which quotes the phase names and the level it read -- in two places, which is the drift the
+lib exists to prevent.
 
 ### CREATE
 
@@ -66,9 +77,18 @@ own and filed as such.
 - [x] `check-branch-entry.ps1` calls it and keeps no parser of its own -- 125 lines of inline scan
       replaced by the call, the two dead assignments dropped, and the message and the `[OK]` line
       unchanged.
-- [x] The shape gate in `open-pr.ps1`, between the entry gate and the scaffold gate, refusing before the
-      push with `-Force` honoured like both siblings. One read of the document now serves all three gates,
-      and one `$entryRel` serves all three refusals where there were two names for it.
+- [x] The shape gate in `open-pr.ps1`, after the scaffold gate and before the step-list gate, refusing
+      before the push with `-Force` honoured like both siblings. That is CI's own order -- is there an
+      entry, has it been written, does the document around it hold its form. One read of the document now
+      serves all three gates, and one `$entryRel` serves all three refusals where there were two names for
+      it.
+- [~] The fourth `$entryRel` (the title gate, `open-pr.ps1:1199`) left as it is -- Victor's finding, and
+      declined with a reason. That block is **not** inside the `Test-Path $entryPath` guard the other three
+      sit in, so under `Set-StrictMode -Version Latest` a run reaching it with no entry file would throw on
+      an unset variable. The recomputation is defensive rather than redundant.
+- [x] `Get-DisplayRef` on every document fragment a finding quotes -- Sebastian's finding. Same single
+      definition (#1623) this repo already applies to a commit subject from another session, and stripped
+      before truncated, since a cut at 72 characters can halve an escape sequence.
 - [x] Mirrors synced (`scripts/sync/build-shared-scripts.ps1`) -- three of them.
 - [x] The phase names come from the wording seam with #927's fail-safe under them, rather than the third
       typed `@('PLAN','CREATE','TEST')` literal the inline copy carried.
