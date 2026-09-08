@@ -19,12 +19,21 @@ one the harness has already started to run the hook.
 The pattern is real and was in every hook it named that exists. Two corrections, both measured before
 anything was changed:
 
-- **Six hooks, not seven.** `claude-home-sessioncheck.ps1` is not in this tree —
-  [#1609](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1609) is still open, so the
-  seventh instance it credits has not landed. The six are `connector`, `git-identity`,
-  `script-contract`, `unfolded-entry`, `consumer-prose` and `roster`.
-  `shopify-floor-sessioncheck.ps1` is a seventh session check and is **not** a subject: it has no check
-  script and spawns nothing.
+- **Seven hooks — six when this branch opened, and the seventh arrived mid-branch.**
+  `claude-home-sessioncheck.ps1` was not in the tree at the start: 
+  [#1609](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1609) was still open, so the
+  count was six and this document said so. **#1609 then merged as [#1640] while this branch was
+  waiting on CI**, and the staleness guard that refused the merge is what surfaced it — bringing the
+  branch forward brought the seventh hook in with the pattern intact. It is converted here, so the
+  report's own list of seven is satisfied in full rather than six-sevenths of the way.
+
+  The seven are `connector`, `git-identity`, `script-contract`, `unfolded-entry`, `consumer-prose`,
+  `roster` and `claude-home`. `shopify-floor-sessioncheck.ps1` is an eighth session check and is
+  **not** a subject: it has no check script and spawns nothing.
+
+  **Worth keeping for the next reader:** a report's count can be right about a tree that does not
+  exist yet. "Not in this tree" was a correct measurement and a wrong conclusion within four hours,
+  and nothing in the branch would have caught it — the guard that did is the one watching `main`.
 - **"The obvious fix is not a one-liner" is right about dot-sourcing and wrong about the fix.** `exit`
   inside a **dot-sourced** script does terminate the hook, and so does one inside a script **block**
   invoked with `&`. Neither is what this needed: a `.ps1` **file** invoked with `&` gets its own scope,
@@ -76,6 +85,9 @@ and `compact`.
   missing the file reports itself as a skipped check instead of failing at load with nothing said. That
   path was walked for real: the connector hook got the call before it got the dot-source, and it said so
   in one line rather than going quiet.
+- [x] `claude-home-sessioncheck.ps1` — the seventh, converted after it arrived on `main` mid-branch
+  (#1640). Same shape as the other six; its `-HomeOverride` is the argument an array splat would have
+  silently dropped.
 - [x] `plugins/dkj-policy/scripts/README.md` — the mirror row and the destination table, both of which
   the lint gate's check 32 refuses to let go stale.
 
@@ -140,8 +152,8 @@ reaching an `exit` leaves whatever the previous native call put there. It is res
 ### DEPLOY: fix/1625-hook-in-process-check
 
 Every SessionStart check hook in this family spawned a second `powershell.exe` to run its own check
-script, on top of the interpreter the harness had already started for the hook. All six now run their
-check **in that same interpreter**, through one shared `Invoke-CheckScript`
+script, on top of the interpreter the harness had already started for the hook. All **seven** now run
+their check **in that same interpreter**, through one shared `Invoke-CheckScript`
 ([`hook-check-lib.ps1`](../scripts/lib/hook-check-lib.ps1), mirrored into `dkj-policy` and
 `dkj-team-alpha`). That is **~305–443 ms** of wall-clock off every session start, resume, clear and
 compact — bounded below by the slowest hook's own improvement (2161 ms → 1856 ms) and above by six
@@ -151,7 +163,9 @@ The figure is smaller than [#1625](https://github.com/DKJ-Solutions/claude-code-
 filed, and deliberately so: it assumed the hooks run sequentially and named settling that as the thing to
 do first. They run in parallel — *"Claude Code runs all matching hooks in parallel"* — so the ~875 ms
 sum was never on the critical path. It is also not one spawn's 219 ms, because six simultaneous process
-creations contend rather than each costing what one costs.
+creations contend rather than each costing what one costs. (The measurements are of the six that existed
+when they were taken; the seventh arrived mid-branch and was not re-measured, which is why the range is
+quoted unchanged rather than widened on an estimate.)
 
 **Score:** 3
 
