@@ -62,11 +62,26 @@ try {
     # every session start, in every consumer, for output that is filtered out again, is the clearest
     # possible case of cost without benefit. A deliberate run of check-script-contract.ps1 still does the
     # full check, which is where those findings are read.
-    $checkArgs = @('-SkipReachability')
-    if ($ConsumerPathOverride) { $checkArgs += @('-ConsumerPathOverride', $ConsumerPathOverride) }
+    # The in-process check runner (issue #1625). Dot-sourced HERE rather than at the top of this try,
+    # BELOW the "check script not found" guard above: that guard has its own message, and a lib missing
+    # from the payload must not be what answers a question about the CHECK script. $PSScriptRoot-relative,
+    # so it resolves the same in the source tree, in the plugin mirror and in a consumer's plugin cache --
+    # lib and hook travel in one payload. Unguarded, and inside this try: a payload missing it reports
+    # itself as a skipped check rather than failing at load with nothing said.
+    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
 
-    $out = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $checkScript @checkArgs)
-    $code = $LASTEXITCODE
+    # A HASHTABLE, NEVER AN ARRAY. In-process an array splats POSITIONALLY, so '-SkipReachability'
+    # would bind to $ConsumerPathOverride -- the check's first positional parameter -- and the run
+    # would silently do the full reachability walk this hook exists to skip. See trap 1 in
+    # hook-check-lib.ps1's header.
+    $checkArgs = @{ SkipReachability = $true }
+    if ($ConsumerPathOverride) { $checkArgs['ConsumerPathOverride'] = $ConsumerPathOverride }
+
+    # In this interpreter, not a second one (issue #1625): the harness already paid one interpreter
+    # start-up to run this hook, and the check does not need another.
+    $result = Invoke-CheckScript -Path $checkScript -Arguments $checkArgs
+    $out  = @($result.Output)
+    $code = $result.ExitCode
 
     # Blocking signals reach the session context. [ERROR] is the script-contract token for a
     # repo-owned lib that lags the function contract a shared script calls at runtime (the exact
