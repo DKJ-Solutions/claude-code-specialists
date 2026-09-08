@@ -33,19 +33,121 @@
 
 ### PLAN
 
+#### The finding, verified before it was repaired
+
+Issue [#1635](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1635) named
+`scripts/tests/worktree-lane.tests.ps1` and it stands exactly as reported: its `Invoke-Git` is the
+better of the two helper shapes in that directory -- it *returns* `@{ Code; Out }` -- and the fixture
+builder then piped every one of those verdicts to `Out-Null`.
+
+**Two things in the report needed correcting, and both changed the work.** First, the repair it proposes
+reusing is **not on `main`**: `sync-main.tests.ps1` still discards the exit code here, because #1622's
+fix sits on the parked branch `fix/1622-fixture-git-judged`, now PR
+[#1640](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1640). So this branch does **not**
+touch that file -- it belongs to that PR, and the two cannot conflict. Second, the report's own table is
+disclaimed as untrustworthy and is: its right-hand column counts any mention of `$LASTEXITCODE` or
+`.Code` in a file, including asserts *about* the script under test. Measured per helper instead of per
+file, the sweep is wider than the table's nine rows and the priority order is different.
+
+#### What was measured, and the four shapes it found
+
+Every fixture-building git call under `scripts/tests/`, read by what its helper does with the exit code:
+
+- **Discarded outright** -- `remote-ahead-lib`, `gate-lib`, `prune-merged`, `machine-local-gate`,
+  `backing-gate` (a named helper piping to `Out-Null`); `park-commit`, `park-branch`, `park-cycle`,
+  `entry-scaffold`, `new-branch`, `fold-changelog`, `bootstrap-drift` (the inline
+  `& git ... 2>$null | Out-Null` idiom); `plugin-versions`, `connector-sessioncheck` (a `Git-X` that
+  returns the output and drops the verdict).
+- **Returned and then thrown away** -- `worktree-lane`, the report's own instance.
+- **Already judged, left alone** -- `publish-to-business` and `unfolded-entry-gate` both *throw* on a
+  non-zero exit.
+- **Not a subject** -- a git call that is a QUESTION rather than a mutation. Every read
+  (`rev-parse`, `log`, `status`, `diff-tree`, `for-each-ref`, `hash-object`, `ls-files`, `ls-remote`)
+  and every existence probe whose non-zero exit *is* the answer the case wanted.
+
+#### Why a shared lib rather than the same block fourteen times
+
+The repaired shape is about forty lines of judging, counting, printing and a summary. Pasted into
+fourteen suites it is a duplication finding on arrival, and a rule that lives in fourteen places drifts.
+So the rule has one source and each suite keeps its own helper signature and its own EAP handling --
+which is what made the pass a substitution rather than fourteen redesigns.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/fixture-git-lib.ps1` -- the rule in one place: `Assert-FixtureGitOk` (judge one
+      call), `Invoke-FixtureGitJudged` (array form), `Invoke-FixtureGitIn` (the `& git -C $dir <rest>`
+      idiom), `Get-FixtureGitFailureCount` and `Write-FixtureGitSummary`. Workshop-only -- nothing under
+      `scripts/tests/` is mirrored into a plugin, so it is not in the shared-scripts registry.
+- [x] `Invoke-FixtureGitIn` takes **no `param()` block**, deliberately. An advanced function binds a
+      leading-dash argument to a parameter name, so `branch -D <name>` would resolve `-D` against a
+      `-Dir`-style parameter and silently change the command that runs. git's own flags include
+      `-C`, `-c`, `-D`, `-R`, `-q`, `-m` and `-b`; a simple function passes every one through verbatim.
+- [x] Fifteen suites converted: the twelve discarding outright, `worktree-lane`, plus the two `Git-X`
+      suites. Each dot-sources the lib, judges its fixture mutations, and fails the run on the count.
+- [x] The count does not throw. A suite that dies at the first hiccup reports less than one that runs on
+      and names what broke -- so the summary at the foot is what turns the count into an exit code,
+      **including on a run where every assert passed**.
+- [x] `sync-main.tests.ps1` untouched -- PR #1640's file.
 
 ### TEST
 
+- [x] `scripts/tests/fixture-git-lib.tests.ps1`, new: 15 asserts over real git commands, a succeeding
+      one and a failing one. The counter starts at zero, a working call is not counted, a failing call is
+      counted once and accumulates, the summary answers `$true` and does not reset, and a dashed flag
+      reaches git verbatim -- asserted on the argument vector the failure line reports, which is the only
+      place the resolved arguments are observable from outside. That suite runs no
+      `Write-FixtureGitSummary` gate at its own foot, and says why: it fails fixture commands on purpose.
+- [x] Every converted suite run individually, all green: `remote-ahead-lib` 43, `sync-rules` 152,
+      `park-commit` 28, `park-branch` 31, `park-cycle` 91, `entry-scaffold` 747, `new-branch` 255,
+      `backing-gate` 49, `machine-local-gate` 42, `prune-merged` 113, `gate-lib` 123,
+      `fold-changelog` 254, `bootstrap-drift` 205, `worktree-lane` 35, `fixture-git-lib` 15.
+- [x] **The new judging caught its first two cases on its first run, and they were the conversion's own
+      over-reach rather than fixture defects.** `park-cycle` reported 5 failures and `new-branch` 1, every
+      assert green -- exactly the shape #1635 predicted. All six were one `Test-RefOnRemote` per suite:
+      `rev-parse --verify --quiet` on a ref that is *expected* to be absent, judged by the very next line.
+      Both are back to a raw `& git` with the reason written at the call site, because counting a negative
+      case as a broken fixture would report every passing negative as a defect.
+- [x] Nine converted suites came out with mixed line endings, from a scripted insertion that wrote CRLF
+      into LF files. `.gitattributes` would have normalised them on checkin; they were normalised in the
+      working copy anyway, so what is committed is what was tested.
+- [x] `check-plugin-integrity.ps1`: 0 errors, 228 `.ps1` parsed, `[script-ascii]` green over the two new
+      files.
+- [~] No separate pre-run of the full test gate: `open-pr.ps1` runs it and refuses to push on a failing
+      suite, so a copy set going ahead of it proves nothing that gate would not have caught.
+
 ### DEPLOY: fix/1635-fixture-git-judged-siblings
 
-**Score:**
+A test fixture's own git commands are now judged in every suite that builds one. The standing idiom was
+`& git -C $dir init -q 2>$null | Out-Null` inside a lowered `$ErrorActionPreference` -- and lowering the
+preference is right and stays, because git writes ordinary progress to stderr and under `EAP=Stop` that
+is a terminating error before any exit code is read. What was wrong is that the **exit code went with
+it**: a git command that failed was indistinguishable from one that worked. That matters more in a
+fixture than in production code, where a failed git usually goes on to fail visibly: a fixture that
+ignores one produces a repo that is *plausible* -- it exists, it has a HEAD, it just does not hold what
+the case assumed -- and every assert below it then measures the wrong thing, attributing the failure to
+the script under test. Thirty concurrent lanes over one temp tree make a transient `index.lock` sharing
+violation ordinary rather than rare, so the shape to expect is a suite that is red under the gate, green
+alone, and silent about why.
+
+`scripts/lib/fixture-git-lib.ps1` now holds that rule once -- judge, print git's own output, count, and
+fail the run on the count **even when every assert passed**, because a clean sweep over a repo that was
+never built proves less than it appears to. Fifteen suites route through it; each keeps its own helper
+signature, so the pass was a substitution rather than fifteen redesigns. Reads and existence probes are
+deliberately not subjects, and the two that were converted by mistake are back to a raw `& git` with the
+reason at the call site. `sync-main.tests.ps1` is untouched: its own repair is PR #1640.
+
+**Score:** 3
+
+A red gate now names the broken fixture instead of the script that was fine, which is the difference
+between reading a failure and spending a 190s run reproducing one that may not reproduce. Noticed the
+moment it fires and invisible until then, so not higher.
 
 #### What makes this deploy extra special
 
-**Score:**
+Nothing -- this is the source repo's own test suites, which no consumer runs and no release ships. The
+lib is workshop-only by design: nothing under `scripts/tests/` is mirrored into a plugin.
+
+**Score:** N/A
 
 #### Pull Request
 

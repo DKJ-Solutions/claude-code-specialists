@@ -24,6 +24,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot        = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $LibSrc          = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $NewBranchSrc = Join-Path $RepoRoot 'scripts\task\new-branch.ps1'
 $BranchInfoSrc   = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
@@ -202,15 +206,15 @@ Copy-Item -LiteralPath $RefPrintLibSrc    -Destination (Join-Path $fixture 'scri
 $prevEap = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'
-    & git -C $fixture init -q 2>$null | Out-Null
-    & git -C $fixture config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
-    & git -C $fixture config user.name 'Tycho Tests' 2>$null | Out-Null
+    Invoke-FixtureGitIn $fixture init -q
+    Invoke-FixtureGitIn $fixture config user.email 'tycho-tests@local.invalid'
+    Invoke-FixtureGitIn $fixture config user.name 'Tycho Tests'
     # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-    & git -C $fixture config commit.gpgsign false 2>$null | Out-Null
-    & git -C $fixture symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
+    Invoke-FixtureGitIn $fixture config commit.gpgsign false
+    Invoke-FixtureGitIn $fixture symbolic-ref HEAD refs/heads/main
     [System.IO.File]::WriteAllText((Join-Path $fixture 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
-    & git -C $fixture add -A 2>$null | Out-Null
-    & git -C $fixture commit -q -m 'init' 2>$null | Out-Null
+    Invoke-FixtureGitIn $fixture add -A
+    Invoke-FixtureGitIn $fixture commit -q -m 'init'
     # new-branch makes the branch ITSELF since the two scripts merged (August 7, 2026) -- the fixture no
     # longer checks one out first. CLAUDE_PROJECT_DIR is what the shared scripts read for their repo root
     # (the dual-context contract), and it is set for the child only rather than for this runner.
@@ -2809,8 +2813,15 @@ Assert-True ($tallyCutSrc -match '(?s)Convert-ChangelogForRelease -Content \$cha
     'tally: and the cut resets it on the emptied document, so no released changelog carries a stale count'
 
 Write-Host ""
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'entry-scaffold-lib.ps1'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

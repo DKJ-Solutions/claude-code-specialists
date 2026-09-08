@@ -27,6 +27,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $LibPath  = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 
 $script:pass = 0
@@ -66,13 +70,13 @@ function New-Fixture {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $dir init -q 2>$null | Out-Null
-        & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
-        & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir init -q
+        Invoke-FixtureGitIn $dir config user.email 'tycho-tests@local.invalid'
+        Invoke-FixtureGitIn $dir config user.name 'Tycho Tests'
         # Pinned LOCALLY rather than inherited: on a machine with core.autocrlf=true every `git add`
         # here writes the "LF will be replaced by CRLF" notice to stderr, which is fixture noise in a
         # suite that decides nothing about line endings. Same choice as gate-lib.tests.ps1.
-        & git -C $dir config core.autocrlf false 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir config core.autocrlf false
         # AND commit.gpgsign, FOR THE SAME REASON ONE STEP FURTHER (issue #1323). Inherited, it is not
         # noise but a hard failure: on a machine with signing forced on, every commit in this suite
         # needs the signing agent to answer, and when it does not `git commit` fails -- 12 of 28 asserts
@@ -89,11 +93,11 @@ function New-Fixture {
         # should keep signing; here it is not a question -- Invoke-GitParkCommit commits the user's real
         # work on their real branch under their own identity, so pinning signing off inside it would be
         # wrong. The fixture is the layer that owns this, exactly as #1287 concluded.
-        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
-        & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir config commit.gpgsign false
+        Invoke-FixtureGitIn $dir symbolic-ref HEAD refs/heads/main
         Set-Content -LiteralPath (Join-Path $dir 'README.md') -Value '# fixture' -Encoding utf8
-        & git -C $dir add -A 2>$null | Out-Null
-        & git -C $dir commit -q -m 'init' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir add -A
+        Invoke-FixtureGitIn $dir commit -q -m 'init'
     } finally { $ErrorActionPreference = $prevEap }
 
     $script:fixtures += $dir
@@ -159,7 +163,7 @@ Write-Doc -Dir $d3 -Rel $rel3 -Text "## Development: fix/y-v1`n"
 Write-Doc -Dir $d3 -Rel 'src/staged.txt'   -Text "staged`n"
 Write-Doc -Dir $d3 -Rel 'src/untracked.txt' -Text "untracked`n"
 $prevEap = $ErrorActionPreference
-try { $ErrorActionPreference = 'Continue'; & git -C $d3 add -- 'src/staged.txt' 2>$null | Out-Null }
+try { $ErrorActionPreference = 'Continue'; Invoke-FixtureGitIn $d3 add -- 'src/staged.txt' }
 finally { $ErrorActionPreference = $prevEap }
 
 $r3 = Invoke-GitParkCommit -RepoRoot $d3 -Branch 'fix/y-v1' -Scope 'BranchFiles' -Paths @($rel3)
@@ -244,5 +248,12 @@ foreach ($f in $script:fixtures) {
 
 Write-Host ""
 Write-Host "Summary: $script:pass passed, $script:fail failed." -ForegroundColor $(if ($script:fail -gt 0) { 'Red' } else { 'Green' })
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'park-lib.ps1 (Invoke-GitParkCommit)'
 if ($script:fail -gt 0) { exit 1 }
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
+    exit 1
+}
 exit 0

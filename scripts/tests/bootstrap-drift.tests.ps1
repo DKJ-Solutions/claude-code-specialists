@@ -19,6 +19,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $Bootstrap  = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\skills\specialists-init\bootstrap.ps1'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 $Integrity  = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
@@ -494,7 +498,7 @@ try {
     $FixtureIgn = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-ign-$PID"
     if (Test-Path -LiteralPath $FixtureIgn) { Remove-Item -Recurse -Force -LiteralPath $FixtureIgn }
     New-Item -ItemType Directory -Path (Join-Path $FixtureIgn '.claude') -Force | Out-Null
-    & git -C $FixtureIgn init --quiet 2>$null | Out-Null
+    Invoke-FixtureGitIn $FixtureIgn init --quiet
     [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.gitignore'), ".claude/settings.json`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.claude\settings.json'),
         '{ "enabledPlugins": { "dkj-team-alpha@claude-code-specialists": true }, "env": { "SOME_TOKEN": "x" } }', $Utf8NoBom)
@@ -613,8 +617,8 @@ try {
         if (Test-Path -LiteralPath $gitFix) { Remove-Item -Recurse -Force -LiteralPath $gitFix }
         New-Item -ItemType Directory -Path $gitFix -Force | Out-Null
         try {
-            & git -C $gitFix init -q 2>$null | Out-Null
-            if ($OriginUrl) { & git -C $gitFix remote add origin $OriginUrl 2>$null | Out-Null }
+            Invoke-FixtureGitIn $gitFix init -q
+            if ($OriginUrl) { Invoke-FixtureGitIn $gitFix remote add origin $OriginUrl }
             # The workflow plugin has to be enabled here: RepoName lives in that half of the scaffold since
             # August 8, 2026, so without it there is no line for the derivation to land in and every case
             # below would pass or fail for the wrong reason.
@@ -841,8 +845,15 @@ finally {
 }
 
 Write-Host ""
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'bootstrap.ps1'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green
