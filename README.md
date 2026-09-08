@@ -788,9 +788,9 @@ bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
 theme, the reading copy of the release notes, laying the repo's law-bearing documents out in rank order
 so a session can read them against each other, reaping the local branches a merge left behind, telling
-whether this checkout's installed plugin version matches the marketplace clone, pricing
-what a skill costs the sessions that carry it, and giving a branch its own worktree so another one can
-ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-dkj-policy-bwj`<!-- /skills:all --> are the
+whether this checkout's installed plugin matches the marketplace clone and which command closes any
+gap, pricing what a skill costs the sessions that carry it, and giving a branch its own worktree so
+another one can ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-dkj-policy-bwj`<!-- /skills:all --> are the
 deliberate exceptions: a checklist with no script of its own (see below); a skill that must not have
 one — `orchestrator` reads a persona file into the conversation, and the environment it exists for is
 precisely the one where `powershell` is absent; and the two `dkj-policy-bwj` procedures, which run over

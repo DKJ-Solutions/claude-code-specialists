@@ -75,6 +75,17 @@ That is what makes the update a step of its own rather than something a merge do
 reason this section sits in the folder index instead of only in the plugin's own
 [README](../plugins/dkj-policy/README.md).
 
+**First, whether an update is even due in this checkout.** The
+[`plugin-versions`](../plugins/dkj-policy/skills/plugin-versions/SKILL.md) skill — run
+`scripts/task/plugin-versions.ps1` from a checkout of this repo, or invoke the skill by name — prints,
+per enabled plugin, the version and commit *this* checkout installed against the version and HEAD of
+the local marketplace clone, with a per-plugin verdict — up to date, update this plugin, or refresh
+the marketplace clone — and the exact command for each. It compares the installed and clone
+**commits**, so it surfaces a lag the `version` string cannot show between two releases. It does
+**not** lift the limit stated
+below: it reads the marketplace clone this checkout already has and cannot tell you whether that clone
+itself trails `origin`. Read-only, no arguments, runs on any machine.
+
 Two commands, from the root of the checkout you want to move, once per plugin:
 
 ```powershell

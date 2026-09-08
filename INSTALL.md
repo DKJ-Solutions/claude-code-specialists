@@ -192,6 +192,15 @@ claude plugin marketplace update claude-code-specialists
 claude plugin update dkj-team-alpha@claude-code-specialists --scope project
 ```
 
+**Before running them, check whether you are behind at all.** Once `dkj-policy` is installed, the
+`plugin-versions` skill answers that per device — one read-only run, no arguments, on any machine. It
+prints, per enabled plugin, the version and commit this checkout installed against the marketplace
+clone's version and HEAD, then a per-plugin verdict — up to date, update this plugin, or refresh the
+clone — with the command for each. It supersedes the hand-run `installed_plugins.json` query for the
+*"am I current?"* question. That query keeps the one job the skill cannot do — telling you the install
+happened at all — because the skill ships inside the plugin and is silent when the plugin is what is
+missing.
+
 Same scope flag, same reason. **The version number is not the code** — the clone these commands read
 tracks `main`, not the tag, so your `gitCommitSha` is the truth about your session and your `version`
 only tells you which release notes to read. A new *skill* needs a session restart before it appears;
@@ -1054,6 +1063,11 @@ clone these commands read tracks `main`, not the tag.
 claude plugin marketplace update claude-code-specialists          # 1. refresh the marketplace cache
 claude plugin update dkj-team-alpha@claude-code-specialists --scope project   # 2. then update, per plugin
 ```
+
+The `plugin-versions` skill (shipped by `dkj-policy`) packages the installed-vs-clone comparison this
+section describes into one read-only run, with a per-plugin verdict on which command — if any — closes
+the gap. It reads the marketplace clone you already have, so it is a *staying-current* check, not a
+substitute for the install verification above.
 
 **Keep line 1 in the procedure — and here is exactly what each command was measured to do, because
 the two differ and an earlier version of this page generalised them.**

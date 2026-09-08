@@ -219,6 +219,13 @@ started before it. If you also run the ministry, the same pair updates it, with 
 place of `dkj-policy`: it is separately published and separately installed, so updating this plugin
 leaves it exactly where it was.
 
+**`plugin-versions` tells you, per machine, whether the pair is even due.** This plugin ships it as a
+skill (`plugin-versions`): one read-only run in the consuming checkout prints, per enabled plugin, the
+version and commit that checkout installed against the marketplace clone's version and HEAD, with a
+per-plugin verdict — up to date, update this plugin, or refresh the clone — and the command for each.
+It reads the clone that checkout already holds, so it cannot see whether the clone itself trails
+`origin`; between two releases nothing can.
+
 **Both things those commands touch are per-machine state, and that is the whole reason this section
 exists.** The marketplace is a cached git clone under `~/.claude/plugins/marketplaces/`, and the install
 record is a per-machine file keyed on the **folder path** of the checkout the install was run in. So a

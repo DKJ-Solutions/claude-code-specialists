@@ -49,8 +49,10 @@ Two facts make the reading trustworthy:
   loaded -- `version`, short `gitCommitSha`, and `scope` (`project` / `local` / `user`).
 - **The marketplace clone advances only on `claude plugin marketplace update <marketplace>`** -- not on
   a push and not on a merge. So the clone's per-plugin `plugin.json` `version` is **cut-granular** and
-  its git **HEAD sha** is the finer truth. Between two releases no version string can tell you the clone
-  is behind origin; the sha can.
+  its git **HEAD sha** is the finer truth. Between two releases the `version` string cannot move, so it
+  cannot show your install lagging the clone; the HEAD sha still can, and that is what the verdict
+  compares. Whether the clone itself trails `origin` is a further gap this skill does not close -- it
+  reads the clone as it stands.
 
 ## The output
 
