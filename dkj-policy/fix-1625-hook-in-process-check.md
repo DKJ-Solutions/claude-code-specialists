@@ -79,6 +79,12 @@ and `compact`.
 - [x] `plugins/dkj-policy/scripts/README.md` — the mirror row and the destination table, both of which
   the lint gate's check 32 refuses to let go stale.
 
+- [x] The lesson itself is recorded where a FUTURE cost measurement will meet it, not only in this
+  lib: Nolan #25's portable manual gains **"a cost paid N times is not N times the cost"** — establish
+  concurrency before multiplying, do not collapse a parallel batch to one either, and name rather
+  than quote a run that cannot resolve its own effect. Portable rather than lens, per
+  [`CLAUDE.md`](../CLAUDE.md): the arithmetic is about any runner, not about this repo.
+
 #### A lib rather than four lines copied six times
 
 Three traps, and every one of them fails **silently** — a wrong answer, not a crash — so a drifted
