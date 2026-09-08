@@ -2856,6 +2856,95 @@ $missingPrSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\rele
 Assert-True ($missingPrSrc -match '(?s)Test-DevelopmentEntryMissing.*?Get-EntryScaffoldFindings') `
     'entry-missing: and so does open-pr, ahead of its own scaffold gate -- the local half of the same refusal'
 
+
+# --- Get-DevelopmentShapeFindings: the shape rules, and the caller that now refuses on them (#1650) ---
+# WHAT THIS BLOCK EXISTS FOR, and it is not the rules themselves. Both were written on August 26, 2026 and
+# branch-entry-gate.tests.ps1 has end-to-end scenarios for each; what nothing asserted was WHERE they run.
+# They were inline in check-branch-entry.ps1 -- CI only, advisory only -- so the four local gates all
+# passed PR #1644's document, each correctly on its own terms, and it shipped through push, the required
+# check, the merge and the fold. Then the fold DELETED the file the one red check names, which is what
+# makes an advisory red the wrong instrument here: a reader following it finds nothing to open.
+#
+# SO THE PROPERTY UNDER TEST IS THE SHARING, and the two halves of it fail independently: the rules must
+# still say the same thing (below), and BOTH callers must ask (the call sites at the end). The scoping
+# asymmetry is the third -- the arc is the source repo's rule and the preamble holds everywhere -- and it
+# is the half a later refactor is most likely to flatten, because it looks like an inconsistency.
+Write-Host ''
+Write-Host 'Get-DevelopmentShapeFindings (#1650)'
+
+# THE CASE THAT MUST NEVER REFUSE, from the real writer rather than a hand-built fixture: a change to the
+# document format shows up here instead of leaving this block asserting against a shape nothing produces.
+$shapeWhole = (Format-Development -Branch 'feat/shape') -join "`n"
+$shapeSound = Get-DevelopmentShapeFindings -Text $shapeWhole -EnforcePhaseArc
+Assert-Equal 0 @($shapeSound.Findings).Count 'shape: the document the scaffolder writes holds its shape in the source repo'
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text $shapeWhole).Findings).Count 'shape: and in a consumer, where only the preamble rule applies'
+Assert-Equal 4 $shapeSound.PhaseCount 'shape: it reads the four phases -- PLAN / CREATE / TEST / DEPLOY'
+
+# THE LEVELS ARE READ OFF THE DOCUMENT, and both numbers come back from the call that judged it. A caller
+# composing its own would drift on the next level shift, which is the one-day defect #924 recorded.
+Assert-Equal (('#' * (Get-BranchCycleSectionLevel))) $shapeSound.PhaseMark 'shape: PhaseMark is the level actually read, not a literal'
+Assert-Equal (('#' * ((Get-BranchCycleSectionLevel) + 1))) $shapeSound.SubMark 'shape: and SubMark is one under it -- the level a stray is demoted to'
+$shapeShallow = Get-DevelopmentShapeFindings -Text "# feat/x`n`n> guidance`n`n## PLAN`n`n## CREATE`n`n## TEST`n`n## DEPLOY: feat/x`n`nbody`n" -EnforcePhaseArc
+Assert-Equal 0 @($shapeShallow.Findings).Count 'shape: a document written one level shallower is judged by its own levels, not refused'
+Assert-Equal '##' $shapeShallow.PhaseMark 'shape: and reported at the level it was written at'
+
+# THE MEASURED CUT, reproduced the way the #1632 block above reproduces its own: truncated at the first
+# phase heading, a string that also occurs INSIDE the guidance blockquote, with the body glued on below.
+# That is PR #1644's document -- no phase headings left, DEPLOY intact, prose sitting in the guidance
+# region -- and it is reachable by any edit that anchors on that heading as a string.
+$shapeLines = @($shapeWhole -split '\r?\n')
+$shapePhase = ('#' * (Get-BranchCycleSectionLevel)) + ' ' + @((Get-BranchFileWording).StepPhases)[0]
+$shapeCut = 0
+for ($si = 0; $si -lt $shapeLines.Count; $si++) {
+    if ($shapeLines[$si] -match [regex]::Escape($shapePhase)) { $shapeCut = $si; break }
+}
+Assert-True ($shapeCut -gt 0) 'shape: (the phase heading really occurs inside the guidance block, which is what makes the cut reachable)'
+$shapeBroken = (($shapeLines[0..($shapeCut - 1)]) -join "`n") +
+    "`nIssue #1625: every SessionStart check hook spawns a second powershell.exe.`n`n" +
+    (('#' * (Get-BranchCycleSectionLevel)) + " DEPLOY: feat/shape`n`nThe hook runs in-process.`n`n**Score:** 2`n")
+$shapeBrokenFindings = @((Get-DevelopmentShapeFindings -Text $shapeBroken -EnforcePhaseArc).Findings)
+Assert-True ($shapeBrokenFindings.Count -gt 0) 'shape: PR #1644''s document is refused -- branch prose sitting in the guidance region'
+Assert-True (($shapeBrokenFindings -join "`n") -match 'above the first') 'shape: and the finding says where the content is, not merely that something is wrong'
+Assert-True (($shapeBrokenFindings -join "`n") -match 'Issue #1625') 'shape: naming the line, so the repair needs no hunting'
+Assert-True (@((Get-DevelopmentShapeFindings -Text $shapeBroken).Findings).Count -gt 0) 'shape: and a consumer is refused it too -- the preamble rule reads shape, not text'
+
+# THE GAP THIS CLOSES, asserted rather than described: the predicate beside it does NOT cover this
+# document. #1632 answers "the DEPLOY section is gone"; #1644's was intact, which is why every gate but
+# this one was green on it and why the two are separate functions.
+Assert-True (-not (Test-DevelopmentEntryMissing -Text $shapeBroken)) 'shape: the entry-missing predicate is silent on it -- its DEPLOY section survived the cut'
+
+# THE SCOPING. Same document, and the arc rule must fire ONLY where the caller says so: refusing a
+# consumer's own heading everywhere is the shape this repo declined once at 124 findings, all false.
+$shapeFifth = $shapeWhole -replace ('(?m)^' + [regex]::Escape($shapePhase)), (('#' * (Get-BranchCycleSectionLevel)) + " Where this stands`n`nParked.`n`n" + $shapePhase)
+$shapeFifthFindings = @((Get-DevelopmentShapeFindings -Text $shapeFifth -EnforcePhaseArc).Findings)
+Assert-True ($shapeFifthFindings.Count -gt 0) 'shape/#898: a fifth phase heading is refused in the source repo'
+Assert-True (($shapeFifthFindings -join "`n") -match 'Where this stands') 'shape/#898: and the finding names WHICH heading does not belong -- a count could not'
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text $shapeFifth).Findings).Count 'shape/#898: a consumer keeping a heading of their own is NOT refused -- heading-blindness is their guarantee'
+
+# FENCE-AWARE, like every reader of this format: a document explaining the arc quotes its own headings.
+$shapeFenced = $shapeWhole -replace ('(?m)^' + [regex]::Escape($shapePhase)), ("``````text`n" + $shapePhase + "`n``````" + "`n`n" + $shapePhase)
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text $shapeFenced -EnforcePhaseArc).Findings).Count 'shape: a phase heading quoted inside a fence is illustration, not a fifth phase'
+
+# AND EMPTY TEXT IS NOT A DEFECT, for the same reason it is not one for the predicate above.
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text '' -EnforcePhaseArc).Findings).Count 'shape: empty text raises nothing'
+
+# THE TWO CALL SITES, which is the half #1650 was actually filed about. CI must still ask -- it is the gate
+# for the branch that never ran open-pr -- and open-pr must ask and REFUSE, before the push.
+$shapeGateSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\lint\check-branch-entry.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($shapeGateSrc -match 'Get-DevelopmentShapeFindings -Text \$fileText -EnforcePhaseArc:\(Test-IsWorkflowSourceRepo') `
+    'shape: the CI gate asks the lib, and passes the source-repo answer as the switch'
+Assert-True ($shapeGateSrc -notmatch 'preambleStrays') `
+    'shape: and holds no second parser of its own -- the drift entry-scaffold-lib.ps1 exists to prevent'
+$shapePrSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\open-pr.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($shapePrSrc -match 'Get-DevelopmentShapeFindings -Text \$entryFileText -EnforcePhaseArc:\(Test-IsWorkflowSourceRepo') `
+    'shape: open-pr asks it too -- the local half that lands before the push'
+Assert-True ($shapePrSrc -match '(?s)Get-DevelopmentShapeFindings.*?shape gate:.*?exit 1') `
+    'shape: and REFUSES on it rather than warning -- an advisory red was the whole defect'
+Assert-True ($shapePrSrc -match '(?s)Get-DevelopmentShapeFindings.*?if \(\$Force\).*?Write-Warning "shape gate') `
+    'shape: with -Force honoured, matching both siblings above it'
+Assert-True ($shapePrSrc -match '(?s)Test-DevelopmentEntryMissing.*?Get-EntryScaffoldFindings.*?Get-DevelopmentShapeFindings') `
+    'shape: and it runs in CI''s order -- is there an entry, has it been written, does the document hold its form'
+
 Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

@@ -333,19 +333,26 @@ The constitution above, concretely implemented here:
   here was measured there. Moved off this always-on path on August 15, 2026, where it was 9,440 B over
   102 lines: 26% of this document, and the same shape as the release craft moved out the day before.
 
-- **Five more gates arrive with the workflow plugin**, and all of them read the branch's own document.
-  Four run locally: the **scaffold gate** refuses to push an entry still carrying the wording
-  `new-branch.ps1` wrote it with, the **step-list gate** refuses to push *and* to merge while
-  `dkj-policy/<branch>.md` has an unresolved step above its DEPLOY heading, the
+- **More gates arrive with the workflow plugin**, and all of them read the branch's own document. Most run
+  locally, before the push: the **scaffold gate** refuses to push an entry still carrying the wording
+  `new-branch.ps1` wrote it with, the **shape gate** refuses a document that has lost a phase heading or
+  carries branch content in the generic block above the first one, the **step-list gate** refuses to push
+  *and* to merge while `dkj-policy/<branch>.md` has an unresolved step above its DEPLOY heading, the
   **backing gate** refuses to push when that plan reads as finished while nothing is committed on the
   branch behind it and the work sits uncommitted in the working copy, and the
   **DEPLOY lock** refuses to merge once that section no longer matches what the PR published — it is fixed
-  at the moment the PR opens, because that is what the review approved and what the fold folds. The fifth
+  at the moment the PR opens, because that is what the review approved and what the fold folds. One more
   runs in **CI** (`.github/workflows/branch-entry.yml` → `check-branch-entry.ps1`) and exists because the
-  local four are escapable by not using the scripts; it re-uses three of their functions rather than
-  restating the convention, and it reports the significance instead of refusing on it. **The backing gate is
-  deliberately not among the three**: its subject is what sits uncommitted in a working copy, and a CI
-  runner checks out a commit, so there the measurement always reads zero. Their mechanics, escape valves and
+  local ones are escapable by not using the scripts; it re-uses their functions rather than restating the
+  convention, and it reports the significance instead of refusing on it. **The backing gate is deliberately
+  not among the re-used**: its subject is what sits uncommitted in a working copy, and a CI runner checks
+  out a commit, so there the measurement always reads zero. **And the shape gate was the mirror image of
+  that until September 8, 2026**
+  ([#1650](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650)) — it existed *only* in
+  that CI script, which reports rather than refuses, so PR #1644 shipped through push, the required check,
+  the merge and the fold with its first phase heading gone, and the fold then deleted the very file the one
+  red check named. **Neither count is stated here any more, deliberately**: both went stale as gates were
+  added, and a wrong number reads as authority. Their mechanics, escape valves and
   the measurements behind them are in
   [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md), under its PULL REQUEST step -- each gate
   sits at the point where it fires rather than in a list of its own.

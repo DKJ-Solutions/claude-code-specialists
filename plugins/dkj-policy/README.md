@@ -131,7 +131,7 @@ below changes for you, and nothing here asks you to run anything.
 | [`new-branch`](skills/new-branch/SKILL.md) | starting any piece of work — creates the branch and its `dkj-policy/<branch>.md` in one move |
 | [`park`](skills/park/SKILL.md) | handing an unfinished branch to another machine: push, no PR |
 | [`worktree-lane`](skills/worktree-lane/SKILL.md) | one branch has to be built while another one ships — opens a branch in its own worktree, and hands it back when it is ready to ship |
-| [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the four gates, pushes, opens the PR with the title and body composed from the entry |
+| [`open-pr`](skills/open-pr/SKILL.md) | the work is committed — runs the gates, pushes, opens the PR with the title and body composed from the entry |
 | [`ship-pr`](skills/ship-pr/SKILL.md) | open → wait for CI → merge → fold, in one motion |
 | [`fold-changelog`](skills/fold-changelog/SKILL.md) | the fold on its own, after a merge done by hand |
 | [`check-branch-entry`](skills/check-branch-entry/SKILL.md) | the CI gate on the branch dossier — the same two checks `open-pr` runs, where a hand-pushed branch cannot escape them |

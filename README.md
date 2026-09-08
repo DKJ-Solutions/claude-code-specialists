@@ -324,7 +324,7 @@ The full picture, top-level folder by folder:
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
   (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/dkj-teams/agent-shared/`), and the tests.
   [`scripts/README.md`](scripts/README.md) is the directory-by-directory map, with the entry points and
-  the four gates. A
+  the gates on the branch dossier. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `dkj-team-alpha`, the
   branch/release workflow in `dkj-policy` — see its own
   [README](plugins/dkj-policy/scripts/README.md).

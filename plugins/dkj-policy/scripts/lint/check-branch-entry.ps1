@@ -283,143 +283,31 @@ if ($scaffoldFindings.Count -gt 0) {
 
 Write-Host "[OK] '$entryRel' carries a written entry."
 
-# --- The document's SHAPE: four phases (#898) and a generic preamble (#899) ---------------------------
-# TWO RULES DAVE ENFORCED BY READING, on a document a session writes, with no signal in between. Both were
-# caught by eye on August 26, 2026, on the same document, within one afternoon -- and the second one had
-# been introduced by the session before, in the same position, which is what makes it a shape the document
-# invites rather than a slip.
+# --- The document's SHAPE: the phase arc (#898) and a generic preamble (#899) -------------------------
+# BOTH RULES ARE THE LIB'S, and since September 8, 2026 (issue #1650) that is what lets open-pr.ps1 refuse
+# them BEFORE the push. They were inline here, in the one gate of the five that runs only in CI and only
+# ADVISORILY -- so nothing stopped a document that had lost its first phase heading: PR #1644 went through
+# push, the required check, the merge and the fold with the shape rule red, and the fold then DELETED the
+# file this check names, leaving an advisory finding pointing at a path a reader cannot open. What runs
+# here is unchanged -- the same text, the same two rules, the same message.
 #
-# THEY ARE SCOPED DIFFERENTLY, AND THAT ASYMMETRY IS THE DESIGN rather than an inconsistency:
-#
-#   #898, the heading count, is the SOURCE REPO's rule. DEVELOPMENT-portable.md states heading-blindness
-#   as a FEATURE -- "the gate reads step marks only, so a heading of any level is invisible to it" -- and
-#   the reason it is a feature is that a consumer may keep headings of their own in a document they
-#   adopted. Refusing those everywhere would break correct files in somebody else's repo, which is the
-#   shape this house declined once already at 124 findings, all false. So it runs behind
-#   Test-IsWorkflowSourceRepo and this family is held to its own rule.
-#
-#   #899, the preamble, holds EVERYWHERE, because it reads the SHAPE and not the text. The region between
-#   the title and the first phase heading is the scaffolder's guidance, which is blockquoted whatever language it has
-#   been translated into -- so "a non-blank line that does not start with '>'" survives translation. A byte
-#   comparison against StepsGuidance could not: it carries a '{0}' seam the consumer answers themselves,
-#   and inbound #562 is the measured consumer who translated the block around it.
-#
-# WHY THE PREAMBLE ONE IS NOT MERELY TIDINESS. The measured paragraph sat flush under the guidance with no
-# heading between them, so it READ as guidance -- and guidance is generic by construction. A reader who
-# finds one branch's status inside it learns to distrust the whole region, including the rules that do
-# apply everywhere.
-#
-# NEITHER RE-DERIVES WHERE THE ENTRY BEGINS. Split-Development is the one splitter three readers
-# already share, and it is fence-aware because a document explaining this format quotes its own headings.
-# A second parser here is exactly the drift entry-scaffold-lib.ps1 exists to prevent.
-$shapeFindings = @()
-$cycleHalves = Split-Development -Text $fileText
-$headText = [string]$cycleHalves.Head
-
-# Fence tracking, so a quoted heading is illustration rather than a phase. Same rule check 4 of the lint gate
-# argues for links and check 28 for imports.
-#
-# THE LEVELS ARE READ OFF THE DOCUMENT, NOT PINNED, and a range would be wrong rather than merely loose
-# (August 26, 2026). Both levels shifted one down that day: the title went H1 -> H2 and the phases H2 -> H3.
-# So the new TITLE level and the old PHASE level are the same number, and a gate accepting '^#{2,3}' as a
-# phase would read a post-shift title as a fifth phase -- refusing a correct document, which is the one
-# failure mode this gate must not have. Reading the first heading as the title and the phases as exactly one
-# level under it needs no era flag and no list of levels to maintain: it is the invariant the format has
-# always had, and the one the suite already asserts as "the sections sit exactly one level under the title".
-$titleLevel = 0
-$inTitleProbe = $false
-foreach ($probeLine in [regex]::Split($fileText, '\r?\n')) {
-    if ($probeLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $inTitleProbe = -not $inTitleProbe; continue }
-    if ($inTitleProbe) { continue }
-    if ($probeLine -match '^(#{1,6})\s+\S') { $titleLevel = $Matches[1].Length; break }
-}
-# No heading at all: fall back to the written pair, so a malformed document is judged by today's shape
-# rather than skipping the check entirely.
-if ($titleLevel -le 0) { $titleLevel = Get-BranchCycleHeadingLevel }
-$phaseLevel = $titleLevel + 1
-$phaseRx    = '^#{' + $phaseLevel + '}\s+(\S.*)$'
-$titleRx    = '^#{1,' + $titleLevel + '}\s'
-# AND EVERY FINDING BELOW QUOTES THESE INSTEAD OF TYPING A LEVEL (#924, August 26, 2026). The reasoning is
-# already written out at the [OK] line further down -- "the level in this line is the one that was actually
-# READ, not a literal" -- and it held for that one line only. Six markers on the FAILURE path were typed,
-# so on the day the shape shifted one level down the gate refused a document for the new levels while
-# reporting the old ones: it told a reader to demote a '###' to a '###', and pointed at "the first '##'"
-# in a document whose phases are '###'. That is the worse way round of the two, because the failure
-# message is the one somebody reads while they cannot yet see what is wrong.
-$phaseMark = '#' * $phaseLevel
-$subMark   = '#' * ($phaseLevel + 1)
-
-$inShapeFence = $false
-$shapeLineNo = 0
-$topHeadings = @()
-$preambleStrays = @()
-$seenFirstTop = $false
-foreach ($shapeLine in [regex]::Split($fileText, '\r?\n')) {
-    $shapeLineNo++
-    if ($shapeLine -match '^\s{0,3}(?:`{3,}|~{3,})') { $inShapeFence = -not $inShapeFence; continue }
-    if ($inShapeFence) { continue }
-    if ($shapeLine -match $phaseRx) {
-        $seenFirstTop = $true
-        $topHeadings += [pscustomobject]@{ Line = $shapeLineNo; Text = $Matches[1].Trim() }
-        continue
-    }
-    if ($shapeLine -match $titleRx) { continue }
-    # The preamble region: everything after the title and before the first phase heading. Blank lines and blockquote
-    # lines are the guidance block; anything else is this branch's own content, sitting where the text is
-    # supposed to be identical in every branch document in every repo.
-    if (-not $seenFirstTop -and $shapeLine.Trim() -ne '' -and $shapeLine -notmatch '^\s*>') {
-        $preambleStrays += [pscustomobject]@{ Line = $shapeLineNo; Text = $shapeLine.Trim() }
-    }
-}
-
-# The arc is PLAN / CREATE / TEST / DEPLOY. Held only in the source repo -- see the block above.
-#
-# THE PHASES ARE NAMED, NOT COUNTED, and the first draft of this check got that wrong in a way worth
-# recording: it reported "everything past the fourth heading", which named '## DEPLOY' as the extra the
-# moment the stray sat ABOVE '## PLAN' -- which is exactly where both measured instances sat. A count
-# cannot say WHICH heading does not belong; only the names can. Read from Get-BranchFileWording, the
-# same source the scaffolder writes them from, so a repo that renames a phase is judged by its own names
-# rather than by three literals typed here.
-$knownPhases = @()
-if (Get-Command Get-BranchFileWording -ErrorAction SilentlyContinue) {
-    $knownPhases = @((Get-BranchFileWording).StepPhases | Where-Object { $_ })
-}
-if ($knownPhases.Count -eq 0) { $knownPhases = @('PLAN', 'CREATE', 'TEST') }
-
-# DEPLOY is matched on its PREFIX, because its heading carries the branch name (DEPLOY: feat/x).
-$strayHeadings = @($topHeadings | Where-Object {
-    ($knownPhases -notcontains $_.Text) -and ($_.Text -notmatch '^DEPLOY\b')
-})
-
-if ($strayHeadings.Count -gt 0 -and (Test-IsWorkflowSourceRepo -RepoRoot $repoRoot)) {
-    $shapeFindings += "carries $($topHeadings.Count) '$phaseMark' headings, and the arc is $($knownPhases -join ' / ') / DEPLOY -- four, never a fifth."
-    foreach ($h in $strayHeadings) {
-        $shapeFindings += "  extra heading, line $($h.Line): '$phaseMark $($h.Text)'"
-    }
-    $shapeFindings += "  Demote it to '$subMark' under whichever of the four it belongs to."
-}
-
-if ($preambleStrays.Count -gt 0) {
-    $shapeFindings += "carries branch content above the first '$phaseMark', where the block is generic guidance:"
-    foreach ($s in $preambleStrays) {
-        $trimmed = if ($s.Text.Length -gt 72) { $s.Text.Substring(0, 72) + '...' } else { $s.Text }
-        $shapeFindings += "  line $($s.Line): $trimmed"
-    }
-    $shapeFindings += '  That region is identical in every branch document in every repo, so a status note'
-    $shapeFindings += "  there reads as guidance. Move it under one of the '$phaseMark' phases, as a '$subMark'."
-}
+# THE ARC IS THE SOURCE REPO'S RULE AND THE PREAMBLE HOLDS EVERYWHERE, and the switch is passed from here
+# rather than read inside because this script has the repo root while the lib is handed a text.
+# Get-DevelopmentShapeFindings's own header carries the measurement behind each, and the asymmetry.
+$shape = Get-DevelopmentShapeFindings -Text $fileText -EnforcePhaseArc:(Test-IsWorkflowSourceRepo -RepoRoot $repoRoot)
+$shapeFindings = @($shape.Findings)
 
 if ($shapeFindings.Count -gt 0) {
     Write-Host "[ERROR] '$entryRel' $($shapeFindings[0])" -ForegroundColor Red
     foreach ($f in ($shapeFindings | Select-Object -Skip 1)) { Write-Host "        $f" -ForegroundColor Red }
     exit 1
 }
-# The level in this line is the one that was actually READ, not a literal: the checks above derive the phase
-# level from the document's own title, so a message naming '##' would have described the wrong shape for every
+# The level in this line is the one that was actually READ, not a literal: the lib derives the phase level
+# from the document's own title, so a message naming '##' would have described the wrong shape for every
 # document written after August 26, 2026 -- and a coverage line that misreports what it read is worse than
-# none, because it reads as confirmation. It quotes $phaseMark rather than composing a second time, which is
-# what made the findings above disagree with this line for one day.
-Write-Host "[OK] '$entryRel' keeps its shape: $($topHeadings.Count) '$phaseMark' heading(s), and nothing but guidance above the first."
+# none, because it reads as confirmation. Both numbers come back from the call that judged the document,
+# which is what kept the findings and this line agreeing after a day when each composed its own.
+Write-Host "[OK] '$entryRel' keeps its shape: $($shape.PhaseCount) '$($shape.PhaseMark)' heading(s), and nothing but guidance above the first."
 
 # --- The DEPLOY lock: is the section still what the PR published? ------------------------------------
 # Refused, not reported, which puts it with the checks above rather than with the significance below. The

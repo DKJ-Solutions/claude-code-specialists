@@ -105,7 +105,7 @@ scripts named below the table, which nothing in this table reaches at all.
 | [`task/check-policy-drift.ps1`](task/check-policy-drift.ps1) | lays out every document that legislates here — the plugins' portable pages against this repo's own prose — so the two can be read against each other; it decides nothing | `check-policy-drift` |
 | [`task/push-preview.ps1`](task/push-preview.ps1) | pushes the branch to its own **unpublished** preview theme, creating that theme on the first push rather than at branch creation | `push-preview` |
 | [`task/sync-main.ps1`](task/sync-main.ps1) | mirrors the live Shopify theme into the trunk without letting live overwrite the trunk's own work | `sync-main` |
-| [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
+| [`release/open-pr.ps1`](release/open-pr.ps1) | the gates on the branch dossier, the push and the PR; the body and title come from the entry | `open-pr` |
 | [`release/ship-pr.ps1`](release/ship-pr.ps1) | open → wait for CI → merge → fold, in one motion | `ship-pr` |
 | [`release/verify-resolved-issues.ps1`](release/verify-resolved-issues.ps1) | checks that a merged PR closed the issues it declared, and closes any it did not — `ship-pr.ps1` runs it as its own process after the merge | `ship-pr` |
 | [`release/verify-pushed-merges.ps1`](release/verify-pushed-merges.ps1) | resolves the pull requests a push to the trunk carried and runs the check above against each — the same step, off the merge instead of off the shipping session, since a queue merge is one no session sees | — (CI: `verify-resolved.yml`) |
