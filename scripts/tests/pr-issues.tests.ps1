@@ -1941,9 +1941,10 @@ Assert-True ($shipText -like '*git merge origin/main*') 'the remedy tells the op
 # and `git merge` were both there and both wrong on their own -- so an assert on `git checkout`
 # anywhere in the file would pass on a remedy that printed it last, or in a neighbouring message. The
 # three IndexOf reads pin the sequence inside one refusal, which is the fact that repairs it. Each
-# read is OFFSET from the one before it, so the two git lines are the remedy's own and not the
-# unrelated `git fetch origin main` refusal 30 lines higher -- the same offset-scoped technique
-# open-pr's refresh/append ordering asserts use above (#919).
+# read is OFFSET from the one before it, so the two git lines are the remedy's own and not step 3b's
+# unrelated single-line `'git fetch origin main' failed` refusal further up the same file -- the same
+# offset-scoped technique open-pr's refresh/append ordering asserts use above (#919). The two-space
+# indent does a second job here: that earlier refusal quotes the command, it does not lay it out.
 $idxCheckout = $shipText.IndexOf('  git checkout $branch')
 $idxFetchRem = if ($idxCheckout -ge 0) { $shipText.IndexOf('  git fetch origin main', $idxCheckout) } else { -1 }
 $idxMergeRem = if ($idxFetchRem -ge 0) { $shipText.IndexOf('  git merge origin/main', $idxFetchRem) } else { -1 }
