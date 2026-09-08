@@ -43,7 +43,34 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 16 minor entries** <!-- pending-tally -->
+**9 / 17 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1588-stale-ci-remedy-checkout · 20260908-100702
+
+`ship-pr`'s stale-CI refusal now tells you to check the branch out before bringing it forward. It printed
+`git fetch` and `git merge` alone, and by the time it fires the same run has already returned your tree to
+the trunk -- so both commands acted on `main`, silently: the merge fast-forwarded the trunk with a diffstat
+that reads exactly like the branch moving forward, the push was a no-op, and the branch was untouched. The
+cost was a full CI cycle and a re-run complaining about the wrong problem, twice in five days.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service notices. This is a refusal message inside the shipping tooling;
+its reader is whoever is merging a pull request.
+
+**Score:** N/A
+
+#### Pull Request
+
+ship-pr's stale-CI remedy names the branch to check out first
+
+Plugins: dkj-policy
+
+[PR #1596](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1596)
+
+---
 
 ### DEPLOY: fix/1584-ship-pr-conflicting-early-exit · 20260908-095109
 
