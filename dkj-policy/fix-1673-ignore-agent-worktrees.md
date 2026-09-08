@@ -81,6 +81,9 @@ and shed a third:
 - [x] Probe worktree removed; `git worktree list` back to the primary alone.
 - [x] Full lint gate + all suites via `open-pr.ps1 -GatesOnly`.
 - [x] Pure ASCII confirmed in all four changed `.ps1` files.
+- [x] Review round -- Victor #19, Sebastian #23, Edith #17 in parallel on the diff. Two independent
+      reviewers converged on the same blocking finding (the raw printed path); all three findings
+      folded in, and re-verified against a worktree registered at `.claude/worktrees/pro be; rm -rf x`.
 
 ### DEPLOY: fix/1673-ignore-agent-worktrees
 
@@ -97,6 +100,16 @@ accusing the **real** file and naming the worktree's copy as the legitimate clai
 reading that has no route back to the cause. The gate now reads `git worktree list --porcelain`
 through the new `Get-NestedWorktreePath` and reports the worktree first, saying in as many words that
 the duplicate findings below it are a consequence rather than real.
+
+The path that finding prints is guarded, which is not incidental: `git worktree add` is not held to
+`check-ref-format` the way a branch name is, so a registered path may carry spaces, shell
+metacharacters or format characters that make a printed line read as something other than what it
+says -- and the finding names the path twice, once as prose and once inside a remedy the reader is
+invited to run. This repo had already answered that shape at
+[#1637](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1637) and
+[#1638](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1638); the answer is reused
+rather than re-derived, so the command reads `<path>` when the real one is unsafe to paste and a note
+says why.
 
 Whether the gate should instead *work through* a nested worktree is left open deliberately and filed
 as [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678): it is ~20 walk sites
