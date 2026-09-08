@@ -75,10 +75,15 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
   on exactly this reasoning ran `git stash` and then `git checkout HEAD -- <file>` to settle the
   conflict it caused, and four uncommitted edits of the orchestrator's own — made after the branch's
   last commit, while the review ran — were gone with no error and no notice.
-- **So commit before you fan out, if you have anything uncommitted.** It is one command, it is what
-  makes the parallel chain safe rather than merely permitted, and it is the orchestrator's own move: a
-  boundary in eleven agent defs reduces the risk and cannot remove it, and nothing in the harness will
-  tell you afterwards that something was lost.
+- **So commit before you fan out, if you have anything uncommitted.** It is the orchestrator's own
+  move, and it is what makes the parallel chain safe rather than merely permitted: a boundary in the
+  agent defs reduces the risk and cannot remove it, and nothing in the harness will tell you afterwards
+  that something was lost. **It is not free, though, and pretending otherwise is how the advice gets
+  ignored**: in a repo that does not squash on merge, a mid-work commit made only so a review could run
+  is permanent history — and tidying several of them afterwards is a rebase or an amend, which is
+  precisely what a repo's own safety rules may gate behind the owner's word. Weigh that against what it
+  buys, prefer one commit over several, and where the repo forbids the tidy-up, say so rather than
+  reaching for the command.
 
 ## Picking up an inbound report — the six checks, in full
 

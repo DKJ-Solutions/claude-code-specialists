@@ -48,7 +48,7 @@ holding it — and it said `GENERATED, edit agent-shared/<name>.md`.
 
 **That path resolves in this repo and nowhere else.** This directory sits *outside* every plugin root,
 so it does not travel in the package: for a consumer the instruction pointed at a file they do not have.
-Inbound [#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) C2 reported it as a dead
+Inbound [#669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/669) C2 reported it as a dead
 pointer, which understates it — three lines below, in the same agent def, the `inbound-behaviour` block
 says *"You do not modify the shared core locally"* and names the issue route. The pointer told a reader
 to do what the paragraph it introduces forbids.
@@ -95,7 +95,7 @@ specialist joins a circle.
 
 It is the second-widest block, and the width was a decision rather than a default — the per-block rule
 above says so. Inbound
-[#668](https://github.com/DaveKJohn/claude-code-specialists/issues/668) offered the narrower option:
+[#668](https://github.com/DKJ-Solutions/claude-code-specialists/issues/668) offered the narrower option:
 insert it only into the specialists that *act* on file content, not the ones that merely locate it. That
 line was measured against the roster and does not hold. **All 26 agent defs carry `Read`, `Grep` and
 `Glob`**, and a specialist that greps a file and reports what it found has already relayed the content
@@ -116,7 +116,7 @@ has read.
 ### Why `lens-optional` has exactly the same 26 carriers
 
 Same scope, and for a reason that is the mirror image rather than a copy. Inbound
-[#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) C1 measured that **all four**
+[#669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/669) C1 measured that **all four**
 specialists put on that assessment hit the same friction first and independently: look for the repo lens,
 fail to find it, continue on the plugin source. Every agent def names its lens in its opening sentence,
 so every agent def could produce that hunt — the width follows the pointer, and the pointer is in all 26.
@@ -157,11 +157,20 @@ corrections, in opposite directions:
 - The report's table listed **five** reviewers holding `Bash` and named Marlowe #29 among them. He holds
   `Read, Grep, Glob, WebSearch, WebFetch, Skill` — no `Bash` — so a block placed on that table would
   have put the rule in a context that cannot break it and, worse, would have read as complete.
-- Four of the 11 carriers are not reviewers at all: the app developer, the test engineer, the systems
-  administrator and the refactoring specialist all hold `Bash` beside `Edit`/`Write`. A `git stash` from
-  a test run discards exactly the same three files as one from a review. Their legitimate editing is
-  what makes the distinction the block draws load-bearing rather than pedantic: **files in your scope,
-  through your own tools, yes; the tree, the index and `HEAD`, never.**
+- **Seven of the 11 carriers are not reviewers at all** — a majority, so "the reviewers" was not merely
+  an undercount but the wrong noun. The app developer, the test engineer, the systems administrator and
+  the refactoring specialist hold `Bash` beside `Edit`/`Write`, and so do all three of
+  `dkj-team-ecomm`'s specialists (SEO #26, CRO #27, performance/SEA #28), none of whom appears in any
+  review chain. A `git stash` from a test run or a pagespeed measurement discards exactly the same three
+  files as one from a review. Their legitimate editing is what makes the distinction the block draws
+  load-bearing rather than pedantic: **files in your scope, through your own tools, yes; the tree, the
+  index and any ref, never.**
+
+  This enumeration was itself wrong on its first draft — it said "four" and named only the
+  `dkj-team-alpha` half, which is the same miscount by craft that the bullet above corrects in the
+  original report. Recorded rather than quietly fixed, because it is evidence for the width decision
+  rather than an embarrassment: reasoning about this circle from the crafts one happens to have in mind
+  produced the wrong answer twice in one afternoon, and only `grep` over `tools:` got it right.
 
 **No persona carries it, and that is the mirror of the other two exclusions above rather than a copy.**
 The DevOps engineer and the release manager ship as personas and mutating the working copy *is* their
@@ -169,6 +178,19 @@ craft — a checkout, a merge, the fold's step onto the trunk. Giving them this 
 they exist to do. The personas are also not the exposure: this hazard is a **dispatched** subagent
 sharing one checkout with a session that is still editing in it, and the parallel review chain in Chris's
 lens (six specialists on one diff while the orchestrator keeps working) is precisely that arrangement.
+
+**And because this circle is a capability, a check can keep it — which is the half that makes it
+durable.** Every other block's circle is a craft judgement, and lint check 7 has never had an opinion
+about a sentinel pair that is *absent*: it compares the inside of a pair against its source. That is
+right for a craft block and wrong here, because "holds `Bash`" is decidable. So `working-copy-boundary`
+is the subject of **lint check 36**, which reads `Get-ToolRequiredSharedBlocks` in
+[`agent-shared-lib.ps1`](../../../scripts/lib/agent-shared-lib.ps1) — a `tool -> block` table — and
+reports any agent def that names the tool and carries no block. Without it the circle held only as long
+as somebody remembered: a specialist gaining `Bash` later, or one edited `tools:` line, would sit
+silently outside the boundary with every gate green — the same enforced-by-memory shape as the defect
+itself, arriving through the maintenance door. The reverse direction is deliberately not checked:
+carrying a block you are not obliged to is a decision somebody can make, carrying none you are is the
+defect. It was reported by the red-team pass on this branch, before the block had shipped.
 
 **Whether a reviewer should instead be dispatched into a worktree of its own** — removing the hazard
 mechanically rather than by instruction — is a separate decision, filed as
