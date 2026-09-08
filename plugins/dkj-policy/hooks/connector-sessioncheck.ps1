@@ -183,12 +183,6 @@ function Group-ConnectorSignals {
 }
 
 try {
-    # The in-process check runner (issue #1625). Dot-sourced $PSScriptRoot-relative, so it resolves
-    # the same in the source tree, in the plugin mirror and in a consumer's plugin cache -- lib and
-    # hook travel in one payload. Deliberately unguarded, and deliberately INSIDE this try: a payload
-    # missing it then reports itself as a skipped check rather than failing at load with nothing said.
-    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
-
     $cwd = (Get-Location).Path
 
     if ($WorkshopPathOverride) {
@@ -322,6 +316,18 @@ try {
         }
         exit 0
     }
+
+    # The in-process check runner (issue #1625). Dot-sourced HERE rather than at the top of this try,
+    # and that placement is the point: the version-engine branch above returns without ever calling
+    # Invoke-CheckScript, so a load-time dependency up there is one that path does not have -- and it
+    # would take out the three branches that answer "no source checkout on this machine" for a file
+    # none of them reads. Measured: doing exactly that turned three of connector-sessioncheck.tests'
+    # engine-branch cases into "skipped due to an error".
+    #
+    # $PSScriptRoot-relative, so it resolves the same in the source tree, in the plugin mirror and in a
+    # consumer's plugin cache -- lib and hook travel in one payload. Unguarded, and inside this try: a
+    # payload missing it reports itself as a skipped check rather than failing at load with nothing said.
+    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
 
     $checkScript = Join-Path $workshop 'scripts\sync\check-connectors.ps1'
 

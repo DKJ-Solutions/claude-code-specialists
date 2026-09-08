@@ -43,11 +43,6 @@ param(
 Set-StrictMode -Version Latest
 
 try {
-    # The in-process check runner (issue #1625). Dot-sourced $PSScriptRoot-relative, so it resolves
-    # the same in the source tree, in the plugin mirror and in a consumer's plugin cache -- lib and
-    # hook travel in one payload. Deliberately unguarded, and deliberately INSIDE this try: a payload
-    # missing it then reports itself as a skipped check rather than failing at load with nothing said.
-    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
     if ($CheckScriptOverride) {
         $checkScript = $CheckScriptOverride
     } elseif ($env:CLAUDE_PLUGIN_ROOT) {
@@ -67,6 +62,14 @@ try {
     # every session start, in every consumer, for output that is filtered out again, is the clearest
     # possible case of cost without benefit. A deliberate run of check-script-contract.ps1 still does the
     # full check, which is where those findings are read.
+    # The in-process check runner (issue #1625). Dot-sourced HERE rather than at the top of this try,
+    # BELOW the "check script not found" guard above: that guard has its own message, and a lib missing
+    # from the payload must not be what answers a question about the CHECK script. $PSScriptRoot-relative,
+    # so it resolves the same in the source tree, in the plugin mirror and in a consumer's plugin cache --
+    # lib and hook travel in one payload. Unguarded, and inside this try: a payload missing it reports
+    # itself as a skipped check rather than failing at load with nothing said.
+    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
+
     # A HASHTABLE, NEVER AN ARRAY. In-process an array splats POSITIONALLY, so '-SkipReachability'
     # would bind to $ConsumerPathOverride -- the check's first positional parameter -- and the run
     # would silently do the full reachability walk this hook exists to skip. See trap 1 in

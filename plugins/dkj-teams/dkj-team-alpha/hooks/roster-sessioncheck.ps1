@@ -69,11 +69,6 @@ param(
 Set-StrictMode -Version Latest
 
 try {
-    # The in-process check runner (issue #1625). Dot-sourced $PSScriptRoot-relative, so it resolves
-    # the same in the source tree, in the plugin mirror and in a consumer's plugin cache -- lib and
-    # hook travel in one payload. Deliberately unguarded, and deliberately INSIDE this try: a payload
-    # missing it then reports itself as a skipped check rather than failing at load with nothing said.
-    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
     if ($CheckScriptOverride) {
         $checkScript = $CheckScriptOverride
     } elseif ($env:CLAUDE_PLUGIN_ROOT) {
@@ -86,6 +81,14 @@ try {
         Write-Host 'roster-sessioncheck: roster-sync check script not found -- check skipped.'
         exit 0
     }
+
+    # The in-process check runner (issue #1625). Dot-sourced HERE rather than at the top of this try,
+    # BELOW the "check script not found" guard above: that guard has its own message, and a lib missing
+    # from the payload must not be what answers a question about the CHECK script. $PSScriptRoot-relative,
+    # so it resolves the same in the source tree, in the plugin mirror and in a consumer's plugin cache --
+    # lib and hook travel in one payload. Unguarded, and inside this try: a payload missing it reports
+    # itself as a skipped check rather than failing at load with nothing said.
+    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
 
     # A HASHTABLE, NEVER AN ARRAY. In-process an array splats POSITIONALLY, so '-ConsumerPathOverride'
     # would bind to the check's first positional parameter and the path itself would be dropped --
