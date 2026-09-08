@@ -36,7 +36,7 @@
 #### What #1620 is, and the reason verified before anything was written
 
 Step 2b hands the primary checkout back to the trunk the moment the PR exists (issue #1073), and the
-front-door check at `scripts/release/ship-pr.ps1:362` refuses a re-run with `You are on main; ship-pr
+front-door check at `scripts/release/ship-pr.ps1:393` refuses a re-run with `You are on main; ship-pr
 runs from a branch.` Both are in the tree as reported. So for the whole CI wait -- the longest step in
 the run -- the checkout stands on `main` while the branch's merge and fold are still owed, and a
 process that does not survive that wait prints **nothing**: no refusal, no remedy, no next line. The

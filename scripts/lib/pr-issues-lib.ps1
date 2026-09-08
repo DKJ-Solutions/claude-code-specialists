@@ -415,7 +415,7 @@ function Get-InterruptedShipResumeNote {
         [int]$MaxShown = 5
     )
 
-    $records = @(@($Candidates) | Where-Object { $_ })
+    $records = @($Candidates | Where-Object { $_ })
     if ($records.Count -eq 0) { return '' }
 
     $shown = @($records | Select-Object -First $MaxShown)

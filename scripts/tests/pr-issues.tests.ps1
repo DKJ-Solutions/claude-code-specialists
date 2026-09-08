@@ -2541,10 +2541,14 @@ Assert-True ($noteTwo -like '*git checkout feat/b*') 'and the second, because th
 
 # A REMEDY WHOSE FIRST LINE IS OFF THE SCREEN is the failure #1046 records for a warning printed at
 # depth, so the list is capped and says how many it did not print.
-$manyCands = @(1..7 | ForEach-Object { [pscustomobject]@{ Number = (1600 + $_); Branch = "fix/b$_"; Token = "fix/b$_"; Note = '' } })
+# THE FIXTURE IS BUILT NEWEST-FIRST, which is what Get-InterruptedShipCandidates hands this function --
+# this one does not re-sort, it takes the head of the list it was given. Built ascending, the assert
+# below would be checking the wrong end of it.
+$manyCands = @(7..1 | ForEach-Object { [pscustomobject]@{ Number = (1600 + $_); Branch = "fix/b$_"; Token = "fix/b$_"; Note = '' } })
 $noteMany = Get-InterruptedShipResumeNote -Candidates $manyCands -MaxShown 5
 Assert-True ($noteMany -like '*and 2 further open PR(s)*') 'over the cap, the note says how many candidates it did not list'
-Assert-True ($noteMany -notlike '*fix/b1 *') 'and the ones it dropped are the oldest, not the newest'
+Assert-True ($noteMany -like '*git checkout fix/b7*') 'the newest candidate is listed'
+Assert-True ($noteMany -notlike '*git checkout fix/b1*') 'and the ones it dropped are the tail of the list, not the head'
 
 # THE PASTE VERDICT IS THE CALLER'S (ref-print-lib, #1594), and this note prints whatever token it was
 # handed -- a head ref name is chosen by whoever opened the PR.

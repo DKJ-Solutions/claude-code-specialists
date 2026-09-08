@@ -330,7 +330,6 @@ as far as printing one. An interrupted process prints nothing — no refusal, no
 kill usually takes the scrollback with it, which is why the state had to be recognised at the front door
 rather than described in a message the operator never sees.
 
-
 **Working in the primary anyway used to cost you your checkout, and no longer does.** Step 5 ran
 `git checkout main` in the tree the script was started from, unconditionally, one line after the merge.
 Measured on git 2.54.0.windows.1 for
