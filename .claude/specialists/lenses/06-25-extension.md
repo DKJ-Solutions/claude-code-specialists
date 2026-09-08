@@ -835,6 +835,60 @@ diffs**. If they are, C removes the wait precisely where the review has most to 
 place to make that trade. B produces exactly the data needed to answer it, which is the argument for
 having done B first. Re-ask C when that question has an answer, not before.
 
+#### C was taken on September 8, 2026 — and NOT because anybody re-argued it (Dave, [#1602](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1602))
+
+`ship-pr` now blocks on the required checks only and reports the non-required ones at step 8, after the
+fold. **The measurement above is untouched and was reconfirmed a third time** — 21.2% governance over
+n=99 laps against this table's 23% over n=100 — so nothing here was found wrong. What changed is that
+the cost being traded stopped being the one this section priced.
+
+**In August the wait cost TIME. Since September 3, 2026 it can also cost a LAP**, and that class did
+not exist when C was declined. [#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292)
+added the staleness gate: `ship-pr` refuses the merge when `main` gained a commit after the certifying
+run was created. The trunk goes on moving while step 3 waits, so a commit landing in the stretch between
+the last **required** check and the last check of **any** kind voids a certificate that was valid the
+moment before — and the refusal is correct on the gate's own terms, because that commit genuinely is
+untested against this branch. The price is a whole further CI cycle. Measured per **lap** rather than per
+merged PR, because a merged PR's `gh pr checks` reports only its final head and so drops precisely the
+laps that refused:
+
+| n = 99 ci.yml `pull_request` laps, 2026-09-05 → 2026-09-08 | |
+|---|---|
+| a non-required check governed the wait | 21 (21.2%) — median tail 191s, max 753s |
+| certificate voided, after #1592's fold discount | 25 (25.3%) |
+| **voided ONLY inside the non-required tail** | **5 (5.1%)** — what C removes |
+| voided inside the tail *and* before it | 0 |
+
+**5.1% is the mean and the mean is the wrong statistic here.** All five sit on ONE day, the busiest in
+the sample: **5 of the 8 tail-governed laps that day (62.5%)** lost a lap, against **0 of 13** across the
+three quieter days. The governance share and the tail length are flat across all four days, so what moves
+is the trunk's own rate — which is
+[#1592](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1592)'s title measured: two sound
+decisions that do not converge **on a busy trunk**.
+
+**And the coverage half of the trade turned out not to exist.** This section priced C as costing "the
+guarantee that a review has been seen before the merge". Read against the code, there has never been such
+a guarantee: `Get-MergeBlockVerdict` has returned `Blocked = $false` for a red non-required check since
+[#943](https://github.com/DKJ-Solutions/claude-code-specialists/issues/943), and step 3 printed *"a check
+FAILED but the merge is not blocked … Continuing to step 4"* and merged. So the pre-merge wait decided
+**when that sentence was printed**, not whether the merge happened. Be exact about what the wait did
+guarantee — the review had **concluded and been reported** before the merge — and about what C actually
+costs, which is the window in which a human who is watching could intervene. `ship-pr`'s own step-3
+invitation (*"Nothing here needs YOU — background this run"*) is an instruction not to be sitting in it.
+
+**The August precondition is still unanswered, and it is now a residual rather than a gate.** Whether the
+long reviews are the large diffs was not measured then and is not measured now. It no longer blocks C,
+because C's cost was never the review coverage it was thought to be — but it is exactly the question that
+sizes what is left: if long reviews are large diffs, C moves the report past the merge precisely where the
+review has most to say. **Worth measuring; do not treat the reversal as having answered it.**
+
+**The lesson for this role, and it is the mirror of the one below.** That lesson is *a cost that varies
+per run is counted over its population*. This one is **a decision is only as current as the cost classes
+that existed when it was taken**. C was declined on a correct measurement of the wrong cost — correct in
+August, incomplete by September, and nothing in the record said so, because a measurement carries its
+date and not its assumptions. So when a decision is cited to close a question, check what has been built
+since it was taken, not only whether its numbers still hold.
+
 **The lesson this role broke twice in one release.** *A cost that varies per run is counted over its
 population, not cited from one run.* The 33-fold spread above is why: any single reading of
 `claude-review` is almost uninformative, and two readings that both came out of the tail read as a

@@ -260,7 +260,10 @@ Assert-True ($tail -match "Test-Path -LiteralPath \`$foldRunner") `
     'the enqueue arm TESTS for .github/workflows/fold-on-merge.yml before promising it folds anything'
 Assert-True ($tail -match 'NOTHING HERE FOLDS THAT ENTRY') `
     'and where there is none it says so, instead of naming a workflow this repo does not have'
-Assert-True ($tail -match 'fold-changelog-entry\.ps1 -Branch \$branch -Commit -Push') `
+# THE TOKEN, NOT THE RAW REF (issue #1594). The handed-over command prints $branchPaste.Token so a
+# branch name carrying a shell metacharacter cannot enter a line the reader pastes; what this assert
+# exists to pin -- that the enqueue arm hands over a repair at all -- is unchanged.
+Assert-True ($tail -match 'fold-changelog-entry\.ps1 -Branch \$\(\$branchPaste\.Token\) -Commit -Push') `
     'and hands over the command that repairs it by hand, since nothing else will'
 
 # 2. THE ADOPTION COMMAND IS SHARED, or it exists only for the repo that does not need it. Read from

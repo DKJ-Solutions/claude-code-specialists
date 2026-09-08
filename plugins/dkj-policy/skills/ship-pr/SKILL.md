@@ -288,6 +288,19 @@ The decision itself is `Get-TrunkReturnDecision` in `worktree-lib.ps1`, a pure f
 plus `git status --porcelain`, so it is asserted in `worktree-lib.tests.ps1` rather than only exercised by
 a live ship.
 
+**And the go-ahead line READS that decision rather than asserting an outcome**
+([#1616](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1616)). For three days it carried
+the trunk clause as a literal — `step 2b already put it back on the trunk` printed with no condition on it
+— so on every run where one of the three conditions above declined, the one line a reader is told to act
+on contradicted the line four rows above it. Measured on
+[PR #1615](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1615), September 8, 2026, where
+what declined it was a single unrelated modified file the branch had deliberately left alone. It is
+`Get-TrunkReturnGoAheadLine` now, in the same lib and asserted in the same suite: the yes arm is word for
+word what it was, and the no arm names the branch this checkout is standing on and points at the lane
+instead — a lane is detached at `origin/<trunk>`, so it is unaffected by where the primary happens to
+stand. **Both arms keep the two clauses that are true either way** — step 1 is over, the tree is free —
+because withdrawing those along with the trunk clause would cancel the invitation the line exists to make.
+
 
 **Working in the primary anyway used to cost you your checkout, and no longer does.** Step 5 ran
 `git checkout main` in the tree the script was started from, unconditionally, one line after the merge.
@@ -395,9 +408,24 @@ then watches it. A non-zero exit from the watch means **not merged** — the scr
 retrying, because branch protection would block it anyway and forcing past a red CI is exactly what
 this chain must not do.
 
-**It deliberately does not name a check.** Step 3 watches whatever checks the PR has and reads the exit
-code. Naming one here would be a claim about the consumer's CI that this script cannot keep — and it
-was the half of the "this is too repo-specific to share" argument that did not survive being read.
+**It deliberately does not name a check.** Step 3 watches whichever checks this repo's own ruleset
+requires — read from the trunk's **branch rules** (`gh api repos/<repo>/rules/branches/<trunk>`, the
+payload step 0b already fetched), never from a name written into the script. `gh pr checks --required`
+is the fall-back for a checkout whose token cannot read those rules, and it is second rather than first
+for a measured reason: it reports the required checks *that have registered*, so asked seconds after
+the push it answers nothing, and cannot tell that from a trunk that requires nothing. The ruleset has
+no such race.
+Naming one here would be a claim about the consumer's CI that this script cannot keep, and it was the
+half of the "this is too repo-specific to share" argument that did not survive being read.
+
+**The non-required checks are still waited for and still reported — at step 8, after the fold**
+([#1602](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1602), September 8, 2026). Until
+then the merge sat behind them, and the trunk goes on moving while it waits: a commit landing between the
+last required check and the last check of any kind voids the certificate step 3b then correctly refuses
+on, at the price of a whole further CI cycle. Measured over 99 laps that is 5.1% of them — but 62.5% of
+the tail-governed laps on the busiest day of the sample, so it is a busy-trunk cost rather than a
+background one. Nothing about the merge DECISION changed: a red non-required check has never blocked this
+merge, so waiting for one beforehand only decided when that was printed.
 
 ### A repo with no required check at all
 
@@ -406,8 +434,12 @@ required check — and that is the shape most new repos start in. Nothing here n
 and two behaviours are worth knowing rather than deducing ([inbound
 #1083](https://github.com/DaveKJohn/claude-code-specialists/issues/1083)):
 
-- **the wait works unchanged**, because step 3 watches every check the PR has rather than a named or
-  required one;
+- **the wait works unchanged**, because with no required check known step 3 watches every check the PR
+  has rather than a named one. **That is still true after #1602**, and deliberately so: `--required` is
+  added only where the ruleset names something, and "this repo requires nothing" is indistinguishable
+  from "the required check has not registered yet" — so the fall-back is the behaviour every ship had
+  before that change. A repo without a ruleset therefore also never reaches step 8, which would
+  otherwise claim a non-required tail that never existed;
 - **the merge verdict refuses on a red check rather than proceeding.** With nothing required,
   `gh pr checks --required` exits non-zero, and *"this repo requires nothing"* is indistinguishable from
   *"the required checks have not reported yet"* — so the verdict blocks. The repo without a ruleset is
