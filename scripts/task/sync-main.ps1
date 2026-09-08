@@ -1077,13 +1077,25 @@ try {
     }
 
     Write-Host ''
+    # THE PRIMARY REPORT GOES THROUGH THE DISPLAY STRIP, LIKE EVERY REF ON THIS PAGE (issue #1638). The
+    # paths reaching these three lines are real .NET strings by the time they arrive -- Convert-GitQuotedPath
+    # has already decoded $headBlobs' keys, so a \p{Cc} in this repo's own tree is a live escape byte
+    # here rather than git's C-quoted rendering of one, and $mirrorPaths came off Get-ChildItem where no
+    # quoting was ever involved. These lines are printed in a loop, so one ESC[2K in a path repaints the
+    # rows above it.
+    #
+    # AND Get-DisplayPath RATHER THAN Get-DisplayRef, which is the whole reason that function exists.
+    # The '{1,-46}' padding is the second half of the defect: a zero-width \p{Cf} run spends format
+    # width without spending display columns, so the row slides against its neighbours in a list a
+    # reader scans by column. Replacing each removed character with one space puts the two widths back
+    # in step -- and collapsing the runs, which the ref strip does, would undo exactly that.
     Write-Host "  held back ($trunkShown wins): $($keep.Count)" -ForegroundColor Green
-    foreach ($r in $keep) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, $r.Path, $r.Reason) -ForegroundColor DarkGray }
+    foreach ($r in $keep) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, (Get-DisplayPath -Path $r.Path), $r.Reason) -ForegroundColor DarkGray }
     Write-Host "  to take from live:       $($take.Count)" -ForegroundColor Cyan
-    foreach ($r in $take) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, $r.Path, $r.Reason) -ForegroundColor Cyan }
+    foreach ($r in $take) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, (Get-DisplayPath -Path $r.Path), $r.Reason) -ForegroundColor Cyan }
     if ($conflict.Count -gt 0) {
         Write-Host "  CONFLICTS:               $($conflict.Count)" -ForegroundColor Red
-        foreach ($r in $conflict) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, $r.Path, $r.Reason) -ForegroundColor Red }
+        foreach ($r in $conflict) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, (Get-DisplayPath -Path $r.Path), $r.Reason) -ForegroundColor Red }
     }
 
     if ($conflict.Count -gt 0) {
@@ -1091,8 +1103,34 @@ try {
         Write-Host 'REFUSING TO SYNC. Both sides changed the paths above, so taking either would lose the' -ForegroundColor Red
         Write-Host 'other. Nothing has been written. Compare them by hand and merge deliberately:' -ForegroundColor Red
         foreach ($r in $conflict) {
-            $mirrorFile = Join-Path $mirror ($r.Path -replace '/', '\')
-            Write-Host "  git diff --no-index -- `"$($r.Path)`" `"$mirrorFile`"" -ForegroundColor Yellow
+            # THE PASTE AXIS, AND THE UNTRUSTED VALUE APPEARS TWICE IN ONE LINE (issue #1637). This is a
+            # command a reader is invited to copy and run, and $mirrorFile is DERIVED from $r.Path, so a
+            # single hostile path used to poison both operands. It is judged once and answered as a
+            # pair: either both halves carry the real path or both read '<path>', never one of each,
+            # which would print a `git diff` whose two operands are different files.
+            #
+            # THE DOUBLE QUOTES THAT USED TO BE HERE WERE THE DEFECT, NOT THE GUARD. ref-print-lib is
+            # explicit that command substitution runs inside double quotes in bash and in PowerShell
+            # alike, so quoting a hostile value closes nothing -- and it reads as protection, which is
+            # worse than a bare interpolation because the next reader stops looking.
+            $pathPaste = Get-PasteableRef -Ref $r.Path -Placeholder '<path>' -Kind Path
+            $mirrorFile = if ($pathPaste.IsSafe) {
+                Join-Path $mirror ($r.Path -replace '/', '\')
+            } else {
+                # The placeholder is joined the same way, so the mirror operand shows where that path
+                # goes: 'C:\...\mirror\<path>'. The pair is visibly one substitution, which is what tells
+                # the reader the two holes take the same value.
+                Join-Path $mirror $pathPaste.Token
+            }
+            # THE MIRROR OPERAND IS STILL QUOTED, AND THAT IS NOT THE SPELLING REJECTED ABOVE. What sits
+            # inside these quotes is $mirror -- built by this run from its own seam answer and the
+            # machine's profile path -- plus a half that has either passed the allowlist or been replaced
+            # by the placeholder. The quotes are here for a SPACE in that profile path
+            # ('C:\Users\Ada Lovelace\...'), the one thing an allowlist over the theme path cannot speak
+            # to because it never saw the prefix. They are not standing in for the refusal; the refusal
+            # above is. The repo operand needs none for the same reason it is safe at all.
+            Write-Host "  git diff --no-index -- $($pathPaste.Token) `"$mirrorFile`"" -ForegroundColor Yellow
+            if (-not $pathPaste.IsSafe) { Write-Host $pathPaste.Note -ForegroundColor DarkYellow }
         }
         # The mirror is what those commands read, so a refused run keeps it whatever the switch says.
         $KeepMirror = $true

@@ -43,7 +43,48 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**19 / 38 minor entries** <!-- pending-tally -->
+**20 / 39 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1637-sync-main-path-print · 20260908-154618
+
+`sync-main` no longer prints a file path raw. Its primary report -- the take, hold-back and conflict
+listings -- goes through a new path-shaped display strip, and its conflict remedy no longer
+interpolates a path into a paste-ready `git diff` at all: the path is judged against the same
+allowlist a branch name is, and a refused one is replaced by `<path>` in **both** operands with a note
+naming the real path outside any command context.
+
+Two things make this more than a sweep. The double quotes that were there were the defect rather than
+the guard -- command substitution runs inside double quotes in bash and PowerShell alike, so the line
+read as protected while closing nothing, which is worse than a bare interpolation because the next
+reader sees quotes and stops looking. And the display strip had to be a second function rather than a
+reuse: `Get-DisplayRef` collapses space runs and trims, which is right for a ref (git forbids a space
+in one) and wrong for a path, where a doubled or trailing space is part of the name. Preserving one
+space per removed character is also what fixes the alignment -- a zero-width run spends format width
+without spending display columns, so a padded row used to slide against its neighbours.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The paths are the point. They come from this repo's own `HEAD` and from a filesystem walk of the
+pulled **live theme** -- which third parties edit through the Shopify theme editor, outside any
+review, and which is the entire reason that sync exists. Measured for #1637: `git ls-tree -r` and
+`git diff --name-only` hand back `assets/x$(id -un).js` and `assets/z;touch owned.js` unquoted in
+every `core.quotePath` setting, because git quotes control characters and high bytes and not shell
+metacharacters. So the consumer running this sync against a real store is the reader who was being
+handed a command to paste, built from a name they do not control.
+
+**Score:** 3
+
+#### Pull Request
+
+sync-main stops printing raw file paths: a faithful display strip and a paste refusal for the conflict remedy
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1645](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1645)
+
+---
 
 ### DEPLOY: fix/1625-hook-in-process-check · 20260908-153515
 
