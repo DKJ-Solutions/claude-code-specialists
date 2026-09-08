@@ -36,19 +36,72 @@
 
 ### PLAN
 
+#### The finding, verified before it was repaired
+
+#1676's symptom and mechanism both still stand, read out of the tree rather than taken from the report:
+`remote-ahead-lib.ps1` composed `, whose tip is: <sha> <author>: <subject>` behind `if ($tipLine)`, and an
+empty `$tipLine` fell through that in silence. The `-Utf8` arm can produce one with exit code 0 --
+`Read-NativeCaptureFileText` opens the capture with `FileShare.ReadWrite` on purpose (#1252), so a
+grandchild holding the handle past a clean exit yields whatever was flushed.
+
+The report left three things open. Two are settled here and the third is filed:
+
+- **Caller or lib?** The caller, which is what the report recommended. It needs nothing to change
+  underneath and does not weaken #1252's trade.
+- **Can an empty capture ever be legitimate here?** No, and that is what makes stating the failure honest
+  rather than defensive: the `rev-list` above has already returned a count above zero, so `$RemoteRef`
+  resolves and has at least one commit, and `--format=%h ...` always yields the hash for one. There is no
+  third reading in which git legitimately answers nothing.
+- **The other `-Utf8` callers.** Surveyed, and it is a class: filed as
+  [#1679](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1679), with five more sites that
+  turn an empty capture into a substantive answer -- the sharpest being ship-pr's DEPLOY lock, which would
+  refuse a merge naming a section that had not changed. Out of scope here on purpose: the choice between a
+  per-caller repair and a lib-side `ShortRead` field is the substance of that issue.
+
+- [x] Verify the symptom, the reason and the proposed repair against the tree, not the report
+- [x] Settle where the repair goes -- the caller, per #1676's own recommendation
+- [x] Survey the other `-Utf8` callers and file what the survey found (#1679)
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `remote-ahead-lib.ps1`: name the three reasons a tip could not be read, and say so in the sentence
+      instead of dropping the clause
+- [x] Record in the function's own docstring that the sentence now has two shapes, so a caller needs no
+      knowledge of which one it got
+- [x] Mirror the shared lib into `plugins/dkj-policy/` via `build-shared-scripts.ps1`
 
 ### TEST
 
+- [x] `remote-ahead-lib.tests.ps1` case 6b: the observed shape (exit 0, nothing read), a whitespace-only
+      capture, a non-zero `git log`, and a tip that strips to nothing -- each asserted on the reason it
+      names, plus the regression asserted as a shape rather than as wording (never the bare count sentence)
+- [x] A premise assert that the same fixture DOES yield a tip with the real capture, so the stub is what
+      changes the answer -- and a restore assert that it does not leak into the cases below
+- [x] `remote-ahead-lib.tests.ps1`: 57 pass, 0 fail
+- [x] `new-branch.tests.ps1`: all 255 asserts pass, the ten #1439 `adversarial tip` asserts among them
+
 ### DEPLOY: fix/1676-remote-ahead-tip-short-read
 
-**Score:**
+The remote-ahead warning now says when it could not read the diverged branch's tip, instead of dropping
+that half of the sentence in silence. `Get-RemoteAheadNote` reads an empty `git log` capture on exit code 0
+as a failure to read rather than as nothing to report, names which of three reasons it was, and states
+that the author and the subject are missing from the warning and not absent from the branch.
+
+The silent drop degraded the guard to exactly the sentence #1439 was filed for being insufficient: "1
+commit(s) behind" reads identically for another session's push and for a fast-forward of your own autopark,
+and the author and the subject are what separate them. It degraded on the loaded machine, which is when two
+sessions are most likely to be racing.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+`remote-ahead-lib.ps1` is a shipping script, so this reaches every consumer through the next release, at
+all three doors that ask the question -- `new-branch`'s resume warning, `open-pr`'s remote-ahead gate and
+`park-cycle`'s refused-push report. Nothing a consumer types changes; the sentence gains a clause it used
+to omit.
+
+**Score:** 3
 
 #### Pull Request
 
