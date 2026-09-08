@@ -107,6 +107,14 @@ step further out. Both are filed rather than folded in here.
       `ref-print-lib` beside it, which the new dot-source needs
 - [x] the two stale statements the suites carried -- *"prose is deliberately not a subject"* and the
       lib's own *"it does not sanitise for DISPLAY"* -- rewritten rather than left to be cited again
+- [x] the ordering hazard this branch walked into is pinned: every display variable's FIRST mention
+      outside a comment must be its own assignment. Both scripts run under `Set-StrictMode -Version
+      Latest`, where reading an unassigned variable **throws** rather than printing nothing -- so
+      `$branchShown` placed one line below its first use killed the whole run and cost 50 asserts in
+      `sync-main.tests.ps1`. `ship-pr.ps1` has no suite at all, which is why the assert covers it too.
+      The obvious index-comparison spelling of that assert does **not** catch it (the earlier use is
+      inside a string, so it has no space after the name and the assignment sorts first); the shipped
+      one reads line by line, and was verified by re-breaking the ordering and watching it go red.
 - [x] full lint + test gate green
 
 ### DEPLOY: fix/1623-ref-display-strip

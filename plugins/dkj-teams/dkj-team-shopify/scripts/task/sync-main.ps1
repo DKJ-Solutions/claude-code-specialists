@@ -672,19 +672,23 @@ while (
     $branch = "$branchPrefix$stamp-$n"
     if ($n -gt 20) { Write-Host "Twenty sync branches already exist for $stamp. Something is wrong; stopping." -ForegroundColor Red; exit 1 }
 }
-Write-Host "      $branchShown"
-
-# JUDGED ONCE, beside the composition that produced it, for the two printed commands further down
-# (issue #1594). Not gated on anything: both readers are failure or hand-over paths that must not do
-# work of their own on the way out.
+# BOTH VERDICTS ARE TAKEN HERE, ABOVE THE FIRST LINE THAT PRINTS THE NAME. The paste verdict is for the
+# two printed commands further down (issue #1594); the display name is for the six sentences that merely
+# QUOTE the branch (issue #1623), and the very first of those is the line below. Neither is gated on
+# anything: their readers are failure or hand-over paths that must not do work of their own on the way
+# out. Under Set-StrictMode -Version Latest an assignment that sat below its first use would not print
+# an empty name, it would THROW -- which is how the display name arrived one line too late and cost 50
+# asserts in this script's own suite before it left the branch.
+#
+# #1594 scoped prose out on the ground that git rejects the characters that make it deceptive.
+# `git check-ref-format` rejects \p{Cc} and ACCEPTS \p{Cf} -- and this name never met git at all before
+# it is printed: it is $branchPrefix, a seam answer a consumer wrote, plus a date. So the strip is
+# load-bearing here rather than belt-and-braces. $branch itself stays raw and is what `git checkout -b`,
+# `git push` and `gh pr create` still receive.
 $branchPaste = Get-PasteableRef -Ref $branch
-# AND THE DISPLAY NAME, beside it, for the six sentences that merely QUOTE the branch (issue #1623). The
-# paste verdict above covers the two printed commands; these are prose, and #1594 scoped prose out on the
-# ground that git rejects the characters that make it deceptive. `git check-ref-format` rejects \p{Cc} and
-# ACCEPTS \p{Cf} -- and this name never met git at all before it is printed: it is $branchPrefix, a seam
-# answer a consumer wrote, plus a date. So the strip is load-bearing here rather than belt-and-braces.
-# $branch itself stays raw and is what `git checkout -b`, `git push` and `gh pr create` still receive.
 $branchShown = Get-DisplayRef -Ref $branch
+
+Write-Host "      $branchShown"
 
 # --- 4b. is a PREVIOUS run's branch still standing? ------------------------------------------------
 # Inbound #1021, and it belongs here rather than beside the verdict it produces: a refusal at this point

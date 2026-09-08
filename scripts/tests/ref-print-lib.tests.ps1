@@ -338,6 +338,44 @@ Assert-True ($shipText -match [regex]::Escape('$shipProgressRelShown = Get-Displ
 Assert-True ($syncText -match [regex]::Escape('$branchRow = Get-DisplayRef -Ref ([string]$r.Branch)')) 'sync-main.ps1 strips the ls-remote branch names in its predecessor rows'
 Assert-True ($syncText -match [regex]::Escape('STILL STANDING: $(Get-DisplayRef -Ref ([string]$s.Branch))')) 'and the standing-branch line the operator reads first, which prints the same names'
 
+# EVERY DISPLAY VARIABLE IS ASSIGNED ABOVE ITS FIRST USE, and this assert exists because the branch that
+# added them got it wrong. Both scripts run under `Set-StrictMode -Version Latest`, where reading an
+# unassigned variable does not print an empty string -- it THROWS, and the run dies at whatever line it
+# reached. sync-main's own suite caught it at 50 failed asserts; ship-pr.ps1 has no suite at all, so the
+# same slip there would only surface in a live ship, mid-merge. A textual index comparison is enough:
+# both are straight-line scripts, and the sites in question are top-level statements.
+# READ LINE BY LINE, AND COMMENTS SKIPPED, because the obvious spelling does not work. Comparing
+# IndexOf('$branchShown =') against IndexOf('$branchShown') finds the assignment first whenever the
+# earlier USE has no space after the name -- which is exactly how it is spelled inside a string
+# ("      $branchShown"), i.e. precisely the case this assert exists for. Verified against the broken
+# ordering before it was repaired: the index spelling passed, this one fails.
+function Get-FirstMentionLine {
+    param([string]$Text, [string]$Var)
+    $i = 0
+    foreach ($line in ($Text -split "`r?`n")) {
+        $i++
+        $t = $line.TrimStart()
+        if ($t.StartsWith('#')) { continue }
+        if ($line.Contains($Var)) { return [pscustomobject]@{ Number = $i; Text = $line } }
+    }
+    return $null
+}
+
+foreach ($v in @(
+    @{ Text = $shipText; Var = '$branchShown';          Label = 'ship-pr: $branchShown' },
+    @{ Text = $shipText; Var = '$shipCycleRefShown';    Label = 'ship-pr: $shipCycleRefShown' },
+    @{ Text = $shipText; Var = '$shipProgressRelShown'; Label = 'ship-pr: $shipProgressRelShown' },
+    @{ Text = $syncText; Var = '$branchShown';          Label = 'sync-main: $branchShown' },
+    @{ Text = $syncText; Var = '$trunkShown';           Label = 'sync-main: $trunkShown' }
+)) {
+    $first = Get-FirstMentionLine -Text $v.Text -Var $v.Var
+    Assert-True ($null -ne $first) "mentioned outside a comment at all -- $($v.Label)"
+    if ($first) {
+        Assert-True ($first.Text -match ([regex]::Escape($v.Var) + '\s*=\s*Get-DisplayRef')) `
+            "the FIRST line naming it is its assignment, not a use -- strict mode makes the other order fatal rather than empty, line $($first.Number) -- $($v.Label)"
+    }
+}
+
 # --- the mirrors carry it too --------------------------------------------------------------------
 # A CONSUMER RUNS THE MIRROR, so a repair present only in the root copy is a repair no consumer has. The
 # drift lint proves the copies match; these asserts prove the lib was REGISTERED in the first place,
