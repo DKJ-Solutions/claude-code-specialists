@@ -63,6 +63,17 @@
     $LASTEXITCODE), because git writes progress to stderr, which under EAP=Stop would become a
     terminating NativeCommandError before the exit code could be judged (the #96/#97/#107 pitfall).
 
+    AND A REFUSED PUSH IS THE EARLIEST COLLISION SIGNAL THIS WORKFLOW HAS (issue #1600). Running on
+    every turn is what makes it that: from the moment a second session pushes to the same branch, every
+    turn of this one ends in a non-fast-forward refusal. new-branch.ps1's remote-ahead warning (#1439)
+    asks the same question once, at a resume that goes through that script; open-pr.ps1's gate asks it
+    at the very end, when the duplicated work has already been paid for. So the failure path fetches the
+    one ref and names the other side -- its count, author and subject, through the shared
+    Get-RemoteAheadNote -- instead of saying "diverged from origin?" and sending the reader for a reason
+    this run already holds. Measured on feat/plugin-version-overview, September 8, 2026: two sessions
+    ran the same pre-PR review in full, each finding real defects the other missed, and the signal was
+    available for roughly half an hour before open-pr surfaced it.
+
     ALWAYS EXITS 0. It runs on a hook, and a hook that fails is a hook that interrupts the work it was
     added to protect. Every refusal above is a normal outcome, not an error.
 
@@ -105,6 +116,10 @@ function Write-CycleParkNote {
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
+# The divergence sentence, shared with new-branch.ps1's resume warning and open-pr.ps1's remote-ahead
+# gate rather than composed a fourth time (issue #1450 extracted it; #1600 added this caller). What it
+# strips out of somebody else's %an and %s is the whole reason it is one definition -- see its header.
+. (Join-Path $PSScriptRoot '..\lib\remote-ahead-lib.ps1')
 
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # source root copy falls back to the git root. Same resolution as every other mirrored script -- but via
@@ -209,6 +224,9 @@ if ($statusRes.ExitCode -eq 0) { $dirty = [bool](($statusRes.Output | Out-String
 # DELIBERATELY NO FETCH. The remote-tracking ref is read as it stands: a fetch on every turn costs the
 # network call this gate exists to avoid, and a ref that has gone stale because the other device pushed
 # is exactly the case where the push below fails loudly -- which is the right outcome, not a defect.
+# THE FAILURE PATH DOES FETCH, and that is this rule rather than an exception to it (#1600): "loudly"
+# has to mean the session learns WHOSE work is on the other side, and only a fetch can say. It sits
+# after a refused push, so it never touches the ordinary turn this gate is protecting.
 $aheadOrAbsent = $true
 $remoteRef = "refs/remotes/origin/$branch"
 $refRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $root, 'rev-parse', '--verify', '--quiet', $remoteRef) -DiscardStderr
@@ -317,11 +335,70 @@ try {
 # parking entry points already share. This is the third caller and it adds no steps of its own: the
 # scope picks both the pathspec and the words, so the log says `park: <branch> (the branch files only)`
 # for this the same as for new-branch's push at creation.
-$ok = Invoke-GitPark -RepoRoot $root -Branch $branch -Scope 'BranchFiles' -Paths @($cycleRel) -BodyNote $backingNote
+# -NoFailureMessage: this caller reports its own failure below, with more than that sentence can know,
+# and cycle-autopark.ps1 now merges the child's stderr into what it prints -- so leaving it in would put
+# a PowerShell error banner above the report, in a hook whose contract is that it never fails (#1600).
+$ok = Invoke-GitPark -RepoRoot $root -Branch $branch -Scope 'BranchFiles' -Paths @($cycleRel) `
+                     -BodyNote $backingNote -NoFailureMessage
 if (-not $ok) {
-    # Reported, never fatal -- see the always-exits-0 paragraph. A failed push here is usually the
-    # divergence case the no-fetch note above describes, and it is worth a visible line.
-    Write-Host "park-cycle: '$cycleRel' could NOT be pushed -- run park-cycle by hand for the reason (diverged from origin?)." -ForegroundColor Yellow
+    # --- A FAILED PUSH HERE IS THE COLLISION SIGNAL, SO IT IS NAMED (issue #1600) -----------------
+    #
+    # WHAT THIS USED TO SAY, and why one line of it was the defect: "could NOT be pushed -- run
+    # park-cycle by hand for the reason (diverged from origin?)". Every word of that is true and the
+    # question mark is the problem -- it sends the reader for a reason this run already holds, and it
+    # hedges the one fact worth stating outright. THIS SCRIPT IS THE EARLIEST DETECTOR IN THE WORKFLOW
+    # of two sessions on one branch: it runs on a Stop hook after EVERY turn, so from the moment the
+    # other side pushes, every turn of this session ends in a refused push. Nothing else looks that
+    # often -- new-branch.ps1's own remote-ahead warning (#1439) fires once, at a resume that goes
+    # through it, and open-pr.ps1's gate fires at the very end, after the work is paid for.
+    #
+    # MEASURED, September 8, 2026 (#1600). Two sessions ran the same pre-PR review on
+    # feat/plugin-version-overview in full, from the same handoff note, and found DIFFERENT real
+    # defects -- so neither round was redundant and either winning outright would have shipped a bug.
+    # They diverged at 11:45, the other side's work reached origin at ~11:51, this side's autopark hit
+    # its first refused push at 12:05, and the collision was not learned until open-pr refused the push
+    # at ~12:20. The signal existed for half an hour. What the session's own report carried was git's
+    # `! [rejected]` plumbing plus five `hint:` lines plus the sentence above; the ONE sentence naming
+    # another session -- Get-GitPushFailureMessage's, written by Invoke-GitPark -- goes to stderr in a
+    # PowerShell error banner, and cycle-autopark.ps1 captures stdout. So the interpretation was the
+    # half that did not arrive.
+    #
+    # THE AUTHOR AND THE SUBJECT ARE THE POINT, exactly as new-branch.ps1 argues for the same sentence:
+    # `park: ... (all outstanding work)` under an identity that is not yours is what separates a
+    # collision from a fast-forward of your own autopark from another device. "1 commit behind" reads
+    # identically in both, which is why the count alone would not have moved the measured case.
+    #
+    # THE FETCH IS ON THE FAILURE PATH ONLY, so the header's DELIBERATELY-NO-FETCH rule stands
+    # unchanged: that rule is about the ordinary turn, and this branch is reached only after a push has
+    # already reached the remote and been refused BY it -- the network is up, the turn has already paid
+    # for a round trip, and nothing else can say what is on the other side. One ref, bounded by the
+    # shared network timeout, and a fetch that fails costs the tip line and never the report.
+    $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $root, 'fetch', 'origin', $branch) `
+                                  -DiscardStderr -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+    $note = ''
+    if ($fetch.ExitCode -eq 0) {
+        # FETCH_HEAD, not refs/remotes/origin/<branch>: `git fetch origin <branch>` writes the fetched
+        # tip there in every git version, while whether it also updates the remote-tracking ref depends
+        # on the remote's refspec configuration -- and a ref that did not move would make this read 0 on
+        # exactly the branch that just refused the push.
+        $note = Get-RemoteAheadNote -RepoRoot $root -LocalRef 'HEAD' -RemoteRef 'FETCH_HEAD' `
+                                    -BranchLabel $branch -FreshLabel "origin/$branch" -StaleLabel "origin/$branch" -Fresh $true
+    }
+
+    # Reported, never fatal -- see the always-exits-0 paragraph. Write-Host rather than Write-Warning
+    # so it lands on the stdout cycle-autopark.ps1 captures and re-prints: a Stop hook's report IS this
+    # sentence's delivery route, and the whole finding above is that the interpretation went to the one
+    # stream that route does not read.
+    if ($note) {
+        Write-Host "park-cycle: '$cycleRel' could NOT be pushed -- $note" -ForegroundColor Yellow
+        Write-Host '  ANOTHER SESSION OR DEVICE IS WORKING THIS BRANCH. Read what is there before building further' -ForegroundColor Yellow
+        Write-Host '  (git pull --ff-only); if the tip is your own autopark from another machine, that is the same' -ForegroundColor Yellow
+        Write-Host '  command. Nothing on this branch is lost -- the push was refused, not overwritten.' -ForegroundColor Yellow
+    } else {
+        # The push failed for something other than a divergence this run could read: no origin left, a
+        # credential refusal, a timeout, a fetch that could not answer either. Git's own output is above.
+        Write-Host "park-cycle: '$cycleRel' could NOT be pushed -- see git's output above; run park-cycle by hand for the reason." -ForegroundColor Yellow
+    }
     exit 0
 }
 
