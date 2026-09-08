@@ -244,6 +244,32 @@ if (-not (Test-BranchChangelogIsFilled -Text $fileText)) {
     exit 1
 }
 
+# AND "IS THERE AN ENTRY AT ALL" IS A THIRD QUESTION, ahead of the scaffold check rather than inside it
+# (issue #1632). The two checks above and the one below cover three states -- no file, the reset state, an
+# entry still carrying the scaffolder's wording -- and a document whose DEPLOY SECTION HAS BEEN DELETED is
+# none of them. It passed all three: Get-DevelopmentEntryText's fallback handed the scaffold check the
+# guidance PREAMBLE, which contains no scaffold marker because nobody scaffolded it, so the gate reported a
+# written entry over a file with no entry text whatsoever. The scaffold gate passes by ABSENCE.
+#
+# ASKED OF THE DOCUMENT AND ANSWERED BY THE LIB, for the same reason the reset check above is: the
+# predicate reads the document's SHAPE -- guidance blockquote, named phases -- and a second copy of that
+# reasoning here would be free to disagree with open-pr's, which is the drift entry-scaffold-lib.ps1
+# exists to prevent. Test-DevelopmentEntryMissing's own header carries the measurement.
+#
+# BEFORE the shape checks further down, deliberately. Those report '0 heading(s), and nothing but guidance
+# above the first' as a PASS on exactly this document -- while the guidance it just read says in capitals
+# FOUR HEADINGS, AND NEVER A FIFTH. #898 closed the upper bound and the lower one was never asserted, so
+# zero was admitted. Refusing here means that line is never reached to say it.
+if (Test-DevelopmentEntryMissing -Text $fileText) {
+    Write-Host "[ERROR] '$entryRel' has no entry at all -- its DEPLOY section is gone." -ForegroundColor Red
+    Write-Host '        This document carries a plan (its guidance block, its phases, or both) but no'
+    Write-Host '        DEPLOY heading, so there is nothing for the fold to move into the changelog. Left'
+    Write-Host '        as it is, the fold would paste the GUIDANCE into it as the change description.'
+    Write-Host '        The new-branch skill is idempotent: run it on this branch to restore the section,'
+    Write-Host '        then write what the change does.'
+    exit 1
+}
+
 $scaffoldFindings = @(Get-EntryScaffoldFindings -EntryText $entryText -Wording (Get-EntryScaffoldWording))
 if ($scaffoldFindings.Count -gt 0) {
     Write-Host "[ERROR] '$entryRel' has not been written yet:" -ForegroundColor Red
