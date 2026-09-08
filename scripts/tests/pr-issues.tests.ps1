@@ -1960,6 +1960,29 @@ Assert-True ($shipText -like "*-DiscardStderr -Arguments @('log', 'origin/main',
 Assert-True ($shipText -like '*gained $($staleVerdict.Count) commit(s) after the run that certified PR*') 'the refusal states how many commits and which PR they voided the certificate for'
 Assert-True ($shipText -like '*stale-CI certificate*') 'and leads with a recognisable, greppable name for the failure'
 Assert-True ($shipText -like '*git merge origin/main*') 'the remedy tells the operator how to bring the branch forward'
+
+# AND THE REMEDY LEADS WITH THE CHECKOUT (issue #1588). Step 2b has already handed this tree back to
+# the trunk (#1073) by the time this gate fires -- past the whole CI wait -- so a remedy starting at
+# `git fetch` acts on 'main': the merge fast-forwards the trunk, prints a diffstat that reads exactly
+# like the branch being brought forward, and the push after it is a no-op. Nothing fails, so the first
+# thing to say anything is the re-run of ship-pr, one full CI cycle later, and what it says is a
+# message about the wrong problem. Measured on PR #1583 and, five days earlier, PR #1316.
+#
+# ASSERTED AS AN ORDER, not as three presences. The defect was never a missing string -- `git fetch`
+# and `git merge` were both there and both wrong on their own -- so an assert on `git checkout`
+# anywhere in the file would pass on a remedy that printed it last, or in a neighbouring message. The
+# three IndexOf reads pin the sequence inside one refusal, which is the fact that repairs it. Each
+# read is OFFSET from the one before it, so the two git lines are the remedy's own and not step 3b's
+# unrelated single-line `'git fetch origin main' failed` refusal further up the same file -- the same
+# offset-scoped technique open-pr's refresh/append ordering asserts use above (#919). The two-space
+# indent does a second job here: that earlier refusal quotes the command, it does not lay it out.
+$idxCheckout = $shipText.IndexOf('  git checkout $branch')
+$idxFetchRem = if ($idxCheckout -ge 0) { $shipText.IndexOf('  git fetch origin main', $idxCheckout) } else { -1 }
+$idxMergeRem = if ($idxFetchRem -ge 0) { $shipText.IndexOf('  git merge origin/main', $idxFetchRem) } else { -1 }
+Assert-True ($idxCheckout -ge 0) 'the stale-CI remedy names the branch to check out, using the branch the gate already read'
+Assert-True ($idxFetchRem -gt $idxCheckout -and $idxMergeRem -gt $idxFetchRem) 'and it comes FIRST -- checkout, then fetch, then merge, in that order'
+Assert-True ($shipText -like '*CHECKOUT IS THE FIRST STEP*') 'the refusal says why that line is there, so nobody reads it as a stray step'
+
 Assert-True ($shipText -like '*-SkipStaleCheck ships on the old certificate anyway*') 'and the escape valve is documented right beside the refusal it bypasses'
 Assert-True ($shipText -like '*exit 1*') 'a stale certificate is a hard refusal (an exit code), not a warning that lets the merge through'
 
