@@ -1336,6 +1336,27 @@ certificate anyway.
             $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object {
                 if ($_.Length -gt 8) { $_.Substring(0, 8) } else { $_ }
             }) -join ', '
+            # THE REMEDY LEADS WITH A CHECKOUT, BECAUSE THIS RUN HAS ALREADY MOVED THE TREE (#1588).
+            # Step 2b hands the primary checkout back to the trunk the moment the PR exists (#1073), and
+            # this gate fires long after that -- past the whole CI wait. So the operator reading the
+            # refusal is standing on 'main', not on the branch the two git commands are about. WHAT THAT
+            # COSTS IS A SILENT NO-OP, NOT AN ERROR, which is why nothing caught it for five days: on a
+            # trunk behind origin/main, `git merge origin/main` fast-forwards local 'main' and prints a
+            # full diffstat -- reading exactly like the branch being brought forward -- and the push after
+            # it is `Everything up-to-date`. The first thing to say anything is the re-run of ship-pr, one
+            # full CI cycle later, and what it says is `You are on main` -- a message about the wrong
+            # problem. Measured twice: PR #1583 (issue #1579) on September 8, 2026, and PR #1316 on
+            # September 3, recorded as a parenthetical in #1325 and never repaired because that issue
+            # closed on a different axis (CI sharding). THE OPERATOR CANNOT BE THE GUARD HERE: the branch
+            # check fires at the start of an assignment, and this is the middle of one -- re-reading `git
+            # branch` between a refusal and its own prescribed remedy is not a step anything asks for.
+            #
+            # $branch IS THE GATE'S OWN READING rather than a guess -- captured at line 357 before step 2b
+            # ran, so it still names the branch even though HEAD no longer does. It is printed
+            # UNCONDITIONALLY, not gated on the trunk-return decision: where step 2b declined to move (a
+            # dirty tree, another worktree on the trunk) the line is a harmless no-op, and a remedy that
+            # is sometimes missing a step is worse than one that sometimes repeats a checkout you have.
+            # NOT the gate performing the update itself -- that is option 3 in #1325 and a larger decision.
             Write-Error @"
 stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
 started (issue #1292) -- NOT merged.
@@ -1344,8 +1365,11 @@ The required check(s) ($(Format-CheckNameList -Names $staleCheckNames)) tested G
 stood when that run was created; anything landed on 'main' since is untested against this branch. Newest
 first: $shownShas
 
-Bring the branch up to date so CI re-runs against the current 'main', then re-run ship-pr:
+Bring the branch up to date so CI re-runs against the current 'main', then re-run ship-pr. THE
+CHECKOUT IS THE FIRST STEP -- this run already handed the tree back to the trunk (issue #1073), so
+without it the merge below fast-forwards 'main' and leaves the branch untouched, silently (#1588):
 
+  git checkout $branch
   git fetch origin main
   git merge origin/main
   <push, wait for CI to go green again, re-run ship-pr>

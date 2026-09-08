@@ -305,8 +305,10 @@ race is real in every repo, and this part is how you stand against it.
 **Detect-and-rebase is this workflow's answer** (Dave, September 7, 2026,
 [#1546](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1546)). `ship-pr` dates the run
 behind your **required** check, counts what the trunk gained after it, and **refuses the merge** when
-that is not zero -- naming the commits and the two commands that bring the branch forward. It converges
-by repetition rather than by construction, and it runs anywhere.
+that is not zero -- naming the commits and the commands that bring the branch forward, the first of them
+a `git checkout` back onto the branch, because this run returned your tree to the trunk the moment the PR
+opened and the gate fires a whole CI wait later. It converges by repetition rather than by construction,
+and it runs anywhere.
 
 **So the one thing to close here is a required status check.** With none named, `ship-pr` prints *"no
 required check name is known -- not checked"* and the staleness guard is simply **off**. Making one CI
