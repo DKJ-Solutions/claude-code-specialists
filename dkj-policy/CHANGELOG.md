@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**16 / 33 minor entries** <!-- pending-tally -->
+**17 / 34 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1620-ship-resume-front-door · 20260908-144854
+
+A `ship-pr` run whose process does not survive the CI wait can be resumed from the checkout it was
+interrupted in. Step 2b puts that checkout back on the trunk as soon as the PR exists (#1073), so the
+re-run used to meet `You are on main; ship-pr runs from a branch` -- a refusal about the wrong problem,
+in a state where the killed process has usually taken the scrollback with it. The front door now asks
+whether an open PR exists whose head branch is in this checkout, and where it finds one it names the
+PR, the branch and the `git checkout` that resumes the ship, instead of refusing on the general rule.
+It stays best-effort: where `gh` cannot answer, the refusal is exactly the line it has always been.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow ships with the same script and the same step 2b, so the same
+interrupted ship is recoverable there without reading the source repo's issues -- and a consumer is
+where it is most expensive, because their operator has no `ship-pr.ps1` in front of them to read the
+comment the diagnosis used to live in.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr names the interrupted ship's branch at the front door instead of refusing on 'You are on main'
+
+Plugins: dkj-policy
+
+[PR #1634](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1634)
+
+---
 
 ### DEPLOY: fix/1623-ref-display-strip · 20260908-143357
 
