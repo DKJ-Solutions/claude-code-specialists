@@ -677,6 +677,34 @@ try {
     # to go looking for, and a path-shaped note here would be the wrong answer rather than a wording nit.
     Assert-True ($evil.Out -match [regex]::Escape('The branch name is: sync/live-2026-08-17;touch')) 'guard/unsafe: and names the real branch as PROSE, so the reader can still act on it'
 
+    # THE #821 CLASS AT THE PREDECESSOR READ (issue #1629), which is the one read that never had this pin.
+    # The accented path further up pins it at the ls-tree/mirror comparison; this read is the one that
+    # decides SUPERSESSION, and it asked git for the predecessor's file set with no core.quotePath of its
+    # own. git quotes a path with a byte above 0x7F by default, so that side arrived as
+    # '"sections/caf\303\251.liquid"' while the take set holds the decoded string from the mirror walk --
+    # no match, and a branch this run covers exactly reported as independent.
+    #
+    # THE WRONG ANSWER IS THE EXPENSIVE DIRECTION. 'all of them in this run' tells the operator to close
+    # that PR; 'NOT in this run' tells them both branches are needed. So the defect kept a redundant sync
+    # PR alive and told the operator the two were unrelated -- while naming a path that IS in the run.
+    # Its own accented name rather than the one above, so this case does not depend on that block's order.
+    $predAccented = 'sections/pr' + [char]0x00E9 + 'd' + [char]0x00E9 + 'cesseur.liquid'
+    $qpRepo = New-Consumer -Label 'guard-qp' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $qpRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Add-PredecessorBranch -Dir $qpRepo -Name 'sync/live-2026-08-18' -Files @{ $predAccented = 'a third party wrote this' }
+    $qpMirror = New-Mirror -Label 'guard-qp' -Files @{
+        'sections/theme.liquid'     = 'v1'
+        'sections/unrelated.liquid' = 'u1'
+    }
+    Set-FixtureFile -Root $qpMirror -Rel $predAccented -Value 'a third party wrote this'
+    $qp = Invoke-Sync -Dir $qpRepo -Mirror $qpMirror -Extra @('-DryRun')
+    Assert-True ($qp.Out -match 'all of them in this run') 'guard/quotepath: an accented path the predecessor captured is recognised in this run'
+    Assert-True ($qp.Out -notmatch 'NOT in this run') 'guard/quotepath: so the branch is not reported as independent when this run supersedes it'
+    Assert-True ($qp.Out -match 'close that PR') 'guard/quotepath: and the operator is told the action, which the wrong verdict withheld'
+    # THE QUOTED FORM MUST NOT REACH THE REPORT EITHER: an octal escape printed at the operator is the
+    # same wrong answer wearing a different face, and it is what a fix that only decoded HALF would leave.
+    Assert-True ($qp.Out -notmatch [regex]::Escape('\303\251')) 'guard/quotepath: no C-quoted octal escape is printed anywhere in the verdict'
+
     # A MERGED BRANCH IS NOT A PREDECESSOR. Its ref lingers here because the fixture has no
     # delete_branch_on_merge, which is exactly the consumer this script must not refuse forever.
     $mergedRepo = New-Consumer -Label 'guard-merged' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'

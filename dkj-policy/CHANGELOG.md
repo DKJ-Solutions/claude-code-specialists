@@ -43,7 +43,46 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**22 / 43 minor entries** <!-- pending-tally -->
+**23 / 44 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1629-predecessor-paths-quotepath · 20260908-172319
+
+`sync-main`'s standing-predecessor verdict now reads its file lists correctly, and prints them safely.
+Two defects, and the first is the one that gave a wrong answer: the `git diff` that asks what a
+predecessor branch captured set no `core.quotePath`, so git quoted any path with a byte above 0x7F while
+the paths it was compared against arrived decoded. A theme file with an accent in its name matched
+nothing, and a branch this run supersedes exactly was reported as independent -- which tells you to keep
+a redundant sync PR open, while naming a path that is in the run. That read now forces the flag and
+decodes it, the pair inbound #821 established and the neighbouring reads already used. Second, the paths
+printed under each verdict row are stripped of control and format characters, like the branch name
+#1623 stripped six lines above them. That strip became necessary rather than tidy with the first fix:
+git C-quotes a control character in every `core.quotePath` setting -- measured on 2.55 -- so it was
+closing that half by accident, and decoding on purpose hands the printer a live escape instead. Format
+characters were never covered either way. The strip is `Get-DisplayPath`, the path-shaped one #1638
+added, which does not collapse runs or trim -- so a path with a real space in it still names the file it
+names.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer with a non-ASCII theme file name was getting a wrong verdict, and nothing said so: the run
+was green, the report was confident, and the named path looked like evidence. The accented filename is
+not hypothetical in a Shopify theme, and the failure needed no hostile input at all -- just an accent
+and a standing sync PR. The second half prevents a file name from repainting the report it appears in.
+Nothing changes for an all-ASCII theme.
+
+**Score:** 3
+
+#### Pull Request
+
+sync-main reads and prints a predecessor's file paths correctly
+
+Plugins: dkj-team-shopify
+
+[PR #1652](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1652)
+
+---
 
 ### DEPLOY: fix/1627-trunk-and-lsremote-paste · 20260908-170957
 

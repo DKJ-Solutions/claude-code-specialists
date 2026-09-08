@@ -401,6 +401,14 @@ Assert-True ($shipText -match [regex]::Escape('$shipProgressRelShown = Get-Displ
 Assert-True ($syncText -match [regex]::Escape('$branchRow = Get-DisplayRef -Ref ([string]$r.Branch)')) 'sync-main.ps1 strips the ls-remote branch names in its predecessor rows'
 Assert-True ($syncText -match [regex]::Escape('STILL STANDING: $(Get-DisplayRef -Ref ([string]$s.Branch))')) 'and the standing-branch line the operator reads first, which prints the same names'
 
+# THE PATHS UNDER THAT ROW (#1629) -- the last of this script's path prints, after #1637/#1638 closed the
+# other three lists and the paste-ready remedy. Get-DisplayPath rather than Get-DisplayRef, asserted by
+# NAME: these rows are compared against live and typed back, so a collapsed or trimmed path names a
+# different file, which is exactly why #1638 made them two functions.
+Assert-True ($syncText -match [regex]::Escape('foreach ($p in $u) { Write-Host "      $(Get-DisplayPath -Path $p)"')) 'sync-main.ps1 strips the predecessor file paths it prints under that row'
+Assert-True (-not $syncText.Contains('foreach ($p in $u) { Write-Host "      $p"')) 'and no longer carries the raw interpolation those paths used to be printed with'
+Assert-True (-not ($syncText -match [regex]::Escape('foreach ($p in $u) { Write-Host "      $(Get-DisplayRef'))) 'and does NOT reach for the ref-shaped strip, which would collapse a path with a real space in it'
+
 # EVERY DISPLAY VARIABLE IS ASSIGNED ABOVE ITS FIRST USE, and this assert exists because the branch that
 # added them got it wrong. Both scripts run under `Set-StrictMode -Version Latest`, where reading an
 # unassigned variable does not print an empty string -- it THROWS, and the run dies at whatever line it
