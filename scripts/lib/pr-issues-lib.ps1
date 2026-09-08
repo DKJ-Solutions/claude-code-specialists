@@ -1811,21 +1811,30 @@ function Format-AuthoredText {
         THE WORDS STAY. The note only has to be READABLE; quoting the payload would keep it and add
         noise. Same choice and same reasoning as the sibling site.
 
-        THREE SITES CARRY THIS CLASS, and the count is stated because a wrong one is what made this gap
-        hard to find (that is the second half of #1612). Get-RemoteAheadNote (remote-ahead-lib.ps1) met
-        it first -- a commit's %an and %s, printed by new-branch and open-pr -- and its comment states
-        the reasoning quoted above. Get-PasteableRef (ref-print-lib.ps1, #1594) applies it to the note
-        it prints when a ref is refused, on the ground that a guard whose refusal path is itself an
-        injection surface is worse than no guard. This is the third.
+        TWO LIBS CARRY THIS CLASS, AND THE COUNT IS STATED BECAUSE A WRONG ONE IS WHAT MADE THIS GAP HARD
+        TO FIND (the second half of #1612). It was three until #1623, and the arrangement is worth reading
+        before it is changed again:
 
-        WRITTEN DOWN THREE TIMES RATHER THAN LIFTED INTO A SHARED HOME, which is the tree's own live
-        convention rather than a shortcut taken here: ref-print-lib re-typed the class deliberately with
-        remote-ahead-lib already in place, and recorded why at the line. The functions share nothing but
-        the class -- different bounds (120, 500 and none, each for its own reason), different source
-        processes, and no lib among them is loaded by another's callers, so a shared home would cost a
-        registry entry, a mirror, a dot-source line in every caller and a Copy-Item in every fixture
-        suite. What the copies must never do is DISAGREE -- so pr-issues.tests.ps1 pins all three to the
-        same character class and asserts the count, guarding the drift instead of designing it away.
+          - THIS LIB types it, for the reason above.
+          - ref-print-lib.ps1 types it, inside Get-DisplayRef -- the one definition of the prose strip
+            since #1623, applied at thirty-two printed sentences across ship-pr.ps1, sync-main.ps1,
+            remote-ahead-lib.ps1 and worktree-lib.ps1, and to this lib's sibling Get-PasteableRef note.
+          - remote-ahead-lib.ps1 typed the FIRST copy (a commit's %an and %s, #1439) and no longer does:
+            #1623 gave it a caller's reason to load ref-print-lib anyway -- the branch label in its own
+            sentence, which it had been printing raw beside the subject it sanitised -- and once the lib
+            was loaded a private copy was pure drift surface.
+
+        WHY THIS LIB STILL TYPES ITS OWN, which is the question the bullet above invites. The argument
+        that kept three copies apart -- different bounds (120, 500 and none), different source processes,
+        and no lib among them loaded by another's callers -- is still exactly true of THIS one: nothing
+        here has a reason to load ref-print-lib, so lifting the class would cost a dot-source in every
+        caller and a Copy-Item in every fixture suite to save one regex. remote-ahead-lib's case is the
+        one that changed, and it changed because it acquired the dependency for its own sake.
+
+        What the remaining copies must never do is DISAGREE -- so pr-issues.tests.ps1 compares them to the
+        same character class and asserts WHICH libs carry it, guarding the drift instead of designing it
+        away. A third site appearing again is not forbidden; it has to update that assert, this block and
+        the new-branch skill page, which is the claim #1612 was filed about.
     #>
     param([string]$Text)
 
