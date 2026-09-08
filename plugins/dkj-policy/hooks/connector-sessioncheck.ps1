@@ -19,7 +19,7 @@
         checkout's installed plugin version is the one the local marketplace clone holds. Only an
         install that is BEHIND its clone is surfaced as a finding; a stale CLONE is deliberately not
         one (it is a cache this checkout does not own, and shouting about it teaches the reader to
-        skim). Every branch of that path says the register checks did not run -- the #533 lesson
+        skim). Every branch of that path says the register checks did not run -- true of all four since #1606, the #533 lesson
         applied to a new code path, since a reader told "no errors" about checks that never happened
         has been handed a positive all-clear for nothing. Still exit 0;
     - blocking signals only ([FOUT]/[ERROR]/[DRIFTED]) -> compact summary in the
@@ -61,6 +61,21 @@
     slowest of the three (~2.6s, it runs the drift check per consumer), which is why the cost was
     measured before widening the matcher rather than assumed. See roster-sessioncheck.ps1's docstring
     for the full reasoning (JSON cannot carry a comment).
+
+    AND THE CONSUMER PATH IS NOT CHEAP EITHER, which the figure above does not say and used to imply:
+    ~2.6s is the WORKSHOP path, reachable only where a source checkout sits beside the consumer. The
+    #1591 fallback below measures 1.3-1.8s (Nolan, 2026-09-08) -- two nested powershell bring-ups plus
+    git in the clone -- and it fires on the path that is COMMON rather than rare. The dominant term is
+    the process spawn (~750ms floor), not the per-plugin git calls (~9ms matched, ~46ms behind), so the
+    cost is near-flat in the number of enabled plugins until roughly twenty of them.
+
+    THE MATCHER IS STILL RIGHT AND MUST NOT BE NARROWED TO PAY FOR IT. Dropping 'compact' would buy
+    back that cost per compaction and reintroduce exactly the silence the note above describes -- for
+    the new branch too, on every machine that has no source checkout, which is most of them. The
+    answer to the cost is a cache: nothing the fallback reads changes for the life of a session (the
+    install record and the clone are static, which is why the branch's own closing line tells the
+    reader to restart), so a session with four compactions pays it five times for one answer. Filed
+    rather than built here, to keep #1591 to the signal it was about.
 
 .PARAMETER WorkshopPathOverride
     (Optional, for tests) Skip the candidate search and use this path as the candidate
@@ -206,10 +221,19 @@ try {
             if (Test-Path -LiteralPath $cand -PathType Leaf) { $engine = $cand; break }
         }
 
+        # EVERY BRANCH FROM HERE DOWN SAYS THE REGISTER CHECKS DID NOT RUN, which is the #533 lesson
+        # applied to a new code path: a reader told 'no errors' about a run that never examined the
+        # register has been handed a positive all-clear for checks that did not happen. What is
+        # reported here is one question out of five, and the line says so. Defined ahead of the
+        # no-engine branch on purpose -- that branch is the one that inherited the pre-#1591 wording
+        # and was therefore the one sibling missing the phrase (#1606).
+        $skipped = 'no source checkout on this machine, so the register checks (consumer registration, lens inventory, agent-def drift) did not run'
+
         if (-not $engine) {
-            # A plugin install predating the mirror. Degrade to the line this hook printed before
-            # rather than inventing one: the state is the same as it always was.
-            Write-Host 'connector-sessioncheck: no verified workshop checkout found on this machine, and no plugin-versions engine beside this hook -- check skipped.'
+            # A plugin install predating the mirror. The verdict half degrades to what this hook
+            # printed before -- the state really is the same as it always was -- but the register
+            # half is stated here as in every other branch.
+            Write-Host "connector-sessioncheck: $skipped, and no plugin-versions engine sits beside this hook either -- version check skipped."
             exit 0
         }
 
@@ -218,12 +242,6 @@ try {
         $vsignals = @($vout | Where-Object { $_ -cmatch '^\s*\[ERROR\]' })
         $vnotices = @($vout | Where-Object { $_ -cmatch '^\s*\[INFO\]' })
         $vsummary = @($vout | Where-Object { $_ -cmatch '^\s*\[SUMMARY\]' } | ForEach-Object { $_.Trim() }) | Select-Object -First 1
-
-        # EVERY BRANCH BELOW SAYS THE REGISTER CHECKS DID NOT RUN. That is the #533 lesson applied
-        # to a new code path: a reader told 'no errors' about a run that never examined the register
-        # has been handed a positive all-clear for checks that did not happen. What is reported here
-        # is one question out of five, and the line says so.
-        $skipped = 'no source checkout on this machine, so the register checks (consumer registration, lens inventory, agent-def drift) did not run'
 
         if (-not $vsummary -and $vsignals.Count -eq 0 -and $vnotices.Count -eq 0) {
             # The engine produced nothing this hook recognises -- a broken install, or a shape change.
@@ -242,7 +260,19 @@ try {
         } else {
             # Nothing actionable. One line, carrying the tally rather than a bare all-clear, so
             # 'up to date' is distinguishable from 'could not be determined'.
-            Write-Host "connector-sessioncheck: $skipped. Version check: $($vsummary -replace '^\[SUMMARY\]\s*', '')"
+            #
+            # THE FALLBACK IS NOT DEFENSIVE PADDING (#1607). With no plugins enabled the engine says
+            # so in a single [INFO] line and emits no [SUMMARY] at all -- a real state, and the only
+            # one where its whole answer lives in a notice. Reading $vsummary unconditionally
+            # interpolated an empty string, so the line trailed off after 'Version check: ' and the
+            # one thing the engine had to say was dropped. Depending on the engine always emitting a
+            # summary was itself the defect, so this reads whichever half is actually there.
+            $verdict = if ($vsummary) {
+                $vsummary -replace '^\[SUMMARY\]\s*', ''
+            } else {
+                ($vnotices | ForEach-Object { $_.Trim() -replace '^\[INFO\]\s*', '' }) -join '; '
+            }
+            Write-Host "connector-sessioncheck: $skipped. Version check: $verdict"
         }
         exit 0
     }

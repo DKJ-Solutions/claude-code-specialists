@@ -34,6 +34,18 @@
                                                                     "cannot determine -- " (regression)
       13 asymmetric gap (b): install has a sha but no version, -> same regression, opposite side
          clone has a version but no HEAD/.gcs-sha
+      14 -Brief: a 'behind' verdict                            -> "[ERROR] <id>: <verdict> -- <action>"
+      15 -Brief: a 'clone-behind' verdict (stale clone)         -> "[INFO] <id>: <verdict>", NEVER
+                                                                    "[ERROR]" -- #1591's explicit instruction
+      16 -Brief: an 'indeterminate' verdict (foreign plugin)    -> "[INFO] <id>: <verdict>", NEVER "[ERROR]"
+      17 -Brief: 'match' / 'ver-match' verdicts                 -> nothing printed for that plugin; the
+                                                                    run's entire output is the [SUMMARY] line
+      18 -Brief: no plugins enabled                             -> one "[INFO] no plugins..." line, no
+                                                                    [SUMMARY], exit 0
+      19 -Brief: one run mixing every code at once               -> exactly one "[SUMMARY]" line, whose
+                                                                    counts partition all five rows
+      20 -Brief suppresses the header line; the default view    -> both pinned so neither mode can
+         (no -Brief) is unaffected and keeps its header             regress the other
     Every scenario asserts exit code 0 explicitly (this is a report, not a gate).
 
     Dependency-free (no Pester), same style as check-report-lib.tests.ps1 / adopt-workflow-folder.tests.ps1.
@@ -179,7 +191,7 @@ function Write-Admin {
 }
 
 function Invoke-PV {
-    param([Parameter(Mandatory = $true)][string]$Repo, [Parameter(Mandatory = $true)][string]$UserHome)
+    param([Parameter(Mandatory = $true)][string]$Repo, [Parameter(Mandatory = $true)][string]$UserHome, [switch]$Brief)
     # CLAUDE_PROJECT_DIR is pinned to the fixture checkout so the source-repo guard resolves a
     # deterministic root (a dir with no .claude-plugin/marketplace.json -> condition 2 fails -> the
     # guard returns nothing) instead of depending on the ambient env or `git rev-parse`. -RootOverride
@@ -189,6 +201,7 @@ function Invoke-PV {
     try {
         $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Script,
                '-RootOverride', $Repo, '-UserHomeOverride', $UserHome)
+        if ($Brief) { $a += '-Brief' }
         $run = Invoke-NativeCapture -FilePath 'powershell' -Arguments $a -Utf8
         $joined = ($run.Output | ForEach-Object { "$_" }) -join "`n"
         return [pscustomobject]@{
@@ -416,6 +429,124 @@ try {
     Assert-Has  $r 'no version in the install record' '13: names the missing version on the install side'
     Assert-Has  $r 'no HEAD or sha on the clone side' '13: names the missing HEAD/sha on the clone side'
     Assert-Has  $r '-- 1 could not be determined' '13: still counted as indeterminate in the summary tally'
+
+    # --- 14. -Brief: a 'behind' verdict -> "[ERROR] <id>: <verdict> -- <action>" ---------------------
+    Write-Host "14. -Brief: 'behind' -> [ERROR] with the action appended" -ForegroundColor Cyan
+    $c = New-Case 'brief-behind'
+    $shaA = New-Clone -Dir $c.Clone -Version '4.32.0'
+    $shaB = Add-CloneCommit -Dir $c.Clone
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '14: exit 0'
+    Assert-Equal (
+        "[ERROR] ${ID}: the clone is AHEAD of your install (same version string 4.32.0, newer commit) -- $UPD`n" +
+        "[SUMMARY] 1 plugin(s) enabled here: 1 behind, 0 up to date."
+    ) $r.Text.Trim() '14: the whole run is the marker line plus the summary, verbatim'
+
+    # --- 15. -Brief: a 'clone-behind' verdict (stale clone) -> "[INFO]", NEVER "[ERROR]" -------------
+    # THE REGRESSION #1591 NAMES EXPLICITLY: a stale clone is not an error. If this code is ever
+    # promoted to [ERROR], this assert is the one that must fail.
+    Write-Host "15. -Brief: 'clone-behind' -> [INFO], never [ERROR]" -ForegroundColor Cyan
+    $c = New-Case 'brief-clonebehind'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @(
+        (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '15: exit 0'
+    Assert-Has   $r "[INFO] $($ID): your install (deadbeefdead) is not in the clone's history" '15: reported as [INFO]'
+    Assert-Lacks $r '[ERROR]' '15: never promoted to [ERROR] -- the #1591 regression guard'
+    Assert-Has   $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 ahead of a stale clone, 0 up to date.' '15: the summary counts it as a stale clone, not as behind'
+
+    # --- 16. -Brief: an 'indeterminate' verdict (foreign plugin) -> "[INFO]", NEVER "[ERROR]" --------
+    Write-Host "16. -Brief: 'indeterminate' (foreign plugin) -> [INFO], never [ERROR]" -ForegroundColor Cyan
+    $c = New-Case 'brief-indeterminate'
+    New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @('dkj-team-alpha') | Out-Null
+    $foreign = 'foreign-thing@ccs-fixture'
+    Set-Enabled -RepoDir $c.Repo -Ids @($foreign)
+    Write-Admin -Path $c.Admin -Plugins @{ $foreign = @( (New-Rec -ProjectPath $c.Repo -Version '9.9.9' -Sha 'beefbeef') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '16: exit 0'
+    Assert-Has   $r "[INFO] $($foreign): cannot determine -- 'foreign-thing' is not in the clone's marketplace.json" '16: reported as [INFO]'
+    Assert-Lacks $r '[ERROR]' '16: never promoted to [ERROR]'
+    Assert-Has   $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 undetermined, 0 up to date.' '16: the summary counts it as undetermined'
+
+    # --- 17. -Brief: 'match' / 'ver-match' -> nothing printed for that plugin ------------------------
+    # With one plugin enabled, "nothing printed for that plugin" means the ENTIRE run is the
+    # [SUMMARY] line -- the strongest form of "emits nothing" this suite can pin.
+    Write-Host "17a. -Brief: 'match' -> the whole run is just the [SUMMARY] line" -ForegroundColor Cyan
+    $c = New-Case 'brief-match'
+    $head = New-Clone -Dir $c.Clone -Version '4.32.0'
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $head) ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '17a: exit 0'
+    Assert-Equal '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 up to date.' $r.Text.Trim() '17a: match emits nothing but the summary'
+
+    Write-Host "17b. -Brief: 'ver-match' -> the whole run is just the [SUMMARY] line, identically" -ForegroundColor Cyan
+    $c = New-Case 'brief-vermatch'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '17b: exit 0'
+    Assert-Equal '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 up to date.' $r.Text.Trim() '17b: ver-match emits nothing but the summary -- indistinguishable from match, by contract'
+
+    # --- 18. -Brief: no plugins enabled -> a single [INFO] line, no [SUMMARY], exit 0 -----------------
+    Write-Host "18. -Brief: no plugins enabled -> one [INFO] line, no [SUMMARY]" -ForegroundColor Cyan
+    $c = New-Case 'brief-none-enabled'
+    Set-Enabled -RepoDir $c.Repo -Ids @()
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '18: exit 0'
+    Assert-Equal '[INFO] no plugins are enabled for this checkout -- nothing to compare.' $r.Text.Trim() '18: exactly one INFO line and nothing else -- no [SUMMARY] when there is nothing to summarize'
+
+    # --- 19. -Brief: one run mixing every code -> exactly one [SUMMARY] line partitioning all rows ---
+    Write-Host "19. -Brief: a mix of every code -> one [SUMMARY] line, correctly partitioned" -ForegroundColor Cyan
+    $c = New-Case 'brief-mixed'
+    $mixNames = @('plug-behind', 'plug-clonebehind', 'plug-match', 'plug-vermatch')
+    $shaA = New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames $mixNames
+    $shaB = Add-CloneCommit -Dir $c.Clone
+    $foreignMix = 'plug-foreign@ccs-fixture'
+    $ids = @('plug-behind@ccs-fixture', 'plug-clonebehind@ccs-fixture', $foreignMix, 'plug-match@ccs-fixture', 'plug-vermatch@ccs-fixture')
+    Set-Enabled -RepoDir $c.Repo -Ids $ids
+    Write-Admin -Path $c.Admin -Plugins @{
+        'plug-behind@ccs-fixture'      = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) )
+        'plug-clonebehind@ccs-fixture' = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') )
+        $foreignMix                    = @( (New-Rec -ProjectPath $c.Repo -Version '9.9.9' -Sha 'beefbeef') )
+        'plug-match@ccs-fixture'       = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaB) )
+        'plug-vermatch@ccs-fixture'    = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') )
+    }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '19: exit 0'
+    $lines = @($r.Text -split "`n" | ForEach-Object { $_.TrimEnd("`r") })
+    $errLines = @($lines | Where-Object { $_ -match '^\[ERROR\]' })
+    $infoLines = @($lines | Where-Object { $_ -match '^\[INFO\]' })
+    $summaryLines = @($lines | Where-Object { $_ -match '^\[SUMMARY\]' })
+    Assert-Equal 1 $errLines.Count '19: exactly one [ERROR] line (only the behind plugin)'
+    Assert-True  ($errLines[0] -like "*plug-behind@ccs-fixture*") '19: the [ERROR] line names the behind plugin'
+    Assert-Equal 2 $infoLines.Count '19: exactly two [INFO] lines (the stale clone + the foreign plugin)'
+    Assert-True  (($infoLines -join '|') -like '*plug-clonebehind@ccs-fixture*') '19: one [INFO] line is the stale-clone plugin'
+    Assert-True  (($infoLines -join '|') -like '*plug-foreign@ccs-fixture*') '19: the other [INFO] line is the foreign plugin'
+    Assert-Equal 1 $summaryLines.Count '19: exactly one [SUMMARY] line for the whole run'
+    Assert-Equal '[SUMMARY] 5 plugin(s) enabled here: 1 behind, 1 ahead of a stale clone, 1 undetermined, 2 up to date.' $summaryLines[0] '19: the summary partitions all five rows correctly'
+    Assert-Lacks $r 'plug-match@ccs-fixture:'    '19: the match plugin gets no marker line of its own'
+    Assert-Lacks $r 'plug-vermatch@ccs-fixture:' '19: the ver-match plugin gets no marker line of its own'
+
+    # --- 20. -Brief suppresses the header; the default view keeps it, unaffected --------------------
+    Write-Host "20. -Brief has no header; the default (no -Brief) view is unchanged" -ForegroundColor Cyan
+    $c = New-Case 'brief-header'
+    $head = New-Clone -Dir $c.Clone -Version '4.32.0'
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $head) ) }
+    $rDefault = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    $rBrief   = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $rDefault.Code '20: default view exit 0'
+    Assert-Equal 0 $rBrief.Code   '20: brief view exit 0'
+    Assert-Has   $rDefault "plugin-versions -- $($c.Repo)" '20: the default view still prints its header (unchanged)'
+    Assert-Lacks $rDefault '[SUMMARY]' '20: the default view never emits the brief marker vocabulary'
+    Assert-Lacks $rBrief   'plugin-versions--'  '20: -Brief never prints the header line (an absolute path stays out of a session start)'
+    Assert-Has   $rBrief   '[SUMMARY]' '20: -Brief still emits its own summary'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
