@@ -24,6 +24,17 @@
     exactly as fold-on-merge.yml advances the real one. The fixture then fetches; the check under test
     never does.
 
+    AND SINCE #1601 THAT UPSTREAM COMMIT IS A WHOLE FOLD, not half of one. It used to only DELETE the
+    branch document, which was enough while the check asked whether the document was gone upstream; the
+    check asks whether the ENTRY is in CHANGELOG.md on that ref now, so Push-UpstreamFold writes it as
+    well -- through Format-BranchFileHeadingLine, the same formatter the fold itself writes it with. A
+    fixture that models half a commit cannot prove anything about the other half.
+
+    THE #1601 CASE IS THE ONE FIXTURE BUILT THE LONG WAY ROUND, because it needs a checkout that is
+    AHEAD as well as behind: origin gains an unrelated commit (Push-UpstreamUnrelated) while the branch
+    document arrives here as a local-only commit. Everything else in this file commits and pushes in one
+    go, which can never reach that state.
+
     Pure ASCII (repo convention for .ps1).
 #>
 $ErrorActionPreference = 'Stop'
@@ -47,8 +58,31 @@ function New-Tree {
     param([Parameter(Mandatory = $true)][string]$Label)
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("unfoldedgate-$PID-$Label-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
     New-Item -ItemType Directory -Path (Join-Path $dir 'dkj-policy') -Force | Out-Null
+    # A CHANGELOG.md IN EVERY TREE SINCE #1601, because that is now the file the upstream question is
+    # asked of. Without one 'git show <ref>:...' fails and Test-BranchFoldedOnRef answers $null -- the
+    # right VERDICT for a stranded document, reached for the wrong reason, which is exactly the kind of
+    # accidental pass a fixture must not hand out.
+    Set-Changelog -Dir $dir
     $script:trees += $dir
     return $dir
+}
+
+function Set-Changelog {
+    # The changelog's pending head, and optionally a folded entry per branch -- headings from the REAL
+    # formatter, never a literal here, for the same reason the documents come from Format-Development.
+    param(
+        [Parameter(Mandatory = $true)][string]$Dir,
+        [string[]]$FoldedBranch = @()
+    )
+    $lines = @('# Changelog', '', (Get-ChangelogUnreleasedHeading), '')
+    foreach ($b in $FoldedBranch) {
+        $lines += (Format-BranchFileHeadingLine -Branch $b -Title (Get-BranchFileWording).ChangelogTitle -Level (Get-EntryHeadingLevel))
+        $lines += @('', "Folded entry for $b.", '')
+    }
+    $target = Join-Path $Dir 'dkj-policy\CHANGELOG.md'
+    $parent = Split-Path -Parent $target
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    [System.IO.File]::WriteAllText($target, ($lines -join "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
 }
 
 function Set-Doc {
@@ -128,13 +162,19 @@ function Initialize-GitTree {
 
 function Push-UpstreamFold {
     <# Advance origin/main PAST this checkout, the way fold-on-merge.yml does: delete the branch
-       document(s) and commit. Done in a second clone so the fixture under test stays BEHIND -- which is
-       the whole condition #1585 is about. The fixture then fetches, because the check reads the
-       remote-tracking ref from disk and deliberately never fetches for itself. #>
+       document(s), ADD their entries to CHANGELOG.md, and commit. Done in a second clone so the fixture
+       under test stays BEHIND -- which is the whole condition #1585 is about. The fixture then fetches,
+       because the check reads the remote-tracking ref from disk and deliberately never fetches for itself.
+
+       IT WROTE ONLY THE DELETION UNTIL #1601, which was half a fold commit. That was enough while the
+       check asked whether the document was gone upstream; it is not enough now that the check asks
+       whether the ENTRY is there, and a fixture that models half a commit cannot prove anything about
+       the other half. -FoldBranch is the branch each removed document belonged to. #>
     param(
         [Parameter(Mandatory = $true)][string]$Dir,
         [Parameter(Mandatory = $true)][string]$Bare,
-        [Parameter(Mandatory = $true)][string[]]$RemoveRel
+        [Parameter(Mandatory = $true)][string[]]$RemoveRel,
+        [Parameter(Mandatory = $true)][string[]]$FoldBranch
     )
     $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("unfoldedgate-$PID-upstream-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
     $script:trees += $clone
@@ -143,7 +183,31 @@ function Push-UpstreamFold {
     Invoke-GitStep -GitArgs @('-C', $clone, 'config', 'user.email', 'fold@test.invalid')
     Invoke-GitStep -GitArgs @('-C', $clone, 'config', 'commit.gpgsign', 'false')
     foreach ($rel in $RemoveRel) { Invoke-GitStep -GitArgs @('-C', $clone, 'rm', '--quiet', ($rel -replace '/', '\')) }
+    Set-Changelog -Dir $clone -FoldedBranch $FoldBranch
+    Invoke-GitStep -GitArgs @('-C', $clone, 'add', '-A')
     Invoke-GitStep -GitArgs @('-C', $clone, 'commit', '-m', 'fold: upstream', '--quiet')
+    Invoke-GitStep -GitArgs @('-C', $clone, 'push', '--quiet', 'origin', 'main')
+    Invoke-GitStep -GitArgs @('-C', $Dir, 'fetch', '--quiet', 'origin')
+}
+
+function Push-UpstreamUnrelated {
+    <# Advance origin/main by a commit that has NOTHING to do with any fold -- somebody else's work
+       landing on the trunk. The #1601 fixture needs it: that state is a checkout AHEAD and BEHIND, and
+       the "behind" half must not itself be a fold, or the case being tested would be resolved by the
+       upstream commit rather than reported by the check. #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Dir,
+        [Parameter(Mandatory = $true)][string]$Bare
+    )
+    $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("unfoldedgate-$PID-unrelated-" + [guid]::NewGuid().ToString('N').Substring(0, 6))
+    $script:trees += $clone
+    Invoke-GitStep -GitArgs @('clone', '--quiet', $Bare, $clone)
+    Invoke-GitStep -GitArgs @('-C', $clone, 'config', 'user.name', 'somebody else')
+    Invoke-GitStep -GitArgs @('-C', $clone, 'config', 'user.email', 'other@test.invalid')
+    Invoke-GitStep -GitArgs @('-C', $clone, 'config', 'commit.gpgsign', 'false')
+    [System.IO.File]::WriteAllText((Join-Path $clone 'upstream.txt'), "unrelated`n", (New-Object System.Text.UTF8Encoding($false)))
+    Invoke-GitStep -GitArgs @('-C', $clone, 'add', '-A')
+    Invoke-GitStep -GitArgs @('-C', $clone, 'commit', '-m', 'unrelated upstream work', '--quiet')
     Invoke-GitStep -GitArgs @('-C', $clone, 'push', '--quiet', 'origin', 'main')
     Invoke-GitStep -GitArgs @('-C', $Dir, 'fetch', '--quiet', 'origin')
 }
@@ -258,7 +322,7 @@ try {
     $stale = New-Tree -Label 'stale'
     Set-Doc -Dir $stale -Branch 'feat/alpha'
     $bare = Initialize-GitTree -Dir $stale
-    Push-UpstreamFold -Dir $stale -Bare $bare -RemoveRel @((Get-BranchFilePaths -Branch 'feat/alpha').File)
+    Push-UpstreamFold -Dir $stale -Bare $bare -RemoveRel @((Get-BranchFilePaths -Branch 'feat/alpha').File) -FoldBranch @('feat/alpha')
     $r = Invoke-Script -Dir $stale -Branch 'main'
     Assert-True ($r.Code -eq 0 -and $r.Out -match '\[WARN\]' -and $r.Out -notmatch '\[ERROR\]') `
         'the fold already landed on origin -- [WARN] and exit 0, never the skipped-fold [ERROR]'
@@ -271,12 +335,55 @@ try {
     Set-Doc -Dir $mix -Branch 'feat/alpha'
     Set-Doc -Dir $mix -Branch 'fix/beta'
     $bareMix = Initialize-GitTree -Dir $mix
-    Push-UpstreamFold -Dir $mix -Bare $bareMix -RemoveRel @((Get-BranchFilePaths -Branch 'feat/alpha').File)
+    Push-UpstreamFold -Dir $mix -Bare $bareMix -RemoveRel @((Get-BranchFilePaths -Branch 'feat/alpha').File) -FoldBranch @('feat/alpha')
     $r = Invoke-Script -Dir $mix -Branch 'main'
     Assert-True ($r.Code -eq 1 -and $r.Out -match '\[ERROR\]' -and $r.Out -match 'fold-changelog-entry\.ps1 -Branch fix/beta' -and $r.Out -notmatch 'fold-changelog-entry\.ps1 -Branch feat/alpha') `
         'one folded upstream, one genuinely stranded -- exit 1, and only the stranded one is offered a fold'
     Assert-True ($r.Out -match 'git pull --ff-only' -and $r.Out -match 'Already folded on origin.*feat-alpha') `
         'and the mixed report names the gap and says the pull clears the other document'
+
+    # --- a checkout that is BOTH ahead and behind (issue #1601) -----------------------------------
+    Write-Host ''
+    Write-Host 'check-unfolded-entry.ps1 -- a DIVERGED checkout (#1601)'
+
+    # THE STATE #1585 LEFT MISREAD, and the one case in this file whose fixture has to be built the long
+    # way round: New-Tree + Initialize-GitTree commit everything at once, and this needs the document to
+    # arrive as a LOCAL-ONLY commit while origin moves on independently. Ahead 1, behind 1 -- so
+    # HEAD..origin/main is non-zero, the gap gate #1585 used would open, and the document is absent from
+    # origin's tree for a reason that has nothing to do with a fold.
+    $div = New-Tree -Label 'diverged'
+    $divBare = Initialize-GitTree -Dir $div
+    # origin gains a commit of its own -- this checkout is now BEHIND.
+    Push-UpstreamUnrelated -Dir $div -Bare $divBare
+    # ...and gains a merged-but-unfolded document that is only ever committed locally -- now AHEAD too.
+    Set-Doc -Dir $div -Branch 'feat/alpha'
+    Invoke-GitStep -GitArgs @('-C', $div, 'add', '-A')
+    Invoke-GitStep -GitArgs @('-C', $div, 'commit', '-m', 'merge: feat/alpha (fold never ran)', '--quiet')
+    Invoke-GitStep -GitArgs @('-C', $div, 'fetch', '--quiet', 'origin')
+    $r = Invoke-Script -Dir $div -Branch 'main'
+    Assert-True ($r.Code -eq 1 -and $r.Out -match '\[ERROR\]' -and $r.Out -match 'fold-changelog-entry\.ps1 -Branch feat/alpha') `
+        'ahead AND behind, entry not in origin CHANGELOG.md -- the fold is owed, [ERROR] exit 1'
+    Assert-True ($r.Out -notmatch 'ALREADY been folded') `
+        'and it is never called already folded -- the pull it used to prescribe cannot fast-forward here'
+
+    # --- Test-BranchFoldedOnRef, the lib function ------------------------------------------------
+    Write-Host ''
+    Write-Host 'Test-BranchFoldedOnRef'
+
+    . (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
+    $refMain = 'refs/remotes/origin/main'
+    Assert-True ((Test-BranchFoldedOnRef -RepoRoot $stale -Ref $refMain -Branch 'feat/alpha') -eq $true) `
+        'origin carries the entry -- $true'
+    Assert-True ((Test-BranchFoldedOnRef -RepoRoot $div -Ref $refMain -Branch 'feat/alpha') -eq $false) `
+        'origin readable and does not name the branch -- $false, not $null'
+    Assert-True ($null -eq (Test-BranchFoldedOnRef -RepoRoot $stale -Ref $refMain -Branch '')) `
+        'no branch to key on -- $null'
+    Assert-True ($null -eq (Test-BranchFoldedOnRef -RepoRoot $stale -Ref '' -Branch 'feat/alpha')) `
+        'no ref -- $null'
+    Assert-True ($null -eq (Test-BranchFoldedOnRef -RepoRoot $stale -Ref $refMain -Branch 'feat/alpha' -ChangelogRel 'dkj-policy/no-such-file.md')) `
+        'no changelog at that ref -- $null, which the check reads as NOT folded'
+    Assert-True ((Test-BranchFoldedOnRef -RepoRoot $stale -Ref $refMain -Branch 'feat/alph') -eq $false) `
+        'a prefix of the folded branch does not answer for it -- matched as a whole name'
 
     # --- unfolded-entry-sessioncheck.ps1, the hook (always exit 0) --------------------------------
     Write-Host ''
@@ -298,7 +405,7 @@ try {
     $hs = New-Tree -Label 'hook-stale'
     Set-Doc -Dir $hs -Branch 'feat/alpha'
     $bareHs = Initialize-GitTree -Dir $hs
-    Push-UpstreamFold -Dir $hs -Bare $bareHs -RemoveRel @((Get-BranchFilePaths -Branch 'feat/alpha').File)
+    Push-UpstreamFold -Dir $hs -Bare $bareHs -RemoveRel @((Get-BranchFilePaths -Branch 'feat/alpha').File) -FoldBranch @('feat/alpha')
     $r = Invoke-Hook -Dir $hs
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'this checkout is just behind origin' -and $r.Out -match 'git pull --ff-only' -and $r.Out -notmatch 'its fold never ran') `
         'the fold already landed on origin -- the hook reports the stale checkout, never the skipped-fold sentence'
