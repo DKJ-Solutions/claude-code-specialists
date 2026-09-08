@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**16 / 29 minor entries** <!-- pending-tally -->
+**16 / 30 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1612-relay-sanitise · 20260908-135612
+
+`ship-pr` prints the sentence a failing workflow wrote about itself, and it now strips the control and
+format characters out of that sentence before it reaches your terminal -- the same guard the
+"N commits behind" line has always had on a commit subject. An ANSI or OSC escape in a workflow's own
+`::error title=...::` can no longer repaint the console it is relayed into, and an RTL override can no
+longer make the relayed line read as something other than what it says. The words are kept; only the
+characters that act rather than read are removed. The 500-character cap is unchanged.
+
+Small, because it prevents a failure that has not happened: the author of an annotation is whoever writes
+the repo's own workflows, which is a high-trust surface. It is worth more than a 1 in one specific shape
+that is ordinary practice -- a workflow echoing untrusted input into `::error title=...::`, such as a PR
+title, a branch name or a third-party action's output -- where the relayed text stops being the author's
+own.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+It closes a claim as well as a gap. A page in the tree told readers this workflow printed
+externally-authored text to a console in exactly one place, so nobody had reason to look for the second
+one -- and the comment beside the second one already described itself as guarded. The repair makes three
+statements agree with the code instead of one, and pins the two sanitisers to each other so the next
+reader inherits a checkable arrangement rather than a claim.
+
+**Score:** N/A
+
+#### Pull Request
+
+Strip control and format characters from the relayed annotation, and correct the only-place claim
+
+Plugins: dkj-policy
+
+[PR #1621](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1621)
+
+---
 
 ### DEPLOY: feat/1591-consumer-version-verdict · 20260908-134603
 
