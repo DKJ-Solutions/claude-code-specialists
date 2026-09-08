@@ -43,7 +43,72 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**14 / 24 minor entries** <!-- pending-tally -->
+**14 / 26 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1602-merge-on-required-green · 20260908-125722
+
+`ship-pr` no longer holds the merge behind checks the ruleset does not require. Step 3 blocks on the
+required checks only; the rest are waited for and reported at a new step 8, after the fold. That
+stops the trunk from voiding a valid certificate during a wait nothing was gated on -- measured at
+5.1% of 99 laps, and 62.5% of the tail-governed laps on the busiest day in the sample, each one
+costing a whole further CI cycle. With no required check known the wait is byte-for-byte the old
+one, so a repo without a ruleset is untouched.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- `ship-pr` is the maintainer's shipping tool. No subscriber of anything reaches it, and the
+consuming repos that do run it meet it as the same command with a shorter path to the merge.
+
+**Score:** N/A
+
+#### Pull Request
+
+ship-pr merges as soon as every required check is green
+
+Plugins: dkj-policy
+
+[PR #1614](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1614)
+
+---
+
+### DEPLOY: fix/1594-printed-command-ref-safety · 20260908-123649
+
+Seven printed, paste-ready commands across `ship-pr.ps1` and `sync-main.ps1` interpolated the branch
+name raw. git's ref rules admit `;`, `&`, `|`, `` ` ``, `$( )` and the apostrophe -- so a legal branch
+name could carry a shell metacharacter into a line the reader, often an agent session, pastes and runs.
+Quoting does not close it in either direction: command substitution runs inside double quotes in bash
+and PowerShell alike, and a legal apostrophe terminates single quotes. The new shared
+`Get-PasteableRef` refuses to put such a name in a command at all -- it prints `<branch>` and names the
+branch beneath, outside any command context -- and `Test-BranchName` now holds the same allowlist so a
+branch this workflow creates is safe by construction. Both halves exist because neither closes it
+alone.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The repair the report proposed does not work, and that is the durable part. "Quote the variable" is the
+reflex, and this is a measured case where both spellings fail for different reasons -- which is why the
+answer is a refusal rather than an escape, and why the reasoning is written into the lib's own header
+where the next person to reach for quotes will find it.
+
+The other half is the size. The issue reported three sites of seven, in good faith, from the outside;
+the pickup check is what found the other four. A repair that had satisfied the report would have left
+four live and carried a citation saying the class was closed.
+
+**Score:** N/A
+
+#### Pull Request
+
+A branch name is never interpolated raw into a printed, paste-ready command
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1615](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1615)
+
+---
 
 ### DEPLOY: fix/1600-branch-pickup-divergence · 20260908-121846
 

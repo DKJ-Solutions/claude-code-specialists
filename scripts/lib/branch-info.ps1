@@ -103,6 +103,10 @@ function Test-BranchName {
             ABOUT chores.
           - name contains the substring 'final' (case-insensitive, so also 'finalize'/'refinalization' --
             deliberately broad; see below)
+          - name contains a character outside [A-Za-z0-9._/-], or does not start with a letter or a
+            digit. A SHELL rule, not a taste rule: this workflow prints the branch name into paste-ready
+            commands and quoting does not make a metacharacter safe (issue #1594; see the block at the
+            end of this function for the measurement and for why the print sites are guarded separately)
 
         WHY 'final' IS REFUSED, IN DAVE'S OWN WORDS (August 7, 2026): "je weet nooit zeker of iets echt
         final is" -- you can never be certain something really is final. A branch named for being the last
@@ -154,6 +158,35 @@ function Test-BranchName {
         return [pscustomobject]@{
             IsValid = $false
             Reason  = "Branch name must not contain the token 'final' -- you can never be sure something really is final, and the next round then has to be called 'final-2'. Use a version suffix instead, e.g. 'fix/template-newline-v2'."
+            IsKnown = $false
+        }
+    }
+
+    # THE CHARACTER SET, AND IT IS A SHELL RULE RATHER THAN A TASTE RULE (issue #1594, September 8, 2026).
+    # git's own ref rules reject ASCII control characters and the space and admit everything else, so
+    # `fix/evil;touch`, `fix/evil$(touch)` and `fix/it's-fine` are all legal branch names -- measured with
+    # `git check-ref-format --branch`, exit 0 for each. This workflow PRINTS the branch name into
+    # paste-ready commands (ship-pr's stale-CI and fold remedies, sync-main's push and PR lines), and
+    # neither single nor double quoting closes that: `$( )` runs inside double quotes in bash and in
+    # PowerShell alike, and a legal apostrophe terminates single quotes. So the name is held to the
+    # characters that are inert in every shell a remedy might be pasted into.
+    #
+    # THIS IS THE CREATION-SIDE HALF AND IT DOES NOT CLOSE THE HOLE ALONE -- deliberately. This file is
+    # REPO-OWNED and per-consumer (the script contract requires the function, not its body; the config
+    # blueprint carries seam VALUES, not this rule), and a branch that was cloned, fetched, or created
+    # with plain `git checkout -b` never meets it. The half that travels is Get-PasteableRef in the
+    # mirrored scripts\lib\ref-print-lib.ps1, which guards the print sites themselves. Both exist because
+    # each is wrong to rely on alone: this one stops the workflow AUTHORING such a name -- new-branch's
+    # -Name is where a session, often a model, types one -- and that one stops any name reaching a command.
+    #
+    # MEASURED BEFORE IT WAS ADOPTED: all 994 pull-request head refs in this repo's history match the
+    # pattern, so it refuses nothing anybody here has ever wanted. The first character is pinned to a
+    # letter or digit so a name cannot read as a flag; git already rejects a leading '-' (exit 128), which
+    # makes that half belt-and-braces rather than load-bearing.
+    if ($Branch -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]*$') {
+        return [pscustomobject]@{
+            IsValid = $false
+            Reason  = "Branch name may only contain letters, digits, '.', '_', '-' and '/', and must start with a letter or a digit. This workflow prints the branch name into commands that get pasted into a shell, and a character like ';', '&', '|', '`$' or a quote is not made safe by quoting it (issue #1594). Rename it using those characters only."
             IsKnown = $false
         }
     }

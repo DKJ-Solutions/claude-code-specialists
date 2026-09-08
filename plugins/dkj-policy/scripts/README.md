@@ -113,6 +113,7 @@ an absent link is a fact rather than an oversight.
 | `lib/worktree-lib.ps1` | reads `git worktree list --porcelain`: who holds which branch, and which tree is the primary one | none — dot-sourced lib |
 | `lib/git-identity-lib.ps1` | the identity a checkout acts as on the tracker and the identity it commits as, read once for every caller that needs either | none — dot-sourced lib |
 | `lib/claim-issue-lib.ps1` | the two decisions `claim-issue.ps1` makes: which account this checkout claims under, and whether the issue in front of it may be claimed at all | none — dot-sourced lib |
+| `lib/ref-print-lib.ps1` | `Get-PasteableRef` — may this branch name go into a printed command a reader will run verbatim? Returns the placeholder and the explaining line when it may not, because git accepts shell metacharacters in a ref and no quoting closes that | none — dot-sourced lib |
 <!-- /shared-scripts:mirror -->
 
 ## How the mirror works
