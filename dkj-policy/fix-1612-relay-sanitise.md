@@ -62,14 +62,29 @@ the relay. That sentence is what stops a reader looking for a second site.
 
 #### What was NOT done, and why
 
-**No third lib.** The obvious DRY move -- lift the character class into a shared helper -- was priced and
-declined. `native-capture-lib.ps1` is the only lib both dependency chains already load and it carries a
-written request not to be widened again (`park-lib.ps1` and `gate-lib.ps1` both cite it); a new lib would
-cost a registry entry in `shared-scripts-lib.ps1`, a mirror, a dot-source line in four callers and a
-`Copy-Item` in four fixture suites. The two relays share nothing but the class: different bounds (120
-against 500, and #1116 measured the 500 twice), different source processes. So the class is written twice
-and the **drift** is pinned by an assert comparing the two patterns -- which is what a shared home would
-have bought, at the cost of the machinery.
+**No shared home for the class.** The obvious DRY move -- lift it into a helper both libs load -- was
+priced and declined. `native-capture-lib.ps1` is the only lib both dependency chains already load, and it
+carries a written request not to be widened again (`park-lib.ps1` and `gate-lib.ps1` both cite it); a new
+lib would cost a registry entry in `shared-scripts-lib.ps1`, a mirror, a dot-source line in every caller
+and a `Copy-Item` in every fixture suite. The functions share nothing but the class: different bounds,
+different source processes.
+
+**And the tree settled that question one day before this branch, in the other direction.** #1594 landed
+`scripts/lib/ref-print-lib.ps1` on September 8, 2026, and `Get-PasteableRef` **re-typed this same
+character class** with `remote-ahead-lib` already in place, recording at the line why ("a guard whose
+refusal path is itself an injection surface is worse than no guard"). So hand-typing the class and citing
+its source is the live convention here, not a shortcut this branch invented. What the copies may not do is
+disagree -- which is what the assert buys, at none of the machinery's cost.
+
+#### And that lib arrived mid-branch, which changed a claim this branch was writing
+
+`ref-print-lib.ps1` reached `main` while this PR was in CI (#1618), and the merge that brought the branch
+forward is where it turned up. The first draft of this repair said the class lived in **two** libs, in the
+docstring, on the skill page and in `new-branch.tests.ps1` -- a count a reader falsifies with one `grep`,
+which is precisely the defect #1612's second half is about. Corrected to **three** in all four places
+before the merge, and the count is now asserted rather than asserted-in-prose: `pr-issues.tests.ps1`
+enumerates `scripts/lib/*.ps1` and pins the set to exactly those three, naming the two documents a fourth
+site has to update.
 
 **The 500 is untouched**, as the report asks. Only the character class was in question.
 
@@ -85,8 +100,8 @@ have bought, at the cost of the machinery.
       order are load-bearing: a newline is itself a control character, so stripping first would leave no
       first line to take; capping first would count characters the reader never sees.
 - [x] `Get-MissingCheckSuiteNote`'s neighbouring comment now describes what the function does.
-- [x] The skill page's retired claim replaced by the two sites, their two bounds, and the assert that
-      keeps them from disagreeing -- and the same claim in `new-branch.tests.ps1` corrected with it.
+- [x] The skill page's retired claim replaced by the **three** sites, their three bounds, and the assert
+      that keeps them from disagreeing -- and the same claim in `new-branch.tests.ps1` corrected with it.
 - [x] Plugin mirror rebuilt (`scripts/sync/build-shared-scripts.ps1`).
 
 ### TEST
@@ -95,7 +110,10 @@ have bought, at the cost of the machinery.
       the note; the words on either side of the override survive in the order they were written; no
       double space is left where an escape was; and a format-character-only title falls through rather
       than winning. Fixtures carry `\u` escapes, so the suite stays pure ASCII.
-- [x] Plus the drift pin: both libs carry the same class, and this lib carries exactly **one** copy of it.
+- [x] Plus the drift pin: all three libs carry the same class, this lib carries exactly **one** copy of
+      it, and `scripts/lib/` holds no fourth site -- the count itself is an assert now.
+- [x] Merged `origin/main` after the staleness guard refused the first ship (a non-fold commit had landed
+      behind the certifying run, exactly what #1292 exists for), then re-ran the gate on the merged tree.
 - [x] `scripts/tests/pr-issues.tests.ps1` -- 759 asserts, all passing.
 - [x] Full lint + suite gate via `open-pr.ps1`.
 

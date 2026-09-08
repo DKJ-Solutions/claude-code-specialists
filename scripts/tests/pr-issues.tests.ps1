@@ -1358,14 +1358,24 @@ $annBlankTitle = '[{"annotation_level":"failure","title":"\u200b\u202e","message
 Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annBlankTitle) -like 'real*') 'a title of nothing but format characters is untitled, and the next annotation wins'
 Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson '[{"annotation_level":"failure","title":"\u202e","message":"m"}]') 'and on its own it produces no note at all, not an empty-titled one'
 
-# THE DRIFT PIN. The class is written down in two libs -- here and in remote-ahead-lib.ps1 -- because
-# the two relays share nothing else: different bounds (500 against 120), different source processes,
-# and neither lib is loaded by the other's callers. Two hand-typed copies may not DISAGREE, so the
-# character class itself is compared rather than described.
+# THE DRIFT PIN, ACROSS ALL THREE SITES. The class is hand-typed in three libs -- here,
+# remote-ahead-lib.ps1 (a commit's %an and %s, #1439) and ref-print-lib.ps1 (the note printed when a ref
+# is refused, #1594) -- because those functions share nothing else: different bounds (500, 120 and
+# none), different source processes, and no lib among them is loaded by another's callers. The tree
+# chose that arrangement knowingly, ref-print-lib having re-typed the class with remote-ahead-lib
+# already in place. What three hand-typed copies may not do is DISAGREE, so the character class itself
+# is compared rather than described -- and the COUNT is asserted too, because #1612's second half was a
+# stale claim about exactly this count.
 $prIssuesLibText  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1'))
 $remoteAheadText  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\remote-ahead-lib.ps1'))
+$refPrintText     = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1'))
 Assert-True ($prIssuesLibText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'this lib carries the strip pattern'
 Assert-True ($remoteAheadText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'and so does the sibling relay it was copied from'
+Assert-True ($refPrintText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'and so does the third site, which re-typed it deliberately (#1594)'
+$classSites = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '..\lib') -Filter '*.ps1' |
+                Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match ([regex]::Escape('[\p{Cc}\p{Cf}]')) } |
+                ForEach-Object { $_.Name } | Sort-Object)
+Assert-NameSet @('pr-issues-lib.ps1', 'ref-print-lib.ps1', 'remote-ahead-lib.ps1') $classSites 'THREE libs strip this class and no more -- a fourth site has to update the count in Format-AuthoredText and on the new-branch skill page, which is the claim #1612 was filed about'
 Assert-Equal 1 ([regex]::Matches($prIssuesLibText, [regex]::Escape("-replace '[\p{Cc}\p{Cf}]', ' '")).Count) 'ONE definition inside this lib -- Format-AuthoredText, which both the title and the message go through'
 
 # --- The two caps that bound the SAME string, pinned so neither moves alone (#1116) ---------------

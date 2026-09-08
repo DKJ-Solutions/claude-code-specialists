@@ -1789,14 +1789,21 @@ function Format-AuthoredText {
         THE WORDS STAY. The note only has to be READABLE; quoting the payload would keep it and add
         noise. Same choice and same reasoning as the sibling site.
 
-        THE SIBLING SITE IS Get-RemoteAheadNote (remote-ahead-lib.ps1), which met this class first --
-        a commit's %an and %s, printed by new-branch and open-pr -- and whose comment states the
-        reasoning quoted above. The class is written in two libs rather than lifted into a third: the
-        two functions share nothing else, their bounds differ for measured reasons (120 against 500,
-        and #1116 measured the 500 twice), and neither lib is loaded by the other's callers, so a
-        shared home would cost a new mirror entry and a dot-source line in every caller and both
-        fixture suites. What the two copies must never do is DISAGREE -- so pr-issues.tests.ps1 pins
-        them to the same character class, guarding the drift instead of designing it away.
+        THREE SITES CARRY THIS CLASS, and the count is stated because a wrong one is what made this gap
+        hard to find (that is the second half of #1612). Get-RemoteAheadNote (remote-ahead-lib.ps1) met
+        it first -- a commit's %an and %s, printed by new-branch and open-pr -- and its comment states
+        the reasoning quoted above. Get-PasteableRef (ref-print-lib.ps1, #1594) applies it to the note
+        it prints when a ref is refused, on the ground that a guard whose refusal path is itself an
+        injection surface is worse than no guard. This is the third.
+
+        WRITTEN DOWN THREE TIMES RATHER THAN LIFTED INTO A SHARED HOME, which is the tree's own live
+        convention rather than a shortcut taken here: ref-print-lib re-typed the class deliberately with
+        remote-ahead-lib already in place, and recorded why at the line. The functions share nothing but
+        the class -- different bounds (120, 500 and none, each for its own reason), different source
+        processes, and no lib among them is loaded by another's callers, so a shared home would cost a
+        registry entry, a mirror, a dot-source line in every caller and a Copy-Item in every fixture
+        suite. What the copies must never do is DISAGREE -- so pr-issues.tests.ps1 pins all three to the
+        same character class and asserts the count, guarding the drift instead of designing it away.
     #>
     param([string]$Text)
 
