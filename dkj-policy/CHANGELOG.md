@@ -43,7 +43,51 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**26 / 52 minor entries** <!-- pending-tally -->
+**26 / 53 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1667-review-dispatch-worktree · 20260908-204043
+
+A dispatched review runs in the primary checkout and never in `isolation: "worktree"`, and Chris's
+portable manual now says so at the one place a reader meets the question -- the *Delegating parallel
+work* section, which already named worktree isolation as an option. #1667 filed the call as the
+owner's because its own first bullet was inferred; both halves were probed instead, in this repo, on
+September 8, 2026.
+
+The flag is worse than the hazard it would remove. A dispatched worktree is a fresh checkout of the
+primary's **HEAD commit** on a branch of the harness's own making, with a clean `git status`: an
+untracked file and a tracked edit made seconds earlier were both invisible inside it. A review sits
+*before* the PR, so the tree it would read is the one without the change, and what comes back is a
+confident "no findings" carrying nothing that says which tree it read. And the worktree lands at
+`.claude/worktrees/agent-<id>` **inside** the checkout, ignored by nothing, so while it stands the
+primary's own `git status` carries `?? .claude/worktrees/` -- it dirties the tree it was dispatched
+to protect. That is why the repo's lane mechanism puts its worktrees in a sibling directory; the
+harness flag does not offer the choice.
+
+So the `working-copy-boundary` block -- #1665, merged the same evening this was measured -- stays the
+whole of the answer for reviewers, and it is not weakened by being unenforceable: `isolation` is set
+by the caller at dispatch and lives in no agent def, so no lint gate could ever have reached it. The
+section now sits under the bullets #1665 added rather than restating them, and worktree isolation
+stands for the case the `fork` bullet named it for -- several sub-agents writing the same files at
+once -- with both costs named there rather than waived.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. This is guidance in an orchestrator's on-demand
+manual about how sub-agents are dispatched; no behaviour anybody invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The review chain is not dispatched into a worktree, and the measurement says why
+
+Plugins: dkj-team-alpha
+
+[PR #1675](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1675)
+
+---
 
 ### DEPLOY: docs/1668-fixture-teardown-measured · 20260908-203035
 
