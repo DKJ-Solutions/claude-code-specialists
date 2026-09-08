@@ -12,9 +12,14 @@
         asserts git's acceptance as an explicit premise: if a future git tightened its rules, that assert
         is the one that should go red, because at that point the case has stopped testing anything real.
       - UNREACHABLE -- git rejects the name ('^', '*', '~', ':', '[', '\', '?', whitespace and every
-        control character). Asserted anyway, and not as padding: the guard has to be a property of the
-        STRING, not an inference from git's rules. sync-main.ps1 hands it a name built from a seam answer
-        a consumer wrote, which git has never seen.
+        ASCII control character). Asserted anyway, and not as padding: the guard has to be a property of
+        the STRING, not an inference from git's rules. sync-main.ps1 hands it a name built from a seam
+        answer a consumer wrote, which git has never seen.
+
+    THE SPLIT IS ON `\p{Cc}` VERSUS `\p{Cf}`, AND THAT IS THE #1617 CORRECTION. git enforces only the
+    ASCII control class, so the format characters -- U+202E, U+200D, U+200B, U+2066 -- are REACHABLE
+    and belong in the first half. They sat in the second until September 8, 2026, under a header
+    saying git refuses them, which mirrored the same wrong claim in the lib's own scope note.
 
     THE STRUCTURAL HALF IS AS LOAD-BEARING AS THE UNIT HALF. The lib is correct and unreachable if a call
     site still interpolates the raw ref, so all seven sites #1594 measured are asserted to name the token
@@ -147,16 +152,58 @@ foreach ($unreachable in @('fix/a^b', 'fix/a*b', 'fix/a~b', 'fix/a:b', 'fix/a[b]
     Assert-True (-not (Test-RefPasteSafe -Ref $unreachable)) "refused here anyway: '$unreachable'"
 }
 
-# --- the space and the control characters: git refuses them, and so does this ----------------------
+# --- the space and the CONTROL characters: git refuses them, and so does this ---------------------
 # NOT REACHABLE THROUGH A REF, and asserted anyway. Get-PasteableRef takes a string, and a caller that
 # hands it something other than `git rev-parse`'s output (a seam answer, a -Name parameter) is not bound
 # by git's rules at all -- so the guard must not depend on git having filtered first.
+#
+# THE FORMAT CHARACTERS ARE NOT IN THIS GROUP AND USED TO BE (#1617). U+202E sat here under a header
+# saying git refuses it, which is false: git enforces `\p{Cc}` and not `\p{Cf}`. It has moved to the
+# reachable block below, where its premise is measured like every other reachable case.
 Write-Host ''
-Write-Host 'Whitespace and control characters -- refused here too, independently of git' -ForegroundColor Cyan
+Write-Host 'Whitespace and ASCII control characters -- refused here too, independently of git' -ForegroundColor Cyan
 
-foreach ($ws in @('fix/a b', "fix/a`tb", "fix/a`nb", "fix/a$([char]0x1B)[31mb", "fix/a$([char]0x202E)b")) {
-    Assert-True (-not (Test-RefPasteSafe -Ref $ws)) 'refused: a name carrying whitespace or a control/format character'
+foreach ($ws in @('fix/a b', "fix/a`tb", "fix/a`nb", "fix/a$([char]0x1B)[31mb")) {
+    if ($gitAvailable) {
+        Assert-True (-not (Test-GitAcceptsRef -Ref $ws)) "git itself rejects this whitespace/control name (so this case is defence in depth, not a hole)"
+    }
+    Assert-True (-not (Test-RefPasteSafe -Ref $ws)) 'refused: a name carrying whitespace or an ASCII control character'
 }
+
+# --- the FORMAT characters: git ACCEPTS them, which is the #1617 finding --------------------------
+# MEASURED, September 8, 2026. `git check-ref-format --branch` returns 0 for every code point below, a
+# branch so named is creatable and checkout-able, and `git rev-parse --abbrev-ref HEAD` returns it
+# verbatim -- which is the source every print site reads its branch from. They are `\p{Cf}` (format),
+# not `\p{Cc}` (control), and git enforces only the second class. U+202E and U+200D are the two #1446
+# was filed for, where they bypassed the #1439 tip sanitiser on a non-UTF-8 console.
+#
+# THE PREMISE IS ASSERTED THE SAME WAY THE SHELL-METACHARACTER CASES ASSERT THEIRS: if a future git
+# tightened its ref rules this is the assert that should go red, because at that point ref-print-lib's
+# scope note has stopped describing a live gap and should be re-read.
+Write-Host ''
+Write-Host 'Format characters -- git accepts them in a ref, and this guard refuses them anyway' -ForegroundColor Cyan
+
+foreach ($cf in @(
+    @{ Ref = "fix/a$([char]0x202E)b"; Label = 'U+202E RIGHT-TO-LEFT OVERRIDE' },
+    @{ Ref = "fix/a$([char]0x200D)b"; Label = 'U+200D ZERO WIDTH JOINER' },
+    @{ Ref = "fix/a$([char]0x200B)b"; Label = 'U+200B ZERO WIDTH SPACE' },
+    @{ Ref = "fix/a$([char]0x2066)b"; Label = 'U+2066 LEFT-TO-RIGHT ISOLATE' }
+)) {
+    if ($gitAvailable) {
+        Assert-True (Test-GitAcceptsRef -Ref $cf.Ref) "git ACCEPTS $($cf.Label) in a branch name (the #1617 premise)"
+    }
+    Assert-True (-not (Test-RefPasteSafe -Ref $cf.Ref)) "refused on the paste axis anyway: $($cf.Label)"
+    $v = Get-PasteableRef -Ref $cf.Ref
+    Assert-Equal '<branch>' $v.Token "...and its token is the placeholder: $($cf.Label)"
+    Assert-True ($v.Note -notmatch '[\p{Cf}]') "...and the format character does not survive into the note: $($cf.Label)"
+}
+
+# AND THE SCOPE NOTE SAYS SO, rather than claiming git closed this class. The lib's own reasoning is
+# what #1617 was filed against -- the guard was already right and the sentence explaining it was not --
+# so the correction is pinned here, where a rewrite that quietly restores the old claim goes red.
+$libText = [System.IO.File]::ReadAllText($LibPath)
+Assert-True ($libText -match [regex]::Escape('1617')) 'ref-print-lib.ps1 cites #1617 where it scopes display out'
+Assert-True ($libText -notmatch [regex]::Escape('git already rejects the control characters that would make prose deceptive')) 'and no longer claims git closes the deceptive class for a ref name'
 
 # AND THE NOTE ITSELF IS NOT AN INJECTION SURFACE. The one place this lib prints is the refusal path, so
 # a control or format character surviving into it would mean the guard's own output could repaint a
