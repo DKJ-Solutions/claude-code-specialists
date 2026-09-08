@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**17 / 36 minor entries** <!-- pending-tally -->
+**18 / 37 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1628-claim-readback-three-states · 20260908-152548
+
+`claim-issue` no longer reports a read it could not make as a claim the tracker refused. The read-back
+held one boolean for two opposite facts -- "gh answered and your account is not there" and "gh never
+answered" -- and printed the first for both, naming a cause it had not measured ("most often an account
+with no write access") and telling you to treat the issue as UNCLAIMED. Measured on the claim of #1623:
+that fired, and a plain `gh issue view` on the same checkout seconds later showed the claim sitting
+there. Followed literally by a second session, it inverts the duplicate-work hazard the step exists to
+prevent. There are now three states. A read that answered and found your account absent still refuses,
+with the same message, because that is the one state it was ever right about. A read that did not
+answer prints a warning naming the exit code, says the claim most likely landed and why, hands over
+`gh issue view <n> --json assignees`, and **does not block** -- a claim is the opening of the work, so a
+false stop costs the whole assignment. The closing verdict says `(unconfirmed)` in that state rather
+than asserting a claim it could not confirm.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo runs this script as its claim step, and this is the failure mode it hits: an
+intermittent `gh` on an otherwise healthy checkout. Before this, that session was told its claim was
+refused and to treat the issue as unclaimed -- so it either stopped, or re-claimed work it already
+held. Now it is told the claim probably landed, told how to confirm it, and carries on. Nothing
+tightens: a genuine refusal refuses exactly as before, with the same words and the same exit code.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue tells an unverified claim apart from a refused one
+
+Plugins: dkj-policy
+
+[PR #1633](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1633)
+
+---
 
 ### DEPLOY: fix/1622-fixture-git-judged · 20260908-151234
 
