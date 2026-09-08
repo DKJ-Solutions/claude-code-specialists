@@ -17,12 +17,27 @@
     at 1.1-1.8s, of which ~750ms is the process spawn alone. A session with four compactions paid it
     five times for an answer that was identical each time.
 
-    THE INVARIANT THIS CACHE STANDS ON, stated plainly because everything below is only as sound as
-    it is: what the fallback reads -- the install record keyed on this checkout's path, and the
-    marketplace clone -- is static for the life of a session. That is not an assumption made here; it
-    is the same fact the hook's own closing line already tells the reader ("then restart the session
-    -- a skill or hook that arrives with an update is not in a session that started before it").
-    Where that is not true, the answer is a restart, which is a NEW session and therefore a new key.
+    WHAT THIS CACHE STANDS ON, AND THE ARGUMENT IT DOES *NOT* MAKE. #1605 justified it as "nothing
+    the fallback reads changes for the life of a session", citing the hook's own closing line ("then
+    restart the session -- a skill or hook that arrives with an update is not in a session that
+    started before it"). That citation proves something narrower than it looks: a running hook's CODE
+    is pinned for the session, which is true and is why the restart line exists. It says nothing about
+    the two files the verdict is actually about -- the install record keyed on this checkout's path,
+    and the marketplace clone -- and those are ordinary mutable files. A sibling terminal running
+    `claude plugin update` or `claude plugin marketplace update` changes them immediately, with no
+    restart of this session involved (Victor, on the branch that built this).
+
+    SO THE HONEST CLAIM IS A BOUND, NOT AN INVARIANT: a replay is the same answer unless the machine
+    changed under it, and where it did, the change surfaces at most -MaxAgeHours late instead of at
+    the next firing. That is a real cost and it is why the default is ONE hour rather than the four
+    this started with -- long enough that a working session's compaction cycle almost never
+    re-measures, short enough that "silent until you restart" is not a state this can produce.
+
+    AND THE DIRECTION THAT MATTERS SELF-HEALS. The reading a reader acts on is "you are behind", and
+    acting on it means an update, after which this hook tells them to restart -- which is a new
+    session id and therefore a bypass of this cache, not a wait for it to expire. What the bound
+    covers is the other direction: a clone advanced from elsewhere while this session ran, which was
+    reported at the next compaction before #1605 and is now reported within the hour.
 
     THE KEY IS THE HARNESS'S OWN session_id, NOT A PAIR OF FILE TIMESTAMPS. The issue proposed
     keying on the install record's mtime plus the clone's .git/FETCH_HEAD mtime, on the ground that
@@ -38,18 +53,37 @@
     /clear arrive with a NEW id, so both re-measure without this file having to read the payload's
     'source' field or hold a list of which kinds may trust a cache.
 
-    A RESUME IS THE ONE CASE THE ID CANNOT BOUND, hence -MaxAgeHours. Resuming reuses the session id,
-    so a session resumed days later would replay a verdict measured before whatever happened in
-    between. The id says "the same session"; it says nothing about WHEN. So a replay is additionally
-    bounded by age (default 4 hours, comfortably longer than a working session's compaction cycle and
-    far shorter than a next-day resume), and entries older than the reap window are deleted on the
-    next write rather than left to accumulate one file per session forever.
+    A RESUME IS THE SECOND REASON FOR -MaxAgeHours, and it is the one the id cannot cover at all.
+    Resuming reuses the session id, so a session resumed days later would replay a verdict measured
+    before whatever happened in between: the id says "the same session" and says nothing about WHEN.
+    Entries older than the reap window are additionally deleted on the next write, rather than left
+    to accumulate one file per session forever.
 
     THE CACHE IS ADVISORY IN BOTH DIRECTIONS, and every function here fails towards MEASURING. No
     session id, an unparseable payload, an unwritable temp directory, a corrupt entry, a shape this
     lib does not recognise: each returns "no cached answer" and the caller does what it did before
     this file existed. A cache that can break a session start would be a worse defect than the cost
     it saves.
+
+    WHAT IS AND IS NOT VERIFIED ABOUT AN ENTRY, since a reader will ask. Shape, key and age are
+    checked; PROVENANCE is not -- an entry is trusted because it is in this directory under this
+    session's id, not because anything proves who wrote it. So a local actor able to write into that
+    directory, who also knows the live session id, could make this hook print a fabricated verdict
+    into a session's context (Sebastian, on the branch that built this). Two things bound that and
+    both pre-date this file: reaching it already needs local execution as this same user, and every
+    line the hook prints from here is framed as data rather than instructions, with the summary
+    picked by -Last precisely so a shadowing line cannot displace a real finding. It is written down
+    because it is NEW -- before this there was no hook-trusted artefact on disk at all -- not because
+    anything here defends against it.
+
+    ONE IDIOM, TWO PLACES, and a note for whoever next touches either. gate-lib.ps1's evidence
+    record (Get-GateEvidencePath / Read-GateEvidence / Save-GateEvidence) carries the same small
+    pattern: an age-bounded JSON record, the negative-age guard below, and a best-effort BOM-less
+    write. The two were not merged, and that was a decision rather than an oversight -- gate-lib
+    keeps ONE fixed-key record per repo under .git/, keyed on a content fingerprint, while this is a
+    multi-entry cache under temp keyed on a session id from outside the process. If a third caller
+    ever wants the idiom, that is the moment to factor it, not now (Victor, on the branch that built
+    this).
 
     Read-only outside its own directory under temp. It never writes into a repo, into ~/.claude, or
     anywhere a check reads state from.
@@ -225,15 +259,16 @@ function Get-SessionCacheEntry {
         16-hex-character digest, so two subjects can in principle land on one name; comparing the
         key the writer recorded makes a collision a miss rather than a wrong answer.
 
-        THE AGE BOUND IS WHY A RESUME IS SAFE -- see this file's header. It is checked against the
-        WrittenAt the writer recorded rather than the file's mtime, because an mtime is changed by
-        anything that touches the file and the question here is when the measurement was taken.
+        THE AGE BOUND CARRIES BOTH ARGUMENTS IN THIS FILE'S HEADER -- the resume that reuses an id,
+        and the mid-session change the id cannot see -- and it is checked against the WrittenAt the
+        writer recorded rather than the file's mtime, because an mtime is changed by anything that
+        touches the file and the question here is when the measurement was taken.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$SessionId,
         [Parameter(Mandatory = $true)][string]$Key,
         [string]$Root = '',
-        [double]$MaxAgeHours = 4
+        [double]$MaxAgeHours = 1
     )
 
     if (-not (Test-SessionIdShape -SessionId $SessionId)) { return $null }
@@ -256,8 +291,17 @@ function Get-SessionCacheEntry {
         # a machine whose clock is ahead) would otherwise read as valid for as long as the skew lasts.
         if ($ageHours -lt 0 -or $ageHours -gt $MaxAgeHours) { return $null }
 
+        # AN EXPLICIT JSON null IS A MISS, and it is not the same shape as an empty list. The writer
+        # never produces one -- a hand-edited or truncated file can -- and piping $null through
+        # ForEach-Object iterates ONCE with $_ = $null, so the entry would read back as a single
+        # empty line rather than as no lines: a verdict of one blank line, printed into a session.
+        # 'output: []' is a real state (an engine that printed nothing) and survives this, because
+        # ConvertFrom-Json hands back an empty Object[] there and not $null (verified, not assumed).
+        $outRaw = $j.output
+        if ($null -eq $outRaw) { return $null }
+
         return [pscustomobject]@{
-            Output   = @($j.output | ForEach-Object { [string]$_ })
+            Output   = @($outRaw | ForEach-Object { [string]$_ })
             ExitCode = [int]$j.exitCode
         }
     } catch {
@@ -324,8 +368,15 @@ function Remove-StaleSessionCacheEntry {
         Reaping on the FILE's mtime rather than on the WrittenAt inside it, which is the opposite of
         what Get-SessionCacheEntry compares and is right for the opposite reason: this pass has to be
         able to remove a file it cannot parse, and a corrupt or truncated entry is exactly the one
-        with no readable timestamp. It only ever deletes inside the cache directory and only files
-        matching the shape this lib writes.
+        with no readable timestamp.
+
+        IT DELETES ONLY WHAT THIS LIB'S OWN NAMES LOOK LIKE, matched against the shape
+        Get-SessionCacheFileName composes -- a session id, a hyphen, sixteen hex characters, '.json'.
+        It said so before it did so: the filter was '*.json' alone, which would sweep any stale JSON
+        file that happened to sit in the directory (Victor and Sebastian both, on the branch that
+        built this). Nothing writes there today, so nothing was lost -- but a docstring promising a
+        check the code does not make is the half that would still read as true after the directory
+        was shared with something else.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -337,6 +388,7 @@ function Remove-StaleSessionCacheEntry {
         if (-not (Test-Path -LiteralPath $Root -PathType Container)) { return 0 }
         $cutoff = [datetime]::UtcNow.AddHours(-1 * $OlderThanHours)
         foreach ($f in @(Get-ChildItem -LiteralPath $Root -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
+            if ($f.Name -cnotmatch '^[A-Za-z0-9._-]{8,128}-[0-9a-f]{16}\.json$') { continue }
             if ($f.LastWriteTimeUtc -lt $cutoff) {
                 Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue
                 if (-not (Test-Path -LiteralPath $f.FullName)) { $gone++ }

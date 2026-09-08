@@ -82,28 +82,46 @@
     back that cost per compaction and reintroduce exactly the silence the note above describes -- for
     the fallback too, on every machine that has no source checkout, which is most of them.
 
-    SO THE FALLBACK PAYS IT ONCE PER SESSION INSTEAD (#1605, September 8, 2026). Nothing it reads
-    changes for the life of a session -- the install record and the marketplace clone are static,
-    which is why this hook's own closing line tells the reader to restart after an update -- and a
-    session with four compactions was paying the spawn five times for one answer. The engine's output
-    is now held in session-cache-lib.ps1 against the harness's own session_id, taken from the payload
-    the harness writes to this hook's stdin, and every verdict below is rendered from the cached lines
-    exactly as from measured ones. The id is the whole key on purpose: a compaction keeps it and
-    replays, a startup and a /clear arrive with a new one and re-measure, so this file never has to
-    read the payload's 'source' field or decide which kinds of firing may trust a cache. Three things
-    invalidate an entry without anybody arranging it -- a new session id, a different engine path (a
-    consumer's cache carries the plugin version in that path, so a plugin update misses by itself),
-    and a different checkout. A resume is the one case the id cannot bound, since it reuses the id, so
-    a replay is additionally bounded by age; the lib's header carries that reasoning and the bound.
+    SO THE FALLBACK PAYS IT ONCE PER SESSION INSTEAD (#1605, September 8, 2026). A session with four
+    compactions was paying the spawn five times for one answer, so the engine's output is now held in
+    session-cache-lib.ps1 against the harness's own session_id -- taken from the payload the harness
+    writes to this hook's stdin -- and every verdict below is rendered from cached lines exactly as
+    from measured ones.
+
+    THE session_id IS WHAT DECIDES WHETHER AN ANSWER MAY BE REPLAYED, and it is one axis of a
+    two-axis key rather than the whole of it: the other is the SUBJECT, which folds in the engine
+    path and the checkout (see $cacheKey below). So three things invalidate an entry without anybody
+    arranging it -- a new session id, a different engine path (a consumer's cache carries the plugin
+    version in that path, so a plugin update misses by itself), and a different checkout. What the id
+    buys on its own is that this file never reads the payload's 'source' field: a compaction keeps the
+    id and replays, a startup and a /clear arrive with a new one and re-measure.
+
+    AND #1605's OWN JUSTIFICATION FOR IT DOES NOT HOLD, which is worth writing down here rather than
+    quietly not repeating. The issue argued that nothing the fallback reads changes for the life of a
+    session, citing this hook's restart line as proof. That line is about a hook's or skill's CODE
+    being pinned to the session that started it; the verdict is about two ordinary mutable files, and
+    a sibling terminal running `claude plugin update` or `claude plugin marketplace update` moves them
+    with no restart involved. So what a replay guarantees is a BOUND and not an invariant: where the
+    machine changed underneath, the change surfaces at most an hour late instead of at the next
+    firing, and the lib's header carries the bound and both reasons for it. The direction a reader
+    acts on self-heals -- acting on "you are behind" means an update, after which this hook says to
+    restart, and a restart is a new id and therefore a bypass.
+
     The cache is advisory in both directions: no session id, an unwritable temp directory or a corrupt
     entry all fall back to measuring, which is what this branch did before it existed.
 
-    WHAT IT SAVED, measured on a five-plugin consumer fixture on 2026-09-08, five pairs of firings:
-    a median of 1,288 ms measuring against 439 ms replaying -- about 850 ms per compaction, and the
-    439 ms that remain are this hook's own interpreter bring-up rather than anything it chose to do.
-    A session with four compactions therefore pays 1.3s once instead of 6.5s in total. The saving is
-    near-flat in the number of enabled plugins for the reason the figures above give: what is skipped
-    is the spawn, not the per-plugin git calls.
+    WHAT IT SAVED (Sylvester, 2026-09-08, one machine): a median of 1,288 ms measuring against 439 ms
+    replaying, over five measure-then-replay pairs in a single run against a SYNTHETIC five-plugin
+    consumer fixture -- an install record, a git marketplace clone and five plugin.json files built
+    for the measurement, not one of this repo's real consumers. About 850 ms of that is the saving,
+    and the 439 ms that remain are this hook's own interpreter bring-up rather than anything it chose
+    to do; a session with four compactions therefore pays 1.3s once instead of 6.5s in total.
+
+    THAT 850 ms AND THE ~750 ms FLOOR ABOVE ARE TWO DIFFERENT MEASUREMENTS, and both are right. The
+    floor is what the ENGINE process costs before it looks at a single plugin; the 850 ms is the whole
+    difference between this branch measuring and replaying, so it also carries the spawn of the engine
+    on top of that floor. The saving stays near-flat in the number of enabled plugins for the reason
+    the figures above give: what is skipped is the spawn, not the per-plugin git calls.
 
 .PARAMETER WorkshopPathOverride
     (Optional, for tests) Skip the candidate search and use this path as the candidate

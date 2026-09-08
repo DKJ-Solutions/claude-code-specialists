@@ -140,21 +140,38 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $corruptRoot $name),
         (@{ sessionId = $VALID; key = 'subject|one'; writtenAt = ([datetime]::UtcNow.AddHours(2).ToString('o')); exitCode = 0; output = @('x') } | ConvertTo-Json), $Utf8)
     Assert-True ($null -eq (Get-SessionCacheEntry -SessionId $VALID -Key 'subject|one' -Root $corruptRoot)) '5: a future-dated entry is a miss -- a clock that moved would otherwise stay valid for the skew'
+    # AN EXPLICIT JSON null IS THE ONE SHAPE THAT DOES NOT ANNOUNCE ITSELF (Victor, on the branch that
+    # built this). Every case above fails a check and returns a miss; this one used to PASS every
+    # check and then read back as one empty line, because piping $null through ForEach-Object
+    # iterates once with $_ = $null. A blank verdict printed into a session start is the wrong kind of
+    # wrong: it looks like something the engine said. Written as raw JSON on purpose -- ConvertTo-Json
+    # over @{ output = $null } is not guaranteed to produce the literal this needs.
+    [System.IO.File]::WriteAllText((Join-Path $corruptRoot $name),
+        ('{ "sessionId": "' + $VALID + '", "key": "subject|one", "writtenAt": "' + ([datetime]::UtcNow.ToString('o')) + '", "exitCode": 0, "output": null }'), $Utf8)
+    Assert-True ($null -eq (Get-SessionCacheEntry -SessionId $VALID -Key 'subject|one' -Root $corruptRoot)) '5: an entry whose output is JSON null is a miss, NOT one blank line'
     Assert-True ($null -eq (Get-SessionCacheEntry -SessionId $VALID -Key 'nothing here' -Root (Join-Path $Fixture 'no-such-dir'))) '5: a cache root that does not exist is a miss, not an error'
 
     # --- 6. the reap --------------------------------------------------------------------------------
     Write-Host '6. Remove-StaleSessionCacheEntry -- what the sweep takes, and what it leaves' -ForegroundColor Cyan
     $reapRoot = Join-Path $Fixture 'reap'
     New-Item -ItemType Directory -Path $reapRoot -Force | Out-Null
-    foreach ($n in @('old-1.json', 'old-2.json')) {
+    $oldA   = "$VALID-0123456789abcdef.json"
+    $oldB   = "$VALID-fedcba9876543210.json"
+    $fresh  = "$VALID-1111111111111111.json"
+    # NOT this lib's name shape, and old enough to be swept if the filter were extension-only. Both
+    # were named 'old-1.json'/'fresh.json' until the filter went in, which is precisely why the
+    # docstring could promise a shape check that did not exist (Victor and Sebastian).
+    $alien  = 'someone-elses-cache.json'
+    foreach ($n in @($oldA, $oldB, $alien)) {
         [System.IO.File]::WriteAllText((Join-Path $reapRoot $n), '{}', $Utf8)
         (Get-Item -LiteralPath (Join-Path $reapRoot $n)).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-48)
     }
-    [System.IO.File]::WriteAllText((Join-Path $reapRoot 'fresh.json'), '{}', $Utf8)
+    [System.IO.File]::WriteAllText((Join-Path $reapRoot $fresh), '{}', $Utf8)
     [System.IO.File]::WriteAllText((Join-Path $reapRoot 'keep.txt'), 'not mine', $Utf8)
     (Get-Item -LiteralPath (Join-Path $reapRoot 'keep.txt')).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-48)
     Assert-Equal 2 (Remove-StaleSessionCacheEntry -Root $reapRoot -OlderThanHours 24) '6: both stale entries go, and the count says so'
-    Assert-True (Test-Path -LiteralPath (Join-Path $reapRoot 'fresh.json')) '6: a fresh entry stays'
+    Assert-True (Test-Path -LiteralPath (Join-Path $reapRoot $fresh)) '6: a fresh entry stays'
+    Assert-True (Test-Path -LiteralPath (Join-Path $reapRoot $alien)) '6: a stale .json that is NOT this libs name shape is left alone -- the docstring promised this before the code did it'
     Assert-True (Test-Path -LiteralPath (Join-Path $reapRoot 'keep.txt')) '6: a file this lib did not write is never touched, however old'
     Assert-Equal 0 (Remove-StaleSessionCacheEntry -Root (Join-Path $Fixture 'no-such-dir') -OlderThanHours 24) '6: a root that does not exist reaps nothing and does not throw'
 
@@ -162,15 +179,17 @@ try {
     # session forever, and the only thing that ever calls the sweep on a real machine.
     $sweepRoot = Join-Path $Fixture 'sweep'
     New-Item -ItemType Directory -Path $sweepRoot -Force | Out-Null
-    [System.IO.File]::WriteAllText((Join-Path $sweepRoot 'ancient.json'), '{}', $Utf8)
-    (Get-Item -LiteralPath (Join-Path $sweepRoot 'ancient.json')).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-48)
+    $ancient  = "$VALID-2222222222222222.json"
+    $ancient2 = "$VALID-3333333333333333.json"
+    [System.IO.File]::WriteAllText((Join-Path $sweepRoot $ancient), '{}', $Utf8)
+    (Get-Item -LiteralPath (Join-Path $sweepRoot $ancient)).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-48)
     Set-SessionCacheEntry -SessionId $VALID -Key 'k' -Output @('x') -Root $sweepRoot | Out-Null
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $sweepRoot 'ancient.json'))) '6: a write sweeps the stale entries it finds beside it'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $sweepRoot $ancient))) '6: a write sweeps the stale entries it finds beside it'
     Assert-True ($null -ne (Get-SessionCacheEntry -SessionId $VALID -Key 'k' -Root $sweepRoot)) '6: and the entry it came to write is there'
-    [System.IO.File]::WriteAllText((Join-Path $sweepRoot 'ancient2.json'), '{}', $Utf8)
-    (Get-Item -LiteralPath (Join-Path $sweepRoot 'ancient2.json')).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-48)
+    [System.IO.File]::WriteAllText((Join-Path $sweepRoot $ancient2), '{}', $Utf8)
+    (Get-Item -LiteralPath (Join-Path $sweepRoot $ancient2)).LastWriteTimeUtc = [datetime]::UtcNow.AddHours(-48)
     Set-SessionCacheEntry -SessionId $VALID -Key 'k' -Output @('x') -Root $sweepRoot -ReapOlderThanHours 0 | Out-Null
-    Assert-True (Test-Path -LiteralPath (Join-Path $sweepRoot 'ancient2.json')) '6: -ReapOlderThanHours 0 turns the sweep off'
+    Assert-True (Test-Path -LiteralPath (Join-Path $sweepRoot $ancient2)) '6: -ReapOlderThanHours 0 turns the sweep off'
 
     # --- 7. the file name ---------------------------------------------------------------------------
     Write-Host '7. Get-SessionCacheFileName -- deterministic, per subject, and readable' -ForegroundColor Cyan
