@@ -809,6 +809,49 @@ $reportOne = Get-CheckWaitReport -ChecksJson $twoChecks -RequiredNamesJson '[{"n
 Assert-True ($reportOne -like '*NOT required*') 'one required name: the not-required label still works'
 Assert-True ($reportOne -like "*after the last required check ('a')*") 'and the excess-wait clause still fires'
 
+# --- Get-RequiredCheckNames: the shared walk over the required payload (issue #1602) --------------
+# THE ONE-CHECK RULESET IS WHY THIS SUITE EXISTS AT ALL. This repo requires exactly one check, and a
+# one-element JSON array is handed through by 5.1 as the object itself -- so the collapse that
+# mislabelled every wait in a two-required-check repo (asserted directly above) is invisible to any
+# fixture that mirrors this repo's own ruleset. Every shape below therefore includes the two-name
+# case, which is the shape nobody here runs and the one a consumer may.
+Write-Host ""
+Write-Host "Get-RequiredCheckNames -- the shared required-check walk" -ForegroundColor Cyan
+
+Assert-NameSet @('lint-en-tests') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"lint-en-tests","bucket":"pass","state":"SUCCESS"}]') `
+    'one required check: the ordinary shape in this repo'
+Assert-NameSet @('a','b') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"a"},{"name":"b"}]') `
+    'TWO required checks: the 5.1 member-enumeration collapse would answer with the single string "a b"'
+Assert-Equal 2 (@(Get-RequiredCheckNames -RequiredChecksJson '[{"name":"a"},{"name":"b"}]')).Count `
+    'and the count is 2 rather than 1 -- the collapse is a count bug before it is a name bug'
+Assert-NameSet @('a','b','c') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"c"},{"name":"a"},{"name":"b"}]') `
+    'three required checks, unsorted in: sorted out, so a caller may compare two readings for equality'
+Assert-NameSet @('a') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"a"},{"name":"a"}]') `
+    'a duplicated name collapses to one -- Sort-Object -Unique, so a re-read cannot look like a change'
+
+# EMPTY IS A STATE, NOT A FAILURE. Every one of these is a legitimate reading -- a ruleset that
+# requires nothing, a required workflow that has not registered yet, a gh that answered nothing -- and
+# each caller breaks the tie itself: the wait falls back to watching every check, step 3b warns and
+# skips, and the merge verdict refuses on the failure path only.
+Assert-Equal 0 (@(Get-RequiredCheckNames -RequiredChecksJson '')).Count            'empty payload: no names, no throw'
+Assert-Equal 0 (@(Get-RequiredCheckNames -RequiredChecksJson '   ')).Count         'whitespace payload: no names'
+Assert-Equal 0 (@(Get-RequiredCheckNames -RequiredChecksJson '[]')).Count          'empty list: no names -- the 5.1 array trap again'
+Assert-Equal 0 (@(Get-RequiredCheckNames -RequiredChecksJson 'not json')).Count    'unparseable payload: no names rather than an exception'
+Assert-Equal 0 (@(Get-RequiredCheckNames -RequiredChecksJson '[{"bucket":"pass"}]')).Count `
+    'a nameless record names nothing -- the field the whole walk is about is the one that may be absent'
+Assert-NameSet @('a') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"a"},{"name":""},{"name":null}]') `
+    'blank and null names are dropped rather than returned as empty strings a caller would watch on'
+Assert-NameSet @('lint en tests') (Get-RequiredCheckNames -RequiredChecksJson '[{"name":"lint en tests"}]') `
+    'a name containing a space stays ONE name -- the shape a space-splitting parse silently doubles'
+
+# AND THE TWO CALLERS THAT SHARE IT MUST AGREE WITH IT, or the refactor moved a bug rather than a
+# duplicate: Get-MergeBlockVerdict reads the same payload for its own verdict, and a payload this
+# function reads as naming nothing is exactly the one the verdict must treat as unreadable.
+Assert-True (Get-MergeBlockVerdict -RequiredChecksJson '[{"bucket":"pass"}]').Blocked `
+    'a payload Get-RequiredCheckNames finds no name in is the payload the verdict refuses on'
+Assert-True (Get-MergeBlockVerdict -RequiredChecksJson 'not json').Blocked `
+    'and the same for one neither of them can parse'
+
 # The prose helper. Quoted per name, so a check name containing a space cannot read as two.
 Assert-Equal ''                     (Format-CheckNameList -Names @())                'no names -> empty, so a caller can concatenate unconditionally'
 Assert-Equal "'a'"                  (Format-CheckNameList -Names @('a'))             'one name'
@@ -1371,9 +1414,14 @@ foreach ($bad in @('', '   ', 'not json', 'null', '[]', '[{}]', '[{"annotation_l
 # reads the red mark with no reason beside it, which is the whole defect.
 Assert-True ($shipText -like '*Get-AuthoredFailureNote -AnnotationsJson*') 'ship-pr relays what the failing workflow said about itself (#1103)'
 Assert-True ($shipText -like '*check-runs/*/annotations*') 'reading it from the check run, which is where an authored annotation lives'
-Assert-True ($shipText -like '*FailedOther -notcontains*') 'and only for the NOT-REQUIRED failures -- a required one is a refusal, not a merge that walks past'
+# THE RELAY MOVED INTO A SHARED FUNCTION AT #1602 (step 8 needed the same loop), so these two asserts
+# now pin the CALL rather than the loop body -- the claims themselves are unchanged. The filter is the
+# argument step 3 passes; the ordering is where that call sits, not where the function is defined,
+# which is near the top of the file with the other script-local helpers.
+Assert-True ($shipText -like '*$filter.Count -gt 0 -and $filter -notcontains $ref.Name*') 'the relay filters on the names it is given -- an empty list means no filter, which is step 8''s case'
+Assert-True ($shipText -like '*Write-FailedCheckReasons -ChecksJson $checkFactsJson -Repo $repo -OnlyNames $verdict.FailedOther*') 'and step 3 gives it only the NOT-REQUIRED failures -- a required one is a refusal, not a merge that walks past'
 $idxProceed = $shipText.IndexOf('a check FAILED but the merge is not blocked')
-$idxSpoken  = $shipText.IndexOf('Get-AuthoredFailureNote')
+$idxSpoken  = $shipText.IndexOf('Write-FailedCheckReasons -ChecksJson $checkFactsJson')
 Assert-True ($idxProceed -ge 0 -and $idxSpoken -gt $idxProceed) 'the reason is printed under that warning, where the reader has just landed'
 Write-Host ""
 # --- The PRODUCER of the annotation everything above relays (issue #1118) -------------------------
@@ -1912,7 +1960,12 @@ Write-Host "ship-pr.ps1's step 3b -- what is assertable without a live remote (i
 Assert-True ($shipText -like '*Get-RequiredCheckRunIds -ChecksJson $checkFactsJson -Names $staleCheckNames*') 'step 3b finds the run(s) behind the required check(s) from the check facts step 3 already fetched -- no fresh search'
 Assert-True ($shipText -like '*Get-CertifyingRunCreatedAt -CreatedAtValues $createdAtValues*') 'and reduces the fetched created_at values with the re-anchored selector, not the retired startedAt one'
 Assert-True ($shipText -like '*Get-StaleCertificateVerdict -NewMainCommits $newMainCommits*') 'and hands the freshly fetched main history to the verdict function, unchanged by the re-anchor'
-Assert-True ($shipText -like '*$requiredFactsJson | ConvertFrom-Json*') 'the required check names for the stale check are parsed from the already-fetched required-checks payload, not a second gh call'
+# THE POINT OF THIS ASSERT IS THE SOURCE OF THE NAMES, NOT THE SPELLING OF THE PARSE (issue #1602).
+# It pinned the inline `$requiredFactsJson | ConvertFrom-Json` until that walk was shared into
+# Get-RequiredCheckNames, and the claim it exists to make is untouched: the names come from the
+# payload step 3 has already fetched, so step 3b spends no gh call of its own on them.
+Assert-True ($shipText -like '*Get-RequiredCheckNames -RequiredChecksJson $requiredFactsJson*') 'the required check names for the stale check come from the already-fetched required-checks payload, not a second gh call'
+Assert-True ($shipText -notlike '*$parsedStaleNames*') 'and step 3b no longer carries its own copy of that walk -- the shape the one-required-check ruleset here cannot test'
 Assert-True ($shipText -like '*''api'', "repos/$repo/actions/runs/$runId", ''--jq'', ''.created_at''*') 'the one NEW network call per certifying run asks for that run''s own created_at, not a check''s startedAt'
 
 # -SkipStaleCheck actually gates the block: the whole read-and-refuse path sits behind the switch.
@@ -1939,6 +1992,69 @@ Assert-True ($shipText -like '*could not read the history of ''origin/main'' -- 
 # an exact line break, so for those the existence checks above are as far as this suite goes.
 Assert-True ($shipText -like "*'git fetch origin main' failed -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway.*") 'the failed-fetch refusal names -SkipStaleCheck in the same single-line message'
 Assert-True ($shipText -like "*could not read the history of 'origin/main' -- NOT merged (issue #1292). -SkipStaleCheck ships on the old certificate anyway.*") 'the failed-log refusal names -SkipStaleCheck in the same single-line message'
+
+# --- ship-pr's step 3 blocks on the REQUIRED checks only (issue #1602) ----------------------------
+# ORCHESTRATION, SO SOURCE TEXT IS WHAT A SUITE CAN REACH -- the same split every other ship-pr block
+# in this file works under: the wait drives a live remote and the ORDER of its parts does not. What
+# these asserts protect is the property the change rests on, which is an ordering claim: the merge
+# happens on a certificate that has not been left to go stale by a wait on a check the ruleset does
+# not require, and the report that wait used to print still happens, after the fold.
+Write-Host ""
+Write-Host "ship-pr.ps1's step 3 -- required-only wait, non-required reported after the fold (#1602)" -ForegroundColor Cyan
+
+Assert-True ($shipText -like '*if ($requiredWaitNames.Count -gt 0) { $watchArgs += ''--required'' }*') 'the watch narrows to the required checks when the ruleset names any'
+Assert-True ($shipText -like '*$watchArgs = @(''pr'', ''checks'', "$pr", ''--watch'', ''--interval'', "$PollSeconds", ''--repo'', $repo)*') 'and the base arguments are otherwise the ones every ship before this used'
+Assert-True ($shipText -like '*Get-RequiredCheckNames -RequiredChecksJson $requiredWaitJson*') 'the mode is decided from the repo''s OWN ruleset answer, never from a check name in this script'
+Assert-True ($shipText -notlike '*''--watch'', ''--interval'', "$PollSeconds", ''--repo'', $repo, ''--required''*') 'and --required is appended conditionally rather than baked into the call'
+
+# FAIL-OPEN IS THE HALF A CONSUMER FEELS. With no required check known this must behave exactly as
+# every ship did before #1602 -- watch everything -- because "this ruleset requires nothing" and "the
+# required check has not registered yet" are indistinguishable from here.
+Assert-True ($shipText -like '*No required check is known, so this waits on EVERY check, exactly as before*') 'a repo with no ruleset is told the wait is unchanged for it, and that this is not a finding'
+Assert-True ($shipText -like '*if ($requiredWaitNames.Count -eq 0) {*') 'step 8 is branched off the same reading, so the two halves cannot disagree about which mode ran'
+
+# THE MODE MAY NARROW MID-RUN BUT NEVER WIDEN. A required workflow that had not created its check run
+# when the probe asked is found one watch later; an empty re-reading is not evidence that the ruleset
+# requires nothing, and widening on it would undo the fix invisibly.
+Assert-True ($shipText -like '*if ($requiredWaitRefresh.Count -gt 0) { $requiredWaitNames = $requiredWaitRefresh }*') 'the refresh only ever narrows the watch -- an unreadable re-read leaves the earlier names standing'
+
+# THE REPORT IS NOT LOST, IT IS MOVED. This is the assert that would fail if step 8 were ever dropped
+# as "the merge already happened": #831's whole finding was that an invisible wait turns two anecdotes
+# into a policy question, and the report is what made it visible.
+Assert-True ($shipText -like '*Step 8: what the NOT-required checks said (issue #1602)*') 'the moved report has a step of its own rather than being folded into an existing one'
+Assert-True ($shipText -like '*Get-CheckWaitReport -ChecksJson $tailFactsJson*') 'and it is #831''s own report over the full payload, not a new summary invented here'
+Assert-True ($shipText -like '*Get-AuthoredFailureNote -AnnotationsJson*') 'the #1103 relay of what the failing check said about itself rides along -- it matters more here, being the only place the reader meets the failure'
+
+# AND IT RUNS AFTER EVERYTHING OWED TO THE TRUNK. A wait on somebody else's CI placed above the fold
+# would sit in the one gap nothing reports -- merged upstream, branch document still on the trunk
+# (#1270). Asserted by offset rather than by prose, since that is the actual claim.
+$foldIdx = $shipText.IndexOf('Step 5: main + fold + commit + push')
+$tailIdx = $shipText.IndexOf('Step 8: what the NOT-required checks said')
+Assert-True ($foldIdx -gt 0 -and $tailIdx -gt $foldIdx) 'step 8 sits BELOW the fold, so it can stall or be abandoned without leaving a half-state'
+$verifyIdx = $shipText.IndexOf('Step 6: the issues the PR declared it closes')
+Assert-True ($verifyIdx -gt 0 -and $tailIdx -gt $verifyIdx) 'and below the resolved-issues check, so nothing that mutates state outside this repo waits on it'
+
+# THE QUEUE PATH MERGES NOTHING HERE, so it has no fold to report after and says where to read them.
+Assert-True ($shipText -like '*The NOT-required checks were not waited for here (#1602)*') 'the enqueue exit names the report it cannot give rather than dropping it silently'
+
+# BOUNDED, BECAUSE THIS IS THE POST-MERGE REGION #1179's RULE IS DRAWN FOR. Step 3's watch is
+# unbounded on purpose -- a stall there blocks a merge that has not happened, so the PR shows it. A
+# stall at step 8 leaves a finished ship holding a terminal with no prompt to come back to.
+Assert-True ($shipText -like '*$tailMaxWaitSec = 1800*') 'step 8''s watch is bounded, unlike step 3''s -- the post-merge region is the worse place to hang (#1179)'
+Assert-True ($shipText -like '*-TimeoutSeconds $tailMaxWaitSec*') 'and the bound is actually passed to the watch rather than only declared'
+
+# A TIMEOUT IS NOT A FAILED CHECK, and exit code 124 is why this needs asserting: Invoke-NativeCapture
+# substitutes it for a killed child so the number and TimedOut agree, which means a timed-out report
+# reaches the failure branch as a non-zero exit unless TimedOut is read.
+Assert-True ($shipText -like '*if ($tailChecks.ExitCode -ne 0 -and -not $tailChecks.TimedOut) {*') 'a timed-out report does not announce that a check failed -- TimedOut is read, not just the exit code'
+Assert-True ($shipText -like '*} elseif (-not $tailChecks.TimedOut) {*') 'and it does not claim every check is green either -- neither arm fires on a timeout'
+Assert-True ($shipText -like '*giving up on the REPORT, not on the ship (#1602)*') 'the timeout says what it gave up on, since the ship really is complete'
+
+# THE MEASURED CLAIM THE BOUND RESTS ON, kept in the file rather than only in the issue: 1800s clears
+# both populations this step waits on. If either figure is ever revised, this assert is what points at
+# the number that has to move with it.
+Assert-True ($shipText -like '*753s in #1602''s own n=99*') 'the bound cites the tail it was sized against'
+Assert-True ($shipText -like '*23m 23s (1403s)*') 'and #831''s own worst case, which is the larger of the two'
 
 # AND THE FAILED FETCH KEEPS GIT'S OWN DIAGNOSIS (issue #1334). The refusal above says the fetch failed;
 # only git says WHY -- the auth error, the host, the reason. The flag that would drop it was added here on

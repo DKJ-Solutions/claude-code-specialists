@@ -905,6 +905,55 @@ function Get-CheckOutcome {
     return 'unknown'
 }
 
+function Get-RequiredCheckNames {
+    <#
+    .SYNOPSIS
+        The check names in a `gh pr checks --required --json name,...` payload, sorted and unique.
+        Empty when the payload is absent, unparseable, or names nothing.
+
+    .DESCRIPTION
+        ONE PARSE, THREE CALLERS, AND IT WAS THREE PARSES UNTIL ISSUE #1602. `gh pr checks --required`
+        is read at three points in ship-pr.ps1 -- to decide which checks the wait must block on
+        (#1602), to name what the staleness gate is protecting (#1292), and inside
+        Get-CheckWaitReport's own label -- and each had written out the same walk over the payload.
+        That is the shape the 5.1 pitfall this file documents everywhere thrives in: the collapse
+        Get-CheckWaitReport hit on August 26, 2026, where `@(@($json | ConvertFrom-Json) | ...)`
+        member-enumerated two required names into the single bogus string 'a b', survived unseen for
+        weeks precisely BECAUSE this repo's ruleset requires exactly one check and a one-element JSON
+        array is handed through as the object itself. A repo with two required checks is the shape
+        nobody here runs, so a fourth copy of the walk is a fourth chance to ship that bug to a
+        consumer who does.
+
+        EMPTY IS NOT AN ERROR AND MUST NOT BE READ AS ONE. `--required` exits non-zero on a repo whose
+        ruleset requires nothing, which is a legitimate state -- GitHub Free with no ruleset is the
+        documented case -- and it is indistinguishable from here from "the required checks have not
+        reported yet". Every caller therefore has to choose its own tie-break and this function makes
+        none for them: Get-MergeBlockVerdict refuses on the failure path and stays green on the green
+        one, step 3b warns and skips, and the #1602 wait falls back to watching every check. What they
+        share is only the walk.
+
+        SORTED AND UNIQUE so a caller can compare two readings for equality without sorting first --
+        the #1602 wait re-reads this list between watch attempts and only wants to know whether the
+        answer changed.
+
+    .PARAMETER RequiredChecksJson
+        `gh pr checks <pr> --required --json name` output; any other fields may ride along and are
+        ignored. Anything that will not parse yields an empty list rather than throwing: every caller
+        of this treats "could not read" as a state to decide about, not as a failure to propagate.
+    #>
+    param([string]$RequiredChecksJson)
+
+    if (-not $RequiredChecksJson -or -not $RequiredChecksJson.Trim()) { return @() }
+    try { $parsed = $RequiredChecksJson | ConvertFrom-Json } catch { return @() }
+
+    # Assign first, wrap second -- the 5.1 rule the docstring above gives the measured cost of.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.name })
+    if ($records.Count -eq 0) { return @() }
+
+    return @(@($records | ForEach-Object { [string]$_.name } | Where-Object { $_ -and $_.Trim() }) |
+        Sort-Object -Unique)
+}
+
 function Get-MergeBlockVerdict {
     <#
     .SYNOPSIS

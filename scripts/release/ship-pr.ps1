@@ -93,16 +93,25 @@
          Three conditions, in Get-TrunkReturnDecision and tested there: the primary checkout only, the
          trunk held by nobody else, and a clean tree. Never a refusal -- a tree that cannot go home
          stays where it is and says which of the three it was.
-      3. Wait for EVERY check the PR has to finish (gh pr checks <pr> --watch), then judge the merge on
-         the ones the ruleset REQUIRES. A failing required check stops the run WITHOUT merging; a
-         failing check the ruleset does not require prints a loud warning and does not (issue #943 --
-         the exit code of --watch says "something failed", never "the merge is blocked", and reading it
-         as the second let one broken advisory workflow block every chain). Either way, print WHICH
+      3. Wait for every check the ruleset REQUIRES to finish (gh pr checks <pr> --watch --required),
+         then judge the merge on those same checks. A failing required check stops the run WITHOUT
+         merging; a failing check the ruleset does not require prints a loud warning and does not
+         (issue #943 -- the exit code of --watch says "something failed", never "the merge is blocked",
+         and reading it as the second let one broken advisory workflow block every chain). Print WHICH
          check governed the wait and for how long (#831) -- whichever finished last, labelled against
          the repo's own ruleset. Best-effort: unreadable, and the run says only how long it waited --
          except for the required list, where unreadable means REFUSE, since a ruleset that requires
-         nothing and one whose required checks have not reported look identical from here. The wait
-         itself is unchanged; see the comment at the step.
+         nothing and one whose required checks have not reported look identical from here.
+
+         `--required` SINCE ISSUE #1602, and with no required check known this waits on EVERY check
+         exactly as it did before, so a repo with no ruleset is untouched. The non-required checks are
+         still waited for and still reported -- at step 8, after the fold. What that buys is the LAP,
+         not the clock: the trunk goes on moving while this step waits, and a commit landing between
+         the last required check and the last check of any kind voids the certificate step 3b then
+         correctly refuses on. Measured over 99 laps: 5.1% of them, and 62.5% of the tail-governed laps
+         on the busiest day of the sample. #831's wait and #831's report both survive it, because a red
+         non-required check has never blocked this merge (#943) -- so waiting for one before the merge
+         only decided when a sentence was printed. Full argument and figures at the step.
 
          AND RE-ENTER THE WATCH WHEN IT IS THE CONNECTION THAT DROPPED, NOT A CHECK (issue #1219).
          `--watch` is one long-lived GraphQL call and it can die mid-wait on a transient socket error
@@ -187,6 +196,18 @@
          needs to be standing. It never fails the ship.
       6. Verify the issues the PR declared it closes are actually CLOSED, and close any that are not
          (verify-resolved-issues.ps1 -- its own script, and tested there).
+      7. Say so when the repo does not delete head branches on merge, so the merged branch is not left
+         standing on the remote unnoticed (inbound #815). A read, never a flag: the repo setting covers
+         every merge route while --delete-branch covers only this one. Silent when the answer is yes.
+      8. Wait for the NOT-required checks and report what they said (issue #1602) -- #831's report, at
+         the one moment it can be complete, since step 3 no longer waits for them. It runs LAST because
+         it waits on somebody else's CI and everything owed to the trunk is already done: the merge, the
+         fold, its push and the hand-back. It can therefore stall or be abandoned without leaving a
+         half-state, and it never fails the ship. Skipped entirely where step 3 watched every check.
+
+    Steps 7 and 8 were added to this list on September 8, 2026; step 7 had been documented only at the
+    step since #815, which is the same undercount this file's own conventions call a gap to close on
+    discovery rather than a quiet exception.
 
     Step 6 is the second half of the resolves gate (a lesson from PRs #341-#343, where eight repaired
     findings stayed open because the bodies carried plain mentions instead of closing keywords).
@@ -760,6 +781,71 @@ function Test-BranchEntryAlreadyFolded {
     }
 }
 
+function Write-FailedCheckReasons {
+    <#
+    .SYNOPSIS
+        Print what each FAILING check said about ITSELF -- the #1103 relay -- for a `gh pr checks
+        --json ... link` payload. Prints nothing when nothing failed, nothing carries a job, or no
+        annotation was authored.
+
+    .DESCRIPTION
+        ONE COPY, TWO CALLERS, SHARED AT ISSUE #1602. This loop was written once at step 3, for the
+        path where the merge proceeds past a red check the ruleset does not require. #1602 gave that
+        same path a second home at step 8 -- the non-required checks are now reported after the fold
+        -- and a second copy of a loop that makes network calls and swallows its own exceptions is
+        the kind of duplication that drifts silently: the two would diverge on the next measurement
+        and nothing would say which one a given ship had used.
+
+        WHY IT IS SCRIPT-LOCAL AND NOT IN THE LIB. It makes gh calls, so no suite can reach it --
+        the same line every verdict in pr-issues-lib.ps1 is drawn on, from the other side. What IS
+        testable already lives there: Get-FailedCheckRunRefs selects the records, and
+        Get-AuthoredFailureNote words the sentence. Only the calling around them is here, beside
+        Wait-CheckRegistration, which is script-local for the identical reason.
+
+        BEST-EFFORT BY CONSTRUCTION. Every read is guarded and a failure costs these lines and
+        nothing else. A check whose link names no job is skipped: there is nothing to ask
+        annotations of. A diagnostic must never be the reason the sentence beside it cannot print.
+
+    .PARAMETER ChecksJson
+        `gh pr checks <pr> --json name,bucket,state,link` output. Empty or unparseable prints nothing.
+
+    .PARAMETER Repo
+        owner/name, for the annotations endpoint.
+
+    .PARAMETER OnlyNames
+        Restrict the relay to these check names. EMPTY MEANS NO FILTER, and the two callers differ
+        here on purpose. Step 3 passes the verdict's FailedOther, because a red REQUIRED check there
+        is a refusal whose reason the operator has already met first-hand from the local gate -- and
+        relaying it would explain a failure the run is not proceeding past. Step 8 runs after the
+        merge, where every required check has already concluded green, so there is nothing for a
+        filter to exclude and it passes what the verdict gives it or nothing at all.
+    #>
+    param(
+        [string]$ChecksJson,
+        [string]$Repo,
+        [string[]]$OnlyNames = @()
+    )
+
+    $spoken = @()
+    try {
+        $filter = @($OnlyNames | Where-Object { $_ -and ([string]$_).Trim() })
+        foreach ($ref in @(Get-FailedCheckRunRefs -ChecksJson $ChecksJson)) {
+            if (-not $ref.JobId) { continue }
+            if ($filter.Count -gt 0 -and $filter -notcontains $ref.Name) { continue }
+            # -DiscardStderr because this output is PARSED, the same reason every other parsed read
+            # in this file carries it.
+            $ann = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
+                'api', "repos/$Repo/check-runs/$($ref.JobId)/annotations")
+            if ($ann.ExitCode -ne 0) { continue }
+            $note = Get-AuthoredFailureNote -AnnotationsJson ($ann.Output -join "`n") -CheckName $ref.Name
+            if ($note) { $spoken += $note }
+        }
+    } catch {
+        $spoken = @()
+    }
+    foreach ($note in $spoken) { Write-Host "  $note" -ForegroundColor Yellow }
+}
+
 function Wait-CheckRegistration {
     <#
     .SYNOPSIS
@@ -859,20 +945,29 @@ function Wait-CheckRegistration {
 # That poll is Wait-CheckRegistration, a function so the watch loop can RE-ENTER it: `--watch` can win
 # the race the poll just lost and come back saying `no checks reported` itself (#1350), and the answer
 # to that is this same wait, not the merge verdict.
-# Deliberately does NOT name a check: this step watches whatever checks the PR has, so naming one here
-# would be a claim about the consumer's CI that this script cannot keep. What it does ask the ruleset,
-# since inbound #1549, is whether the checks it just watched INCLUDE every required one -- a green
-# `--watch` exit alone does not say so, because the watch only ever sees what was registered when it
-# started. That reads the repo's own answer via `gh pr checks --required` rather than naming anything.
+# Deliberately does NOT name a check: this step watches whichever checks the repo's own ruleset
+# requires, so naming one here would be a claim about the consumer's CI that this script cannot keep.
+# What it asks the ruleset, since inbound #1549, is whether the checks it just watched INCLUDE every
+# required one -- a green `--watch` exit alone does not say so, because the watch only ever sees what
+# was registered when it started. That reads the repo's own answer via `gh pr checks --required`.
 #
 # WHAT IT DOES SAY, once the watch is over, is which check actually held it up (#831). The wait used to
 # be invisible -- the run printed gh's own table and nothing about the ordering, so learning which check
 # governed meant opening the Actions page afterwards. That invisibility is how two observations, both
 # out of the tail, became a policy question about whether to wait on non-required checks at all.
 # Measured over n=100 paired runs in this repo, the non-required check governs 23% of the time at a
-# median cost of 0s, so THE WAIT IS LEFT EXACTLY AS IT IS and made legible instead (Dave,
+# median cost of 0s, so THE WAIT WAS LEFT EXACTLY AS IT WAS and made legible instead (Dave,
 # August 24, 2026). The report still names no check of its own: the governing one is whichever finished
 # last, and 'required' comes from the repo's own ruleset via `gh pr checks --required`.
+#
+# THAT WAIT MOVED ON SEPTEMBER 8, 2026, AND #831's FINDING IS WHY IT COULD (Dave, issue #1602). The
+# merge is no longer behind the non-required checks; they are watched and reported at step 8, after
+# the fold. What #831 measured is untouched and is now measured a third time -- 21.2% of 99 laps, the
+# same answer -- and what #831 DECIDED is untouched too, because it decided the wait should stay
+# VISIBLE, and it still is. The reason the merge could move out from behind it is that the merge was
+# never behind it in the sense that matters: a red non-required check does not block this merge and
+# never has (#943), so the pre-merge wait on one decided when a sentence was printed. The full
+# argument, the 5.1% it buys, and why that number is 62.5% on a busy day are at the probe below.
 #
 # AND WHAT IT SAYS BEFORE THE WATCH IS THAT NOBODY HAS TO SIT HERE (Dave, issue #985, August 27, 2026).
 # The wait is real -- 11m48s of `lint-en-tests` on PR #980, against a local run of the same suites minutes
@@ -952,6 +1047,66 @@ Write-Host "  Open that second terminal in a lane: scripts\task\worktree-lane.ps
 $maxWaitSec = 180
 $waited = Wait-CheckRegistration -Pr "$pr" -Repo $repo -Branch $branch `
     -PollSeconds $PollSeconds -MaxWaitSec $maxWaitSec
+
+# --- THE WATCH BLOCKS ON THE REQUIRED CHECKS ONLY (issue #1602) ----------------------------------
+# WHAT THIS CHANGES, AND WHAT IT DELIBERATELY DOES NOT. The merge below is allowed to go as soon as
+# every check the ruleset REQUIRES is green; the non-required ones are still waited for and still
+# reported, at step 8, after the fold. So #831 keeps its wait and its report and #1549 keeps its
+# guard -- what moves is the moment the report is PRINTED, not whether one happens.
+#
+# WHY THAT IS WORTH A CHANGE AT ALL. Step 3b below refuses the merge when 'main' gained a commit
+# after the certifying run was created, and the trunk goes on moving while this step waits. A commit
+# that lands in the stretch between the last REQUIRED check and the last check of any kind voids a
+# certificate that was valid the moment before -- and it costs a whole further CI lap on a refusal
+# that is, on the gate's own terms, correct. Measured on 99 ci.yml pull_request laps,
+# 2026-09-05..2026-09-08 (issue #1602, refused laps included, which is why it is per-lap and not per
+# merged PR -- a merged PR's `gh pr checks` reports only its final head):
+#
+#   a non-required check governed the wait                 21 of 99 (21.2%)   median tail 191s, max 753s
+#   certificate voided, after #1592's fold discount        25 of 99 (25.3%)
+#   voided ONLY inside that non-required tail               5 of 99  (5.1%)  <- what this removes
+#   voided inside the tail AND before it                    0 of 99
+#
+# 21.2% reconfirms #831's own n=100 finding of 23% for a third time. The 5.1% is the whole benefit
+# and it is small -- but all five sit on ONE day, the busiest in the sample: 5 of the 8 tail-governed
+# laps that day (62.5%) lost a lap, against 0 of 13 across the three quieter days. The governing
+# share and the tail length are flat across all four, so what moves is the trunk's own rate, which
+# is exactly #1592's title -- two sound decisions that do not converge ON A BUSY TRUNK.
+#
+# THE OBJECTION THAT MADE THIS EXPENSIVE DOES NOT HOLD, and that is the finding that decided it.
+# #1602 priced this as reversing #831, on the ground that #831 wants the wait to SEE a red
+# non-required check. It does, and it still does -- but a red non-required check has never gated the
+# merge here: the verdict below returns Blocked = $false for it and prints "a check FAILED but the
+# merge is not blocked ... Continuing to step 4". So the pre-merge wait on a non-required check
+# decided WHEN that sentence was printed and nothing else. Under this change the operator reads the
+# same sentence at step 8 and their options are identical, because the merge was never theirs to
+# stop at that point. The one thing genuinely lost is a Ctrl+C window -- and the invitation printed
+# five lines above is an instruction not to be sitting in it.
+#
+# FAIL-OPEN, ON THE REPO'S OWN ANSWER. `gh pr checks --required` exits non-zero on a ruleset that
+# requires nothing, and that is indistinguishable from "the required checks have not registered
+# yet". Either way this reads an EMPTY list and watches every check, which is exactly the behaviour
+# of every ship before this change -- so a consumer with no ruleset is not affected by any of it.
+# The list is re-read per watch attempt below for the same reason: the required check may simply not
+# have created its check run yet when this first asks, and a re-entry then finds it.
+#
+# WHAT IS NOT CLAIMED: that the run gets shorter. It does not -- step 8 spends the same seconds this
+# step used to. What is bought is the LAP, by putting the merge on a certificate that is still
+# current, and nothing here shortens CI's own 310-461s window.
+$requiredWaitJson = ''
+try {
+    $requiredWaitProbe = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+        'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
+    if ($requiredWaitProbe.ExitCode -eq 0) { $requiredWaitJson = $requiredWaitProbe.Output -join "`n" }
+} catch {
+    $requiredWaitJson = ''
+}
+$requiredWaitNames = @(Get-RequiredCheckNames -RequiredChecksJson $requiredWaitJson)
+if ($requiredWaitNames.Count -gt 0) {
+    Write-Host "  Blocking on the REQUIRED check(s) only: $(Format-CheckNameList -Names $requiredWaitNames). The rest are waited for and reported after the fold (#1602)." -ForegroundColor DarkGray
+} else {
+    Write-Host "  No required check is known, so this waits on EVERY check, exactly as before (no ruleset, or not registered yet; this is not a finding)." -ForegroundColor DarkGray
+}
 # --watch now blocks until the registered check finishes; exit 0 = all passed, non-zero = SOMETHING
 # failed. WHICH something is the whole question, and the answer is NOT in that exit code (#943). This
 # line used to read "branch protection blocks the merge until green, so a non-zero here means we must
@@ -986,7 +1141,14 @@ $watchAttempt = 0
 $lostWatchNote = ''
 while ($true) {
     $watchAttempt++
-    $checks = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo)
+    # `--required` WHEN THE RULESET NAMES ONE, AND EVERY CHECK WHEN IT DOES NOT (issue #1602; the
+    # argument and the measurement are at the probe above). Built per attempt rather than once,
+    # because $requiredWaitNames is refreshed from the in-loop read below: a required workflow that
+    # had not registered its check run when the probe asked is found on the next attempt, and the
+    # watch narrows then instead of staying wide for the rest of the run.
+    $watchArgs = @('pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo)
+    if ($requiredWaitNames.Count -gt 0) { $watchArgs += '--required' }
+    $checks = Invoke-NativeCapture -FilePath 'gh' -Arguments $watchArgs
     $checks.Output | ForEach-Object { Write-Host $_ }
 
     # THE WATCH STARTED BEFORE THE CHECKS REGISTERED -- issue #1350, PR #1348 (September 3, 2026). A
@@ -1045,12 +1207,22 @@ while ($true) {
         # the verdict it is the case that keeps refusing, since "requires nothing" and "the required checks
         # have not reported" are indistinguishable from here.
         $requiredFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
-            'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
+            'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state,startedAt,completedAt', '--repo', $repo)
         if ($requiredFacts.ExitCode -eq 0) { $requiredFactsJson = $requiredFacts.Output -join "`n" }
     } catch {
         $checkFactsJson = ''
         $requiredFactsJson = ''
     }
+
+    # THE WATCH MODE FOLLOWS THE FRESHEST READING (issue #1602). The probe above ran before the first
+    # watch, when a required workflow may not have created its check run yet; this read is one watch
+    # later. Refreshing here rather than re-asking gh costs nothing -- the call has just been made for
+    # the verdict -- and it is only ever allowed to NARROW the watch: an empty reading leaves the
+    # earlier names standing, because "the list did not read this time" is not evidence that the
+    # ruleset requires nothing, and dropping back to watching everything on it would undo the fix
+    # mid-run for no reason anybody could see in the output.
+    $requiredWaitRefresh = @(Get-RequiredCheckNames -RequiredChecksJson $requiredFactsJson)
+    if ($requiredWaitRefresh.Count -gt 0) { $requiredWaitNames = $requiredWaitRefresh }
 
     # A GREEN WATCH IS NOT THE SAME CLAIM AS "EVERY REQUIRED CHECK CONCLUDED" -- inbound #1549. This line
     # used to break straight out of the loop, past the two fact reads directly above it, and the wait
@@ -1202,31 +1374,32 @@ if ($checks.ExitCode -ne 0) {
     # exactly the one nobody was going to read.
     #
     # Best-effort by construction, like the stalled-run note on the refusal path above: every read is
-    # guarded and a failure costs this line and nothing else. A check whose link names no job is
-    # skipped -- there is nothing to ask annotations of.
-    $spoken = @()
-    try {
-        foreach ($ref in @(Get-FailedCheckRunRefs -ChecksJson $checkFactsJson)) {
-            if (-not $ref.JobId) { continue }
-            if ($verdict.FailedOther -notcontains $ref.Name) { continue }
-            # -DiscardStderr because this output is PARSED, the same reason the run read above gives.
-            $ann = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Arguments @(
-                'api', "repos/$repo/check-runs/$($ref.JobId)/annotations")
-            if ($ann.ExitCode -ne 0) { continue }
-            $note = Get-AuthoredFailureNote -AnnotationsJson ($ann.Output -join "`n") -CheckName $ref.Name
-            if ($note) { $spoken += $note }
-        }
-    } catch {
-        $spoken = @()
-    }
-    foreach ($note in $spoken) { Write-Host "  $note" -ForegroundColor Yellow }
+    # guarded and a failure costs this line and nothing else. Shared with step 8 since #1602 --
+    # Write-FailedCheckReasons, above, which carries the argument for the filter this call passes.
+    Write-FailedCheckReasons -ChecksJson $checkFactsJson -Repo $repo -OnlyNames $verdict.FailedOther
     Write-Host "  Continuing to step 4. The failing check is still failing; nothing here fixes it." -ForegroundColor Yellow
+} elseif ($requiredWaitNames.Count -gt 0) {
+    # NOT "CI green" -- SAY WHAT IS ACTUALLY GREEN (issue #1602). The watch blocked on the required
+    # checks only, so at this moment the non-required ones may be running, or red. "CI green" would be
+    # the exact overclaim this step was careful to avoid everywhere else, and it would be read by the
+    # one reader who then meets a red check at step 8 and has to reconcile the two lines.
+    Write-Host "ship-pr: every REQUIRED check is green. The rest are still watched, and reported at step 8." -ForegroundColor Green
 } else {
     Write-Host "ship-pr: CI green." -ForegroundColor Green
 }
 
 $waitReport = $null
-if ($checkFactsJson) {
+# THE REPORT IS ABOUT THE WAIT THAT ACTUALLY HAPPENED (issue #1602). Where the watch blocked on the
+# required checks only, the full payload still holds non-required checks that have NOT concluded --
+# so handing it here would name whichever check happened to finish last AMONG THOSE DONE and call it
+# "governed the merge", which is now simply false: more checks are still to come and none of them
+# governed anything. The required payload is the honest subject for this line, and #831's own
+# question -- which check governed, and what the non-required tail cost -- is answered in full at
+# step 8, once every check has actually reported.
+if ($requiredWaitNames.Count -gt 0 -and $requiredFactsJson) {
+    $waitReport = Get-CheckWaitReport -ChecksJson $requiredFactsJson `
+        -RequiredNamesJson $requiredFactsJson -WaitedSeconds $waitedSec
+} elseif ($checkFactsJson) {
     $waitReport = Get-CheckWaitReport -ChecksJson $checkFactsJson `
         -RequiredNamesJson $requiredFactsJson -WaitedSeconds $waitedSec
 }
@@ -1337,16 +1510,12 @@ if ($waitReport) {
 if ($SkipStaleCheck) {
     Write-Host "ship-pr: -SkipStaleCheck set -- not checking whether 'main' moved since the certifying run." -ForegroundColor DarkYellow
 } else {
-    $staleCheckNames = @()
-    if ($requiredFactsJson -and $requiredFactsJson.Trim()) {
-        try {
-            # Assign first, wrap second -- the 5.1 pitfall every parse in this file already avoids.
-            $parsedStaleNames = $requiredFactsJson | ConvertFrom-Json
-            $staleCheckNames = @(@($parsedStaleNames) | Where-Object { $_ -and $_.name } | ForEach-Object { [string]$_.name })
-        } catch {
-            $staleCheckNames = @()
-        }
-    }
+    # THE SAME WALK AS THE WAIT'S, SHARED SINCE #1602 rather than written out a third time. It was
+    # inline here and inline at the probe above, and the 5.1 collapse this parse guards against is
+    # invisible in a repo whose ruleset requires exactly ONE check -- which is this one, so a local
+    # copy is a defect nothing here can measure. Get-RequiredCheckNames is tested; the tie-break on an
+    # empty answer stays local, and below it is a warning rather than a refusal.
+    $staleCheckNames = @(Get-RequiredCheckNames -RequiredChecksJson $requiredFactsJson)
 
     if ($staleCheckNames.Count -eq 0) {
         # NO RULESET, OR AN UNREADABLE ONE -- INDISTINGUISHABLE HERE, AND NEITHER REFUSES. See the
@@ -1853,6 +2022,16 @@ if ($queueActive) {
     Write-Host "  Not run here (the PR has not merged yet). Unless this repo verifies on the merge itself," -ForegroundColor DarkGray
     Write-Host "  check what it declared it closes once it has landed:" -ForegroundColor DarkGray
     Write-Host "    scripts\release\verify-resolved-issues.ps1 -Pr $pr" -ForegroundColor DarkGray
+    # STEP 8 HAS NO HOME HERE EITHER, AND FOR THE SAME REASON -- it is named rather than dropped
+    # (issue #1602). Where the watch above blocked on the required checks only, the non-required ones
+    # were left running deliberately, to be reported after the fold; under a queue there is no fold
+    # here and no merge to report against, so nothing prints them. The checks themselves are
+    # unaffected -- they run, and they are on the PR -- so this is a lost REPORT, not a lost check,
+    # which is why one line naming where to read them is the whole repair.
+    if ($requiredWaitNames.Count -gt 0) {
+        Write-Host "  The NOT-required checks were not waited for here (#1602). Read them with:" -ForegroundColor DarkGray
+        Write-Host "    gh pr checks $pr --repo $repo" -ForegroundColor DarkGray
+    }
     exit 0
 }
 if (-not $mergedState) {
@@ -2185,4 +2364,137 @@ if ($dbomRes.ExitCode -eq 0) {
         Write-Host "  gh api -X PATCH repos/$repo -F delete_branch_on_merge=true" -ForegroundColor Yellow
         Write-Host "  (the local clone is a separate half -- scripts\task\prune-merged.ps1 reaps that, and deletes nothing it cannot prove is merged)" -ForegroundColor DarkGray
     }
+}
+
+# --- Step 8: what the NOT-required checks said (issue #1602) --------------------------------------
+# THIS IS #831's REPORT, MOVED RATHER THAN REMOVED. Step 3 now blocks on the required checks only, so
+# the non-required ones are still running when the merge goes -- and the question #831 was filed to
+# answer, which check governed and what the tail cost, cannot be answered until they report. This is
+# where it is answered. Nothing is skipped and nothing is downgraded to a guess: the same
+# Get-CheckWaitReport, over the full payload, once the full payload exists.
+#
+# IT RUNS LAST, AND THE ORDER IS THE WHOLE SAFETY ARGUMENT. Everything owed to the trunk has already
+# happened: the merge, the fold, its push, the trunk hand-back and the resolved-issues check. A merge
+# without its fold is #1270's defect -- the branch's document stranded on 'main' with nothing saying
+# so -- and this step waits on somebody else's CI, so putting it anywhere above the fold would put a
+# multi-minute wait between the merge and the one thing that must follow it. Below the fold it can
+# stall, be killed, or be abandoned by an operator who has read enough, and the trunk is already
+# whole.
+#
+# SO IT NEVER FAILS THE SHIP, and that is not politeness -- it is the only correct exit code. The PR
+# is merged and folded by the time this line runs; there is no outcome here that a non-zero exit
+# would help with, and a red exit on a finished ship is exactly the signal that sends a later reader
+# looking for a half-state that does not exist. A red non-required check is reported, in the wording
+# it had at step 3, and the ship still reads as done.
+#
+# SKIPPED ENTIRELY WHERE STEP 3 WATCHED EVERYTHING. With no required check known, step 3 waited on
+# every check exactly as it did before #1602 and printed the report there -- so there is nothing left
+# to wait for and printing a second report would only claim a tail that never existed. That is the
+# same line every other #1602 branch draws, and it keeps a repo with no ruleset out of this step
+# completely.
+if ($requiredWaitNames.Count -eq 0) {
+    # Deliberately silent: step 3 already said which check governed, over the same payload this step
+    # would re-read. A line here would be noise on every ship in a repo with no ruleset.
+} else {
+    Write-Host "ship-pr: PR #$pr is merged and folded. Now reporting what the NOT-required check(s) said (#1602)." -ForegroundColor Cyan
+    Write-Host "  Nothing below is owed to the trunk -- it is already whole. Ctrl+C here costs the report and nothing else." -ForegroundColor DarkGray
+
+    $tailBegan = Get-Date
+    # A WATCH RATHER THAN A READ, because a read would report 'pending' and call it a day -- which
+    # loses precisely what #831 asked for. Measured September 8, 2026: `gh pr checks --watch` works
+    # on a MERGED PR (exit 0), the checks living on the head commit, which the merge does not remove.
+    # Not `--required`, obviously: this is the half step 3 did not watch.
+    #
+    # BOUNDED, AND THE BOUND IS THIS FILE'S OWN RULE RATHER THAN A NEW ONE (inbound #1179). That rule
+    # is drawn for exactly this region: "this is the worse of the two places to hang -- the PR is
+    # already MERGED by the time this line runs". Step 3's watch is deliberately unbounded because a
+    # stall there blocks a merge that has not happened and is therefore visible in the PR; a stall
+    # HERE leaves a finished ship holding a terminal open, with nothing for the operator to read and
+    # no prompt to come back to.
+    #
+    # 1800s, AND IT IS SIZED OFF THE MEASUREMENTS RATHER THAN PICKED. $NativeCaptureNetworkTimeoutSeconds
+    # (120) is far too short to reuse here -- it bounds a single git round trip, while this bounds a
+    # wait on somebody else's CI. The tail this step exists to watch ran to 753s in #1602's own n=99
+    # sample, and #831's n=100 measured `claude-review` at up to 23m 23s (1403s) end to end. 1800s
+    # clears both with room and still ends the run, which is the whole requirement: this bound is not
+    # a deadline anybody should meet, it is the difference between a report that gave up and a process
+    # that never returns.
+    $tailMaxWaitSec = 1800
+    $tailChecks = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+        'pr', 'checks', "$pr", '--watch', '--interval', "$PollSeconds", '--repo', $repo) `
+        -TimeoutSeconds $tailMaxWaitSec
+    $tailChecks.Output | ForEach-Object { Write-Host $_ }
+    $tailWaitedSec = [int][math]::Round(((Get-Date) - $tailBegan).TotalSeconds)
+    # A TIMEOUT HERE IS NOT A FAILURE OF ANYTHING, and it must not read as one. The ship is complete;
+    # what ran out is a report. Said before the report below, because the lines after it would
+    # otherwise be read as facts about a payload this run never got to see.
+    if ($tailChecks.TimedOut) {
+        Write-Host "  The NOT-required check(s) had not finished within $(Format-CheckDuration -Seconds $tailMaxWaitSec) -- giving up on the REPORT, not on the ship (#1602)." -ForegroundColor DarkYellow
+        Write-Host "  PR #$pr is merged and folded. Read them at your leisure:  gh pr checks $pr --repo $repo" -ForegroundColor DarkYellow
+    }
+
+    # Best-effort by construction, like every diagnostic in this file: a read that throws costs this
+    # report and never the ship, which has already landed.
+    $tailFactsJson = ''
+    $tailRequiredJson = ''
+    try {
+        $tailFacts = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+            'pr', 'checks', "$pr", '--json', 'name,bucket,state,startedAt,completedAt,link', '--repo', $repo)
+        if ($tailFacts.ExitCode -eq 0) { $tailFactsJson = $tailFacts.Output -join "`n" }
+        $tailRequired = Invoke-NativeCapture -FilePath 'gh' -Arguments @(
+            'pr', 'checks', "$pr", '--required', '--json', 'name,bucket,state', '--repo', $repo)
+        if ($tailRequired.ExitCode -eq 0) { $tailRequiredJson = $tailRequired.Output -join "`n" }
+    } catch {
+        $tailFactsJson = ''
+        $tailRequiredJson = ''
+    }
+
+    # THE WAIT REPORTED IS THIS STEP'S OWN, not step 3's. Handing step 3's seconds here would double
+    # count the required wait; handing this step's says what the tail actually cost after the merge,
+    # which is the number #1602 was filed about. Get-CheckWaitReport's own 'X after the last required
+    # check' clause is unchanged and is where the tail's real size is stated.
+    $tailReport = $null
+    if ($tailFactsJson) {
+        $tailReport = Get-CheckWaitReport -ChecksJson $tailFactsJson `
+            -RequiredNamesJson $tailRequiredJson -WaitedSeconds $tailWaitedSec
+    }
+    if ($tailReport) {
+        Write-Host "  $tailReport" -ForegroundColor DarkGray
+    } else {
+        Write-Host "  waited $(Format-CheckDuration -Seconds $tailWaitedSec) -- no readable check facts, so nothing to report about the tail" -ForegroundColor DarkGray
+    }
+
+    # AND THE FAILURE WORDING IS STEP 3's, VERBATIM, because it is the same fact about the same PR --
+    # only later. The merge proceeding past a red non-required check is not new behaviour and was not
+    # introduced here: Get-MergeBlockVerdict has returned Blocked = $false for it since #943, and
+    # step 3 printed this same sentence before continuing. What #1602 changed is when the reader meets
+    # it, so the sentence must not change with it.
+    # `-and -not $tailChecks.TimedOut` IS LOAD-BEARING, not defensive noise. Invoke-NativeCapture
+    # substitutes exit code 124 for a killed child precisely so the number and TimedOut tell the same
+    # story -- which means a timeout arrives here as a non-zero exit, and without this clause the run
+    # would announce that a check FAILED because a report ran out of time. TimedOut is the field to
+    # read when certainty is needed, exactly as native-capture-lib says.
+    if ($tailChecks.ExitCode -ne 0 -and -not $tailChecks.TimedOut) {
+        $tailVerdict = $null
+        try { $tailVerdict = Get-MergeBlockVerdict -RequiredChecksJson $tailRequiredJson -ChecksJson $tailFactsJson } catch { $tailVerdict = $null }
+        if ($tailVerdict -and -not $tailVerdict.Blocked) {
+            Write-Host "ship-pr: a check FAILED but the merge was not blocked -- $($tailVerdict.Reason)." -ForegroundColor Yellow
+        } else {
+            Write-Host "ship-pr: a NOT-required check FAILED after the merge -- PR #$pr is merged and folded regardless." -ForegroundColor Yellow
+        }
+        # THE AUTHORED REASON RIDES ALONG, the same relay #1103 added at step 3 and for the same
+        # measured reason: eight issues were filed in this repo against a red `claude-review` whose
+        # own diagnostic step had already printed the cause. That relay is worth MORE here, not less
+        # -- this is now the only place the reader meets the failure at all. Shared with step 3
+        # rather than copied; the filter argument is at the function.
+        $tailFailedOther = @()
+        if ($tailVerdict) { $tailFailedOther = @($tailVerdict.FailedOther) }
+        Write-FailedCheckReasons -ChecksJson $tailFactsJson -Repo $repo -OnlyNames $tailFailedOther
+        Write-Host "  Nothing here fixes it, and nothing here needs undoing: the ship is complete." -ForegroundColor Yellow
+    } elseif (-not $tailChecks.TimedOut) {
+        Write-Host "  Every check on PR #$pr is green." -ForegroundColor Green
+    }
+    # NO THIRD ARM ON PURPOSE. On a timeout the two lines above the report have already said what
+    # happened and what to run; claiming green here would be the same overclaim the TimedOut guard
+    # above exists to prevent, and repeating the giving-up sentence would be noise.
 }
