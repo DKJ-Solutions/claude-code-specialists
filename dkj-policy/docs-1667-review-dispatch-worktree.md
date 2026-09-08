@@ -75,6 +75,18 @@ flag.
       **dirties the checkout it was meant to protect**, for as long as it stands.
 - [x] Both probes reverted: worktree removed, probe file deleted, `README.md` restored,
       `git status` clean and `git worktree list` back to the primary alone.
+- [x] Review round on the committed diff -- Edith, Nolan and Sebastian in parallel, in the primary
+      checkout, which is what this branch decides. Sebastian: no blocking findings, and one claim of
+      his that did not hold on checking -- he read `fix/1665-working-copy-boundary` as merged, where
+      it is parked. Nolan: the manual is confirmed on-demand and not always-on (its `@`-import is the
+      persona body, not the manual), +33 lines / +2,446 B paid only by a session that opens it. Edith
+      and Nolan converged on the same defect from opposite ends, and it is repaired: the manual named
+      the `working-copy-boundary` block as an established fact, which it is not -- the block is on a
+      parked branch, so on the trunk today nothing forbids the hazard. The manual now says that
+      plainly and names no artefact that has not landed. Two more taken: the sentence claiming the
+      prevented failure "leaves a diff behind" was cut, because #1665 measured that failure as silent
+      too, and the closing paragraph now restates **both** costs for the writing case, which is what
+      the DEPLOY section already claimed it did.
 - [x] Lint gate + all suites green before the push.
 
 ### DEPLOY: docs/1667-review-dispatch-worktree
