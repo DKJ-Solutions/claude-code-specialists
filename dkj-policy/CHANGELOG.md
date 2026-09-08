@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**26 / 49 minor entries** <!-- pending-tally -->
+**26 / 50 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1659-temp-path-unpredictable · 20260908-190619
+
+Seven sites across six scripts composed their temp path as `<label>-$PID`, which is a name a local
+actor can reach first: `New-Item -Force` and `WriteAllText` both follow a symlink or junction, so a
+pre-planted link redirects the write, and where the script then deletes recursively there, the same
+window is a delete primitive in somebody else's directory. All seven now call one composer,
+`New-ScratchPath`, which
+returns `<temp>/<label>-<pid>-<guid>` -- there is no name to plant at. A reparse-point check was the
+obvious alternative and was declined on the measurement: it is a check-then-write, and on macOS `/tmp`
+is itself a symlink, so the same check refuses a whole platform for the ordinary case. A scan in
+`native-capture.tests.ps1` now fails on the eighth site, which is what the class needed more than the
+seven edits did.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. These are the workflow's own scripts, and the hardening
+is against a local actor on the machine running them; no behaviour a consumer invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+No shipping script composes a predictable temp path any more
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1666](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1666)
+
+---
 
 ### DEPLOY: fix/1655-unjudged-fixture-git-check · 20260908-185415
 
