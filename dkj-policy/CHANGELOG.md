@@ -43,4 +43,36 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**Nothing pending.** The last release took every entry. <!-- pending-tally -->
+**0 / 1 patch entry** <!-- pending-tally -->
+
+### DEPLOY: fix/1562-origin-remote-redirect · 20260907-211130
+
+The repo-citation section of `CLAUDE.md` now covers the layer it could not reach: a checkout's own
+`origin` remote. A checkout cloned before the September 2, 2026 transfer still pushes to
+`DaveKJohn/claude-code-specialists.git` and succeeds only because GitHub answers `remote: This
+repository moved` — every push of the `v4.32.0` cut did exactly that. The note names the
+one-command repoint (`git remote set-url origin
+https://github.com/DKJ-Solutions/claude-code-specialists.git`) and ties the fragility to the same
+condition the prose rule already carries: the redirect holds only while nothing is created at the
+old path.
+
+**Score:** 1
+
+The failure this prevents has not happened: pushes from un-repointed checkouts still work today. It
+bites the day anything is created at `DaveKJohn/claude-code-specialists` — every such checkout's
+pushes then fail with no redirect to catch them, and nothing in the tree points at the cause.
+
+#### What makes this deploy extra special
+
+N/A — an internal documentation note. A subscriber of the service never sees a repo remote URL.
+
+**Score:** N/A
+
+#### Pull Request
+
+Note the origin remote fix for checkouts still on DaveKJohn/
+
+[PR #1563](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1563)
+
+---
+
