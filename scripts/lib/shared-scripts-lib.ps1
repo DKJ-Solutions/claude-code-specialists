@@ -491,6 +491,35 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE PASTE-SAFETY VERDICT ON A REF NAME (issue #1594, September 8, 2026) -- may this branch
+            # name go into a printed command a reader will run verbatim? ship-pr.ps1 carries five such
+            # remedies and sync-main.ps1 two, and the lib is the single answer for all seven. It is the
+            # NEIGHBOUR of remote-ahead-lib above rather than a section of it: that one sanitises text
+            # somebody else wrote for DISPLAY (a commit's %an/%s, where an RTL override deceives a
+            # reader), this one decides whether a name may enter a COMMAND. git's ref rules already
+            # reject the control characters the display case is about, and admit every shell
+            # metacharacter this case is about, so the two guards have disjoint subjects and neither
+            # implies the other.
+            Name    = 'ref-print-lib'
+            Source  = 'scripts\lib\ref-print-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE SECOND MIRROR OF THE SAME SOURCE, on native-capture-lib-shopify's precedent -- read its
+            # banner for why a second entry rather than a list of mirrors, and why the name carries the
+            # plugin. sync-main.ps1 is the caller here: two of #1594's seven sites are its own printed
+            # remedies (the by-hand push, and the 'gh pr create' line the default non-merging path
+            # prints). Neither is attacker-reachable -- sync-main composes its own branch name from a
+            # prefix and a timestamp -- but they are the same defect and they get the same one
+            # definition, because a second hand-typed copy of a security predicate is exactly what #1194
+            # measured drifting within a day.
+            Name    = 'ref-print-lib-shopify'
+            Source  = 'scripts\lib\ref-print-lib.ps1'
+            Plugin  = 'dkj-team-shopify'
+            LibOnly = $true
+        },
+        @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
             Plugin = 'dkj-policy'

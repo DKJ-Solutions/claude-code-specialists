@@ -339,6 +339,12 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 # changelog is, which is half of the two-path bound a fold commit has to fit inside. Same plugin-payload
 # sibling and the same unguarded dot-source open-pr.ps1 and fold-changelog-entry.ps1 already use for it.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
+# For every printed remedy below that puts the branch name into a command the reader runs verbatim
+# (issue #1594): Get-PasteableRef decides whether the name may go in at all, and supplies the placeholder
+# plus the explaining line when it may not. Same plugin-payload sibling and the same unguarded
+# dot-source as the six above -- a payload missing this file must fail at load rather than print an
+# unguarded command.
+. (Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1')
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -360,6 +366,20 @@ if (Get-Command Get-PrMergeMethod -ErrorAction SilentlyContinue) {
 
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a branch."; exit 1 }
+
+# JUDGED ONCE, HERE, RATHER THAN AT EACH OF THE FIVE PRINT SITES (issue #1594). Every remedy this
+# script prints puts the SAME name into a command, so one verdict beside the read that produced it
+# cannot drift from a second one further down -- and it is computed unconditionally because four of the
+# five sites are refusal paths that must not do work of their own on the way out. $branch here is the
+# branch this run is shipping, read off HEAD, so a hostile name is one somebody pushed and this operator
+# then checked out; the reachability argument is in the issue, and the repair does not depend on it.
+$branchPaste = Get-PasteableRef -Ref $branch
+# THE SAME NOTE WITH ITS OWN LEADING BLANK LINE, for the three here-strings that append it to a command
+# line rather than printing it through Write-Host. A branch name safe to paste is the overwhelmingly
+# common case, and an interpolated '' sitting on its own line would add a stray blank line to every one
+# of those refusals as they have always printed -- so the safe path stays byte-identical and only the
+# refused path grows. One definition rather than three locals: the three sites want the identical string.
+$branchPasteNoteBlock = if ($branchPaste.Note) { "`n" + $branchPaste.Note } else { '' }
 
 # --- Step 0: is 'main' free for step 5 to check out? (issue #1069) --------------------------------
 # THE ORDERING IS THE WHOLE POINT. git allows one worktree per branch, so a tree standing on 'main'
@@ -1543,7 +1563,10 @@ certificate anyway.
             # UNCONDITIONALLY, not gated on the trunk-return decision: where step 2b declined to move (a
             # dirty tree, another worktree on the trunk) the line is a harmless no-op, and a remedy that
             # is sometimes missing a step is worse than one that sometimes repeats a checkout you have.
-            # NOT the gate performing the update itself -- that is option 3 in #1325 and a larger decision.
+            # AND THE CHECKOUT NAMES A PASTE-SAFE TOKEN, not the raw ref (issue #1594): this remedy is the
+            # first of the seven sites that issue measured, and the one whose reader is most often an
+            # agent session pasting it back verbatim. $branchPasteNoteBlock explains a refused name and is
+            # '' for every name this workflow creates, so the line above is unchanged in the common case.
             Write-Error @"
 stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
 started (issue #1292) -- NOT merged.$exemptClause
@@ -1556,10 +1579,10 @@ Bring the branch up to date so CI re-runs against the current 'main', then re-ru
 CHECKOUT IS THE FIRST STEP -- this run already handed the tree back to the trunk (issue #1073), so
 without it the merge below fast-forwards 'main' and leaves the branch untouched, silently (#1588):
 
-  git checkout $branch
+  git checkout $($branchPaste.Token)
   git fetch origin main
   git merge origin/main
-  <push, wait for CI to go green again, re-run ship-pr>
+  <push, wait for CI to go green again, re-run ship-pr>$branchPasteNoteBlock
 
 -SkipStaleCheck ships on the old certificate anyway -- use it only when the window is known-harmless
 (e.g. the gained commits are docs-only). There is no re-run of the wait for this gate: fixing it means
@@ -1843,7 +1866,8 @@ if ($queueActive) {
         Write-Host "  process this run never observes. The branch document will sit on 'main' unfolded, so the" -ForegroundColor Yellow
         Write-Host '  changelog never receives the entry and a release cut in that window misses the change.' -ForegroundColor Yellow
         Write-Host '  Fold it by hand once the merge has landed:' -ForegroundColor Yellow
-        Write-Host "    fold-changelog-entry.ps1 -Branch $branch -Commit -Push" -ForegroundColor Yellow
+        Write-Host "    fold-changelog-entry.ps1 -Branch $($branchPaste.Token) -Commit -Push" -ForegroundColor Yellow
+        if ($branchPaste.Note) { Write-Host $branchPaste.Note -ForegroundColor Yellow }
         Write-Host '  And put the runner in place so the next ship does not need this -- run the adopt-dkj-policy' -ForegroundColor Yellow
         Write-Host '  skill (Part 3, adopt-merge-queue.ps1), which places it and the rest of the queue floor.' -ForegroundColor Yellow
     }
@@ -1997,7 +2021,7 @@ release trips over it. Fold from the tree that HOLDS main -- fold-changelog-entr
 -RepoRoot for exactly this since #101:
 
   git -C <that worktree> fetch --prune origin; git -C <that worktree> merge --ff-only origin/main
-  & "$foldScript" -Branch $branch -RepoRoot <that worktree> -Push
+  & "$foldScript" -Branch $($branchPaste.Token) -RepoRoot <that worktree> -Push$branchPasteNoteBlock
 
 `git worktree list` names it.
 "@
@@ -2021,7 +2045,7 @@ The PR is merged, the branch document is still in the tree, and every gate stays
 release trips over it. Fold by hand from any tree standing on an up-to-date main:
 
   git checkout main; git fetch --prune origin; git merge --ff-only origin/main
-  & "$foldScript" -Branch $branch -Push
+  & "$foldScript" -Branch $($branchPaste.Token) -Push$branchPasteNoteBlock
 "@
         exit 1
     }
@@ -2157,7 +2181,8 @@ if (-not $foldTree -and -not $shipTreeIsPrimary) {
             # NEVER FAILS THE SHIP. Everything this script was asked to do has happened by now: merged,
             # folded, pushed. What is left is a lock on 'main' that the next run's step 0 will report by
             # name anyway -- so this says it once, here, where it is cheapest to act on.
-            Write-Warning "this tree is still on 'main' and is not the primary checkout, so it holds the trunk for the whole clone. Move it off: git -C `"$repoRoot`" checkout $branch"
+            Write-Warning "this tree is still on 'main' and is not the primary checkout, so it holds the trunk for the whole clone. Move it off: git -C `"$repoRoot`" checkout $($branchPaste.Token)"
+            if ($branchPaste.Note) { Write-Warning $branchPaste.Note }
         }
     }
 }

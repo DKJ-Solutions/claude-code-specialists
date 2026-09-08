@@ -1976,7 +1976,10 @@ Assert-True ($shipText -like '*git merge origin/main*') 'the remedy tells the op
 # unrelated single-line `'git fetch origin main' failed` refusal further up the same file -- the same
 # offset-scoped technique open-pr's refresh/append ordering asserts use above (#919). The two-space
 # indent does a second job here: that earlier refusal quotes the command, it does not lay it out.
-$idxCheckout = $shipText.IndexOf('  git checkout $branch')
+# THE TOKEN, NOT THE RAW REF (issue #1594). The remedy prints $branchPaste.Token so a branch name
+# carrying a shell metacharacter cannot enter a command the reader pastes; the ORDER this block exists to
+# pin is unchanged, so only the string being located moved.
+$idxCheckout = $shipText.IndexOf('  git checkout $($branchPaste.Token)')
 $idxFetchRem = if ($idxCheckout -ge 0) { $shipText.IndexOf('  git fetch origin main', $idxCheckout) } else { -1 }
 $idxMergeRem = if ($idxFetchRem -ge 0) { $shipText.IndexOf('  git merge origin/main', $idxFetchRem) } else { -1 }
 Assert-True ($idxCheckout -ge 0) 'the stale-CI remedy names the branch to check out, using the branch the gate already read'
