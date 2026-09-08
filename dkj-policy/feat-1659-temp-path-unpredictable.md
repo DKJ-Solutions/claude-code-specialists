@@ -99,16 +99,29 @@ The PR title is narrowed to *shipping* scripts for the same reason.
 - [x] `native-capture.tests.ps1`: nine asserts on the composer (two calls differ, direct child of the
       temp dir, leaf shape, nothing created without `-Directory`, and three refusals -- `..`, a
       separator, an undotted extension).
-- [x] A **scan** in the same suite: any statement under `scripts/**` outside `tests/` that reaches
-      `GetTempPath()` through `Join-Path` must carry a guid, with one line exempt by its exact text
-      (the composer's own). Plus a per-file assert that the five converted scripts still call it.
+- [x] A **scan** in the same suite: any non-comment line under `scripts/**` outside `tests/` naming a
+      temp root -- the .NET call or the `TEMP`/`TMP` environment variables -- must carry a guid or a
+      `# temp-path-exempt:` marker, of which exactly two are declared and counted. Plus a per-file
+      assert that the five caller files still reach the composer.
 - [x] Negative control run: the scan was proved to fail by re-introducing `git-park-msg-$PID.txt` in
       `park-lib.ps1` -- 3 asserts red, green again on restore.
 - [x] `test-suite-gate.tests.ps1` adjusted: it used to **compose** the capture directory from the
       driver's `GATE-PID`, which a guid makes impossible. It now reports `CapturePid` and **finds** the
       directory by `test-suite-gate-<pid>-*` -- zero matches is the green case's assertion, one match is
       the red case's.
-- [x] Lint gate + all suites green.
+- [x] Review round -- Victor, Sebastian and Edith in parallel on the diff. Three findings acted on, all
+      in the commit after the first: the scan's first shape required the temp call and the join on **one
+      line**, which a two-statement composition and `$env:TEMP` both walked past; its exemption was an
+      exact source-text match that a reflow of the composer would have turned against itself; and the
+      DEPLOY section said "seven scripts" where it is seven **sites** across six.
+- [~] "Lint gate + all suites green" -- dropped as a step because `open-pr.ps1` runs both and refuses
+      the push on either, so ticking it here is a claim about a run that has not happened. What WAS run
+      by hand is the pair this branch changes, and only because Victor reproduced a failure in one:
+      `native-capture.tests.ps1` 87/87 and `test-suite-gate.tests.ps1` 82/82.
+- [x] The failure Victor reproduced is closed, and it is worth naming because it is the branch's own
+      trap: the sibling scanner in `test-suite-gate.tests.ps1` reads **every** line in `scripts/tests/`,
+      comments and string literals included, and flagged this scan's own explanatory comment as a
+      predictable fixture path. A guard's prose lives inside the tree its sibling guard measures.
 
 ### DEPLOY: feat/1659-temp-path-unpredictable
 
