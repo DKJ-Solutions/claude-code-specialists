@@ -63,12 +63,16 @@ the numbers said the classes separate cheaply.
 
 ### TEST
 
-- [x] 13 new asserts in `check-plugin-integrity-docs.tests.ps1` (scenarios 76-84), pinning the
+- [x] 12 new asserts in `check-plugin-integrity-docs.tests.ps1` (scenarios 76-84), pinning the
       boundary and not only the finding: the question, the converted form, the second invocation
       spelling, both other discard forms, the bare pipeline, and the scope
 - [x] Probe the check's own stated boundary rather than trusting it -- which found the `[void]` gap
       the measurement could not, this tree holding only two of the three discard spellings
-- [x] The four converted suites green on their own (31 / 608 / 46 / 15 asserts)
+- [x] The three converted SUITES green on their own -- `find-specialist-mentions` (31 asserts),
+      `shared-scripts` (608), `source-repo-guard` (46) -- plus `fixture-git-lib.tests.ps1` (15),
+      which covers the lib they were converted onto. The fourth converted file,
+      `fresh-consumer.measure.ps1`, is a measurement and asserts nothing by design, so it is checked
+      by parse and by resolving its new dot-source rather than by a count
 - [x] The full lint gate green -- `[fixture-git] checked 85 -- 0 finding(s)`
 - [x] The full test gate green -- all 81 suites in 211s
 
