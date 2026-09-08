@@ -165,6 +165,32 @@ Assert-True ($body -notmatch "--add-assignee'\s*,\s*'@me'") "the script never se
 # is what a read-back looks like from here -- the facts before, the assignees after.
 Assert-True ((([regex]::Matches($body, "'issue',\s*'view'")).Count) -ge 2) 'the claim is read back after the write, not assumed from the exit code'
 
+# THE READ-BACK'S THREE STATES (#1628). The defect was one boolean standing for two opposite facts --
+# "gh answered and said no" and "gh never answered" -- with the refusal message printed for both. It is
+# a WRONG MESSAGE on a path no behavioural test here reaches, so the shape is what a suite can hold:
+# the refusal must be gated on the read having succeeded, and the unverified path must exist and must
+# not exit. A later edit collapsing them back would restore a false stop on a claim that landed.
+Assert-True ($body -match '\$readOk\s*=\s*\[bool\]\(\$after\s+-and\s+\$after\.ExitCode\s+-eq\s+0\)') 'whether the read-back answered is its own value, separate from what it said'
+Assert-True ($body -match 'if\s*\(\$readOk\s+-and\s+-not\s+\$landed\)') 'the "not on the issue" refusal fires only where the read actually answered'
+Assert-True ($body -notmatch 'if\s*\(-not\s+\$landed\)\s*\{') 'no branch keys the refusal off $landed alone -- that is the collapse itself'
+Assert-True ($body -match 'if\s*\(-not\s+\$readOk\)') 'a read that did not answer has its own branch'
+
+# The unverified branch must stay non-blocking and must name what it measured. Its whole reason for
+# existing is that a false stop costs the assignment (#1485), so an `exit` added to it would be the
+# defect back in a new spelling -- and a message that does not name the exit code is the old one's
+# other half: a cause asserted rather than measured.
+$unverified = if ($body -match '(?s)if\s*\(-not\s+\$readOk\)\s*\{(.*?)\n\}') { $Matches[1] } else { '' }
+Assert-True ($unverified -ne '') 'the unverified branch is findable as a block'
+Assert-True ($unverified -notmatch '\bexit\b') 'the unverified read does NOT block -- the write returned 0 and the claim most likely landed'
+Assert-True ($unverified -match '\[WARNING\]') 'it reports as a warning, not as the refusal it is not'
+Assert-True ($unverified -match 'exited \$\(\$after\.ExitCode\)') 'it names the exit code it actually measured'
+Assert-True ($unverified -notmatch [regex]::Escape('$after.TimedOut')) 'no reason branches on TimedOut -- this script passes no timeout, so it could never print'
+
+# ...and the closing verdict must not contradict the warning it sits under: an unconditional
+# '[OK] claimed' there asserts exactly what the read-back failed to establish.
+Assert-True ($body -match '\$confirmed\s*=\s*if\s*\(\$landed\)') 'the headline distinguishes a confirmed claim from an unconfirmed one'
+Assert-True ($body -match "claimed for '\`$\(\`$identity\.Account\)'\`$confirmed") 'and the OK line carries that distinction rather than asserting the claim landed'
+
 # The title is the one field on the issue that a stranger writes, and this script prints it twice.
 Assert-True ($body -notmatch '\$\(\$facts\.title\)') 'the issue title is never printed straight from the tracker'
 
