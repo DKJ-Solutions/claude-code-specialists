@@ -43,7 +43,58 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**23 / 46 minor entries** <!-- pending-tally -->
+**24 / 47 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1656-gate-count-readme · 20260908-180529
+
+The `dkj-policy` README's one-paragraph summary no longer counts the gates. It read *"Four gates hold the
+whole thing together, and none of them is advisory"* and now reads *"Gates on the branch's own paperwork
+hold the whole thing together"* -- the same claim, with the half that goes stale removed and the half that
+does the work kept verbatim.
+
+The count was correct when it was written and is correct today. What it was not is durable: the paragraph
+sits one sentence above the pointer to
+[`CONTRIBUTING-portable.md`](../plugins/dkj-policy/CONTRIBUTING-portable.md), whose matching sentence
+becomes "Five further gates" the moment
+[#1650](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650) lands -- so the summary would
+have started contradicting its own next paragraph without anybody editing it. That is the second time this
+count has gone stale by standing still, which is the argument for naming the gates instead: *"Gates on the
+branch's own paperwork"* is what `CONTRIBUTING-portable.md` already calls them, and it stays true at four,
+five or six.
+
+Deliberately scoped to this one sentence. The other counts in the tree are either a different subject or
+sit in files #1650's own branch is already editing; the one it leaves behind,
+`CONTRIBUTING.md:380`, is filed on
+[that thread](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650#issuecomment-5589481061)
+rather than swept from here.
+
+**Score:** 1
+
+A wrong number in a summary paragraph misleads nobody today -- it prevents a contradiction that has not
+happened yet, and names the failure it prevents. Cosmetic in isolation; worth doing because the alternative
+is finding it a third time.
+
+#### What makes this deploy extra special
+
+This page ships with the plugin, and it is the one the README itself calls *"the page to read"* before
+handing a consumer to `CONTRIBUTING-portable.md`. A consumer adopting the workflow reads the summary and
+the page it points at in that order, so the pending contradiction would have landed on them first and with
+nothing in their own tree to explain it.
+
+**Score:** 1
+
+They read a paragraph that stays true instead of one that quietly stops being true. Cosmetic on arrival,
+and invisible if it works.
+
+#### Pull Request
+
+Drop the gate count from the dkj-policy README's opening paragraph
+
+Plugins: dkj-policy
+
+[PR #1658](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1658)
+
+---
 
 ### DEPLOY: docs/1642-pre-split-entry-shape · 20260908-175640
 
