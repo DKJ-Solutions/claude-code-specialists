@@ -668,6 +668,16 @@ function Invoke-GitPark {
         raw error record instead of letting its own `if (-not $ok) { exit 1 }` report it. The message is
         non-terminating and the CALLER decides what a red costs. Two of that issue's three messages moved
         into the extracted half above; this is the third.
+
+        -NoFailureMessage IS FOR THE CALLER THAT SAYS IT BETTER (issue #1600). park-cycle.ps1 runs on a
+        Stop hook, and since #1600 its failure arm fetches the ref and names the OTHER SESSION on the far
+        side of a refused push -- count, author and subject -- which is strictly more than the sentence
+        here can know. The hook now also merges the child's stderr into what it prints, so leaving both in
+        puts a seven-line PowerShell error banner directly above that report, in a hook whose whole
+        contract is that it never fails. The message this suppresses is a REPORT, never the verdict:
+        `return $false` is unchanged, so a caller that passes this still learns the push failed and still
+        decides what it costs. park-branch.ps1 does not pass it and is byte-for-byte unaffected -- there
+        the sentence IS the report, and the run stops on it.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -675,7 +685,8 @@ function Invoke-GitPark {
         [ValidateSet('Everything', 'BranchFiles')][string]$Scope = 'Everything',
         [string[]]$Paths = @(),
         [string]$Intent = '',
-        [string]$BodyNote = ''
+        [string]$BodyNote = '',
+        [switch]$NoFailureMessage
     )
 
     $commit = Invoke-GitParkCommit -RepoRoot $RepoRoot -Branch $Branch -Scope $Scope -Paths $Paths `
@@ -691,7 +702,9 @@ function Invoke-GitPark {
         # Flattened before it is matched: with stderr merged in (2>&1) the captured output is an ARRAY that
         # can hold ErrorRecords as well as strings, and -match against an array returns the matching
         # elements rather than a boolean -- which an if() then reads as true for any non-empty result.
-        Write-Error (Get-GitPushFailureMessage -Output ($pushRes.Output | Out-String)) -ErrorAction Continue
+        if (-not $NoFailureMessage) {
+            Write-Error (Get-GitPushFailureMessage -Output ($pushRes.Output | Out-String)) -ErrorAction Continue
+        }
         return $false
     }
 
