@@ -305,6 +305,15 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # registered in scripts/lib/shared-scripts-lib.ps1.
 . (Join-Path $PSScriptRoot '..\lib\shopify-cli-lib.ps1')
 
+# THE PASTE-SAFETY VERDICT on the branch name this script prints into two commands (issue #1594): the
+# by-hand push in the failed-push path, and the 'gh pr create' line the default non-merging path prints.
+# Neither is attacker-reachable the way ship-pr's five sites are -- the name is composed here, from a
+# date stamp and Get-ShopifySyncBranchPrefix's answer -- but that prefix is a string a CONSUMER authors
+# in its own repo-config, so it is not a constant either, and a prefix carrying a shell metacharacter
+# would reach both printed lines. One definition rather than a local rule: see the lib's header for why
+# quoting is not the alternative. Unguarded, for the reason the two dot-sources above give.
+. (Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1')
+
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # source root copy falls back to the git root. Same resolution as every other mirrored script, which is
 # what lets both copies stay byte-identical.
@@ -650,6 +659,11 @@ while (
     if ($n -gt 20) { Write-Host "Twenty sync branches already exist for $stamp. Something is wrong; stopping." -ForegroundColor Red; exit 1 }
 }
 Write-Host "      $branch"
+
+# JUDGED ONCE, beside the composition that produced it, for the two printed commands further down
+# (issue #1594). Not gated on anything: both readers are failure or hand-over paths that must not do
+# work of their own on the way out.
+$branchPaste = Get-PasteableRef -Ref $branch
 
 # --- 4b. is a PREVIOUS run's branch still standing? ------------------------------------------------
 # Inbound #1021, and it belongs here rather than beside the verdict it produces: a refusal at this point
@@ -1108,7 +1122,8 @@ try {
         Write-Host "Push failed. The commit is local on $branch." -ForegroundColor Red
         if ($push.TimedOut) {
             Write-Host "  'git push' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
-            Write-Host "  The branch is NOT on origin. Fix the credential and push it by hand: git push -u origin $branch" -ForegroundColor Red
+            Write-Host "  The branch is NOT on origin. Fix the credential and push it by hand: git push -u origin $($branchPaste.Token)" -ForegroundColor Red
+            if ($branchPaste.Note) { Write-Host $branchPaste.Note -ForegroundColor Red }
         }
         exit 1
     }
@@ -1145,7 +1160,8 @@ try {
         Write-Host ''
         Write-Host 'Done -- and deliberately NOT merged.' -ForegroundColor Green
         Write-Host 'Open the PR, look at what the third parties changed, and merge it yourself:' -ForegroundColor Green
-        Write-Host "  gh pr create --base $trunk --head $branch --title `"$msg`" --body-file `"$bodyFile`"$labelText" -ForegroundColor Cyan
+        Write-Host "  gh pr create --base $trunk --head $($branchPaste.Token) --title `"$msg`" --body-file `"$bodyFile`"$labelText" -ForegroundColor Cyan
+        if ($branchPaste.Note) { Write-Host $branchPaste.Note -ForegroundColor Cyan }
         Write-Host ''
         if ($prLabels.Count -gt 0) {
             # WHY THE PRINTED LINE CARRIES THEM AND THE NOTE SAYS SO. This path is the default one, so it is
