@@ -43,7 +43,31 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**13 / 22 minor entries** <!-- pending-tally -->
+**13 / 23 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1597-readme-six-enabled-plugins · 20260908-115352
+
+The `dkj-policy/` folder index no longer describes this repo as enabling two plugins. Its "Updating the
+plugins" section states that `.claude/settings.json` enables every plugin in the marketplace and prints
+an update command for each of the six, so an update round in another checkout of this repo no longer
+leaves four plugins silently behind.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — an internal maintenance document of this repo. No consumer reads it, and nothing about the
+plugins they install changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name all six enabled plugins in the dkj-policy folder index
+
+[PR #1610](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1610)
+
+---
 
 ### DEPLOY: fix/1601-folded-upstream-diverged-checkout · 20260908-113102
 
