@@ -34,7 +34,10 @@
       7. Get-TrunkReturnDecision answers all three of its conditions (issue #1073): the primary
          checkout only, nobody else holding the trunk, and a clean tree -- and answers rather than
          throwing on everything git might hand over, because step 2b is not a gate and a decision it
-         cannot make must leave the ship running.
+         cannot make must leave the ship running;
+      8. Get-TrunkReturnGoAheadLine DESCRIBES that decision rather than asserting an outcome (issue
+         #1616) -- the no arm never claims the trunk, both arms keep the two clauses that are true
+         either way, and a missing branch name still words a printable line.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -249,6 +252,41 @@ Assert-True (-not (Get-TrunkReturnDecision -PorcelainLines $PorcelainMasterLane 
     'the trunk name is the caller''s, not hardcoded'
 Assert-True (Get-TrunkReturnDecision -PorcelainLines $PorcelainMasterLane -SelfPath 'C:/repo' -TrunkBranch 'main' -StatusLines @()).Return `
     'and a lane on master does not block a repo whose trunk is main'
+
+Write-Host ""
+Write-Host "7. Get-TrunkReturnGoAheadLine -- does the go-ahead say what step 2b actually did? (issue #1616)" -ForegroundColor Cyan
+
+# THE DEFECT THIS SECTION PINS was not a wrong decision but a wrong SENTENCE about it. ship-pr's step-3
+# preamble asserted "step 2b already put it back on the trunk" as a literal, so on every run where the
+# decision above declined -- the dirty tree, the lane, a held trunk, an unreadable porcelain -- the line
+# a reader is told to act on said the opposite of the line four rows above it. Measured on PR #1615,
+# September 8, 2026.
+$goYes = Get-TrunkReturnGoAheadLine -Returned $true -Branch 'fix/something-v1'
+Assert-True ($goYes -like '*put it back on the trunk*') 'the yes arm still says the tree went home'
+Assert-True ($goYes -like '*#1073*') 'and still cites the issue that put step 2b there'
+
+$goNo = Get-TrunkReturnGoAheadLine -Returned $false -Branch 'fix/something-v1'
+# THE ONE ASSERT THE OLD LITERAL COULD NOT PASS: no arm of this line may claim the trunk when step 2b
+# did not take it. Worded as an absence on purpose -- a future rewording is free, claiming the trunk is
+# not.
+Assert-True ($goNo -notlike '*put it back on the trunk*') 'the no arm does not claim the trunk'
+Assert-True ($goNo -like "*'fix/something-v1'*") 'and names the branch the checkout is standing on'
+Assert-True ($goNo -like '*lane*') 'and points at the lane, which is unaffected by where the primary stands (#1069)'
+
+# BOTH ARMS KEEP THE TWO TRUE CLAUSES. Step 1 is the only step that reads the working tree, so the tree
+# really is free at this point however step 2b answered -- withdrawing that half along with the trunk
+# clause would cancel the invitation #1428 exists to make.
+foreach ($line in @($goYes, $goNo)) {
+    Assert-True ($line -like 'This line is the go-ahead:*') 'the line still announces itself as the go-ahead'
+    Assert-True ($line -like '*step 1 is over*') 'and still says step 1 is over'
+    Assert-True ($line -like '*the tree is free (#1145)*') 'and still says the tree is free'
+}
+
+# NO BRANCH NAME IS A WORDING PROBLEM, NOT A REFUSAL: the name is the caller's variable, and a go-ahead
+# that cannot be printed is worse than one that names the branch less precisely.
+$goBare = Get-TrunkReturnGoAheadLine -Returned $false
+Assert-True ($goBare -like '*on its branch*') 'an unknown branch name still words the no arm'
+Assert-True ($goBare -notlike "*''*") 'and never prints an empty pair of quotes'
 
 Write-Host ""
 if ($script:fail -gt 0) {

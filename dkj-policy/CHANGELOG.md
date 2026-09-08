@@ -43,7 +43,67 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**14 / 26 minor entries** <!-- pending-tally -->
+**15 / 28 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1602-step8-report-wording · 20260908-132217
+
+`ship-pr`'s step 8 no longer reports that a check "governed the merge" after the merge has already
+happened. Since #1602 that report is printed after the fold, once the non-required checks have
+finally reported -- and on the laps that change is actually about, the check finishing last is the
+non-required one, so the line stated the exact opposite of what occurred: the merge went minutes
+earlier *because* it no longer waits for that check. The line now names which check finished last and
+keeps everything else, including the excess clause that sizes the tail.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- one sentence of `ship-pr`'s own console output, read by whoever ships a branch.
+
+**Score:** N/A
+
+#### Pull Request
+
+step 8's report no longer says a check governed a merge that already happened
+
+Plugins: dkj-policy
+
+[PR #1619](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1619)
+
+---
+
+### DEPLOY: fix/1616-go-ahead-trunk-claim · 20260908-131115
+
+`ship-pr`'s go-ahead line now says what step 2b actually did with the working tree instead of
+asserting that it went home. The trunk clause was a literal, so on every run where step 2b
+declined to move the tree -- a dirty tree, a lane, a trunk another worktree holds -- the line a
+reader is told to act on contradicted the line four rows above it. It is
+`Get-TrunkReturnGoAheadLine` in `worktree-lib.ps1` now, asserted in that lib's suite: the yes arm is
+word for word what it was, and the no arm names the branch the checkout is standing on and sends the
+reader to a lane, which is detached at `origin/<trunk>` and therefore unaffected either way. Both
+arms keep the two clauses that are true regardless -- step 1 is over, the tree is free -- because
+withdrawing those with the trunk clause would cancel the invitation the line exists to make.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer runs this same script from the plugin mirror, and the go-ahead is what tells them it is
+safe to open a second terminal and carry on. Until now it told them their primary checkout was on
+the trunk on runs where it was standing on the shipping branch -- the exact state #1073 exists to
+prevent, reported as already handled.
+
+**Score:** 3
+
+#### Pull Request
+
+State what step 2b actually decided in ship-pr's go-ahead line
+
+Plugins: dkj-policy
+
+[PR #1618](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1618)
+
+---
 
 ### DEPLOY: fix/1602-merge-on-required-green · 20260908-125722
 

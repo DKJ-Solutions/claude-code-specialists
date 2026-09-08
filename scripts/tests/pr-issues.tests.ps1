@@ -809,6 +809,51 @@ $reportOne = Get-CheckWaitReport -ChecksJson $twoChecks -RequiredNamesJson '[{"n
 Assert-True ($reportOne -like '*NOT required*') 'one required name: the not-required label still works'
 Assert-True ($reportOne -like "*after the last required check ('a')*") 'and the excess-wait clause still fires'
 
+# --- -PostMerge: the report is printed after the merge too, and must not claim causation (#1602) ---
+# ship-pr's step 8 prints this same report AFTER the merge and the fold, once the non-required checks
+# have finally reported. There "governed the merge" inverts the fact the report carries: on a lap where
+# the non-required check finishes last, the merge went minutes EARLIER precisely because it no longer
+# waits for it. Measured on PR #1614's own successful ship, where the phrase was correct only because
+# `lint-en-tests` happened to finish last that lap.
+Write-Host ""
+Write-Host "Get-CheckWaitReport -PostMerge -- no causation claim once the merge has happened" -ForegroundColor Cyan
+
+$pmChecks   = '[{"name":"lint-en-tests","startedAt":"2026-09-08T16:00:00Z","completedAt":"2026-09-08T16:06:00Z"},{"name":"claude-review","startedAt":"2026-09-08T16:00:00Z","completedAt":"2026-09-08T16:12:00Z"}]'
+$pmRequired = '[{"name":"lint-en-tests"}]'
+
+$pmBefore = Get-CheckWaitReport -ChecksJson $pmChecks -RequiredNamesJson $pmRequired -WaitedSeconds 360
+Assert-True ($pmBefore -like '*finished last and governed the merge*') 'without the switch the line is byte-for-byte the one #831 shipped'
+
+$pmAfter = Get-CheckWaitReport -ChecksJson $pmChecks -RequiredNamesJson $pmRequired -WaitedSeconds 360 -PostMerge
+Assert-True ($pmAfter -notlike '*governed the merge*') 'with it, the causation claim is gone -- nothing after the merge governed it'
+Assert-True ($pmAfter -like "*'claude-review' finished last*") 'while the check that finished last is still named, which is #831''s actual question'
+
+# EVERYTHING ELSE ON THE LINE IS WANTED AFTER THE MERGE TOO, which is why this is a wording switch
+# rather than a second report. Asserted individually, because a switch that quietly dropped the
+# not-required label or the excess clause would take the report's whole value with it.
+Assert-True ($pmAfter -like '*NOT required*') 'the required/not-required label survives'
+Assert-True ($pmAfter -like "*after the last required check ('lint-en-tests')*") 'and so does the excess clause -- the number that sizes the tail'
+Assert-True ($pmAfter -like '*6m 00s*') 'and the excess is still measured, not merely mentioned'
+Assert-True ($pmAfter -like '*waited*') 'and the wall-clock the step itself spent is still reported'
+
+# THE SWITCH CHANGES NOTHING ELSE, asserted by comparing the two lines with the phrase removed.
+$pmBeforeNormalised = $pmBefore -replace 'finished last and governed the merge', 'finished last'
+Assert-Equal $pmBeforeNormalised $pmAfter 'the two lines differ in exactly that phrase and nowhere else'
+
+# AND A REQUIRED CHECK FINISHING LAST READS CORRECTLY BOTH WAYS -- the case PR #1614 happened to hit,
+# which is why the defect survived its own successful ship.
+$pmReqLast = Get-CheckWaitReport -ChecksJson '[{"name":"claude-review","startedAt":"2026-09-08T16:00:00Z","completedAt":"2026-09-08T16:03:00Z"},{"name":"lint-en-tests","startedAt":"2026-09-08T16:00:00Z","completedAt":"2026-09-08T16:06:00Z"}]' -RequiredNamesJson $pmRequired -WaitedSeconds 360 -PostMerge
+Assert-True ($pmReqLast -like "*'lint-en-tests' finished last*") 'the required check finishing last is named the same way'
+Assert-True ($pmReqLast -like '*, required)*') 'and labelled required'
+Assert-True ($pmReqLast -notlike '*after the last required check*') 'with no excess clause, there being no tail to size'
+
+# The call-site pins for this switch live in the ship-pr section below, where $shipText exists.
+# They were first written HERE, above its assignment, and the failure mode is worth stating exactly
+# because it cuts both ways: `$null -like '*x*'` is FALSE, so a positive assert placed too early
+# fails loudly and gets found -- which is what happened. `$null -notlike '*x*'` is TRUE, so a
+# NEGATIVE one would have passed silently forever. Audited on the way past: every -notlike in this
+# suite reads a locally computed value, not a source-text variable assigned further down.
+
 # --- Get-RequiredCheckNames: the shared walk over the required payload (issue #1602) --------------
 # THE ONE-CHECK RULESET IS WHY THIS SUITE EXISTS AT ALL. This repo requires exactly one check, and a
 # one-element JSON array is handed through by 5.1 as the object itself -- so the collapse that
@@ -2150,6 +2195,11 @@ Assert-True ($shipText -like '*(no $subject registered yet -- waited*') 'as does
 # into a policy question, and the report is what made it visible.
 Assert-True ($shipText -like '*Step 8: what the NOT-required checks said (issue #1602)*') 'the moved report has a step of its own rather than being folded into an existing one'
 Assert-True ($shipText -like '*Get-CheckWaitReport -ChecksJson $tailFactsJson*') 'and it is #831''s own report over the full payload, not a new summary invented here'
+Assert-True ($shipText -like '*-WaitedSeconds $tailWaitedSec -PostMerge*') 'passed -PostMerge, so it does not claim a check governed a merge that has already happened'
+Assert-True ($shipText -like '*-RequiredNamesJson $requiredFactsJson -WaitedSeconds $waitedSec*') 'while step 3, which runs BEFORE the merge, does not pass it'
+$idxPost = $shipText.IndexOf('-WaitedSeconds $tailWaitedSec -PostMerge')
+$idxPre  = $shipText.IndexOf('-RequiredNamesJson $requiredFactsJson -WaitedSeconds $waitedSec')
+Assert-True ($idxPre -ge 0 -and $idxPost -gt $idxPre) 'and the un-switched call is the earlier one in the file, i.e. the pre-merge report'
 Assert-True ($shipText -like '*Get-AuthoredFailureNote -AnnotationsJson*') 'the #1103 relay of what the failing check said about itself rides along -- it matters more here, being the only place the reader meets the failure'
 
 # AND IT RUNS AFTER EVERYTHING OWED TO THE TRUNK. A wait on somebody else's CI placed above the fold
