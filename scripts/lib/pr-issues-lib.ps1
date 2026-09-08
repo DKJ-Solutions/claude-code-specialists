@@ -905,6 +905,55 @@ function Get-CheckOutcome {
     return 'unknown'
 }
 
+function Get-RequiredCheckNames {
+    <#
+    .SYNOPSIS
+        The check names in a `gh pr checks --required --json name,...` payload, sorted and unique.
+        Empty when the payload is absent, unparseable, or names nothing.
+
+    .DESCRIPTION
+        ONE PARSE, THREE CALLERS, AND IT WAS THREE PARSES UNTIL ISSUE #1602. `gh pr checks --required`
+        is read at three points in ship-pr.ps1 -- to decide which checks the wait must block on
+        (#1602), to name what the staleness gate is protecting (#1292), and inside
+        Get-CheckWaitReport's own label -- and each had written out the same walk over the payload.
+        That is the shape the 5.1 pitfall this file documents everywhere thrives in: the collapse
+        Get-CheckWaitReport hit on August 26, 2026, where `@(@($json | ConvertFrom-Json) | ...)`
+        member-enumerated two required names into the single bogus string 'a b', survived unseen for
+        weeks precisely BECAUSE this repo's ruleset requires exactly one check and a one-element JSON
+        array is handed through as the object itself. A repo with two required checks is the shape
+        nobody here runs, so a fourth copy of the walk is a fourth chance to ship that bug to a
+        consumer who does.
+
+        EMPTY IS NOT AN ERROR AND MUST NOT BE READ AS ONE. `--required` exits non-zero on a repo whose
+        ruleset requires nothing, which is a legitimate state -- GitHub Free with no ruleset is the
+        documented case -- and it is indistinguishable from here from "the required checks have not
+        reported yet". Every caller therefore has to choose its own tie-break and this function makes
+        none for them: Get-MergeBlockVerdict refuses on the failure path and stays green on the green
+        one, step 3b warns and skips, and the #1602 wait falls back to watching every check. What they
+        share is only the walk.
+
+        SORTED AND UNIQUE so a caller can compare two readings for equality without sorting first --
+        the #1602 wait re-reads this list between watch attempts and only wants to know whether the
+        answer changed.
+
+    .PARAMETER RequiredChecksJson
+        `gh pr checks <pr> --required --json name` output; any other fields may ride along and are
+        ignored. Anything that will not parse yields an empty list rather than throwing: every caller
+        of this treats "could not read" as a state to decide about, not as a failure to propagate.
+    #>
+    param([string]$RequiredChecksJson)
+
+    if (-not $RequiredChecksJson -or -not $RequiredChecksJson.Trim()) { return @() }
+    try { $parsed = $RequiredChecksJson | ConvertFrom-Json } catch { return @() }
+
+    # Assign first, wrap second -- the 5.1 rule the docstring above gives the measured cost of.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.name })
+    if ($records.Count -eq 0) { return @() }
+
+    return @(@($records | ForEach-Object { [string]$_.name } | Where-Object { $_ -and $_.Trim() }) |
+        Sort-Object -Unique)
+}
+
 function Get-MergeBlockVerdict {
     <#
     .SYNOPSIS
@@ -2411,4 +2460,78 @@ function Get-MergeQueueVerdict {
         if ((([string]$r.type).Trim().ToLowerInvariant()) -eq 'merge_queue') { $active = $true; break }
     }
     return [pscustomobject]@{ Readable = $true; Active = $active }
+}
+
+function Get-RequiredCheckContexts {
+    <#
+    .SYNOPSIS
+        The check contexts a trunk's ruleset REQUIRES, read from the branch-rules payload. Returns
+        Readable (bool) and Names (string[]), sorted and unique. Issue #1602.
+
+    .DESCRIPTION
+        WHY NOT `gh pr checks --required`, WHICH THIS FILE ALREADY READS EVERYWHERE. Because that
+        endpoint answers a different question, and the difference is a RACE. It reports the required
+        checks *that have registered on this PR*, so a required workflow which has not yet created its
+        check run is simply absent from it -- indistinguishable from a ruleset that requires nothing.
+        For the merge verdict that ambiguity is harmless and is resolved conservatively (refuse on the
+        failure path, stay green on the green one). For deciding WHAT TO WAIT FOR it is fatal, because
+        the decision is made at the one moment the answer is least likely to have arrived: seconds
+        after open-pr pushed.
+
+        MEASURED ON THIS CHANGE'S OWN FIRST SHIP, PR #1614 (September 8, 2026). The probe asked
+        `gh pr checks --required` immediately after the registration wait, got nothing back --
+        `branch-entry` and `claude-review` are separate workflows and register faster than ci.yml's
+        jobs -- and the run fell back to watching every check, which is the correct fail-open. But
+        `gh pr checks --watch` picks up checks that register after it starts, so the full watch then
+        ran to completion, the re-entry the #1549 loop provides was never reached, and the narrowing
+        never happened at all. The change was inert on the very first lap it ran.
+
+        THE RULESET HAS NO RACE. It states which contexts are required whether or not anything has
+        registered, and `required_status_checks` being absent is a positive answer: this trunk requires
+        nothing. So this reads the payload ship-pr has ALREADY fetched for the fold-push and
+        merge-queue verdicts -- no extra network call, and available before the wait begins rather
+        than after it.
+
+        READABLE IS SEPARATE FROM EMPTY, and the caller must not collapse the two -- the same
+        distinction Get-MergeQueueVerdict above draws on the same payload, for the same reason.
+        Readable = $false means the question was not answered (no token scope, an older gh, a repo
+        whose rules cannot be read -- all states ship-pr's step 0b already tolerates), and the caller
+        then falls back to the `gh pr checks --required` probe rather than assuming either way.
+        Readable = $true with no names means the trunk genuinely requires nothing, which is the
+        GitHub Free case, and the wait must then watch everything exactly as it always did.
+
+    .PARAMETER BranchRulesJson
+        `gh api repos/<repo>/rules/branches/<trunk>` output. Empty or unparseable -> Readable = $false.
+        An empty JSON array parses to $null in 5.1 and is the legitimate "this trunk has no rules"
+        answer, NOT unreadable -- the trap Get-MergeQueueVerdict documents beside its own parse.
+
+    .OUTPUTS
+        [pscustomobject] Readable (bool) and Names (string[]).
+    #>
+    param([string]$BranchRulesJson)
+
+    $unreadable = [pscustomobject]@{ Readable = $false; Names = @() }
+    if (-not $BranchRulesJson -or -not $BranchRulesJson.Trim()) { return $unreadable }
+    try { $parsed = $BranchRulesJson | ConvertFrom-Json } catch { return $unreadable }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.PSObject.Properties['type'] })
+
+    $names = @()
+    foreach ($r in $records) {
+        if ((([string]$r.type).Trim().ToLowerInvariant()) -ne 'required_status_checks') { continue }
+        if (-not $r.PSObject.Properties['parameters']) { continue }
+        $p = $r.parameters
+        if (-not $p -or -not $p.PSObject.Properties['required_status_checks']) { continue }
+        # Wrapped for the same reason as above: one required check is handed through as the object
+        # itself, and this repo's own ruleset requires exactly one -- so the collapse would be
+        # invisible here and would surface only in a consumer with two.
+        foreach ($c in @(@($p.required_status_checks) | Where-Object { $_ })) {
+            if (-not $c.PSObject.Properties['context']) { continue }
+            $ctx = ([string]$c.context).Trim()
+            if ($ctx) { $names += $ctx }
+        }
+    }
+
+    return [pscustomobject]@{ Readable = $true; Names = @(@($names) | Sort-Object -Unique) }
 }
