@@ -66,8 +66,10 @@ work, not the repair.
 - [x] New case (d3): dirty under `-DryRun` proceeds on a branch, where the same run without the switch
       refuses.
 - [x] Full suite green, then the whole gate via open-pr.
-- [x] Verified against the live repro: this checkout's own unrelated uncommitted `.claude/settings.json`,
-      standing on the trunk.
+- [x] Verified live against this checkout's own unrelated uncommitted `.claude/settings.json`: on the
+      branch it refuses and names the branch; with `-DryRun` it proceeds and produces the parked-branch
+      report the lens sends a session here for. The trunk arm is fixture-only on purpose -- checking out
+      `main` restores the pre-fix script, which is what reproduced the defect at the trunk's HEAD.
 
 ### DEPLOY: fix/1575-prune-merged-dirty-guard
 
