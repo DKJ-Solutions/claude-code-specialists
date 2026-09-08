@@ -6729,9 +6729,14 @@ function Get-BranchFileDeclaredBranch {
         IT IS NOT THE PRE-SPLIT ROOT ENTRY, which is what this claimed and what the two sibling comments
         below cited: of the 344 root entries in this repo's history, 0 carry a '**Branch:**' line and 0 open
         with an H1 (334 open at H3, 10 at H2) -- and the root scan is non-recursive, so 'branch/' was never
-        in its reach either. What survives as the reason to leave the fallback un-narrowed for that scan is
-        the regex alone: it is anchored end to end, so it cannot collide with ordinary prose the way the
-        heading pattern can.
+        in its reach either. THAT COUNT NEEDS NO DATE FILTER, which is worth saying because the sentence
+        above hands you one: no root entry was ever added AFTER the split, so 344 is the whole population and
+        a '--until' boundary removes nothing. A re-measurement that applies one splits the 10 H2 files across
+        it -- they were written in the flat window itself -- and comes out disagreeing with this comment
+        about the very numbers it cites. Measured that way once already, on this branch's own review.
+
+        WHAT SURVIVES as the reason to leave the fallback un-narrowed for that scan is the regex alone: it
+        is anchored end to end, so it cannot collide with ordinary prose the way the heading pattern can.
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Text,

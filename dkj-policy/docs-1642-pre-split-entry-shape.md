@@ -64,7 +64,8 @@ behind it. So the measurement came before the edit.
 
 ### TEST
 
-- [x] `cut-release-guardrail.tests.ps1` -- 108 asserts, including the new H3 one.
+- [x] `cut-release-guardrail.tests.ps1` -- the suite reports 108 asserts passed, including the new H3
+      one (105 `Assert-True` call sites, some of them inside loops).
 - [x] `entry-scaffold.tests.ps1` -- 760 asserts.
 - [x] `shared-scripts.tests.ps1` -- 608 asserts, so the mirror is in sync.
 - [x] Full lint gate and every suite, via `open-pr.ps1`.
