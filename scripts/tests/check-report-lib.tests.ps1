@@ -476,7 +476,7 @@ try {
   "version": 2,
   "plugins": {
     "dkj-team-alpha@m": [
-      { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "3.0.6" }
+      { "scope": "project", "projectPath": "$($repoA -replace '\\', '\\')", "version": "3.0.6", "gitCommitSha": "0badc0de0badc0de0badc0de0badc0de0badc0de" }
     ],
     "other@m": [
       { "scope": "project", "projectPath": "$($repoB -replace '\\', '\\')", "version": "3.0.6" }
@@ -491,6 +491,7 @@ try {
     Assert-Equal 'dkj-team-alpha@m' ($r.Ids -join ',') 'path match: only the plugin recorded for THIS path'
     Assert-Equal '3.0.6' $r.RecordsById['dkj-team-alpha@m'][0].Version 'path match: the record is projected onto a fixed shape'
     Assert-Equal 'project' $r.RecordsById['dkj-team-alpha@m'][0].Scope 'path match: Scope travels along'
+    Assert-Equal '0badc0de0badc0de0badc0de0badc0de0badc0de' $r.RecordsById['dkj-team-alpha@m'][0].GitCommitSha 'path match: GitCommitSha travels along (plugin-versions.ps1 compares it to the clone HEAD)'
     Assert-True (Test-PluginInstalledHere -InstallRecord $r -PluginId 'dkj-team-alpha@m') 'path match: installed here'
     Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'other@m')) 'THE #302 CASE: a record for another path is NOT installed here'
     Assert-True (-not (Test-PluginInstalledHere -InstallRecord $r -PluginId 'absent@m')) 'no record at all: not installed here'

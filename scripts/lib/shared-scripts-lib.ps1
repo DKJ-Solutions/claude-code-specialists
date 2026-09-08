@@ -150,6 +150,31 @@ function Get-SharedScriptPairs {
             Skill  = 'prune-merged'
         },
         @{
+            # PER-DEVICE PLUGIN VERSION OVERVIEW (Dave, September 8, 2026). "Which plugin version is
+            # installed in this checkout, on this machine, and is a plugin update due?" -- a question
+            # no existing check answers: check-connectors' check 4 goes inert on a plain consumer with
+            # no sibling source checkout. Reads the install record for this checkout's path
+            # (Get-InstallRecord) against the marketplace clone's plugin.json .version + git HEAD --
+            # both present on every consumer machine -- and prints a verdict per plugin.
+            #
+            # SHARED for the ordinary reason: it is a consumer's question far more than this repo's,
+            # and the alternative is every consumer hand-deriving the same two reads. It reuses
+            # check-report-lib (already mirrored to dkj-policy as check-report-lib-workflow),
+            # plugin-tree-lib and native-capture-lib -- all plugin-carried already, so the payload
+            # gains only this file.
+            Name   = 'plugin-versions'
+            Source = 'scripts\task\plugin-versions.ps1'
+            Plugin = 'dkj-policy'
+            Skill  = 'plugin-versions'
+            # Fixtures: a scratch repo root and a scratch ~/.claude home, so the suite can put a whole
+            # install-record + marketplace-clone state in front of the script. A consumer never types
+            # either.
+            SkillParamsExempt = @('RootOverride', 'UserHomeOverride')
+            # Timeable with no arguments: it reads two JSON files and shells to git in a clone, and
+            # writes nothing anywhere.
+            MeasureArgs = @()
+        },
+        @{
             # THE POLICY-DRIFT REPORT. The corollary in CONTRIBUTING-portable.md's "A third rank sits
             # above both" -- a consumer document may point at a shared law or answer a seam it names,
             # never restate it -- had two narrow deliveries (check-retired-doc-name, a filename;
