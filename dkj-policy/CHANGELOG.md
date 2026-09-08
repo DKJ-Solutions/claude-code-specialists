@@ -43,7 +43,46 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**16 / 32 minor entries** <!-- pending-tally -->
+**16 / 33 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1623-ref-display-strip · 20260908-143357
+
+A branch name this workflow prints in a sentence can no longer read as a different branch. `git
+check-ref-format` enforces `\p{Cc}` and **accepts** `\p{Cf}`, so a branch carrying U+202E, U+200B,
+U+200D or U+2066 is creatable, checkout-able and returned verbatim by `git rev-parse` -- and
+thirty-two printed sentences across `ship-pr.ps1`, `sync-main.ps1`, `remote-ahead-lib.ps1` and
+`worktree-lib.ps1` put that name straight into a console. `Get-DisplayRef`, one definition in
+`ref-print-lib.ps1`, now replaces every control and format character with a space, collapses the
+runs and trims; the words stay, because a reader standing on that branch has to recognise it. The
+paste axis is unchanged and stays distinct: a command gets a placeholder, a sentence gets a strip.
+
+Two of the thirty-two are worth naming on their own. `ship-pr.ps1`'s go-ahead line is the one line
+the ship documents as safe to act on. And `sync-main.ps1`'s standing-predecessor rows print names
+that came off `git ls-remote` -- text chosen by whoever pushed the branch, read by an operator
+deciding which pull request to close.
+
+The same movement retired the tree's second copy of the strip pattern: `remote-ahead-lib.ps1` had
+been sanitising a commit subject and printing the branch label beside it raw, which is the sharpest
+instance the report found.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a subscriber. It changes what a console prints to whoever runs the
+workflow's own scripts, and only for a branch name no ordinary repo has.
+
+**Score:** N/A
+
+#### Pull Request
+
+A ref name printed as prose is stripped of control and format characters
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1631](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1631)
+
+---
 
 ### DEPLOY: fix/1609-claude-home-pollution · 20260908-141700
 
