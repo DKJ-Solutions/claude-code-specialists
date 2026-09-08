@@ -126,25 +126,38 @@ test **data**, not paths any run creates — plus one real fixture, which is rew
       reported 0. Caught only because those cases assert a positive count; the failure mode is written
       into the function's docstring
 - [x] The full lint gate green — `check-plugin-integrity.ps1`, 0 errors
-- [x] All 81 suites green — 427s, 16 lanes
+- [x] All suites green locally — three full-gate runs on this branch (483s, 729s, 782s, 16 lanes)
+- [x] **CI caught a 97th site the local runs could not see, and it was the new rule working.** The first
+      PR run failed `test-suite-gate.tests.ps1` on `session-cache-lib.tests.ps1:29` — a guid-less fixture
+      path in a file that did not exist on this branch. `main` had gained 24 commits meanwhile, one of
+      them #1672's session cache, and CI tests the **merge**. So the rule flagged a path this branch had
+      never met, which is exactly what it is for. Merged `origin/main` in (clean), rewrote that site, and
+      re-ran. Worth recording because a green local gate is not evidence about the merge, and the
+      staleness race is what `ship-pr` guards for the other direction
 - [x] Reviewed by Victor (code), Sebastian (security), Edith (copy) and Nolan (cost). Every finding
       acted on in this branch: Sebastian's two guard evasions, Nolan's duplicate walk, Edith's three
       prose findings and her disputed dot-source count. Victor found no correctness defect
 - [~] No new suite added. The rule and its enforcement both live in `test-suite-gate.tests.ps1`, which
       already owns this subject and now carries nine new asserts; a separate suite would have to
       re-scan the same tree to say the same thing
-- [~] The permanent-litter consequence is **not** repaired here. A guid path can never be reclaimed by a
-      later run's pre-delete — but that pre-delete was already reclaiming essentially nothing (413
-      leftover trees across 7 days on this machine, all under the old scheme), so this branch does not
-      make it worse in the near term. It does make it monotonic, which is worth closing separately:
-      filed as [#1668](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1668), where the
-      largest single contributor is already traced to `fold-changelog.tests.ps1`'s `New-Tree`
+- [~] The litter consequence needed no repair, and the issue I filed about it was **wrong about why**.
+      A guid path can never be reclaimed by a later run's pre-delete, and that pre-delete was already
+      reclaiming essentially nothing — so this branch does not make the near-term rate worse. But I filed
+      [#1668](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1668) claiming
+      `fold-changelog.tests.ps1`'s `New-Tree` never tears down, and it does: it registers every tree the
+      moment it builds one and sweeps that register twice, and has since the file was created. I counted
+      `Remove-Item` occurrences instead of reading the register — the symptom was real, the reason was
+      invented. Another session measured it properly and closed #1668 as completed: both suites leak
+      **zero** when run to completion, the leftovers are all registered *after* a suite's last completed
+      sweep (the signature of an aborted run), and of my 413 figure **546** entries were
+      deliberately-retained `sync-pr-body-*` files and **162** an unrelated tool's logs. The measurement
+      now lives in `scripts/README.md`, merged into this branch from `main` and left as they wrote it
 
 ### DEPLOY: fix/1664-fixture-temp-path-guid
 
 Every temp fixture path in `scripts/tests/` now carries a fresh guid as well as `$PID`, and the rule in
 `test-suite-gate.tests.ps1` requires it — `$PID` alone no longer passes. 96 statements across 53 suites
-were rewritten to `<label>-$PID-<guid>`, which is exactly how `New-ScratchPath` composes a path one
+were rewritten to `<label>-$PID-<guid>` (97 with the one that arrived from `main` mid-branch), which is exactly how `New-ScratchPath` composes a path one
 layer up: the pid stays in front because it is what attributes a leftover to a run that is still alive,
 and the guid is what nobody can name in advance.
 
