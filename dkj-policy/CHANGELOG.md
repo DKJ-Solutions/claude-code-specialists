@@ -197,15 +197,15 @@ The machine-local path gate stops giving wrong advice on the path it fires on. I
 branch's commits touch a tracked file that usually belongs to a clone -- `.claude/settings.json` here
 -- and its remedy sentence said, flatly, to drop the change from the branch because "machine-local
 plugin enablement belongs in `.claude/settings.local.json`". That is right for a machine's own extra
-enable, which is the sweep the gate was built for (#1557), and wrong for the other case the same file
-carries: a branch whose subject IS the declared, tracked set every clone inherits. Measured on PR
+enable, the sweep the gate was built for (#1559, measured on PR #1557), and wrong for the other case
+the same file carries: a branch whose subject IS the declared, tracked set every clone inherits. Measured on PR
 #1573, where the gate fired on a branch that existed to change exactly that. The note now names both
 cases and prescribes the move only for the clone's own edit; the seam comment in `repo-config.ps1`
 records which half of the advice belongs where, and the suite asserts it. Nothing about when the gate
 fires changed, and it still only warns -- what changed is that the sentence a reader acts on is true on
-both paths. The cost of leaving it was not a broken branch but a decaying reader: a warning that
-misfires advice on the intended happy path is one that gets scrolled past, and it is then scrolled past
-on the day it is right.
+both paths. The cost of leaving it was not a broken branch but a decaying reader: a warning that gives
+the wrong advice on the path it fires on is one that gets scrolled past, and it is then scrolled past on
+the day it is right.
 
 **Score:** 2
 
@@ -214,7 +214,8 @@ on the day it is right.
 The note is emitted by a shared script that travels in the plugin mirror, so every consumer running
 `open-pr` reads this text. A consumer branch that legitimately changes its own shared harness settings
 now gets advice it can follow instead of being told to move the change somewhere gitignored. Small --
-it is three sentences on a rare path -- but it is advice the reader was previously right to ignore.
+three sentences on a rare path -- but until now following that advice was the wrong move, and only a
+reader who already distrusted it came out right.
 
 **Score:** 2
 
