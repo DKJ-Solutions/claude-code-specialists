@@ -43,7 +43,92 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**19 / 38 minor entries** <!-- pending-tally -->
+**20 / 40 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1632-missing-entry-refused · 20260908-160353
+
+A branch document with its `### DEPLOY` section **deleted** carried no entry at all and passed every
+gate that exists to catch exactly that -- both of `check-branch-entry.ps1`'s document checks in CI and
+both of `open-pr.ps1`'s locally, which then composed the PR title and description out of the guidance
+block. The cause is one value standing for two states: `Get-DevelopmentEntryText` hands back the whole
+text when it finds no DEPLOY heading, which is the honest answer for a legacy entry file and the guidance
+*preamble* for today's document, and a blockquote nobody scaffolded carries no scaffold marker -- so the
+scaffold gate passed **by absence**. A new pure predicate, `Test-DevelopmentEntryMissing`, separates the
+two beside the splitter it bounds, and both readers now ask it ahead of their scaffold check. It reads
+shape rather than text, so it survives translation: no DEPLOY section *and* a plan present -- the
+scaffolder's blockquote guidance under the title, or the phases by their seam names -- is a document that
+lost its entry, while no DEPLOY section and no plan is the legacy shape whose fallback stands. Reachable
+by accident rather than only by hand, which is what earns it a gate: the measured document was produced
+by an edit truncating at `### PLAN`, a string that also sits *inside* the guidance blockquote.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Three discriminators were tried and two rejected on evidence rather than taste, and the rejections are
+the reusable part. A **level** test cannot work -- today's document title is an H2 and the flat-window
+entry heading (August 5-26, 2026) is an H2 too, so `Test-IsChangelogEntryFile` and
+`Test-BranchChangelogIsFilled` both read the broken document as an entry file, which is the same
+collision that moved the latter to the name test. The **declared branch** looked clean until
+`Get-BranchFileDeclaredBranch`'s deliberately un-narrowed `**Branch:**` fallback answered for a pre-split
+root entry as well, so refusing on it would have refused a perfectly good entry. What is left errs
+toward under-refusal on purpose: a document that lost its guidance *and* its phases is not recognised,
+because a missed refusal is the state that already exists while a false one stops a branch that worked
+yesterday. Ten shapes are pinned at the lib, five of them false-refusal cases somebody's branch is
+carrying right now.
+
+**Score:** N/A
+
+#### Pull Request
+
+Refuse a branch document whose DEPLOY section is gone
+
+Plugins: dkj-policy
+
+[PR #1647](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1647)
+
+---
+
+### DEPLOY: fix/1637-sync-main-path-print · 20260908-154618
+
+`sync-main` no longer prints a file path raw. Its primary report -- the take, hold-back and conflict
+listings -- goes through a new path-shaped display strip, and its conflict remedy no longer
+interpolates a path into a paste-ready `git diff` at all: the path is judged against the same
+allowlist a branch name is, and a refused one is replaced by `<path>` in **both** operands with a note
+naming the real path outside any command context.
+
+Two things make this more than a sweep. The double quotes that were there were the defect rather than
+the guard -- command substitution runs inside double quotes in bash and PowerShell alike, so the line
+read as protected while closing nothing, which is worse than a bare interpolation because the next
+reader sees quotes and stops looking. And the display strip had to be a second function rather than a
+reuse: `Get-DisplayRef` collapses space runs and trims, which is right for a ref (git forbids a space
+in one) and wrong for a path, where a doubled or trailing space is part of the name. Preserving one
+space per removed character is also what fixes the alignment -- a zero-width run spends format width
+without spending display columns, so a padded row used to slide against its neighbours.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The paths are the point. They come from this repo's own `HEAD` and from a filesystem walk of the
+pulled **live theme** -- which third parties edit through the Shopify theme editor, outside any
+review, and which is the entire reason that sync exists. Measured for #1637: `git ls-tree -r` and
+`git diff --name-only` hand back `assets/x$(id -un).js` and `assets/z;touch owned.js` unquoted in
+every `core.quotePath` setting, because git quotes control characters and high bytes and not shell
+metacharacters. So the consumer running this sync against a real store is the reader who was being
+handed a command to paste, built from a name they do not control.
+
+**Score:** 3
+
+#### Pull Request
+
+sync-main stops printing raw file paths: a faithful display strip and a paste refusal for the conflict remedy
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1645](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1645)
+
+---
 
 ### DEPLOY: fix/1625-hook-in-process-check · 20260908-153515
 
