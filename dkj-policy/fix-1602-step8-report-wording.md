@@ -33,21 +33,56 @@
 
 ### PLAN
 
+#### Why this is a separate branch and not part of #1602
+
+#1602's work merged as PR #1614. Its own successful ship then printed the defect this branch fixes,
+and by then there was nothing left to amend -- so it is a follow-up rather than a fixup.
+
+- [x] Read PR #1614's step-8 output and check the report's wording against what actually happened.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `Get-CheckWaitReport -PostMerge`: names the check that finished last without claiming it
+      governed a merge that has already gone. Everything else on the line is unchanged, because
+      everything else is exactly as useful after the merge as before it.
+- [x] ship-pr's step 8 passes it; step 3, which runs before the merge, does not.
 
 ### TEST
 
+- [x] Both wordings asserted, plus that the switch changes nothing else -- compared by normalising
+      the un-switched line and asserting equality, so a switch that quietly dropped the
+      not-required label or the excess clause would fail.
+- [x] The case PR #1614 happened to hit (the required check finishing last) asserted too, since that
+      is why the defect survived its own successful ship.
+- [x] Call-site pins for both steps, and the ordering between them.
+
+#### A test-suite trap met on the way, stated precisely
+
+The two call-site asserts were first written above `$shipText`'s own assignment. That failed loudly,
+which is how it was found -- and the reason is worth writing down because it cuts both ways:
+`$null -like '*x*'` is **false**, so a positive assert placed too early fails; `$null -notlike '*x*'`
+is **true**, so a negative one would have passed silently forever.
+
+- [x] Audited the suite for that shape: every `-notlike` in it reads a locally computed value, not a
+      source-text variable assigned further down. Nothing to file.
+
 ### DEPLOY: fix/1602-step8-report-wording
 
-**Score:**
+`ship-pr`'s step 8 no longer reports that a check "governed the merge" after the merge has already
+happened. Since #1602 that report is printed after the fold, once the non-required checks have
+finally reported -- and on the laps that change is actually about, the check finishing last is the
+non-required one, so the line stated the exact opposite of what occurred: the merge went minutes
+earlier *because* it no longer waits for that check. The line now names which check finished last and
+keeps everything else, including the excess clause that sizes the tail.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- one sentence of `ship-pr`'s own console output, read by whoever ships a branch.
+
+**Score:** N/A
 
 #### Pull Request
 
 step 8's report no longer says a check governed a merge that already happened
-

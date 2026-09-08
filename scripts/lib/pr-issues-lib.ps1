@@ -743,10 +743,17 @@ function Get-CheckWaitReport {
     .PARAMETER WaitedSeconds
         The wall-clock this script itself spent on step 3. Negative means unmeasured, and is then left
         out of the line rather than reported as zero.
+
+    .PARAMETER PostMerge
+        Word the line for a report printed AFTER the merge (ship-pr's step 8, issue #1602): the
+        governing check is named as having finished last, without the claim that it governed a merge
+        that has already happened. Everything else about the line is identical. Omitted, the line is
+        byte-for-byte the one #831 shipped.
     #>
     param(
         [string]$ChecksJson,
         [string]$RequiredNamesJson = '',
+        [switch]$PostMerge,
         [int]$WaitedSeconds = -1
     )
 
@@ -804,7 +811,22 @@ function Get-CheckWaitReport {
     }
 
     $ran = if ($governing.Ran -ge 0) { Format-CheckDuration -Seconds $governing.Ran } else { 'duration unknown' }
-    $parts += "'$($governing.Name)' finished last and governed the merge ($ran$label)"
+    # "GOVERNED THE MERGE" IS ONLY TRUE BEFORE THE MERGE (issue #1602). Since ship-pr's step 8 the
+    # same report is also printed AFTER the merge and the fold, over the full payload, once the
+    # non-required checks have finally reported -- and there the phrase inverts the very fact the
+    # report exists to carry. On a lap where the non-required check finishes last, post-merge, the
+    # line would read `'claude-review' finished last and governed the merge (6m, NOT required)` about
+    # a merge that had gone six minutes earlier precisely BECAUSE it no longer waits for that check.
+    # A reader would conclude the opposite of what happened, in the one place they meet the fact --
+    # and on the 21% of laps this whole change is about. Measured on PR #1614's own successful ship,
+    # where the phrase was correct only because `lint-en-tests` happened to finish last that lap.
+    #
+    # THE REST OF THE LINE IS UNCHANGED AND STILL WANTED, which is why this is a wording switch and
+    # not a second function: which check finished last, how long it ran, whether the ruleset requires
+    # it, and how much later it finished than the last required check are all exactly as useful after
+    # the merge as before it. Only the claim about causation moves.
+    $governedPhrase = if ($PostMerge) { "finished last" } else { "finished last and governed the merge" }
+    $parts += "'$($governing.Name)' $governedPhrase ($ran$label)"
 
     # What waiting on a non-required check actually cost on THIS run: the gap between it and the last
     # required check to finish. Stated only when both halves are known -- a figure assembled from a
