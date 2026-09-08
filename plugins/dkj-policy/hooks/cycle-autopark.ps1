@@ -22,15 +22,45 @@
     so the common case adds no line to the session; a push reports itself, because a commit made on
     somebody's behalf should be visible in the transcript that caused it.
 
-    AND THE CHILD'S stderr IS PART OF THE REPORT (issue #1600). This captured stdout only, which is the
-    ordinary shape and was wrong here for one reason: a refused push is this workflow's earliest signal
-    that a second session is on the same branch, and the sentence naming that -- Get-GitPushFailureMessage's,
-    written through Write-Error by Invoke-GitPark -- is on stderr. So the one turn where this hook has
-    something urgent to say was the one turn whose most useful line it dropped. park-cycle.ps1 now says
-    it on stdout as well, in its own voice and with the other side's author and subject; this capture is
-    the second half of that repair, so no future line of the child's can be lost to the stream it chose.
-    Measured on feat/plugin-version-overview, September 8, 2026: two sessions ran the same pre-PR review
-    in full, each finding real defects the other missed.
+    AND EVERY STREAM park-cycle WRITES IS PART OF THE REPORT (issue #1600). This captured stdout only,
+    which is the ordinary shape and was wrong here for one reason: a refused push is this workflow's
+    earliest signal that a second session is on the same branch, and the sentence naming that --
+    Get-GitPushFailureMessage's, written through Write-Error by Invoke-GitPark -- is on stderr. So the one
+    turn where this hook has something urgent to say was the one turn whose most useful line it dropped.
+    park-cycle.ps1 now says it on stdout as well, in its own voice and with the other side's author and
+    subject; this capture is the second half of that repair, so no future line of park-cycle's can be lost
+    to the stream it chose. Measured on feat/plugin-version-overview, September 8, 2026: two sessions ran
+    the same pre-PR review in full, each finding real defects the other missed.
+
+    IT RUNS park-cycle IN A RUNSPACE, NOT IN A SECOND INTERPRETER (issue #1641). This spawned a whole
+    `powershell.exe` to run one script, on EVERY turn -- the Stop hook fires far more often than the
+    SessionStart family #1625 is about, so the same avoidable start-up is paid the most times here.
+    MEASURED on this machine (Windows PowerShell 5.1, 7 runs of the full hook against a do-nothing stub):
+    220 ms median spawning, 150 ms median through a runspace -- ~70 ms back per turn.
+
+    THE HONEST FIGURE IS THAT 70 ms AND NOT THE SPAWN'S OWN 102 ms, because a runspace is not free: cold,
+    in a fresh hook process, opening one costs ~45 ms of the 102 ms it saves. #1625's option 1 -- refactor
+    the check into a verdict-returning lib function -- would save the rest, and is not available here:
+    park-cycle.ps1 calls `exit` at fourteen top-level places, and `exit` inside a DOT-SOURCED script
+    terminates the hook with it. A runspace is what makes those fourteen harmless, because `exit` ends
+    that runspace's pipeline and not this process.
+
+    `*>&1` RATHER THAN THIS FILE'S OLD `2>&1`, and the widening is the point: it merges EVERY stream --
+    Write-Host (Information), Write-Output, Write-Error, Write-Warning -- into one ordered sequence, so
+    the safety net the paragraph above describes now covers streams the old redirect never read. Order
+    across streams is preserved, which separate Streams.* buckets would have lost. ToString() below stays
+    load-bearing for exactly the old reason: what arrives is InformationRecords and ErrorRecords, not
+    strings, and a bare Write-Host of a record prints its own formatting instead of the sentence.
+
+    THE RUNSPACE IS GIVEN ExecutionPolicy Bypass DELIBERATELY, because that is parity and not a loosening:
+    the child this replaces was launched with -ExecutionPolicy Bypass, and a runspace otherwise inherits
+    the host's effective policy -- so on a machine at AllSigned or Restricted, dropping the flag would
+    turn a working hook into a silent no-op. -NoProfile needs no equivalent: a runspace loads no profile.
+
+    $ErrorActionPreference is still left alone in THIS file, and the reason has changed rather than gone.
+    There is no child process any more, so the NativeCommandError that redirect could raise (the
+    #96/#97/#107 pitfall) cannot arise here at all; park-cycle sets its own preference in its own
+    runspace, where it cannot reach this one.
 
     ALWAYS EXITS 0, and never blocks. A Stop hook that fails is a hook that interrupts the work it was
     added to protect, and nothing this does is important enough to strand a turn: the worst outcome of
@@ -69,22 +99,49 @@ try {
     # turn, so the same notice would become a line per turn saying nothing new.
     if (-not $parkScript -or -not (Test-Path -LiteralPath $parkScript -PathType Leaf)) { exit 0 }
 
-    $parkArgs = @('-Quiet')
-    if ($RepoRootOverride) { $parkArgs += @('-RepoRoot', $RepoRootOverride) }
+    # A HASHTABLE, because it is splatted BY NAME. An array splats positionally, which would bind the
+    # string '-Quiet' to park-cycle's -RepoRoot and leave -Quiet false -- a hook that prints its whole
+    # report on every turn, with nothing failing to say so.
+    $parkArgs = @{ Quiet = $true }
+    if ($RepoRootOverride) { $parkArgs['RepoRoot'] = $RepoRootOverride }
 
-    # 2>&1 MERGES THE CHILD'S stderr INTO WHAT IS CAPTURED -- see the paragraph in the header for why
-    # that one stream carried the line this hook exists to deliver. Windows PowerShell 5.1 wraps each
-    # merged stderr line in an ErrorRecord rather than handing over a string, so ToString() below is
-    # load-bearing and not defensive: a bare Write-Host of the record prints its own formatting instead
-    # of the sentence. $ErrorActionPreference is left alone deliberately -- this file sets no EAP, so it
-    # runs at the default 'Continue' and a NativeCommandError cannot terminate the capture the way it
-    # would inside the workflow scripts (the #96/#97/#107 pitfall, which is what native-capture-lib.ps1
-    # exists for; a hook this thin does not dot-source a lib to run one child).
-    $out = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $parkScript @parkArgs 2>&1)
-    foreach ($line in $out) {
-        if ($null -eq $line) { continue }
-        $text = $line.ToString()
-        if ($text.Trim()) { Write-Host $text }
+    # See the runspace paragraphs in the header for all four decisions here: why not a child process,
+    # why not a dot-source, why *>&1, and why Bypass.
+    $iss = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+    $iss.ExecutionPolicy = [Microsoft.PowerShell.ExecutionPolicy]::Bypass
+    $runspace = $null
+    $shell = $null
+    try {
+        $runspace = [runspacefactory]::CreateRunspace($iss)
+        $runspace.Open()
+        $shell = [powershell]::Create()
+        $shell.Runspace = $runspace
+
+        # The path and the arguments go in as ARGUMENTS rather than being interpolated into the script
+        # text: $parkScript is a path this repo does not choose (a plugin root, or a test's override), and
+        # a quote in it would otherwise end the string and run whatever followed.
+        $null = $shell.AddScript('param($Path, $Splat) & $Path @Splat *>&1').
+                       AddArgument($parkScript).
+                       AddArgument($parkArgs)
+
+        # COLLECTED AS IT IS PRODUCED, not taken from Invoke()'s return value, and that is parity rather
+        # than polish. A terminating error inside park-cycle makes Invoke() throw, and a thrown Invoke()
+        # returns nothing -- so the lines written BEFORE the failure would be lost, exactly the class of
+        # loss #1600 was about. The child process could not lose them, because it had already printed
+        # them. This collection is filled either way and is read in the finally below.
+        $out = New-Object 'System.Management.Automation.PSDataCollection[psobject]'
+        try {
+            $shell.Invoke($null, $out, $null)
+        } finally {
+            foreach ($line in $out) {
+                if ($null -eq $line) { continue }
+                $text = $line.ToString()
+                if ($text.Trim()) { Write-Host $text }
+            }
+        }
+    } finally {
+        if ($shell)    { $shell.Dispose() }
+        if ($runspace) { $runspace.Dispose() }
     }
 } catch {
     # Swallowed on purpose -- see the always-exits-0 paragraph. The message is dropped rather than

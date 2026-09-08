@@ -65,11 +65,15 @@ function New-Stub {
     <#
         A stand-in for park-cycle.ps1 that writes what the case is about and exits with $ExitCode. It
         takes the two parameters the hook passes, so a binding failure cannot be mistaken for silence.
+
+        -Body appends raw lines after the two writes and before the exit, for the cases that need to say
+        something this signature does not cover (a warning, an output object, a PID, a throw).
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Label,
         [string]$StdOut = '',
         [string]$StdErr = '',
+        [string]$Body = '',
         [int]$ExitCode = 0
     )
     $path = Join-Path $Fixture "stub-$Label.ps1"
@@ -78,17 +82,49 @@ param([switch]`$Quiet, [string]`$RepoRoot = '')
 `$ErrorActionPreference = 'Continue'
 if ('$StdOut') { Write-Host '$StdOut' }
 if ('$StdErr') { Write-Error '$StdErr' -ErrorAction Continue }
+$Body
 exit $ExitCode
+Write-Host 'AFTER-EXIT-MUST-NOT-APPEAR'
 "@
     [System.IO.File]::WriteAllText($path, $body, $Ascii)
     return $path
 }
 
+function Invoke-HookWithPid {
+    <#
+        Runs the hook through Start-Process so the test learns the HOOK's OWN process id, which is what
+        case (f) compares the stub's $PID against. Invoke-Hook cannot answer that question: `&` gives back
+        output and an exit code, never the child's id.
+
+        Output is redirected to files rather than read from a pipe, because Start-Process offers no other
+        route -- and stderr is redirected to its own file only so the console stays clean; nothing reads it.
+        The hook relays everything it has to say on stdout by design.
+    #>
+    param([Parameter(Mandatory = $true)][string]$ScriptOverride)
+    $outFile = Join-Path $Fixture 'pid-stdout.txt'
+    $errFile = Join-Path $Fixture 'pid-stderr.txt'
+    $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
+    try {
+        Remove-Item Env:\CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue
+        $p = Start-Process -FilePath 'powershell' `
+                           -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Hook,
+                                           '-ScriptOverride', $ScriptOverride) `
+                           -NoNewWindow -Wait -PassThru `
+                           -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        $text = if (Test-Path -LiteralPath $outFile) { Get-Content -LiteralPath $outFile -Raw } else { '' }
+        return [pscustomobject]@{ HookPid = $p.Id; Out = $text }
+    } finally {
+        if ($null -eq $prevPlugin) { Remove-Item Env:\CLAUDE_PLUGIN_ROOT -ErrorAction SilentlyContinue }
+        else { $env:CLAUDE_PLUGIN_ROOT = $prevPlugin }
+    }
+}
+
 function Invoke-Hook {
     <# Runs the hook as a child, capturing stdout only -- which is what a Stop hook's own report is. #>
-    param([string]$ScriptOverride = '')
+    param([string]$ScriptOverride = '', [string]$RepoRootOverride = '')
     $callArgs = @()
-    if ($ScriptOverride) { $callArgs += @('-ScriptOverride', $ScriptOverride) }
+    if ($ScriptOverride)     { $callArgs += @('-ScriptOverride', $ScriptOverride) }
+    if ($RepoRootOverride)   { $callArgs += @('-RepoRootOverride', $RepoRootOverride) }
     $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
     try {
         # Cleared so a case that passes NO override really meets "no script found" rather than this
@@ -152,6 +188,61 @@ try {
     $rE = Invoke-Hook
     Assert-True ($rE.Code -eq 0) 'no script: exit 0'
     Assert-True ([string]::IsNullOrWhiteSpace($rE.Out)) 'no script: and not one line printed'
+
+    # --- (f) park-cycle RUNS IN THE HOOK'S OWN PROCESS -- the #1641 contract ----------------------
+    # THE SUBJECT OF #1641: the hook spawned a whole second powershell.exe to run one script, on every
+    # turn. Measured on the real park-cycle, 7 runs each: 867 ms median spawning against 695 ms through a
+    # runspace. Nothing above would notice a return to a child process -- every stream assert passes
+    # either way, which is exactly why the saving needs an assert of its own rather than a comment.
+    # $PID is the whole test: in-process it IS the hook's, and no spawn can fake that.
+    Write-Host "cycle-autopark.ps1 -- park-cycle runs in-process, not in a second interpreter (#1641)" -ForegroundColor Cyan
+    $rF = Invoke-HookWithPid -ScriptOverride (New-Stub -Label 'f' -Body 'Write-Host "child-pid=$PID"')
+    Assert-Says $rF.Out "child-pid=$($rF.HookPid)" 'in-process: park-cycle reports the HOOK''s own process id'
+
+    # --- (g) THE PARAMETERS BIND BY NAME ----------------------------------------------------------
+    # The arguments are SPLATTED into the runspace, and a hashtable splats by name where an array splats
+    # positionally. Got this wrong once while writing the change: as an array, the string '-Quiet' bound to
+    # -RepoRoot and -Quiet stayed false -- a hook that prints park-cycle's entire report on every turn,
+    # with nothing failing to say so. Only an assert on the VALUES catches that; every stream case above
+    # stayed green through it.
+    Write-Host "cycle-autopark.ps1 -- -Quiet and -RepoRoot arrive bound to the right parameters" -ForegroundColor Cyan
+    $stubG = New-Stub -Label 'g' -Body 'Write-Host "bound quiet=$($Quiet.IsPresent) root=[$RepoRoot]"'
+    $rG = Invoke-Hook -ScriptOverride $stubG -RepoRootOverride 'C:\some\where'
+    Assert-Says $rG.Out 'bound quiet=True root=[C:\some\where]' 'binding: -Quiet is set and -RepoRoot is the path given, not each other'
+
+    # --- (h) THE WIDER MERGE -- warning and output streams, which 2>&1 never read ------------------
+    # The redirect is *>&1 now rather than 2>&1, so the safety net covers every stream park-cycle can
+    # write to instead of stdout plus stderr. park-cycle uses Write-Host today; the point of the net is
+    # the line somebody adds later through a stream nobody thought about.
+    Write-Host "cycle-autopark.ps1 -- warning and output streams are relayed too" -ForegroundColor Cyan
+    $rH = Invoke-Hook -ScriptOverride (New-Stub -Label 'h' -Body @'
+Write-Warning 'a warning nobody used to see'
+Write-Output 'an output object nobody used to see'
+'@)
+    Assert-Says $rH.Out 'a warning nobody used to see'       'wider merge: Write-Warning is relayed'
+    Assert-Says $rH.Out 'an output object nobody used to see' 'wider merge: Write-Output is relayed'
+
+    # --- (i) exit INSIDE park-cycle ENDS park-cycle, NOT THE HOOK ----------------------------------
+    # THIS IS WHY IT IS A RUNSPACE AND NOT A DOT-SOURCE. park-cycle.ps1 calls `exit` at fourteen top-level
+    # places, and `exit` inside a dot-sourced script terminates its CALLER -- so the cheapest-looking
+    # in-process route would have taken the hook's own relay loop down with it. In a runspace `exit` ends
+    # that runspace's pipeline: the lines before it arrive, the line after it never runs, the hook lives.
+    Write-Host "cycle-autopark.ps1 -- a child's exit ends the child, not the hook (#1641)" -ForegroundColor Cyan
+    $rI = Invoke-Hook -ScriptOverride (New-Stub -Label 'i' -StdOut 'written before the exit' -ExitCode 3)
+    Assert-True ($rI.Code -eq 0) 'exit: the hook still exits 0 after a child that exited 3'
+    Assert-Says $rI.Out 'written before the exit' 'exit: what was written before it still arrives'
+    Assert-True (-not ($rI.Out -match 'AFTER-EXIT-MUST-NOT-APPEAR')) 'exit: and the line after it did not run'
+
+    # --- (j) A TERMINATING ERROR DOES NOT SWALLOW WHAT CAME BEFORE IT ------------------------------
+    # PARITY WITH THE CHILD PROCESS, and the reason the relay reads a PSDataCollection instead of
+    # Invoke()'s return value: a child had already PRINTED its early lines before it died, while a thrown
+    # Invoke() returns nothing at all. Taking the return value would have re-created #1600's loss --
+    # park-cycle's most urgent lines going missing on the one turn it had something urgent to say -- by a
+    # different route.
+    Write-Host "cycle-autopark.ps1 -- a child that throws still delivers its earlier lines" -ForegroundColor Cyan
+    $rJ = Invoke-Hook -ScriptOverride (New-Stub -Label 'j' -StdOut 'said before the throw' -Body 'throw "park-cycle fell over"')
+    Assert-True ($rJ.Code -eq 0) 'throw: the hook exits 0 -- a Stop hook never fails a turn'
+    Assert-Says $rJ.Out 'said before the throw' 'throw: the earlier line is not lost with the failure'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
