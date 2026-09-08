@@ -340,8 +340,6 @@ foreach ($id in ($ids | Sort-Object)) {
 
     $rows.Add([pscustomobject]@{
         Id        = $id
-        Name      = $name
-        Layer     = if ($enabled.LayerById.ContainsKey($id)) { [string]$enabled.LayerById[$id] } else { '' }
         InstText  = $instText
         CloneText = $cloneText
         CloneVer  = $cloneVer
