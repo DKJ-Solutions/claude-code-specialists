@@ -33,19 +33,43 @@
 
 ### PLAN
 
+Inbound #1584. `Wait-CheckRegistration` in `ship-pr.ps1` polled for the full 180s on a CONFLICTING
+PR before ever reaching #1247's conflict branch, and the pre-180s path then handed #1234's
+close/reopen remedy -- which cannot resolve a conflict. Read the mergeable state ahead of the wait,
+refuse a definitive CONFLICTING at once (reusing the existing note builder), and where the conflict
+is a folded-entry delete/modify say the branch is spent instead of offering a rebase.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `ship-pr.ps1`: lift the #1234 / #1247 note-building block into `Get-MissingCheckSuiteRefusalNote`, shared by the early exit and the timeout
+- [x] `ship-pr.ps1`: read `gh pr view --json mergeable` before the poll loop; refuse immediately on a definitive `CONFLICTING`, fall through on `MERGEABLE` / `UNKNOWN`
+- [x] `ship-pr.ps1`: `Test-BranchEntryAlreadyFolded` -- augment the refusal when `main` carries a commit that deleted the branch's own `dkj-policy/<slug>.md`
+- [x] mirror both into `plugins/dkj-policy/scripts/release/ship-pr.ps1`, LF-identical (shared-script drift lint)
 
 ### TEST
 
+- [x] `pr-issues.tests.ps1`: `#1584` block -- early-exit call site, shared builder called twice, mergeable read before the loop, folded-entry augmentation
+- [x] `check-plugin-integrity.ps1` green (parse + shared-script drift)
+- [x] full test-suite gate green (exit 0)
+
 ### DEPLOY: fix/1584-ship-pr-conflicting-early-exit
 
-**Score:**
+`ship-pr` now refuses a CONFLICTING pull request the instant it starts waiting for CI, instead of
+after the full 180s check-registration timeout. A conflicting PR has no `refs/pull/<n>/merge` for a
+`pull_request` workflow to run against, so no check suite can ever register for it -- a state GitHub
+reports the moment the PR exists, which made the wait pure cost. The refusal reuses the existing
+#1247 diagnosis (resolve the conflict; a close/reopen was measured doing nothing), and where the
+conflict is a branch whose changelog entry has already folded on `main`, it says the branch is spent
+and the follow-up belongs on a fresh branch off the trunk -- rather than a rebase that just re-adds a
+folded entry.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- internal shipping-workflow tooling; no subscriber of a service is affected.
+
+**Score:** N/A
 
 #### Pull Request
 
