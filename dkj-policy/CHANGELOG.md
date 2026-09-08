@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**26 / 50 minor entries** <!-- pending-tally -->
+**26 / 51 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1665-working-copy-boundary · 20260908-202038
+
+A dispatched specialist holding `Bash` is now told, in its own always-loaded boundary, that the checkout
+it stands in is not its own to move: no `git stash`, `checkout -- <path>`, `reset`, `clean`, `restore`,
+branch switch, or anything else that mutates the tree, the index or **any ref** -- whatever files it may
+legitimately edit. The block names the read-only way to read another ref instead, and says that a clean
+`git status` proves nothing, because it is exactly what discarded uncommitted work looks like.
+
+It closes a real loss rather than a hypothetical one: a review stashed, hit other sessions' stash
+entries, and resolved the conflict with `git checkout HEAD -- <file>` on three files, taking four of the
+orchestrator's uncommitted edits with it and reporting `No repo content was altered`. The old wording
+did not reach that, because a stash corrects nothing and lands nothing.
+
+**And the circle that carries it is now kept by a gate rather than by memory.** This is the first shared
+block placed by **capability** instead of by craft -- it goes wherever `tools:` names `Bash` -- and that
+is the one kind of circle a check can hold, so **lint check 36** reports any agent def that names the
+tool and carries no block. Without it a specialist gaining `Bash` later would have sat silently outside
+the boundary with every gate green, which is the same enforced-by-memory failure as the defect itself.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- the block ships to every consumer of the four team plugins, but its reader is a subagent rather
+than a subscriber of a service, and this repo publishes to none.
+
+**Score:** N/A
+
+#### Pull Request
+
+A review may not mutate the working copy: no git stash, checkout --, reset or clean
+
+Plugins: dkj-team-alpha, dkj-team-ecomm
+
+[PR #1671](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1671)
+
+---
 
 ### DEPLOY: feat/1659-temp-path-unpredictable · 20260908-190619
 
