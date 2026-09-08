@@ -377,7 +377,16 @@ if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a bran
 # IT ALSO ANSWERS THE SECOND HALF OF #1069, at the end of step 5: whether THIS tree is the primary
 # checkout. Read here rather than there because it is the same porcelain, and because an unreadable list
 # has to fall back to "primary" -- which is the behaviour every run had before this change.
+#
+# THE REFUSAL ITSELF IS DEFERRED PAST THE QUEUE VERDICT (issue #1572). Its whole ground is "step 5 could
+# not fold after the merge" -- and under a merge queue step 5 folds nothing: the queue's own push to main
+# runs fold-on-merge.yml (#1493), so this session opens, waits, enqueues and exits without touching the
+# trunk. Refusing here would block the exact workflow the lane exists for -- the primary standing on the
+# trunk is where step 2b (#1073) deliberately puts it, and `ship-pr` itself tells you to open a lane in a
+# second terminal. So $trunkHolder is only READ here; the refusal fires below, gated on -not $queueActive,
+# the same shape and the same one-line justification #1506 already established for the fold-push verdict.
 $shipTreeIsPrimary = $true
+$trunkHolder = $null
 $wtList = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
 if ($wtList.ExitCode -eq 0) {
     $primaryRoot = Get-PrimaryWorktreePath -PorcelainLines $wtList.Output
@@ -385,21 +394,6 @@ if ($wtList.ExitCode -eq 0) {
         $shipTreeIsPrimary = (Get-WorktreePathKey $primaryRoot) -eq (Get-WorktreePathKey $repoRoot)
     }
     $trunkHolder = Get-WorktreeHoldingBranch -PorcelainLines $wtList.Output -Branch 'main' -SelfPath $repoRoot
-    if ($trunkHolder) {
-        Write-Error @"
-'main' is checked out in ANOTHER worktree, so step 5 could not fold after the merge:
-
-  $trunkHolder
-
-Nothing has been pushed or merged -- this is the cheap place to stop. Release the trunk there first,
-then run ship-pr again. If that worktree is a finished lane, hand it back:
-
-  powershell -NoProfile -File "scripts\task\worktree-lane.ps1" -HandBack -Lane "$trunkHolder"
-
-If it is a checkout you still want, move it off the trunk yourself (git -C "$trunkHolder" checkout <its branch>).
-"@
-        exit 1
-    }
 } else {
     # BEST-EFFORT, never a refusal: an unreadable worktree list says something about git, not about the
     # trunk, and this script has to keep working in a clone that has never had a second worktree.
@@ -486,6 +480,33 @@ if ($queueActive) {
     Write-Host "ship-pr: 'main' is behind a merge queue -- this run will ENQUEUE the PR, and the queue merges it." -ForegroundColor Cyan
     Write-Host "  The fold is not this session's to push: fold-on-merge.yml folds off the queue's own push to main (#1493)." -ForegroundColor DarkGray
 }
+
+# --- Step 0a's refusal, deferred to here (issue #1572) ------------------------------------------
+# Step 0a above only READ whether another worktree holds 'main'. The refusal belongs after the queue
+# verdict, because its whole ground -- "step 5 could not fold after the merge" -- does not hold under a
+# queue: this session never folds there, so a primary standing on the trunk (where step 2b put it,
+# #1073) blocks nothing. Where no queue is read, $queueActive is $false and the guard fires exactly as
+# it always did -- unreadable keeps meaning "assume the session folds", the safe direction #1506 insists
+# on. The two remedies below cost something a queue makes unnecessary, which is the point of the gate.
+if ($trunkHolder -and -not $queueActive) {
+    Write-Error @"
+'main' is checked out in ANOTHER worktree, so step 5 could not fold after the merge:
+
+  $trunkHolder
+
+Nothing has been pushed or merged -- this is the cheap place to stop. Release the trunk there first,
+then run ship-pr again. If that worktree is a finished lane, hand it back:
+
+  powershell -NoProfile -File "scripts\task\worktree-lane.ps1" -HandBack -Lane "$trunkHolder"
+
+If it is a checkout you still want, move it off the trunk yourself (git -C "$trunkHolder" checkout <its branch>).
+"@
+    exit 1
+}
+if ($trunkHolder -and $queueActive) {
+    Write-Host "  Another worktree holds 'main' ($trunkHolder) -- not a blocker under a queue: step 5 folds nothing here (#1572)." -ForegroundColor DarkGray
+}
+
 # AND UNDER A QUEUE THE FOLD-PUSH VERDICT IS NOT THIS RUN'S QUESTION (issue #1506). Step 0b asks whether
 # THIS ACCOUNT can push the fold; with a queue the pusher is the GitHub Actions app running
 # fold-on-merge.yml, whose entitlement is a different actor's and cannot be read from `gh api user`.
