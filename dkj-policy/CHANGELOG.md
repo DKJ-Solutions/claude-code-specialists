@@ -43,7 +43,48 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**13 / 23 minor entries** <!-- pending-tally -->
+**14 / 24 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1600-branch-pickup-divergence · 20260908-121846
+
+A branch resumed from a handoff note now learns that another session is already on it -- at the moment
+of pickup, and again on every turn after it.
+
+Two sessions had run the same pre-PR review on one parked branch in full, each finding real defects the
+other missed, and neither learned of the other until the push at the very end. The signal existed for
+half an hour: `cycle-autopark`'s push is refused the moment the other side pushes, every turn. What was
+missing was delivery. The refusal now fetches that one ref and **names the other side** -- how far
+behind, and the remote tip's author and subject, which is what separates a collision from a
+fast-forward of your own autopark -- where it used to say *"run park-cycle by hand for the reason
+(diverged from origin?)"* and send the reader for an answer the run already held. The Stop hook carries
+the child's stderr into its report, so no line park-cycle writes can be lost to the stream it chose.
+
+And the pickup route that carries the guard is now the one the documentation prescribes: `park`'s
+"picking a parked branch back up" opens with `new-branch.ps1 -Name <the parked branch>` -- idempotent,
+and the only resume that counts the gap and names the tip -- instead of leaving `git checkout` as the
+implied route, which is the door this incident came through three days after
+[#1439](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1439) closed the other one.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow runs `cycle-autopark` on every turn, so this changes what their sessions
+are told at the moment two of them collide -- and duplicated work is expensive in a way wasted tokens
+are not: the measured pair each found defects the other missed, so either winning outright would have
+shipped a bug. It arrives on a plugin update with nothing to adopt.
+
+**Score:** 4
+
+#### Pull Request
+
+A resumed branch learns another session is on it, at pickup and every turn
+
+Plugins: dkj-policy
+
+[PR #1613](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1613)
+
+---
 
 ### DEPLOY: docs/1597-readme-six-enabled-plugins · 20260908-115352
 
