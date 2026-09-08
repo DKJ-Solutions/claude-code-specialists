@@ -51,6 +51,9 @@ $PrIssuesLibSrc   = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
 # lib once open-pr.ps1 became a second reader. Without it in the fixture, every resume case below dies
 # on a raw path-not-found instead of testing anything, exactly like the two libs above.
 $RemoteAheadLibSrc = Join-Path $RepoRoot 'scripts\lib\remote-ahead-lib.ps1'
+# remote-ahead-lib.ps1 dot-sources this for Get-DisplayRef (issue #1623), so a fixture that copies the one
+# without the other builds a repo whose scripts die on a missing function.
+$RefPrintLibSrc = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 # Direct Test-BranchName calls (separate from the CLI) for the empty/whitespace-only case --
 # PowerShell's mandatory-param binding catches an empty -Name via the CLI with a generic error, so
 # the exact Reason text can only be tested directly.
@@ -214,6 +217,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')                -Force
     Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')           -Force
     Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')       -Force
+    Copy-Item -LiteralPath $RefPrintLibSrc    -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')          -Force
 
     $prevEap = $ErrorActionPreference
     try {

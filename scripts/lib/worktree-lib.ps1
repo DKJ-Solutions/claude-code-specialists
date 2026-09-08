@@ -34,7 +34,16 @@
     scripts/tests/worktree-lib.tests.ps1 rather than only exercised by a full live ship.
 
     Pure ASCII (repo convention for .ps1).
+
+    ONE DEPENDENCY, and only the last function has it: Get-DisplayRef (ref-print-lib.ps1), loaded below.
+    The five readers above stay pure functions of the porcelain text.
 #>
+
+# THE PROSE SANITISER, loaded rather than copied (issue #1623) -- see Get-TrunkReturnGoAheadLine at the
+# foot of this file for what needs it. $PSScriptRoot-relative so it resolves in the plugin mirror as well
+# as here, and unconditional because the function that calls it has no fallback wording; ref-print-lib.ps1
+# is a leaf with no dependencies of its own.
+. (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
 
 # THE COMPARISON KEY, and it is not decoration. Three things make two spellings of the same directory
 # compare unequal on Windows, and all three have been measured in this repo:
@@ -238,13 +247,21 @@ function Get-TrunkReturnDecision {
 # read, and a go-ahead that cannot be worded is worse than one that names the branch less precisely. Empty
 # gives "on its branch", which is still true and still points at the lane.
 #
-# AND IT IS INTERPOLATED RAW ON PURPOSE, which is the question a reader of this function asks next. A ref
-# name quoted inside a prose sentence is not a paste-ready command, and #1594 decided that axis
-# deliberately hours before this function existed: ref-print-lib.ps1 guards the PASTE sites with an
-# allowlist and scopes display out by name, so sanitising here would treat one prose site differently from
-# the nine others ship-pr.ps1 already prints, step 2b's own reason line among them. What is NOT settled is
-# that scope note's reasoning -- git rejects the ASCII control characters and accepts U+202E and U+200D
-# (measured, exit 0) -- and that residual is #1617's, for the whole class rather than for this line.
+# AND IT WAS INTERPOLATED RAW UNTIL #1623, on a reasoning this comment already flagged as unsettled: that
+# #1594 had scoped display out because git rejects the characters that make prose deceptive. It rejects
+# \p{Cc} and ACCEPTS \p{Cf} (measured, exit 0 on U+202E and U+200D), so the residual this note handed to
+# #1617 turned out to be the whole of it. What has NOT changed is the reason not to treat this line
+# specially: it is stripped exactly as the other prose sites are, through the one definition in
+# ref-print-lib.ps1, rather than refused the way a paste site is.
+#
+# THE STRIP LIVES HERE RATHER THAN AT THE CALLER, which is the next question. ship-pr.ps1 could hand in a
+# stripped label and this function stay pure -- and then the guarantee would sit one file away from the
+# sentence it protects, free to drift the moment a second caller appears. It is the same argument
+# ship-pr.ps1 makes for judging the paste verdict once beside the read that produced it, applied the other
+# way round: the composer owns what its own output may contain, so this function's suite can assert it.
+#
+# THIS IS THE GO-AHEAD LINE (#1616) -- the one line the ship documents as safe to act on -- which is why a
+# name that prints as something other than what it is costs more here than anywhere else in the script.
 function Get-TrunkReturnGoAheadLine {
     param(
         [Parameter(Mandatory = $true)][bool]$Returned,
@@ -254,6 +271,7 @@ function Get-TrunkReturnGoAheadLine {
     if ($Returned) {
         return "$lead, and step 2b already put it back on the trunk (#1073)."
     }
-    $where = if ("$Branch".Trim()) { "on '$($Branch.Trim())'" } else { 'on its branch' }
+    $shownBranch = Get-DisplayRef -Ref $Branch
+    $where = if ($shownBranch) { "on '$shownBranch'" } else { 'on its branch' }
     return "$lead -- but step 2b left this checkout $where (its line above says why), so take the lane below rather than a second terminal in this checkout (#1073)."
 }

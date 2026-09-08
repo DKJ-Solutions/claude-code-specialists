@@ -501,7 +501,7 @@ function Write-SyncLogEntry {
         $text = Add-SyncLogEntry -Existing $existing -Entry $entry
 
         [System.IO.File]::WriteAllText($full, $text, (New-Object System.Text.UTF8Encoding($false)))
-        Write-Host "Sync log: entry for $Branch written to $rel." -ForegroundColor DarkGray
+        Write-Host "Sync log: entry for $(Get-DisplayRef -Ref $Branch) written to $rel." -ForegroundColor DarkGray
         return $rel
     } catch {
         Write-Host "Could not write the sync-log entry to '$rel', so this sync leaves no record in the tree: $($_.Exception.Message)" -ForegroundColor Yellow
@@ -538,14 +538,21 @@ function Write-SyncPredecessorVerdict {
     Write-Host ''
     Write-Host 'Standing sync branches, measured against what this run takes:' -ForegroundColor Yellow
     foreach ($r in $report) {
+        # THE MOST EXTERNALLY-AUTHORED REF NAME IN THIS SCRIPT (issue #1623). These names are not composed
+        # here and were never validated here: they come off `git ls-remote`, so whoever pushed a branch
+        # matching the prefix chose them. `git check-ref-format` accepts \p{Cf}, so U+202E or a zero-width
+        # run reaches this loop intact -- and the whole point of these rows is that the operator reads a
+        # branch name and decides which PR to close, which is the decision a name printing as a DIFFERENT
+        # branch corrupts. Stripped once per row rather than at each of the three arms.
+        $branchRow = Get-DisplayRef -Ref ([string]$r.Branch)
         if ($r.Captured -eq 0) {
-            Write-Host "  $($r.Branch) -- its file set could not be read, so nothing is claimed about it." -ForegroundColor Yellow
+            Write-Host "  $branchRow -- its file set could not be read, so nothing is claimed about it." -ForegroundColor Yellow
         } elseif ($r.Superseded) {
-            Write-Host "  $($r.Branch) -- $($r.Captured) file(s), all of them in this run." -ForegroundColor Green
+            Write-Host "  $branchRow -- $($r.Captured) file(s), all of them in this run." -ForegroundColor Green
             Write-Host '      This run supersedes it: close that PR, then merge this one.' -ForegroundColor DarkGray
         } else {
             $u = @($r.Uncovered)
-            Write-Host "  $($r.Branch) -- $($r.Captured) file(s), $($u.Count) NOT in this run:" -ForegroundColor Red
+            Write-Host "  $branchRow -- $($r.Captured) file(s), $($u.Count) NOT in this run:" -ForegroundColor Red
             foreach ($p in $u) { Write-Host "      $p" -ForegroundColor Red }
             Write-Host '      Neither supersedes the other. Those paths exist only on that branch.' -ForegroundColor DarkGray
         }
@@ -553,6 +560,13 @@ function Write-SyncPredecessorVerdict {
 }
 
 $trunk        = if (([string]$seam.Trunk).Trim())        { ([string]$seam.Trunk).Trim() }        else { 'main' }
+# THE TRUNK IS A REF NAME FROM THE SAME SEAM, and it is printed in nine sentences of this run's own
+# progress report (issue #1623). #1623 counted the branch's six and not these, because it read the script
+# for `$branch`; the mechanism is identical and the source is more exposed, not less -- $trunk is whatever
+# Get-TrunkBranchName in the consumer's repo-config.ps1 returns, and nothing between there and the first
+# `Write-Host` asks git whether it is a legal ref. The raw $trunk stays raw for `git checkout` and
+# `gh pr create --base`.
+$trunkShown   = Get-DisplayRef -Ref $trunk
 $pattern      = if (([string]$seam.Pattern).Trim())      { ([string]$seam.Pattern).Trim() }      else { Get-SyncDefaultReferencePattern }
 $branchPrefix = if (([string]$seam.BranchPrefix).Trim()) { ([string]$seam.BranchPrefix).Trim() } else { 'sync/live-' }
 $mergeMethod  = if (([string]$seam.MergeMethod).Trim())  { ([string]$seam.MergeMethod).Trim() }  else { 'merge' }
@@ -585,9 +599,9 @@ if ($DryRun) {
     Write-Host "[1/6] dry run -- staying on $onBranch, checking out and pulling nothing." -ForegroundColor Yellow
 } else {
     Write-Host ''
-    Write-Host "[1/6] $trunk, fast-forward from origin ..." -ForegroundColor Yellow
+    Write-Host "[1/6] $trunkShown, fast-forward from origin ..." -ForegroundColor Yellow
     & git checkout $trunk | Out-Null
-    if ($LASTEXITCODE -ne 0) { Write-Host "Could not switch to $trunk." -ForegroundColor Red; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Write-Host "Could not switch to $trunkShown." -ForegroundColor Red; exit 1 }
     # BOUNDED (inbound #1181). The cheapest of the five to stall in -- nothing has been written yet --
     # and it is still bounded rather than left alone: a run that hangs here hangs before it has said
     # anything, which reads as the script being slow to start rather than as a credential to fix.
@@ -595,7 +609,7 @@ if ($DryRun) {
                                  -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
     $pull.Output | ForEach-Object { Write-Host $_ }
     if ($pull.ExitCode -ne 0) {
-        Write-Host "Could not fast-forward $trunk from origin." -ForegroundColor Red
+        Write-Host "Could not fast-forward $trunkShown from origin." -ForegroundColor Red
         if ($pull.TimedOut) {
             Write-Host "  'git pull' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
         }
@@ -658,12 +672,19 @@ while (
     $branch = "$branchPrefix$stamp-$n"
     if ($n -gt 20) { Write-Host "Twenty sync branches already exist for $stamp. Something is wrong; stopping." -ForegroundColor Red; exit 1 }
 }
-Write-Host "      $branch"
+Write-Host "      $branchShown"
 
 # JUDGED ONCE, beside the composition that produced it, for the two printed commands further down
 # (issue #1594). Not gated on anything: both readers are failure or hand-over paths that must not do
 # work of their own on the way out.
 $branchPaste = Get-PasteableRef -Ref $branch
+# AND THE DISPLAY NAME, beside it, for the six sentences that merely QUOTE the branch (issue #1623). The
+# paste verdict above covers the two printed commands; these are prose, and #1594 scoped prose out on the
+# ground that git rejects the characters that make it deceptive. `git check-ref-format` rejects \p{Cc} and
+# ACCEPTS \p{Cf} -- and this name never met git at all before it is printed: it is $branchPrefix, a seam
+# answer a consumer wrote, plus a date. So the strip is load-bearing here rather than belt-and-braces.
+# $branch itself stays raw and is what `git checkout -b`, `git push` and `gh pr create` still receive.
+$branchShown = Get-DisplayRef -Ref $branch
 
 # --- 4b. is a PREVIOUS run's branch still standing? ------------------------------------------------
 # Inbound #1021, and it belongs here rather than beside the verdict it produces: a refusal at this point
@@ -916,7 +937,7 @@ try {
     # decoder back in charge. The same treatment goes on 'check-ignore', whose output is a path for the
     # same reason.
     Write-Host ''
-    Write-Host "[5/6] comparing live against $trunk ..." -ForegroundColor Yellow
+    Write-Host "[5/6] comparing live against $trunkShown ..." -ForegroundColor Yellow
 
     $headBlobs = @{}
     foreach ($line in (& git -c core.quotePath=true ls-tree -r HEAD)) {
@@ -990,7 +1011,7 @@ try {
 
     if ($differing.Count -eq 0) {
         Write-Host ''
-        Write-Host "No differences at all -- $trunk already matches live." -ForegroundColor Green
+        Write-Host "No differences at all -- $trunkShown already matches live." -ForegroundColor Green
         exit 0
     }
     Write-Host "      $($differing.Count) path(s) differ (line-ending-only differences already excluded)"
@@ -1031,7 +1052,7 @@ try {
     }
 
     Write-Host ''
-    Write-Host "  held back ($trunk wins): $($keep.Count)" -ForegroundColor Green
+    Write-Host "  held back ($trunkShown wins): $($keep.Count)" -ForegroundColor Green
     foreach ($r in $keep) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, $r.Path, $r.Reason) -ForegroundColor DarkGray }
     Write-Host "  to take from live:       $($take.Count)" -ForegroundColor Cyan
     foreach ($r in $take) { Write-Host ("    [{0}] {1,-46} {2}" -f $r.Status, $r.Path, $r.Reason) -ForegroundColor Cyan }
@@ -1056,7 +1077,7 @@ try {
     if ($take.Count -eq 0) {
         Write-Host ''
         Write-Host "No third-party drift. Everything live holds differently is a version this repo has had" -ForegroundColor Green
-        Write-Host "before -- $trunk has simply moved on. Nothing to sync, nothing written." -ForegroundColor Green
+        Write-Host "before -- $trunkShown has simply moved on. Nothing to sync, nothing written." -ForegroundColor Green
         # AND THIS IS THE MOST MISLEADING PLACE TO STOP WITHOUT SAYING IT. "Nothing to sync" is true of
         # live and false of the repo while a predecessor stands: that branch holds drift the trunk still
         # lacks, and an empty take set makes every one of its paths uncovered -- correctly. Without this
@@ -1067,7 +1088,7 @@ try {
 
     if ($DryRun) {
         Write-Host ''
-        Write-Host "DRY RUN -- would put the $($take.Count) file(s) above on $branch. Nothing written." -ForegroundColor Magenta
+        Write-Host "DRY RUN -- would put the $($take.Count) file(s) above on $branchShown. Nothing written." -ForegroundColor Magenta
         # THE DRY RUN IS THE ONE PLACE THIS VERDICT IS THE WHOLE POINT OF THE RUN. A dry run is exempt from
         # the refusal at [3b/6] precisely so somebody staring at open sync PRs can ask "does today's drift
         # supersede that pile?" -- and this is the answer to that question.
@@ -1082,9 +1103,9 @@ try {
     Write-SyncPredecessorVerdict -Standing $standing -TakePaths @($take | ForEach-Object { $_.Path })
 
     Write-Host ''
-    Write-Host "Third-party drift on $($take.Count) file(s); putting it on $branch." -ForegroundColor Cyan
+    Write-Host "Third-party drift on $($take.Count) file(s); putting it on $branchShown." -ForegroundColor Cyan
     & git checkout -b $branch | Out-Null
-    if ($LASTEXITCODE -ne 0) { Write-Host "Could not create $branch. Nothing written." -ForegroundColor Red; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Write-Host "Could not create $branchShown. Nothing written." -ForegroundColor Red; exit 1 }
 
     foreach ($r in $take) {
         $dest = Join-Path $repoRoot ($r.Path -replace '/', '\')
@@ -1119,7 +1140,7 @@ try {
                                  -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
     $push.Output | ForEach-Object { Write-Host $_ }
     if ($push.ExitCode -ne 0) {
-        Write-Host "Push failed. The commit is local on $branch." -ForegroundColor Red
+        Write-Host "Push failed. The commit is local on $branchShown." -ForegroundColor Red
         if ($push.TimedOut) {
             Write-Host "  'git push' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
             Write-Host "  The branch is NOT on origin. Fix the credential and push it by hand: git push -u origin $($branchPaste.Token)" -ForegroundColor Red
@@ -1253,7 +1274,7 @@ try {
         if ($prView.TimedOut) {
             Write-Host "  'gh pr view' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
         }
-        Write-Host "  Nothing is lost; the PR is open on $branch. Merge it yourself once CI is green." -ForegroundColor Red
+        Write-Host "  Nothing is lost; the PR is open on $branchShown. Merge it yourself once CI is green." -ForegroundColor Red
         exit 1
     }
     Write-Host "Sync PR #$pr opened; waiting up to $ChecksTimeoutMinutes min for CI." -ForegroundColor Cyan
@@ -1344,14 +1365,14 @@ try {
                                  -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
     $post.Output | ForEach-Object { Write-Host $_ }
     if ($post.ExitCode -ne 0) {
-        Write-Host "Sync PR #$pr IS MERGED, but $trunk could not be fast-forwarded, so this checkout does not have it yet." -ForegroundColor Red
+        Write-Host "Sync PR #$pr IS MERGED, but $trunkShown could not be fast-forwarded, so this checkout does not have it yet." -ForegroundColor Red
         if ($post.TimedOut) {
             Write-Host "  'git pull' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above." -ForegroundColor Red
         }
         Write-Host '  Nothing is lost; pull by hand: git pull --ff-only' -ForegroundColor Red
         exit 1
     }
-    Write-Host "Done -- sync PR #$pr merged into $trunk." -ForegroundColor Green
+    Write-Host "Done -- sync PR #$pr merged into $trunkShown." -ForegroundColor Green
     exit 0
 }
 finally {
