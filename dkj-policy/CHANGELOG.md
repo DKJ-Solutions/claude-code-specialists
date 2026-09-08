@@ -43,7 +43,57 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 8 minor entries** <!-- pending-tally -->
+**5 / 9 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1575-prune-merged-dirty-guard · 20260908-084930
+
+`prune-merged.ps1` no longer refuses a dirty working tree on runs that could never move it. The
+refusal's own ground is step 4c -- stepping off the branch you are standing on in order to reap it --
+and that step is unreachable when HEAD is the trunk (never a reap candidate), when HEAD is detached,
+and under `-DryRun` (which deletes nothing). The guard now asks exactly that reachability question, so
+those runs proceed; a dirty tree they pass through is reported with the reason it was harmless, rather
+than passed over in silence.
+
+This is the command the orchestrator's lens tells a session to run mid-assignment in place of
+classifying `git ls-remote` output by hand -- and mid-assignment is exactly when a checkout has
+uncommitted work in it, so the guard was blocking the report in the state the advice was written for.
+The two ways out it offered are the wrong price for a read: parking commits to a branch, and stashing
+touches a file the session was told to leave alone.
+
+Nothing the guard protected is given up. A dirty checkout standing on a non-trunk branch refuses
+exactly as before, because that branch can be squash-merged while the work is uncommitted, and that is
+the case where the step-off drags it onto the trunk. The refusal now names the branch that makes it
+reachable, and offers `-DryRun` beside commit, park and stash.
+
+That last case is why the doc half moved too. The orchestrator's lens and the consumer-facing skill page
+for this script now name `-DryRun` as the route for a session standing on a branch with uncommitted
+work, which is the ordinary mid-assignment shape: it deletes nothing, so it never has to step off, and
+the classification it prints -- the paste-ready delete command for a merged leftover,
+`Kept ... -- live work` for everything else -- is identical to the full run's. The skill page had gone
+further than stale; it still described the refusal as unconditional, which is what a consumer would have
+read.
+
+The suite's own dirty case ran from the trunk, so it had been pinning the defect; it is re-pointed at a
+branch, and two cases are added for the arms that now proceed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this is a maintenance script in the development workflow. No subscriber of a service reaches it,
+and nothing about a published artifact changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+prune-merged only refuses a dirty tree where the run could actually step off it
+
+Plugins: dkj-policy
+
+[PR #1581](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1581)
+
+---
 
 ### DEPLOY: fix/1570-shopify-floor-no-store-seam · 20260908-084027
 
