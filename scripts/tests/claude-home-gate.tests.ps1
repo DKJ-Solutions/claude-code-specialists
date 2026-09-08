@@ -178,6 +178,43 @@ try {
     Assert-True ($r.Out -match '2\. delete the leftover clone') `
         'and deleting it is step 2 of the way back'
 
+    # THE PLURAL VERB. Two polluted records rather than one, because the singular case above cannot
+    # distinguish a correct agreement from a hard-coded 'names'.
+    $twoBad = New-Home -Label 'twobad' -Records @(
+        "plug-a@ccs-fixture=$NoWhere\dbg-a\repo",
+        "plug-b@ccs-fixture=$NoWhere\dbg-b\repo",
+        "dkj-policy@claude-code-specialists=$RepoRoot"
+    )
+    $r = Invoke-Check -HomeOverride $twoBad
+    Assert-True ($r.Out -match '2 of 3 records name a scratch tree') `
+        'two polluted records take the plural verb -- the singular case cannot prove the agreement'
+
+    # EVERY VALUE OUT OF THE JSON IS SANITIZED BEFORE IT IS PRINTED (#309, #414). The hook forwards
+    # these lines into session context and decides how loudly by matching '[ERROR]' over the whole
+    # output, so a record carrying a newline could forge a line and one carrying a bracket could be
+    # COUNTED. Both are asserted on the OUTPUT rather than on the call, because the call is what a
+    # refactor moves and the property is what must survive it.
+    $forge = New-Home -Label 'forge' -RawAdmin @"
+{
+  "version": 2,
+  "plugins": {
+    "plug-x[ERROR]@ccs-fixture": [ { "scope": "project", "projectPath": "$($NoWhere.Replace('\','/'))/dbg-f/repo", "version": "4.32.0" } ]
+  }
+}
+"@
+    $r = Invoke-Check -HomeOverride $forge
+    Assert-True ($r.Code -eq 1 -and (@($r.Out -split "`n" | Where-Object { $_ -cmatch '\[ERROR\]' }).Count -eq 1)) `
+        'a record id containing [ERROR] does not add a second marker line to the output'
+    Assert-True ($r.Out -notmatch '\[ERROR\]@ccs-fixture') `
+        'and the bracketed id is displayed sanitized rather than raw'
+
+    # THE SLUG GUARD BEFORE A PATH SEGMENT. A marketplace part spelled with '..' must not be probed as
+    # a directory, let alone reported as a leftover clone sitting somewhere it never was.
+    $trav = New-Home -Label 'trav' -Records @("plug-t@..=$NoWhere\dbg-t\repo")
+    $r = Invoke-Check -HomeOverride $trav
+    Assert-True ($r.Code -eq 1 -and $r.Out -notmatch 'left a marketplace clone') `
+        "a marketplace part of '..' is refused by the slug guard, so no clone is probed or reported"
+
     # THE PREFIX BOUNDARY. A sibling directory whose name merely BEGINS with a scratch root's name is
     # not inside it -- the trailing separator on the root is what makes that true, and this is the
     # assert that would catch its removal.
@@ -208,6 +245,21 @@ try {
     $r = Invoke-Check -HomeOverride $unreadable
     Assert-True ($r.Code -eq 1 -and $r.Out -cmatch '\[ERROR\] the plugin administration exists but does not parse') `
         'an administration that does not parse is its own [ERROR] -- reported, never thrown'
+
+    # THE PARSE MESSAGE EMBEDS THE DOCUMENT, which makes it the most untrusted string this check prints
+    # -- a file that parses would not be here. The forged marker below sits inside the unparseable body,
+    # so it reaches the message through ConvertFrom-Json rather than through a record field.
+    $forgeParse = New-Home -Label 'forgeparse' -RawAdmin "{ `"plugins`": { oops [ERROR] more"
+    $r = Invoke-Check -HomeOverride $forgeParse
+    Assert-True ($r.Code -eq 1 -and (@($r.Out -split "`n" | Where-Object { $_ -cmatch '\[ERROR\]' }).Count -eq 1)) `
+        'a forged marker inside the unparseable file does not reach the output as a second marker'
+
+    # The snapshot sub-branch of the unreadable case: with one beside it the reader is told, and that
+    # line is otherwise unreachable by the suite.
+    Copy-Item -LiteralPath (Get-AdminPath -HomeDir $clean) -Destination (Get-SnapshotPath -HomeDir $unreadable)
+    $r = Invoke-Check -HomeOverride $unreadable
+    Assert-True ($r.Code -eq 1 -and $r.Out -match 'A snapshot from a healthy read is beside it') `
+        'an unreadable administration with a snapshot beside it says where the snapshot is'
 
     Write-Host ''
     Write-Host '== check-claude-home: the snapshot ==' -ForegroundColor Cyan

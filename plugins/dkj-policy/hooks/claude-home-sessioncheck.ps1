@@ -23,18 +23,21 @@
     about the MACHINE rather than about the tree. A CI runner has no plugin administration at all, so a
     workflow leg would report the empty state on every push.
 
-    Deliberately soft, mirroring its four siblings:
+    Deliberately soft, mirroring git-identity-sessioncheck.ps1 beside it:
       - check script not found -> a notice and done (exit 0);
       - only a blocking signal ([ERROR]) -> the report in the session context, never a block. [OK] and
         [SKIP] stay silent at session start; a deliberate run of check-claude-home.ps1 shows them;
       - the script ALWAYS ends with exit 0 -- a session start must never strand here.
 
-    THIS ONE IS NOT READ-ONLY, and it is the only member of the family that is not. Its four siblings
-    each state that they change nothing; this one lets the check refresh
+    THIS ONE IS NOT READ-ONLY, and it is the only member of the family that is not. Every other session
+    check states in as many words that it changes nothing; this one lets the check refresh
     ~/.claude/plugins/installed_plugins.snapshot.json, and that snapshot is half the repair -- restoring
     it puts the previous records BACK, where re-installing writes new ones and changes what is
     installed. The write is bounded to that one path, happens only when the administration reads
-    healthy, and never on a finding. Nothing in the repo is touched, in any repo.
+    healthy, and never on a finding. It touches nothing in any repo.
+
+    The siblings are NAMED rather than counted here, on the rule the plugin README's own hooks cell
+    states -- see check-claude-home.ps1's docstring for what counting them cost while this was written.
 
     Matcher note: hooks.json matches "startup|resume|clear|compact", not just "startup" -- a
     SessionStart hook's injected stdout does not survive a compaction by itself, so a startup-only

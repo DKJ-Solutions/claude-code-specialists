@@ -82,15 +82,62 @@ The install records are back (18 records; `dkj-policy` and `dkj-team-alpha` at 4
       caught the shortcut, and it was right to: a script exempted because "this one does not need a
       root" is how that invariant erodes.
 
+#### What the review round changed
+
+Four reviewers ran on the diff in parallel. Three findings were real and are repaired here:
+
+- **Every value printed out of the JSON was raw** (#309/#414's vector). The hook forwards the whole
+  output into session context and counts `[ERROR]` over it, so a record id carrying a bracket could be
+  *counted* and one carrying a newline could forge a line -- in the one check whose premise is that the
+  file may hold whatever a stray script wrote. `Id` now goes through `Format-SuspectToken`,
+  `ProjectPath` and the clone directory through `Format-SafePathToken`, and `$record.Error` through
+  `Format-SafeProseToken`. That last one was missed by the reviewer who found the class and is the
+  widest of the three: `ConvertFrom-Json`'s message **embeds the offending document**, so on an
+  unparseable administration it carried the file's whole raw text.
+- **`Test-PluginMarketplaceSlug` was missing** before the id's marketplace part became a path segment
+  -- the lib's own stated rule, already honoured at this seam by `check-roster-sync` and
+  `check-policy-drift`. A part spelled `..` would have had `Test-Path` probe, and on a hit report as a
+  leftover clone, a directory nowhere near `marketplaces/`.
+- **Two always-on documents still called the hooks read-only** -- `README.md` and
+  `.claude/specialists/SPECIALISTS.md`, the second loaded into every session. My change falsified both;
+  both now state the one exception.
+
+And one finding was wrong in a way worth keeping: the docstring said *"its four siblings all state that
+they change nothing"*, two reviewers returned two different numbers, and **both were wrong** -- eight
+hook files across three plugins carry that line. Counting was the defect; the siblings are now named,
+which is the answer the plugin README's own hooks cell already reached after its count went stale twice
+in two days.
+
+Deliberately **not** done here, with the reason:
+
+- **The double process spawn** every hook in the family pays (~125 ms x 7 per session start) is filed as
+  [#1625](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1625). It predates this branch
+  by six hooks; this one added the seventh instance of an established pattern, and the repair needs each
+  check's `exit` calls refactored into a lib -- a cross-cutting change to every consumer's session start,
+  which does not belong behind a review about `~/.claude`.
+- **The `suite-durations.json` row** for the new suite waits for this branch's first CI run.
+  `record-suite-durations.ps1` takes CI run ids on purpose: a workstation figure read as a CI one is the
+  exact defect it exists to prevent (#1358). A missing row is charged the maximum and self-corrects on
+  the next refresh, so this costs packing accuracy for one run and nothing else.
+- **The snapshot re-reads a file `Get-InstallRecord` already read.** Declared in the code rather than
+  repaired: the alternative is an `-IncludeRaw` switch on a lib five other scripts call, which is more
+  shared API surface than a few-KB re-read costs.
+
 ### TEST
 
-- [x] `scripts/tests/claude-home-gate.tests.ps1` -- 30 asserts. Every case passes `-HomeOverride` into
+- [x] `scripts/tests/claude-home-gate.tests.ps1` -- 36 asserts. Every case passes `-HomeOverride` into
       a fixture tree and `-NoSnapshot` unless the case is about the snapshot: a suite for this check
       that used the real home would be the defect under test, committed.
 - [x] Covered: the finding and its record naming, the leftover clone in both directions, the
       prefix boundary (a sibling whose name merely begins the same way), clean / no-records / fresh /
       unreadable, the snapshot written once and not rewritten, **the snapshot untouched on a finding**,
       a missing administration with a snapshot beside it, the hook's four branches, and mirror parity.
+- [x] Added after review, each closing a branch a regression could have walked back through: the
+      **plural verb** (the singular case cannot tell a correct agreement from a hard-coded `names`),
+      a **forged `[ERROR]` in a record id** and **in the parse message** -- both asserted on the marker
+      COUNT in the output rather than on the sanitizer call, so a refactor that moves the call still
+      has to keep the property -- the **`..` marketplace part** refused by the slug guard, and the
+      unreadable-with-a-snapshot line that was otherwise unreachable.
 - [x] Lint gate green (it caught a missing `shared-scripts:mirror` row, now added). The eleven suites
       the change could touch all pass, including `check-report-lib` (206), `roster-sync` (349) and
       `shared-scripts` (600).

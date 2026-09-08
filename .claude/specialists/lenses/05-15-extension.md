@@ -2078,7 +2078,7 @@ restoring it puts the previous records **back**, where re-installing writes new 
 installed. That distinction is why #1609 was left unrepaired at filing rather than fixed in a minute.
 
 **It is the only session check in the family that WRITES**, and that is a change in kind rather than an
-oversight — its five siblings each state that they change nothing. The write is bounded to one path it
+oversight — every other session check states in as many words that it changes nothing. The write is bounded to one path it
 owns, never happens on a finding, and is switched off by `-NoSnapshot`. It also has no `MeasureArgs` in the
 registry, deliberately: the no-argument form reads the real administration, and a timing harness must not
 write to it as a side effect of measuring.
@@ -2088,6 +2088,33 @@ ordinary state of a machine that has never installed a plugin into a project —
 thing that separates that from a file something deleted, and the verdict turns on it rather than on the
 missing file. Without that the check would cry wolf on every fresh machine and be switched off before it
 ever caught anything.
+
+**Every value it prints out of that JSON file is sanitized, and this check is the place in the tree
+that needed it most.** The hook forwards the whole output into session context and decides how loudly by
+matching `[ERROR]` over it, so an id carrying a newline can forge a line and one carrying a bracket can
+be *counted* — the vector #309 and #414 were filed for. The check's own premise is that this file may
+hold whatever a stray script wrote, and the first draft printed the record fields raw. So `Id` goes
+through `Format-SuspectToken` (the record is the complaint, and a sanitized id shown as clean would hide
+what is wrong with it), `ProjectPath` and the clone directory through `Format-SafePathToken`, and
+**`$record.Error` through `Format-SafeProseToken`** — that last one is the widest of the three and does
+not look like it: `ConvertFrom-Json`'s message **embeds the offending document**, so on an unparseable
+administration it carries the file's whole raw text, and a file that parses would never reach that
+branch.
+
+**The boundary is stated so it is not over-applied: values out of the JSON are sanitized, paths this
+script builds from the environment are not.** `$record.Path` and the snapshot path come from the
+resolved home, and two of the lines printing them are a `Copy-Item` command the reader **pastes** —
+`Format-SafePathToken` truncates at 200 characters with an ellipsis, so sanitizing there would hand
+somebody a command that silently does not work.
+
+**And the sibling hooks are NAMED rather than counted, which this branch proved the hard way.** The
+draft said *"its four siblings all state that they change nothing"*; two reviewers checked that sentence
+and returned two different numbers, four and five, because one counted `dkj-policy`'s hooks and the
+other counted every plugin's. **Both were wrong** — eight hook files across three plugins carry that
+line. It is the same failure the plugin README's own hooks cell already records ("this cell said *two*
+and went stale twice inside two days") and the same answer: name one, count none. Worth keeping because
+the count was wrong in a *docstring*, where no gate looks, and it was load-bearing — it is the sentence
+justifying the write.
 
 **Its suite may never touch the real `~/.claude`, and that is the defect under test rather than a
 courtesy.** [`scripts/tests/claude-home-gate.tests.ps1`](../../../scripts/tests/claude-home-gate.tests.ps1)

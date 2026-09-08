@@ -66,8 +66,16 @@
     trust, and "only ever written from a healthy read" already answers it.
 
     THIS IS THE ONE SESSION CHECK IN THE FAMILY THAT WRITES, and that is a change in kind rather than
-    an oversight -- its four siblings all state that they change nothing. The write is bounded to one
-    path it owns, is skipped entirely on any finding, and is switched off by -NoSnapshot.
+    an oversight -- every other session check in this family states in as many words that it changes
+    nothing (git-identity-sessioncheck.ps1: "Read-only: the hook changes nothing, in any repo"). The
+    write is bounded to one path it owns, is skipped entirely on any finding, and is switched off by
+    -NoSnapshot.
+
+    THE SIBLINGS ARE NAMED RATHER THAN COUNTED, on the rule the plugin README's own hooks cell states:
+    that cell said "two", went stale twice inside two days, and its answer was to stop counting. This
+    sentence proved the rule while being written -- two reviewers checked it and returned two different
+    numbers, four and five, because one counted this plugin's hooks and the other counted every plugin's.
+    Both were wrong: eight hook files across three plugins carry that line today.
 
     ADVISORY, AND IN NO GATE, for the reason check-git-identity gives: the subject is a fact about the
     MACHINE, not about the diff. A CI runner has no plugin administration at all, so a workflow leg
@@ -223,9 +231,16 @@ if (-not $record.Readable) {
     # belongs here because a half-finished write leaves exactly this -- and because every reader
     # downstream treats unreadable as "no evidence of absence" and stays deliberately silent about it
     # (Test-PluginInstalledHere), so without this line nobody says it at all.
+    # THE PARSE ERROR IS THE MOST UNTRUSTED STRING THIS SCRIPT PRINTS, and it does not look like one.
+    # ConvertFrom-Json's message EMBEDS THE OFFENDING DOCUMENT -- measured on a fixture, the message
+    # carried the file's whole raw text, newlines and all -- so echoing it raw into output the hook
+    # forwards into session context is the #309 line-forging vector at its widest: the content is
+    # attacker-shaped by construction, since a file that parses would not be here. Format-SafeProseToken
+    # is the sibling for echoing somebody else's text (#1419): control characters out, brackets
+    # substituted so no marker can FORM, and a note when it had to change anything.
     Write-Host '[ERROR] the plugin administration exists but does not parse:' -ForegroundColor Red
     Write-Host "          file:  $($record.Path)" -ForegroundColor Red
-    Write-Host "          error: $($record.Error)" -ForegroundColor Red
+    Write-Host "          error: $(Format-SafeProseToken -Value $record.Error)" -ForegroundColor Red
     Write-Host '        Until it parses, every check that asks "which plugin version is this checkout running?"' -ForegroundColor Red
     Write-Host '        answers from no evidence and stays silent about having none.' -ForegroundColor Red
     if ($snapshotExists) {
@@ -255,6 +270,11 @@ if ($polluted.Count -eq 0) {
     # report above is the part that matters, and it has already been printed.
     if (-not $NoSnapshot) {
         try {
+            # THIS RE-READS A FILE Get-InstallRecord ALREADY READ, and that is a declared trade rather
+            # than an oversight. It read the same bytes to parse them and discards the raw text, so the
+            # alternative is an -IncludeRaw switch on a lib five other scripts call -- more shared API
+            # surface than a re-read of a few-KB file costs (measured in the low single-digit
+            # milliseconds against a session start already spending hundreds).
             $live = Get-Content -LiteralPath $record.Path -Raw -Encoding UTF8
             $prior = if ($snapshotExists) { Get-Content -LiteralPath $snapshotPath -Raw -Encoding UTF8 } else { $null }
             if ($live -ne $prior) {
@@ -279,6 +299,14 @@ foreach ($id in @($polluted | ForEach-Object { $_.Id } | Select-Object -Unique))
     if ($at -lt 0) { continue }
     $market = ([string]$id).Substring($at + 1)
     if (-not $market) { continue }
+    # THE SLUG GUARD BEFORE THE PATH SEGMENT, which is the lib's own stated rule and what
+    # check-roster-sync and check-policy-drift already do at the same seam. The id comes out of the
+    # JSON file this whole check exists because a stray script can write, so a marketplace part
+    # spelled '..\..\Windows' would otherwise have Test-Path probe -- and on a hit REPORT as a
+    # "leftover clone" -- a directory nowhere near marketplaces/. Join-Path and Test-Path resolve '..'
+    # without complaint. Nothing here deletes, so the cost is a misleading report rather than a lost
+    # directory; the guard is one line and the convention is already established.
+    if (-not (Test-PluginMarketplaceSlug -Marketplace $market)) { continue }
     $dir = Join-Path $marketplaceDir $market
     if (Test-Path -LiteralPath $dir -PathType Container) { $leftoverClones += $dir }
 }
@@ -288,10 +316,17 @@ $totalPlural = if ($allRecords.Count -ne 1) { 's' } else { '' }
 # The verb agrees with the POLLUTED count, not the total: "1 of 2 records names", "2 of 3 records name".
 $pollutedVerb = if ($polluted.Count -eq 1) { 'names' } else { 'name' }
 
+# EVERY VALUE OUT OF THE ADMINISTRATION IS SANITIZED BEFORE IT IS PRINTED (#309, #414). These lines
+# are forwarded verbatim into session context by the hook, which decides how loudly by matching
+# '[ERROR]' over the whole output -- so a record id or projectPath carrying a newline could forge a
+# line, and one carrying a bracket could be COUNTED. This check is the place in the tree that needs
+# that treatment most, its whole premise being that this file may hold content a stray script wrote.
+# The id goes through the SUSPECT form because the record itself is the complaint: a sanitized id shown
+# as clean would hide exactly what is wrong with it.
 Write-Host '[ERROR] a FIXTURE has written into the real plugin administration on this machine:' -ForegroundColor Red
 Write-Host "          file: $($record.Path)" -ForegroundColor Red
 foreach ($p in $polluted) {
-    Write-Host ("          record: {0}  ->  {1}" -f $p.Id, $p.ProjectPath) -ForegroundColor Red
+    Write-Host ("          record: {0}  ->  {1}" -f (Format-SuspectToken -Value $p.Id), (Format-SafePathToken -Value $p.ProjectPath)) -ForegroundColor Red
 }
 Write-Host "        $($polluted.Count) of $($allRecords.Count) record$totalPlural $pollutedVerb a scratch tree, which no checkout does. A record like this is" -ForegroundColor Red
 Write-Host '        invisible to every other check here: the shared reader filters to this repo, and separately' -ForegroundColor Red
