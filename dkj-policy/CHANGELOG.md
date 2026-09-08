@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**24 / 47 minor entries** <!-- pending-tally -->
+**25 / 48 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1650-shape-gate-local · 20260908-182018
+
+The branch document's **shape** rules -- four `###` headings and never a fifth, and nothing
+branch-specific above the first phase -- are one shared function now
+(`Get-DevelopmentShapeFindings`), and `open-pr` refuses on them before the push. They lived only in
+`check-branch-entry.ps1`, which runs in CI and only advisorily, so nothing stopped a malformed document:
+PR #1644 shipped through push, the required check, the merge and the fold with its `### PLAN` heading and
+most of its guidance block gone, every other gate correctly green -- and the fold then deleted the very
+file the one red check named, so the evidence was destroyed by the thing whose success it was warning
+about. CI still reports rather than refuses, from the same code, and `branch-entry` is still not a
+required check.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer gets the same refusal, before the push, on the half of the rule that applies to them: branch
+content in the generic guidance block. The heading-count half stays the source repo's own, so a document
+where they keep a heading of their own is still not refused. Documented as its own gate on the `open-pr`
+skill page and in the portable contributing page, both of which travel with the plugin.
+
+**Score:** 3
+
+#### Pull Request
+
+The branch-document shape rule becomes a shared function and refuses before the push
+
+Plugins: dkj-policy
+
+[PR #1661](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1661)
+
+---
 
 ### DEPLOY: docs/1656-gate-count-readme · 20260908-180529
 
