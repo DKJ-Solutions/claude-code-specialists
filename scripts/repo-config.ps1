@@ -359,10 +359,19 @@ function Get-PrMergeMethod {
 # escape valve, and this repo has scar tissue from findings-list gates (the stale-path check, 124
 # findings, all false).
 #
-# The sanctioned home for machine-local plugin enablement is .claude/settings.local.json, which is
-# gitignored -- so the note points there. #303 (v3.0.7) already documented that
-# `claude plugin install --scope project` writes enabledPlugins into the tracked settings.json; this
-# is the gate side of the same class.
+# The sanctioned home for a MACHINE'S OWN enablement is .claude/settings.local.json, which is
+# gitignored -- so the note points there, for that case and no other. #303 (v3.0.7) already
+# documented that `claude plugin install --scope project` writes enabledPlugins into the tracked
+# settings.json; this is the gate side of the same class.
+#
+# BUT THE FILE ITSELF IS NOT MACHINE-LOCAL, and the note must not read as though it were (#1574).
+# What settings.json declares is a shared, tracked answer every clone inherits, so a branch whose
+# subject IS that declaration -- a plugin added to the enabled set, one turned off -- is the happy
+# path, and this gate fires on it: measured on PR #1573, whose entire subject was that change. So the
+# note states BOTH cases and prescribes the move only for the clone's own edit. Wrong advice on the
+# intended path is how an advisory note gets scrolled past, and it is then scrolled past on the day it
+# is right -- the failure the neighbouring Shopify floor check argues against in its own .DESCRIPTION
+# ("a check that goes quiet for the right-looking reason is worse than one that speaks").
 #
 # OPTIONAL and probed with Get-Command, following Get-PrAssignee / Get-PrDescriptionPlaceholder
 # rather than the script contract: absent or an empty return means "nothing is machine-local here"
