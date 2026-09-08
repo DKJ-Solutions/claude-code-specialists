@@ -301,6 +301,34 @@ instead — a lane is detached at `origin/<trunk>`, so it is unaffected by where
 stand. **Both arms keep the two clauses that are true either way** — step 1 is over, the tree is free —
 because withdrawing those along with the trunk clause would cancel the invitation the line exists to make.
 
+**And a ship that does not survive the wait can be resumed from the checkout it left behind**
+([#1620](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1620)). The hand-back has a
+price, and this is it: for the whole CI wait — the longest step in the run — `HEAD` says `main` while the
+branch's merge and fold are still owed, so re-running `ship-pr` from that checkout met
+`You are on main; ship-pr runs from a branch`, a refusal about the wrong problem. Measured on
+[PR #1618](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1618), September 8, 2026, where the
+backgrounded process was killed by the host for low memory; `git checkout <branch>` and the same command
+resumed correctly, `open-pr` skipping the create for the PR that already existed. **Nothing was ever at
+risk** — both merge gates read `refs/heads/<branch>` ([#970](https://github.com/DKJ-Solutions/claude-code-specialists/issues/970)) — what was lost was the operator knowing what to do.
+
+**The front door now diagnoses instead of restating the rule.** Standing on the trunk is still refused, and
+the sentence is unchanged; under it, where an open PR's head branch is a branch **this checkout has**, the
+refusal names the PR, the branch and the `git checkout` that resumes the ship. The pair is the whole signal
+and the local half is what keeps it quiet: measured in the source repo the day it was written, 26 local
+branches against 1 open PR whose head ref was not here — so the answer was *no candidate*, with 25 merged
+leftovers producing no noise at all. `Get-InterruptedShipCandidates` decides and
+`Get-InterruptedShipResumeNote` words it, both in `pr-issues-lib.ps1` and both asserted in
+`pr-issues.tests.ps1` — the same decision/wording split, for the same reason, as the go-ahead line above.
+It is **best-effort**: two reads, neither load-bearing, so a `gh` that cannot answer leaves the refusal
+exactly as it has always been. And it prescribes no `-SkipLint`/`-SkipTests`: a resume re-runs the local
+gate against a commit CI is already testing, and whether that should be skipped by default is a separate
+question this remedy deliberately does not answer for you.
+
+**Why #1588's repair does not cover this**, since both are the same message from the same root cause. That
+one put the checkout at the head of the *stale-CI refusal's* printed remedy, which reaches a run that gets
+as far as printing one. An interrupted process prints nothing — no refusal, no remedy, no next line — and a
+kill usually takes the scrollback with it, which is why the state had to be recognised at the front door
+rather than described in a message the operator never sees.
 
 **Working in the primary anyway used to cost you your checkout, and no longer does.** Step 5 ran
 `git checkout main` in the tree the script was started from, unconditionally, one line after the merge.
