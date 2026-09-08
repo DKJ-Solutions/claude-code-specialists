@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 13 minor entries** <!-- pending-tally -->
+**8 / 14 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1587-staleness-source-of-truth · 20260908-093101
+
+`dkj-policy/README.md`'s staleness paragraph claimed a connector manifest "carries the version its
+record was last seen on." No manifest field has ever stored a version — that bookkeeping was removed
+by decision on July 20, 2026 (see [`connectors/README.md`](../connectors/README.md#the-manifest-format))
+— and the actual mechanism reads the version installed on that machine from its own
+`installed_plugins.json` record and compares it to the source checkout's `plugin.json`; the register's
+only part in that is `localCheckout`, i.e. which machine record to read. The rewritten paragraph keeps
+what was true (`connector-sessioncheck` still reports every lagging consumer at session start, and
+`check-connectors.ps1` is still the deliberate full run, because the lagging checkout itself reports a
+plausible version and works) and adds the case the old wording missed: with no verified source checkout
+on the machine, the check is skipped outright, so silence there is not "up to date" — it is no verdict
+at all. No other passage in the file rested on the same false premise.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this corrects one paragraph's wording about an internal maintenance mechanism (the connector
+register and the staleness check). No subscriber of a service reaches this page or is affected by
+whether the mechanism is described accurately.
+
+**Score:** N/A
+
+#### Pull Request
+
+Describe the plugin-staleness mechanism as it actually works
+
+[PR #1590](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1590)
+
+---
 
 ### DEPLOY: fix/1566-truncated-plugin-links · 20260908-092431
 
