@@ -46,11 +46,15 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\sync-main.ps1'
 
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1622, moved to a shared source by #1635. This
+# file is where the rule was first written, inline; sixteen sibling suites turned out to need the same
+# forty lines, so the counter, the printer and the summary now live in one place and this suite reads
+# them like every other. See the lib for why an unjudged fixture command is worse than an unjudged
+# production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
+
 $script:pass = 0
 $script:fail = 0
-# EVERY FIXTURE git CALL THAT FAILED (issue #1622). Counted rather than thrown on -- see Invoke-Git for
-# why -- and read by the summary at the foot of this file, which is where it changes what the run MEANS.
-$script:fixtureGitFailures = 0
 $script:trees = @()
 
 function Assert-True {
@@ -91,18 +95,17 @@ function Invoke-Git {
         already makes: under Windows PowerShell 5.1 that wraps each stderr line in an ErrorRecord, which
         is harmless at EAP=Continue and is why the redirect is inside the try. `$LASTEXITCODE` is
         unaffected by it -- it is `$?` that the wrapping disturbs, and nothing here reads `$?`.
+
+        THE JUDGING ITSELF NOW COMES FROM scripts/lib/fixture-git-lib.ps1 (issue #1635). It was written
+        inline here first, and then sixteen sibling suites needed the same forty lines -- so the verdict,
+        the counter and the printed block moved to one source and this function kept its own signature.
+        Everything above still describes what happens; only the place it is implemented changed.
     #>
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
         $out = & git @args 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $script:fixtureGitFailures++
-            Write-Host "  [FIXTURE GIT FAILED] exit $LASTEXITCODE -- git $($args -join ' ')" -ForegroundColor Magenta
-            foreach ($line in (($out | Out-String) -split "`r?`n")) {
-                if ("$line".Trim()) { Write-Host "      $line" -ForegroundColor Magenta }
-            }
-        }
+        Assert-FixtureGitOk -Code $LASTEXITCODE -GitArgs @($args | ForEach-Object { "$_" }) -Output $out
     } finally { $ErrorActionPreference = $prevEap }
 }
 
@@ -674,6 +677,34 @@ try {
     # to go looking for, and a path-shaped note here would be the wrong answer rather than a wording nit.
     Assert-True ($evil.Out -match [regex]::Escape('The branch name is: sync/live-2026-08-17;touch')) 'guard/unsafe: and names the real branch as PROSE, so the reader can still act on it'
 
+    # THE #821 CLASS AT THE PREDECESSOR READ (issue #1629), which is the one read that never had this pin.
+    # The accented path further up pins it at the ls-tree/mirror comparison; this read is the one that
+    # decides SUPERSESSION, and it asked git for the predecessor's file set with no core.quotePath of its
+    # own. git quotes a path with a byte above 0x7F by default, so that side arrived as
+    # '"sections/caf\303\251.liquid"' while the take set holds the decoded string from the mirror walk --
+    # no match, and a branch this run covers exactly reported as independent.
+    #
+    # THE WRONG ANSWER IS THE EXPENSIVE DIRECTION. 'all of them in this run' tells the operator to close
+    # that PR; 'NOT in this run' tells them both branches are needed. So the defect kept a redundant sync
+    # PR alive and told the operator the two were unrelated -- while naming a path that IS in the run.
+    # Its own accented name rather than the one above, so this case does not depend on that block's order.
+    $predAccented = 'sections/pr' + [char]0x00E9 + 'd' + [char]0x00E9 + 'cesseur.liquid'
+    $qpRepo = New-Consumer -Label 'guard-qp' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $qpRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Add-PredecessorBranch -Dir $qpRepo -Name 'sync/live-2026-08-18' -Files @{ $predAccented = 'a third party wrote this' }
+    $qpMirror = New-Mirror -Label 'guard-qp' -Files @{
+        'sections/theme.liquid'     = 'v1'
+        'sections/unrelated.liquid' = 'u1'
+    }
+    Set-FixtureFile -Root $qpMirror -Rel $predAccented -Value 'a third party wrote this'
+    $qp = Invoke-Sync -Dir $qpRepo -Mirror $qpMirror -Extra @('-DryRun')
+    Assert-True ($qp.Out -match 'all of them in this run') 'guard/quotepath: an accented path the predecessor captured is recognised in this run'
+    Assert-True ($qp.Out -notmatch 'NOT in this run') 'guard/quotepath: so the branch is not reported as independent when this run supersedes it'
+    Assert-True ($qp.Out -match 'close that PR') 'guard/quotepath: and the operator is told the action, which the wrong verdict withheld'
+    # THE QUOTED FORM MUST NOT REACH THE REPORT EITHER: an octal escape printed at the operator is the
+    # same wrong answer wearing a different face, and it is what a fix that only decoded HALF would leave.
+    Assert-True ($qp.Out -notmatch [regex]::Escape('\303\251')) 'guard/quotepath: no C-quoted octal escape is printed anywhere in the verdict'
+
     # A MERGED BRANCH IS NOT A PREDECESSOR. Its ref lingers here because the fixture has no
     # delete_branch_on_merge, which is exactly the consumer this script must not refuse forever.
     $mergedRepo = New-Consumer -Label 'guard-merged' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
@@ -945,12 +976,10 @@ Write-Host ''
 # default, because a red suite normally means the script regressed. Printed even when every assert
 # passed: a fixture that half-built and still went green is a case this suite is not testing, and the
 # reader should know which run they are looking at.
-if ($script:fixtureGitFailures -gt 0) {
-    Write-Host "FIXTURE: $($script:fixtureGitFailures) git command(s) FAILED while building this run's repos -- see the [FIXTURE GIT FAILED] lines above." -ForegroundColor Magenta
-    Write-Host "         Whatever the asserts say below, they are not a verdict on sync-main.ps1: some of them read a repo that was never built." -ForegroundColor Magenta
-    Write-Host "         Under the parallel test gate this is the shape to expect from contention (issue #1622) -- re-run the suite on its own before reading anything into it." -ForegroundColor Magenta
-    Write-Host ''
-}
+#
+# THE BLOCK ITSELF IS NOW Write-FixtureGitSummary's (issue #1635) -- same text, same reasoning, one
+# source, shared with the sixteen sibling suites that turned out to need it.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'sync-main.ps1'
 if ($script:fail -gt 0) {
     Write-Host "FAILED: $($script:fail) of $($script:pass + $script:fail) asserts." -ForegroundColor Red
     exit 1
@@ -958,8 +987,8 @@ if ($script:fail -gt 0) {
 # A CLEAN SWEEP OF ASSERTS OVER A BROKEN FIXTURE IS NOT A PASS. Nothing above would have caught it: the
 # count is the only thing that knows, so it is what decides the exit code here rather than a green run
 # quietly certifying a suite that never ran what it claims to.
-if ($script:fixtureGitFailures -gt 0) {
-    Write-Host "FAILED: every assert passed, but $($script:fixtureGitFailures) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

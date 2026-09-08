@@ -28,6 +28,10 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
+
 # Every lib park-cycle.ps1 dot-sources $PSScriptRoot-relative. A fixture missing one has no script at
 # all, so they are named here rather than globbed: a lib that is added to the script and forgotten here
 # must fail loudly in this suite, not be silently supplied by a wildcard.
@@ -180,20 +184,20 @@ function New-Fixture {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $dir init -q 2>$null | Out-Null
-        & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
-        & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir init -q
+        Invoke-FixtureGitIn $dir config user.email 'tycho-tests@local.invalid'
+        Invoke-FixtureGitIn $dir config user.name 'Tycho Tests'
         # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir config commit.gpgsign false
         # symbolic-ref rather than checkout -b: works on a still-unborn HEAD whatever git's own
         # init.defaultBranch says. Same reasoning as park-branch.tests.ps1.
-        & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir symbolic-ref HEAD refs/heads/main
         [System.IO.File]::WriteAllText((Join-Path $dir 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
-        & git -C $dir add -A 2>$null | Out-Null
-        & git -C $dir commit -q -m 'init' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir add -A
+        Invoke-FixtureGitIn $dir commit -q -m 'init'
         if (-not $NoOrigin) {
-            & git init --bare -q $bareRemote 2>$null | Out-Null
-            & git -C $dir remote add origin $bareRemote 2>$null | Out-Null
+            Invoke-FixtureGitJudged @('init', '--bare', '-q', $bareRemote)
+            Invoke-FixtureGitIn $dir remote add origin $bareRemote
         }
     } finally { $ErrorActionPreference = $prevEap }
 
@@ -292,7 +296,10 @@ function Test-RefOnRemote {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $Bare rev-parse --verify --quiet $Ref 2>$null | Out-Null
+        # NOT judged, and deliberately not Invoke-FixtureGitIn (issue #1635): this is a QUESTION rather
+        # than a fixture mutation. A missing ref is the answer the caller asked for and exit 1 is how git
+        # gives it, so counting it as a broken fixture would report every negative case as a defect.
+        & git -C $Bare rev-parse --verify --quiet $Ref | Out-Null
         return ($LASTEXITCODE -eq 0)
     } finally { $ErrorActionPreference = $prevEap }
 }
@@ -300,7 +307,7 @@ function Test-RefOnRemote {
 function Switch-ToBranch {
     param([Parameter(Mandatory = $true)][string]$Dir, [Parameter(Mandatory = $true)][string]$Name)
     $prevEap = $ErrorActionPreference
-    try { $ErrorActionPreference = 'Continue'; & git -C $Dir checkout -q -b $Name 2>$null | Out-Null }
+    try { $ErrorActionPreference = 'Continue'; Invoke-FixtureGitIn $Dir checkout -q -b $Name }
     finally { $ErrorActionPreference = $prevEap }
 }
 
@@ -505,8 +512,8 @@ try {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixK add -- $relK 2>$null | Out-Null
-        & git -C $fixK commit -q -m 'cycle by hand' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixK add -- $relK
+        Invoke-FixtureGitIn $fixK commit -q -m 'cycle by hand'
     } finally { $ErrorActionPreference = $prevEap }
 
     $rK = Invoke-ParkCycle -Dir $fixK
@@ -596,11 +603,11 @@ try {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixO add -- $relO 2>$null | Out-Null
-        & git -C $fixO commit -q -m 'cycle by hand' 2>$null | Out-Null
-        & git -C $fixO push -q -u origin 'fix/diverged-v1' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixO add -- $relO
+        Invoke-FixtureGitIn $fixO commit -q -m 'cycle by hand'
+        Invoke-FixtureGitIn $fixO push -q -u origin 'fix/diverged-v1'
         # Rewrite the tip origin already has: local and origin now share no descendant line.
-        & git -C $fixO commit -q --amend -m 'cycle by hand (rewritten)' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixO commit -q --amend -m 'cycle by hand (rewritten)'
     } finally { $ErrorActionPreference = $prevEap }
 
     $rO = Invoke-ParkCycle -Dir $fixO
@@ -632,20 +639,20 @@ try {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixP add -- $relP 2>$null | Out-Null
-        & git -C $fixP commit -q -m 'the handoff note' 2>$null | Out-Null
-        & git -C $fixP push -q -u origin 'feat/two-sessions-v1' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixP add -- $relP
+        Invoke-FixtureGitIn $fixP commit -q -m 'the handoff note'
+        Invoke-FixtureGitIn $fixP push -q -u origin 'feat/two-sessions-v1'
 
         # The other session: its own clone, its own identity, its own park on the shared branch.
-        & git clone -q "$fixP.git" $peerP 2>$null | Out-Null
-        & git -C $peerP config user.email 'other@local.invalid' 2>$null | Out-Null
-        & git -C $peerP config user.name 'Other Session' 2>$null | Out-Null
-        & git -C $peerP config commit.gpgsign false 2>$null | Out-Null
-        & git -C $peerP checkout -q 'feat/two-sessions-v1' 2>$null | Out-Null
+        Invoke-FixtureGitJudged @('clone', '-q', "$fixP.git", $peerP)
+        Invoke-FixtureGitIn $peerP config user.email 'other@local.invalid'
+        Invoke-FixtureGitIn $peerP config user.name 'Other Session'
+        Invoke-FixtureGitIn $peerP config commit.gpgsign false
+        Invoke-FixtureGitIn $peerP checkout -q 'feat/two-sessions-v1'
         Add-Content -LiteralPath (Join-Path $peerP ($relP -replace '/', '\')) -Value 'their round'
-        & git -C $peerP add -A 2>$null | Out-Null
-        & git -C $peerP commit -q -m 'park: feat/two-sessions-v1 (all outstanding work)' 2>$null | Out-Null
-        & git -C $peerP push -q origin 'feat/two-sessions-v1' 2>$null | Out-Null
+        Invoke-FixtureGitIn $peerP add -A
+        Invoke-FixtureGitIn $peerP commit -q -m 'park: feat/two-sessions-v1 (all outstanding work)'
+        Invoke-FixtureGitIn $peerP push -q origin 'feat/two-sessions-v1'
 
         # This session edits its own copy and the turn ends -- the state the Stop hook fires in.
         Add-Content -LiteralPath (Join-Path $fixP ($relP -replace '/', '\')) -Value 'our round'
@@ -677,8 +684,15 @@ try {
 }
 
 Write-Host ""
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'park-cycle.ps1'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

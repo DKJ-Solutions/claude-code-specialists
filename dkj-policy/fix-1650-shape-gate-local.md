@@ -58,6 +58,21 @@ number that goes stale on every added gate reads as authority. What is **not** r
 missing documentation: it has no section in `dkj-policy/CONTRIBUTING.md` and none on the `open-pr` skill
 page, which is a doc gap of its own and filed as such.
 
+#### The #1656 collision, and what it cost
+
+Nolan filed [#1656](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1656) during the review
+of this branch, for a stale gate count in `plugins/dkj-policy/README.md` that this branch had **already**
+repaired. Another session picked it up and shipped it as PR #1658 while this branch was still in review, so
+`main` and this branch changed the same sentence in two different wordings and the merge conflicted on it.
+**Theirs stands** -- they own the issue, and the wording is equivalent. Nothing was lost and nothing needed
+arguing about; the branch simply carries one fewer repair than its plan above says, and `Closes #1656` came
+off this PR's body because #1658 closed it.
+
+**The lesson is about where a reviewer's finding goes**, not about the collision. A subagent reviewing a
+branch that already fixes something should hand the finding back rather than file it: the tracker is what
+two sessions share, so a filed issue is an invitation for somebody else to build what is already built.
+The claim rule cannot help here -- #1658's session claimed correctly, and the duplicate was in the filing.
+
 #### The one cost this change accepts rather than repairs
 
 `Test-IsWorkflowSourceRepo` is now evaluated on every run of both callers, where the inline code reached it

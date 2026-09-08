@@ -27,6 +27,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot         = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $NewBranchSrc     = Join-Path $RepoRoot 'scripts\task\new-branch.ps1'
 $BranchInfoSrc    = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # new-branch -Park dot-sources this sibling shared lib for its git push (the #107 stderr guard),
@@ -222,17 +226,17 @@ function New-Fixture {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $dir init -q 2>$null | Out-Null
-        & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
-        & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir init -q
+        Invoke-FixtureGitIn $dir config user.email 'tycho-tests@local.invalid'
+        Invoke-FixtureGitIn $dir config user.name 'Tycho Tests'
         # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir config commit.gpgsign false
         # symbolic-ref instead of checkout -b: works on a still-unborn HEAD regardless of git's own
         # init.defaultBranch setting, and gives no error if HEAD happens to already be named 'main'.
-        & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir symbolic-ref HEAD refs/heads/main
         [System.IO.File]::WriteAllText((Join-Path $dir 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
-        & git -C $dir add -A 2>$null | Out-Null
-        & git -C $dir commit -q -m 'init' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir add -A
+        Invoke-FixtureGitIn $dir commit -q -m 'init'
     } finally {
         $ErrorActionPreference = $prevEap
     }
@@ -256,8 +260,8 @@ function New-BareOrigin {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git init --bare -q $bare 2>$null | Out-Null
-        & git -C $Dir remote add origin $bare 2>$null | Out-Null
+        Invoke-FixtureGitJudged @('init', '--bare', '-q', $bare)
+        Invoke-FixtureGitIn $Dir remote add origin $bare
     } finally { $ErrorActionPreference = $prevEap }
     return $bare
 }
@@ -290,7 +294,7 @@ function Publish-FixtureTrunk {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $Dir push -u -q origin main 2>$null | Out-Null
+        Invoke-FixtureGitIn $Dir push -u -q origin main
     } finally { $ErrorActionPreference = $prevEap }
 }
 
@@ -320,17 +324,17 @@ function Add-OriginCommits {
         # on an UNBORN 'master': the three commits below go there, `push origin main` fails with
         # "src refspec main does not match any", and the fixture reads 0 behind -- a green-looking helper
         # that proves nothing. Same literal trunk name as New-Fixture, for the same reason.
-        & git clone -q --branch main $Bare $clone 2>$null | Out-Null
-        & git -C $clone config user.email 'other-session@local.invalid' 2>$null | Out-Null
-        & git -C $clone config user.name 'Other Session' 2>$null | Out-Null
+        Invoke-FixtureGitJudged @('clone', '-q', '--branch', 'main', $Bare, $clone)
+        Invoke-FixtureGitIn $clone config user.email 'other-session@local.invalid'
+        Invoke-FixtureGitIn $clone config user.name 'Other Session'
         # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-        & git -C $clone config commit.gpgsign false 2>$null | Out-Null
+        Invoke-FixtureGitIn $clone config commit.gpgsign false
         for ($i = 1; $i -le $Count; $i++) {
             [System.IO.File]::WriteAllText((Join-Path $clone "upstream-$i.txt"), "$i`n", (New-Object System.Text.UTF8Encoding $false))
-            & git -C $clone add -A 2>$null | Out-Null
-            & git -C $clone commit -q -m "upstream $i" 2>$null | Out-Null
+            Invoke-FixtureGitIn $clone add -A
+            Invoke-FixtureGitIn $clone commit -q -m "upstream $i"
         }
-        & git -C $clone push -q origin main 2>$null | Out-Null
+        Invoke-FixtureGitIn $clone push -q origin main
     } finally { $ErrorActionPreference = $prevEap }
 }
 
@@ -359,16 +363,16 @@ function Add-OriginBranch {
         $ErrorActionPreference = 'Continue'
         # --branch main for the reason spelled out in Add-OriginCommits: a bare repo's HEAD points at
         # refs/heads/master and only 'main' was ever pushed, so a plain clone lands on an unborn branch.
-        & git clone -q --branch main $Bare $clone 2>$null | Out-Null
-        & git -C $clone config user.email 'other-device@local.invalid' 2>$null | Out-Null
-        & git -C $clone config user.name 'Other Device' 2>$null | Out-Null
+        Invoke-FixtureGitJudged @('clone', '-q', '--branch', 'main', $Bare, $clone)
+        Invoke-FixtureGitIn $clone config user.email 'other-device@local.invalid'
+        Invoke-FixtureGitIn $clone config user.name 'Other Device'
         # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-        & git -C $clone config commit.gpgsign false 2>$null | Out-Null
-        & git -C $clone checkout -q -b $Branch 2>$null | Out-Null
+        Invoke-FixtureGitIn $clone config commit.gpgsign false
+        Invoke-FixtureGitIn $clone checkout -q -b $Branch
         [System.IO.File]::WriteAllText((Join-Path $clone $MarkerFile), "parked elsewhere`n", (New-Object System.Text.UTF8Encoding $false))
-        & git -C $clone add -A 2>$null | Out-Null
-        & git -C $clone commit -q -m "work parked on the other device" 2>$null | Out-Null
-        & git -C $clone push -q origin $Branch 2>$null | Out-Null
+        Invoke-FixtureGitIn $clone add -A
+        Invoke-FixtureGitIn $clone commit -q -m "work parked on the other device"
+        Invoke-FixtureGitIn $clone push -q origin $Branch
     } finally { $ErrorActionPreference = $prevEap }
 }
 function Add-OriginBranchCommits {
@@ -403,15 +407,15 @@ function Add-OriginBranchCommits {
         # --branch $Branch, not 'main': this clone exists to extend THAT branch, and the reasoning in
         # Add-OriginCommits about a bare repo's HEAD applies just as much -- a plain clone would land on
         # an unborn 'master' and the push below would fail into a green-looking helper that proves nothing.
-        & git clone -q --branch $Branch $Bare $clone 2>$null | Out-Null
-        & git -C $clone config user.email 'other-session@local.invalid' 2>$null | Out-Null
-        & git -C $clone config user.name $Author 2>$null | Out-Null
+        Invoke-FixtureGitJudged @('clone', '-q', '--branch', $Branch, $Bare, $clone)
+        Invoke-FixtureGitIn $clone config user.email 'other-session@local.invalid'
+        Invoke-FixtureGitIn $clone config user.name $Author
         # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-        & git -C $clone config commit.gpgsign false 2>$null | Out-Null
+        Invoke-FixtureGitIn $clone config commit.gpgsign false
         [System.IO.File]::WriteAllText((Join-Path $clone $MarkerFile), "built by the other session`n", (New-Object System.Text.UTF8Encoding $false))
-        & git -C $clone add -A 2>$null | Out-Null
-        & git -C $clone commit -q -m $Subject 2>$null | Out-Null
-        & git -C $clone push -q origin $Branch 2>$null | Out-Null
+        Invoke-FixtureGitIn $clone add -A
+        Invoke-FixtureGitIn $clone commit -q -m $Subject
+        Invoke-FixtureGitIn $clone push -q origin $Branch
     } finally { $ErrorActionPreference = $prevEap }
 }
 function Test-BranchOnRemote {
@@ -424,7 +428,10 @@ function Test-BranchOnRemote {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $Bare rev-parse --verify --quiet $Ref 2>$null | Out-Null
+        # NOT judged, and deliberately not Invoke-FixtureGitIn (issue #1635): this is a QUESTION rather
+        # than a fixture mutation. A missing ref is the answer the caller asked for and exit 1 is how git
+        # gives it, so counting it as a broken fixture would report every negative case as a defect.
+        & git -C $Bare rev-parse --verify --quiet $Ref | Out-Null
         return ($LASTEXITCODE -eq 0)
     } finally { $ErrorActionPreference = $prevEap }
 }
@@ -887,7 +894,7 @@ try {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixtureI add -- 'stray.txt' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixtureI add -- 'stray.txt'
     } finally {
         $ErrorActionPreference = $prevEap
     }
@@ -1083,8 +1090,8 @@ Write-Output `$t.Type
     $prevEapM = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixtureM add -A 2>$null | Out-Null
-        & git -C $fixtureM commit -q -m 'parent entry' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixtureM add -A
+        Invoke-FixtureGitIn $fixtureM commit -q -m 'parent entry'
     } finally { $ErrorActionPreference = $prevEapM }
 
     $rM2 = Invoke-NewBranch -Dir $fixtureM -Name 'feat/child-v1' -Title 'The stacked child branch'
@@ -1201,8 +1208,8 @@ Write-Output `$t.Type
         $prevEap = $ErrorActionPreference
         try {
             $ErrorActionPreference = 'Continue'
-            & git -C $fx add -A 2>$null | Out-Null
-            & git -C $fx commit -q -m 'move document onto the legacy name' 2>$null | Out-Null
+            Invoke-FixtureGitIn $fx add -A
+            Invoke-FixtureGitIn $fx commit -q -m 'move document onto the legacy name'
         } finally { $ErrorActionPreference = $prevEap }
         Assert-Equal $case.Branch (Get-BranchFileDeclaredBranch -Text $docText) "$($case.Label): the moved document still declares its branch"
 
@@ -1457,7 +1464,7 @@ Write-Output `$t.Type
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixResume checkout -q main 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixResume checkout -q main
     } finally { $ErrorActionPreference = $prevEap }
 
     # NO VALVE ON THIS ONE, DELIBERATELY, and it is the assert #1417 rests on. The trunk under this run
@@ -1502,7 +1509,7 @@ Write-Output `$t.Type
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixAhead checkout -q main 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixAhead checkout -q main
     } finally { $ErrorActionPreference = $prevEap }
 
     $rY1b = Invoke-NewBranch -Dir $fixAhead -Name 'feat/dup-1439-v1' -Title 'Duplicated branch'
@@ -1601,7 +1608,7 @@ Write-Output `$t.Type
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixEvil checkout -q main 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixEvil checkout -q main
     } finally { $ErrorActionPreference = $prevEap }
 
     $rY5b = Invoke-NewBranch -Dir $fixEvil -Name 'feat/evil-tip-1439-v1' -Title 'Evil tip'
@@ -1649,7 +1656,7 @@ Write-Output `$t.Type
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixLong checkout -q main 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixLong checkout -q main
     } finally { $ErrorActionPreference = $prevEap }
     $rY6b = Invoke-NewBranch -Dir $fixLong -Name 'feat/long-tip-1439-v1' -Title 'Long tip'
     Assert-True (-not (Test-Phrase -Text $rY6b.Out -Phrase ('x' * 200))) 'capped tip: the 400-character subject does not reach the output whole'
@@ -1822,8 +1829,15 @@ exit 1
 }
 
 Write-Host ""
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'new-branch.ps1'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

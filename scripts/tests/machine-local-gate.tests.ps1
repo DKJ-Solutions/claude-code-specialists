@@ -22,6 +22,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $LibPath  = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 
 $script:pass = 0
@@ -90,20 +94,20 @@ function New-GitFixture {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $dir init -q 2>$null | Out-Null
-        & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
-        & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
-        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
-        & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir init -q
+        Invoke-FixtureGitIn $dir config user.email 'tycho-tests@local.invalid'
+        Invoke-FixtureGitIn $dir config user.name 'Tycho Tests'
+        Invoke-FixtureGitIn $dir config commit.gpgsign false
+        Invoke-FixtureGitIn $dir symbolic-ref HEAD refs/heads/main
         New-Item -ItemType Directory -Path (Join-Path $dir '.claude') -Force | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $dir 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
         [System.IO.File]::WriteAllText((Join-Path $dir '.claude/settings.json'), "{`n}`n", (New-Object System.Text.UTF8Encoding $false))
-        & git -C $dir add -A 2>$null | Out-Null
-        & git -C $dir commit -q -m 'init' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir add -A
+        Invoke-FixtureGitIn $dir commit -q -m 'init'
         if (-not $NoOrigin) {
-            & git init --bare -q $bareRemote 2>$null | Out-Null
-            & git -C $dir remote add origin $bareRemote 2>$null | Out-Null
-            & git -C $dir push -q -u origin main 2>$null | Out-Null
+            Invoke-FixtureGitJudged @('init', '--bare', '-q', $bareRemote)
+            Invoke-FixtureGitIn $dir remote add origin $bareRemote
+            Invoke-FixtureGitIn $dir push -q -u origin main
         }
     } finally { $ErrorActionPreference = $prevEap }
     $script:gitFixtures += $dir
@@ -113,8 +117,14 @@ function New-GitFixture {
 function Invoke-GitQuiet {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
     $prevEap = $ErrorActionPreference
-    try { $ErrorActionPreference = 'Continue'; & git @Arguments 2>$null | Out-Null }
-    finally { $ErrorActionPreference = $prevEap }
+    try {
+        $ErrorActionPreference = 'Continue'
+        # THE EXIT CODE IS READ, NOT DISCARDED (issue #1635). It went to Out-Null with the output, so a
+        # failed fixture command was indistinguishable from a working one -- and a repo that half-built
+        # is plausible rather than correct, which makes every assert below it measure the wrong thing.
+        $out = & git @Arguments 2>&1
+        Assert-FixtureGitOk -Code $LASTEXITCODE -GitArgs @($Arguments) -Output $out
+    } finally { $ErrorActionPreference = $prevEap }
 }
 function Get-GitOutput {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
@@ -234,8 +244,15 @@ Assert-True ($openPr.IndexOf('machine-local path gate:') -lt $openPr.IndexOf('sc
 Assert-True ($openPr.IndexOf('machine-local path gate:') -lt $openPr.IndexOf("'push', '-u', 'origin'")) 'and before the push'
 
 Write-Host ''
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'park-lib.ps1 (the machine-local gate)'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green
