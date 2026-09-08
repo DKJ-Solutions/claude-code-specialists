@@ -36,7 +36,7 @@
 Issue #1575: `prune-merged.ps1` refused a dirty working tree unconditionally, on the stated ground of
 stepping off the branch you are standing on -- a step (4c) that is unreachable when HEAD is the trunk,
 when HEAD is detached, or under `-DryRun`. Verified in the source before repairing: the guard sits at
-step 1 and never consults the HEAD it read two lines earlier, and the candidate list is `refs/heads`
+step 1 and never consults the HEAD it read earlier in that same pre-flight block, and the candidate list is `refs/heads`
 minus the trunk, so 4c can only ever match a non-trunk branch.
 
 #### One correction to the report
