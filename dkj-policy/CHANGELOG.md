@@ -43,7 +43,107 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 5 minor entries** <!-- pending-tally -->
+**5 / 8 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1570-shopify-floor-no-store-seam · 20260908-084027
+
+The Shopify floor session check gains a third state. A repo that enables `dkj-team-shopify` without a
+store -- the plugin's own source repo, or any repo that turns the team on only to validate its
+manifests and hooks -- can now answer `Get-ShopifyRepoHasNoStore` with `$true` in its
+`scripts/repo-config.ps1`, and the check then stays silent on the half-armed live-theme finding
+instead of raising a permanent `[ERROR]` it has no truthful way to clear. The silence follows a
+deliberate, self-authored declaration only -- never an inference from the tree -- so no real store is
+ever quieted by it, and the guard hook, every other seam and the independent duplicate-guard finding
+are unchanged.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer that enables `dkj-team-shopify` purely to check that its manifests and hooks still resolve,
+without owning a store, gets a clean session start instead of a standing `[ERROR]` or a faked theme
+id. Store consumers -- the common case -- see nothing change.
+
+**Score:** 2
+
+#### Pull Request
+
+let a repo declare it has no Shopify store, so the floor check stops the permanent [ERROR]
+
+Plugins: dkj-team-shopify
+
+[PR #1578](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1578)
+
+---
+
+### DEPLOY: fix/1574-machine-local-remedy-wording · 20260908-083227
+
+The machine-local path gate stops giving wrong advice on the path it fires on. It warns whenever a
+branch's commits touch a tracked file that usually belongs to a clone -- `.claude/settings.json` here
+-- and its remedy sentence said, flatly, to drop the change from the branch because "machine-local
+plugin enablement belongs in `.claude/settings.local.json`". That is right for a machine's own extra
+enable, which is the sweep the gate was built for (#1557), and wrong for the other case the same file
+carries: a branch whose subject IS the declared, tracked set every clone inherits. Measured on PR
+#1573, where the gate fired on a branch that existed to change exactly that. The note now names both
+cases and prescribes the move only for the clone's own edit; the seam comment in `repo-config.ps1`
+records which half of the advice belongs where, and the suite asserts it. Nothing about when the gate
+fires changed, and it still only warns -- what changed is that the sentence a reader acts on is true on
+both paths. The cost of leaving it was not a broken branch but a decaying reader: a warning that
+misfires advice on the intended happy path is one that gets scrolled past, and it is then scrolled past
+on the day it is right.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The note is emitted by a shared script that travels in the plugin mirror, so every consumer running
+`open-pr` reads this text. A consumer branch that legitimately changes its own shared harness settings
+now gets advice it can follow instead of being told to move the change somewhere gitignored. Small --
+it is three sentences on a rare path -- but it is advice the reader was previously right to ignore.
+
+**Score:** 2
+
+#### Pull Request
+
+Sharpen the machine-local gate's remedy so it names both cases
+
+Plugins: dkj-policy
+
+[PR #1577](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1577)
+
+---
+
+### DEPLOY: feat/source-enables-every-plugin · 20260908-081857
+
+The source repo now enables **every** plugin in its own marketplace, not just the core team and the
+workflow, and says why: a plugin whose agent defs, manifests and hooks are never resolved anywhere is one
+whose install is only ever proven in somebody else's session. Enabling all six means a frontmatter that
+stops parsing, a manifest that goes stale or a hook that stops resolving surfaces at this repo's own
+session start instead of downstream. The three add-on teams and `dkj-policy-bwj` have no work here and are
+not expected to, so the eleven specialists they bring get roster entries and empty `VUL-IN` lenses -- and
+`CLAUDE.md` and `SPECIALISTS.md` both now say, in as many words, that those eleven lenses are the intended
+end state and not a backlog. The one cost that cannot be documented away is `dkj-team-shopify`'s floor
+check, which reports an `[ERROR]` every session here because it asks which theme is live and has no third
+state for a repo with no store; that is named in the repo slot and filed as #1570, with an explicit
+instruction not to silence it by inventing a theme id.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- nothing under `plugins/` changed, so no released payload moves and no consumer sees anything from
+this branch. It is a change to how the source repo is configured and what its own governance documents
+claim.
+
+**Score:** N/A
+
+#### Pull Request
+
+Enable every plugin in the source repo, with the roster catch-up it owes
+
+[PR #1573](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1573)
+
+---
 
 ### DEPLOY: feat/consumer-readme-update-topup · 20260908-080839
 
