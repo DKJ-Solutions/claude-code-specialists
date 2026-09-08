@@ -7,7 +7,7 @@
 
         . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 
-    Supplies the six pure functions below. None of them runs git -- the caller passes the lines
+    Supplies the seven pure functions below. None of them runs git -- the caller passes the lines
     `git worktree list --porcelain` produced, so every one of them is testable, which is the whole
     reason this file exists rather than a fourth inline parse.
 
@@ -36,7 +36,7 @@
     Pure ASCII (repo convention for .ps1).
 
     ONE DEPENDENCY, and only the last function has it: Get-DisplayRef (ref-print-lib.ps1), loaded below.
-    The five readers above stay pure functions of the porcelain text.
+    The six readers above stay pure functions of the porcelain text.
 #>
 
 # THE PROSE SANITISER, loaded rather than copied (issue #1623) -- see Get-TrunkReturnGoAheadLine at the
@@ -219,6 +219,66 @@ function Get-TrunkReturnDecision {
         }
     }
     return [pscustomobject]@{ Return = $true; Reason = '' }
+}
+
+# IS ANY WORKTREE STANDING INSIDE THE ONE WE ARE ABOUT TO WALK? (issue #1673, September 8, 2026.)
+#
+# THE HARNESS PLACES ITS OWN WORKTREE INSIDE THE REPO, at .claude/worktrees/agent-<id>, and nothing
+# ignores that path. worktree-lane.ps1's own header already states the alternative this repo takes for
+# ITS worktrees -- a lane sits in a SIBLING '<repo>-lanes/' directory, outside the tree, "because a
+# worktree inside the tree would be walked by the lint gate's link scan and by the test suites." The
+# harness does not get that choice, so the tree-walking checks have to be told rather than left to find
+# out the hard way: every count check-plugin-integrity.ps1 and its test suites take by walking
+# $RepoRoot -Recurse doubles while a nested worktree stands, because it is a second, complete copy of
+# the tree it is standing inside -- measured (issue #1673): plugin.json 6->12, *-agent.md 26->52,
+# SKILL.md 27->54, *.ps1 236->472, and the specialist-id check then reports 26 duplicate-id findings,
+# one per agent def, each accusing the REAL file and naming the worktree's copy as the claimant.
+#
+# A PURE FUNCTION OF THE SAME PORCELAIN THE REST OF THIS FILE READS, deliberately, rather than a
+# git-invoking check of its own: the caller (check-plugin-integrity.ps1) already has to read
+# 'git worktree list --porcelain' to ask this, and Get-WorktreePathKey already carries the separator/
+# case/trailing-slash normalisation this comparison needs -- re-deriving it here would be the third
+# copy of that problem the header above already refused to write once more.
+#
+# -PrimaryRoot IS THE CALLER'S OWN $RepoRoot, NOT DERIVED FROM THE PORCELAIN. The caller already knows
+# which tree it is (it is running from inside it), so asking Get-PrimaryWorktreePath to tell it back
+# would trust the porcelain's own ORDER for a fact the caller can state directly -- and would answer
+# nothing at all for a caller invoked from a tree git does not consider the main worktree.
+#
+# THE PREFIX TRAP, AND WHY A TRAILING SEPARATOR IS WHAT AVOIDS IT: 'C:\repo-lanes\x' shares the text
+# prefix 'C:\repo' with 'C:\repo' but sits BESIDE it, not inside it -- exactly the trap
+# Get-WorktreePathKey's own callers have hit before. Comparing against the key PLUS a trailing
+# separator ('c:\repo\') means 'c:\repo-lanes\x' fails the test on the character right after the
+# shared prefix ('-' is not '\'), while 'c:\repo\.claude\worktrees\agent-1' passes on the same
+# character. The primary root itself is excluded explicitly rather than relying on the prefix test to
+# reject it (a root's key trivially fails a STARTSWITH-ITS-OWN-PREFIX+SEPARATOR test already, but the
+# exclusion is stated rather than left to be an accident of string comparison).
+#
+# AN UNREADABLE PrimaryRoot ANSWERS EMPTY RATHER THAN MATCHING EVERYTHING: an empty key would otherwise
+# make an empty prefix ('\'), which a UNC worktree path ('\\server\share\...') satisfies trivially --
+# reporting every worktree as nested inside a root the caller could not even name.
+#
+# ORDINAL, STATED RATHER THAN DEFAULTED: String.StartsWith(string) is CULTURE-SENSITIVE in .NET, which
+# on a path comparison is a correctness question rather than a style one -- a culture-aware compare can
+# treat ignorable characters (a soft hyphen, a zero-width joiner) as equal to nothing at all, so a
+# crafted path could satisfy a prefix it does not actually sit under. Every other path StartsWith in
+# this repo already passes one explicitly (worktree-lane.ps1, plugin-tree-lib.ps1, measure-context-lib.ps1);
+# Ordinal rather than OrdinalIgnoreCase because Get-WorktreePathKey has already lowercased both sides.
+function Get-NestedWorktreePath {
+    param(
+        [string[]]$PorcelainLines,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$PrimaryRoot
+    )
+    $primaryKey = Get-WorktreePathKey $PrimaryRoot
+    if (-not $primaryKey) { return @() }
+    $prefix = $primaryKey + '\'
+    $nested = @()
+    foreach ($record in (Get-WorktreeRecords -PorcelainLines $PorcelainLines)) {
+        $key = Get-WorktreePathKey $record.Path
+        if (-not $key -or $key -eq $primaryKey) { continue }
+        if ($key.StartsWith($prefix, [System.StringComparison]::Ordinal)) { $nested += $record.Path }
+    }
+    return @($nested)
 }
 
 # THE SENTENCE THAT DESCRIBES THE DECISION ABOVE, and it is here because the one that used to describe it

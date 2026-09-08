@@ -39,7 +39,12 @@
          #1616) -- the no arm never claims the trunk, both arms keep the two clauses that are true
          either way, and a missing branch name still words a printable line;
       9. the branch name that line prints cannot read as a DIFFERENT branch (issue #1623) -- git accepts
-         \p{Cf} in a ref, so the composer strips its own input rather than trusting the caller to.
+         \p{Cf} in a ref, so the composer strips its own input rather than trusting the caller to;
+     10. Get-NestedWorktreePath (issue #1673) finds a worktree standing INSIDE the primary root -- the
+         shape the harness's own dispatched-agent worktree takes -- while a sibling lane and a directory
+         that merely shares a text PREFIX with the primary ('<repo>-lanes/x' against '<repo>') are both
+         left unreported, the primary never reports itself, and an empty/malformed/unreadable input
+         answers no findings rather than throwing or matching everything.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -326,6 +331,70 @@ Assert-True ($goInvisible -notmatch "'\s*'") 'and never prints quotes around not
 $libText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1'))
 Assert-True ($libText -match 'ref-print-lib\.ps1') 'worktree-lib dot-sources the lib that owns the one strip definition'
 Assert-True ($libText -match [regex]::Escape('$shownBranch = Get-DisplayRef -Ref $Branch')) 'and the go-ahead composer strips its own input'
+
+Write-Host ""
+Write-Host "9. Get-NestedWorktreePath -- is a worktree standing INSIDE the one we are about to walk? (issue #1673)" -ForegroundColor Cyan
+
+# THE SHAPE THE HARNESS ACTUALLY PRODUCES: a dispatched agent's worktree lands at
+# .claude/worktrees/agent-<id>, INSIDE the primary root rather than beside it like a lane.
+$PorcelainAgentWorktree = @(
+    'worktree C:/repo',
+    'HEAD aaaa',
+    'branch refs/heads/fix/1673-ignore-agent-worktrees',
+    '',
+    'worktree C:/repo/.claude/worktrees/agent-1',
+    'HEAD bbbb',
+    'detached',
+    ''
+)
+Assert-Equal 'C:/repo/.claude/worktrees/agent-1' `
+    "$((Get-NestedWorktreePath -PorcelainLines $PorcelainAgentWorktree -PrimaryRoot 'C:/repo'))" `
+    'a worktree standing inside the primary root is reported'
+
+# A SIBLING LANE IS NOT NESTED -- worktree-lane.ps1 places it OUTSIDE the tree on purpose (its own header
+# says why), and this function must not report the very thing that repair exists to keep clear of a walk.
+Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines $PorcelainTwoTrees -PrimaryRoot $PrimaryPath).Count)" `
+    'a sibling lane (<repo>-lanes/...) is not reported as nested'
+
+# THE PREFIX TRAP: 'C:/repo-lanes/x' shares the TEXT prefix 'C:/repo' with 'C:/repo' but sits beside it,
+# not inside it -- the same trap Get-WorktreePathKey's own callers have hit before. A prefix test with no
+# trailing separator would wrongly report this one.
+$PorcelainPrefixTrap = @(
+    'worktree C:/repo',
+    'HEAD aaaa',
+    'branch refs/heads/main',
+    '',
+    'worktree C:/repo-lanes/x',
+    'HEAD bbbb',
+    'branch refs/heads/feat/x',
+    ''
+)
+Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines $PorcelainPrefixTrap -PrimaryRoot 'C:/repo').Count)" `
+    'a directory merely sharing a text prefix with the primary root is not reported as nested'
+
+# PROOF THAT Get-WorktreePathKey IS ACTUALLY WIRED IN, not merely available beside it: the primary root is
+# handed in with all three of its differences at once (separator, case, trailing separator), and the
+# nested worktree must still be recognised as nested rather than as a false stranger.
+Assert-Equal 'C:/repo/.claude/worktrees/agent-1' `
+    "$((Get-NestedWorktreePath -PorcelainLines $PorcelainAgentWorktree -PrimaryRoot 'c:\REPO\'))" `
+    'the primary-root comparison goes through the key, not through -eq'
+
+# THE PRIMARY ITSELF IS NEVER ITS OWN FINDING, exactly as Get-WorktreeHoldingBranch must never report the
+# tree asking the question as its own blocker.
+$soloRecords = @('worktree C:/repo', 'HEAD aaaa', 'branch refs/heads/main', '')
+Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines $soloRecords -PrimaryRoot 'C:/repo').Count)" `
+    'a lone checkout does not report itself as nested inside itself'
+
+# WHAT GIT (OR THE CALLER) MIGHT ACTUALLY HAND OVER: every one of these answers empty rather than
+# throwing, since this is read alongside a lint gate that must degrade quietly when git is unavailable.
+Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines @() -PrimaryRoot 'C:/repo').Count)" `
+    'empty porcelain answers no findings rather than throwing'
+Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines @('garbage') -PrimaryRoot 'C:/repo').Count)" `
+    'unparseable porcelain answers no findings rather than throwing'
+# AN UNREADABLE PRIMARY ROOT MUST NOT MATCH EVERYTHING: an empty key would otherwise build an empty
+# prefix, which a UNC worktree path ('\\server\share\...') would satisfy trivially.
+Assert-Equal '0' "$((Get-NestedWorktreePath -PorcelainLines $PorcelainAgentWorktree -PrimaryRoot '').Count)" `
+    'an unreadable primary root answers no findings rather than matching every worktree'
 
 Write-Host ""
 if ($script:fail -gt 0) {
