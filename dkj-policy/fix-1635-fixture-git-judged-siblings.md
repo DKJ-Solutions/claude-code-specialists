@@ -41,10 +41,12 @@ better of the two helper shapes in that directory -- it *returns* `@{ Code; Out 
 builder then piped every one of those verdicts to `Out-Null`.
 
 **Two things in the report needed correcting, and both changed the work.** First, the repair it proposes
-reusing is **not on `main`**: `sync-main.tests.ps1` still discards the exit code here, because #1622's
-fix sits on the parked branch `fix/1622-fixture-git-judged`, now PR
-[#1640](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1640). So this branch does **not**
-touch that file -- it belongs to that PR, and the two cannot conflict. Second, the report's own table is
+reusing was **not on `main`** when this branch opened: #1622's fix sat on the parked branch
+`fix/1622-fixture-git-judged`, so `sync-main.tests.ps1` still discarded the exit code here and the file
+was left alone to keep the two branches from colliding. That parked branch became PR
+[#1640](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1640) and merged while this
+branch's own gate was running -- see the last CREATE step for what that changed. Second, the report's
+own table is
 disclaimed as untrustworthy and is: its right-hand column counts any mention of `$LASTEXITCODE` or
 `.Code` in a file, including asserts *about* the script under test. Measured per helper instead of per
 file, the sweep is wider than the table's nine rows and the priority order is different.
@@ -53,11 +55,11 @@ file, the sweep is wider than the table's nine rows and the priority order is di
 
 Every fixture-building git call under `scripts/tests/`, read by what its helper does with the exit code:
 
-- **Discarded outright** -- `remote-ahead-lib`, `gate-lib`, `prune-merged`, `machine-local-gate`,
-  `backing-gate` (a named helper piping to `Out-Null`); `park-commit`, `park-branch`, `park-cycle`,
-  `entry-scaffold`, `new-branch`, `fold-changelog`, `bootstrap-drift` (the inline
-  `& git ... 2>$null | Out-Null` idiom); `plugin-versions`, `connector-sessioncheck` (a `Git-X` that
-  returns the output and drops the verdict).
+- **Discarded outright, fifteen of them** -- `remote-ahead-lib`, `gate-lib`, `prune-merged`,
+  `machine-local-gate`, `backing-gate` (a named helper piping to `Out-Null`); `park-commit`,
+  `park-branch`, `park-cycle`, `entry-scaffold`, `new-branch`, `fold-changelog`, `bootstrap-drift`,
+  `sync-rules` (the inline `& git ... | Out-Null` idiom); `plugin-versions`, `connector-sessioncheck`
+  (a `Git-X` that returns the output and drops the verdict).
 - **Returned and then thrown away** -- `worktree-lane`, the report's own instance.
 - **Already judged, left alone** -- `publish-to-business` and `unfolded-entry-gate` both *throw* on a
   non-zero exit.
@@ -82,12 +84,18 @@ which is what made the pass a substitution rather than fourteen redesigns.
       leading-dash argument to a parameter name, so `branch -D <name>` would resolve `-D` against a
       `-Dir`-style parameter and silently change the command that runs. git's own flags include
       `-C`, `-c`, `-D`, `-R`, `-q`, `-m` and `-b`; a simple function passes every one through verbatim.
-- [x] Fifteen suites converted: the twelve discarding outright, `worktree-lane`, plus the two `Git-X`
-      suites. Each dot-sources the lib, judges its fixture mutations, and fails the run on the count.
+- [x] Seventeen suites converted: the fifteen discarding outright, `worktree-lane`, and `sync-main` (see
+      below). Each dot-sources the lib, judges its fixture mutations, and fails the run on the count.
 - [x] The count does not throw. A suite that dies at the first hiccup reports less than one that runs on
       and names what broke -- so the summary at the foot is what turns the count into an exit code,
       **including on a run where every assert passed**.
-- [x] `sync-main.tests.ps1` untouched -- PR #1640's file.
+- [x] `sync-main.tests.ps1` **is** converted after all, and the reason it changed mid-branch is worth
+      keeping: it was deliberately left alone while #1622's repair sat on a parked branch, and PR #1640
+      merged while this one's own gate was running. Catching up on `main` therefore pulled an **inline**
+      copy of exactly this rule into the branch. Folding it onto the shared source was the alternative to
+      filing the contradiction my own change had created -- the duplication is gone instead of tracked,
+      and the file keeps `Invoke-Git`'s signature plus every paragraph of #1622's reasoning, with one
+      added note saying where the implementation now lives.
 
 ### TEST
 
@@ -100,7 +108,8 @@ which is what made the pass a substitution rather than fourteen redesigns.
 - [x] Every converted suite run individually, all green: `remote-ahead-lib` 43, `sync-rules` 152,
       `park-commit` 28, `park-branch` 31, `park-cycle` 91, `entry-scaffold` 747, `new-branch` 255,
       `backing-gate` 49, `machine-local-gate` 42, `prune-merged` 113, `gate-lib` 123,
-      `fold-changelog` 254, `bootstrap-drift` 205, `worktree-lane` 35, `fixture-git-lib` 15.
+      `fold-changelog` 254, `bootstrap-drift` 205, `worktree-lane` 35, `fixture-git-lib` 15, and
+      `sync-main` 126 after the fold above.
 - [x] **The new judging caught its first two cases on its first run, and they were the conversion's own
       over-reach rather than fixture defects.** `park-cycle` reported 5 failures and `new-branch` 1, every
       assert green -- exactly the shape #1635 predicted. All six were one `Test-RefOnRemote` per suite:
@@ -131,10 +140,12 @@ alone, and silent about why.
 
 `scripts/lib/fixture-git-lib.ps1` now holds that rule once -- judge, print git's own output, count, and
 fail the run on the count **even when every assert passed**, because a clean sweep over a repo that was
-never built proves less than it appears to. Fifteen suites route through it; each keeps its own helper
+never built proves less than it appears to. Seventeen suites route through it; each keeps its own helper
 signature, so the pass was a substitution rather than fifteen redesigns. Reads and existence probes are
 deliberately not subjects, and the two that were converted by mistake are back to a raw `& git` with the
-reason at the call site. `sync-main.tests.ps1` is untouched: its own repair is PR #1640.
+reason at the call site. `sync-main.tests.ps1` -- where #1622 wrote the rule inline, merged from `main`
+part-way through this branch -- reads the shared source too, so the forty lines exist once rather than
+sixteen times.
 
 **Score:** 3
 
