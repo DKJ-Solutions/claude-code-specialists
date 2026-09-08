@@ -629,7 +629,7 @@ function Invoke-GitParkCommit {
     $msg = "park: $Branch ($($script:GitParkScopes[$Scope]))"
     if ($Intent.Trim()) { $msg = "$msg`n`n$($Intent.Trim())" }
     if ($BodyNote.Trim()) { $msg = "$msg`n`n$($BodyNote.Trim())" }
-    $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "git-park-msg-$PID.txt"
+    $msgFile = New-ScratchPath -Label 'git-park-msg' -Extension '.txt'
     [System.IO.File]::WriteAllText($msgFile, $msg, (New-Object System.Text.UTF8Encoding $false))
     try {
         $commitArgs = @('-C', $RepoRoot, 'commit', '-F', $msgFile)

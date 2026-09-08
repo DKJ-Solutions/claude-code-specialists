@@ -2452,7 +2452,7 @@ release trips over it. Fold from the tree that HOLDS main -- fold-changelog-entr
         exit 1
     }
 } else {
-    $foldTree = Join-Path ([System.IO.Path]::GetTempPath()) "ship-pr-fold-$pr-$PID"
+    $foldTree = New-ScratchPath -Label "ship-pr-fold-$pr"
     # $headNow IS A SECOND REF NAME AND GETS THE SAME STRIP (issue #1623). It is read off HEAD exactly as
     # $branch was, so leaving it raw beside a stripped $branchShown would sanitise one half of this
     # sentence and print the other -- and this half is the one naming the branch somebody moved TO, which

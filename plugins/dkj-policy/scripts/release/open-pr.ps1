@@ -1720,7 +1720,7 @@ if ($existingPr) {
                 (($lostHeadings | ForEach-Object { "  - $_" }) -join "`n") +
                 "`nThe body on GitHub is replaced anyway - check it after this run, and reinstate anything that was answered by hand.")
         }
-        $editFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-body-edit-$PID.md"
+        $editFile = New-ScratchPath -Label 'open-pr-body-edit' -Extension '.md'
         [System.IO.File]::WriteAllText($editFile, $newBody, (New-Object System.Text.UTF8Encoding $false))
         try {
             $edit = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'edit', "$($existingPr.number)", '--body-file', $editFile, '--repo', $repo)
@@ -1874,7 +1874,7 @@ if ($resolveIssues.Count -gt 0) {
 
 # Body via a temp file: --body $Body would let PowerShell 5.1 mangle embedded quotes on native
 # commands, causing gh to read the body as separate arguments.
-$bodyFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-body-$PID.md"
+$bodyFile = New-ScratchPath -Label 'open-pr-body' -Extension '.md'
 [System.IO.File]::WriteAllText($bodyFile, $Body, (New-Object System.Text.UTF8Encoding $false))
 
 # #101: optional assignee/milestone via repo-config. Not defined, or an empty return value: the
