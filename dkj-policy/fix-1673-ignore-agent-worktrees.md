@@ -36,23 +36,84 @@
 
 ### PLAN
 
-Ignore .claude/worktrees/ so a dispatched agent's worktree no longer reads as a dirty tree; decide what, if anything, reports a stranded worktree once git status cannot.
+Ignore `.claude/worktrees/` so a dispatched agent's worktree no longer reads as a dirty tree; decide
+what, if anything, reports a stranded worktree once `git status` cannot.
+
+#### What verifying the report changed about the plan
+
+The reported symptom held -- `git check-ignore -v .claude/worktrees/x` matched nothing, and all four
+refusals #1673 names are real. But the *reason* was only half of it. The tree walks that matter here
+are **filesystem** walks, which `.gitignore` does not affect at all, so the plan grew a second half
+and shed a third:
+
+- **In:** the ignore, a way to ask "is a worktree standing inside this tree", and the lint gate
+  naming that cause instead of leaving an operator inside 26 findings that point at the wrong files.
+- **Out, and filed as [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678):**
+  making the gate work *through* a nested worktree. That is ~20 walk sites plus three suites behind
+  one predicate, it needs its own meta-gate or it is the enforced-by-memory shape #1665 was filed
+  against, and "refuse cleanly" is a defensible permanent answer. Not a decision to make silently in
+  a `.gitignore` commit.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `.gitignore`: anchored `/.claude/worktrees/`, in the house style of the `/Microsoft/` block --
+      stating that the harness writes it, why it is anchored, and the honest cost (a stranded
+      worktree is now invisible to `git status`).
+- [x] `scripts/lib/worktree-lib.ps1`: `Get-NestedWorktreePath`, a pure function of the same porcelain
+      the file's other readers take, reusing `Get-WorktreePathKey` rather than re-deriving the
+      separator/case/trailing-slash normalisation a third time.
+- [x] Mirror it into `plugins/dkj-policy/scripts/lib/worktree-lib.ps1`, byte-identical, as the
+      shared-scripts drift lint requires.
+- [x] `scripts/lint/check-plugin-integrity.ps1`: a pre-flight block that reads the porcelain and
+      `Add-Error`s a finding naming the worktree, ahead of the findings it explains.
+- [~] Exclude the nested path from the walk sites -- dropped, and filed as #1678. See PLAN above for
+      why this is a decision rather than an omission.
 
 ### TEST
 
+- [x] `scripts/tests/worktree-lib.tests.ps1` section 9: nested found, sibling `<repo>-lanes/` not
+      reported, the shared-text-prefix trap, the primary never self-reported, empty/malformed
+      porcelain, and an unreadable root answering empty rather than matching everything.
+- [x] Whole suite green -- 73 asserts.
+- [x] End-to-end against a **real** nested worktree, which is the one thing the unit tests cannot
+      reach: with a probe standing, `git status --porcelain` no longer reports it (the ignore holds),
+      and the gate's finding prints at output line 110 against the first duplicate-id at line 112.
+- [x] Probe worktree removed; `git worktree list` back to the primary alone.
+- [x] Full lint gate + all suites via `open-pr.ps1 -GatesOnly`.
+- [x] Pure ASCII confirmed in all four changed `.ps1` files.
+
 ### DEPLOY: fix/1673-ignore-agent-worktrees
 
-**Score:**
+A dispatched agent's worktree lands inside the repo at `.claude/worktrees/agent-<id>`, and nothing
+ignored it -- so the primary checkout read as dirty for as long as one stood, which is a refusal in
+`cut-release.ps1`, in `prune-merged.ps1` on a branch, and in `worktree-lane.ps1 -HandBack`. It is now
+ignored, anchored so it cannot silence a legitimately-named folder deeper in the tree.
+
+The larger half is one `.gitignore` cannot reach. The lint gate and three of the suites walk the tree
+with `Get-ChildItem -Recurse`, which reads the filesystem rather than git, so a nested worktree is a
+second complete copy of the repo they are standing inside: every count doubles (`*-agent.md` 26 to
+52, `*.ps1` 236 to 472) and `check-plugin-integrity.ps1` fails with 26 duplicate-id errors, each one
+accusing the **real** file and naming the worktree's copy as the legitimate claimant. An operator
+reading that has no route back to the cause. The gate now reads `git worktree list --porcelain`
+through the new `Get-NestedWorktreePath` and reports the worktree first, saying in as many words that
+the duplicate findings below it are a consequence rather than real.
+
+Whether the gate should instead *work through* a nested worktree is left open deliberately and filed
+as [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678): it is ~20 walk sites
+plus three suites, it needs a gate of its own or it is enforced by memory, and refusing cleanly is a
+defensible permanent answer.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A. The two things that change behaviour are both repo-local -- the `.gitignore` entry and
+`check-plugin-integrity.ps1`, which is not mirrored into any plugin. A consumer receives the new
+`Get-NestedWorktreePath` in the `dkj-policy` mirror of `worktree-lib.ps1`, but nothing on their side
+calls it yet, so nobody downstream notices this release.
+
+**Score:** N/A
 
 #### Pull Request
 
 Ignore the harness's agent worktree directory
-
