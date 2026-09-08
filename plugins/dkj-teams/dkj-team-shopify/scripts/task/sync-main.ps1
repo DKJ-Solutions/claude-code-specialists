@@ -551,9 +551,30 @@ function Write-SyncPredecessorVerdict {
             Write-Host "  $branchRow -- $($r.Captured) file(s), all of them in this run." -ForegroundColor Green
             Write-Host '      This run supersedes it: close that PR, then merge this one.' -ForegroundColor DarkGray
         } else {
+            # AND THE PATHS UNDER THAT ROW, for the reason the row above them was stripped (issue #1629).
+            # #1623 stripped the branch name and scoped these out; #1637/#1638 then closed the same class
+            # at this script's other three path lists and its paste-ready remedy. These are the ones left,
+            # and they carry MORE of the decision than any of those: the operator answers "does today's
+            # drift supersede that standing PR?" from exactly this list, which is why it is printed rather
+            # than counted.
+            #
+            # THE READ ABOVE IS WHY THIS IS LOAD-BEARING NOW, not tidiness. Measured, git 2.55:
+            # `diff --name-only` C-quotes \p{Cc} in EVERY core.quotePath setting -- an ESC arrived as the
+            # four characters '\033' with the flag on, off, and set false in the repo's own config -- so
+            # git was closing the control half by accident, while \p{Cf} was quoted only with the flag on
+            # and U+202E reached this loop intact whenever a consumer had turned it off. Now that the read
+            # forces the flag and Convert-GitQuotedPath unpacks it, '\033' becomes a live ESC byte:
+            # correct for comparing, an ANSI/OSC repaint surface if printed raw.
+            #
+            # Get-DisplayPath, NOT Get-DisplayRef, and the difference is the point (#1638). It neither
+            # collapses runs nor trims, because git, NTFS and Shopify's asset names all accept a space --
+            # a doubled or trailing one included -- and these rows are what a reader compares against live
+            # before merging by hand. A collapsed path names a different file. #1629 proposed Get-DisplayRef
+            # as the one definition if stripping turned out right here; it was, and by the time this landed
+            # the tree had the path-shaped answer that question was really asking for.
             $u = @($r.Uncovered)
             Write-Host "  $branchRow -- $($r.Captured) file(s), $($u.Count) NOT in this run:" -ForegroundColor Red
-            foreach ($p in $u) { Write-Host "      $p" -ForegroundColor Red }
+            foreach ($p in $u) { Write-Host "      $(Get-DisplayPath -Path $p)" -ForegroundColor Red }
             Write-Host '      Neither supersedes the other. Those paths exist only on that branch.' -ForegroundColor DarkGray
         }
     }
@@ -855,9 +876,22 @@ elseif ($candidates.Count -eq 0) {
         # branch is exactly the file set the run behind it decided to take. An unreadable diff leaves
         # Paths empty, and Get-SyncPredecessorReport reads that as "not superseded" rather than as "no
         # paths, therefore covered".
-        $predPaths = @(Invoke-SyncGitQuiet @('diff', '--name-only',
+        # 'core.quotePath=true' PLUS THE UNPACKER, the same pair as the 'ls-tree' and 'check-ignore'
+        # reads further down, and for the same reason (inbound #821, issue #1629). This read was the one
+        # that never got it. These paths are not display-only: Get-SyncPredecessorReport compares them
+        # against this run's take set, whose paths come off the mirror WALK as real .NET strings. So a
+        # path with a byte above 0x7F has to arrive decoded or the comparison is wrong -- and left to
+        # git's default a repo may set 'core.quotepath' in its own config, which puts the console code
+        # page back in charge of the answer. Measured, git 2.55: with the flag off, 'assets/cafe.js'
+        # with an accent comes out as raw UTF-8 bytes; with it on, '"assets/caf\303\251.js"', which is
+        # pure ASCII on the wire and decoded here once.
+        #
+        # THE WRONG ANSWER IT WOULD PRODUCE IS THE ONE THAT MATTERS: an uncovered path is what tells the
+        # operator this run does NOT supersede that branch, so a path that fails to match its own twin
+        # in the take set reports a predecessor as independent when it is not.
+        $predPaths = @(Invoke-SyncGitQuiet @('-c', 'core.quotePath=true', 'diff', '--name-only',
             "refs/remotes/origin/$trunk...refs/remotes/origin/$name") |
-            ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+            ForEach-Object { Convert-GitQuotedPath -Path (([string]$_).Trim()) } | Where-Object { $_ })
         $standing += [pscustomobject]@{ Branch = $name; Paths = @($predPaths) }
     }
 
