@@ -43,7 +43,47 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**15 / 28 minor entries** <!-- pending-tally -->
+**16 / 29 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1591-consumer-version-verdict · 20260908-134603
+
+A consumer with no source checkout beside it now gets a real answer at session start instead of
+`no verified workshop checkout found -- check skipped`. That machine is the ordinary case, not an
+edge case: the register checks genuinely cannot run there, because `check-connectors.ps1` is
+source-only and is not plugin-carried -- so the hook said nothing at all about versions, and a
+session could load a plugin release behind the one on the machine with no signal of it. It now runs
+the plugin-carried `plugin-versions.ps1` in a new `-Brief` mode, which reports per enabled plugin
+whether the version THIS checkout installed is the one the local marketplace clone holds, and prints
+the command that closes the gap.
+
+Only an install that is BEHIND its clone is reported as a finding. A stale clone is deliberately not
+one -- it is a cache this checkout does not own, and shouting about it teaches the reader to skim the
+marker that matters -- and `[INFO]` lines are kept out of a clean run entirely, because a plugin from
+another marketplace reports "cannot determine" forever and would become permanent session-start
+noise. Every branch says the register checks did not run, so nobody reads a version answer as an
+all-clear for five checks that never happened.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow receives it in the next release, and it closes the blind spot the
+`plugin-versions` skill could only answer when someone thought to ask: a session that has quietly
+loaded a plugin release behind the machine's own now says so at the start, unprompted, on the
+machines where nothing was checking. The signal arrives where the cost of not having it is highest --
+a consumer acting on stale agent defs, skills or hooks without knowing it.
+
+**Score:** 4
+
+#### Pull Request
+
+A real version verdict on a plain consumer, instead of a session start that says nothing
+
+Plugins: dkj-policy
+
+[PR #1611](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1611)
+
+---
 
 ### DEPLOY: fix/1602-step8-report-wording · 20260908-132217
 
