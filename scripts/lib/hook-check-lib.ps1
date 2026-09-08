@@ -23,13 +23,24 @@
     THE SAVING IS WALL-CLOCK AND IT IS NOT THE SUM, BECAUSE THE HARNESS RUNS HOOKS IN PARALLEL.
     "Claude Code runs all matching hooks in parallel" (Claude Code hooks guide), so the six spawns
     never sat end to end on the critical path and the ~1.3 s that summing them suggests was never
-    real. Measured instead the way the harness actually runs them -- six concurrent hook processes,
-    with the redundant spawn and without -- the difference is 311-443 ms over three rounds. That is
-    MORE than one spawn in isolation and far less than six, because six simultaneous process
-    creations contend for CPU and disk rather than costing what one costs. Paid on every startup,
-    resume, clear and compact.
+    real.
 
-    That measurement is the reason this lib exists at all rather than the issue being closed as an
+    TWO MEASUREMENTS BOUND IT, AND NEITHER IS THE SUM. Six concurrent copies of a SYNTHETIC hook --
+    identical work either side, so only the spawn differs -- came out 311-443 ms apart over three
+    rounds. That is MORE than one spawn in isolation and far less than six, because six simultaneous
+    process creations contend for CPU and disk rather than each costing what one costs. Against that,
+    a parallel batch cannot finish before its slowest member, and the slowest of the six real hooks
+    (connector) went from 2161 ms to 1856 ms -- so ~305 ms is the floor the real hooks put under it.
+    The two agree, which is the only reason either is quoted.
+
+    THE REAL SIX WERE ALSO TIMED IN PARALLEL, AND THAT RUN IS NOT QUOTED ANYWHERE. Its variance was
+    +/-2 s against an effect of ~300 ms -- one round of three came out NEGATIVE -- so it cannot
+    resolve the thing it was measuring. It is recorded here rather than dropped because the absence
+    of a real-hook parallel figure is otherwise the first thing a reader goes looking for.
+
+    Paid on every startup, resume, clear and compact.
+
+    Those measurements are the reason this lib exists at all rather than the issue being closed as an
     accepted cost: #1625 filed the figure as ~875 ms additive on the assumption that hooks run
     sequentially, and settling the parallel question was named there as the thing to do BEFORE
     optimising on the number. Settled, the prize is smaller than filed and still worth a contained

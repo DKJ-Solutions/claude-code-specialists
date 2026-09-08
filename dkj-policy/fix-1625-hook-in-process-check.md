@@ -41,8 +41,8 @@ anything was changed:
 So the ~875 ms the report reached by summing seven spawns was never additive to the critical path, and
 this issue could reasonably have closed as its own option 3.
 
-It does not, because the parallel figure is **not** one spawn either. Measured the way the harness
-actually runs them — six concurrent hook processes, with the redundant spawn and without, three rounds:
+It does not, because the parallel figure is **not** one spawn either. Six concurrent copies of a
+**synthetic** hook — identical work either side, so only the spawn differs — three rounds:
 
 | | wall-clock |
 |---|---|
@@ -51,8 +51,17 @@ actually runs them — six concurrent hook processes, with the redundant spawn a
 | **saving** | **443 / 311 / 332 ms** |
 
 More than one spawn in isolation, far less than six, because six simultaneous process creations contend
-for CPU and disk rather than each costing what one costs. Paid on every `startup`, `resume`, `clear` and
-`compact`.
+for CPU and disk rather than each costing what one costs.
+
+**A second bound, from the real hooks, agrees with it.** A parallel batch cannot finish before its
+slowest member, and the slowest of the six is `connector`, which went 2161 ms → 1856 ms. So ~305 ms is
+the floor the real hooks put under the synthetic range above. Two measurements of different kinds
+landing in the same place is the only reason either is quoted.
+
+**What is deliberately NOT quoted: the real six timed in parallel.** That run was made, and its variance
+was +/-2 s against an effect of ~300 ms, with one round of three coming out negative — it cannot resolve
+what it was measuring, so it is named here rather than cited. Paid on every `startup`, `resume`, `clear`
+and `compact`.
 
 ### CREATE
 
@@ -111,6 +120,8 @@ reaching an `exit` leaves whatever the previous native call put there. It is res
 ### TEST
 
 - [x] All six hooks run and print reports **identical** to this session's own start, verdict for verdict.
+- [~] The real six timed **in parallel**: run, and dropped rather than quoted. Variance +/-2 s against a
+  ~300 ms effect, one round of three negative — it cannot resolve what it measures on this machine.
 - [x] Per-hook medians of 3, before → after: connector 2161 → 1856, git-identity 1489 → 1114,
   script-contract 1195 → 818, unfolded-entry 1136 → 704, consumer-prose 841 → 523, roster 1965 → 1406.
 - [x] Interpreter start-up isolated on this machine, 5 runs of a script whose only line is `exit 0`:
@@ -126,9 +137,9 @@ Every SessionStart check hook in this family spawned a second `powershell.exe` t
 script, on top of the interpreter the harness had already started for the hook. All six now run their
 check **in that same interpreter**, through one shared `Invoke-CheckScript`
 ([`hook-check-lib.ps1`](../scripts/lib/hook-check-lib.ps1), mirrored into `dkj-policy` and
-`dkj-team-alpha`). Measured across six concurrent hooks — which is how the harness runs them — that is
-**311–443 ms** of wall-clock off every session start, resume, clear and compact. Reports are unchanged,
-verdict for verdict.
+`dkj-team-alpha`). That is **~305–443 ms** of wall-clock off every session start, resume, clear and
+compact — bounded below by the slowest hook's own improvement (2161 ms → 1856 ms) and above by six
+concurrent synthetic hooks differing only in the spawn. Reports are unchanged, verdict for verdict.
 
 The figure is smaller than [#1625](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1625)
 filed, and deliberately so: it assumed the hooks run sequentially and named settling that as the thing to
