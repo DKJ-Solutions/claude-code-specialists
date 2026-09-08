@@ -655,6 +655,17 @@ infrastructure.
   mirrored into the workflow plugin and also driven by `unfolded-entry-sessioncheck.ps1`. Advisory, not
   in `main-ci-gate`. The full reasoning is in the `#1244` chain-reaction passage on the `ci.yml` bullet
   above; the detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`.
+
+  **Since [#1585](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1585) the check tells a
+  SKIPPED fold from a checkout that is merely BEHIND**, and that distinction is invisible from the working
+  copy alone: a stale checkout still has the document on disk and still has a `CHANGELOG.md` without the
+  entry, so the detector reported a fold that `fold-on-merge.yml` had already pushed. The extra question
+  costs no network — `Get-TrunkGap -NoFetch` for the gap, then `git cat-file -e origin/<trunk>:<rel>` per
+  leftover — and is asked **only when the gap is non-zero**, because absent-on-origin at a gap of zero means
+  an uncommitted document instead, which no pull repairs. **That gate is also why nothing in CI changed**:
+  `actions/checkout` on a push to `main` leaves the gap at 0, so both workflows above keep taking the same
+  arm, and `fold-on-merge.yml`'s `'\[ERROR\] the trunk carries'` match is deliberately still the exact
+  headline the stranded case prints.
 - **`.github/workflows/fold-on-merge.yml` + `FOLD_PUSH_TOKEN`** — the fold that survives a merge the
   shipping session never sees (a queue merge or a UI merge), by running the same fold this repo
   otherwise only runs from `ship-pr.ps1`'s own next step, on every `push` to `main` (issue #1493, PR
