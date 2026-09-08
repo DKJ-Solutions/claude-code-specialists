@@ -1376,6 +1376,53 @@ Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annReal).Length -gt 400)
 $annMulti = '[{"annotation_level":"failure","title":"t","message":"line one\nline two"}]'
 Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annMulti) -notlike '*line two*') 'and cut to its first line, since this is pasted into a console'
 
+# --- The relayed text is STRIPPED, not only bounded (#1612) ---------------------------------------
+#
+# The cut above removes the NEWLINE tricks and nothing else: an in-line ESC[, an OSC string or an RTL
+# override survives Trim() and the 500 untouched, and this note is printed under ship-pr's own warning
+# prefix -- read by a terminal that an escape repaints and by an agent session that an override lies to.
+# The sibling relay (Get-RemoteAheadNote, remote-ahead-lib.ps1) has guarded the same class since it was
+# extracted, on the same reasoning; these asserts are what stop the two from disagreeing.
+#
+# The JSON carries \u escapes, so this file stays pure ASCII (repo convention for .ps1) while the parse
+# hands the function the real characters.
+$annEsc = '[{"annotation_level":"failure","title":"claude-review -- \u001b[2Jwiped",' +
+          '"message":"a\u001b]0;pwned\u0007 b\u202egnitfarc"}]'
+$noteEsc = Get-AuthoredFailureNote -AnnotationsJson $annEsc -CheckName 'claude-review'
+Assert-Equal $false ($noteEsc.Contains([char]27))    'no ESC survives into the console: an ANSI/OSC introducer repaints the terminal it lands in'
+Assert-Equal $false ($noteEsc.Contains([char]7))     'and neither does the BEL that terminates an OSC string'
+Assert-Equal $false ($noteEsc.Contains([char]0x202E)) 'nor an RTL override, which makes the line read as something other than what it says'
+Assert-True  ($noteEsc -like '*wiped*')              'the WORDS stay -- the note only has to be readable, and quoting would keep the payload and add noise'
+Assert-True  ($noteEsc -like '*gnitfarc*')           'including the ones the override was wrapped around, in the order they were actually written'
+Assert-Equal 0 ([regex]::Matches($noteEsc, '  ').Count) 'runs of spaces collapse, so a stripped escape leaves no gap for the next reader to wonder about'
+
+# A "title" made only of format characters is not a workflow diagnosing itself. It has to fall through
+# like any untitled annotation -- which is why the strip runs BEFORE the emptiness test, not after it.
+$annBlankTitle = '[{"annotation_level":"failure","title":"\u200b\u202e","message":"m"},' +
+                 '{"annotation_level":"failure","title":"real","message":"r"}]'
+Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annBlankTitle) -like 'real*') 'a title of nothing but format characters is untitled, and the next annotation wins'
+Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson '[{"annotation_level":"failure","title":"\u202e","message":"m"}]') 'and on its own it produces no note at all, not an empty-titled one'
+
+# THE DRIFT PIN, ACROSS ALL THREE SITES. The class is hand-typed in three libs -- here,
+# remote-ahead-lib.ps1 (a commit's %an and %s, #1439) and ref-print-lib.ps1 (the note printed when a ref
+# is refused, #1594) -- because those functions share nothing else: different bounds (500, 120 and
+# none), different source processes, and no lib among them is loaded by another's callers. The tree
+# chose that arrangement knowingly, ref-print-lib having re-typed the class with remote-ahead-lib
+# already in place. What three hand-typed copies may not do is DISAGREE, so the character class itself
+# is compared rather than described -- and the COUNT is asserted too, because #1612's second half was a
+# stale claim about exactly this count.
+$prIssuesLibText  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1'))
+$remoteAheadText  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\remote-ahead-lib.ps1'))
+$refPrintText     = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1'))
+Assert-True ($prIssuesLibText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'this lib carries the strip pattern'
+Assert-True ($remoteAheadText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'and so does the sibling relay it was copied from'
+Assert-True ($refPrintText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'and so does the third site, which re-typed it deliberately (#1594)'
+$classSites = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '..\lib') -Filter '*.ps1' |
+                Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match ([regex]::Escape('[\p{Cc}\p{Cf}]')) } |
+                ForEach-Object { $_.Name } | Sort-Object)
+Assert-NameSet @('pr-issues-lib.ps1', 'ref-print-lib.ps1', 'remote-ahead-lib.ps1') $classSites 'THREE libs strip this class and no more -- a fourth site has to update the count in Format-AuthoredText and on the new-branch skill page, which is the claim #1612 was filed about'
+Assert-Equal 1 ([regex]::Matches($prIssuesLibText, [regex]::Escape("-replace '[\p{Cc}\p{Cf}]', ' '")).Count) 'ONE definition inside this lib -- Format-AuthoredText, which both the title and the message go through'
+
 # --- The two caps that bound the SAME string, pinned so neither moves alone (#1116) ---------------
 #
 # `claude-code-review.yml` writes `headline + ' ' + reason` into one annotation and this function
