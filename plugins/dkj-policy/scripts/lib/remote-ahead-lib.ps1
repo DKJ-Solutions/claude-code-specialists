@@ -19,8 +19,18 @@
     reader at two different next actions -- one a fast-forward on the happy path, the other a refusal.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script. Depends on
-    Invoke-NativeCapture (native-capture-lib.ps1), which every caller of this file already loads.
+    Invoke-NativeCapture (native-capture-lib.ps1), which every caller of this file already loads, and on
+    Get-DisplayRef (ref-print-lib.ps1), which it loads itself -- see the dot-source below.
 #>
+
+# THE STRIP HAS ONE DEFINITION, AND IT IS NOT HERE (issue #1623). This file held the tree's second copy of
+# the control-and-format strip pattern -- described rather than written, because this file's own suite
+# counts the literal here and expects none -- while that same suite already policed the pattern's copies
+# in new-branch.ps1 and open-pr.ps1. Policing a rule across the callers while keeping a private copy in
+# the lib is the shape this repo keeps repairing. Unconditional, and $PSScriptRoot-relative rather than repo-relative, so
+# it resolves in the plugin mirror as well as here; release-lib.ps1 loads its two siblings the same way.
+# ref-print-lib.ps1 is a leaf with no dependencies of its own, which is what makes it safe to load first.
+. (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
 
 function Get-RemoteAheadNote {
     <#
@@ -59,11 +69,19 @@ function Get-RemoteAheadNote {
     # piece of text here that somebody else wrote, and it is read by both a terminal and an agent session
     # -- an ANSI/OSC escape or an RTL override would deceive either reader, and a crafted subject wearing
     # this script's own warning prefix is an injection surface rather than a display bug.
-    $tipLine = (($tipLine -replace '[\p{Cc}\p{Cf}]', ' ') -replace ' {2,}', ' ').Trim()
+    $tipLine = Get-DisplayRef -Ref $tipLine
     if ($tipLine.Length -gt 120) { $tipLine = $tipLine.Substring(0, 120).TrimEnd() + '...' }
 
+    # AND THE BRANCH LABEL GOES THROUGH THE SAME STRIP (issue #1623). Two lines above, the commit subject
+    # is sanitised for exactly the reason that applies word for word to the name interpolated here -- and
+    # this line printed it raw, which is the sharpest instance the issue found. It is not belt-and-braces:
+    # `git check-ref-format` accepts \p{Cf}, so a fetched or hand-made branch really can carry U+202E or a
+    # zero-width run into this sentence, and open-pr.ps1 hands this function whatever HEAD reads as. The
+    # sentence exists to tell the reader WHOSE WORK is on the other side of a divergence, so a label that
+    # prints as a different name than it is defeats the whole line.
     $seenRef = if ($Fresh) { $FreshLabel } else { $StaleLabel }
-    $note = "'$BranchLabel' is $ahead commit(s) behind $seenRef"
+    $shownLabel = Get-DisplayRef -Ref $BranchLabel
+    $note = "'$shownLabel' is $ahead commit(s) behind $seenRef"
     if ($tipLine) { $note += ", whose tip is: $tipLine" }
     $note += '.'
     return $note

@@ -1403,24 +1403,29 @@ $annBlankTitle = '[{"annotation_level":"failure","title":"\u200b\u202e","message
 Assert-True ((Get-AuthoredFailureNote -AnnotationsJson $annBlankTitle) -like 'real*') 'a title of nothing but format characters is untitled, and the next annotation wins'
 Assert-Equal '' (Get-AuthoredFailureNote -AnnotationsJson '[{"annotation_level":"failure","title":"\u202e","message":"m"}]') 'and on its own it produces no note at all, not an empty-titled one'
 
-# THE DRIFT PIN, ACROSS ALL THREE SITES. The class is hand-typed in three libs -- here,
-# remote-ahead-lib.ps1 (a commit's %an and %s, #1439) and ref-print-lib.ps1 (the note printed when a ref
-# is refused, #1594) -- because those functions share nothing else: different bounds (500, 120 and
-# none), different source processes, and no lib among them is loaded by another's callers. The tree
-# chose that arrangement knowingly, ref-print-lib having re-typed the class with remote-ahead-lib
-# already in place. What three hand-typed copies may not do is DISAGREE, so the character class itself
-# is compared rather than described -- and the COUNT is asserted too, because #1612's second half was a
-# stale claim about exactly this count.
+# THE DRIFT PIN, ACROSS EVERY LIB THAT TYPES THE CLASS. It was three until #1623 and it is two: here,
+# and ref-print-lib.ps1, which since #1623 owns the one definition of the prose strip (Get-DisplayRef)
+# as well as the note printed when a ref is refused (#1594). remote-ahead-lib.ps1 typed the FIRST copy
+# (a commit's %an and %s, #1439) and no longer does -- #1623 gave it a caller's reason to load
+# ref-print-lib for its own sake, and once the lib was loaded a private copy was pure drift surface.
+#
+# THE ARGUMENT FOR THE REMAINING TWO IS UNCHANGED and is not laziness: they share nothing else --
+# different bounds (500 and none), different source processes, and neither lib is loaded by the other's
+# callers -- so lifting this one would cost a dot-source in every caller and a Copy-Item in every
+# fixture suite to save one regex. What the copies may not do is DISAGREE, so the character class itself
+# is compared rather than described -- and WHICH libs carry it is asserted too, because #1612's second
+# half was a stale claim about exactly this.
 $prIssuesLibText  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1'))
 $remoteAheadText  = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\remote-ahead-lib.ps1'))
 $refPrintText     = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1'))
 Assert-True ($prIssuesLibText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'this lib carries the strip pattern'
-Assert-True ($remoteAheadText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'and so does the sibling relay it was copied from'
-Assert-True ($refPrintText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'and so does the third site, which re-typed it deliberately (#1594)'
+Assert-True ($refPrintText -match ([regex]::Escape('[\p{Cc}\p{Cf}]'))) 'and so does ref-print-lib, which re-typed it deliberately (#1594) and now owns the prose strip too (#1623)'
+Assert-True (-not ($remoteAheadText -match ([regex]::Escape('[\p{Cc}\p{Cf}]')))) 'while the sibling relay it was copied FROM no longer does -- it reads Get-DisplayRef instead (#1623)'
+Assert-True ($remoteAheadText -match 'ref-print-lib\.ps1') 'because it dot-sources the lib that owns the definition'
 $classSites = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '..\lib') -Filter '*.ps1' |
                 Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match ([regex]::Escape('[\p{Cc}\p{Cf}]')) } |
                 ForEach-Object { $_.Name } | Sort-Object)
-Assert-NameSet @('pr-issues-lib.ps1', 'ref-print-lib.ps1', 'remote-ahead-lib.ps1') $classSites 'THREE libs strip this class and no more -- a fourth site has to update the count in Format-AuthoredText and on the new-branch skill page, which is the claim #1612 was filed about'
+Assert-NameSet @('pr-issues-lib.ps1', 'ref-print-lib.ps1') $classSites 'TWO libs type this class and no more -- a third has to update Format-AuthoredText and the new-branch skill page, which is the claim #1612 was filed about'
 Assert-Equal 1 ([regex]::Matches($prIssuesLibText, [regex]::Escape("-replace '[\p{Cc}\p{Cf}]', ' '")).Count) 'ONE definition inside this lib -- Format-AuthoredText, which both the title and the message go through'
 
 # --- The two caps that bound the SAME string, pinned so neither moves alone (#1116) ---------------
@@ -2486,6 +2491,95 @@ Assert-True ($shipText -like '*if ($newMainCommits.Count -gt 0) {*') 'nothing is
 # the refusal, because the operator's next move is to look at the trunk and count for themselves.
 Assert-True ($shipText -like '*Get-StaleCertificateVerdict -NewMainCommits $newMainCommits -ExemptCommits $foldExemptCommits*') 'the verdict receives the exempt list beside the gained one'
 Assert-True ($shipText -like '*are fold commits (changelog + branch document only) -- discounted (issue #1592).*') 'a discounted fold is reported even on the passing path, so the silence is never ambiguous'
+
+Write-Host ""
+Write-Host "Get-InterruptedShipCandidates -- what an interrupted ship leaves behind (issue #1620)" -ForegroundColor Cyan
+# THE PAIR IS THE SIGNAL: an open PR whose head ref is a branch THIS checkout has. Neither half alone
+# says anything, and the local half is what keeps the list quiet -- measured in this repo the day the
+# function was written, 26 local branches against 1 open PR whose head ref was not here.
+$candLocal = @('main', 'fix/1616-go-ahead', 'feat/other', 'docs/merged-leftover')
+$candJson = '[{"headRefName":"fix/1616-go-ahead","number":1618},{"headRefName":"feat/other","number":1601},{"headRefName":"fix/elsewhere","number":1590}]'
+$cands = @(Get-InterruptedShipCandidates -Json $candJson -LocalBranches $candLocal -TrunkBranch 'main')
+Assert-Equal 2 $cands.Count 'only the PRs whose head branch is in this checkout are candidates'
+Assert-Equal 1618 $cands[0].Number 'newest PR first -- the interrupted ship is the most recent thing this checkout did'
+Assert-Equal 'fix/1616-go-ahead' $cands[0].Branch 'and the record carries the branch a resume would check out'
+Assert-Equal 1601 $cands[1].Number 'the older candidate is kept rather than dropped'
+
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json '[]' -LocalBranches $candLocal).Count 'no open PR -> no candidate'
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json '' -LocalBranches $candLocal).Count 'empty payload -> no candidate (gh could not answer)'
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json 'not json at all' -LocalBranches $candLocal).Count 'unparseable payload -> no candidate, never a throw beside a refusal'
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json $candJson -LocalBranches @()).Count 'no local branch -> no candidate'
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json $candJson -LocalBranches $null).Count 'and an unreadable branch list is the same answer'
+# A field gh was never asked for is ABSENT, which is not empty under Set-StrictMode -- the shape that
+# throws mid-refusal if it is read unguarded.
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json '[{"number":1618}]' -LocalBranches $candLocal).Count 'a record with no headRefName is skipped, not read'
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json '[{"headRefName":"feat/other"}]' -LocalBranches $candLocal).Count 'and one with no number cannot be named in a remedy, so it is skipped too'
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json '[{"headRefName":"main","number":1618}]' -LocalBranches $candLocal -TrunkBranch 'main').Count 'a PR whose head IS the trunk is not a branch to check out'
+# git ref names are case-sensitive, and a near-match is not the branch a resume would land on.
+Assert-Equal 0 @(Get-InterruptedShipCandidates -Json '[{"headRefName":"FEAT/Other","number":1618}]' -LocalBranches $candLocal).Count 'the branch match is exact -- a differently-cased ref is a different ref'
+
+Write-Host ""
+Write-Host "Get-InterruptedShipResumeNote -- the wording the operator acts on (issue #1620)" -ForegroundColor Cyan
+# THE DECISION AND ITS WORDING ARE SPLIT for the reason #1616 measured in ship-pr's go-ahead line: a
+# sentence a reader is told to act on must be asserted, not trusted to a live ship.
+Assert-Equal '' (Get-InterruptedShipResumeNote -Candidates @()) 'no candidate -> no note, so the refusal is the line it has always been'
+Assert-Equal '' (Get-InterruptedShipResumeNote -Candidates $null) 'and a null list is the same answer'
+
+$noteOne = Get-InterruptedShipResumeNote -Candidates @([pscustomobject]@{ Number = 1618; Branch = 'fix/1616-go-ahead'; Token = 'fix/1616-go-ahead'; Note = '' }) -TrunkBranch 'main'
+Assert-True ($noteOne -like '*git checkout fix/1616-go-ahead*') 'the note prints the checkout that resumes the ship'
+Assert-True ($noteOne -like '*PR #1618*') 'and names the PR the resume will land, so the reader can tell two candidates apart'
+Assert-True ($noteOne -like '*issue #1073*') 'it names step 2b as the reason the checkout is on the trunk at all'
+Assert-True ($noteOne -like '*RESUMES rather than starting over*') 'and says the re-run resumes, which is the fact that makes the command safe to run'
+Assert-True ($noteOne -like "*'main'*") 'the trunk is named from the caller rather than assumed'
+Assert-True ($noteOne.StartsWith("`n`n")) 'it opens with a blank line, so it cannot run into the refusal sentence it follows'
+# NO FLAG IS PRESCRIBED. Whether a resume should skip the local gate is a separate question (#1620), and
+# a remedy that answered it here would be this script deciding it by printing it.
+Assert-True ($noteOne -notlike '*-SkipLint*') 'the remedy prescribes no gate skip -- that question is not this one'
+Assert-True ($noteOne -notlike '*-SkipTests*') 'nor the test skip'
+
+$noteTwo = Get-InterruptedShipResumeNote -Candidates @(
+    [pscustomobject]@{ Number = 1618; Branch = 'fix/a'; Token = 'fix/a'; Note = '' },
+    [pscustomobject]@{ Number = 1601; Branch = 'feat/b'; Token = 'feat/b'; Note = '' }
+) -TrunkBranch 'main'
+Assert-True ($noteTwo -like '*git checkout fix/a*') 'with two candidates both are listed -- the first'
+Assert-True ($noteTwo -like '*git checkout feat/b*') 'and the second, because the note asks which one rather than picking'
+
+# A REMEDY WHOSE FIRST LINE IS OFF THE SCREEN is the failure #1046 records for a warning printed at
+# depth, so the list is capped and says how many it did not print.
+# THE FIXTURE IS BUILT NEWEST-FIRST, which is what Get-InterruptedShipCandidates hands this function --
+# this one does not re-sort, it takes the head of the list it was given. Built ascending, the assert
+# below would be checking the wrong end of it.
+$manyCands = @(7..1 | ForEach-Object { [pscustomobject]@{ Number = (1600 + $_); Branch = "fix/b$_"; Token = "fix/b$_"; Note = '' } })
+$noteMany = Get-InterruptedShipResumeNote -Candidates $manyCands -MaxShown 5
+Assert-True ($noteMany -like '*and 2 further open PR(s)*') 'over the cap, the note says how many candidates it did not list'
+Assert-True ($noteMany -like '*git checkout fix/b7*') 'the newest candidate is listed'
+Assert-True ($noteMany -notlike '*git checkout fix/b1*') 'and the ones it dropped are the tail of the list, not the head'
+
+# THE PASTE VERDICT IS THE CALLER'S (ref-print-lib, #1594), and this note prints whatever token it was
+# handed -- a head ref name is chosen by whoever opened the PR.
+$notePaste = Get-InterruptedShipResumeNote -Candidates @([pscustomobject]@{ Number = 9; Branch = 'fix/evil;touch'; Token = '<branch>'; Note = '  NOTE: the branch name is not safe to paste' })
+Assert-True ($notePaste -like '*git checkout <branch>*') 'a refused name reaches the command as the placeholder, never raw'
+Assert-True ($notePaste -like '*not safe to paste*') 'and the note explaining it is printed under the whole list'
+Assert-True ($notePaste -notlike '*checkout fix/evil;touch*') 'the raw name is never in a command line'
+# A CALLER THAT FORGOT TO RESOLVE gets the placeholder too, rather than an unjudged ref in a command.
+$noteNoToken = Get-InterruptedShipResumeNote -Candidates @([pscustomobject]@{ Number = 9; Branch = 'fix/x' })
+Assert-True ($noteNoToken -like '*git checkout <branch>*') 'a record with no Token falls back to the placeholder, not to .Branch'
+
+Write-Host ""
+Write-Host "ship-pr.ps1's front door -- the refusal diagnoses instead of restating the rule (issue #1620)" -ForegroundColor Cyan
+# The asserts above prove the two functions; these prove the caller asks for them. Same reasoning as the
+# step-3b block below: a reverted call site leaves every assert above green while the refusal says
+# nothing the operator can act on.
+Assert-True ($shipText -like '*You are on main; ship-pr runs from a branch.$resumeNote*') 'the front-door refusal carries the resume note, and keeps the sentence it has always had'
+Assert-True ($shipText -like '*Get-InterruptedShipCandidates -Json ($openPrList.Output -join*') 'it asks the tested function which open PR belongs to a branch in this checkout'
+Assert-True ($shipText -like "*'--json', 'number,headRefName'*") 'asking gh for the two fields that function reads'
+Assert-True ($shipText -like "*'for-each-ref', '--format=%(refname:short)', 'refs/heads'*") 'and git for the local half of the pair'
+Assert-True ($shipText -like '*Get-PasteableRef -Ref $_.Branch*') 'each candidate name is judged before it reaches a printed command (#1594)'
+Assert-True ($shipText -like '*Get-InterruptedShipResumeNote -Candidates $resumeCandidates*') 'and the wording comes from the tested function rather than a here-string here'
+# BEST-EFFORT: an unreadable read yields no note, and the refusal is unchanged -- a diagnostic must never
+# be the reason a refusal cannot be printed.
+Assert-True ($shipText -like '*if ($openPrList.ExitCode -eq 0 -and $localHeads.ExitCode -eq 0) {*') 'both reads must succeed before anything is diagnosed'
+Assert-True ($shipText -like '*$resumeNote = ''''*') 'and the note starts empty, so a gh that cannot answer leaves the original refusal'
 Assert-True ($shipText -like '*further commit(s) landed in the same window and were discounted as folds*') 'and the refusal states the difference between its count and what git log shows'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

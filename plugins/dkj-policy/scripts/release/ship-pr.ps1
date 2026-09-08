@@ -390,7 +390,41 @@ if (Get-Command Get-PrMergeMethod -ErrorAction SilentlyContinue) {
 }
 
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
-if ($branch -eq 'main') { Write-Error "You are on main; ship-pr runs from a branch."; exit 1 }
+if ($branch -eq 'main') {
+    # THE REFUSAL DIAGNOSES INSTEAD OF ONLY RESTATING THE RULE (issue #1620). Standing on the trunk is
+    # usually a plain mistake -- and it is ALSO the state this script's own step 2b creates: the trunk is
+    # handed back the moment the PR exists (#1073), so for the whole CI wait, the longest step in the run,
+    # HEAD says 'main' while a merge and a fold are still owed. A run that does not survive that wait
+    # leaves exactly this checkout, and the operator re-running ship-pr met a message about the wrong
+    # problem. Measured on PR #1618, September 8, 2026: the backgrounded process was killed by the host
+    # for low memory, and `git checkout <branch>` plus the same command resumed correctly.
+    #
+    # #1588's REPAIR CANNOT REACH THIS. It put the checkout at the head of the stale-CI refusal's printed
+    # remedy, which helps a run that gets as far as printing one; an interrupted process prints nothing at
+    # all, and the kill takes the scrollback with it. The sentence the operator needs was in this file the
+    # whole time -- the dropped-watch retry block's comment says resuming a ship that died there means
+    # checking the branch out again -- which is a comment nobody is reading at that moment.
+    #
+    # BEST-EFFORT, AND THE REFUSAL IS UNCHANGED WHERE IT CANNOT READ. Two reads, neither of them load-
+    # bearing: an unreadable one yields no candidates and the message is the line it has always been.
+    # Same posture and same reason as Get-MissingCheckSuiteRefusalNote below -- a diagnostic must never be
+    # why a refusal cannot be printed. It costs two commands on a path that is already refusing.
+    $resumeNote = ''
+    $openPrList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--state', 'open', '--json', 'number,headRefName', '--limit', '100', '--repo', $repo) -DiscardStderr
+    $localHeads = Invoke-NativeCapture -FilePath 'git' -Arguments @('for-each-ref', '--format=%(refname:short)', 'refs/heads') -DiscardStderr
+    if ($openPrList.ExitCode -eq 0 -and $localHeads.ExitCode -eq 0) {
+        # THE PASTE VERDICT IS RESOLVED HERE rather than in the lib, because ref-print-lib.ps1 owns that
+        # judgement (#1594) and these names are the least trustworthy refs this script prints: a head ref
+        # is chosen by whoever opened the PR, not by this operator's own checkout.
+        $resumeCandidates = @(Get-InterruptedShipCandidates -Json ($openPrList.Output -join "`n") -LocalBranches @($localHeads.Output) -TrunkBranch 'main' | ForEach-Object {
+            $candidatePaste = Get-PasteableRef -Ref $_.Branch
+            [pscustomobject]@{ Number = $_.Number; Branch = $_.Branch; Token = $candidatePaste.Token; Note = $candidatePaste.Note }
+        })
+        $resumeNote = Get-InterruptedShipResumeNote -Candidates $resumeCandidates -TrunkBranch 'main'
+    }
+    Write-Error "You are on main; ship-pr runs from a branch.$resumeNote"
+    exit 1
+}
 
 # JUDGED ONCE, HERE, RATHER THAN AT EACH OF THE FIVE PRINT SITES (issue #1594). Every remedy this
 # script prints puts the SAME name into a command, so one verdict beside the read that produced it
@@ -405,6 +439,16 @@ $branchPaste = Get-PasteableRef -Ref $branch
 # of those refusals as they have always printed -- so the safe path stays byte-identical and only the
 # refused path grows. One definition rather than three locals: the three sites want the identical string.
 $branchPasteNoteBlock = if ($branchPaste.Note) { "`n" + $branchPaste.Note } else { '' }
+# AND THE DISPLAY NAME, judged in the same place for the same reason (issue #1623). The paste verdict
+# above covers the lines a reader is invited to RUN; this covers the eleven lines that merely quote the
+# branch in a sentence, which #1594 scoped out on the ground that git rejects the characters that would
+# make prose deceptive. It rejects \p{Cc} and accepts \p{Cf}: a branch carrying U+202E, U+200B, U+200D or
+# U+2066 is creatable, checkout-able and returned verbatim by the `git rev-parse` above, so those
+# sentences could print a name that reads as a different branch than the one being shipped. Not a
+# placeholder, unlike the paste axis -- a sentence has to keep naming the branch to be worth printing --
+# so the characters go and the words stay. Every prose site below uses this; $branch itself stays raw and
+# is what every git and gh argument in this script still receives.
+$branchShown = Get-DisplayRef -Ref $branch
 
 # --- Step 0: is 'main' free for step 5 to check out? (issue #1069) --------------------------------
 # THE ORDERING IS THE WHOLE POINT. git allows one worktree per branch, so a tree standing on 'main'
@@ -641,7 +685,7 @@ if ($NoMerge) {
 # --base main for the reason spelled out in open-pr.ps1's lookup: without it a consumer's stacked PR
 # (branch -> branch) could be the one that gets merged, into its intermediate base.
 $prList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'open', '--json', 'number', '--limit', '1', '--repo', $repo) -DiscardStderr
-if ($prList.ExitCode -ne 0) { Write-Error "Could not list the PR for '$branch' (is gh logged in?)."; exit 1 }
+if ($prList.ExitCode -ne 0) { Write-Error "Could not list the PR for '$branchShown' (is gh logged in?)."; exit 1 }
 $prRecord = Get-ExistingPrRecord -Json ($prList.Output -join "`n")
 if ($null -eq $prRecord) {
     # NO OPEN PR IS TWO DIFFERENT ANSWERS, and until inbound #1077 this line gave the alarming one to
@@ -652,15 +696,15 @@ if ($null -eq $prRecord) {
     $mergedList = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'main', '--state', 'merged', '--json', 'number,url', '--limit', '1', '--repo', $repo) -DiscardStderr
     $mergedRecord = if ($mergedList.ExitCode -eq 0) { Get-ExistingPrRecord -Json ($mergedList.Output -join "`n") } else { $null }
     if ($mergedRecord) {
-        Write-Host "ship-pr: PR #$($mergedRecord.number) for '$branch' is already merged -- nothing to ship. $($mergedRecord.url)" -ForegroundColor Green
-        Write-Host "ship-pr: this checkout is still on '$branch' -- the merge deleted the remote branch, not the local one. 'git checkout main' (or prune-merged) clears it up." -ForegroundColor DarkGray
+        Write-Host "ship-pr: PR #$($mergedRecord.number) for '$branchShown' is already merged -- nothing to ship. $($mergedRecord.url)" -ForegroundColor Green
+        Write-Host "ship-pr: this checkout is still on '$branchShown' -- the merge deleted the remote branch, not the local one. 'git checkout main' (or prune-merged) clears it up." -ForegroundColor DarkGray
         exit 0
     }
-    Write-Error "No open PR to main found for '$branch' after open-pr -- stopping."
+    Write-Error "No open PR to main found for '$branchShown' after open-pr -- stopping."
     exit 1
 }
 $pr = $prRecord.number
-Write-Host "ship-pr: PR #$pr opened for '$branch'." -ForegroundColor Green
+Write-Host "ship-pr: PR #$pr opened for '$branchShown'." -ForegroundColor Green
 
 # --- Step 2b: give the trunk back BEFORE the wait (issue #1073) -----------------------------------
 # THE RULE THIS EXISTS FOR IS NOT IN A SCRIPT, IT IS IN THE ORCHESTRATOR'S BODY, and it said two things
@@ -716,10 +760,10 @@ if ($trunkReturn.Return) {
         # NOT FATAL: nothing is merged, the branch is pushed, and step 5 reads HEAD for itself. The one
         # thing that would be wrong is stopping a ship over a checkout that was a convenience.
         $back.Output | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
-        Write-Host "ship-pr: could not check out 'main' -- staying on '$branch'; step 5 will fold from here as before." -ForegroundColor DarkYellow
+        Write-Host "ship-pr: could not check out 'main' -- staying on '$branchShown'; step 5 will fold from here as before." -ForegroundColor DarkYellow
     }
 } else {
-    Write-Host "ship-pr: staying on '$branch' -- $($trunkReturn.Reason)." -ForegroundColor DarkGray
+    Write-Host "ship-pr: staying on '$branchShown' -- $($trunkReturn.Reason)." -ForegroundColor DarkGray
 }
 
 function Get-MissingCheckSuiteRefusalNote {
@@ -959,7 +1003,12 @@ function Wait-CheckRegistration {
             $conflictNote = "GitHub reports this PR as CONFLICTING, and a pull_request workflow runs against the merge commit (refs/pull/<n>/merge) that a conflicting PR has none of -- so no check suite can be created for it at all. Resolve the conflict (merge 'main' in, or rebase) and the ordinary push creates it. A close/reopen does NOT repair this and was measured doing nothing (#1247)."
         }
         if (Test-BranchEntryAlreadyFolded -Branch $Branch) {
-            $conflictNote += " AND THIS BRANCH IS SPENT: its changelog entry (dkj-policy/$($Branch -replace '/', '-').md) has already folded on 'main', so the conflict is the fold's deletion against this branch's own copy -- resolving it just re-adds a folded entry. Put the follow-up work on a fresh branch off 'main' (#1584)."
+            # THE PATH IS BUILT FROM THE BRANCH, so it is prose carrying a ref name and is stripped like
+            # any other (issue #1623). Test-BranchEntryAlreadyFolded above composes the same path to READ
+            # the file and is deliberately left raw: a strip there would look for a file that does not
+            # exist. The two spellings differ only for a name no repo should have, and only in the
+            # direction that makes the printed one readable.
+            $conflictNote += " AND THIS BRANCH IS SPENT: its changelog entry ($(Get-DisplayRef -Ref ("dkj-policy/$($Branch -replace '/', '-').md"))) has already folded on 'main', so the conflict is the fold's deletion against this branch's own copy -- resolving it just re-adds a folded entry. Put the follow-up work on a fresh branch off 'main' (#1584)."
         }
         Write-Error "No CI check will register for PR #$Pr -- NOT merged (CONFLICTING). $conflictNote"
         exit 1
@@ -1174,7 +1223,7 @@ Write-Host "ship-pr: waiting for the CI check(s) on PR #$pr..." -ForegroundColor
 Write-Host "  Nothing here needs YOU -- background this run and the wait costs nothing." -ForegroundColor DarkGray
 Write-Host "  It does need this session's process: the merge and the fold are still owed, and both run from here (#1428)." -ForegroundColor DarkGray
 Write-Host "  So leave this one running and carry on in a SECOND terminal -- do not quit the harness." -ForegroundColor DarkGray
-Write-Host "  $(Get-TrunkReturnGoAheadLine -Returned $treeOnTrunk -Branch $branch)" -ForegroundColor DarkGray
+Write-Host "  $(Get-TrunkReturnGoAheadLine -Returned $treeOnTrunk -Branch $branchShown)" -ForegroundColor DarkGray
 Write-Host "  Open that second terminal in a lane: scripts\task\worktree-lane.ps1 -Name <name>" -ForegroundColor DarkGray
 # --- THE WATCH BLOCKS ON THE REQUIRED CHECKS ONLY (issue #1602) ----------------------------------
 # WHAT THIS CHANGES, AND WHAT IT DELIBERATELY DOES NOT. The merge below is allowed to go as soon as
@@ -2014,6 +2063,12 @@ $shipCycleRead = {
 # would look for the pre-#1255 shared name and miss this branch's own document entirely. The failure would
 # be the silent one the paragraph above describes: no path, no text, and a gate reading "no document".
 $shipProgressRel  = Resolve-BranchFilePath -Kind Cycle -Reader $shipCycleRead -Branch $branch
+# BOTH OF THESE ARE PRINTED IN THE TWO REFUSALS BELOW, and both are built from the branch name, so both
+# get the prose strip (issue #1623). The raw pair above stays raw: one is a git ref this script resolves
+# a file at, the other is the path it reads -- a stripped spelling would look for something that is not
+# there. The refusals print the readable spelling of the same two things.
+$shipCycleRefShown    = Get-DisplayRef -Ref $shipCycleRef
+$shipProgressRelShown = Get-DisplayRef -Ref $shipProgressRel
 $shipCycleText    = & $shipCycleRead $shipProgressRel
 if ($null -ne $shipCycleText) {
     $shipSteps = @(Get-BranchProgressFindings -Text $shipCycleText)
@@ -2024,7 +2079,7 @@ if ($null -ne $shipCycleText) {
         # same refusal twice.
         $shipDetail = ($shipSteps | ForEach-Object { "  - $($_.Label): $($_.Line)`n      $($_.Remedy)" }) -join "`n"
         Write-Error @"
-step-list gate: $shipProgressRel at $shipCycleRef still has unresolved steps - PR #$pr is NOT merged.
+step-list gate: $shipProgressRelShown at $shipCycleRefShown still has unresolved steps - PR #$pr is NOT merged.
 
 $shipDetail
 
@@ -2078,7 +2133,7 @@ if ($null -ne $shipCycleText) {
                 "the first line the body does not have is:`n    $($lock.FirstDrift)"
             }
             Write-Error @"
-DEPLOY lock: $shipProgressRel at $shipCycleRef has changed since PR #$pr was opened - it is NOT merged.
+DEPLOY lock: $shipProgressRelShown at $shipCycleRefShown has changed since PR #$pr was opened - it is NOT merged.
 
 $lockDrift
 
@@ -2398,7 +2453,12 @@ release trips over it. Fold from the tree that HOLDS main -- fold-changelog-entr
     }
 } else {
     $foldTree = Join-Path ([System.IO.Path]::GetTempPath()) "ship-pr-fold-$pr-$PID"
-    Write-Host "ship-pr: HEAD is on '$headNow', not '$branch' -- this checkout moved while CI ran." -ForegroundColor Yellow
+    # $headNow IS A SECOND REF NAME AND GETS THE SAME STRIP (issue #1623). It is read off HEAD exactly as
+    # $branch was, so leaving it raw beside a stripped $branchShown would sanitise one half of this
+    # sentence and print the other -- and this half is the one naming the branch somebody moved TO, which
+    # the reader has no other line to learn from. The raw $headNow above stays raw: it is compared, not
+    # printed, and stripping it would break the comparison it exists for.
+    Write-Host "ship-pr: HEAD is on '$(Get-DisplayRef -Ref $headNow)', not '$branchShown' -- this checkout moved while CI ran." -ForegroundColor Yellow
     Write-Host "  Folding in a throwaway worktree instead, so nothing here is touched: $foldTree" -ForegroundColor Yellow
     $wtAdd = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'add', $foldTree, 'main')
     $wtAdd.Output | ForEach-Object { Write-Host $_ }
@@ -2545,7 +2605,7 @@ if (-not $foldTree -and -not $shipTreeIsPrimary) {
     if ($back.ExitCode -ne 0) {
         $detach = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', '--detach')
         if ($detach.ExitCode -eq 0) {
-            Write-Host "  '$branch' could not be checked out here, so this tree is detached instead -- 'main' is free." -ForegroundColor Yellow
+            Write-Host "  '$branchShown' could not be checked out here, so this tree is detached instead -- 'main' is free." -ForegroundColor Yellow
         } else {
             # NEVER FAILS THE SHIP. Everything this script was asked to do has happened by now: merged,
             # folded, pushed. What is left is a lock on 'main' that the next run's step 0 will report by
@@ -2586,7 +2646,7 @@ $dbomRes = Invoke-NativeCapture -FilePath 'gh' -Arguments @('api', "repos/$repo"
 if ($dbomRes.ExitCode -eq 0) {
     $dbom = (($dbomRes.Output | Out-String) -replace '\s', '')
     if ($dbom -eq 'false') {
-        Write-Host "Note: '$repo' does not delete head branches on merge, so '$branch' is still on the remote. Switch it on once with:" -ForegroundColor Yellow
+        Write-Host "Note: '$repo' does not delete head branches on merge, so '$branchShown' is still on the remote. Switch it on once with:" -ForegroundColor Yellow
         Write-Host "  gh api -X PATCH repos/$repo -F delete_branch_on_merge=true" -ForegroundColor Yellow
         Write-Host "  (the local clone is a separate half -- scripts\task\prune-merged.ps1 reaps that, and deletes nothing it cannot prove is merged)" -ForegroundColor DarkGray
     }

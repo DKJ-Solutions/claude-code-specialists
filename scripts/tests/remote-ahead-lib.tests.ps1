@@ -164,6 +164,20 @@ try {
     Assert-True ($note5 -notmatch [char]0x202E) 'the RTL override itself is gone'
     Assert-True ($note5 -match 'safe-looking') 'the ordinary words around it survive'
 
+    # --- 5b. and so is the BRANCH LABEL, which was the raw half of the same sentence ------------
+    # ISSUE #1623. Case 5 above proves the commit subject is stripped; the label two statements later in
+    # the same composition was interpolated raw, which is the sharpest instance that issue found. It is
+    # not belt-and-braces: `git check-ref-format` accepts \p{Cf}, so a fetched branch really can carry a
+    # zero-width run or an RTL override into this sentence -- and the sentence exists to tell the reader
+    # WHOSE work is on the other side of a divergence, which a mis-printing name defeats.
+    Assert-True ($note5 -match [regex]::Escape($p5.Branch)) 'premise: an ordinary branch label still reads verbatim'
+    $note5b = Get-RemoteAheadNote -RepoRoot $p5.Clone -LocalRef 'HEAD' -RemoteRef "refs/remotes/origin/$($p5.Branch)" `
+                                  -BranchLabel ('fix/a' + [char]0x202E + [char]0x200D + 'b') `
+                                  -FreshLabel "origin/$($p5.Branch)" -StaleLabel 'stale' -Fresh $true
+    Assert-True ($note5b -match 'is 1 commit\(s\) behind') 'a hostile branch label is still reported, not refused'
+    Assert-True ($note5b -notmatch '[\p{Cc}\p{Cf}]') 'and no control or format character survives anywhere in the note'
+    Assert-True ($note5b -match [regex]::Escape("'fix/a b'")) 'the label reads as the stripped name, quoted, so the reader can still recognise it'
+
     # --- 6. length cap ---------------------------------------------------------------------------
     Write-Host "`n== 6. a long subject is capped rather than pushing the sentence off-screen ==" -ForegroundColor Cyan
     $p6 = New-RemoteFixturePair
@@ -198,6 +212,13 @@ try {
     # case above while leaving the file with two definitions that can disagree from tomorrow onward.
     Assert-Equal 0 ([regex]::Matches($newBranchText, [regex]::Escape('\p{Cc}\p{Cf}')).Count) 'new-branch.ps1 no longer carries its own copy of the strip pattern'
     Assert-Equal 0 ([regex]::Matches($openPrText, [regex]::Escape('\p{Cc}\p{Cf}')).Count) 'open-pr.ps1 never carried one either'
+    # AND SINCE #1623 THE LIB DOES NOT CARRY IT EITHER. Policing the pattern's copies across the callers
+    # while keeping a private one in the lib is the shape this repo keeps repairing: ref-print-lib.ps1 has
+    # the single definition and this file dot-sources it.
+    $libText = [System.IO.File]::ReadAllText($LibPath)
+    Assert-Equal 0 ([regex]::Matches($libText, [regex]::Escape('\p{Cc}\p{Cf}')).Count) 'remote-ahead-lib.ps1 stopped carrying its own copy of the strip pattern'
+    Assert-True ($libText -match 'ref-print-lib\.ps1') 'and dot-sources the lib that owns it'
+    Assert-True ($libText -match [regex]::Escape('Get-DisplayRef -Ref $BranchLabel')) 'the branch label goes through that one definition'
 
     # --- 9. open-pr's gate sits BEFORE the lint+test gate, and blocks -------------------------
     Write-Host "`n== 9. open-pr asks before spending the gate, and refuses rather than warns ==" -ForegroundColor Cyan

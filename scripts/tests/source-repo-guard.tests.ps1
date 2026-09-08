@@ -306,6 +306,18 @@ $guardExempt = @(
     # always-on pages produce zero hits, because every supremacy sentence they carry names the plugin's
     # page as the winner and the detector reads direction.
     'scripts\lint\check-consumer-prose.ps1',
+    # SessionStart: claude-home-sessioncheck (#1609). Same first reason as check-git-identity above --
+    # the hook runs it from '${CLAUDE_PLUGIN_ROOT}/scripts/lint/', so Assert-OwnCopy would refuse it and
+    # thereby the hook at every session start here -- and it has no second caller either: no CI half,
+    # because a runner has no plugin administration at all and would report the empty state on every push.
+    #
+    # IT IS THE ONE EXEMPTION ON THIS LIST WHERE THE GUARD WOULD BE MEANINGLESS RATHER THAN MERELY
+    # INCONVENIENT, and that is worth stating rather than inheriting the reason above. Every other script
+    # here reads the REPO, so a released copy genuinely can answer a stale question about this tree --
+    # which is the staleness the guard exists to refuse. This one reads one file in the user's HOME and
+    # nothing repo-relative at all, so the released copy and this one are not merely both acceptable:
+    # they compute the identical answer. There is no version of this script whose age can make it wrong.
+    'scripts\lint\check-claude-home.ps1',
     'scripts\task\park-cycle.ps1'              # Stop: cycle-autopark (#900)
 )
 

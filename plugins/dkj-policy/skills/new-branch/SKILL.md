@@ -245,7 +245,7 @@ file, and the rule flips with the destination rather than with the text.
 
 **It is NOT the only console this workflow writes somebody else's words to** -- that claim stood here
 and was false from the day `ship-pr` began relaying the sentence a failing workflow wrote about itself
-(`Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`, #1103). **There are three**, and the count
+(`Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`, #1103). **There are four**, and the count
 is worth stating precisely because the wrong one is what kept the second site unguarded:
 
 1. **This one** -- the remote tip's `%an` and `%s`, printed by `new-branch` and `open-pr`
@@ -257,13 +257,27 @@ is worth stating precisely because the wrong one is what kept the second site un
 3. **The note printed when a branch name is refused for a paste-ready command** (`Get-PasteableRef`,
    `scripts/lib/ref-print-lib.ps1`, #1594) -- because a guard whose refusal path is itself an injection
    surface is worse than no guard. Not capped.
+4. **Every sentence this workflow prints a REF NAME into** (`Get-DisplayRef`,
+   `scripts/lib/ref-print-lib.ps1`,
+   [#1623](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1623)) -- thirty-two of them
+   across `ship-pr.ps1`, `sync-main.ps1`, `remote-ahead-lib.ps1` and `worktree-lib.ps1`. `git
+   check-ref-format` enforces `\p{Cc}` and **accepts** `\p{Cf}`, so a branch created by hand, cloned or
+   fetched carries U+202E or a zero-width run straight into those lines; `sync-main`'s come off `git
+   ls-remote` and its seam answers, which git never validated at all. Not capped.
 
-The class is hand-typed in all three, on purpose and knowingly: #1594 re-typed it with this site already
-in place and recorded why. The functions share nothing else -- three different bounds, three different
-source processes, and no lib among them is loaded by another's callers -- so what is guarded is that the
-copies cannot DISAGREE, by an assert in `pr-issues.tests.ps1` that compares the patterns themselves and
-pins the count at three. A reader who needs every place this workflow prints foreign text now has the
-list, which is what the retired sentence was for.
+**This entry is why the count was worth stating.** It was three until September 8, 2026, and #1623 was
+filed as the third counter-example to the sentence this section retired -- the same shape as #1612's own
+second half. The list is the thing that has to be kept true, not the number in front of it.
+
+The class itself is hand-typed in **two** libs now, on purpose and knowingly: this one and
+`ref-print-lib.ps1`. #1594 re-typed it with this site already in place and recorded why, and #1623
+retired that third copy rather than adding a fourth -- `remote-ahead-lib.ps1` acquired a reason to load
+`ref-print-lib.ps1` for its own sake (its branch label, printed raw beside the subject it already
+sanitised), and once the lib was loaded a private copy was pure drift surface. The two that remain share
+nothing else -- different bounds, different source processes, and neither is loaded by the other's
+callers -- so what is guarded is that they cannot DISAGREE, by an assert in `pr-issues.tests.ps1` that
+compares the patterns themselves and pins **which** libs carry the class. A reader who needs every place
+this workflow prints foreign text now has the list, which is what the retired sentence was for.
 
 **It costs no network call.** The base measurement above already fetches *every* ref (that is what
 `-FetchAllRefs` is for, and #1139 is why), so the remote-tracking ref is on disk and as fresh as this run
