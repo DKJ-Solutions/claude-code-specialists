@@ -2681,8 +2681,12 @@ if (-not $watchNarrowed) {
     # check' clause is unchanged and is where the tail's real size is stated.
     $tailReport = $null
     if ($tailFactsJson) {
+        # -PostMerge, BECAUSE THE MERGE HAS HAPPENED AND NOTHING HERE GOVERNED IT. Without it this
+        # line reads `'claude-review' finished last and governed the merge (..., NOT required)` about
+        # a merge that went minutes earlier precisely because it no longer waits for that check --
+        # the opposite of what this step exists to report, in the one place the reader meets it.
         $tailReport = Get-CheckWaitReport -ChecksJson $tailFactsJson `
-            -RequiredNamesJson $tailRequiredJson -WaitedSeconds $tailWaitedSec
+            -RequiredNamesJson $tailRequiredJson -WaitedSeconds $tailWaitedSec -PostMerge
     }
     if ($tailReport) {
         Write-Host "  $tailReport" -ForegroundColor DarkGray
