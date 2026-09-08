@@ -43,7 +43,56 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**25 / 48 minor entries** <!-- pending-tally -->
+**26 / 49 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1655-unjudged-fixture-git-check · 20260908-185415
+
+A test suite can no longer reintroduce the fixture-git idiom that #1635 swept out. Check 35
+(`[fixture-git]`) walks `scripts/tests/` for a git command whose output is discarded and whose exit
+code is judged on neither the same statement nor the next -- the idiom that made a git which FAILED
+indistinguishable from one that worked, so every assert below it read a repo that was never built and
+blamed the script under test.
+
+The sweep it enforces turned out to be unfinished, which is the finding rather than a side note. The
+matcher read **27 unjudged calls still standing in four files** -- `find-specialist-mentions`,
+`shared-scripts`, `source-repo-guard` and `fresh-consumer.measure`, whose spellings (`git ... 2>&1 |
+Out-Null` with no `&`, and `& $git @(...)` over a scriptblock) the earlier search never reached. All
+27 are converted here, so the check is born green with **zero exemptions**. Over the pre-sweep tree it
+reads 182 findings in 18 files: the house style, measured.
+
+What makes the check possible at all is that a git QUESTION reads its exit code **immediately** --
+`rev-parse --verify --quiet` on a ref expected to be absent answers with exit 1 and is judged on the
+next line. So a call is cleared when `$LASTEXITCODE` appears in the same statement or the next one, no
+verb is special-cased, and no file is exempt: **zero probe false positives over both trees**. The
+subject is deliberately a *discarded* result rather than every unjudged call -- widening to a bare
+statement pipeline yields 20 findings here and all 20 are value-returning questions. All three ways to
+discard are covered (`| Out-Null`, `$null =`, a `[void]` cast), each after one shared unwrap of any
+`(...)` so a pair of brackets is not an escape hatch, and the clearing condition reads the AST rather
+than the line text. None of those three came from the measurement -- this tree holds only the plainest
+spelling of each -- but from probing the check's own stated boundary and from the review that followed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here reaches a consumer's own repo: the check reads `scripts/tests/`, which is workshop-only
+and mirrored into no plugin. One portable page does change -- the system-administration manual gains
+a tenth PowerShell trap (`@($i, $i + 1)` is `@($i, $i) + 1`, the comma binding tighter than the
+addition), which travels to every consumer at the next release and is worth having: it produced nine
+false findings inside the very pass that was deciding whether this check's false-positive rate was
+acceptable.
+
+**Score:** 1
+
+#### Pull Request
+
+A lint check for the unjudged fixture-git idiom, and the four suites the #1635 sweep missed
+
+Plugins: dkj-team-alpha
+
+[PR #1663](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1663)
+
+---
 
 ### DEPLOY: fix/1650-shape-gate-local · 20260908-182018
 
