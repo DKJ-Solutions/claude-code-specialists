@@ -255,7 +255,10 @@ Rendall), and the **repo-neutral bootstrap skill** `specialists-init`.
 at repo level deliberately, because they differ per repo (or are safety-critical). The plugins
 deliberately carry **no safety/guardrail hooks** and **no repo-specific skills** — with a few named,
 repo-neutral exceptions: the skill `specialists-init` (the adoption path itself), and a set of
-informational, read-only SessionStart hooks that never block — `roster-sessioncheck` (roster-drift
+informational SessionStart hooks that never block, read-only with one stated exception —
+`claude-home-sessioncheck`, which keeps a snapshot of your `~/.claude` plugin administration while it
+reads healthy so a clobber of it is restorable (#1609), and touches nothing in any repo —
+`roster-sessioncheck` (roster-drift
 signaling) in the **core team**, and in **`dkj-policy`** the rest, among them
 `connector-sessioncheck` (sync signaling), `script-contract-sessioncheck` (signals when a repo's own
 workflow libs no longer expose a function the shared scripts call) and `consumer-prose-sessioncheck`
