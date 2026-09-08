@@ -85,7 +85,9 @@ the gate's own lib so the three cannot conflict.
       they named `z-broken.tests.ps1.out.txt` while the gate writes `$suite.BaseName + '.out.txt'` and
       `BaseName` strips only the last extension. The deleted-sibling assert had the same wrong name and
       was passing **vacuously** -- it now names `a-first.tests.out.txt` and tests something.
-- [ ] The full lint + test gate, via `open-pr.ps1`.
+- [~] No separate pre-run of the full lint + test gate: `open-pr.ps1` runs both itself and refuses to
+      push on an error or a failing suite, so a copy set going ahead of it proves nothing that gate
+      would not have caught and records nothing it will credit.
 
 ### DEPLOY: fix/1636-gate-keeps-red-capture
 
