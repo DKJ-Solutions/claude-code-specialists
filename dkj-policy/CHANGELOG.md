@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**4 / 7 minor entries** <!-- pending-tally -->
+**5 / 8 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1570-shopify-floor-no-store-seam · 20260908-084027
+
+The Shopify floor session check gains a third state. A repo that enables `dkj-team-shopify` without a
+store -- the plugin's own source repo, or any repo that turns the team on only to validate its
+manifests and hooks -- can now answer `Get-ShopifyRepoHasNoStore` with `$true` in its
+`scripts/repo-config.ps1`, and the check then stays silent on the half-armed live-theme finding
+instead of raising a permanent `[ERROR]` it has no truthful way to clear. The silence follows a
+deliberate, self-authored declaration only -- never an inference from the tree -- so no real store is
+ever quieted by it, and the guard hook, every other seam and the independent duplicate-guard finding
+are unchanged.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer that enables `dkj-team-shopify` purely to check that its manifests and hooks still resolve,
+without owning a store, gets a clean session start instead of a standing `[ERROR]` or a faked theme
+id. Store consumers -- the common case -- see nothing change.
+
+**Score:** 2
+
+#### Pull Request
+
+let a repo declare it has no Shopify store, so the floor check stops the permanent [ERROR]
+
+Plugins: dkj-team-shopify
+
+[PR #1578](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1578)
+
+---
 
 ### DEPLOY: fix/1574-machine-local-remedy-wording · 20260908-083227
 
