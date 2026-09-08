@@ -67,6 +67,18 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
   agents' self-reports. **A self-report about the working copy is the least trustworthy of them**, and
   not because a subagent lies: it reports what `git status` told it, and a clean `git status` reads the
   same whether nothing was touched or your uncommitted edits were discarded.
+- **And that reconciliation has a measurement now, not only an instruction** (September 8, 2026,
+  [#1670](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1670)). Take a reading of the
+  working copy **before** you dispatch and compare it **after** the agents return: what the comparison
+  reports is *shrinkage* only — a path that was changed and no longer is, a worktree edit that has been
+  reverted under a path that remains, or a stash entry that has gone by its own id. Growth is expected
+  and stays silent, so a subagent legitimately writing files never trips it. Where the workflow plugin
+  is installed the step is the `check-fanout` skill (`-Capture` before, `-Compare <path>` after); where
+  it is not, the same reading by hand is `git status --porcelain --untracked-files=all` plus
+  `git stash list --format=%H`, kept and diffed — **and remember to exclude the paths your own commits
+  carried in the meantime**, which is the one false positive the hand-rolled version gets wrong.
+  It **reports and cannot restore**: uncommitted content that was discarded is in no reflog, so what
+  the finding buys you is knowing which file to write again.
 - Fanning out **read-only** work in parallel is fine as far as the *deliverable* goes — nobody is
   writing files — but **"read-only" describes the assignment, not the tools.** A specialist holding
   `Bash` can move the tree with `git` while changing no file of its own, and that is what the
@@ -77,8 +89,9 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
   last commit, while the review ran — were gone with no error and no notice.
 - **So commit before you fan out, if you have anything uncommitted.** It is the orchestrator's own
   move, and it is what makes the parallel chain safe rather than merely permitted: a boundary in the
-  agent defs reduces the risk and cannot remove it, and nothing in the harness will tell you afterwards
-  that something was lost. **It is not free, though, and pretending otherwise is how the advice gets
+  agent defs reduces the risk and cannot remove it, and nothing in the harness will tell you **on its
+  own** that something was lost — the bullet above is a step somebody has to run, not a notice that
+  arrives. **It is not free, though, and pretending otherwise is how the advice gets
   ignored**: in a repo that does not squash on merge, a mid-work commit made only so a review could run
   is permanent history — and tidying several of them afterwards is a rebase or an amend, which is
   precisely what a repo's own safety rules may gate behind the owner's word. Weigh that against what it

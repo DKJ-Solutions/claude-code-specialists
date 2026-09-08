@@ -75,6 +75,7 @@ an absent link is a fact rather than an oversight.
 | `task/park-cycle.ps1` | the automatic half of parking: pushes the branch's development document to origin, unless a PR has already published it | documented on the [`park`](../skills/park/SKILL.md) page; run only by the `cycle-autopark` Stop hook, never by hand |
 | `task/prune-merged.ps1` | fast-forwards the trunk and deletes local branches that are provably merged; a branch without that proof is left alone | [`prune-merged`](../skills/prune-merged/SKILL.md) |
 | `task/plugin-versions.ps1` | per enabled plugin: the version installed in THIS checkout (from the install record for this path) against the marketplace clone's `plugin.json` version + git HEAD, with a verdict on whether a plugin update is due | [`plugin-versions`](../skills/plugin-versions/SKILL.md) |
+| `task/check-fanout.ps1` | `-Capture` before a fan-out and `-Compare <path>` after it: reports only what SHRANK in the working copy — a changed path that is now unchanged, a reverted worktree edit, a stash entry gone by its own id. Growth is expected and stays silent | [`check-fanout`](../skills/check-fanout/SKILL.md) |
 | `task/check-policy-drift.ps1` | lists every law-bearing document in rank order — the installed plugins' portable pages against this repo's own — so a session can read the two against each other; locates and hands over, decides nothing | [`check-policy-drift`](../skills/check-policy-drift/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
@@ -101,6 +102,7 @@ an absent link is a fact rather than an oversight.
 | `lib/pr-body-lib.ps1` | composes and refreshes the PR body from the entry | none — dot-sourced lib |
 | `lib/pr-issues-lib.ps1` | reads the issues a PR declares it closes | none — dot-sourced lib |
 | `lib/park-lib.ps1` | `Invoke-GitPark` — the one stage/commit/push behind both parking entry points | none — dot-sourced lib |
+| `lib/fanout-lib.ps1` | the working-copy snapshot and the whole shrinkage judgement as a pure function — `Get-WorkingCopySnapshot`, `Compare-WorkingCopySnapshot`, `Format-WorkingCopyShrinkage` | none — dot-sourced lib |
 | `lib/source-repo-guard-lib.ps1` | `Assert-OwnCopy` — refuses a released copy running in the repo that maintains it | none — dot-sourced lib |
 | `lib/native-capture-lib.ps1` | `Invoke-NativeCapture`, the stderr-safe native-command wrapper | none — dot-sourced lib |
 | `lib/check-report-lib.ps1` | the `[OK]`/`[INFO]`/`[ERROR]` report helper | none — dot-sourced lib |
