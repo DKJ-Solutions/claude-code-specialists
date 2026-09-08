@@ -71,6 +71,14 @@ and does not exist on the trunk. Its `<temp>/dkj-session-cache` **must** persist
 guid is not available to it: that shape needs a different answer and it belongs on that branch. Said
 there rather than left implicit here.
 
+And `scripts/tests/` is outside the scan on purpose -- fixtures have their own rule and their own
+enforcer -- but that rule answers a different question (two concurrent runs, not a hostile neighbour),
+so the exposure is unchanged there. Measured while reviewing this branch: **108** predictable fixture
+paths across **66** files, **53** of them opening with a recursive delete at that path. Bigger than the
+half this branch closes, pre-existing, and filed as
+[#1664](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1664) rather than swept in here.
+The PR title is narrowed to *shipping* scripts for the same reason.
+
 ### CREATE
 
 - [x] `New-ScratchPath` in `lib/native-capture-lib.ps1` -- `<temp>/<label>-<pid>-<guid>`, `-Extension`,
@@ -125,5 +133,5 @@ is against a local actor on the machine running them; no behaviour a consumer in
 
 #### Pull Request
 
-Every temp path the script layer composes is unpredictable
+No shipping script composes a predictable temp path any more
 
