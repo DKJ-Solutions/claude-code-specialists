@@ -15,7 +15,9 @@ each other -- run them in any order, or run only the one you need:
   whether a required check exists for the staleness guard to read. A merge queue is optional here.
 
 No part depends on another having run. All three are dry-run by default and never overwrite a file
-that already exists.
+that already exists. Part 1 makes exactly one write **into** an existing file -- it appends the folder
+README's marked UPDATE section when that page does not carry it -- and it replaces nothing; see its
+rules below.
 
 ## Part 1 -- scaffold the workflow folder
 
@@ -68,6 +70,14 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
   markers is yours. **Nothing is ever rewritten**, which is new since August 23, 2026: `new-branch` used
   to refresh the generated `branch/templates/` on drift, and the merged development document carries its own
   guidance, so there is no reference beside it left to keep current.
+- **With one bounded exception, and it is additive too: the folder README's UPDATE section.** A re-run
+  **appends** that section when your `README.md` does not carry it, and leaves the file alone once it
+  does. Create-when-absent is right for a page you then write in, and it is also the reason a section
+  added to this scaffold *later* reaches an already-adopted repo not at all -- so this one section
+  carries a marker comment (`<!-- dkj-policy:update-section -->`) that the run recognises. Bounded to one
+  append at the end of one file, in whichever folder `Get-WorkflowFolderName` says you actually have;
+  nothing else in the page is read, and nothing is rewritten. Delete the marker and the next `-Apply`
+  writes the section again, which is also how you take a newer version of it.
 - **The branch document comes from the shared formatter** -- the same one `new-branch` and the fold
   call -- so the scaffold cannot write a shape of its own.
 - **Refused in a repo that publishes plugins** (`.claude-plugin/marketplace.json` present). The source
