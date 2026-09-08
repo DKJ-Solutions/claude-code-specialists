@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 14 minor entries** <!-- pending-tally -->
+**9 / 15 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1586-fold-on-merge-stale-trunk-deferral · 20260908-094224
+
+The `Fold on merge` CI job no longer goes red when two merges land within seconds of each other. Its
+checkout reads the trunk once, and the fold's trunk-freshness guard measures the same trunk again about
+eleven seconds later -- so a second merge in that gap left the job refusing on an entry another actor
+had already folded. The guard was right and the trunk ended correct; only the red was wrong, and it
+described a state that was gone by the time anybody opened it.
+
+That refusal now carries its own exit code -- `2`, the only thing in `fold-changelog-entry.ps1` that
+returns it -- and the job stands down green on that code alone, naming the reason in the log. Every
+other non-zero code still fails it, so the three real ways the job goes red are untouched. Nothing is
+lost by standing down: the guard fires in a pre-pass before a single entry is folded, and the push that
+moved the trunk queues its own run of the same job behind this one. The consumer template in
+`adopt-merge-queue.ps1` places the same behaviour, and both workflow headers stop claiming -- as
+#1543's repair did -- that `ref: <trunk>` puts that guard out of reach.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer who has adopted the CI floor gets a fold runner that stops crying wolf, and the guidance
+that goes with it: a `Stood down:` line in the log is the job working rather than a fold that went
+missing. `git fetch` + `--ff-only` before the fold was the obvious alternative and is declined in
+writing -- it narrows the window without closing it, which leaves the guardrail red *rarely*, and a
+guardrail that is wrong rarely is the one nobody reads.
+
+**Score:** 2
+
+#### Pull Request
+
+fold-on-merge stands down on a trunk that moved under it, instead of going red
+
+Plugins: dkj-policy
+
+[PR #1593](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1593)
+
+---
 
 ### DEPLOY: docs/1587-staleness-source-of-truth · 20260908-093101
 
