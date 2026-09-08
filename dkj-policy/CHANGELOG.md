@@ -43,7 +43,49 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**20 / 40 minor entries** <!-- pending-tally -->
+**21 / 41 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1639-claim-issue-network-bound · 20260908-161105
+
+`claim-issue` bounds all three of its `gh` calls at the shared network timeout, so a stalled `gh` is
+reported instead of waited out. This is the worst step in the workflow to hang in: the claim is the
+first move of an issue-driven assignment, so a stall there is a session that never starts with nothing
+printed to say why -- and the shape is not hypothetical, since the measurement behind #1628 is a
+checkout where `gh` returned exit 1 intermittently while working fine from the shell, minutes apart,
+in one session.
+
+**A timed-out write is reported as an unknown rather than a failure.** The read and the read-back only
+ask questions, so a stall costs nothing but the answer; `gh issue edit` changes the tracker, and a
+write that never reported back may have landed. Saying "the claim failed" there would be a claim about
+the tracker the run cannot make, so it says it does not know, stops, and names re-running as the way
+out -- an already-landed claim comes back as *already yours*.
+
+And the reason the gap existed is closed too. The shared bound described itself as *"THE BOUND A GIT
+NETWORK CALL PASSES"* and listed three sites while six files read it and two passed it to `gh`. That
+comment is the one place a script author learns the policy, so the policy read as somebody else's. It
+now names both commands and points at a `grep` instead of carrying a list no gate can keep true.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow runs this claim step, and it is the first thing their session does
+with an issue number. Unbounded, a `gh` that never answers there presents as a session that simply
+sits -- no output, no verdict, nothing naming the cause -- which is the failure that costs an operator
+the most time to diagnose and the least to fix once named. They also get the corrected policy comment,
+which is what stops the next `gh`-only script in their tree from repeating this.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue bounds its three gh calls, and the shared bound stops describing itself as git-only
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1651](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1651)
+
+---
 
 ### DEPLOY: fix/1632-missing-entry-refused · 20260908-160353
 
