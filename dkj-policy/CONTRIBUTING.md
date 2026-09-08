@@ -238,8 +238,8 @@ under whichever of the four owns it, and everything between the title and `### P
 guidance. **Both were conventions a writer kept, and now a gate refuses both here** — measured the day they
 were stated, when `check-branch-entry.ps1` gave byte-identical output at four headings and at five. That
 day closed the measurement; [§3.2.5](#325-the-shape-gate-on-the-document-around-the-entry) is what closed
-the gap it left, and it carries which half holds in a consumer and which is this repo's own. Recorded, with
-that measurement, in
+the gap it left, and it carries which half holds in a consumer and which is this repo's own. Recorded --
+both rules, and the reasoning behind each, though not the measurement itself -- in
 [`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md).
 
 **Pick the prefix by what actually changes**, not by which files move along: `docs/` is purely text, `feat/`
