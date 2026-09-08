@@ -564,9 +564,17 @@ $trunk        = if (([string]$seam.Trunk).Trim())        { ([string]$seam.Trunk)
 # progress report (issue #1623). #1623 counted the branch's six and not these, because it read the script
 # for `$branch`; the mechanism is identical and the source is more exposed, not less -- $trunk is whatever
 # Get-TrunkBranchName in the consumer's repo-config.ps1 returns, and nothing between there and the first
-# `Write-Host` asks git whether it is a legal ref. The raw $trunk stays raw for `git checkout` and
-# `gh pr create --base`.
+# `Write-Host` asks git whether it is a legal ref. The raw $trunk stays raw for `git checkout`, which
+# hands it to git as one argument with no shell in between.
+#
+# BUT NOT FOR THE PRINTED `gh pr create --base` (issue #1627), which is what the sentence here used to
+# say. That line is not a call -- it is a command the reader is invited to copy and run, so it is the
+# PASTE axis and needs #1594's remedy rather than #1623's. It already routed `--head` through
+# Get-PasteableRef and left `--base` raw beside it, so one printed command was visibly half-guarded.
+# Its own placeholder, because that command can now print two: '<branch>' twice would leave the reader
+# unable to tell which note belonged to which half.
 $trunkShown   = Get-DisplayRef -Ref $trunk
+$trunkPaste   = Get-PasteableRef -Ref $trunk -Placeholder '<trunk>'
 $pattern      = if (([string]$seam.Pattern).Trim())      { ([string]$seam.Pattern).Trim() }      else { Get-SyncDefaultReferencePattern }
 $branchPrefix = if (([string]$seam.BranchPrefix).Trim()) { ([string]$seam.BranchPrefix).Trim() } else { 'sync/live-' }
 $mergeMethod  = if (([string]$seam.MergeMethod).Trim())  { ([string]$seam.MergeMethod).Trim() }  else { 'merge' }
@@ -876,8 +884,18 @@ elseif ($candidates.Count -eq 0) {
             Write-Host '  Nothing was pulled and nothing was written.' -ForegroundColor Red
             Write-Host ''
             Write-Host '  Look at what those branches hold, merge or close them, then run this again:' -ForegroundColor Yellow
+            # JUDGED PER BRANCH, not once (issue #1627). #1623 stripped these same names for the rows it
+            # prints as prose, on the ground that `git ls-remote` is where they come from and nothing here
+            # validated them; this is that same reach on the PASTE axis, where the remedy is a placeholder
+            # rather than a strip. A stripped name in a command would hand the reader a line that runs with
+            # a DIFFERENT value than the one on screen, which is worse than refusing to print it.
+            # `git check-ref-format` is no help either: it exits 0 on 'fix/evil;touch', 'fix/evil$(touch)'
+            # and 'fix/evil`touch`' alike (#1594's own measurement). Each line carries its own note beneath
+            # it, so two unsafe predecessors stay tellable apart.
             foreach ($s in $standing) {
-                Write-Host "    gh pr list --head $($s.Branch) --state open" -ForegroundColor Cyan
+                $sPaste = Get-PasteableRef -Ref ([string]$s.Branch)
+                Write-Host "    gh pr list --head $($sPaste.Token) --state open" -ForegroundColor Cyan
+                if ($sPaste.Note) { Write-Host $sPaste.Note -ForegroundColor Cyan }
             }
             Write-Host '  Or ask whether THIS run supersedes them, without writing anything:' -ForegroundColor Yellow
             Write-Host '    -DryRun         reports the per-branch verdict and stops' -ForegroundColor Cyan
@@ -1226,8 +1244,9 @@ try {
         Write-Host ''
         Write-Host 'Done -- and deliberately NOT merged.' -ForegroundColor Green
         Write-Host 'Open the PR, look at what the third parties changed, and merge it yourself:' -ForegroundColor Green
-        Write-Host "  gh pr create --base $trunk --head $($branchPaste.Token) --title `"$msg`" --body-file `"$bodyFile`"$labelText" -ForegroundColor Cyan
+        Write-Host "  gh pr create --base $($trunkPaste.Token) --head $($branchPaste.Token) --title `"$msg`" --body-file `"$bodyFile`"$labelText" -ForegroundColor Cyan
         if ($branchPaste.Note) { Write-Host $branchPaste.Note -ForegroundColor Cyan }
+        if ($trunkPaste.Note)  { Write-Host $trunkPaste.Note  -ForegroundColor Cyan }
         Write-Host ''
         if ($prLabels.Count -gt 0) {
             # WHY THE PRINTED LINE CARRIES THEM AND THE NOTE SAYS SO. This path is the default one, so it is

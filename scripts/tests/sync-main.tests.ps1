@@ -646,6 +646,34 @@ try {
     Assert-True ($indep.Out -match 'sections/reverted-since\.liquid') 'guard/independent: and that path is named, because it is the decision'
     Assert-True ($indep.Out -match 'Neither supersedes the other') 'guard/independent: so neither branch is presented as redundant'
 
+    # AN UNSAFE PREDECESSOR NAME REACHES THE PRINTED COMMAND, and this is the behavioural half of #1627 --
+    # the source-shape asserts in ref-print-lib.tests.ps1 prove the call site, this proves the output. The
+    # name is a LEGAL ref that the paste allowlist refuses: `git check-ref-format --branch` exits 0 on
+    # 'sync/live-2026-08-17;touch' (measured), and nothing between `git ls-remote` and that `Write-Host`
+    # asks git anything anyway -- whoever pushed a branch under this prefix chose the name.
+    #
+    # THE TWO HALVES ARE ASSERTED SEPARATELY ON PURPOSE. The command must carry the placeholder, and the
+    # note must carry the real name -- a remedy that hides the name leaves the reader unable to act, which
+    # is the failure Get-PasteableRef's own contract calls worse than the one it guards.
+    $unsafePred = 'sync/live-2026-08-17;touch'
+    $evilRepo = New-Consumer -Label 'guard-evil' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
+    Add-FixtureCommit -Dir $evilRepo -Message 'sync: the floor' -Write @{ 'sections/unrelated.liquid' = 'u1' }
+    Add-PredecessorBranch -Dir $evilRepo -Name $unsafePred -Files @{ 'sections/from-editor.liquid' = 'a third party wrote this' }
+    $evilMirror = New-Mirror -Label 'guard-evil' -Files @{
+        'sections/theme.liquid'       = 'v1'
+        'sections/unrelated.liquid'   = 'u1'
+        'sections/from-editor.liquid' = 'a third party wrote this'
+    }
+    $evil = Invoke-Sync -Dir $evilRepo -Mirror $evilMirror
+    Assert-True ($evil.Code -eq 1) 'guard/unsafe: a standing branch still refuses the run, whatever it is called'
+    Assert-True ($evil.Out -match [regex]::Escape('gh pr list --head <branch> --state open')) 'guard/unsafe: the printed command carries the placeholder, not the name'
+    Assert-True ($evil.Out -notmatch [regex]::Escape('gh pr list --head sync/live-2026-08-17;touch')) 'guard/unsafe: and never the raw name after a command word'
+    Assert-True ($evil.Out -match 'not safe to paste into the line above') 'guard/unsafe: the note explains why the line reads a placeholder'
+    # 'The branch name is:' -- the note's own noun, which #1637 made a function of -Kind. Asserted with
+    # the noun rather than around it, because that word is the half telling the reader WHAT kind of thing
+    # to go looking for, and a path-shaped note here would be the wrong answer rather than a wording nit.
+    Assert-True ($evil.Out -match [regex]::Escape('The branch name is: sync/live-2026-08-17;touch')) 'guard/unsafe: and names the real branch as PROSE, so the reader can still act on it'
+
     # A MERGED BRANCH IS NOT A PREDECESSOR. Its ref lingers here because the fixture has no
     # delete_branch_on_merge, which is exactly the consumer this script must not refuse forever.
     $mergedRepo = New-Consumer -Label 'guard-merged' -ThemeId '123456' -StoreDomain 'a-store.myshopify.com'
