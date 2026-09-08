@@ -1248,16 +1248,26 @@ function Test-IsFoldOnlyCommit {
         #1592 attributed the window to ship-pr waiting on the NON-required 'claude-review' check, reading
         "lint-en-tests finished in 2s" off the check table. That 2s is the AGGREGATOR job's own elapsed:
         'lint-en-tests' in ci.yml is a needs: [lint, suites] job on ubuntu that compares two strings, so it
-        cannot conclude before the windows legs it waits on. Measured over the last 40 paired pull_request
-        runs, CI itself takes 5-7 minutes and the non-required check governs 8 of 40 (20%, median excess 0s)
+        cannot conclude before the two windows-latest legs it waits on. Measured over the last 40 paired
+        pull_request runs, CI itself takes 310-461s (median 374s) and the non-required check governs 8 of the
+        40 -- 20%, median excess 0s across all of them and about 6 minutes in the 8 where it does govern
         -- which reconfirms #831's own n=100 finding of 23% rather than overturning it, and leaves the wait
         exactly where Dave left it. Of the two refusals, attempt 3's first voiding commit landed BEFORE its
         required check concluded, so it was lost before the certificate was ever valid.
 
         FAILS CLOSED, EVERY WAY IN. An unreadable diff, a shape with two paths (a rename or a copy, which the
-        fold does not produce), a path outside the entry folder, a changelog that is deleted rather than
-        written, a missing seam, or no branch-document deletion at all: each returns $false, and a commit that
-        does not read as a fold is counted exactly as it was before this function existed. The residual this
+        fold does not produce), a path outside the entry folder, a path NESTED below it, a branch document
+        touched rather than removed, a changelog that is deleted rather than written, a missing seam, or no
+        branch-document deletion at all: each returns $false, and a commit that
+        does not read as a fold is counted exactly as it was before this function existed.
+
+        ONE KNOWN FALSE NEGATIVE, AND IT IS THE SAFE DIRECTION. Folding a branch cut before the
+        August 23, 2026 document merge can additionally remove Get-BranchFilePaths' LegacyCycle,
+        'dkj-policy/branch/branch-cycle.md' -- nested one level down, so the flat-leaf test above
+        disqualifies the whole commit and that fold is not exempted. The operator then gets the ordinary
+        pre-#1592 refusal and its remedy, which is what they got for the fifteen days before this existed.
+        Left as it is deliberately: admitting a subfolder to buy back a vanishingly rare shape widens the
+        bound for every commit, and the bound is the only thing this function has to offer. The residual this
         leaves is named rather than engineered around: a fold's changelog text could link to a path the
         shipping branch deletes, and the dead-link scan would then go red on the trunk. It is the cheapest
         class of red there is, it is caught by the trunk's own CI within minutes, and the text was already on
@@ -1335,12 +1345,21 @@ function Test-IsFoldOnlyCommit {
         if ($leaf -notmatch '(?i)\.md$') { return $false }
         if (@($reserved | Where-Object { $_ -ieq $leaf }).Count -gt 0) { return $false }
 
-        # THE DELETION IS THE SIGNATURE, and requiring it is what keeps an ordinary pull request out of this
-        # exemption. A branch that edits the changelog's intro and nothing else would otherwise arrive here
-        # as a changelog-only commit and be waved through -- and this repo's own suites do assert on that
-        # intro, so it is a commit whose reach this function cannot vouch for. Only the fold removes a
-        # branch document, so only the fold has both halves.
-        if ($status -match '^D') { $sawEntryDeletion = $true }
+        # EVERY BRANCH DOCUMENT IN THE DIFF IS A DELETION, NOT MERELY ONE OF THEM. Caught in review before
+        # this merged: the first build set the flag on a 'D' and let any OTHER status inside the folder
+        # through unremarked, so 'M CHANGELOG.md' + 'D fix-a.md' + 'A sneaky.md' classified as a fold. The
+        # fold script cannot produce that shape -- every path it names beside the changelog is one it has
+        # just removed -- but this function's whole job is to PROVE a commit was written by that script, and
+        # a shape it accepts without proof is exactly the false positive it exists to refuse. The docstring
+        # and this suite both claim "the bound is the two paths"; this is the line that makes that true.
+        if ($status -notmatch '^D') { return $false }
+
+        # THE DELETION IS ALSO THE SIGNATURE, and requiring at least one is what keeps an ordinary pull
+        # request out of this exemption. A branch that edits the changelog's intro and nothing else would
+        # otherwise arrive as a changelog-only commit and be waved through -- and this repo's own suites do
+        # assert on that intro, so it is a commit whose reach this function cannot vouch for. Only the fold
+        # removes a branch document, so only the fold has both halves.
+        $sawEntryDeletion = $true
     }
 
     return ($sawChangelogWrite -and $sawEntryDeletion)

@@ -41,12 +41,14 @@ repo's own rule that a finding's reason is checked before its symptom is repaire
 
 - That `2s` is the **aggregator job's** own elapsed. `lint-en-tests` in
   [`ci.yml`](../.github/workflows/ci.yml) is `needs: [lint, suites]` on ubuntu and compares two
-  strings, so it cannot conclude before the windows legs it waits on. CI itself takes 5-7 minutes,
-  which is what the certificate's window actually is. The report's own table already showed this --
-  `wait 11m45s` minus `after last required check 5m57s` puts the required check at 5m48s.
-- The non-required check governs **8 of the last 40** paired `pull_request` runs (20%, median excess
-  0s), which **reconfirms** #831's own n=100 finding of 23% rather than overturning it. So the wait
-  stays exactly where Dave left it, and #1592's options 2 and 3 lose their premise with it.
+  strings, so it cannot conclude before the two `windows-latest` legs it waits on. CI itself takes
+  310-461s (median 374s), which is what the certificate's window actually is. The report's own table
+  already showed this -- `wait 11m45s` minus `after last required check 5m57s` puts the required
+  check at 5m48s.
+- The non-required check governs **8 of the last 40** paired `pull_request` runs -- 20%, median
+  excess 0s across all 40 and about 6 minutes in the 8 where it does govern -- which **reconfirms**
+  #831's own n=100 finding of 23% rather than overturning it. So the wait stays exactly where Dave
+  left it, and #1592's options 2 and 3 lose their premise with it.
 - Of the two refusals, **attempt 3 was already lost before its certificate was valid**: its first
   voiding commit landed at 08:33:02Z, the required check concluded at 08:37:06Z.
 
@@ -83,13 +85,24 @@ anyway, so nothing here waits on them.
 
 ### TEST
 
-- [x] 53 new asserts in `scripts/tests/pr-issues.tests.ps1`: the fold's shape, every way of not
-      being one (a script or test riding along, a rename, a copy, a nested path, a reserved page, a
-      deleted changelog, a space-separated line), the fail-closed paths, the exemption arithmetic,
-      and step 3b's wiring. Suite green at 732 asserts.
+- [x] 56 new asserts in `scripts/tests/pr-issues.tests.ps1`: the fold's shape, every way of not
+      being one (a script or test riding along, an add or an edit inside the entry folder, a rename,
+      a copy, a nested path, a reserved page, a deleted changelog, a space-separated line), the
+      fail-closed paths, the one known false negative, the exemption arithmetic, and step 3b's
+      wiring. Suite green at 735 asserts.
 - [x] Classifier driven against the real commits: 4ea4f31b, 437366a4, 072bb6bd and 7a755c8b read as
       folds; the two PR merge commits beside them do not.
-- [x] Full lint gate and all suites via `open-pr.ps1`.
+- [x] Code review and copy edit on the diff before the PR. The review found the classifier's bound
+      was not actually enforced inside the entry folder -- `M CHANGELOG.md` + `D fix-a.md` +
+      `A sneaky.md` classified as a fold, because the first build set its flag on a `D` and let any
+      other status through unremarked. Repaired: every branch document in the diff must be a
+      deletion, with two asserts on that shape. Also from the review: `-Utf8` on the diff read
+      (#907's convention for output that is data), the seam read held in one variable, and the
+      nested legacy-fold false negative documented. The copy edit reported two wording defects --
+      one of them diagnosed as a missing possessive when the sense was `windows-latest`, so it was
+      repaired as that instead.
+- [x] Suite run standalone, green. The lint gate ran clean during the copy edit; `open-pr.ps1` runs
+      both again as its own gate before the push, which is not a step this list can tick.
 
 ### DEPLOY: fix/1592-fold-commits-void-certificate
 
@@ -104,12 +117,12 @@ It is why detect-and-rebase can converge on a busy trunk. Shipping PR #1571 took
 about an hour; the three commits that voided its two refused certificates were all folds, and both
 refusals would have passed. Folds are 42% of this trunk's first-parent commits, so the rate at which
 the trunk voids a certificate roughly halves -- against a window that is about as long as CI takes
-(5-7 minutes) and cannot be made much shorter.
+(310-461s measured, median 374s) and cannot be made much shorter.
 
 Nothing changed at the wait. #1592 attributed the window to the non-required `claude-review` check,
 reading `lint-en-tests finished in 2s` off the check table; that 2s is the aggregator job's elapsed,
-and measured over 40 paired runs the non-required check governs 20% of them at a median excess of 0s
--- reconfirming #831 rather than overturning it.
+and measured over 40 paired runs the non-required check governs 8 of them at a median excess of 0s
+across all 40 -- reconfirming #831's own 23% at n=100 rather than overturning it.
 
 **Score:** 4
 

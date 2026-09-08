@@ -1936,7 +1936,7 @@ Assert-True ($shipText -like '*exit 1*') 'a stale certificate is a hard refusal 
 # --- Test-IsFoldOnlyCommit: is one gained commit a fold, and nothing else? (issue #1592) ------------
 # THE SHAPE IS THE WHOLE POINT. This function is what lets step 3b discount a commit, so every way of
 # NOT being a fold is asserted as loudly as the fold itself -- a false positive here waves a genuinely
-# untested commit past the gate #1292 exists to be.
+# untested commit past the very gate #1292 exists for.
 Write-Host ""
 Write-Host "Test-IsFoldOnlyCommit -- the fold's two-path shape, read off the diff (issue #1592)" -ForegroundColor Cyan
 
@@ -1972,6 +1972,16 @@ Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/fix-a.md", "M
 Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/fix-a.md", "M`tscripts/tests/new-branch.tests.ps1")) 'and so does a test file, which is #1292''s own instance verbatim'
 Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/fix-a.md", "M`tREADME.md")) 'a root doc riding along disqualifies it too -- the bound is the two paths, not "docs only"'
 
+# AND THE BOUND HOLDS INSIDE THE FOLDER TOO -- the hole the pre-merge code review found. The three asserts
+# above all disqualify on the PATH; these two disqualify on the STATUS, which the first build did not do:
+# it set its flag on a 'D' and let any other status inside the folder through unremarked, so a fold-shaped
+# commit with an extra add or edit beside the deletion classified as a fold. fold-changelog-entry.ps1
+# cannot write that shape -- every path it names beside the changelog is one it has just removed -- and
+# that is the point: this function's job is to PROVE the fold wrote a commit, so a shape it accepts
+# without proof is the false positive it exists to refuse.
+Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/fix-a.md", "A`tdkj-policy/sneaky.md")) 'an ADDED markdown file in the entry folder riding along disqualifies the commit'
+Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/fix-a.md", "M`tdkj-policy/unrelated.md")) 'and so does an EDITED one -- every branch document in a fold is a deletion, not merely one of them'
+
 # THE FOLDER'S OWN PERMANENT PAGES ARE NOT BRANCH DOCUMENTS, matched case-insensitively for the reason
 # Get-BranchFilePaths.ReservedNames itself gives (Windows hands back 'Readme.md' for 'README.md').
 Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/README.md")) 'the folder''s README is not a branch document'
@@ -1983,6 +1993,13 @@ Assert-Equal $false (Test-Fold -Lines @("D`t$clog", "D`tdkj-policy/fix-a.md")) '
 
 # Structure the fold does not produce: a nested path, a non-markdown file, a rename or a copy.
 Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/releases/history.md")) 'a path NESTED below the entry folder is not a branch document'
+
+# THE ONE KNOWN FALSE NEGATIVE, ASSERTED SO IT IS A DECISION AND NOT A SURPRISE. Folding a branch cut
+# before the August 23, 2026 document merge can also remove Get-BranchFilePaths' LegacyCycle, which is
+# nested -- so that fold is NOT exempted and its ship gets the ordinary pre-#1592 refusal. Left as it is
+# on purpose: admitting a subfolder to buy back a vanishingly rare shape widens the bound for every
+# commit, and the bound is the whole of what this function has to offer.
+Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/fix-a.md", "D`tdkj-policy/branch/branch-cycle.md")) 'a legacy fold that also removes the nested branch-cycle file is NOT exempted -- a false negative, which is the safe direction'
 Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "D`tdkj-policy/fix-a.txt")) 'a non-markdown file in the folder is not a branch document'
 Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "R100`tdkj-policy/fix-a.md`tdkj-policy/fix-b.md")) 'a rename (three fields) disqualifies rather than being half-read'
 Assert-Equal $false (Test-Fold -Lines @("M`t$clog", "C`tdkj-policy/fix-a.md`tdkj-policy/fix-b.md")) 'and so does a copy'
@@ -2056,10 +2073,10 @@ Write-Host "ship-pr.ps1's step 3b -- the fold exemption, wired (issue #1592)" -F
 
 Assert-True ($shipText -like '*Test-IsFoldOnlyCommit -NameStatusLines @($diffRead.Output) -ChangelogPath $changelogForFold*') 'step 3b classifies each gained commit with the pure function, off that commit''s own diff'
 Assert-True ($shipText -like "*'show', '--name-status', '--format=', `$sha*") 'the diff read is name-status with an emptied header, so only the body is parsed'
-Assert-True ($shipText -like '*-DiscardStderr -Arguments @(''show'', ''--name-status''*') 'and it carries -DiscardStderr, because that output is PARSED -- the same reason the first-parent log does'
+Assert-True ($shipText -like '*-Utf8 -FilePath ''git'' -DiscardStderr -Arguments @(''show'', ''--name-status''*') 'and it carries -Utf8 AND -DiscardStderr: the paths are DATA (issue #907) and the output is PARSED'
 Assert-True ($shipText -like '*Get-SeamValue -Name ''Get-ChangelogPath''*') 'the changelog half of the bound comes from the repo''s own seam, not from a literal in this script'
-Assert-True ($shipText -like '*(Get-BranchFilePaths).Directory*') 'and the folder half comes from Get-BranchFilePaths, the same answer four other scripts read'
-Assert-True ($shipText -like '*(Get-BranchFilePaths).ReservedNames*') 'including the folder''s permanent pages, so a fold cannot be faked with its README'
+Assert-True ($shipText -like '*$branchPathsForFold = Get-BranchFilePaths*') 'and the folder half comes from Get-BranchFilePaths, read once and held, the same answer four other scripts read'
+Assert-True ($shipText -like '*$branchPathsForFold.ReservedNames*') 'including the folder''s permanent pages, so a fold cannot be faked with its README'
 Assert-True ($shipText -like '*seam-lib.ps1*') 'and seam-lib is dot-sourced, since Get-SeamValue does not travel with the other libs this script loads'
 
 # FAILS CLOSED: a diff that will not read leaves the commit counted, and an unresolved seam exempts

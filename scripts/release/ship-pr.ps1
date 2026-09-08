@@ -1200,9 +1200,10 @@ if ($waitReport) {
 # AND #1592's OWN REASON DID NOT HOLD, which is why nothing at step 3's wait changed. It read
 # 'lint-en-tests finished in 2s' off the check table and concluded the window was the non-required
 # 'claude-review' wait; that 2s is the AGGREGATOR job's elapsed (ci.yml: needs: [lint, suites], two string
-# compares on ubuntu), so the required check cannot conclude before the windows legs it waits on. Over the
-# last 40 paired pull_request runs the non-required check governs 8 (20%, median excess 0s), which
-# reconfirms #831's n=100 finding of 23% rather than overturning it.
+# compares on ubuntu), so the required check cannot conclude before the two windows-latest legs it waits
+# on. Over the last 40 paired pull_request runs CI itself takes 310-461s (median 374s) and the non-required
+# check governs 8 of them -- 20%, median excess 0s across all 40 and about 6 minutes in the 8 where it does
+# govern -- which reconfirms #831's n=100 finding of 23% rather than overturning it.
 #
 # THE ANCHOR IS THE CERTIFYING RUN'S OWN created_at, NOT A CHECK'S startedAt -- RE-ANCHORED AFTER A
 # RED-TEAM CAUGHT THE FIRST VERSION'S BIAS THE WRONG WAY ROUND (September 3, 2026). The first build read
@@ -1370,20 +1371,33 @@ certificate anyway.
         if ($newMainCommits.Count -gt 0) {
             $changelogForFold = ''
             $entryDirForFold = ''
+            # Read once and held: Get-BranchFilePaths is pure and static, so two calls could never answer
+            # differently -- but a reader has to establish that before they can be sure, and one variable
+            # says it instead.
+            $reservedForFold = @()
             try {
                 $changelogForFold = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
-                $entryDirForFold = (Get-BranchFilePaths).Directory
+                $branchPathsForFold = Get-BranchFilePaths
+                $entryDirForFold = $branchPathsForFold.Directory
+                $reservedForFold = @($branchPathsForFold.ReservedNames)
             } catch {
                 $changelogForFold = ''
                 $entryDirForFold = ''
             }
             if ($changelogForFold -and $entryDirForFold) {
-                $reservedForFold = @((Get-BranchFilePaths).ReservedNames)
                 foreach ($gained in $newMainCommits) {
                     $sha = "$gained".Trim()
                     # --format= empties the header so only the name-status body comes back; -DiscardStderr
                     # because this output is PARSED, the same reason the first-parent log above carries it.
-                    $diffRead = Invoke-NativeCapture -FilePath 'git' -DiscardStderr -Arguments @('show', '--name-status', '--format=', $sha)
+                    #
+                    # AND -Utf8, BECAUSE THESE PATHS ARE DATA (issue #907). Branch names here are ASCII by
+                    # this repo's own naming rule, so the console code page cannot change today's answer --
+                    # but this call compares its output against two seam-supplied paths, which is exactly the
+                    # class the lib's own header says must not be decoded with the console's code page. It
+                    # fails in the safe direction either way (a mis-decoded path matches nothing and the
+                    # commit stays counted), so this is the convention being followed rather than a bug being
+                    # fixed; the alternative was a comment explaining why this one call is the odd one out.
+                    $diffRead = Invoke-NativeCapture -Utf8 -FilePath 'git' -DiscardStderr -Arguments @('show', '--name-status', '--format=', $sha)
                     if ($diffRead.ExitCode -ne 0) { continue }
                     if (Test-IsFoldOnlyCommit -NameStatusLines @($diffRead.Output) -ChangelogPath $changelogForFold `
                             -EntryDirectory $entryDirForFold -ReservedNames $reservedForFold) {
