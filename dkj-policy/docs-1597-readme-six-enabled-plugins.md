@@ -33,19 +33,50 @@
 
 ### PLAN
 
+Resolves [#1597](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1597). The folder
+index's "Updating the plugins" section still described this repo as enabling `dkj-team-alpha` and
+`dkj-policy`, and printed an update command for those two only — while `.claude/settings.json` has
+enabled all six since
+[#1573](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1573). A reader following the
+block would have left four plugins on their old commit, with nothing reporting it.
+
+Verified before editing: `.claude/settings.json` on `main` names all six; the two-plugin wording is
+pre-existing on the trunk rather than introduced by any in-flight branch.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `dkj-policy/README.md`: the enabling sentence now says **every plugin in the marketplace**, six
+      since #1573, instead of naming two.
+- [x] `dkj-policy/README.md`: the fenced block gains one `claude plugin update … --scope project` line
+      per enabled plugin, in `.claude/settings.json`'s own order, and its lead-in says the refresh runs
+      once and the update once per enabled plugin.
+- [x] `dkj-policy/README.md`: one paragraph after the block names the failure mode — a plugin left off
+      the list stays on its old commit with no error and no verdict — and points at
+      `.claude/settings.json` as the enabled set and `plugin-versions` for which ones need the command.
+- [~] No other doc corrected: the only remaining two-plugin statements (`INSTALL.md`) describe a
+      *consumer's* default adoption, not this repo's own enabled set, so they are correct as written.
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` — the printed-command check holds each new `claude plugin update`
+      line to `--scope project` plus the marketplace refresh above it.
+- [x] All script test suites, as CI runs them.
+
 ### DEPLOY: docs/1597-readme-six-enabled-plugins
 
-**Score:**
+The `dkj-policy/` folder index no longer describes this repo as enabling two plugins. Its "Updating the
+plugins" section states that `.claude/settings.json` enables every plugin in the marketplace and prints
+an update command for each of the six, so an update round in another checkout of this repo no longer
+leaves four plugins silently behind.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A — an internal maintenance document of this repo. No consumer reads it, and nothing about the
+plugins they install changes.
+
+**Score:** N/A
 
 #### Pull Request
 
