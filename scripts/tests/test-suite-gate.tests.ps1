@@ -173,6 +173,97 @@ function Join-BacktickContinuation {
     ,$out
 }
 
+function Get-FakeFreshAssignment {
+    <#
+        Every place a suite gives one of the "holds a fresh value" variable names a value that is NOT a
+        fresh guid of usable width. Returns 'file:line' strings, empty when the file is clean.
+
+        WHY THIS READS THE PARSED SYNTAX AND NOT THE LINE TEXT. The rule above accepts '$tag' in a fixture
+        path BY NAME, so this is the check that makes the name mean something -- and a start-of-line regex
+        was the first shape, which Sebastian broke three ways on the branch that introduced it (#1664):
+
+            param([string]$tag = 'fixed-value')       a parameter default -- idiomatic, and not an
+                                                      assignment statement at all
+            if (-not $tag) { $tag = 'literal' }       an assignment inside a one-line block
+            $x = 1; $tag = 'literal'                  a semicolon-joined statement
+
+        None of the three starts its physical line with the assignment, so none was seen, while the outer
+        rule went on calling the resulting path safe because the text '$tag' appeared on it. That is the
+        same class of defect this tree has twice repaired elsewhere by moving a guard onto the AST -- see
+        source-repo-guard.tests.ps1, where a whole-file match on a lib's NAME could not tell loading it
+        from talking about it. The parser has no start-of-line notion, so all three forms are ordinary
+        nodes to it and the evasions are not evasions.
+
+        AND THE WIDTH IS BOUNDED, because 'contains NewGuid' is not the same claim as 'is unguessable'.
+        [Guid]::NewGuid().ToString('N').Substring(0, 1) names a guid and yields four bits, which a
+        neighbour pre-plants sixteen times. The two real call sites take 8 hex characters (32 bits), which
+        is far beyond a blind local pre-plant, so the floor sits there rather than at the full 32.
+
+        THE NAME IS READ FROM UserPath AND THE SCOPE STRIPPED HERE, not from UnqualifiedPath, which is the
+        property that obviously ought to serve and returns an EMPTY STRING on Windows PowerShell 5.1 --
+        measured on this machine, 5.1.26100.9278, for '$tag', '$script:tag' and '[string]$Guid' alike. The
+        first version of this function used it and therefore matched nothing at all: every one of the six
+        cases below reported 0, while the AST walk around it was already correct. It is worth naming
+        because the failure is silent in the dangerous direction -- a guard that finds nothing looks
+        exactly like a tree with nothing to find, and the only reason it was caught is that these cases
+        assert a positive count rather than merely asserting the suite stays green.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string[]]$Names)
+
+    $MinHexWidth = 8
+    $found = @()
+    $leaf  = Split-Path -Leaf $Path
+
+    $tokens = $null; $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors)
+    # A suite that does not parse is a separate, louder problem than this one, and every suite in this
+    # tree parses (the gate runs them). Returning nothing is right: reporting a parse error here would
+    # attribute it to the fixture convention.
+    if ($errors -and $errors.Count) { return $found }
+
+    # UserPath carries the scope ('script:tag'); take what follows the last colon. Empty for a plain name.
+    function Get-BareVarName {
+        param($VariablePath)
+        $u = "$($VariablePath.UserPath)"
+        if ($u -match '^[A-Za-z]+:(.*)$') { return $Matches[1] }
+        return $u
+    }
+
+    function Test-FreshEnough {
+        param($ValueAst, [int]$MinWidth)
+        if ($null -eq $ValueAst) { return $false }
+        $text = $ValueAst.Extent.Text
+        if ($text -notmatch 'NewGuid') { return $false }
+        # A truncation narrows it; anything else keeps the full guid.
+        foreach ($m in [regex]::Matches($text, 'Substring\(\s*\d+\s*,\s*(\d+)\s*\)')) {
+            if ([int]$m.Groups[1].Value -lt $MinWidth) { return $false }
+        }
+        return $true
+    }
+
+    # (a) ordinary assignments -- wherever they sit: inside a block, after a semicolon, in a loop body.
+    foreach ($node in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+        $left = $node.Left
+        # '$tag = ...' and '[string]$tag = ...' both reach the variable through a convert expression.
+        while ($left -is [System.Management.Automation.Language.ConvertExpressionAst]) { $left = $left.Child }
+        if ($left -isnot [System.Management.Automation.Language.VariableExpressionAst]) { continue }
+        if ($Names -notcontains (Get-BareVarName -VariablePath $left.VariablePath)) { continue }
+        if (Test-FreshEnough -ValueAst $node.Right -MinWidth $MinHexWidth) { continue }
+        $found += ('{0}:{1}' -f $leaf, $node.Extent.StartLineNumber)
+    }
+
+    # (b) parameter defaults -- not assignment statements, and the form a regex on '^\s*$tag\s*=' can
+    # never see. A default is a value the variable holds whenever the caller omits it.
+    foreach ($node in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.ParameterAst] }, $true)) {
+        if ($Names -notcontains (Get-BareVarName -VariablePath $node.Name.VariablePath)) { continue }
+        if ($null -eq $node.DefaultValue) { continue }
+        if (Test-FreshEnough -ValueAst $node.DefaultValue -MinWidth $MinHexWidth) { continue }
+        $found += ('{0}:{1}' -f $leaf, $node.Extent.StartLineNumber)
+    }
+
+    return $found
+}
+
 try {
     Write-Host "== test-suite-gate.tests: the gate every PR and every release runs ==" -ForegroundColor Cyan
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
@@ -553,9 +644,10 @@ finally {
 # accepts $PID alone. $PID is neither secret nor large, so a composed fixture leaf is a name a local actor
 # can reach FIRST: New-Item -ItemType Directory -Force and Remove-Item -Recurse -Force both follow a
 # reparse point, so a symlink or junction pre-planted at that exact path redirects the write AND the
-# teardown. Measured September 8, 2026 across these suites: 100 guid-less composed paths, and 116
-# recursive deletes standing at one of them across 50 files. That is the same class #1659 closed in the
-# shipping layer, and the delete half is the part #1659 had almost none of -- one site of its seven.
+# teardown. Measured September 8, 2026 across these suites, this guard excluded from both counts: 100
+# guid-less composed paths, and 114 recursive deletes standing at one of them across 49 files. That is
+# the same class #1659 closed in the shipping layer, and the delete half is the part #1659 had almost
+# none of -- one site of its seven.
 #
 # THE TWO QUESTIONS ARE NOT THE SAME QUESTION, and conflating them is what left the exposure standing for
 # a month. $PID answers "will two concurrent runs tear down each other's tree" -- correctly, and it is
@@ -600,49 +692,49 @@ $suiteFiles = @(Get-ChildItem -Path (Join-Path $RepoRoot 'scripts\tests') -Filte
     Where-Object { $_.Name -ne $self })
 Assert-True ($suiteFiles.Count -gt 20) "the scan found the suites (saw $($suiteFiles.Count) files)"
 
+# The two accepted variable names, declared before the scan because BOTH checks below read them: the
+# discriminator is built from them, and the second check reads their assignments.
+#
+# A path is safe when its name carries a value NOBODY CAN NAME IN ADVANCE: a fresh guid inline, or one of
+# these two variables holding one. $PID is no longer enough on its own (#1664) and neither is $Label --
+# the latter varies within a run and repeats across them, which is exactly the case that was wrong in
+# bootstrap-drift.
+$FreshValueVars = @('tag', 'Guid')
+$discriminator = 'NewGuid|' + (($FreshValueVars | ForEach-Object { '\$' + $_ + '\b' }) -join '|')
+
+# ONE PASS, AND THE EXPENSIVE HALF IS GATED ON THE CHEAP ONE. Reading and folding these ~84 files costs
+# ~0.55s and the matching is noise beside it, so both checks share the walk -- #1664 first added the
+# second one as a second identical walk, which Nolan measured at 0.64s of pure duplication.
+#
+# The AST parse is the part that had to be bounded rather than merely shared. Parsing all 84 files costs
+# ~5.5s, which would have made the fix for that 0.64s duplicate eight times worse than the duplicate; but
+# only THREE files in this tree so much as name one of these variables, and parsing those three costs
+# ~1.5s. So the fold above -- already paid for -- decides whether the parse happens at all. A file naming
+# neither name has no assignment to either and nothing for the parser to find, so the gate cannot hide an
+# offender: the token it screens on is the same one the offending assignment must contain.
+$nameProbe = '\$(?:[A-Za-z]+:)?(?:' + ($FreshValueVars -join '|') + ')\b'
 $tempLines = New-Object System.Collections.Generic.List[pscustomobject]
+$fakeFresh = @()
 foreach ($sf in $suiteFiles) {
     $folded = Join-BacktickContinuation ([System.IO.File]::ReadAllLines($sf.FullName))
+    $namesFreshVar = $false
     foreach ($stmt in $folded) {
+        if (-not $namesFreshVar -and $stmt.Text -match $nameProbe) { $namesFreshVar = $true }
         if ($stmt.Text -notmatch 'GetTempPath\(\)') { continue }
         # This file's own guard quotes the API in prose above; only statements that BUILD a path count.
         if ($stmt.Text -notmatch 'Join-Path') { continue }
         $tempLines.Add([pscustomobject]@{ File = $sf.Name; Line = $stmt.Line; Text = $stmt.Text.Trim() })
     }
+    if ($namesFreshVar) { $fakeFresh += @(Get-FakeFreshAssignment -Path $sf.FullName -Names $FreshValueVars) }
 }
 Assert-True ($tempLines.Count -gt 40) "the scan really read the temp paths (found $($tempLines.Count))"
 
-# A path is safe when its name carries a value NOBODY CAN NAME IN ADVANCE: a fresh guid inline, or one of
-# the two variables below holding one. $PID is no longer enough on its own (#1664) and neither is $Label --
-# the latter varies within a run and repeats across them, which is exactly the case that was wrong in
-# bootstrap-drift.
-$FreshValueVars = @('tag', 'Guid')
-$discriminator = 'NewGuid|' + (($FreshValueVars | ForEach-Object { '\$' + $_ + '\b' }) -join '|')
 $unsafe = @($tempLines | Where-Object { $_.Text -notmatch $discriminator })
 Assert-Equal 0 $unsafe.Count ("every temp fixture path is unguessable (offenders: " +
     (@($unsafe | ForEach-Object { "$($_.File):$($_.Line)" }) -join ', ') + ')')
 
-# AND THE TWO ACCEPTED VARIABLE NAMES MUST EARN THEIR PLACE, or the allowance above is a hole rather than
-# a convenience. '$tag' passes the scan by NAME, so a suite that later assigns it a fixed string -- a
-# label, a case name, $PID -- would keep passing while composing exactly the predictable path this rule
-# forbids. Four sites rely on the allowance (new-branch and shared-scripts, which need one path PER CHILD
-# INVOCATION where $PID is the same for all of them), so it is worth keeping and worth pinning: every
-# assignment to one of these names, in any suite, must take its value from a fresh guid.
-$fakeFresh = @()
-foreach ($sf in $suiteFiles) {
-    $folded = Join-BacktickContinuation ([System.IO.File]::ReadAllLines($sf.FullName))
-    foreach ($stmt in $folded) {
-        $t = $stmt.Text.Trim()
-        if ($t.StartsWith('#')) { continue }
-        foreach ($v in $FreshValueVars) {
-            if ($t -notmatch ('^\s*\$(?:script:|local:)?' + $v + '\s*=')) { continue }
-            if ($t -match 'NewGuid') { continue }
-            $fakeFresh += ('{0}:{1}' -f $sf.Name, $stmt.Line)
-        }
-    }
-}
-Assert-Equal 0 $fakeFresh.Count ("every `$tag/`$Guid is assigned from a fresh guid (offenders: " +
-    ($fakeFresh -join ', ') + ')')
+Assert-Equal 0 $fakeFresh.Count ("every `$tag/`$Guid is assigned from a fresh guid of usable width " +
+    "(offenders: " + ($fakeFresh -join ', ') + ')')
 
 # --- The continuation fold, exercised directly (#1326) ---------------------------------------------
 #
@@ -688,6 +780,45 @@ Assert-True ($splitPidOnly[0].Text -notmatch $discriminator) `
     'a $PID-only path is reported now, per-process though it is (#1664)'
 Assert-True ($splitPidOnly[0].Text -match '\$PID') `
     'and it is reported BECAUSE of the guid, not because $PID went missing'
+
+# --- The by-name allowance cannot be faked (#1664, after Sebastian's review) -----------------------
+#
+# The rule above accepts '$tag' in a fixture path by NAME, so Get-FakeFreshAssignment is what stops that
+# name being given a predictable value. These cases are the three forms that defeated its first,
+# regex-on-the-line shape, plus the width floor -- each written to a real file, because the subject is a
+# parser and a parser needs something to parse.
+Write-Host ''
+Write-Host 'the $tag/$Guid allowance cannot be faked' -ForegroundColor Cyan
+$astProbe = Join-Path $Fixture 'astprobe'
+New-Item -ItemType Directory -Path $astProbe -Force | Out-Null
+
+function Test-FakeFresh {
+    param([string]$Label, [string]$Body)
+    $p = Join-Path $astProbe ("$Label.ps1")
+    [System.IO.File]::WriteAllText($p, $Body, $Utf8NoBom)
+    return @(Get-FakeFreshAssignment -Path $p -Names @('tag', 'Guid'))
+}
+
+Assert-Equal 1 (Test-FakeFresh 'paramdefault' "function F {`n    param([string]`$tag = 'fixed-value')`n}`n").Count `
+    'a parameter default holding a literal is reported -- the form no line regex can see'
+Assert-Equal 1 (Test-FakeFresh 'inblock'      "if (-not `$tag) { `$tag = 'literal' }`n").Count `
+    'an assignment inside a one-line block is reported'
+Assert-Equal 1 (Test-FakeFresh 'semicolon'    "`$x = 1; `$tag = 'literal'`n").Count `
+    'an assignment after a semicolon is reported'
+Assert-Equal 1 (Test-FakeFresh 'scoped'       "`$script:tag = `$PID`n").Count `
+    'a scope prefix does not hide it, and `$PID is not a fresh value'
+Assert-Equal 1 (Test-FakeFresh 'narrow'       "`$tag = [Guid]::NewGuid().ToString('N').Substring(0, 1)`n").Count `
+    'a guid truncated to four bits is reported -- naming NewGuid is not the same claim as being unguessable'
+Assert-Equal 1 (Test-FakeFresh 'typed'        "[string]`$tag = 'literal'`n").Count `
+    'a type constraint on the left does not hide it'
+
+# And the honest forms stay silent, so the check is not simply refusing the name.
+Assert-Equal 0 (Test-FakeFresh 'okfull'   "`$tag = [guid]::NewGuid().ToString('n')`n").Count `
+    'a full fresh guid passes'
+Assert-Equal 0 (Test-FakeFresh 'okwidth'  "`$tag = [Guid]::NewGuid().ToString('N').Substring(0, 8)`n").Count `
+    'and so does the 8-character slice the two real call sites use'
+Assert-Equal 0 (Test-FakeFresh 'okother'  "`$other = 'literal'`n").Count `
+    'a variable outside the allowance is not this check subject'
 
 Write-Host ''
 Write-Host "Result: $script:pass pass, $script:fail fail." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })

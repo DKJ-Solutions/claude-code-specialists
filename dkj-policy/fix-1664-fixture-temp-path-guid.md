@@ -44,12 +44,30 @@ one statement that reads a temp leaf back by name — `test-suite-gate.tests.ps1
 glob `test-suite-gate-<pid>-*`. That glob already tolerates a guid suffix, so the one real reader is
 evidence *for* the shape rather than against it. No suite recomposes a parent's fixture name in a child.
 
-**Can the sites be routed through `New-ScratchPath`?** Reachable, but the wrong instrument. 22 of 85
-suites dot-source `native-capture-lib.ps1` (1406 lines) and 28 offender files would need a new
-dot-source of it; worse, `New-ScratchPath -Directory` creates *without* `-Force` and throws on an
-existing item, so routing the sites through it changes every fixture's setup and teardown shape rather
-than just its path composition. Declined, and the reasoning is recorded in `scripts/README.md` so the
-next reader does not re-open it.
+**Can the sites be routed through `New-ScratchPath`?** Reachable, but the wrong instrument. Only 22 of
+the 85 suites dot-source `native-capture-lib.ps1` (1406 lines), so **37 of the 53** files that had to
+change would need a new dot-source of it; worse, `New-ScratchPath -Directory` creates *without* `-Force`
+and throws on an existing item, so routing the sites through it changes every fixture's setup and
+teardown shape rather than just its path composition. Declined, and the reasoning is recorded in
+`scripts/README.md` so the next reader does not re-open it.
+
+#### Three figures were wrong when first written, and none was caught by a gate
+
+Worth recording together, because all three are the same mistake — trusting a working note instead of
+re-running the measurement — and the third was caught by a reviewer rather than by me.
+
+1. The **recursive-delete** count was taken *including* this guard's own file while the guid-less count
+   beside it excluded it: two adjacent numbers under two different rules, which is the drift a reader
+   cannot see. Corrected to **114 across 49**, both excluding the guard.
+2. The **dot-source** figure was counted from the suites that merely *name* the lib rather than those
+   that dot-source it, understating it as 28. Corrected to **37 of 53**, which makes the argument for
+   declining stronger rather than weaker.
+3. The **22** in the paragraph above survived that pass unverified, and Edith measured **18** — a real
+   disagreement rather than a slip on either side. Both are right about different things: 18 suites name
+   `native-capture-lib.ps1` on their own dot-source line, and 4 more reach it through a variable holding
+   its path (`. $LibPath`, `. $NativeCaptureSrc`), so 22 dot-source it and a literal grep for the
+   filename sees 18. The caution is now in `scripts/README.md` beside the figure, because the next
+   person to check it will reach for the same grep.
 
 **Is it worth doing?** Yes, by the cheap route: keep `$PID`, append a fresh guid inline — exactly
 `New-ScratchPath`'s own `<label>-$PID-<guid>` — and tighten the gate's own rule so the class cannot
@@ -59,11 +77,17 @@ come back. The pid stays because it is what makes a leftover attributable to a l
 #### The count differs from the issue's, and both are right
 
 #1664 reported 108 statements across 66 files, measured on `feat/1659-temp-path-unpredictable` at
-`922604a7`. Measured here after that branch merged: **100** across 53 files, of which **96** were
-rewritten — the remaining 4 (`new-branch` and `shared-scripts`) already build their leaf from `$tag`,
-which is itself a fresh guid, and are safe. The 4 in `test-suite-gate.tests.ps1` the scan reports are
-its own prose and its `#1326` fold test *data*, not paths a run creates; its one real fixture is
-rewritten by hand.
+`922604a7`. Measured here after that branch merged: **100** across 53 files, and they resolve as
+
+| | |
+|---|---|
+| rewritten by the scripted transform | **96** |
+| already safe — they build their leaf from `$tag`, itself a fresh guid (`new-branch`, `shared-scripts`) | **4** |
+| **total the scan reports** | **100** |
+
+`test-suite-gate.tests.ps1` is excluded from that scan and contributes to none of those rows. It holds
+four `GetTempPath()`/`Join-Path` pairs of its own — a *separate* four, in its prose and its `#1326` fold
+test **data**, not paths any run creates — plus one real fixture, which is rewritten by hand.
 
 ### CREATE
 
@@ -75,8 +99,15 @@ rewritten by hand.
       alone no longer passes
 - [x] Pin the two by-name allowances (`$tag`, `$Guid`) to a real guid assignment, so the convenience
       cannot decay into a fixed value
+- [x] **Re-do that pin on the AST after Sebastian broke the first version three ways** — a parameter
+      default, an assignment inside a one-line block, and one after a semicolon all defeated a
+      start-of-line regex, while the outer rule went on calling the resulting path safe. Also bounded the
+      *width*, since `Substring(0, 1)` names a guid and yields four bits
 - [x] Point the `#1326` fold cases at the live pattern rather than a second copy of it, and add the one
       case that separates the new rule from the old (a `$PID`-only path)
+- [x] Collapse the duplicate file walk Nolan measured (0.64s), and **gate the AST parse on the fold that
+      is already paid for** — parsing all 84 suites costs 5.5s, which would have made the fix eight times
+      worse than the defect; only 3 files name either variable, and parsing those costs 1.5s
 - [x] Record the convention in `scripts/README.md` — both halves, and why `New-ScratchPath` is not the
       instrument here
 - [x] Correct `native-capture.tests.ps1`'s exclusion comment, which recorded `tests/` as knowingly left
@@ -84,16 +115,30 @@ rewritten by hand.
 
 ### TEST
 
-- [x] `test-suite-gate.tests.ps1` green — 85 pass, 0 fail
-- [x] Both new asserts proved to BITE, not merely to pass: a guid stripped from a real suite is reported
-      as `agent-shared.tests.ps1:21`, and `$tag = 'fixed'` is reported as `shared-scripts.tests.ps1:75`.
-      Both restored afterwards and re-verified green
+- [x] `test-suite-gate.tests.ps1` green — 94 pass, 0 fail (85 before this branch; +9 asserts)
+- [x] Every new assert proved to BITE, not merely to pass. A guid stripped from a real suite is reported
+      as `agent-shared.tests.ps1:21`; `$tag = 'fixed'` as `shared-scripts.tests.ps1:75`; and a planted
+      parameter default (`[string]$tag = 'sneaky'`) as `shared-scripts.tests.ps1:74` — that last one run
+      against a **real suite**, so it exercises the name-probe gate the synthetic probe files bypass. All
+      restored afterwards and re-verified green
+- [x] **The AST helper's own first version found nothing and looked green.** `UnqualifiedPath` returns an
+      empty string on Windows PowerShell 5.1 (measured, 5.1.26100.9278), so all six evasion cases
+      reported 0. Caught only because those cases assert a positive count; the failure mode is written
+      into the function's docstring
 - [x] The full lint gate green — `check-plugin-integrity.ps1`, 0 errors
 - [x] All 81 suites green — 427s, 16 lanes
-- [x] Reviewed by Victor (code review), Sebastian (security) and Nolan (cost) on the diff
+- [x] Reviewed by Victor (code), Sebastian (security), Edith (copy) and Nolan (cost). Every finding
+      acted on in this branch: Sebastian's two guard evasions, Nolan's duplicate walk, Edith's three
+      prose findings and her disputed dot-source count. Victor found no correctness defect
 - [~] No new suite added. The rule and its enforcement both live in `test-suite-gate.tests.ps1`, which
-      already owns this subject and now carries three new asserts; a separate suite would have to
+      already owns this subject and now carries nine new asserts; a separate suite would have to
       re-scan the same tree to say the same thing
+- [~] The permanent-litter consequence is **not** repaired here. A guid path can never be reclaimed by a
+      later run's pre-delete — but that pre-delete was already reclaiming essentially nothing (413
+      leftover trees across 7 days on this machine, all under the old scheme), so this branch does not
+      make it worse in the near term. It does make it monotonic, which is worth closing separately:
+      filed as [#1668](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1668), where the
+      largest single contributor is already traced to `fold-changelog.tests.ps1`'s `New-Tree`
 
 ### DEPLOY: fix/1664-fixture-temp-path-guid
 
@@ -107,16 +152,23 @@ This is the half [#1659](https://github.com/DKJ-Solutions/claude-code-specialist
 close. `$PID` is neither secret nor large, so a composed leaf was a name a local actor could reach
 first — and `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` both follow a
 reparse point, so a symlink or junction pre-planted there redirected the write *and* the teardown.
-Measured before the repair: 100 guid-less paths, with 116 recursive deletes standing at one of them
-across 50 files. #1659 covered seven sites in the shipping layer and only one of those deleted
-recursively, so the delete half of the class was almost entirely here.
+Measured before the repair, this guard excluded from both counts: 100 guid-less paths, with 114
+recursive deletes standing at one of them across 49 files. #1659 covered seven sites in the shipping
+layer and only one of those deleted recursively, so the delete half of the class was almost entirely
+here.
 
 Two guards were also hardened rather than merely satisfied. The by-name allowance for `$tag` and
 `$Guid` — which four sites legitimately need, where one path per *child invocation* is required and
-`$PID` is the same for all of them — is now pinned to a real guid assignment, so it cannot decay into a
-fixed value while still passing. And the `#1326` continuation-fold cases now match on the live pattern
-instead of a second copy of it: they were still asserting the old alternation, which would have left
-the file proving a rule it no longer enforced.
+`$PID` is the same for all of them — is now pinned to a fresh guid **of usable width**, read from the
+parsed syntax rather than the line text. That second half is the review's doing: a start-of-line regex
+was the first shape, and a parameter default, an assignment inside a one-line block and one after a
+semicolon all walked past it while the outer rule went on calling the resulting path safe. And the
+`#1326` continuation-fold cases now match on the live pattern instead of a second copy of it: they were
+still asserting the old alternation, which would have left the file proving a rule it no longer enforced.
+
+The guard costs about 1.5s. Parsing all 84 suites would cost 5.5s, so the parse is gated on the fold the
+scan already performs — only three files name either variable, and a file naming neither cannot hold an
+assignment to one.
 
 **Score:** 3
 
