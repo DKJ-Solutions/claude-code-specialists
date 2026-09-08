@@ -2,7 +2,7 @@
 .SYNOPSIS
     Per enabled plugin: the version installed IN THIS CHECKOUT against the version the local
     marketplace clone would install, with a verdict on whether a plugin update is due. Runs in any
-    checkout on any device, reads only, takes no arguments for the default view.
+    checkout on any machine, reads only, takes no arguments for the default view.
 
 .DESCRIPTION
     ANSWERS A QUESTION NO EXISTING CHECK DOES: "is the plugin version this checkout loads the same as
@@ -86,6 +86,17 @@ function Format-ShortSha {
     if (-not $Sha) { return '(none)' }
     if ($Sha.Length -le 12) { return $Sha }
     return $Sha.Substring(0, 12)
+}
+
+function Get-ValidatedSha {
+    # A git commit sha is 7-40 hex characters. $GitCommitSha comes from installed_plugins.json and is
+    # interpolated into 'git rev-parse'/'git merge-base' below -- shape-check it first (defense in
+    # depth; the CLI writes that file and neither subcommand exposes a transport flag, so the risk is
+    # low, but the check is cheap) and treat anything else as no sha at all, so the caller falls
+    # through to the version comparison rather than handing a malformed value to git.
+    param([AllowNull()][string]$Sha)
+    if ($Sha -and $Sha -match '^[0-9a-f]{7,40}$') { return $Sha }
+    return ''
 }
 
 function Invoke-CloneGit {
@@ -193,7 +204,8 @@ if ($ids.Count -eq 0) {
 $userHome = Get-UserClaudeHome -UserHomeOverride $UserHomeOverride
 $install = Get-InstallRecord -RepoRoot $repoRoot -UserHomeOverride $UserHomeOverride
 
-$marketplaces = @($ids | ForEach-Object { ($_ -split '@')[-1] } | Sort-Object -Unique)
+$marketplaces = [string[]]@($ids | ForEach-Object { ($_ -split '@')[-1] } | Select-Object -Unique)
+if ($marketplaces.Count -gt 1) { [array]::Sort($marketplaces, [System.StringComparer]::Ordinal) }
 $clones = @{}
 foreach ($mp in $marketplaces) { $clones[$mp] = Resolve-Clone -Marketplace $mp -UserHome $userHome }
 
@@ -201,7 +213,7 @@ foreach ($mp in $marketplaces) { $clones[$mp] = Resolve-Clone -Marketplace $mp -
 
 $rows = New-Object System.Collections.Generic.List[object]
 
-foreach ($id in ($ids | Sort-Object)) {
+foreach ($id in $ids) {
     $parts = $id -split '@'
     $name = $parts[0]
     $mp = $parts[-1]
@@ -219,7 +231,7 @@ foreach ($id in ($ids | Sort-Object)) {
     $instText = ''
     if ($recs.Count -eq 1) {
         $instVer = [string]$recs[0].Version
-        $instSha = [string]$recs[0].GitCommitSha
+        $instSha = Get-ValidatedSha ([string]$recs[0].GitCommitSha)
         $instScope = [string]$recs[0].Scope
         $instText = "$(if ($instVer) { $instVer } else { '(no version)' })  $(Format-ShortSha $instSha)  $(if ($instScope) { $instScope } else { '(no scope)' })"
     } elseif ($recs.Count -gt 1) {
@@ -247,7 +259,7 @@ foreach ($id in ($ids | Sort-Object)) {
     } elseif ($clone.PluginVersion.ContainsKey($name)) {
         $cloneHasPlugin = $true
         $cloneVer = [string]$clone.PluginVersion[$name]
-        $cloneText = "$(if ($cloneVer) { $cloneVer } else { '(no version in plugin.json)' })  HEAD $(Format-ShortSha $clone.Head)"
+        $cloneText = "$(if ($cloneVer) { $cloneVer } else { '(no version in plugin.json)' })  $(if ($clone.IsGit) { 'HEAD' } else { 'sha' }) $(Format-ShortSha $clone.Head)"
     } elseif ($clone.Error) {
         $cloneText = "the clone's marketplace.json could not be read: $($clone.Error)"
     } else {
@@ -316,13 +328,30 @@ foreach ($id in ($ids | Sort-Object)) {
                 $anc = (Invoke-CloneGit -CloneDir $clone.Dir -GitArgs @('merge-base', '--is-ancestor', $instSha, 'HEAD')).ExitCode -eq 0
                 if ($anc) {
                     $code = 'behind'
-                    $verdict = "the clone is AHEAD of your install (same version string $instVer, newer commit)"
-                    if ($instVer -and $cloneVer -and $instVer -ne $cloneVer) { $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer)" }
+                    if ($instVer -and $cloneVer -and $instVer -ne $cloneVer) {
+                        $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer)"
+                    } elseif ($instVer) {
+                        $verdict = "the clone is AHEAD of your install (same version string $instVer, newer commit)"
+                    } else {
+                        $verdict = "the clone is AHEAD of your install (newer commit; no version recorded for your install)"
+                    }
                     $action = "claude plugin update $id --scope project"
                 } else {
-                    $code = 'clone-behind'
-                    $verdict = "your install is AHEAD of the clone -- the clone is stale"
-                    $action = "claude plugin marketplace update $mp"
+                    # Present in the clone's history but not an ancestor of HEAD -- reachable after a
+                    # history rewrite in the clone where the old object survives but is unreachable from
+                    # HEAD. Let the version strings arbitrate direction first, exactly like the
+                    # -not $existsInClone sibling branch above, rather than assuming unconditionally
+                    # that the install is ahead.
+                    $verCmp = Compare-Version -A $instVer -B $cloneVer
+                    if ($null -ne $verCmp -and $verCmp -lt 0) {
+                        $code = 'behind'
+                        $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer); your install's commit is in the clone's history but not an ancestor of HEAD (history rewrite?)"
+                        $action = "claude plugin update $id --scope project"
+                    } else {
+                        $code = 'clone-behind'
+                        $verdict = "your install is AHEAD of the clone -- the clone is stale"
+                        $action = "claude plugin marketplace update $mp"
+                    }
                 }
             }
         }
@@ -330,7 +359,15 @@ foreach ($id in ($ids | Sort-Object)) {
         $cmp = Compare-Version -A $instVer -B $cloneVer
         if ($cmp -eq 0) {
             $code = 'ver-match'
-            $verdict = "versions match ($instVer); no commit sha in the install record to compare finer"
+            # This branch is reached whenever EITHER side lacks a sha (the outer test above is
+            # '$instSha -and $clone.Head'), so attribute the gap to whichever side actually has it.
+            if (-not $instSha -and -not $clone.Head) {
+                $verdict = "versions match ($instVer); neither the install record nor the clone has a commit sha to compare finer"
+            } elseif (-not $instSha) {
+                $verdict = "versions match ($instVer); no commit sha in the install record to compare finer"
+            } else {
+                $verdict = "versions match ($instVer); the marketplace clone has no HEAD commit to compare finer"
+            }
             $action = "if you expect newer: claude plugin marketplace update $mp"
         } elseif ($cmp -lt 0) {
             $code = 'behind'

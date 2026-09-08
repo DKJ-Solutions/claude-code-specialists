@@ -29,12 +29,32 @@
       9  a foreign plugin id not in the clone's marketplace   -> "cannot determine", no error
       10 no plugins enabled                                   -> a sentence, exit 0
       11 projectPath separator / trailing-slash insensitivity -> still matched, "up to date"
-      12 asymmetric gap (a): install has a version but no sha, -> the catch-all verdict names BOTH
+      12 install sha reachable in the clone but NOT an        -> version strings genuinely say the
+         ancestor of HEAD (history rewrite in the clone)         clone is ahead -> per-plugin update,
+                                                                   NOT a marketplace refresh
+      13 same shape as 12, but the version strings do NOT     -> "your install is AHEAD of the
+         say the clone is ahead                                  clone -- stale", marketplace refresh
+      14 malformed gitCommitSha in the install record          -> degrades to the version comparison,
+                                                                   never reaches git, no crash
+      15 asymmetric gap (a): install has a version but no sha, -> the catch-all verdict names BOTH
          clone has HEAD but no readable plugin.json version       missing fields, never a bare
                                                                     "cannot determine -- " (regression)
-      13 asymmetric gap (b): install has a sha but no version, -> same regression, opposite side
+      16 asymmetric gap (b): install has a sha but no version, -> same regression, opposite side
          clone has a version but no HEAD/.gcs-sha
     Every scenario asserts exit code 0 explicitly (this is a report, not a gate).
+
+    Scenarios 12/13 build the "reachable but not an ancestor" state the way a real marketplace clone
+    reaches it: a rebase or force-push in the clone after which the OLD commit still exists as a loose
+    git object (rev-parse -q --verify resolves it) but is no longer on the line from HEAD. See
+    New-DivergedClone below.
+
+    Test 8a additionally carries two SCOPED assertions (Assert-HasBetween / Assert-LacksBetween)
+    alongside its existing Assert-Has: 'sha a1b2c3d4e5f6' also appears verbatim in the per-clone
+    footer line (printed earlier than the per-plugin block), so an unscoped Assert-Has there would
+    still pass even if the PER-PLUGIN "marketplace clone" line wrongly printed 'HEAD' instead of
+    'sha' -- the footer alone would satisfy it. The scoped pair bounds the slice to that one line
+    (from "marketplace clone" to the next "verdict"), so the needle -- or its absence -- can only be
+    found where it is supposed to be.
 
     Dependency-free (no Pester), same style as check-report-lib.tests.ps1 / adopt-workflow-folder.tests.ps1.
     Pure ASCII (repo convention for .ps1).
@@ -69,6 +89,44 @@ function Assert-Lacks {
     param([object]$Run, [string]$Needle, [string]$Label)
     Assert-True (-not $Run.Squish.Contains(($Needle -replace '\s', ''))) $Label
 }
+function Get-TextBetween {
+    # The raw (unsquished) slice of $Run.Text from the first occurrence of $StartMarker up to the
+    # next occurrence of $EndMarker (or to the end of the text if $EndMarker is not found after it).
+    # $null when $StartMarker itself is not found, so callers can fail loudly on a bad scope rather
+    # than silently searching the whole output.
+    param([object]$Run, [string]$StartMarker, [string]$EndMarker)
+    $s = $Run.Text.IndexOf($StartMarker)
+    if ($s -lt 0) { return $null }
+    $e = $Run.Text.IndexOf($EndMarker, $s + $StartMarker.Length)
+    if ($e -lt 0) { return $Run.Text.Substring($s) }
+    return $Run.Text.Substring($s, $e - $s)
+}
+function Assert-HasBetween {
+    # Scoped version of Assert-Has: the needle must appear within the slice from $StartMarker up to
+    # the next $EndMarker, not merely anywhere in the whole run's output. Use this where another part
+    # of the output (the summary, the per-clone footer, the verdict line) can contain the same words
+    # as the one line under test, so an unscoped Contains() would still pass even if that specific
+    # line were wrong.
+    param([object]$Run, [string]$StartMarker, [string]$EndMarker, [string]$Needle, [string]$Label)
+    $slice = Get-TextBetween -Run $Run -StartMarker $StartMarker -EndMarker $EndMarker
+    if ($null -eq $slice) {
+        $script:fail++
+        Write-Host "  [FAIL] $Label`n         marker not found in output: '$StartMarker'" -ForegroundColor Red
+        return
+    }
+    Assert-True (($slice -replace '\s', '').Contains(($Needle -replace '\s', ''))) $Label
+}
+function Assert-LacksBetween {
+    # The negation of Assert-HasBetween.
+    param([object]$Run, [string]$StartMarker, [string]$EndMarker, [string]$Needle, [string]$Label)
+    $slice = Get-TextBetween -Run $Run -StartMarker $StartMarker -EndMarker $EndMarker
+    if ($null -eq $slice) {
+        $script:fail++
+        Write-Host "  [FAIL] $Label`n         marker not found in output: '$StartMarker'" -ForegroundColor Red
+        return
+    }
+    Assert-True (-not (($slice -replace '\s', '').Contains(($Needle -replace '\s', '')))) $Label
+}
 
 # --- fixture builders -------------------------------------------------------------------------------
 
@@ -85,6 +143,16 @@ function Git-X {
     } finally {
         $ErrorActionPreference = $prev
     }
+}
+
+function Get-CloneGitExitCode {
+    # Fixture-side sanity checks (12/13) need the EXIT CODE of a git call in the fixture clone --
+    # e.g. does 'rev-parse -q --verify' resolve the orphaned commit at all -- not just its output, so
+    # this goes through the already dot-sourced Invoke-NativeCapture rather than Git-X above (which
+    # only hands back trimmed text). Distinct name from the script-under-test's own Invoke-CloneGit,
+    # deliberately: this is the TEST's fixture helper, not a stand-in for the script's function.
+    param([Parameter(Mandatory = $true)][string]$Dir, [Parameter(Mandatory = $true)][string[]]$GitArgs)
+    return (Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $Dir) + $GitArgs) -DiscardStderr).ExitCode
 }
 
 function New-Case {
@@ -157,6 +225,27 @@ function Add-CloneCommit {
     Git-X $Dir @('add', '-A') | Out-Null
     Git-X $Dir @('commit', '--quiet', '-m', 'clone c2') | Out-Null
     return (Git-X $Dir @('rev-parse', 'HEAD'))
+}
+
+function New-DivergedClone {
+    # A clone whose HEAD has moved through a history rewrite: the returned sha exists as a real git
+    # object in the clone (rev-parse -q --verify resolves it) but is reachable from NEITHER HEAD nor
+    # an ancestor of it -- exactly the state a rebase or force-push in the marketplace clone leaves
+    # behind while the old object has not yet been garbage-collected. Built by committing once past
+    # a shared base, resetting the clone back to that base (the commit is now an orphan, unreachable
+    # from the branch, but still a loose object), then committing again down a DIFFERENT line so the
+    # clone ends up with a real HEAD that never passed through the returned sha.
+    param(
+        [Parameter(Mandatory = $true)][string]$Dir,
+        [string]$Version = '4.32.0',
+        [string[]]$PluginNames = @('dkj-team-alpha')
+    )
+    New-Clone -Dir $Dir -Version $Version -PluginNames $PluginNames | Out-Null
+    $base = Git-X $Dir @('rev-parse', 'HEAD')
+    $diverged = Add-CloneCommit -Dir $Dir
+    Git-X $Dir @('reset', '--hard', $base) | Out-Null
+    Add-CloneCommit -Dir $Dir | Out-Null
+    return $diverged
 }
 
 function New-Rec {
@@ -323,6 +412,13 @@ try {
     Assert-Equal 0 $r.Code '8a: exit 0'
     Assert-Has  $r 'non-git fetch' '8a: the clone line marks it as a non-git fetch'
     Assert-Has  $r 'sha a1b2c3d4e5f6' '8a: the short sha printed is the one from .gcs-sha'
+    # Scoped: 'sha a1b2c3d4e5f6' also appears verbatim in the per-clone FOOTER line (printed earlier,
+    # before this plugin's own block), so the unscoped Assert-Has above would still pass even if the
+    # PER-PLUGIN "marketplace clone" line wrongly printed 'HEAD' instead of 'sha'. Bound the slice to
+    # that one line (from "marketplace clone" to the next "verdict") so the needle can only be found
+    # where it is supposed to be.
+    Assert-HasBetween  $r 'marketplace clone' 'verdict' 'sha a1b2c3d4e5f6' '8a: the PER-PLUGIN line itself (not just the footer) says "sha", scoped to that line'
+    Assert-LacksBetween $r 'marketplace clone' 'verdict' 'HEAD' '8a: and that same line never says "HEAD" for a non-git clone'
     Assert-Has  $r 'up to date -- your install is at the clone''s HEAD' '8a: matching that sha yields "up to date"'
     Assert-Has  $r 'All 1 plugin(s) up to date on 4.32.0' '8a: and the summary agrees'
 
@@ -381,41 +477,99 @@ try {
     Assert-Equal 0 $r.Code '11b: exit 0'
     Assert-Has  $r 'up to date -- your install is at the clone''s HEAD' '11b: a trailing-separator projectPath still matches'
 
-    # --- 12. Asymmetric gap (a): version but no sha on the install side, HEAD but no readable ---------
+    # --- 12. Reachable in the clone, NOT an ancestor of HEAD -- version strings say clone IS ahead ----
+    # existsInClone = $true, isAncestor = $false. Before the pre-PR repair the script concluded
+    # unconditionally here "your install is AHEAD -- the clone is stale" (a marketplace-refresh
+    # verdict); it now consults Compare-Version first, exactly like its -not $existsInClone sibling
+    # branch. This scenario pins the direction where that consultation matters: the clone's version
+    # really is newer, so the correct verdict points at the PER-PLUGIN update, not a refresh.
+    Write-Host "12. reachable-not-ancestor (history rewrite), version says clone IS ahead -> per-plugin update" -ForegroundColor Cyan
+    $c = New-Case 'diverged-clone-ahead'
+    $orphanSha = New-DivergedClone -Dir $c.Clone -Version '4.33.0'
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $orphanSha) ) }
+    $verify = Get-CloneGitExitCode -Dir $c.Clone -GitArgs @('rev-parse', '-q', '--verify', "$orphanSha^{commit}")
+    $isAnc = Get-CloneGitExitCode -Dir $c.Clone -GitArgs @('merge-base', '--is-ancestor', $orphanSha, 'HEAD')
+    Assert-Equal 0 $verify '12: fixture sanity -- the orphaned commit is still a resolvable object in the clone'
+    Assert-True ($isAnc -ne 0) '12: fixture sanity -- and it is NOT an ancestor of the clone''s (rewritten) HEAD'
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '12: exit 0'
+    Assert-Has  $r 'the clone is AHEAD of your install (4.32.0 -> 4.33.0)' '12: verdict says the clone is genuinely ahead, by version'
+    Assert-Has  $r 'history rewrite?' '12: verdict names the mechanism (a rewrite in the clone''s history)'
+    Assert-Has  $r $UPD '12: the action is the PER-PLUGIN update command, not a marketplace refresh'
+    Assert-Lacks $r $MKT '12: a marketplace refresh is NOT advised here'
+    Assert-Has  $r '1 of 1 plugin(s) behind' '12: the summary counts it as behind'
+
+    # --- 13. Same reachable-not-ancestor shape, but the versions do NOT say the clone is ahead -------
+    # Same existsInClone/isAncestor shape as 12, opposite version relationship: here the stale-clone
+    # verdict (marketplace refresh) is the CORRECT one, and must stay that way.
+    Write-Host "13. reachable-not-ancestor (history rewrite), version does NOT say clone is ahead -> stale clone, refresh" -ForegroundColor Cyan
+    $c = New-Case 'diverged-clone-stale'
+    $orphanSha = New-DivergedClone -Dir $c.Clone -Version '4.32.0'
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $orphanSha) ) }
+    $verify = Get-CloneGitExitCode -Dir $c.Clone -GitArgs @('rev-parse', '-q', '--verify', "$orphanSha^{commit}")
+    $isAnc = Get-CloneGitExitCode -Dir $c.Clone -GitArgs @('merge-base', '--is-ancestor', $orphanSha, 'HEAD')
+    Assert-Equal 0 $verify '13: fixture sanity -- the orphaned commit is still a resolvable object in the clone'
+    Assert-True ($isAnc -ne 0) '13: fixture sanity -- and it is NOT an ancestor of the clone''s (rewritten) HEAD'
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '13: exit 0'
+    Assert-Has  $r 'your install is AHEAD of the clone -- the clone is stale' '13: verdict says the clone is stale (equal version strings do not overrule it)'
+    Assert-Has  $r $MKT '13: the action is the marketplace-refresh command'
+    Assert-Lacks $r $UPD '13: a per-plugin update is NOT advised here'
+    Assert-Has  $r '1 of 1 plugin(s) behind' '13: the summary counts it as behind'
+
+    # --- 14. A malformed gitCommitSha in the install record degrades to the version comparison --------
+    # Get-ValidatedSha rejects anything that is not 7-40 hex characters. A record carrying something
+    # else (corruption, a future format change) must fall through to the version-only comparison
+    # exactly like "no sha recorded at all" (scenario 3) -- never be handed to git.
+    Write-Host "14. malformed gitCommitSha -> degrades to version comparison, never reaches git" -ForegroundColor Cyan
+    $c = New-Case 'malformed-sha'
+    New-Clone -Dir $c.Clone -Version '4.33.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @(
+        (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha 'not-a-valid-sha!!') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '14: exit 0 -- a malformed sha does not crash the script'
+    Assert-Has  $r 'the clone is AHEAD of your install (4.32.0 -> 4.33.0)' '14: verdict is the same as the no-sha version-comparison case (scenario 3)'
+    Assert-Has  $r $UPD '14: the action is the per-plugin update command'
+    Assert-Lacks $r 'not-a-valid-sha' '14: the malformed sha itself is never echoed back'
+    Assert-Lacks $r 'Exception' '14: no unhandled exception text leaked'
+    # --- 15. Asymmetric gap (a): version but no sha on the install side, HEAD but no readable ---------
     # -- plugin.json version on the clone side. NEITHER side is fully empty, so the pre-fix per-SIDE
     # test ("-not $instSha -and -not $instVer" / "-not $clone.Head -and -not $cloneVer") never fires on
     # either line, and the catch-all verdict used to print a bare "cannot determine -- " with the
     # reason missing -- the Code and the summary tally stayed right throughout, which is why nothing
     # else surfaced it. This is the exact defect Victor found on pickup of that branch; the fix names
     # the missing fields per FIELD instead of per side.
-    Write-Host "12. asymmetric gap (a): version/no-sha vs HEAD/no-version -> reason is named, not blank" -ForegroundColor Cyan
+    Write-Host "15. asymmetric gap (a): version/no-sha vs HEAD/no-version -> reason is named, not blank" -ForegroundColor Cyan
     $c = New-Case 'gap-a'
     New-Clone -Dir $c.Clone -Version '' | Out-Null
     Set-Enabled -RepoDir $c.Repo -Ids @($ID)
     Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') ) }
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
-    Assert-Equal 0 $r.Code '12a: exit 0'
-    Assert-True (-not ($r.Text -match 'cannot determine --[ \t]*\r?\n')) '12a: the regression itself -- the verdict is never a bare "cannot determine --" with the reason missing'
-    Assert-Has  $r 'no commit sha in the install record' '12a: names the missing sha on the install side'
-    Assert-Has  $r "no version in the clone's plugin.json" '12a: names the missing version on the clone side'
-    Assert-Has  $r '-- 1 could not be determined' '12a: still counted as indeterminate in the summary tally'
+    Assert-Equal 0 $r.Code '15: exit 0'
+    Assert-True (-not ($r.Text -match 'cannot determine --[ \t]*\r?\n')) '15: the regression itself -- the verdict is never a bare "cannot determine --" with the reason missing'
+    Assert-Has  $r 'no commit sha in the install record' '15: names the missing sha on the install side'
+    Assert-Has  $r "no version in the clone's plugin.json" '15: names the missing version on the clone side'
+    Assert-Has  $r '-- 1 could not be determined' '15: still counted as indeterminate in the summary tally'
 
-    # --- 13. Asymmetric gap (b): the symmetric flip -- sha but no version on the install side, ---------
+    # --- 16. Asymmetric gap (b): the symmetric flip -- sha but no version on the install side, ---------
     # -- version but no HEAD/.gcs-sha on the clone side (a non-git fetch missing its sha file). Same
     # defect, opposite side: a per-side test that only ever fires on one side's both-empty state leaves
     # this state silent too.
-    Write-Host "13. asymmetric gap (b): sha/no-version vs version/no-HEAD -> reason is named, not blank" -ForegroundColor Cyan
+    Write-Host "16. asymmetric gap (b): sha/no-version vs version/no-HEAD -> reason is named, not blank" -ForegroundColor Cyan
     $c = New-Case 'gap-b'
     New-Clone -Dir $c.Clone -Version '4.33.0' -NoGit | Out-Null
     Set-Enabled -RepoDir $c.Repo -Ids @($ID)
     Write-Admin -Path $c.Admin -Plugins @{ $ID = @(
         (New-Rec -ProjectPath $c.Repo -Version '' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') ) }
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
-    Assert-Equal 0 $r.Code '13: exit 0'
-    Assert-True (-not ($r.Text -match 'cannot determine --[ \t]*\r?\n')) '13: the regression itself -- the verdict is never a bare "cannot determine --" with the reason missing'
-    Assert-Has  $r 'no version in the install record' '13: names the missing version on the install side'
-    Assert-Has  $r 'no HEAD or sha on the clone side' '13: names the missing HEAD/sha on the clone side'
-    Assert-Has  $r '-- 1 could not be determined' '13: still counted as indeterminate in the summary tally'
+    Assert-Equal 0 $r.Code '16: exit 0'
+    Assert-True (-not ($r.Text -match 'cannot determine --[ \t]*\r?\n')) '16: the regression itself -- the verdict is never a bare "cannot determine --" with the reason missing'
+    Assert-Has  $r 'no version in the install record' '16: names the missing version on the install side'
+    Assert-Has  $r 'no HEAD or sha on the clone side' '16: names the missing HEAD/sha on the clone side'
+    Assert-Has  $r '-- 1 could not be determined' '16: still counted as indeterminate in the summary tally'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
