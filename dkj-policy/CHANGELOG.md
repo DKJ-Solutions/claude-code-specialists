@@ -43,7 +43,234 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**16 / 32 minor entries** <!-- pending-tally -->
+**19 / 38 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1625-hook-in-process-check · 20260908-153515
+
+Every SessionStart check hook in this family spawned a second `powershell.exe` to run its own check
+script, on top of the interpreter the harness had already started for the hook. All **seven** now run
+their check **in that same interpreter**, through one shared `Invoke-CheckScript`
+([`hook-check-lib.ps1`](../scripts/lib/hook-check-lib.ps1), mirrored into `dkj-policy` and
+`dkj-team-alpha`). That is **~305–443 ms** of wall-clock off every session start, resume, clear and
+compact — bounded below by the slowest hook's own improvement (2161 ms → 1856 ms) and above by six
+concurrent synthetic hooks differing only in the spawn. Reports are unchanged, verdict for verdict.
+
+The figure is smaller than [#1625](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1625)
+filed, and deliberately so: it assumed the hooks run sequentially and named settling that as the thing to
+do first. They run in parallel — *"Claude Code runs all matching hooks in parallel"* — so the ~875 ms
+sum was never on the critical path. It is also not one spawn's 219 ms, because six simultaneous process
+creations contend rather than each costing what one costs. (The measurements are of the six that existed
+when they were taken; the seventh arrived mid-branch and was not re-measured, which is why the range is
+quoted unchanged rather than widened on an estimate.)
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The repair the issue talked itself out of turned out to be the one-liner it said was unavailable.
+`exit` inside a **dot-sourced** script does take the hook with it, and so does one inside a script
+**block** — but a `.ps1` **file** invoked with `&` gets its own scope, and its `exit` returns control
+with `$LASTEXITCODE` set. That is why no check script had to be refactored into a lib to collect this.
+
+What the change is careful about is the other direction: in-process invocation has three failure modes
+that are all **silent**. An array splats positionally, so a flag binds to the first positional parameter
+and its value is dropped; `Write-Host` never reaches the pipeline without `6>&1`, so a hook whose whole
+job is to forward `[ERROR]` and hold the rest back would forward everything; and one `Write-Host` can
+arrive as a single record holding several lines. All three are handled once, in one lib, rather than six
+times — a seventh copy that got any of them wrong would not crash, it would quietly report the wrong
+thing into the session context.
+
+**Score:** 2
+
+#### Pull Request
+
+Session-start hooks run their check in-process instead of spawning a second interpreter
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1644](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1644)
+
+---
+
+### DEPLOY: fix/1628-claim-readback-three-states · 20260908-152548
+
+`claim-issue` no longer reports a read it could not make as a claim the tracker refused. The read-back
+held one boolean for two opposite facts -- "gh answered and your account is not there" and "gh never
+answered" -- and printed the first for both, naming a cause it had not measured ("most often an account
+with no write access") and telling you to treat the issue as UNCLAIMED. Measured on the claim of #1623:
+that fired, and a plain `gh issue view` on the same checkout seconds later showed the claim sitting
+there. Followed literally by a second session, it inverts the duplicate-work hazard the step exists to
+prevent. There are now three states. A read that answered and found your account absent still refuses,
+with the same message, because that is the one state it was ever right about. A read that did not
+answer prints a warning naming the exit code, says the claim most likely landed and why, hands over
+`gh issue view <n> --json assignees`, and **does not block** -- a claim is the opening of the work, so a
+false stop costs the whole assignment. The closing verdict says `(unconfirmed)` in that state rather
+than asserting a claim it could not confirm.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo runs this script as its claim step, and this is the failure mode it hits: an
+intermittent `gh` on an otherwise healthy checkout. Before this, that session was told its claim was
+refused and to treat the issue as unclaimed -- so it either stopped, or re-claimed work it already
+held. Now it is told the claim probably landed, told how to confirm it, and carries on. Nothing
+tightens: a genuine refusal refuses exactly as before, with the same words and the same exit code.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue tells an unverified claim apart from a refused one
+
+Plugins: dkj-policy
+
+[PR #1633](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1633)
+
+---
+
+### DEPLOY: fix/1622-fixture-git-judged · 20260908-151234
+
+A fixture `git` command that fails while `sync-main.tests.ps1` builds its repos is now named, with its
+exit code and git's own stderr, instead of passing silently. That helper is behind all 24 fixture
+mutations in the suite and discarded both, so a half-built repo produced a block of red asserts with no
+cause printed anywhere -- which is what #1622 met under the 16-lane gate, and why the sighting could not
+be diagnosed.
+
+Two things follow. The run says a broken fixture **before** the verdict, because otherwise the default
+reading of a red suite is that the script regressed -- and here it did not. And a run where every assert
+passed but a fixture command did not now **fails**: a clean sweep over a repo that was never built proves
+less than it appears to, and the failure count is the only thing that knows.
+
+The report's own two hypotheses were checked against the tree first and neither survives: the `net:`
+cases are static scans of the script's source, and fixture roots carry `$PID` as well as a GUID while
+lanes are separate processes. What is genuinely different under thirty lanes is dozens of concurrent
+`git` processes over one temp tree.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a test suite's own diagnosability. No subscriber sees it, and nothing about what the workflow
+does changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+A fixture git command that fails is named, instead of leaving a block of red asserts with no cause
+
+[PR #1640](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1640)
+
+---
+
+### DEPLOY: fix/1636-gate-keeps-red-capture · 20260908-150234
+
+A failing test suite's captured output now survives the run that produced it. `Invoke-TestSuiteGate`
+buffers each suite's stdout and stderr to `%TEMP%\test-suite-gate-<PID>\` and printed each block on
+reap, then deleted the directory in its `finally` whether the run was green or red -- so the console was
+the only copy, with no flag to keep it, and a pipe through `tail`, a scrollback limit or a truncated CI
+log lost the evidence for a 130-140s run whose failure may not reproduce. A red run now keeps the
+**failing** suites' `.out.txt`/`.err.txt`, deletes every other capture, and names the directory on the
+verdict line -- the line a session copies into a branch document, a commit message or an issue. A green
+run still keeps nothing, and an empty capture file is dropped rather than padding a directory the
+verdict has just recommended reading. `$captureDir` already carried `$PID`, so a retained directory
+cannot collide with a later run's.
+
+**Score:** 3
+
+The next red gate is diagnosable from a file instead of from scrollback, which is the difference between
+reading the failure and paying 140s to try to reproduce it. Not higher because nothing a session does
+today changes and a green run is byte-for-byte as before.
+
+#### What makes this deploy extra special
+
+A consumer running the `dkj-policy` workflow runs this same gate through `open-pr` and `cut-release`,
+and the lib is mirrored into both `dkj-policy` and `dkj-team-shopify`, so the retention arrives with the
+next release. It is not a change they have to notice or act on, though: nothing they type differs, and
+the only visible difference is one extra line under a red verdict.
+
+**Score:** N/A
+
+#### Pull Request
+
+the test gate keeps a failing suite output
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1643](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1643)
+
+---
+
+### DEPLOY: fix/1620-ship-resume-front-door · 20260908-144854
+
+A `ship-pr` run whose process does not survive the CI wait can be resumed from the checkout it was
+interrupted in. Step 2b puts that checkout back on the trunk as soon as the PR exists (#1073), so the
+re-run used to meet `You are on main; ship-pr runs from a branch` -- a refusal about the wrong problem,
+in a state where the killed process has usually taken the scrollback with it. The front door now asks
+whether an open PR exists whose head branch is in this checkout, and where it finds one it names the
+PR, the branch and the `git checkout` that resumes the ship, instead of refusing on the general rule.
+It stays best-effort: where `gh` cannot answer, the refusal is exactly the line it has always been.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow ships with the same script and the same step 2b, so the same
+interrupted ship is recoverable there without reading the source repo's issues -- and a consumer is
+where it is most expensive, because their operator has no `ship-pr.ps1` in front of them to read the
+comment the diagnosis used to live in.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr names the interrupted ship's branch at the front door instead of refusing on 'You are on main'
+
+Plugins: dkj-policy
+
+[PR #1634](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1634)
+
+---
+
+### DEPLOY: fix/1623-ref-display-strip · 20260908-143357
+
+A branch name this workflow prints in a sentence can no longer read as a different branch. `git
+check-ref-format` enforces `\p{Cc}` and **accepts** `\p{Cf}`, so a branch carrying U+202E, U+200B,
+U+200D or U+2066 is creatable, checkout-able and returned verbatim by `git rev-parse` -- and
+thirty-two printed sentences across `ship-pr.ps1`, `sync-main.ps1`, `remote-ahead-lib.ps1` and
+`worktree-lib.ps1` put that name straight into a console. `Get-DisplayRef`, one definition in
+`ref-print-lib.ps1`, now replaces every control and format character with a space, collapses the
+runs and trims; the words stay, because a reader standing on that branch has to recognise it. The
+paste axis is unchanged and stays distinct: a command gets a placeholder, a sentence gets a strip.
+
+Two of the thirty-two are worth naming on their own. `ship-pr.ps1`'s go-ahead line is the one line
+the ship documents as safe to act on. And `sync-main.ps1`'s standing-predecessor rows print names
+that came off `git ls-remote` -- text chosen by whoever pushed the branch, read by an operator
+deciding which pull request to close.
+
+The same movement retired the tree's second copy of the strip pattern: `remote-ahead-lib.ps1` had
+been sanitising a commit subject and printing the branch label beside it raw, which is the sharpest
+instance the report found.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a subscriber. It changes what a console prints to whoever runs the
+workflow's own scripts, and only for a branch name no ordinary repo has.
+
+**Score:** N/A
+
+#### Pull Request
+
+A ref name printed as prose is stripped of control and format characters
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1631](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1631)
+
+---
 
 ### DEPLOY: fix/1609-claude-home-pollution · 20260908-141700
 

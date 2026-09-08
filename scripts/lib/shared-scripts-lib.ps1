@@ -417,6 +417,36 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE IN-PROCESS SIBLING OF native-capture-lib (issue #1625, September 8, 2026). The six
+            # SessionStart hooks in this family each spawned a second powershell.exe to run their own
+            # check script, on top of the one the harness had already started to run the hook. This lib
+            # holds the one call that replaces it, and its header carries the measurement: 219 ms of
+            # interpreter start-up against 6 ms in-process, and 311-443 ms of real wall-clock across the
+            # six once the harness's PARALLEL hook execution is accounted for rather than assumed away.
+            #
+            # A LIB RATHER THAN FOUR LINES IN EACH HOOK, because the pattern has three traps that all
+            # fail SILENTLY -- an array splats positionally in-process, Write-Host never reaches the
+            # pipeline without 6>&1, and one Write-Host can carry several lines. A drifted sixth copy
+            # would not crash; it would forward the wrong thing, or nothing, into the session context.
+            # Each is written out in hook-check-lib.ps1's own header with what it measured.
+            Name    = 'hook-check-lib'
+            Source  = 'scripts\lib\hook-check-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE SECOND MIRROR OF THE SAME SOURCE, on native-capture-lib-shopify's precedent above --
+            # read check-report-lib-workflow's banner for why a second entry rather than a list of
+            # mirrors, and why the name carries the plugin. roster-sessioncheck.ps1 is the caller here:
+            # it is the one hook in this family that ships in the core team rather than in the workflow
+            # plugin, and the two are separately versioned and separately installed, so reaching into
+            # dkj-policy's cache would be a dependency a version mismatch breaks silently.
+            Name    = 'hook-check-lib-alpha'
+            Source  = 'scripts\lib\hook-check-lib.ps1'
+            Plugin  = 'dkj-team-alpha'
+            LibOnly = $true
+        },
+        @{
             # THE MERGED-PR PROOF (issue #1194, September 1, 2026) -- was THIS ref merged, or only a
             # branch that once wore its name? A THIRD lib with a reader in more than one plugin, and it
             # arrived the way the argument for sharing is usually only made in hindsight: the same

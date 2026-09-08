@@ -279,6 +279,190 @@ function Get-ExistingPrRecord {
     return (@($parsed) | Where-Object { $_ -and $_.number } | Select-Object -First 1)
 }
 
+function Get-InterruptedShipCandidates {
+    <#
+    .SYNOPSIS
+        The open PRs whose head branch is a branch of THIS checkout -- newest PR first, empty when
+        there is none. What an interrupted ship leaves behind, read off a payload rather than guessed.
+
+    .DESCRIPTION
+        ISSUE #1620, September 8, 2026. ship-pr.ps1's step 2b hands the primary checkout back to the
+        trunk the moment the PR exists (#1073), and the CI wait is the longest step in the run -- so for
+        the whole of that wait HEAD says 'main' while the branch's merge and fold are still owed. A run
+        that does not survive the wait therefore leaves a checkout whose HEAD names nothing about the
+        work, and the front-door check answered the re-run with `You are on main; ship-pr runs from a
+        branch`: a message about the wrong problem. Measured on PR #1618, where the backgrounded process
+        was killed by the host for low memory and `git checkout <branch>` plus the same command resumed
+        correctly.
+
+        WHY THIS AND NOT THE REMEDY #1588 ALREADY ADDED. That repair put the checkout at the head of the
+        stale-CI refusal's printed remedy, and it is correct, but it only reaches a run that gets as far
+        as printing a remedy. AN INTERRUPTED PROCESS PRINTS NOTHING -- no refusal, no remedy, no next
+        line -- and a kill usually takes the scrollback with it, so the front door is the only surface
+        left to say it on.
+
+        THE PAIR IS THE SIGNAL: an OPEN PR, whose head ref is a branch THIS checkout has. Neither half
+        alone says anything. There are open PRs for branches that live on other machines, and there are
+        local branches by the dozen whose PRs merged weeks ago -- measured in this repo on the day this
+        was written, 26 local branches against 1 open PR whose head ref was NOT here, so the correct
+        answer was "no candidate" and 25 merged leftovers produced no noise at all. The ceiling on the
+        list is the number of open PRs whose branch is local, never the number of branches lying around.
+
+        AND IT IS NOT AN ASSERTION THAT A SHIP WAS INTERRUPTED, which is why the caller's wording offers
+        the checkout instead of claiming a history this cannot read. A branch parked with its PR open, or
+        one another session is shipping in a lane, satisfies the same pair. The checkout is the right
+        next move in all of them: ship-pr resumes an existing PR rather than opening a second one.
+
+    .PARAMETER Json
+        `gh pr list --state open --json number,headRefName` output. Empty, unparseable or field-less in,
+        EMPTY OUT -- this feeds a diagnostic beside a refusal that must still be printable when gh cannot
+        answer at all.
+
+    .PARAMETER LocalBranches
+        What `git for-each-ref --format=%(refname:short) refs/heads` gave. Compared exactly: git ref
+        names are case-sensitive, and a near-match is not the branch a resume would check out.
+
+    .PARAMETER TrunkBranch
+        Excluded from the result. A PR whose head IS the trunk is not a branch to check out, and the
+        caller has just refused for standing on it.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Json,
+        [AllowNull()][string[]]$LocalBranches,
+        [string]$TrunkBranch = 'main'
+    )
+
+    if (-not $Json -or -not $Json.Trim()) { return @() }
+    if ($null -eq $LocalBranches) { return @() }
+    try { $parsed = $Json | ConvertFrom-Json } catch { return @() }
+    if ($null -eq $parsed) { return @() }
+
+    # ASSIGN FIRST, WRAP SECOND -- the 5.1 pitfall Get-ExistingPrRecord's own header records: piping the
+    # parse straight into @() collects the whole array as ONE element, and every filter below would then
+    # be reading a single Object[].
+    $records = @($parsed | Where-Object { $_ })
+
+    # AN ORDINAL SET, NOT A HASHTABLE, and that is the one line of this function a reader should not
+    # simplify. PowerShell's `@{}` compares keys CASE-INSENSITIVELY, so with one a head ref named
+    # `FEAT/Other` matched a local `feat/other` -- caught by this function's own suite, which asserts
+    # the exact match. git ref names are case-sensitive, so those are two refs, and the printed remedy
+    # would then be a `git checkout` of a name this checkout does not have. Silence is the safe answer
+    # there: no candidate means the refusal stays the line it has always been.
+    $local = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    foreach ($name in $LocalBranches) {
+        if ($null -eq $name) { continue }
+        $trimmed = ([string]$name).Trim()
+        if ($trimmed) { [void]$local.Add($trimmed) }
+    }
+    if ($local.Count -eq 0) { return @() }
+
+    $trunk = ([string]$TrunkBranch).Trim()
+
+    $out = New-Object System.Collections.ArrayList
+    foreach ($record in $records) {
+        # A field gh was never asked for is ABSENT, and absent is not empty under Set-StrictMode -- the
+        # same guard Get-StalledRunNote applies to its own payload, for the same reason.
+        if (-not $record.PSObject.Properties['number']) { continue }
+        if (-not $record.PSObject.Properties['headRefName']) { continue }
+        $number = 0
+        if (-not [int]::TryParse(([string]$record.number).Trim(), [ref]$number)) { continue }
+        if ($number -le 0) { continue }
+        $head = ([string]$record.headRefName).Trim()
+        if (-not $head) { continue }
+        if ($trunk -and $head -ceq $trunk) { continue }
+        if (-not $local.Contains($head)) { continue }
+        [void]$out.Add([pscustomobject]@{ Number = $number; Branch = $head })
+    }
+
+    # NEWEST PR FIRST, because the interrupted ship is the most recent thing this checkout did. It is an
+    # ordering rather than a choice: every candidate is listed, and the caller's wording asks the reader
+    # which one they were shipping instead of picking for them.
+    return @($out | Sort-Object -Property Number -Descending)
+}
+
+function Get-InterruptedShipResumeNote {
+    <#
+    .SYNOPSIS
+        The block ship-pr.ps1 appends to its `You are on main` refusal when this checkout holds the
+        branch of an open PR -- the resume instruction, or '' when there is nothing to resume.
+
+    .DESCRIPTION
+        THE OTHER HALF OF #1620. Get-InterruptedShipCandidates above decides; this words it. Same split,
+        and for the same reason, as Get-TrunkReturnDecision and Get-TrunkReturnGoAheadLine in
+        worktree-lib.ps1: the sentence a reader acts on is asserted in a suite rather than trusted to a
+        live ship, and a wording that drifted from the decision that produced it is the defect #1616
+        measured four rows apart in that same script.
+
+        WHAT IT DOES NOT DO IS PRESCRIBE THE GATE. A resume re-runs the whole local gate against a
+        commit CI is already testing, and whether that should be skipped by default is a separate
+        question -- #1620 says so in as many words. So this names the checkout and the re-run and offers
+        no flag: an operator who wants to skip has ship-pr's own switches in front of them.
+
+    .PARAMETER Candidates
+        Get-InterruptedShipCandidates' records, each additionally carrying the PASTE VERDICT for its
+        branch: .Token is what goes into the printed command, .Note the line explaining a refused name
+        (Get-PasteableRef, #1594). The caller resolves those, because ref-print-lib.ps1 owns that
+        judgement -- and a head ref name is chosen by whoever opened the PR, which is the least
+        trustworthy source any of that issue's print sites reads.
+
+    .PARAMETER MaxShown
+        How many candidates the list prints before it says how many it did not. A remedy whose first
+        line is off the screen is what #1046 records for a warning printed at depth.
+    #>
+    param(
+        [AllowNull()][object[]]$Candidates,
+        [string]$TrunkBranch = 'main',
+        [int]$MaxShown = 5
+    )
+
+    $records = @($Candidates | Where-Object { $_ })
+    if ($records.Count -eq 0) { return '' }
+
+    $shown = @($records | Select-Object -First $MaxShown)
+    $lines = @($shown | ForEach-Object {
+        $token = ''
+        if ($_.PSObject.Properties['Token']) { $token = ([string]$_.Token).Trim() }
+        # THE PLACEHOLDER IS THE FALLBACK RATHER THAN THE RAW NAME. A caller that forgot to resolve the
+        # paste verdict gets '<branch>' -- the convention every printed remedy in this workflow already
+        # uses -- and never a ref name in a command line that nothing judged (#1594).
+        if (-not $token) { $token = '<branch>' }
+        "  PR #$($_.Number) -- git checkout $token"
+    })
+    $hidden = $records.Count - $shown.Count
+    if ($hidden -gt 0) {
+        $lines += "  (and $hidden further open PR(s) whose branch is in this checkout, not listed.)"
+    }
+
+    # THE REFUSED-NAME NOTES COME AFTER THE WHOLE LIST rather than under their own line: they are prose
+    # about a name, and interleaving them would break up the block of commands the reader copies from.
+    $notes = @($shown | ForEach-Object {
+        if ($_.PSObject.Properties['Note']) { ([string]$_.Note).TrimEnd() } else { '' }
+    } | Where-Object { $_ })
+
+    $trunk = if (([string]$TrunkBranch).Trim()) { ([string]$TrunkBranch).Trim() } else { 'main' }
+
+    # TWO LEADING NEWLINES, so the block separates itself from whatever sentence the caller's refusal
+    # ends with. The caller appends this to a one-line message; a single newline would run the two
+    # together as a paragraph and the list below would read as part of the rule it is qualifying.
+    $block = @"
+
+
+BUT '$trunk' IS ALSO WHERE AN INTERRUPTED SHIP LEAVES THIS CHECKOUT (issue #1620). Step 2b hands the
+tree back to the trunk the moment the PR exists (issue #1073), and the CI wait is the longest step in
+the run -- so a ship that died in that wait owes a merge and a fold from a checkout whose HEAD no longer
+names its branch, and it printed nothing on its way out. Open PR(s) whose branch is here:
+
+$($lines -join "`n")
+
+Check out the one you were shipping and run ship-pr again -- it RESUMES rather than starting over:
+open-pr skips the create for a PR that already exists, and both merge gates read refs/heads/<branch>
+(issue #970), so nothing was at risk while the tree stood on the trunk.
+"@
+
+    if ($notes.Count -gt 0) { $block += "`n" + ($notes -join "`n") }
+    return $block.TrimEnd()
+}
+
 function Get-PrCreateFailureReason {
     <#
     .SYNOPSIS
@@ -1811,21 +1995,30 @@ function Format-AuthoredText {
         THE WORDS STAY. The note only has to be READABLE; quoting the payload would keep it and add
         noise. Same choice and same reasoning as the sibling site.
 
-        THREE SITES CARRY THIS CLASS, and the count is stated because a wrong one is what made this gap
-        hard to find (that is the second half of #1612). Get-RemoteAheadNote (remote-ahead-lib.ps1) met
-        it first -- a commit's %an and %s, printed by new-branch and open-pr -- and its comment states
-        the reasoning quoted above. Get-PasteableRef (ref-print-lib.ps1, #1594) applies it to the note
-        it prints when a ref is refused, on the ground that a guard whose refusal path is itself an
-        injection surface is worse than no guard. This is the third.
+        TWO LIBS CARRY THIS CLASS, AND THE COUNT IS STATED BECAUSE A WRONG ONE IS WHAT MADE THIS GAP HARD
+        TO FIND (the second half of #1612). It was three until #1623, and the arrangement is worth reading
+        before it is changed again:
 
-        WRITTEN DOWN THREE TIMES RATHER THAN LIFTED INTO A SHARED HOME, which is the tree's own live
-        convention rather than a shortcut taken here: ref-print-lib re-typed the class deliberately with
-        remote-ahead-lib already in place, and recorded why at the line. The functions share nothing but
-        the class -- different bounds (120, 500 and none, each for its own reason), different source
-        processes, and no lib among them is loaded by another's callers, so a shared home would cost a
-        registry entry, a mirror, a dot-source line in every caller and a Copy-Item in every fixture
-        suite. What the copies must never do is DISAGREE -- so pr-issues.tests.ps1 pins all three to the
-        same character class and asserts the count, guarding the drift instead of designing it away.
+          - THIS LIB types it, for the reason above.
+          - ref-print-lib.ps1 types it, inside Get-DisplayRef -- the one definition of the prose strip
+            since #1623, applied at thirty-two printed sentences across ship-pr.ps1, sync-main.ps1,
+            remote-ahead-lib.ps1 and worktree-lib.ps1, and to this lib's sibling Get-PasteableRef note.
+          - remote-ahead-lib.ps1 typed the FIRST copy (a commit's %an and %s, #1439) and no longer does:
+            #1623 gave it a caller's reason to load ref-print-lib anyway -- the branch label in its own
+            sentence, which it had been printing raw beside the subject it sanitised -- and once the lib
+            was loaded a private copy was pure drift surface.
+
+        WHY THIS LIB STILL TYPES ITS OWN, which is the question the bullet above invites. The argument
+        that kept three copies apart -- different bounds (120, 500 and none), different source processes,
+        and no lib among them loaded by another's callers -- is still exactly true of THIS one: nothing
+        here has a reason to load ref-print-lib, so lifting the class would cost a dot-source in every
+        caller and a Copy-Item in every fixture suite to save one regex. remote-ahead-lib's case is the
+        one that changed, and it changed because it acquired the dependency for its own sake.
+
+        What the remaining copies must never do is DISAGREE -- so pr-issues.tests.ps1 compares them to the
+        same character class and asserts WHICH libs carry it, guarding the drift instead of designing it
+        away. A third site appearing again is not forbidden; it has to update that assert, this block and
+        the new-branch skill page, which is the claim #1612 was filed about.
     #>
     param([string]$Text)
 

@@ -49,6 +49,9 @@ $PrIssuesLibSrc  = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
 # The remote-ahead note composer (issue #1450), which new-branch.ps1 now dot-sources unconditionally
 # too -- same reasoning as the lib above.
 $RemoteAheadLibSrc = Join-Path $RepoRoot 'scripts\lib\remote-ahead-lib.ps1'
+# remote-ahead-lib.ps1 dot-sources this for Get-DisplayRef (issue #1623), so a fixture that copies the one
+# without the other builds a repo whose scripts die on a missing function.
+$RefPrintLibSrc = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -195,6 +198,7 @@ Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $fixture 'scrip
 Copy-Item -LiteralPath $ParkLibSrc -Destination (Join-Path $fixture 'scripts\lib\park-lib.ps1') -Force
 Copy-Item -LiteralPath $PrIssuesLibSrc -Destination (Join-Path $fixture 'scripts\lib\pr-issues-lib.ps1') -Force
 Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $fixture 'scripts\lib\remote-ahead-lib.ps1') -Force
+Copy-Item -LiteralPath $RefPrintLibSrc    -Destination (Join-Path $fixture 'scripts\lib\ref-print-lib.ps1')    -Force
 $prevEap = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'

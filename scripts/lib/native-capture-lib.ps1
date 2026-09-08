@@ -810,6 +810,11 @@ function Invoke-TestSuiteGate {
         Blocks arrive in COMPLETION order, so the log is no longer alphabetical; the closing summary names
         the failures in a fixed order for that reason.
 
+        AND ON A RED RUN THOSE CAPTURE FILES SURVIVE, named on the verdict line -- issue #1636. A green run
+        deletes them as it always did; a run with a failing suite keeps that suite's pair and deletes the
+        rest, so the console stops being the only copy of the evidence. See the 'finally' block for why
+        printing the block was not enough on its own.
+
         -WorkingDirectory IS NOT OPTIONAL, and leaving it off is the one way this rewrite could have
         broken a suite silently. Start-Process starts the child in [Environment]::CurrentDirectory, which
         does NOT follow Set-Location -- so a suite that asks git about "the tree I am in" would have been
@@ -1068,6 +1073,11 @@ function Invoke-TestSuiteGate {
     # cannot be checked against the pool's makespan by a reader who does not know when the suite began, and
     # the offset is what makes 'this suite waited for a lane' visible instead of inferable.
     $suiteTimings = New-Object System.Collections.ArrayList
+    # THE CAPTURE DIRECTORY THAT SURVIVES A RED RUN, named on the verdict line -- issue #1636. Declared
+    # out here, beside $failedNames, because the retention decision is made in the pool's own 'finally'
+    # (below) and the line that has to state it is printed after that block has closed. Empty means
+    # nothing was kept, which is the green case and also the case where a failing suite wrote nothing.
+    $retainedCaptureDir = ''
 
     if ($suites.Count -gt 0) {
         if ($MaxParallel -le 0) {
@@ -1090,6 +1100,11 @@ function Invoke-TestSuiteGate {
         Write-Host "test gate: running $scopeLabel test suites for $Context ($modeLabel)..." -ForegroundColor Cyan
 
         $captureDir = Join-Path ([System.IO.Path]::GetTempPath()) ("test-suite-gate-$PID")
+        # THE FAILING SUITES' CAPTURE FILES, so the 'finally' below can keep exactly those and delete the
+        # rest -- issue #1636. Collected in the reap loop because that is the only place a suite's exit code
+        # and its two file paths are held at once; after $running.Remove the paths are gone, the same reason
+        # $suiteTimings is filled there.
+        $failedCaptureFiles = New-Object System.Collections.ArrayList
 
         try {
             if (Test-Path -LiteralPath $captureDir) { Remove-Item -Recurse -Force -LiteralPath $captureDir }
@@ -1148,6 +1163,8 @@ function Invoke-TestSuiteGate {
                     } else {
                         Write-Host "== $($d.Name) == FAILED (exit $code)" -ForegroundColor Red
                         $failedNames.Add($d.Name) | Out-Null
+                        $failedCaptureFiles.Add($d.OutFile) | Out-Null
+                        $failedCaptureFiles.Add($d.ErrFile) | Out-Null
                     }
                     # -Encoding Oem matches what a redirected Windows PowerShell child writes (its
                     # [Console]::OutputEncoding is the OEM codepage). Everything in scope here is ASCII by
@@ -1163,8 +1180,36 @@ function Invoke-TestSuiteGate {
                 }
             }
         } finally {
+            # A RED RUN KEEPS THE FAILING SUITES' OUTPUT; A GREEN ONE KEEPS NOTHING -- issue #1636. This
+            # block used to delete the directory either way, which made the console the ONLY copy of a
+            # failing suite's output and gave no flag to keep it. The gate does print each block, and that
+            # is what #1622 correctly observed -- but a pipe through 'tail', a scrollback limit, a truncated
+            # CI log or a closed terminal each throw it away, and none of those is the reader's error. A run
+            # here costs ~140s and the failure it carries is, by construction, one that may not reproduce.
+            #
+            # ONLY THE FAILING SUITES' FILES SURVIVE, so a red run does not leave 79 suites of green noise
+            # behind, and an EMPTY file is dropped too: keeping a 0-byte .err.txt would name a directory on
+            # the verdict line that holds nothing to read. If nothing survives, the directory goes and
+            # $retainedCaptureDir stays empty -- so the note below is printed only when there is something
+            # at the other end of it.
+            #
+            # $captureDir CARRIES $PID, so a retained directory cannot collide with a later run's, and the
+            # Remove-Item at the top of the try clears a stale one should a PID ever be reused.
             if (Test-Path -LiteralPath $captureDir) {
-                Remove-Item -Recurse -Force -LiteralPath $captureDir -ErrorAction SilentlyContinue
+                $keep = @()
+                foreach ($f in @($failedCaptureFiles)) {
+                    if ((Test-Path -LiteralPath $f) -and ((Get-Item -LiteralPath $f).Length -gt 0)) { $keep += $f }
+                }
+                if ($keep.Count -eq 0) {
+                    Remove-Item -Recurse -Force -LiteralPath $captureDir -ErrorAction SilentlyContinue
+                } else {
+                    foreach ($f in @(Get-ChildItem -LiteralPath $captureDir -File -ErrorAction SilentlyContinue)) {
+                        if ($keep -notcontains $f.FullName) {
+                            Remove-Item -Force -LiteralPath $f.FullName -ErrorAction SilentlyContinue
+                        }
+                    }
+                    $retainedCaptureDir = $captureDir
+                }
             }
         }
     }
@@ -1272,5 +1317,13 @@ function Invoke-TestSuiteGate {
     }
     $namesInOrder = @($failedNames | Sort-Object) -join ', '
     Write-Host ("test gate: {0} of {1} suites FAILED in {2}s{3}{4}: {5}" -f $failedNames.Count, $total, $elapsed, $laneNote, $shardNote, $namesInOrder) -ForegroundColor Red
+    # THE KEPT OUTPUT IS NAMED ON THE VERDICT, for the reason #1318 put the lane count there: this is the
+    # line a session copies into a branch document, a commit message or an issue, so it is the one place a
+    # path is certain to travel with the failure it belongs to. Indented under the verdict rather than
+    # spliced into it, so nothing that already parses that line has to learn a new shape. Silent when
+    # nothing was kept -- a commands-only gate, or a suite that failed without writing a byte.
+    if ($retainedCaptureDir) {
+        Write-Host ("           output kept at $retainedCaptureDir") -ForegroundColor Red
+    }
     return $false
 }
