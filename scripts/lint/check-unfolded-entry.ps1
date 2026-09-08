@@ -36,21 +36,30 @@
     trunk guard and refuses on a stale checkout, so following the printed remedy was safe -- but the
     [ERROR] was indistinguishable from the real skipped-fold state this check exists to catch.
 
-    SO EACH LEFTOVER IS ASKED ONE MORE QUESTION, AND IT COSTS NO NETWORK: is it still present on the
-    remote-tracking ref refs/remotes/origin/<trunk> that is already on disk? Absent there means the
-    fold has landed and this checkout has not caught up. THE QUESTION IS ONLY ASKED WHEN THE CHECKOUT
-    IS BEHIND -- Get-TrunkGap -NoFetch, the same measurement the fold refuses on and new-branch.ps1
-    warns on -- because absent-on-origin with a gap of ZERO means something else entirely: a document
-    that was never committed, which no pull will fix. That gate is also what keeps this arm unreachable
-    from CI, where the pushed commit IS origin/<trunk> and the gap is 0.
+    SO EACH LEFTOVER IS ASKED ONE MORE QUESTION, AND IT COSTS NO NETWORK: is that branch's entry
+    ALREADY IN CHANGELOG.md on the remote-tracking ref refs/remotes/origin/<trunk> that is on disk?
+    Present there means the fold has landed and this checkout has not caught up.
 
-    AND THE GATE IS A GAP, NOT A DIRECTION, WHICH LEAVES ONE STATE MISREAD: a checkout that is BOTH
-    ahead and behind. There, a document committed locally and never pushed is also absent on origin, and
-    is reported as already folded. The precise test would be the other half of the same fold commit --
-    is the entry in CHANGELOG.md ON THAT REF -- and it is deliberately not built here: it would put a
-    second definition of "what a folded entry looks like in the changelog" in this script, and the
-    state needs local unpushed commits on the trunk, which this workflow only produces between a fold
-    and its push. Named rather than guarded, and tracked as issue #1601.
+    IT USED TO ASK THE OTHER HALF OF THE SAME COMMIT AND THAT WAS WRONG (issue #1601). The fold REMOVES
+    the document and ADDS the entry in one commit, so #1585 asked the cheap half -- 'git cat-file -e
+    <ref>:<document>', is it gone upstream -- and gated it on the checkout being BEHIND, since absence
+    with a gap of ZERO means a document that was never committed. But a gap is not a direction:
+    HEAD..origin/<trunk> is non-zero in a DIVERGED state too, and there a document committed locally
+    and never pushed is also absent on origin. The check then reported a fold that was still owed as
+    already landed, and named 'git pull --ff-only' as the remedy -- a pull that cannot fast-forward.
+    Reproduced September 8, 2026 on a fixture one commit ahead and one behind.
+
+    THE ENTRY'S PRESENCE HAS ONE CAUSE, whichever way the checkout has drifted, so the gap gate is gone
+    rather than widened: it was sufficient and never necessary. Get-TrunkGap -NoFetch is still run --
+    a reader who is behind is still told so, and the ref it names is where the changelog is read -- it
+    simply no longer classifies anything. Nothing in CI changes: there the pushed commit IS
+    origin/<trunk>, the entry is not in its changelog, and the leftover is reported exactly as before.
+
+    AND THE TEST IS Test-BranchFoldedOnRef IN entry-scaffold-lib.ps1, NOT A REGEX HERE. Reading the
+    heading in this script would put a second definition of "what a folded entry looks like in the
+    changelog" beside Get-FoldedEntryForBranch -- the drift Get-UnfoldedTrunkEntry exists to prevent for
+    the sibling question. That is why #1585 named this state instead of guarding it: doing it properly
+    meant a lib function, which is more than that repair was.
 
     RUN IT FROM CI, and from the command line whenever you want the answer early:
 
@@ -119,11 +128,19 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 
 # GUARDED, LIKE consumer-check-lib ABOVE, AND FOR THE SAME REASON. Get-TrunkGap needs
 # Invoke-NativeCapture, and this check is mirrored into a plugin whose cached copy in a consumer may
-# predate #1585. Where the lib is absent the two Get-Command probes below both miss, the upstream
+# predate #1585. Where the lib is absent the Get-Command probes below all miss, the upstream
 # question is never asked, and the report degrades to exactly the pre-#1585 wording -- a check that
 # still answers its original question rather than one that throws at a session start.
 $nativeLib = Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1'
 if (Test-Path -LiteralPath $nativeLib -PathType Leaf) { . $nativeLib }
+
+# SEAM-LIB ON THE SAME TERMS, for the ONE seam this check reads: Get-ChangelogPath, the path
+# Test-BranchFoldedOnRef opens on the remote-tracking ref (#1601). Guarded rather than plain because
+# the whole point of this file's style is that a session start never dies on a cached mirror, and
+# Get-SeamValue rather than a Get-Command probe of my own because the probe IS what that helper is,
+# and check-branch-entry.ps1 next door already reads its seams through it.
+$seamLib = Join-Path $PSScriptRoot '..\lib\seam-lib.ps1'
+if (Test-Path -LiteralPath $seamLib -PathType Leaf) { . $seamLib }
 
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
 
@@ -151,22 +168,36 @@ $trunkRef = ''
 if ((Get-Command Get-TrunkGap -ErrorAction SilentlyContinue) -and (Get-Command Invoke-NativeCapture -ErrorAction SilentlyContinue)) {
     try {
         $gap = Get-TrunkGap -RepoRoot $repoRoot -NoFetch
+        # Measured means the remote-tracking ref EXISTS and the count parsed -- which is the only thing
+        # the classification below needs from this call. Behind is read for the WORDING alone; see the
+        # block on the gap gate under the loop.
         if ($gap.Measured) { $behind = [int]$gap.Behind; $trunkRef = [string]$gap.Ref }
     } catch { }
 }
 
+# The seam, read the same way fold-changelog-entry.ps1 reads it, and left EMPTY where the repo states
+# nothing -- Test-BranchFoldedOnRef then falls back to '<workflow folder>/CHANGELOG.md', which is
+# Get-DefaultChangelogPath's answer.
+$changelogRel = ''
+if (Get-Command Get-SeamValue -ErrorAction SilentlyContinue) {
+    try { $changelogRel = [string](Get-SeamValue -Name 'Get-ChangelogPath' -Default '') } catch { }
+}
+
+# WHY THE TEST IS THE ENTRY AND NOT THE ABSENT DOCUMENT: the docstring above, and
+# Test-BranchFoldedOnRef's own. The ONE thing decided here rather than there is what a $null means to
+# THIS caller, and it is not $false: that function returns $null for every question it could not ask --
+# no ref, no changelog at that ref, no lib in the session. Treating it as NOT FOLDED leaves the leftover
+# reported, which is the pre-#1585 behaviour and the safe direction: an unanswerable question must never
+# wave a skipped fold through on a measurement nobody took. Hence '-eq $true' and not a truthiness test.
 $folded   = New-Object System.Collections.Generic.List[object]
 $stranded = New-Object System.Collections.Generic.List[object]
 foreach ($l in $leftovers) {
     $landed = $false
-    if ($behind -gt 0 -and $trunkRef) {
-        # 'git cat-file -e <ref>:<path>' is the whole test: a non-zero exit means the document is not in
-        # origin's tree at all, which is the fold's own signature -- it REMOVES the document and adds the
-        # entry to CHANGELOG.md in one commit. Reading CHANGELOG.md on that ref instead would answer the
-        # same question and cost a blob read plus a heading match; the absent path is the cheaper half of
-        # the same commit.
-        $probe = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'cat-file', '-e', "${trunkRef}:$($l.Rel)") -DiscardStderr
-        if ($probe.ExitCode -ne 0) { $landed = $true }
+    if ($trunkRef -and (Get-Command Test-BranchFoldedOnRef -ErrorAction SilentlyContinue)) {
+        try {
+            $onRef = Test-BranchFoldedOnRef -RepoRoot $repoRoot -Ref $trunkRef -Branch $l.DeclaredBranch -ChangelogRel $changelogRel
+            if ($onRef -eq $true) { $landed = $true }
+        } catch { }
     }
     if ($landed) { $folded.Add($l) | Out-Null } else { $stranded.Add($l) | Out-Null }
 }
@@ -175,13 +206,27 @@ if ($stranded.Count -eq 0) {
     # NOT [ERROR], AND NOT SILENCE EITHER. The trunk that matters -- origin's -- carries no unfolded
     # entry, so exit 1 would report a defect that does not exist; but a checkout this far behind is worth
     # one line, and the SessionStart hook surfaces this token with its own accurate headline.
-    Write-Host "[WARN] $($folded.Count) development document(s) here have ALREADY been folded on $trunkRef -- this checkout is $behind commit(s) behind:" -ForegroundColor Yellow
+    # THE GAP IS STATED ONLY WHERE THERE IS ONE (#1601). It used to be part of this sentence because the
+    # classification could not be reached without it; now that the test is the entry on the ref, a
+    # checkout in sync can land here too -- a document declaring a branch whose entry origin already
+    # carries -- and "0 commit(s) behind" followed by a pull is a remedy for a state that is not this one.
+    $gapPhrase = if ($behind -gt 0) { " -- this checkout is $behind commit(s) behind" } else { '' }
+    Write-Host "[WARN] $($folded.Count) development document(s) here have ALREADY been folded on ${trunkRef}${gapPhrase}:" -ForegroundColor Yellow
     foreach ($l in $folded) {
         Write-Host "         $($l.Rel)  (declares branch '$($l.DeclaredBranch)')" -ForegroundColor Yellow
     }
     Write-Host '       So this is not a skipped fold and there is nothing to fold -- the entry is already in' -ForegroundColor Yellow
-    Write-Host '       CHANGELOG.md on origin. Catch up instead:' -ForegroundColor Yellow
-    Write-Host '         git pull --ff-only' -ForegroundColor Yellow
+    if ($behind -gt 0) {
+        Write-Host '       CHANGELOG.md on origin. Catch up instead:' -ForegroundColor Yellow
+        Write-Host '         git pull --ff-only' -ForegroundColor Yellow
+    } else {
+        # NO PULL NAMED, because there is nothing to pull. What is certain about this state is stated and
+        # nothing else: fold-changelog-entry.ps1 refuses a branch the changelog already carries (inbound
+        # #1082), so the document is the stray half of a fold that has already happened.
+        Write-Host '       CHANGELOG.md on the ref this checkout is level with. The document is the stray half:' -ForegroundColor Yellow
+        Write-Host '       fold-changelog-entry.ps1 refuses a branch the changelog already carries (inbound #1082),' -ForegroundColor Yellow
+        Write-Host '       so removing it is the repair -- not a fold, and not a pull.' -ForegroundColor Yellow
+    }
     exit 0
 }
 
@@ -205,6 +250,9 @@ if ($behind -gt 0) {
     Write-Host '        or the fold refuses on the stale trunk.' -ForegroundColor Red
 }
 foreach ($l in $folded) {
-    Write-Host "        (Already folded on origin, nothing owed: $($l.Rel) -- the pull clears it.)" -ForegroundColor Yellow
+    # Same conditionality as the [WARN] arm above, and for the same reason: the pull is the remedy for
+    # being behind, and this arm no longer implies that anybody is.
+    $clears = if ($behind -gt 0) { ' -- the pull clears it.' } else { ' -- fold-changelog-entry.ps1 would refuse it as a duplicate.' }
+    Write-Host "        (Already folded on origin, nothing owed: $($l.Rel)$clears)" -ForegroundColor Yellow
 }
 exit 1
