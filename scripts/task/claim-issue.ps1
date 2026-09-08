@@ -232,13 +232,27 @@ if (-not $edit -or $edit.ExitCode -ne 0) {
 # non-collaborator on a repo that allows the edit), and an unverified claim is worse than none: the
 # session believes the tracker says something it does not. One extra read, at the one moment it
 # settles the question this whole script exists to answer.
+#
+# THREE STATES, NOT TWO (#1628, September 8, 2026). A single `$landed` boolean collapsed "the read
+# succeeded and the account is absent" -- the claim was refused -- into "the read never happened", and
+# then printed the first. Those are opposite facts: one says the tracker rejected the claim, the other
+# says THIS RUN DOES NOT KNOW, while the write it is checking returned 0. Measured claiming #1623 in
+# this repo: the message fired, named a cause it had not measured ("most often an account with no
+# write access"), and told the operator to treat the issue as UNCLAIMED -- and a plain `gh issue view`
+# on the same checkout, seconds later, showed the claim sitting there. The same session's `new-branch`
+# run printed 'could not ask gh which issues are open (exit 1)' minutes later, so gh was answering
+# intermittently and the second branch of the old `if` was being reported as the first. Note the
+# contrast that made it legible: `new-branch` names the exit code and says the check COULD NOT ASK.
+#
+# `-DiscardStderr` STAYS, so the could-not-verify line names the exit code rather than gh's own words:
+# Output is parsed as JSON here, and stderr mixed into it would break the parse to improve a message.
 $after = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'view', $number) + $repoArgs + @('--json', 'assignees')) -Utf8 -DiscardStderr
-$landed = $false
-if ($after -and $after.ExitCode -eq 0) {
-    $landed = (Get-AssigneeLogins -Json (@($after.Output) -join "`n")) -contains $identity.Account
-}
+$readOk = [bool]($after -and $after.ExitCode -eq 0)
+$landed = $readOk -and ((Get-AssigneeLogins -Json (@($after.Output) -join "`n")) -contains $identity.Account)
 
-if (-not $landed) {
+if ($readOk -and -not $landed) {
+    # REFUSED -- measured rather than inferred: gh answered, and the account is not in the list it
+    # returned. This is the only state the old message was ever right about, and it is unchanged.
     Write-Host "[ERROR] gh accepted the claim but '$($identity.Account)' is not on #$number." -ForegroundColor Red
     Write-Host '        GitHub drops an assignee it will not accept without failing the command -- most often an' -ForegroundColor Red
     Write-Host '        account with no write access to this repo. Treat the issue as UNCLAIMED.' -ForegroundColor Red
@@ -246,7 +260,30 @@ if (-not $landed) {
     exit 1
 }
 
-Write-Host "[OK] #$number claimed for '$($identity.Account)' -- the work starts here." -ForegroundColor Green
+if (-not $readOk) {
+    # COULD NOT VERIFY -- and it does NOT block, for the reason the claim step exists at all (#1485): a
+    # claim is the OPENING of the work, so a false stop here costs the whole assignment. Everything
+    # that guards against duplicate work has already succeeded -- the pre-write read answered and
+    # showed nobody else holding this issue, and `gh issue edit` returned 0 -- so by far the likelier
+    # state is a claim that landed and a read that did not. What this run cannot do is call that
+    # proven, so it says which of the two states it is in and hands over the command that settles it.
+    #
+    # NO TimedOut BRANCH, deliberately: this script passes no -TimeoutSeconds anywhere, so that field
+    # is always $false here and a branch on it would be a reason that can never print.
+    $why = if ($after) { "exited $($after.ExitCode)" } else { 'could not be run at all' }
+    Write-Host "[WARNING] the claim was written and gh accepted it, but the read-back $why," -ForegroundColor Yellow
+    Write-Host "          so this run cannot confirm '$($identity.Account)' is on #$number. It most likely IS:" -ForegroundColor Yellow
+    Write-Host '          the write returned 0, and the read before it answered normally. Confirm it if you' -ForegroundColor Yellow
+    Write-Host "          want certainty -- gh issue view $number --json assignees" -ForegroundColor Yellow
+    Write-Host "          $($facts.url)" -ForegroundColor Yellow
+}
+
+# THE HEADLINE DOES NOT ASSERT WHAT THE READ-BACK COULD NOT MEASURE (#1628). Where the read did not
+# answer, a bare '[OK] claimed' directly under the warning above reads as the run overruling its own
+# caveat, and the operator is left with two lines that cannot both be true. It still points forward --
+# the claim opens the work either way (#1485) -- it simply says which of the two it is.
+$confirmed = if ($landed) { '' } else { ' (unconfirmed -- see the warning above)' }
+Write-Host "[OK] #$number claimed for '$($identity.Account)'$confirmed -- the work starts here." -ForegroundColor Green
 Write-Host "     $title"
 # The claim is the OPENING of the work, not a checkpoint before it (#1485). Every other line this
 # script and its page emit is a boundary -- what the step is NOT -- so a session that obeys them all
