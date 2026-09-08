@@ -43,7 +43,41 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 9 minor entries** <!-- pending-tally -->
+**6 / 10 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1572-lane-ship-queue-trunk-holder · 20260908-085026
+
+`ship-pr.ps1` refused a lane ship whenever another worktree (the primary checkout) held `main`, on the
+ground that "step 5 could not fold after the merge" -- but under a merge queue step 5 folds nothing:
+the queue's own push to `main` runs `fold-on-merge.yml`. The refusal therefore blocked the exact
+lane workflow `ship-pr` itself recommends, since step 2b (#1073) leaves the primary on the trunk on
+purpose. The refusal now runs *after* the queue verdict and is gated on `-not $queueActive`, the same
+shape #1506 established for the fold-push verdict; under a queue the held trunk is noted, not refused.
+Where no queue is read the guard is unchanged.
+
+**Score:** 4
+
+The lane ship path -- the one `ship-pr` prints while waiting on CI -- was simply broken on a queued
+trunk. Each occurrence was worked around by hand (moving the primary off the trunk, against the
+orchestrator's "end on the trunk" rule for the duration of the ship).
+
+#### What makes this deploy extra special
+
+A consumer running `dkj-policy` *with a merge queue on their trunk* hits the same refusal if they
+follow `ship-pr`'s own advice to ship from a lane. Bounded audience -- GitHub only offers merge queue
+on private repos under Enterprise/Team -- but for those repos the lane ship was unusable.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr no longer refuses a lane ship on a queued trunk where it folds nothing
+
+Plugins: dkj-policy
+
+[PR #1576](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1576)
+
+---
 
 ### DEPLOY: fix/1575-prune-merged-dirty-guard · 20260908-084930
 
