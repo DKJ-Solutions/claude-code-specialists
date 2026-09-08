@@ -37,7 +37,9 @@
          cannot make must leave the ship running;
       8. Get-TrunkReturnGoAheadLine DESCRIBES that decision rather than asserting an outcome (issue
          #1616) -- the no arm never claims the trunk, both arms keep the two clauses that are true
-         either way, and a missing branch name still words a printable line.
+         either way, and a missing branch name still words a printable line;
+      9. the branch name that line prints cannot read as a DIFFERENT branch (issue #1623) -- git accepts
+         \p{Cf} in a ref, so the composer strips its own input rather than trusting the caller to.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -45,6 +47,11 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1')
+# FOR SECTION 8's PREMISE CHECK ONLY. `git check-ref-format` writes its refusal to stderr, and a bare
+# native call under $ErrorActionPreference = 'Stop' turns that into a NativeCommandError in Windows
+# PowerShell 5.1 -- so the premise reads an exit code through the capture lib rather than fighting the
+# host. Same reasoning, same call, as ref-print-lib.tests.ps1.
+. (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -287,6 +294,38 @@ foreach ($line in @($goYes, $goNo)) {
 $goBare = Get-TrunkReturnGoAheadLine -Returned $false
 Assert-True ($goBare -like '*on its branch*') 'an unknown branch name still words the no arm'
 Assert-True ($goBare -notlike "*''*") 'and never prints an empty pair of quotes'
+
+Write-Host ""
+Write-Host "8. ...and the name it prints cannot read as a different branch (issue #1623)" -ForegroundColor Cyan
+
+# THIS IS THE GO-AHEAD LINE, the one line ship-pr documents as safe to act on, and until #1623 it put the
+# branch name in raw. The comment above the function said so and handed the residual to #1617, which
+# measured it: `git check-ref-format` enforces \p{Cc} and ACCEPTS \p{Cf}, so a branch carrying U+202E or a
+# zero-width run is creatable, checkout-able, and returned verbatim by `git rev-parse --abbrev-ref HEAD`.
+# The premise is asserted here rather than assumed, exactly as ref-print-lib's suite does it: if a future
+# git tightened its ref rules, that assert is the one that should go red.
+$evilRef = 'fix/a' + [char]0x202E + 'b'
+$fmt = Invoke-NativeCapture -FilePath 'git' -Arguments @('check-ref-format', '--branch', $evilRef) -DiscardStderr
+Assert-True ($fmt.ExitCode -eq 0) 'premise: git accepts a branch name carrying U+202E'
+
+$goEvil = Get-TrunkReturnGoAheadLine -Returned $false -Branch $evilRef
+Assert-True ($goEvil -notmatch '[\p{Cc}\p{Cf}]') 'no control or format character survives into the go-ahead line'
+Assert-True ($goEvil -like "*'fix/a b'*") 'and the name still reads, stripped, so the operator can recognise the branch'
+Assert-True ($goEvil -like '*lane*') 'the no arm keeps pointing at the lane -- the strip is not a refusal to word the line'
+
+# A NAME MADE ENTIRELY OF FORMAT CHARACTERS HAS NO DISPLAY, so it takes the same arm as no name at all
+# rather than printing a pair of quotes around blanks.
+$goInvisible = Get-TrunkReturnGoAheadLine -Returned $false -Branch ([string]([char]0x200B) + [char]0x200D)
+Assert-True ($goInvisible -like '*on its branch*') 'an all-invisible name words the no arm like a missing one'
+Assert-True ($goInvisible -notmatch "'\s*'") 'and never prints quotes around nothing'
+
+# THE STRIP IS THE COMPOSER'S, NOT THE CALLER'S. ship-pr could hand in a stripped label and this function
+# stay pure -- and the guarantee would then sit one file away from the sentence it protects, free to drift
+# the moment a second caller appears. Asserted structurally so a future refactor back to the caller has to
+# argue with this line rather than pass quietly.
+$libText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1'))
+Assert-True ($libText -match 'ref-print-lib\.ps1') 'worktree-lib dot-sources the lib that owns the one strip definition'
+Assert-True ($libText -match [regex]::Escape('$shownBranch = Get-DisplayRef -Ref $Branch')) 'and the go-ahead composer strips its own input'
 
 Write-Host ""
 if ($script:fail -gt 0) {

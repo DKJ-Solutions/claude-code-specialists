@@ -44,6 +44,9 @@ $EntryScaffoldSrc  = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 # this suite -- it is copied because a MISSING dot-source is not a degraded answer but no script at
 # all, which is how its absence showed up: every single case failed at exit 1 before the first assert.
 $WorktreeLibSrc    = Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1'
+# worktree-lib.ps1 dot-sources this for Get-DisplayRef (issue #1623), so a fixture that copies the one
+# without the other builds a repo whose scripts die on a missing function.
+$RefPrintLibSrc    = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 # And for the merged-PR proof itself (issue #1194): the map and the two-part test every proof-(b) case
 # below is decided by, shared with dkj-team-shopify's sync-main.ps1 since the same mechanism turned out to
 # have been repaired twice in one day. Same reason as worktree-lib above -- and it was rediscovered the
@@ -142,6 +145,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')  -Force
     Copy-Item -LiteralPath $WorktreeLibSrc   -Destination (Join-Path $dir 'scripts\lib\worktree-lib.ps1')        -Force
+    Copy-Item -LiteralPath $RefPrintLibSrc   -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')       -Force
     Copy-Item -LiteralPath $MergedPrLibSrc   -Destination (Join-Path $dir 'scripts\lib\merged-pr-lib.ps1')       -Force
 
     $bareRemote = "$dir.git"
