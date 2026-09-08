@@ -36,8 +36,8 @@
 Issue #1575: `prune-merged.ps1` refused a dirty working tree unconditionally, on the stated ground of
 stepping off the branch you are standing on -- a step (4c) that is unreachable when HEAD is the trunk,
 when HEAD is detached, or under `-DryRun`. Verified in the source before repairing: the guard sits at
-step 1 and never consults the HEAD it read earlier in that same pre-flight block, and the candidate list is `refs/heads`
-minus the trunk, so 4c can only ever match a non-trunk branch.
+step 1 and never consults the HEAD it read earlier in that same pre-flight block, and the candidate
+list is `refs/heads` minus the trunk, so 4c can only ever match a non-trunk branch.
 
 #### One correction to the report
 
@@ -59,6 +59,9 @@ work, not the repair.
 - [x] Mirror into the plugin (`build-shared-scripts.ps1`).
 - [x] The doc half: the orchestrator's lens is the sentence the issue's "why it matters" is about, so it
       now names `-DryRun` as the route on a dirty branch -- the one state that still refuses.
+- [x] And the consumer-facing page for this very script: `plugins/dkj-policy/skills/prune-merged/SKILL.md`
+      described the old unconditional refusal. Found by the code review, not by my own doc sweep, which
+      had required the script name and the refusal wording on the SAME line.
 
 ### TEST
 
@@ -93,11 +96,13 @@ exactly as before, because that branch can be squash-merged while the work is un
 the case where the step-off drags it onto the trunk. The refusal now names the branch that makes it
 reachable, and offers `-DryRun` beside commit, park and stash.
 
-That last case is why the doc half moved too: the orchestrator's lens now names `-DryRun` as the route
-for a session that is standing on a branch with uncommitted work, which is the ordinary mid-assignment
-shape. It deletes nothing, so it never has to step off, and the classification it prints -- the
-paste-ready delete command for a merged leftover, `Kept ... -- live work` for everything else -- is
-identical to the full run's.
+That last case is why the doc half moved too. The orchestrator's lens and the consumer-facing skill page
+for this script now name `-DryRun` as the route for a session standing on a branch with uncommitted
+work, which is the ordinary mid-assignment shape: it deletes nothing, so it never has to step off, and
+the classification it prints -- the paste-ready delete command for a merged leftover,
+`Kept ... -- live work` for everything else -- is identical to the full run's. The skill page had gone
+further than stale; it still described the refusal as unconditional, which is what a consumer would have
+read.
 
 The suite's own dirty case ran from the trunk, so it had been pinning the defect; it is re-pointed at a
 branch, and two cases are added for the arms that now proceed.
