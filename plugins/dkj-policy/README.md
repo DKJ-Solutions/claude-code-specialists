@@ -137,6 +137,7 @@ below changes for you, and nothing here asks you to run anything.
 | [`check-branch-entry`](skills/check-branch-entry/SKILL.md) | the CI gate on the branch dossier — the same two checks `open-pr` runs, where a hand-pushed branch cannot escape them |
 | [`check-policy-drift`](skills/check-policy-drift/SKILL.md) | your own `CLAUDE.md` and this plugin's pages may be saying different things — lays every legislating document out in rank order so you can read them against each other. Report-only; it edits nothing |
 | [`prune-merged`](skills/prune-merged/SKILL.md) | merged branches have piled up in the clone — reaps the local ones it can prove are merged, and leaves every other one alone |
+| [`plugin-versions`](skills/plugin-versions/SKILL.md) | unsure whether this checkout is on the current plugin release — shows, per enabled plugin, the version installed for this checkout against the marketplace clone's version and HEAD, with a verdict on whether a plugin update is due |
 | [`cut-release`](skills/cut-release/SKILL.md) | the release: the bump, the notes, the tag, and the closing steps the script does not automate |
 | [`release-notes-page`](skills/release-notes-page/SKILL.md) | after a release — builds the hand-written notes into one browsable page for the reader they are written for, and optionally the Cloudflare Worker that hosts it |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |
@@ -217,6 +218,13 @@ Then **restart the session** — a skill or a hook that arrived with the update 
 started before it. If you also run the ministry, the same pair updates it, with `dkj-policy-bwj` in
 place of `dkj-policy`: it is separately published and separately installed, so updating this plugin
 leaves it exactly where it was.
+
+**`plugin-versions` tells you, per machine, whether the pair is even due.** This plugin ships it as a
+skill (`plugin-versions`): one read-only run in the consuming checkout prints, per enabled plugin, the
+version and commit that checkout installed against the marketplace clone's version and HEAD, with a
+per-plugin verdict — up to date, update this plugin, or refresh the clone — and the command for each.
+It reads the clone that checkout already holds, so it cannot see whether the clone itself trails
+`origin`; between two releases nothing can.
 
 **Both things those commands touch are per-machine state, and that is the whole reason this section
 exists.** The marketplace is a cached git clone under `~/.claude/plugins/marketplaces/`, and the install
