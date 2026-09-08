@@ -88,10 +88,10 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
 ### A review is dispatched into the primary checkout, never into a worktree
 
 **Decided September 8, 2026, and the measurement is the whole of the reasoning.** `isolation:
-"worktree"` looks like the mechanical answer to the hazard a review carries — a reviewer holding
-`Bash` can `git stash`, `git checkout HEAD --` or `git reset` the orchestrator's uncommitted work
-away, and no mechanism stops it. It is not that answer, for two reasons that were **probed rather
-than reasoned about**, in this system's own source repo.
+"worktree"` is the obvious mechanical answer to the hazard the bullets above describe: a reviewer
+that cannot reach the primary checkout cannot move it, whatever its boundary says. It is not that
+answer, for two reasons that were **probed rather than reasoned about**, in this system's own source
+repo.
 
 - **The worktree carries no uncommitted work.** An untracked file and a tracked edit made in the
   primary seconds before the dispatch were both invisible inside it: the harness cuts a fresh
@@ -105,15 +105,16 @@ than reasoned about**, in this system's own source repo.
   workflow that refuses on a dirty tree sees that, and the flag offers no way to put the worktree
   anywhere else.
 
-So a reviewer is a fresh agent in the primary checkout, and what keeps it off the working copy is an
-instruction to the reviewer rather than a mechanism. **That is not weakened by being
-unenforceable** — no lint gate could reach this anyway, because `isolation` is set by the caller at
-dispatch and lives in no agent def.
+So a reviewer is a fresh agent in the primary checkout, and the `working-copy-boundary` block stays
+the whole of what keeps it off the working copy. **That is not weakened by being unenforceable** —
+no lint gate could reach this anyway, since `isolation` is set by the caller at dispatch and lives in
+no agent def. Committing before you fan out is the orchestrator's own second layer, and it stays the
+one that does not depend on a specialist reading its boundary.
 
-**The bullet above stays true for the case it was written for**, several sub-agents *writing* to the
-same files at once. Both costs apply there too rather than being waived: such a worktree starts from
-HEAD rather than from the working copy, so whatever it produces has to be reconciled back by hand,
-and it dirties the primary for as long as it stands.
+**Worktree isolation stays true for the case the `fork` bullet named it for**, several sub-agents
+*writing* to the same files at once. Both costs apply there too rather than being waived: such a
+worktree starts from HEAD rather than from the working copy, so whatever it produces has to be
+reconciled back by hand, and it dirties the primary for as long as it stands.
 
 ## Picking up an inbound report — the six checks, in full
 

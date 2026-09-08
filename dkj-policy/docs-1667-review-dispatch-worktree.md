@@ -76,17 +76,23 @@ flag.
 - [x] Both probes reverted: worktree removed, probe file deleted, `README.md` restored,
       `git status` clean and `git worktree list` back to the primary alone.
 - [x] Review round on the committed diff -- Edith, Nolan and Sebastian in parallel, in the primary
-      checkout, which is what this branch decides. Sebastian: no blocking findings, and one claim of
-      his that did not hold on checking -- he read `fix/1665-working-copy-boundary` as merged, where
-      it is parked. Nolan: the manual is confirmed on-demand and not always-on (its `@`-import is the
-      persona body, not the manual), +33 lines / +2,446 B paid only by a session that opens it. Edith
-      and Nolan converged on the same defect from opposite ends, and it is repaired: the manual named
-      the `working-copy-boundary` block as an established fact, which it is not -- the block is on a
-      parked branch, so on the trunk today nothing forbids the hazard. The manual now says that
-      plainly and names no artefact that has not landed. Two more taken: the sentence claiming the
-      prevented failure "leaves a diff behind" was cut, because #1665 measured that failure as silent
-      too, and the closing paragraph now restates **both** costs for the writing case, which is what
-      the DEPLOY section already claimed it did.
+      checkout, which is what this branch decides. Sebastian: no blocking findings. Nolan: the manual
+      is confirmed on-demand and not always-on (the `@`-import is the persona body, not the manual),
+      so the added bytes are paid only by a session that opens it. Two of his taken -- the sentence
+      claiming the prevented failure "leaves a diff behind" was cut, because #1665 measured that
+      failure as silent too, and the closing paragraph restates **both** costs for the writing case,
+      which is what the DEPLOY section already claimed it did.
+- [x] **The one finding all three rounds turned on was a race, and it resolved against me.** Edith
+      reported that the manual asserted the `working-copy-boundary` block as established fact when it
+      existed nowhere in this branch's tree, and she was right about the tree. Sebastian had read the
+      same block as already merged, and I checked his claim against `origin/main`, found the block
+      absent, and recorded his as the one that did not hold. It did hold: #1665 merged at 20:20 UTC
+      **that same evening**, between the fetch this branch was cut from and the review round, and the
+      local ref I checked against was the stale half. Corrected here rather than quietly, because the
+      close-out would otherwise have carried a specialist's correct finding as a wrong one. What the
+      repair itself bought stands either way -- the wording chosen was the one that is true whichever
+      order the two branches merge in -- and after merging `origin/main` in, the section now names the
+      block and sits under the bullets #1665 added to the same section instead of restating them.
 - [x] Lint gate + all suites green before the push.
 
 ### DEPLOY: docs/1667-review-dispatch-worktree
@@ -107,11 +113,12 @@ primary's own `git status` carries `?? .claude/worktrees/` -- it dirties the tre
 to protect. That is why the repo's lane mechanism puts its worktrees in a sibling directory; the
 harness flag does not offer the choice.
 
-So the working-copy boundary #1665 is writing stays the whole of the answer for reviewers, and it is
-not weakened by being unenforceable: `isolation` is set by the caller at dispatch and lives in no
-agent def, so no lint gate could ever have reached it. The existing bullet stands for the case it
-was written for -- several sub-agents writing the same files at once -- with both costs now named
-there rather than waived.
+So the `working-copy-boundary` block -- #1665, merged the same evening this was measured -- stays the
+whole of the answer for reviewers, and it is not weakened by being unenforceable: `isolation` is set
+by the caller at dispatch and lives in no agent def, so no lint gate could ever have reached it. The
+section now sits under the bullets #1665 added rather than restating them, and worktree isolation
+stands for the case the `fork` bullet named it for -- several sub-agents writing the same files at
+once -- with both costs named there rather than waived.
 
 **Score:** 2
 
