@@ -1273,7 +1273,7 @@ try {
     }
 
     if (-not $merges) {
-        $bodyFile = Join-Path ([System.IO.Path]::GetTempPath()) ("sync-pr-body-$PID-" + ($branch -replace '[^A-Za-z0-9]', '-') + '.md')
+        $bodyFile = New-ScratchPath -Label ("sync-pr-body-" + ($branch -replace '[^A-Za-z0-9]', '-')) -Extension '.md'
         [System.IO.File]::WriteAllText($bodyFile, $body, (New-Object System.Text.UTF8Encoding($false)))
         Write-Host ''
         Write-Host 'Done -- and deliberately NOT merged.' -ForegroundColor Green

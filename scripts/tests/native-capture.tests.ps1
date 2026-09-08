@@ -541,6 +541,79 @@ Assert-True ($readers.Count -gt 3) "more than three files read the bound, which 
 Assert-True (@($readers | Where-Object { $_.Name -eq 'claim-issue.ps1' }).Count -eq 1) 'and claim-issue.ps1 is now among them (#1639)'
 
 Write-Host ''
+Write-Host ''
+Write-Host 'New-ScratchPath -- a temp path nobody can name in advance (#1659)' -ForegroundColor Cyan
+
+$tempRoot = ([System.IO.Path]::GetTempPath()).TrimEnd('\', '/')
+
+$p1 = New-ScratchPath -Label 'ccs-scratch-test'
+$p2 = New-ScratchPath -Label 'ccs-scratch-test'
+Assert-True ($p1 -ne $p2) 'two calls with the SAME label return different paths -- there is no name to pre-plant a junction at'
+Assert-True ((Split-Path -Parent $p1) -eq $tempRoot) 'the result is a direct child of the temp directory'
+Assert-True ((Split-Path -Leaf $p1) -match "^ccs-scratch-test-$PID-[0-9a-f]{32}$") 'the leaf is <label>-<pid>-<32 hex>, so a leftover is still attributable to a run that is still alive'
+Assert-True (-not (Test-Path -LiteralPath $p1)) 'nothing is created without -Directory -- ship-pr hands its path to `git worktree add`, which makes it'
+
+Assert-True ((New-ScratchPath -Label 'ccs-scratch-test' -Extension '.md') -match '\.md$') '-Extension lands at the end, after the guid'
+
+$pd = New-ScratchPath -Label 'ccs-scratch-test' -Directory
+try {
+    Assert-True (Test-Path -LiteralPath $pd -PathType Container) '-Directory creates the directory itself'
+} finally { Remove-Item -Recurse -Force -LiteralPath $pd -ErrorAction SilentlyContinue }
+
+# THE LABEL IS THE ONE HALF A CALLER COMPOSES -- ship-pr puts a PR number in it, verify-resolved-issues
+# an issue number, sync-main a branch name. These pin that no value of it can walk out of the temp
+# directory, which is the property the "direct child" assert above states and this one enforces.
+function Test-ScratchThrows { param([scriptblock]$Body) try { & $Body | Out-Null; return $false } catch { return $true } }
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label '..' }) 'a label of ".." is refused'
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'a/../../b' }) 'and so is one carrying a separator, so no label can leave the temp directory'
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'ok' -Extension 'md' }) 'an extension missing its dot is refused rather than silently glued to the guid'
+
+Write-Host ''
+Write-Host 'Every temp path this script layer composes carries a guid (#1659)' -ForegroundColor Cyan
+
+# THE SCAN, RATHER THAN A NOTE IN A DOC. #1659 was filed because seven sites had each hand-composed
+# "<label>-$PID" and nothing stopped an eighth; a rule enforced by memory is one that gets skipped.
+# A statement that reaches GetTempPath() THROUGH Join-Path is composing a path something will write at,
+# and it has to carry a guid -- which in practice means calling New-ScratchPath. A statement that merely
+# READS the temp root (check-claude-home enumerates it among the roots a fixture may sit under) has no
+# Join-Path and is deliberately not the subject.
+#
+# ONE LINE IS EXEMPT, BY ITS EXACT TEXT: New-ScratchPath's own composition, which builds $leaf with the
+# guid on the line above so the statement itself carries none. Exempting the FILE would have taken
+# Invoke-NativeCaptureUtf8's composer out of the scan with it -- the site this rule most wants covered.
+#
+# scripts/tests/ is out of scope here because it has its own, stricter rule and its own enforcer:
+# test-suite-gate.tests.ps1 requires $PID or a guid in every fixture path, for a different reason
+# (two concurrent runs tearing down each other's tree).
+$composerLine = '$path = Join-Path ([System.IO.Path]::GetTempPath()) $leaf'
+$tempOffenders = @()
+foreach ($f in @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
+                 Where-Object { $_.Directory.Name -ne 'tests' })) {
+    $n = 0
+    foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
+        $n++
+        $t = $line.Trim()
+        if ($t.StartsWith('#'))        { continue }
+        if ($t -notmatch 'GetTempPath') { continue }
+        if ($t -notmatch 'Join-Path')   { continue }
+        if ($t -eq $composerLine)       { continue }
+        if ($t -match 'NewGuid')        { continue }
+        $tempOffenders += ('{0}:{1}' -f $f.Name, $n)
+    }
+}
+Assert-True ($tempOffenders.Count -eq 0) ('no script composes a temp path without a guid' + $(if ($tempOffenders.Count) { ' -- ' + ($tempOffenders -join ', ') } else { '' }))
+
+# AND THE CONVERSION IS PINNED AT ITS CALL SITES, so a revert to a hand-composed path fails here rather
+# than only in the scan above -- which a reverter could satisfy by adding a guid and leaving the class
+# scattered again. Six sites, one composer.
+$scratchCallers = @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
+                    Where-Object { $_.Directory.Name -ne 'tests' -and $_.Name -ne 'native-capture-lib.ps1' } |
+                    Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'New-ScratchPath' })
+Assert-True ($scratchCallers.Count -ge 5) "the composer is used across the script layer rather than in one place (found $($scratchCallers.Count) files)"
+foreach ($expected in @('park-lib.ps1', 'open-pr.ps1', 'ship-pr.ps1', 'verify-resolved-issues.ps1', 'sync-main.ps1')) {
+    Assert-True (@($scratchCallers | Where-Object { $_.Name -eq $expected }).Count -eq 1) "$expected composes its temp path through New-ScratchPath"
+}
+
 if ($script:fail -eq 0) {
     Write-Host "Result: $($script:pass) pass, 0 fail." -ForegroundColor Green
     exit 0

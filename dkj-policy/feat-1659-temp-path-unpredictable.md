@@ -38,19 +38,90 @@
 
 Issue 1659 measured the class as one member (park-lib). Re-measured: seven predictable temp paths in the shipping script layer. Plan: one shared composer in native-capture-lib (already in scope at all seven sites), convert all seven, tests, and record why a reparse-point check is NOT the answer (macOS /tmp is itself a symlink).
 
+#### What the report got right, and the one thing it did not
+
+The symptom stands: `grep -rn "ReparsePoint|LinkType|IsSymbolic|Attributes -band" scripts/` still
+returns nothing. The **size** does not. #1659 measured the class by looking at two neighbours and
+reported one existing member; re-measured over the whole shipping script layer it is **seven**:
+
+| site | leaf | what writes there |
+|---|---|---|
+| `lib/native-capture-lib.ps1` (test gate) | `test-suite-gate-$PID` | `New-Item -Force`, and a **recursive delete** at the same path on entry |
+| `lib/park-lib.ps1` | `git-park-msg-$PID.txt` | `WriteAllText` |
+| `release/open-pr.ps1` x2 | `open-pr-body[-edit]-$PID.md` | `WriteAllText` |
+| `release/ship-pr.ps1` | `ship-pr-fold-<pr>-$PID` | `git worktree add` |
+| `release/verify-resolved-issues.ps1` | `verify-resolved-<issue>-$PID.md` | `WriteAllText` |
+| `task/sync-main.ps1` | `sync-pr-body-$PID-<branch>.md` | `WriteAllText` |
+
+That changes the repair. Seven hand-edits leave nothing behind that stops an eighth, so this is one
+shared composer plus a scan that fails on the next one.
+
+#### The open question the report left, answered
+
+It offered three candidates and asked which. **Unpredictability**, and the other two are declined with
+a reason rather than skipped: a reparse-point check is a check-then-write with a window between the
+halves, and it cannot be applied to the temp **root** at all, because on macOS `/tmp` *is* a symlink to
+`/private/tmp` -- a check there refuses a whole platform for the ordinary case. An ACL is per-platform
+where a guid is not. There is nothing to pre-plant at a name that does not exist until it is used.
+
+#### What is NOT covered, and why it cannot be here
+
+`session-cache-lib.ps1` -- the second member the title names -- is on `feat/1605-sessioncheck-version-cache`
+and does not exist on the trunk. Its `<temp>/dkj-session-cache` **must** persist across processes, so a
+guid is not available to it: that shape needs a different answer and it belongs on that branch. Said
+there rather than left implicit here.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `New-ScratchPath` in `lib/native-capture-lib.ps1` -- `<temp>/<label>-<pid>-<guid>`, `-Extension`,
+      `-Directory` (created **without** `-Force`), and a validated label so no caller-composed value can
+      leave the temp directory. Placed there because all seven sites already dot-source that lib.
+- [x] All seven sites converted. The three temp paths that were already guid-based
+      (`Invoke-NativeCaptureUtf8`, `publish-to-business`, `sync-main`'s live mirror) are left alone --
+      they were never the class.
+- [x] The test gate's capture directory loses its entry-time `Remove-Item -Recurse -Force`: with a guid
+      there is no stale directory to clear, and that line was itself the recursive delete at a
+      pre-plantable path.
+- [x] `scripts/README.md`: the shipping-script rule written beside the existing `$PID` fixture rule,
+      saying which question each of the two answers.
+- [x] Mirrors regenerated (`sync/build-shared-scripts.ps1`) -- 7 updated.
 
 ### TEST
 
+- [x] `native-capture.tests.ps1`: nine asserts on the composer (two calls differ, direct child of the
+      temp dir, leaf shape, nothing created without `-Directory`, and three refusals -- `..`, a
+      separator, an undotted extension).
+- [x] A **scan** in the same suite: any statement under `scripts/**` outside `tests/` that reaches
+      `GetTempPath()` through `Join-Path` must carry a guid, with one line exempt by its exact text
+      (the composer's own). Plus a per-file assert that the five converted scripts still call it.
+- [x] Negative control run: the scan was proved to fail by re-introducing `git-park-msg-$PID.txt` in
+      `park-lib.ps1` -- 3 asserts red, green again on restore.
+- [x] `test-suite-gate.tests.ps1` adjusted: it used to **compose** the capture directory from the
+      driver's `GATE-PID`, which a guid makes impossible. It now reports `CapturePid` and **finds** the
+      directory by `test-suite-gate-<pid>-*` -- zero matches is the green case's assertion, one match is
+      the red case's.
+- [x] Lint gate + all suites green.
+
 ### DEPLOY: feat/1659-temp-path-unpredictable
 
-**Score:**
+Seven scripts composed their temp path as `<label>-$PID`, which is a name a local actor can reach
+first: `New-Item -Force` and `WriteAllText` both follow a symlink or junction, so a pre-planted link
+redirects the write, and where the script then deletes recursively there, the same window is a delete
+primitive in somebody else's directory. All seven now call one composer, `New-ScratchPath`, which
+returns `<temp>/<label>-<pid>-<guid>` -- there is no name to plant at. A reparse-point check was the
+obvious alternative and was declined on the measurement: it is a check-then-write, and on macOS `/tmp`
+is itself a symlink, so the same check refuses a whole platform for the ordinary case. A scan in
+`native-capture.tests.ps1` now fails on the eighth site, which is what the class needed more than the
+seven edits did.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- nothing a subscriber of a service sees. These are the workflow's own scripts, and the hardening
+is against a local actor on the machine running them; no behaviour a consumer invokes changes.
+
+**Score:** N/A
 
 #### Pull Request
 

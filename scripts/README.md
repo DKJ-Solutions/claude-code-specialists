@@ -80,6 +80,22 @@ twice at once. `$PID` (or a fresh GUID, where one file per child invocation is c
 per-case `$Label` is not, because it repeats across runs. `test-suite-gate.tests.ps1` enforces this and
 names the offending `file:line`.
 
+**Writing a shipping script: do not compose a temp path at all — call `New-ScratchPath`**
+([`lib/native-capture-lib.ps1`](lib/native-capture-lib.ps1)). It returns
+`<temp>/<label>-<pid>-<guid>`, creates the directory with `-Directory`, and refuses a label that is not
+a single safe path segment. The reason is not collision but the *other* property a fixed leaf has: it is
+a name somebody else can reach first. `New-Item -ItemType Directory -Force` and
+`[System.IO.File]::WriteAllText` both follow a symlink or junction, so a pre-planted link at the exact
+path redirects the write — and where the script later deletes recursively there, the same window is a
+delete primitive somewhere else. Measured on September 8, 2026
+([#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659), which had counted the
+class as one): **seven** sites composed `<label>-$PID` by hand, the test gate's capture directory among
+them. A guid removes the target instead of checking for one — a reparse-point check is a check-then-write
+with a window, and it cannot be applied to the temp root at all, because on macOS `/tmp` *is* a symlink.
+`native-capture.tests.ps1` enforces this over `scripts/**` outside `tests/` and names the offending
+`file:line`. The `$PID` convention above is the sibling rule for **fixtures**, and it answers a different
+question — two concurrent runs, not a hostile neighbour.
+
 `repo-config.ps1` sits at the top level rather than in a directory, deliberately: it is **not machinery
 but data** — this repo's own answers to the seam the shared scripts read (the trunk name, the lint script,
 the release grouping, the merge method). A consuming repo has its own, and that is the whole point of the
