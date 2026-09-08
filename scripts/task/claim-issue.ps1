@@ -139,13 +139,31 @@ if ($identity.Reason -eq 'split') {
 # -DiscardStderr because this output is parsed: gh writes its progress and its warnings to stderr, and
 # merged in they are not JSON. The failure branch below therefore says what it can from the exit code
 # rather than quoting gh, which is the trade native-capture-lib names.
-$view = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'view', $number) + $repoArgs + @('--json', 'number,title,state,url,assignees')) -Utf8 -DiscardStderr
+#
+# BOUNDED, LIKE EVERY OTHER NETWORK CALL IN THIS FAMILY (issue #1639). All three `gh` calls in this
+# script were unbounded while every sibling script bounded its own, and the cost lands hardest here:
+# the claim is the FIRST step of an issue-driven assignment (#1485), so a stall at this line is a
+# session that never starts, with nothing printed to say why. The failure mode is not hypothetical on
+# this surface -- #1628's measurement is a checkout where `gh` returned exit 1 intermittently while
+# working fine from the shell, minutes apart, in one session, and an intermittently-unhealthy `gh` is
+# exactly the shape that hangs rather than exits.
+$view = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'view', $number) + $repoArgs + @('--json', 'number,title,state,url,assignees')) -Utf8 -DiscardStderr `
+                             -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
 if (-not $view -or $view.ExitCode -ne 0) {
     Write-Host "[ERROR] could not read issue #$number." -ForegroundColor Red
-    Write-Host '        Three things this is, in the order they are worth checking:' -ForegroundColor Red
-    Write-Host "          1. the number does not exist in $(if ($repoName) { $repoName } else { 'this repo' }), or names a pull request rather than an issue;" -ForegroundColor Red
-    Write-Host '          2. gh is not logged in here      -- run: gh auth status' -ForegroundColor Red
-    Write-Host '          3. this account cannot see it    -- a private repo it has no access to.' -ForegroundColor Red
+    if ($view -and $view.TimedOut) {
+        # A STALL IS NOT ONE OF THE THREE BELOW, so it does not get their list. Each of those is a
+        # verdict gh reached and reported; this is gh reaching none, and sending a reader down a
+        # list of causes that cannot produce a hang is the bound announcing itself as the wrong thing.
+        Write-Host "        gh did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] line above." -ForegroundColor Red
+        Write-Host '        That is a stall, not a verdict about the issue: nothing was read and nothing was claimed.' -ForegroundColor Red
+        Write-Host '        Check that gh is healthy here (gh auth status) and run this again -- it costs one read.' -ForegroundColor Red
+    } else {
+        Write-Host '        Three things this is, in the order they are worth checking:' -ForegroundColor Red
+        Write-Host "          1. the number does not exist in $(if ($repoName) { $repoName } else { 'this repo' }), or names a pull request rather than an issue;" -ForegroundColor Red
+        Write-Host '          2. gh is not logged in here      -- run: gh auth status' -ForegroundColor Red
+        Write-Host '          3. this account cannot see it    -- a private repo it has no access to.' -ForegroundColor Red
+    }
     exit 1
 }
 
@@ -213,7 +231,28 @@ if ($DryRun) {
     exit 0
 }
 
-$edit = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'edit', $number) + $repoArgs + @('--add-assignee', $identity.Account)) -Utf8
+$edit = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'edit', $number) + $repoArgs + @('--add-assignee', $identity.Account)) -Utf8 `
+                             -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+if ($edit -and $edit.TimedOut) {
+    # THE ONE PLACE A TIMEOUT IS NOT THE SAME AS A FAILURE, and it is split out above the branch below
+    # for that reason alone. Every other bounded call in this script only READS; this one WRITES, and a
+    # write that never answered may well have landed server-side. So the honest report is neither "the
+    # claim failed" (which the branch below would print, and which would be a claim about the tracker
+    # this run cannot make) nor an [OK].
+    #
+    # IT STILL STOPS, unlike the read-back's could-not-verify state further down. The difference is
+    # what has already been proven: there, the write returned 0 and only the confirmation was missing,
+    # so carrying on was the likelier-correct act. Here nothing about the write is known at all.
+    # RE-RUNNING IS SAFE AND IS THE WAY OUT: the pre-write read at the top would then report
+    # 'already-yours' if it did land, which is a complete answer, and claim it if it did not.
+    Write-Host "[ERROR] 'gh issue edit' did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] line above." -ForegroundColor Red
+    Write-Host "        THIS RUN DOES NOT KNOW whether the claim landed: the write reached the network and never" -ForegroundColor Red
+    Write-Host '        reported back, so it may be on the tracker already. Treat the issue as UNCLAIMED until you' -ForegroundColor Red
+    Write-Host '        have looked, and run this again -- a claim that did land comes back as "already yours".' -ForegroundColor Red
+    Write-Host "          gh issue view $number --json assignees" -ForegroundColor Red
+    Write-Host "        $($facts.url)" -ForegroundColor Red
+    exit 1
+}
 if (-not $edit -or $edit.ExitCode -ne 0) {
     Write-Host "[ERROR] the claim failed -- #$number is NOT yours." -ForegroundColor Red
     foreach ($line in @($edit.Output)) { Write-Host "        $line" -ForegroundColor Red }
@@ -246,7 +285,8 @@ if (-not $edit -or $edit.ExitCode -ne 0) {
 #
 # `-DiscardStderr` STAYS, so the could-not-verify line names the exit code rather than gh's own words:
 # Output is parsed as JSON here, and stderr mixed into it would break the parse to improve a message.
-$after = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'view', $number) + $repoArgs + @('--json', 'assignees')) -Utf8 -DiscardStderr
+$after = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'view', $number) + $repoArgs + @('--json', 'assignees')) -Utf8 -DiscardStderr `
+                              -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
 $readOk = [bool]($after -and $after.ExitCode -eq 0)
 $landed = $readOk -and ((Get-AssigneeLogins -Json (@($after.Output) -join "`n")) -contains $identity.Account)
 
@@ -268,9 +308,21 @@ if (-not $readOk) {
     # state is a claim that landed and a read that did not. What this run cannot do is call that
     # proven, so it says which of the two states it is in and hands over the command that settles it.
     #
-    # NO TimedOut BRANCH, deliberately: this script passes no -TimeoutSeconds anywhere, so that field
-    # is always $false here and a branch on it would be a reason that can never print.
-    $why = if ($after) { "exited $($after.ExitCode)" } else { 'could not be run at all' }
+    # THE TimedOut REASON IS REACHABLE NOW, AND #1628 LEFT ROOM FOR IT ON PURPOSE. This block used to
+    # carry the opposite note -- "no TimedOut branch, deliberately: this script passes no
+    # -TimeoutSeconds anywhere, so that field is always $false here and a branch on it would be a
+    # reason that can never print" -- which was exactly right on the day it was written and stopped
+    # being true the moment the three calls above were bounded (issue #1639). It is the one reason
+    # worth naming separately here, because a stall and an exit code point the reader at different
+    # things: an exit code means gh answered and disagreed, a timeout means the read never happened at
+    # all, and only the second says nothing whatever about the tracker's state.
+    $why = if ($after -and $after.TimedOut) {
+        "did not answer within $NativeCaptureNetworkTimeoutSeconds seconds"
+    } elseif ($after) {
+        "exited $($after.ExitCode)"
+    } else {
+        'could not be run at all'
+    }
     Write-Host "[WARNING] the claim was written and gh accepted it, but the read-back $why," -ForegroundColor Yellow
     Write-Host "          so this run cannot confirm '$($identity.Account)' is on #$number. It most likely IS:" -ForegroundColor Yellow
     Write-Host '          the write returned 0, and the read before it answered normally. Confirm it if you' -ForegroundColor Yellow
