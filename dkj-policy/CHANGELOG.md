@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 10 minor entries** <!-- pending-tally -->
+**6 / 11 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1579-shopify-no-store-seam · 20260908-090100
+
+This repo now declares that it has no Shopify store, so `dkj-team-shopify`'s floor check stops asking it
+for a live theme id it cannot truthfully give. `scripts/repo-config.ps1` answers
+`Get-ShopifyRepoHasNoStore` with `$true` -- the seam inbound #1570 added to the check -- and the
+`CLAUDE.md` repo slot no longer describes that permanent `[ERROR]` as a gap in the check, because it is
+not one any more. The "do not silence it by seeding a theme id" warning stays: a declaration says there
+is no store, an id says there is one and names it, and only the first of those is true here. The
+session start on a given machine goes quiet once the plugin change reaches its marketplace clone
+through a release, which the slot now states rather than leaving a reader to wonder why the message
+persists.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a consumer of the plugins. Both files are this repo's own layer:
+`scripts/repo-config.ps1` is repo-local configuration and never ships, and `CLAUDE.md`'s repo slot is
+explicitly the part a copying repo replaces. The seam it answers was shipped by #1570; this branch only
+answers it.
+
+**Score:** N/A
+
+#### Pull Request
+
+This repo declares it has no Shopify store, so the floor check goes quiet
+
+[PR #1583](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1583)
+
+---
 
 ### DEPLOY: fix/1572-lane-ship-queue-trunk-holder · 20260908-085026
 
