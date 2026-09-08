@@ -36,6 +36,9 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
 $PrIssuesSrc      = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
+# Added by #1600: the failure arm composes its divergence sentence with Get-RemoteAheadNote rather than
+# a fourth hand-typed copy, so the fixture needs the lib new-branch and open-pr already share.
+$RemoteAheadSrc   = Join-Path $RepoRoot 'scripts\lib\remote-ahead-lib.ps1'
 
 # The cycle path and the scope phrases are read from the shared libs rather than retyped, so a rename
 # stays a one-place change -- the same discipline new-branch.tests.ps1 and park-branch.tests.ps1 follow.
@@ -138,6 +141,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1') -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')           -Force
     Copy-Item -LiteralPath $PrIssuesSrc      -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')      -Force
+    Copy-Item -LiteralPath $RemoteAheadSrc   -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')   -Force
 
     # A .cmd rather than a .ps1: Invoke-NativeCapture resolves 'gh' as a native command, and only an
     # executable extension on PATHEXT is found that way.
@@ -598,6 +602,70 @@ try {
     $rO = Invoke-ParkCycle -Dir $fixO
     Assert-Equal 0 $rO.Code 'rejected push: exit 0 -- the Stop-hook contract holds'
     Assert-Says $rO.Out 'could NOT be pushed' 'rejected push: the caller-owned line is reached, not a raw terminating error'
+
+    # --- (p) THE COLLISION IS NAMED, NOT HINTED AT (#1600) -----------------------------------------
+    # WHAT (o) ABOVE CANNOT SEE. It proves the failure arm is REACHED; it says nothing about whether what
+    # that arm prints is usable. Until #1600 it printed "run park-cycle by hand for the reason (diverged
+    # from origin?)" -- a question mark over an answer the run already held, sending the reader for a
+    # second run to learn what the first one could have said.
+    #
+    # WHY THAT MATTERED ENOUGH TO TEST. This script is the EARLIEST detector of two sessions on one
+    # branch: it runs every turn, so from the moment the other side pushes, every turn of this one ends
+    # in a refused push. Measured on feat/plugin-version-overview, September 8, 2026: two sessions ran
+    # the same pre-PR review in full from one handoff note, each finding real defects the other missed,
+    # and the collision was not learned until open-pr refused the push roughly half an hour later.
+    #
+    # THE FIXTURE IS THE INCIDENT, not an amend: a SECOND CLONE commits under a DIFFERENT IDENTITY and
+    # pushes, which is what makes the author line the assert below is really about. An amend (as in (o))
+    # produces the same rejection with the same author, so it could not tell a collision from a
+    # fast-forward of your own autopark -- which is exactly the distinction this report exists to draw.
+    Write-Host "park-cycle.ps1 -- a rejected push names the other session, not '(diverged from origin?)'" -ForegroundColor Cyan
+    $fixP = New-Fixture -Label 'p' -GhAnswer 'none'
+    Switch-ToBranch -Dir $fixP -Name 'feat/two-sessions-v1'
+    $relP = New-CycleDocument -Dir $fixP -Branch 'feat/two-sessions-v1'
+    $peerP = "$fixP-peer"
+    $script:fixtures += $peerP
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $fixP add -- $relP 2>$null | Out-Null
+        & git -C $fixP commit -q -m 'the handoff note' 2>$null | Out-Null
+        & git -C $fixP push -q -u origin 'feat/two-sessions-v1' 2>$null | Out-Null
+
+        # The other session: its own clone, its own identity, its own park on the shared branch.
+        & git clone -q "$fixP.git" $peerP 2>$null | Out-Null
+        & git -C $peerP config user.email 'other@local.invalid' 2>$null | Out-Null
+        & git -C $peerP config user.name 'Other Session' 2>$null | Out-Null
+        & git -C $peerP config commit.gpgsign false 2>$null | Out-Null
+        & git -C $peerP checkout -q 'feat/two-sessions-v1' 2>$null | Out-Null
+        Add-Content -LiteralPath (Join-Path $peerP ($relP -replace '/', '\')) -Value 'their round'
+        & git -C $peerP add -A 2>$null | Out-Null
+        & git -C $peerP commit -q -m 'park: feat/two-sessions-v1 (all outstanding work)' 2>$null | Out-Null
+        & git -C $peerP push -q origin 'feat/two-sessions-v1' 2>$null | Out-Null
+
+        # This session edits its own copy and the turn ends -- the state the Stop hook fires in.
+        Add-Content -LiteralPath (Join-Path $fixP ($relP -replace '/', '\')) -Value 'our round'
+    } finally { $ErrorActionPreference = $prevEap }
+
+    $rP = Invoke-ParkCycle -Dir $fixP
+    Assert-Equal 0 $rP.Code 'collision: exit 0 -- the Stop-hook contract still holds'
+    Assert-Says $rP.Out 'Other Session' 'collision: the report names WHO is on the other side'
+    Assert-Says $rP.Out 'all outstanding work' 'collision: and their commit subject, which is what separates it from your own autopark'
+    Assert-Says $rP.Out 'ANOTHER SESSION OR DEVICE IS WORKING THIS BRANCH' 'collision: the reader is told what it means, not only what happened'
+    Assert-Says $rP.Out 'git pull --ff-only' 'collision: and what to do about it'
+    if (Test-Says -Text $rP.Out -Phrase 'diverged from origin?') {
+        $script:fail++; Write-Host "  [FAIL] collision: the hedged wording is gone`n         still found: '(diverged from origin?)'" -ForegroundColor Red
+    } else {
+        $script:pass++; Write-Host '  [PASS] collision: the hedged wording is gone' -ForegroundColor Green
+    }
+    # -NoFailureMessage (#1600): Invoke-GitPark's own sentence is suppressed for THIS caller, because the
+    # hook merges the child's stderr into what it prints and a PowerShell error banner directly above the
+    # report reads as the hook having broken. The verdict is unchanged -- the arm above still ran.
+    if (Test-Says -Text $rP.Out -Phrase 'Invoke-GitPark :') {
+        $script:fail++; Write-Host "  [FAIL] collision: no PowerShell error banner above the report`n         still found: 'Invoke-GitPark :'" -ForegroundColor Red
+    } else {
+        $script:pass++; Write-Host '  [PASS] collision: no PowerShell error banner above the report' -ForegroundColor Green
+    }
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }

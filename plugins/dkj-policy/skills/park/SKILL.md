@@ -55,7 +55,39 @@ The script:
 - **No live/deploy action.** The script only touches git (add/commit/push). A consumer whose repo
   drives a live target (e.g. a Shopify theme) is never published by a park.
 
-## Picking a parked branch back up — measure the plan against the main branch first
+## Picking a parked branch back up — resume it with `new-branch`, not with `git checkout`
+
+**The resume command is `new-branch.ps1` with the branch's own name**, and that is not a convenience:
+
+```powershell
+powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/task/new-branch.ps1" -Name "<the parked branch>"
+```
+
+It is idempotent — a document that already belongs to that branch is left exactly as it is — and it is
+**the only pickup route carrying the check that another session is already on the branch**. On a branch
+that exists both locally and on `origin` it counts the gap and names the remote tip's **author and
+subject**, which is what separates a collision from a fast-forward of your own autopark; on one that
+exists only on `origin` it creates the local ref **at the remote tip**, carrying the parked work rather
+than a fork of the trunk. `git checkout` does neither, and says nothing while doing it.
+
+**Measured twice, three days apart, and the second time through this exact door.**
+[#1439](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1439) built that check after two
+sessions wrote `feat/plugin-policy-precedence` end to end from one parked commit.
+[#1600](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1600) is its recurrence on
+`feat/plugin-version-overview`: a session resumed from a handoff note by checking the branch out, so the
+check never ran, and two full pre-PR reviews were paid for — each finding real defects the other missed,
+which is what makes the duplication expensive rather than merely wasteful. **A handoff note is not a
+claim**: it records that a handover is wanted, never that one has been taken.
+
+**And nothing catches this after the fact except the cost.** The claim rule needs an issue, and a parked
+branch usually has none. The branch check at the start of an assignment reads `git status`, which is
+local — with no fetch, `## <branch>...origin/<branch>` is the same line for *in sync* and for *never
+looked*. `prune-merged -IncludeRemote` is for branches you are **not** standing on. What does fire is
+`cycle-autopark`, every turn, once you have something to push: its push is refused and it names the other
+session (see [park-cycle](#park-cycle----the-automatic-one-and-you-do-not-run-it) below) — but that is a
+turn or more after the pickup, and the reads below are cheaper than either.
+
+## Then measure the plan against the main branch
 
 **A parked branch is invisible to every ordinary check, and that is a consequence of the design rather
 than a defect.** Parking opens **no PR**, so the branch appears in no PR listing, in no issue, and in
@@ -150,9 +182,29 @@ it is really answering is *has this branch been published?* rather than *is a PR
 **If the work on such a branch genuinely resumed, park it by hand** — `park-branch.ps1`, deliberately.
 That judgement belongs to the explicit park; the automatic one refuses and says which state refused it.
 
-**Its commit body carries the `Backing:` note** described under *Picking a parked branch back up* above --
+**Its commit body carries the `Backing:` note** described under *Then measure the plan against the main
+branch* above --
 what is actually behind the plan it is publishing, measured on the machine that holds the work. A note, not
 a gate: it never changes whether the park happens.
+
+**And a REFUSED push is the earliest collision signal this workflow has** ([#1600](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1600)).
+Running every turn is what makes it that: once a second session pushes to this branch, every turn of yours
+ends in a non-fast-forward refusal. So the failure arm fetches that one ref and names the other side --
+
+```text
+park-cycle: 'dkj-policy/feat-x.md' could NOT be pushed -- 'feat/x' is 1 commit(s) behind origin/feat/x,
+  whose tip is: 73cfa46 Other Session: park: feat/x (all outstanding work).
+  ANOTHER SESSION OR DEVICE IS WORKING THIS BRANCH. Read what is there before building further
+  (git pull --ff-only); if the tip is your own autopark from another machine, that is the same
+  command. Nothing on this branch is lost -- the push was refused, not overwritten.
+```
+
+It used to say *"run park-cycle by hand for the reason (diverged from origin?)"*, which sent the reader
+for a reason the run already held and hedged the one fact worth stating. The author and the subject are
+the point rather than the count: `park: ... (all outstanding work)` under an identity that is not yours is
+what separates a collision from a fast-forward of your own autopark, and *"1 commit behind"* reads
+identically in both. **This is the one place the script fetches** — the header's no-fetch rule is about
+the ordinary turn, and this arm is reached only after a push has already been refused *by* the remote.
 
 It is silent unless it does something, and it never fails a turn -- it exits 0 on every outcome, including
 the ones it refuses on. Two parameters, both for callers rather than for you:
