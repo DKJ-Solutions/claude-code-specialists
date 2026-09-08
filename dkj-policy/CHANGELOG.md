@@ -43,7 +43,91 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**17 / 36 minor entries** <!-- pending-tally -->
+**19 / 38 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1625-hook-in-process-check · 20260908-153515
+
+Every SessionStart check hook in this family spawned a second `powershell.exe` to run its own check
+script, on top of the interpreter the harness had already started for the hook. All **seven** now run
+their check **in that same interpreter**, through one shared `Invoke-CheckScript`
+([`hook-check-lib.ps1`](../scripts/lib/hook-check-lib.ps1), mirrored into `dkj-policy` and
+`dkj-team-alpha`). That is **~305–443 ms** of wall-clock off every session start, resume, clear and
+compact — bounded below by the slowest hook's own improvement (2161 ms → 1856 ms) and above by six
+concurrent synthetic hooks differing only in the spawn. Reports are unchanged, verdict for verdict.
+
+The figure is smaller than [#1625](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1625)
+filed, and deliberately so: it assumed the hooks run sequentially and named settling that as the thing to
+do first. They run in parallel — *"Claude Code runs all matching hooks in parallel"* — so the ~875 ms
+sum was never on the critical path. It is also not one spawn's 219 ms, because six simultaneous process
+creations contend rather than each costing what one costs. (The measurements are of the six that existed
+when they were taken; the seventh arrived mid-branch and was not re-measured, which is why the range is
+quoted unchanged rather than widened on an estimate.)
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The repair the issue talked itself out of turned out to be the one-liner it said was unavailable.
+`exit` inside a **dot-sourced** script does take the hook with it, and so does one inside a script
+**block** — but a `.ps1` **file** invoked with `&` gets its own scope, and its `exit` returns control
+with `$LASTEXITCODE` set. That is why no check script had to be refactored into a lib to collect this.
+
+What the change is careful about is the other direction: in-process invocation has three failure modes
+that are all **silent**. An array splats positionally, so a flag binds to the first positional parameter
+and its value is dropped; `Write-Host` never reaches the pipeline without `6>&1`, so a hook whose whole
+job is to forward `[ERROR]` and hold the rest back would forward everything; and one `Write-Host` can
+arrive as a single record holding several lines. All three are handled once, in one lib, rather than six
+times — a seventh copy that got any of them wrong would not crash, it would quietly report the wrong
+thing into the session context.
+
+**Score:** 2
+
+#### Pull Request
+
+Session-start hooks run their check in-process instead of spawning a second interpreter
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1644](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1644)
+
+---
+
+### DEPLOY: fix/1628-claim-readback-three-states · 20260908-152548
+
+`claim-issue` no longer reports a read it could not make as a claim the tracker refused. The read-back
+held one boolean for two opposite facts -- "gh answered and your account is not there" and "gh never
+answered" -- and printed the first for both, naming a cause it had not measured ("most often an account
+with no write access") and telling you to treat the issue as UNCLAIMED. Measured on the claim of #1623:
+that fired, and a plain `gh issue view` on the same checkout seconds later showed the claim sitting
+there. Followed literally by a second session, it inverts the duplicate-work hazard the step exists to
+prevent. There are now three states. A read that answered and found your account absent still refuses,
+with the same message, because that is the one state it was ever right about. A read that did not
+answer prints a warning naming the exit code, says the claim most likely landed and why, hands over
+`gh issue view <n> --json assignees`, and **does not block** -- a claim is the opening of the work, so a
+false stop costs the whole assignment. The closing verdict says `(unconfirmed)` in that state rather
+than asserting a claim it could not confirm.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo runs this script as its claim step, and this is the failure mode it hits: an
+intermittent `gh` on an otherwise healthy checkout. Before this, that session was told its claim was
+refused and to treat the issue as unclaimed -- so it either stopped, or re-claimed work it already
+held. Now it is told the claim probably landed, told how to confirm it, and carries on. Nothing
+tightens: a genuine refusal refuses exactly as before, with the same words and the same exit code.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue tells an unverified claim apart from a refused one
+
+Plugins: dkj-policy
+
+[PR #1633](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1633)
+
+---
 
 ### DEPLOY: fix/1622-fixture-git-judged · 20260908-151234
 

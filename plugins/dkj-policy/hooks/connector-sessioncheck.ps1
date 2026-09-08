@@ -317,17 +317,38 @@ try {
         exit 0
     }
 
+    # The in-process check runner (issue #1625). Dot-sourced HERE rather than at the top of this try,
+    # and that placement is the point: the version-engine branch above returns without ever calling
+    # Invoke-CheckScript, so a load-time dependency up there is one that path does not have -- and it
+    # would take out the three branches that answer "no source checkout on this machine" for a file
+    # none of them reads. Measured: doing exactly that turned three of connector-sessioncheck.tests'
+    # engine-branch cases into "skipped due to an error".
+    #
+    # $PSScriptRoot-relative, so it resolves the same in the source tree, in the plugin mirror and in a
+    # consumer's plugin cache -- lib and hook travel in one payload. Unguarded, and inside this try: a
+    # payload missing it reports itself as a skipped check rather than failing at load with nothing said.
+    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
+
     $checkScript = Join-Path $workshop 'scripts\sync\check-connectors.ps1'
-    $checkArgs = @()
-    if ($SkipDrift)    { $checkArgs += '-SkipDrift' }
-    if ($SkipVersions) { $checkArgs += '-SkipVersions' }
+
+    # A HASHTABLE, NEVER AN ARRAY. In-process an array splats POSITIONALLY, so '-SkipDrift' would bind
+    # to $Manifest -- the check's first positional parameter -- and this hook would run the drift check
+    # it meant to skip against a manifest path that is really a flag name. Silently. See trap 1 in
+    # hook-check-lib.ps1's header.
+    $checkArgs = @{}
+    if ($SkipDrift)    { $checkArgs['SkipDrift'] = $true }
+    if ($SkipVersions) { $checkArgs['SkipVersions'] = $true }
 
     # Scoping (Sean recommendation): outside the workshop, a session only sees its own registry data.
     $cwdResolved = (Resolve-Path -LiteralPath $cwd).Path
-    if ($cwdResolved -ne $workshop) { $checkArgs += @('-OnlyConsumer', $cwdResolved) }
+    if ($cwdResolved -ne $workshop) { $checkArgs['OnlyConsumer'] = $cwdResolved }
 
-    $out = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $checkScript @checkArgs)
-    $code = $LASTEXITCODE
+    # In this interpreter, not a second one (issue #1625). THIS hook's other child process -- the
+    # plugin-versions engine above -- deliberately stays a child: it is bounded by Invoke-NativeCapture
+    # with a 30 s timeout, and an in-process call cannot be abandoned from the thread making it.
+    $result = Invoke-CheckScript -Path $checkScript -Arguments $checkArgs
+    $out  = @($result.Output)
+    $code = $result.ExitCode
 
     # -cmatch + square brackets (Victor finding): the raw summary lines of the drift check
     # contain the word 'drifted' in lowercase and are not a signal.
