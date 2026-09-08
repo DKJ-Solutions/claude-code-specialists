@@ -81,6 +81,12 @@ function Assert-Says {
 $Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) "test-suite-gate-test-$PID"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
+# THE CAPTURE DIRECTORIES A RED FIXTURE RUN DELIBERATELY LEAVES BEHIND (issue #1636), removed in this
+# suite's own finally. They sit outside $Fixture -- the gate names them off ITS process id, not off any
+# path a caller hands it -- so the existing teardown cannot reach them, and a suite that proves the gate
+# keeps litter must not become the reason the temp folder fills up.
+$script:KeptCaptureDirs = @()
+
 function New-FakeSuite {
     param([string]$Dir, [string]$Name, [string]$Body)
     New-Item -ItemType Directory -Path $Dir -Force | Out-Null
@@ -121,6 +127,13 @@ function Invoke-Gate {
         # stays so a FAILING assert prints one readable line.
         Flat    = ($text -replace '\s+', ' ')
         Seconds = $sw.Elapsed.TotalSeconds
+        # The capture directory THIS run would have used, derived from the child's own PID (see the
+        # driver) -- issue #1636. Present whether or not the run kept it, so both the green case ("gone")
+        # and the red case ("kept, and holds the failing suite") ask about one known path.
+        CaptureDir = $(
+            $m = [regex]::Match($text, 'GATE-PID:\s*(\d+)')
+            if ($m.Success) { Join-Path ([System.IO.Path]::GetTempPath()) ("test-suite-gate-" + $m.Groups[1].Value) } else { '' }
+        )
     }
 }
 
@@ -199,6 +212,11 @@ if (`$ResidentCount -ge 0) {
     `$script:GateResidentCount = `$ResidentCount
     function Get-ResidentPowerShellCount { return `$script:GateResidentCount }
 }
+# THE CHILD'S OWN PID, printed so the retention cases (issue #1636) can name the capture directory
+# EXACTLY rather than diffing the temp folder for one. \$captureDir is "test-suite-gate-\$PID" of the
+# process that runs the gate, which is this child -- and a diff-based test would be answered by whichever
+# other gate run happened to be alive, this suite's own outer gate included.
+Write-Host "GATE-PID: `$PID"
 `$r = Invoke-TestSuiteGate -TestsDir `$TestsDir -Context 'the fixture' -MaxParallel `$MaxParallel
 Write-Host "GATE-RESULT: `$r"
 "@
@@ -255,6 +273,12 @@ Write-Host "GATE-RESULT: `$r"
     $hc = [Array]::IndexOf($r.Lines, '== c-noisy.tests.ps1 ==')
     Assert-True ($hc -ge 0 -and $r.Lines[$hc + 2] -eq 'STDERR-MARKER-C') 'a suite stderr line lands inside that same block, right behind its stdout'
 
+    # A GREEN RUN KEEPS NOTHING -- the half of #1636 that must not regress into litter. The retention is
+    # for evidence of a failure, so a passing gate has to leave the temp folder exactly as it found it.
+    Assert-True ($r.CaptureDir -ne '') 'the driver reported its own PID, so the capture path is known'
+    Assert-True (-not (Test-Path -LiteralPath $r.CaptureDir)) 'a green run deletes its capture directory -- no litter'
+    Assert-True ($r.Flat -notmatch 'output kept at') 'and says nothing about kept output'
+
     # --- 3. A failing suite: the exit code, the marked header, the named summary --------------------
     Write-Host "a failing run -- the verdict must survive 25 green siblings" -ForegroundColor Cyan
     $bad = Join-Path $Fixture 'suites-bad'
@@ -267,6 +291,22 @@ Write-Host "GATE-RESULT: `$r"
     Assert-True ($r.Text -match '== a-first\.tests\.ps1 ==\r?\n') 'the passing sibling keeps its plain header'
     Assert-True ($r.Text -match 'test gate: 1 of 2 suites FAILED in \d+s \(\d+ lanes?\): z-broken\.tests\.ps1') 'and the closing summary carries the lane count and names it (issue #1318 -- the red line too)'
     Assert-True ($r.Text -match 'MARKER-Z') 'the failing suite still prints its own output -- attributable without a second run'
+
+    # A RED RUN KEEPS THE FAILING SUITE'S CAPTURE, AND ONLY THAT SUITE'S -- issue #1636. The console block
+    # asserted on the line above was always printed; what was missing is a second copy that survives a pipe
+    # through 'tail', a scrollback limit or a truncated CI log. So three things are asserted: the directory
+    # is still there, it holds the FAILING suite's stdout with its marker in it, and it does NOT hold the
+    # passing sibling's -- otherwise a red run over 79 suites leaves 78 files of green noise behind.
+    $script:KeptCaptureDirs += $r.CaptureDir
+    Assert-True (Test-Path -LiteralPath $r.CaptureDir) 'a red run KEEPS its capture directory'
+    Assert-Says $r.Flat "output kept at $($r.CaptureDir)" 'and the verdict names the path, the line a session copies'
+    $keptZ = Join-Path $r.CaptureDir 'z-broken.tests.out.txt'
+    Assert-True (Test-Path -LiteralPath $keptZ) "the failing suite's stdout capture survives"
+    Assert-True ((Test-Path -LiteralPath $keptZ) -and ((Get-Content -LiteralPath $keptZ -Raw) -match 'MARKER-Z')) 'and it holds what the console printed'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $r.CaptureDir 'a-first.tests.out.txt'))) 'the passing sibling''s capture is deleted -- only the evidence is kept'
+    # The empty half of the failing pair goes too: z-broken writes no stderr, so keeping a 0-byte
+    # .err.txt would only pad a directory the verdict line has just recommended reading.
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $r.CaptureDir 'z-broken.tests.err.txt'))) 'and an empty capture file is not kept either'
 
     # --- 4. It really is parallel, and -MaxParallel 1 really is the way back ------------------------
     #
@@ -478,6 +518,9 @@ Write-Host "GATE-RESULT: `$r"
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
+    foreach ($d in @($script:KeptCaptureDirs)) {
+        if ($d -and (Test-Path -LiteralPath $d)) { Remove-Item -Recurse -Force -LiteralPath $d -ErrorAction SilentlyContinue }
+    }
 }
 
 # --- Every suite's temp fixture must be per-process ------------------------------------------------
