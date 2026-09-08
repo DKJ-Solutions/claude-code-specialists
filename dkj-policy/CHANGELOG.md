@@ -43,7 +43,36 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 15 minor entries** <!-- pending-tally -->
+**9 / 16 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1584-ship-pr-conflicting-early-exit · 20260908-095109
+
+`ship-pr` now refuses a CONFLICTING pull request the instant it starts waiting for CI, instead of
+after the full 180s check-registration timeout. A conflicting PR has no `refs/pull/<n>/merge` for a
+`pull_request` workflow to run against, so no check suite can ever register for it -- a state GitHub
+reports the moment the PR exists, which made the wait pure cost. The refusal reuses the existing
+#1247 diagnosis (resolve the conflict; a close/reopen was measured doing nothing), and where the
+conflict is a branch whose changelog entry has already folded on `main`, it says the branch is spent
+and the follow-up belongs on a fresh branch off the trunk -- rather than a rebase that just re-adds a
+folded entry.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- internal shipping-workflow tooling; no subscriber of a service is affected.
+
+**Score:** N/A
+
+#### Pull Request
+
+Refuse a CONFLICTING PR up front instead of after the 180s check-registration wait
+
+Plugins: dkj-policy
+
+[PR #1595](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1595)
+
+---
 
 ### DEPLOY: fix/1586-fold-on-merge-stale-trunk-deferral · 20260908-094224
 
