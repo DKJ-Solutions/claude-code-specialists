@@ -33,19 +33,73 @@
 
 ### PLAN
 
+Issue #1575: `prune-merged.ps1` refused a dirty working tree unconditionally, on the stated ground of
+stepping off the branch you are standing on -- a step (4c) that is unreachable when HEAD is the trunk,
+when HEAD is detached, or under `-DryRun`. Verified in the source before repairing: the guard sits at
+step 1 and never consults the HEAD it read two lines earlier, and the candidate list is `refs/heads`
+minus the trunk, so 4c can only ever match a non-trunk branch.
+
+#### One correction to the report
+
+Its closing line -- *"the suite currently has the dirty case only from a branch"* -- is inverted.
+`New-MergedBranch` ends with `checkout main`, so case (d) ran from the **trunk**: the one assert in the
+suite for this guard was pinning the state the guard should never have refused. That changed the test
+work, not the repair.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Narrow the guard to 4c's own reachability: not `-DryRun`, and HEAD on a branch that is neither
+      the trunk nor detached. `$startBranch` moves above the guard so it can read the HEAD already in hand.
+- [x] Report a dirty tree the run proceeds through, naming which of the three reasons made it harmless
+      -- so an absent refusal is never read as an absent guard.
+- [x] Name the branch in the refusal, and offer `-DryRun` as the read-only way out beside commit, park
+      and stash.
+- [x] Update the header: step 1's description, the new `THE GUARD IS ABOUT THE STEP-OFF` block, and the
+      `-DryRun` parameter note.
+- [x] Mirror into the plugin (`build-shared-scripts.ps1`).
 
 ### TEST
 
+- [x] Re-point case (d) at a **branch**, which is the case the guard genuinely protects, and assert the
+      refusal names that branch.
+- [x] New case (d2): dirty on the trunk proceeds, reports, and does its actual work -- the #1575 case.
+- [x] New case (d3): dirty under `-DryRun` proceeds on a branch, where the same run without the switch
+      refuses.
+- [x] Full suite green, then the whole gate via open-pr.
+- [x] Verified against the live repro: this checkout's own unrelated uncommitted `.claude/settings.json`,
+      standing on the trunk.
+
 ### DEPLOY: fix/1575-prune-merged-dirty-guard
 
-**Score:**
+`prune-merged.ps1` no longer refuses a dirty working tree on runs that could never move it. The
+refusal's own ground is step 4c -- stepping off the branch you are standing on in order to reap it --
+and that step is unreachable when HEAD is the trunk (never a reap candidate), when HEAD is detached,
+and under `-DryRun` (which deletes nothing). The guard now asks exactly that reachability question, so
+those runs proceed; a dirty tree they pass through is reported with the reason it was harmless, rather
+than passed over in silence.
+
+This is the command the orchestrator's lens tells a session to run mid-assignment in place of
+classifying `git ls-remote` output by hand -- and mid-assignment is exactly when a checkout has
+uncommitted work in it, so the guard was blocking the report in the state the advice was written for.
+The two ways out it offered are the wrong price for a read: parking commits to a branch, and stashing
+touches a file the session was told to leave alone.
+
+Nothing the guard protected is given up. A dirty checkout standing on a non-trunk branch refuses
+exactly as before, because that branch can be squash-merged while the work is uncommitted, and that is
+the case where the step-off drags it onto the trunk. The refusal now names the branch that makes it
+reachable, and offers `-DryRun` beside commit, park and stash.
+
+The suite's own dirty case ran from the trunk, so it had been pinning the defect; it is re-pointed at a
+branch, and two cases are added for the arms that now proceed.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- this is a maintenance script in the development workflow. No subscriber of a service reaches it,
+and nothing about a published artifact changes.
+
+**Score:** N/A
 
 #### Pull Request
 
