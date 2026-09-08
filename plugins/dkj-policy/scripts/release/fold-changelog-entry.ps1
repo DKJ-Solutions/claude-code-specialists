@@ -134,6 +134,12 @@ you to commit -- the behaviour this script always had. With them it makes the co
 CHANGELOG.md and the entry files as the commit's pathspec so nothing else can be swept in: this commit
 lands directly on the main branch under one of the two named exceptions to "never commit directly", and
 an exception only stays safe while it stays the size it was granted at.
+
+EXIT CODES. 0 folded (or found nothing to fold, which is not an error); 1 refused or failed; 2 refused
+by the trunk-freshness pre-pass alone -- the checkout is behind origin/<trunk>, and NOTHING was written.
+2 is non-zero like every other refusal, so a caller testing `-ne 0` needs no change; it exists for the
+one caller that is re-triggered by the very push that made the checkout stale (fold-on-merge.yml), which
+can stand down on it instead of going red. See the pre-pass itself for why no other refusal may share it.
 #>
 
 param(
@@ -615,7 +621,28 @@ if (-not $SkipTrunkCheck) {
         Write-Host "  Bring the trunk up to date and run the fold again:" -ForegroundColor DarkGray
         Write-Host "    git checkout $($trunkGap.Trunk); git fetch --prune origin; git merge --ff-only origin/$($trunkGap.Trunk)" -ForegroundColor DarkGray
         Write-Host "  Nothing is lost by stopping: the entry is still in the branch document, and the fold is the same one command later. -SkipTrunkCheck folds anyway." -ForegroundColor DarkGray
-        exit 1
+        # EXIT 2, NOT 1 -- THE ONE REFUSAL IN THIS SCRIPT THAT CARRIES ITS OWN CODE (inbound #1586).
+        #
+        # It is still non-zero, so nothing that reads this the way ship-pr.ps1 does (`-ne 0`) changes
+        # behaviour: a person at a keyboard, and every other caller, sees the same refusal it always was.
+        # What the code buys is one caller that can act on it -- a job triggered by EVERY push to the
+        # trunk, which is what fold-on-merge.yml is. There, a trunk that moved between the checkout and
+        # this pre-pass means the push that moved it has its own run queued behind this one, whose
+        # checkout is at-or-after that push; so this run standing down loses nothing, while going red
+        # invents a fourth, self-healing meaning for a red `Fold on merge` and weakens the three real
+        # ones that file's header teaches a reader to tell apart.
+        #
+        # WHAT MAKES THAT SAFE IS THE POSITION OF THIS BLOCK, not the caller's optimism: it sits in a
+        # PRE-PASS, before a single entry is folded, so a run that ends here has written nothing and
+        # there is no half-state for the successor to inherit. Do not move this refusal below the fold
+        # loop, and do not give any refusal that CAN follow a partial fold this same code.
+        #
+        # AND THE CODE IS THE CONTRACT BECAUSE THE PROSE CANNOT BE. This script is mirrored into
+        # plugins/dkj-policy/scripts/release/ and reaches consumers by release, while the workflow that
+        # reads it reaches them through adopt-merge-queue.ps1's template -- two independent boundaries
+        # for one agreement. fold-on-merge.yml already matches two sentences out of these scripts'
+        # stdout; a third, spanning both boundaries, is drift waiting to happen.
+        exit 2
     }
 }
 

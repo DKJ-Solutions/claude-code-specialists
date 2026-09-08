@@ -58,6 +58,10 @@
 #
 #   2. THE FOLD REFUSING. It ran and declined; its own last lines say why. The #1497 misread of
 #      dkj-policy/CHANGELOG.md (2026-09-05 23:56 and 2026-09-06 07:32, repaired by #1498) was this.
+#      ONE refusal is excluded from this list and no longer turns the job red at all -- the trunk-gap
+#      guard, exit code 2, which the fold step translates into a stood-down green (#1586, below). The
+#      list stays three because that case is not a failure mode: it is this job declining to answer a
+#      question a successor run is already queued to answer.
 #
 #   3. THE FOLD SUCCEEDING and its push being rejected by the ruleset -- a clean fold above a GH013.
 #      Measured verbatim in run 34020828593, the push carrying the #1498 merge, 2026-09-06 08:04:
@@ -77,9 +81,27 @@
 # defaults to github.sha. This repo's ship-pr enqueues rather than folding, so the merge-then-local-fold
 # race #1543 measured in a queueless consumer does not arise here -- but reading the pushed SHA still
 # answers the wrong question ("did the trunk carry a leftover at commit S") when the one this job exists
-# for is "does the trunk carry a leftover NOW". ref: main answers that, keeps this file in step with the
-# adopt-merge-queue.ps1 template, and makes the fold's trunk-gap guard (#1405) unreachable here rather
-# than something a fast second push can trip.
+# for is "does the trunk carry a leftover NOW". ref: main answers that and keeps this file in step with
+# the adopt-merge-queue.ps1 template.
+#
+# WHAT IT DOES NOT DO IS PUT THE FOLD'S TRUNK-GAP GUARD (#1405) OUT OF REACH, WHICH THIS FILE CLAIMED
+# UNTIL #1586. ref: main is read once, at the checkout; the guard measures the same trunk again about
+# eleven seconds later, from inside the fold. Measured, run 34206684361 on 2026-09-08: the checkout took
+# e8ca4cb7 (`merge: ... (#1576)`) at 08:50:31, so the leftover was genuinely there and correctly found --
+# and by 08:50:42 the shipping session had pushed that branch's own fold, leaving this checkout 1 behind
+# and the guard refusing on an entry already folded. The guard was right, and the trunk ended correct.
+#
+# SO THIS JOB STANDS DOWN ON THAT ONE REFUSAL RATHER THAN GOING RED, and the argument is #1543's own,
+# one step further along: this job exists to answer "does the trunk carry a leftover NOW", and a trunk
+# that moved under it has changed what "now" means. The push that moved it is itself a push to main, so
+# it has its own run of this workflow queued behind this one (cancel-in-progress: false, constant group),
+# whose checkout is at-or-after that push -- and where cancellation drops a pending run, the run that
+# SURVIVES is the newest, which reads the tip. Nothing is lost, because the guard fires in a pre-pass
+# before a single entry is folded: the fold script signals it with exit code 2 and nothing else does.
+#
+# FETCH + --ff-only BEFORE THE FOLD WAS THE OTHER CANDIDATE AND WAS DECLINED. It would shrink the window
+# from ~11s to ~1s without closing it, which leaves this job red RARELY -- worse than predictably red,
+# and still the fourth self-healing meaning the three modes below exist to keep out.
 #
 # NO CONCURRENCY CANCELLATION, AND A CONSTANT GROUP (issue #1544), unlike unfolded-entry.yml's read-only
 # report -- that one can let a later run supersede an earlier one, because both report the same fact.
@@ -159,6 +181,23 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/fold-changelog-entry.ps1 -Commit -Push *>&1 | Tee-Object -FilePath fold-output.txt
           $foldExitCode = $LASTEXITCODE
+
+          # EXIT 2 IS "THE TRUNK MOVED UNDER ME", AND THIS JOB STANDS DOWN ON IT (issue #1586). It is
+          # the fold's trunk-freshness pre-pass, which runs before a single entry is folded -- so this
+          # run has written nothing, and the push that made the checkout stale has its own run of this
+          # workflow queued behind it, reading a tip that includes that push. Green, with the reason on
+          # the log, rather than a red that describes a state gone by the time anybody opens it.
+          #
+          # KEYED ON THE CODE AND ONLY ON THAT CODE. Two prose matches already cross from these scripts'
+          # stdout into this file; a third would put this agreement on a sentence that travels to
+          # consumers by a plugin release while this file travels by adopt-merge-queue.ps1's template.
+          # An exit code is checkable from both sides -- and every OTHER non-zero code still fails
+          # below, which is the half that keeps this from becoming a blanket "ignore the fold".
+          if ($foldExitCode -eq 2) {
+            Write-Host "Stood down: the trunk moved between this job's checkout and the fold, so nothing was folded and nothing was written."
+            Write-Host "  The push that moved it has its own run of this workflow, whose checkout includes it. See fold-on-merge.yml's header (#1586)."
+            exit 0
+          }
 
           # The two scripts read the same trunk a moment apart and must agree: the check found a
           # leftover, so fold-all mode reporting nothing to fold is a real disagreement between

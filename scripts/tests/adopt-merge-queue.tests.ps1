@@ -242,6 +242,17 @@ try {
     # The resolves runner keeps the event SHA -- it resolves THIS push''s PRs and has no trunk-gap guard.
     Assert-True ($verify -like '*PUSH_SHA: ${{ github.sha }}*') 'the resolves runner still reads the event SHA -- it resolves the PRs that push carried'
 
+    # AND ref: TRUNK DOES NOT PUT THAT GUARD OUT OF REACH (#1586). The ref is read once, at the
+    # checkout; the fold measures the same trunk again seconds later, so a second merge landing in that
+    # gap still trips it -- and this template said the guard was unreachable until that was measured.
+    # The placed runner therefore stands down on the fold's exit code 2, and on that code alone.
+    Assert-True ($fold -match '(?m)^\s*if \(\$foldExitCode -eq 2\) \{\s*$') `
+        'the placed fold runner branches on the fold exit code 2 (#1586)'
+    Assert-True ($fold -match '(?ms)if \(\$foldExitCode -eq 2\) \{.*?exit 0') 'and exits 0 on it -- a stand-down, not a red'
+    Assert-True ($fold -match '(?m)^\s*exit \$foldExitCode\s*$') 'while every other non-zero code is still propagated, so a real refusal stays red'
+    Assert-True ($fold -notmatch '\$foldExitCode -ne 0') 'and the stand-down is not a blanket "any non-zero is fine"'
+    Assert-True ($fold -like '*#1586*') 'and the runner carries the issue that explains why that one code is green'
+
     # --- 3. Additive: a re-run never overwrites -----------------------------------------------------
     Write-Host '-- 3. a re-run is additive --' -ForegroundColor Cyan
     $edited = '# my own fold runner'
