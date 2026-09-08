@@ -48,6 +48,9 @@ $Script   = Join-Path $RepoRoot 'scripts\task\sync-main.ps1'
 
 $script:pass = 0
 $script:fail = 0
+# EVERY FIXTURE git CALL THAT FAILED (issue #1622). Counted rather than thrown on -- see Invoke-Git for
+# why -- and read by the summary at the foot of this file, which is where it changes what the run MEANS.
+$script:fixtureGitFailures = 0
 $script:trees = @()
 
 function Assert-True {
@@ -57,10 +60,50 @@ function Assert-True {
 }
 
 function Invoke-Git {
-    <# git with the EAP lowered: git writes ordinary progress to stderr, and under EAP=Stop that is a
-       terminating NativeCommandError. #>
+    <#
+        Every fixture MUTATION in this file goes through here -- init, config, checkout, add, commit,
+        remote add, push -- so what this function does with a failure is what the whole suite does.
+
+        THE EAP IS LOWERED because git writes ordinary progress to stderr, and under EAP=Stop that is a
+        terminating NativeCommandError. That much was always right.
+
+        WHAT WAS NOT: IT DISCARDED THE EXIT CODE AS WELL (issue #1622). The body was one line --
+        `& git @args 2>$null | Out-Null` -- so a git command that FAILED was indistinguishable from one
+        that worked. A fixture then half-built, and the cases that read the run's output failed in a
+        block while the ones that read the disk stayed green, with no error text anywhere to say why.
+
+        THAT IS THE SHAPE #1622 REPORTED: this suite red once under the 16-lane gate, green standalone,
+        and no evidence left to read. The report offered two causes and neither survives -- the `net:`
+        cases are static scans of the script's source and the one that runs points at a local
+        `no-such-origin.git`, so the suite reaches no network at all; and fixture roots carry `$PID` AND
+        six hex of a GUID while gate lanes are separate processes, so a path collision needs the PIDs to
+        match first. What IS different under thirty lanes is dozens of concurrent `git` processes over
+        one temp tree, where a transient index.lock sharing violation, a scanner holding a file, or disk
+        pressure is ordinary rather than rare -- and this function was built to say nothing about any of
+        them.
+
+        SO THE EXIT CODE IS JUDGED AND git's OWN STDERR IS PRINTED, and the failure is counted so the
+        summary can say the asserts below are not a verdict on the script. It does NOT throw: a suite
+        that dies at the first fixture hiccup reports less than one that runs on and names what broke,
+        and the count at the end is what makes the difference impossible to miss.
+
+        `2>&1` RATHER THAN `2>$null`, which is the same call worktree-lane.tests.ps1's own Invoke-Git
+        already makes: under Windows PowerShell 5.1 that wraps each stderr line in an ErrorRecord, which
+        is harmless at EAP=Continue and is why the redirect is inside the try. `$LASTEXITCODE` is
+        unaffected by it -- it is `$?` that the wrapping disturbs, and nothing here reads `$?`.
+    #>
     $prevEap = $ErrorActionPreference
-    try { $ErrorActionPreference = 'Continue'; & git @args 2>$null | Out-Null } finally { $ErrorActionPreference = $prevEap }
+    try {
+        $ErrorActionPreference = 'Continue'
+        $out = & git @args 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $script:fixtureGitFailures++
+            Write-Host "  [FIXTURE GIT FAILED] exit $LASTEXITCODE -- git $($args -join ' ')" -ForegroundColor Magenta
+            foreach ($line in (($out | Out-String) -split "`r?`n")) {
+                if ("$line".Trim()) { Write-Host "      $line" -ForegroundColor Magenta }
+            }
+        }
+    } finally { $ErrorActionPreference = $prevEap }
 }
 
 function Set-FixtureFile {
@@ -868,8 +911,27 @@ finally {
 }
 
 Write-Host ''
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT, AND IT CHANGES WHAT THE VERDICT MEANS (issue #1622). Every
+# assert below a git command that failed is measuring a repo that was never built, so reading them as a
+# judgement on sync-main.ps1 is the wrong conclusion -- and it is the conclusion a reader reaches by
+# default, because a red suite normally means the script regressed. Printed even when every assert
+# passed: a fixture that half-built and still went green is a case this suite is not testing, and the
+# reader should know which run they are looking at.
+if ($script:fixtureGitFailures -gt 0) {
+    Write-Host "FIXTURE: $($script:fixtureGitFailures) git command(s) FAILED while building this run's repos -- see the [FIXTURE GIT FAILED] lines above." -ForegroundColor Magenta
+    Write-Host "         Whatever the asserts say below, they are not a verdict on sync-main.ps1: some of them read a repo that was never built." -ForegroundColor Magenta
+    Write-Host "         Under the parallel test gate this is the shape to expect from contention (issue #1622) -- re-run the suite on its own before reading anything into it." -ForegroundColor Magenta
+    Write-Host ''
+}
 if ($script:fail -gt 0) {
     Write-Host "FAILED: $($script:fail) of $($script:pass + $script:fail) asserts." -ForegroundColor Red
+    exit 1
+}
+# A CLEAN SWEEP OF ASSERTS OVER A BROKEN FIXTURE IS NOT A PASS. Nothing above would have caught it: the
+# count is the only thing that knows, so it is what decides the exit code here rather than a green run
+# quietly certifying a suite that never ran what it claims to.
+if ($script:fixtureGitFailures -gt 0) {
+    Write-Host "FAILED: every assert passed, but $($script:fixtureGitFailures) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

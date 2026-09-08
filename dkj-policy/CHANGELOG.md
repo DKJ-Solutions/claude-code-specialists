@@ -43,7 +43,79 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**17 / 35 minor entries** <!-- pending-tally -->
+**18 / 37 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1628-claim-readback-three-states · 20260908-152548
+
+`claim-issue` no longer reports a read it could not make as a claim the tracker refused. The read-back
+held one boolean for two opposite facts -- "gh answered and your account is not there" and "gh never
+answered" -- and printed the first for both, naming a cause it had not measured ("most often an account
+with no write access") and telling you to treat the issue as UNCLAIMED. Measured on the claim of #1623:
+that fired, and a plain `gh issue view` on the same checkout seconds later showed the claim sitting
+there. Followed literally by a second session, it inverts the duplicate-work hazard the step exists to
+prevent. There are now three states. A read that answered and found your account absent still refuses,
+with the same message, because that is the one state it was ever right about. A read that did not
+answer prints a warning naming the exit code, says the claim most likely landed and why, hands over
+`gh issue view <n> --json assignees`, and **does not block** -- a claim is the opening of the work, so a
+false stop costs the whole assignment. The closing verdict says `(unconfirmed)` in that state rather
+than asserting a claim it could not confirm.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consuming repo runs this script as its claim step, and this is the failure mode it hits: an
+intermittent `gh` on an otherwise healthy checkout. Before this, that session was told its claim was
+refused and to treat the issue as unclaimed -- so it either stopped, or re-claimed work it already
+held. Now it is told the claim probably landed, told how to confirm it, and carries on. Nothing
+tightens: a genuine refusal refuses exactly as before, with the same words and the same exit code.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue tells an unverified claim apart from a refused one
+
+Plugins: dkj-policy
+
+[PR #1633](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1633)
+
+---
+
+### DEPLOY: fix/1622-fixture-git-judged · 20260908-151234
+
+A fixture `git` command that fails while `sync-main.tests.ps1` builds its repos is now named, with its
+exit code and git's own stderr, instead of passing silently. That helper is behind all 24 fixture
+mutations in the suite and discarded both, so a half-built repo produced a block of red asserts with no
+cause printed anywhere -- which is what #1622 met under the 16-lane gate, and why the sighting could not
+be diagnosed.
+
+Two things follow. The run says a broken fixture **before** the verdict, because otherwise the default
+reading of a red suite is that the script regressed -- and here it did not. And a run where every assert
+passed but a fixture command did not now **fails**: a clean sweep over a repo that was never built proves
+less than it appears to, and the failure count is the only thing that knows.
+
+The report's own two hypotheses were checked against the tree first and neither survives: the `net:`
+cases are static scans of the script's source, and fixture roots carry `$PID` as well as a GUID while
+lanes are separate processes. What is genuinely different under thirty lanes is dozens of concurrent
+`git` processes over one temp tree.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a test suite's own diagnosability. No subscriber sees it, and nothing about what the workflow
+does changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+A fixture git command that fails is named, instead of leaving a block of red asserts with no cause
+
+[PR #1640](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1640)
+
+---
 
 ### DEPLOY: fix/1636-gate-keeps-red-capture · 20260908-150234
 

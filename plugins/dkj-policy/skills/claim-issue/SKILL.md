@@ -107,6 +107,30 @@ write access to the repo. An unverified claim is worse than none: the session be
 says something it does not. So the script re-reads the assignees and **fails** when its own account
 is not among them, telling you to treat the issue as unclaimed.
 
+**And the read-back reports THREE states, because two of them are opposite facts** (#1628,
+September 8, 2026). It used to hold one boolean, which read `$false` both when the read had answered
+and the account was absent *and* when the read had never happened -- and then printed the first:
+
+| State | What it means | What happens |
+|---|---|---|
+| **claimed** | the read answered and the account is on the issue | `[OK]`, and the work starts |
+| **refused** | the read answered and the account is **not** on the issue | `[ERROR]`, treat it as unclaimed, exit 1 |
+| **could not verify** | the read did not answer (`gh` absent, or a non-zero exit) | `[WARNING]` naming the exit code -- and it does **not** block |
+
+**The third state does not block, and that is the point of separating it.** The write it is checking
+returned 0 and the read *before* the write answered normally, so the far likelier state is a claim
+that landed and a read that did not -- and everything that guards against duplicate work has already
+succeeded by then. Refusing there costs the whole assignment, which is exactly what a claim is not
+allowed to do ([#1485](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1485): the
+claim is the *opening* of the work). So it says which of the two it is in and hands over the one
+command that settles it, the way `new-branch` already words its own unreachable-`gh` line.
+
+Measured on the claim of [#1623](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1623)
+in the source repo: the old message fired, named a cause it had not measured, and told the operator to
+treat the issue as unclaimed -- while a plain `gh issue view` on the same checkout, seconds later,
+showed the claim sitting there. Followed literally by a second session, that inverts the very hazard
+this step exists to prevent.
+
 ## What this skill is NOT
 
 - **Not a branch.** It writes one assignee and nothing else. Opening the branch is
