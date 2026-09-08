@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 17 minor entries** <!-- pending-tally -->
+**10 / 18 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/plugin-version-overview · 20260908-102335
+
+A new `dkj-policy` skill, `plugin-versions`, answers a question nothing else in the system does: for
+each enabled plugin, is the version installed IN THIS CHECKOUT the same as the one the local
+marketplace clone holds, and if not, which command closes the gap? It reads only what every consumer
+machine already has -- the install record keyed on this checkout's `projectPath`
+(`version`, short `gitCommitSha`, `scope`), and the marketplace clone's per-plugin `plugin.json`
+`version` plus its git `HEAD`. Because the clone advances only on
+`claude plugin marketplace update`, the version string is cut-granular and the HEAD sha is the finer
+truth, so the verdict prefers the sha (ancestor of HEAD -> `claude plugin update`; equal -> up to
+date; unknown to the clone -> refresh the clone) and falls back to the version comparison when a sha
+is absent. Read-only, no arguments, runs on any device; a missing clone, a missing install record, a
+declarative-only enable, a moved checkout and a non-git marketplace fetch each degrade to a clear
+line rather than an error. `Get-InstallRecord` in `check-report-lib.ps1` gains a `GitCommitSha` field
+on its projection to feed it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer of the `dkj-policy` workflow receives the `plugin-versions` skill in the next release,
+and with it the first per-device answer to *"is this checkout on the current plugin release, and do I
+run `claude plugin update` or `claude plugin marketplace update`?"* -- a blind spot the repo slot in
+`CLAUDE.md` calls out explicitly ("between two releases no version check can tell you the clone is
+behind"). It is noticed the moment a consumer wonders whether a session loaded a stale plugin.
+
+**Score:** 3
+
+#### Pull Request
+
+A per-device plugin-version overview: installed vs. marketplace clone, with a verdict
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1599](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1599)
+
+---
 
 ### DEPLOY: fix/1588-stale-ci-remedy-checkout · 20260908-100702
 
