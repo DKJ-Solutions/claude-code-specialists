@@ -662,6 +662,47 @@ $statusKind10 = (Invoke-Git -Dir $dir10 -GitArgs @('show', '--name-status', '--p
 Assert-True ($statusKind10 -match '(?m)^D\s+fix-scope\.md')                'the entry file is recorded as deleted in the commit'
 
 # ---------------------------------------------------------------------------------------------------
+Write-Host "The FIRST fold after a release cut -- into an empty '## [Unreleased]' -- folds and commits (issue #1564)" -ForegroundColor Cyan
+#      THE ONE CHANGELOG STATE NO OTHER CASE IN THIS SUITE REACHES: '## [Unreleased]' present, its list
+#      empty, and the pending tally still the post-cut sentence. fold-changelog-entry.ps1 read $insertPos
+#      (a byte offset) against the pre-tally content, then Set-ChangelogPendingSummary rebuilt the document
+#      into a NEW string -- shorter, because the sentinel sentence is the longest tally this repo writes and
+#      a counted one replacing it shrinks the file -- and the console-line code one step later ran
+#      $changelogContent.Substring($insertPos + $entryBlock.Length) against the now-stale offset and threw
+#      'startIndex cannot be larger than the length of the string'. It threw AFTER the write and the
+#      entry-file delete and BEFORE the commit block, so '-Commit -Push' silently did neither and the fold
+#      sat uncommitted on the trunk -- with the entry file gone, so check-unfolded-entry.ps1 saw nothing.
+#
+#      THE FIXTURE IS THE POST-CUT DOCUMENT, composed from the libs so it cannot drift from what
+#      cut-release.ps1 actually leaves: the '## [Unreleased]' heading and Format-ChangelogPendingSummary's
+#      own empty-list sentence, marker and all.
+$dirEU = New-FoldFixture -Label 'empty-unreleased'
+$emptyTally = Format-ChangelogPendingSummary -Content ''
+$postCutDoc = $script:FixtureIntro.TrimEnd() + "`n`n" + ((@($foldPendH, '', $emptyTally, '')) -join "`n")
+[System.IO.File]::WriteAllText((Join-Path $dirEU 'CHANGELOG.md'), $postCutDoc, $Utf8NoBom)
+New-EntryFile -Dir $dirEU -Name 'fix-first-after-cut.md' -Title 'The first entry of the cycle' -Rows '| 0 | - | - |'
+Initialize-FoldGitRepo -Dir $dirEU
+$rEU = Invoke-Fold -Dir $dirEU -ExtraArgs @('-Commit')
+
+Assert-True ($rEU.ExitCode -eq 0)                                          'empty unreleased: the run exits 0 rather than dying in Substring'
+Assert-True ($rEU.Output -notmatch 'startIndex')                           'empty unreleased: no startIndex range error reaches the output'
+Assert-True ($rEU.Output -notmatch 'Substring')                            'empty unreleased: nothing throws out of the console-line block'
+$clEU = (Get-Changelog -Dir $dirEU) -replace "`r`n", "`n"
+Assert-Equal 'The first entry of the cycle' (@(Get-EntryOrder -Changelog $clEU)[0]) 'empty unreleased: the entry landed in the list'
+Assert-Equal 1 @(Get-EntryOrder -Changelog $clEU).Count                    'empty unreleased: exactly one entry, not a stray heading'
+Assert-True ($clEU -match '(?m)^## \[Unreleased\]\s*$')                    'empty unreleased: the pending heading survived the fold'
+Assert-True ($clEU -notmatch [regex]::Escape($emptyTally))                 'empty unreleased: the post-cut sentence was replaced, not left standing'
+Assert-True ($clEU -match ([regex]::Escape((Get-ChangelogPendingSummaryMarker)))) 'empty unreleased: the refreshed tally still carries the marker'
+Assert-True ($rEU.Output -match 'placed above 0 existing entries')         'empty unreleased: the position line -- the one that threw -- now prints'
+# THE HALF THAT MATTERS: the crash sat between the write and the commit, so exit 0 alone is not the proof --
+# the fold must actually be committed, with a clean tree behind it.
+Assert-True ((((Invoke-Git -Dir $dirEU -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()) -match '^fold: fix/first-after-cut changelog') `
+    'empty unreleased: -Commit really committed the fold'
+Assert-True ((((Invoke-Git -Dir $dirEU -GitArgs @('status', '--porcelain')) -join '').Trim()) -eq '') `
+    'empty unreleased: and the working tree is clean afterwards -- nothing left uncommitted'
+Assert-True (-not (Test-Path (Join-Path $dirEU 'fix-first-after-cut.md'))) 'empty unreleased: the entry file was removed as part of the fold'
+
+# ---------------------------------------------------------------------------------------------------
 Write-Host "An entry git never tracked does not break the commit" -ForegroundColor Cyan
 #      Found by this suite before it reached anyone: naming an untracked path makes 'git commit' fail on
 #      the pathspec -- and by then the fold has already deleted the file, so the run ends with the

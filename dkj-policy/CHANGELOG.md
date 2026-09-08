@@ -43,7 +43,80 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 3 minor entries** <!-- pending-tally -->
+**3 / 5 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/consumer-readme-update-topup · 20260908-080839
+
+A consumer's `dkj-policy/README.md` now **gets** the UPDATE section, and gets it even if their folder was
+scaffolded before the section existed. `adopt-dkj-policy` Part 1 places it on a fresh adoption and
+**appends** it to a page that has none, recognised by a marker comment
+(`<!-- dkj-policy:update-section -->`) — the one write this command makes into a file it did not create,
+bounded to a single append at the end of a single file, in whichever folder `Get-WorkflowFolderName` says
+that repo actually has. A page that already carries it is left untouched and reported as such, so a
+re-run still finds nothing to do.
+
+The section itself names that repo's **own** plugin ids, read from its settings chain, one
+`claude plugin update <id> --scope project` line per enabled plugin under the marketplace refresh — with
+the command's shape as the fallback, because a placeholder is honest and a wrong id is not. It carries
+why both halves of the pair matter, that the marketplace clone and the install record are per-checkout
+state no session reports, and the seam answer a newer version of the shared scripts can start asking for.
+
+This closes the reach half of #1567: without it, the section landed in the source repo and in no consumer.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Three consumers are registered against this source today, and every one of them adopted its folder
+before this section existed — so this is the difference between the section existing and the section
+arriving. It is also the first time this scaffold can deliver a *later* improvement to a page it already
+placed, which is a shape the folder's other documents will want as well.
+
+**Score:** 3
+
+#### Pull Request
+
+Let the adoption scaffold place -- and top up -- the UPDATE section in a consumer's folder README
+
+Plugins: dkj-policy
+
+[PR #1569](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1569)
+
+---
+
+### DEPLOY: fix/1564-fold-stale-offset-after-tally · 20260908-075318
+
+`fold-changelog-entry.ps1` crashed on the first fold after every release cut -- folding into an empty
+`## [Unreleased]` -- because it read byte offsets against the changelog *before* the pending-tally
+rewrite replaced that string with a shorter one, then used them in the "placed above N" console line.
+The crash landed between the changelog write and the commit, so `-Commit -Push` silently did neither
+and left the fold uncommitted on the trunk with the entry file already deleted. The offset-dependent
+counts now run before the tally rewrite, while the offsets are still valid; a regression test folds
+into a freshly-cut `## [Unreleased]` and checks the fold is committed.
+
+**Score:** 4
+
+Every first fold after a release cut hit this; recovering it meant a hand-typed commit of the two
+bounded paths, twice in one day per the issue. Not a 5 only because that recovery was known and
+in-bounds.
+
+#### What makes this deploy extra special
+
+A consumer running the `dkj-policy` workflow hits the same crash on their first fold after their own
+release cut -- a shipped script broken on a guaranteed code path, leaving their trunk in a silent
+half-state (`-Commit -Push` doing neither, entry file gone so `check-unfolded-entry.ps1` sees nothing).
+
+**Score:** 4
+
+#### Pull Request
+
+fold-changelog-entry.ps1 no longer crashes on the first fold after a release cut
+
+Plugins: dkj-policy
+
+[PR #1568](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1568)
+
+---
 
 ### DEPLOY: docs/dkj-policy-folder-update-section · 20260908-074642
 

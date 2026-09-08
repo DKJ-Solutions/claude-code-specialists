@@ -11,7 +11,8 @@
     one move:
 
         dkj-policy/
-          README.md              what this folder is, and where each page's portable half lives
+          README.md              what this folder is, where each page's portable half lives, and how
+                                 to update the plugins in another checkout of this repo
           CONTRIBUTING.md        this repo's answers to CONTRIBUTING-portable.md, plus the session rules for
                                  this folder -- one page since #886, not two
           releases/README.md     this repo's answers to RELEASES-portable.md (the release LIST is a
@@ -42,6 +43,14 @@
     STRICTLY ADDITIVE, NEVER OVERWRITES. Every file that already exists is left exactly as it is,
     whatever it contains -- the same rule specialists-init and adopt-config follow, and what makes a
     re-run find nothing to do. The scaffolded docs carry VUL-IN markers where only this repo can answer.
+
+    WITH ONE BOUNDED EXCEPTION, AND IT IS ADDITIVE TOO: the UPDATE section of the folder README. Create-
+    when-absent is right for a page the repo then writes in, and it is also why a section added to this
+    scaffold LATER reaches an already-adopted repo not at all -- "right owner, wrong reach", the shape
+    recorded for PR #734 and stated for CLAUDE.md below. That section carries a marker comment, so this
+    run can recognise it, APPEND it once when it is missing, and never touch anything else in the file.
+    It is bounded to one append at the end of one file, in the folder Get-WorkflowFolderName says this
+    repo actually has; nothing is read back beyond the marker test, and nothing is ever rewritten.
 
     NOTHING HERE IS EVER REWRITTEN, INCLUDING THE BRANCH DOCUMENT. Until August 23, 2026 this command also
     placed branch/templates/ and new-branch refreshed those on drift -- the one exception to "additive
@@ -191,6 +200,87 @@ $noteRootDisplay = if ($noteRootRelPath -eq $workflowFolder -or $noteRootRelPath
 # portable pages live in the plugin install, and a relative link into a plugin cache is a path that is
 # wrong on every machine but this one.
 
+# --- The UPDATE section, and the plugin ids it names ----------------------------------------------
+# WHY IT IS SCAFFOLDED AT ALL: the two update commands are per-CHECKOUT, and nothing in a session reports
+# that this one is behind. A consumer holding the workflow on two machines has no page of their own that
+# says so -- the measurements live in the family's INSTALL.md, one repo away from the plugin they
+# installed -- so the folder index is where it belongs, beside the seam answers a session already reads
+# here.
+#
+# THE IDS ARE READ, NOT ASSUMED. check-report-lib is dot-sourced GUARDED, the idiom this script already
+# uses for the source-repo guard: without the lib the section still scaffolds, naming the SHAPE of the
+# command instead of this repo's own ids. A page printing a command a reader can paste is worth the read;
+# a page printing a WRONG id is worse than one printing a placeholder, which is why the fallback is the
+# placeholder rather than a guess at what this repo enabled.
+$updateIds = @()
+$updateMarketplace = ''
+$reportLib = Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1'
+if (Test-Path -LiteralPath $reportLib -PathType Leaf) {
+    try {
+        . $reportLib
+        if (Get-Command -Name 'Get-EnabledPlugins' -ErrorAction SilentlyContinue) {
+            # RepoEnabledIds, not Ids: an enable arriving from the machine layer is not this repo's to
+            # document, and a scaffolded page claiming it would be describing somebody's laptop.
+            $updateIds = @((Get-EnabledPlugins -RepoRoot $repoRoot).RepoEnabledIds | Where-Object { $_ -like '*@*' })
+        }
+    } catch {
+        Write-Warning "the enabled-plugin list could not be read ($($_.Exception.Message)) -- the UPDATE section is scaffolded with placeholders."
+    }
+}
+if ($updateIds.Count -gt 0) { $updateMarketplace = ($updateIds[0] -split '@', 2)[1] }
+$updateRefreshLine = 'claude plugin marketplace update ' +
+    $(if ($updateMarketplace) { $updateMarketplace } else { '<marketplace>' }) +
+    '   # 1. refresh the cached clone first'
+$updateCommandLines = if ($updateIds.Count -gt 0) {
+    @($updateIds | ForEach-Object { 'claude plugin update ' + $_ + ' --scope project' })
+} else {
+    @('claude plugin update <plugin>@<marketplace> --scope project   # 2. one line per plugin you enabled')
+}
+
+# THE MARKER IS WHAT MAKES THIS SECTION TOP-UP-ABLE, and that is the whole reason it has one. Every other
+# file here is placed once and never touched again, which is right for a page a repo then writes in -- and
+# it also means a section added to this scaffold later reaches an already-adopted repo NOT AT ALL: the
+# "right owner, wrong reach" shape recorded for PR #734, and stated for CLAUDE.md further down. A marker
+# plus a section-level append is the narrowest answer that closes it: nothing existing is read back,
+# rewritten or merged, which is exactly the rule the note-root seam answer below appends under.
+$updateSectionMarker = '<!-- dkj-policy:update-section -->'
+$folderReadmeUpdate = @(
+    '',
+    $updateSectionMarker,
+    '## Updating the plugins',
+    '',
+    'A release ANNOUNCES a new version; nothing delivers it. From this repo''s root:',
+    '',
+    '```powershell',
+    $updateRefreshLine
+) + $updateCommandLines + @(
+    '```',
+    '',
+    'Then **restart the session** -- a skill or a hook that arrived with the update is not in a session',
+    'that started before it.',
+    '',
+    '**Both things those commands touch are per-checkout state, and nothing in a session reports it.** The',
+    'marketplace is a cached git clone, and the install record is keyed on this checkout''s **folder path**.',
+    'So a version picked up on one machine changes nothing in the next checkout -- another machine, a',
+    'colleague''s clone of this repo, a second checkout beside this one -- while the workflow there keeps',
+    'working at whatever version it last installed. Every checkout runs the pair itself, and renaming or',
+    'moving one unlinks its install record with no error.',
+    '',
+    '**Neither part of the pair is optional.** Without the refresh an `install` was measured serving the',
+    '*previous* version; without `--scope project` the command looks in user scope and does not act on a',
+    'project-scoped install at all. Both measurements, and why the version number is not the code you are',
+    'running, are in the family''s `INSTALL.md` under *Staying up to date* -- in your plugin install or in',
+    'the source repo.',
+    '',
+    '**And an update can leave this repo owing the newer scripts an answer.** They dot-source',
+    '`scripts/repo-config.ps1` and `scripts/lib/branch-info.ps1` from here, so a newer version can call a',
+    'function this repo has never had; `script-contract-sessioncheck` names it at the next session start,',
+    'and the `adopt-dkj-policy` skill''s Part 2 fills it in.',
+    '',
+    'Placed by that skill''s Part 1, which tops this section up when it is missing and never rewrites it',
+    'once it is here -- the marker above is how it recognises it. This is your file: edit it freely.'
+)
+
 $folderReadme = @(
     '# `dkj-policy/` -- the workflow''s own folder in this repo',
     '',
@@ -214,7 +304,7 @@ $folderReadme = @(
     '',
     'Scaffolded by the `adopt-dkj-policy` skill (Part 1); strictly additive, so everything here past the',
     'VUL-IN markers is this repo''s own writing.'
-)
+) + $folderReadmeUpdate
 
 # ONE PAGE SINCE AUGUST 26, 2026 (#886), WHERE THERE WERE TWO. This array used to have a sibling,
 # $folderClaude, scaffolding a CLAUDE.md beside it: one page layered over the consumer's root
@@ -456,6 +546,9 @@ Write-Host "== adopt-workflow-folder -- $repoRoot ==" -ForegroundColor Cyan
 if (-not $Apply) { Write-Host '  DRY RUN -- nothing is written. Re-run with -Apply to place the files below.' -ForegroundColor Yellow }
 
 $created = 0
+# Counted separately from $created because it is a different ACT: the loop below creates files that were
+# absent, and the block after it appends a section to a file that was already there.
+$toppedUp = 0
 $kept = 0
 foreach ($t in $targets) {
     $abs = Join-Path $repoRoot ($t.Rel -replace '/', '\')
@@ -473,6 +566,43 @@ foreach ($t in $targets) {
     } else {
         Write-Host "  [create]  $($t.Rel)" -ForegroundColor Green
     }
+}
+
+# --- The one section this run tops up in a file it did NOT create ---------------------------------
+# THE ONLY PLACE THIS COMMAND WRITES INTO AN EXISTING PAGE, and it is bounded to one append at the end
+# of one file. Everything above is create-when-absent, which is right for a page the repo then writes in
+# -- and it is also why a section added to this scaffold later reaches an already-adopted repo not at all.
+# The marker makes the narrow answer possible: recognise the section, append it once when it is missing,
+# and never look at anything else in the file.
+#
+# THE FOLDER IS THE ONE THIS REPO ACTUALLY HAS, not the name $targets scaffolds. Get-WorkflowFolderName
+# prefers whichever folder is on disk, newest name first, and every seam default is composed from its
+# answer -- so a repo still holding a folder under one of this workflow's earlier names reads THAT page,
+# and topping up the name it does not use would put the section where nobody looks.
+#
+# NO READ-BACK BEYOND THE MARKER TEST, and AppendAllText rather than a rewrite, for the same encoding
+# reason the seam answer below states: reading a file and writing it back re-encodes it, and this command
+# was only ever asked to add a section.
+#
+# EVERY BRANCH PRINTS. "Your page already has it" has to be distinguishable from "nobody looked" -- the
+# whole failure this block exists for was silent by construction.
+$folderReadmeRel = "$workflowFolder/README.md"
+$folderReadmeAbs = Join-Path $repoRoot ($folderReadmeRel -replace '/', '\')
+if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
+    # Either it was just created with the section in it, or this repo has no such page at all. Both are
+    # already reported by the loop above, so this block says nothing.
+} elseif ((Get-Content -LiteralPath $folderReadmeAbs -Raw) -match [regex]::Escape($updateSectionMarker)) {
+    Write-Host "  [section] $folderReadmeRel already carries the UPDATE section -- left as it is" -ForegroundColor DarkGray
+} elseif ($Apply) {
+    $existingReadme = [System.IO.File]::ReadAllText($folderReadmeAbs)
+    $readmeAppendix = (($folderReadmeUpdate -join $nl) + $nl)
+    if ($existingReadme.Length -gt 0 -and -not $existingReadme.EndsWith("`n")) { $readmeAppendix = $nl + $readmeAppendix }
+    [System.IO.File]::AppendAllText($folderReadmeAbs, $readmeAppendix, $Utf8NoBom)
+    $toppedUp++
+    Write-Host "  [topped]  $folderReadmeRel -- UPDATE section appended" -ForegroundColor Green
+} else {
+    $toppedUp++
+    Write-Host "  [top up]  $folderReadmeRel -- has no UPDATE section; it would be appended" -ForegroundColor Green
 }
 
 # --- The one seam this run may answer (issue #1150) ------------------------------------------------
@@ -532,9 +662,9 @@ if ($writeNoteRootSeam) {
 
 Write-Host ''
 if ($Apply) {
-    Write-Host "Done: $created file(s) created, $kept left as they were." -ForegroundColor Green
+    Write-Host "Done: $created file(s) created, $kept left as they were$(if ($toppedUp) { ", $toppedUp section(s) topped up" })." -ForegroundColor Green
 } else {
-    Write-Host "Would create $created file(s); $kept already exist. Re-run with -Apply." -ForegroundColor Yellow
+    Write-Host "Would create $created file(s)$(if ($toppedUp) { ", top up $toppedUp section(s)" }); $kept already exist. Re-run with -Apply." -ForegroundColor Yellow
 }
 
 # --- What only this repo can answer, said out loud rather than left to be discovered ---------------
