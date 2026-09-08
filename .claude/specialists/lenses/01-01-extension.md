@@ -137,10 +137,20 @@ Before a specialist starts, Chris guards these claude-code-specialists-specific 
 | Cost: token/context budget and loading strategy, the size of agent defs/manuals/personas — **and wall-clock**, i.e. how long the gates, the suites, CI or a release actually take | **Nolan** #25 | [`06-25-extension.md`](06-25-extension.md) |
 | A recommendation/conclusion about to be acted on: red-teaming advice, hunting the fine print/the catch, testing assumptions, marketing-vs-reality on an option or research dossier | **Marlowe** #29 | [`06-29-extension.md`](06-29-extension.md) |
 
-The entire `dkj-team-alpha` plugin (the core team) is enabled, so Paula #09, Vera #11, Gwen #12, Cody #13, and
-Auden #30 are also invocable as `@dkj-team-alpha:<name>` — but they rarely have work in this repo and
-therefore have no repo lens (yet). If such work does come up,
-[Tessa #16](06-16-extension.md) writes the repo lens first, before the specialist is deployed.
+The table above is the routing, not the roster. **Every plugin in the marketplace is enabled here**, so
+far more specialists are invocable than Chris routes to — and the gap is deliberate rather than a set of
+gaps to close:
+
+- **The rest of the core team.** Paula #09, Vera #11, Gwen #12, Cody #13 and Auden #30 are invocable as
+  `@dkj-team-alpha:<name>`, but rarely have work in this maintenance repo, so their lens is an empty
+  `VUL-IN` scaffold. If such work does come up, [Tessa #16](06-16-extension.md) fills that lens in first,
+  before the specialist is deployed.
+- **The three add-on teams** — `dkj-team-ecomm`, `dkj-team-lifehub` and `dkj-team-shopify`, eleven
+  specialists between them. They are enabled to prove the plugins load in the repo that ships them, and
+  Chris **does not route to them here**: this repo is not a webshop, a personal-life repo or a Shopify
+  store, so an assignment that genuinely belonged to one of them would mean the assignment is in the
+  wrong repo. Their lenses stay empty on purpose; see
+  [`SPECIALISTS.md`](../SPECIALISTS.md) and the repo slot in [`CLAUDE.md`](../../../CLAUDE.md).
 
 Torn between two addresses? Choose based on *what actually changes*, not which files happen to move
 along — exactly like the `docs/` vs `chore/` rule in
