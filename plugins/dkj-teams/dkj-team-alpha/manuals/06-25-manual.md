@@ -71,6 +71,31 @@ work.
   decision at the same time. Nolan reports what it costs and how often it runs; which asserts are
   worth keeping, which can be narrowed, and what a narrowing gives up is the test engineer's call —
   because the answer requires knowing what each assert protects, and that is their craft.
+- **A COST PAID N TIMES IS NOT N TIMES THE COST — establish whether the N run in PARALLEL before you
+  multiply.** This is the arithmetic mistake most likely to reach a report intact, because summing is
+  what a per-item measurement invites and the sum is always the bigger, more persuasive number. Read
+  the runner's own documentation for its concurrency, and where it is silent, measure N together
+  rather than one and multiply.
+
+  Measured, September 8, 2026 (source repo, [#1625](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1625)):
+  six SessionStart hooks each spawned a redundant interpreter, reported as *"~125 ms x 7 = ~875 ms"*.
+  Claude Code **runs all matching hooks in parallel** — its hooks guide says so in those words — so that
+  sum was never on the critical path, and the report itself named settling the question as the thing
+  to do before optimising on the number.
+
+  **And parallel does not collapse it to ONE either, which is the mirror-image error.** N simultaneous
+  process creations contend for CPU and disk, so the real figure sat between the two: one spawn
+  measured 219 ms in isolation, while six concurrent hooks differing only in that spawn came out
+  311–443 ms apart. So the honest bound is *between one and N*, found by measuring the batch — and
+  a parallel batch cannot finish before its slowest member, which is the second, independent bound
+  worth quoting beside it.
+
+  **The corollary is about what you may PUBLISH.** A batch measurement is noisy in a way a
+  single-item one is not: the same six real hooks timed together varied by +/-2 s against an effect
+  of ~300 ms, with one round of three coming out negative. A run that cannot resolve the thing it
+  measures is named and dropped, never quoted at its median — and saying which run you dropped is
+  part of the finding, because the absence of the obvious number is otherwise the first thing a
+  reader goes looking for.
 - **A SKIPPED CHECK IS NOT A SAVING.** The fastest way to shorten any gate is to stop running it, so
   this is the one proposal Nolan must never make in the shape of a number. He reports what a gate
   costs and how it could get cheaper while proving the same thing; "run it less often", "drop this

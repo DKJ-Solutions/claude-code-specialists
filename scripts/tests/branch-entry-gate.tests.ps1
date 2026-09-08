@@ -129,6 +129,38 @@ try {
     Assert-True ($r.Code -eq 1 -and $r.Out -match 'has not been written yet') 'scaffolded: created and never filled in refuses -- the case a heading test lets through'
     Assert-True ($r.Out -match '- ') 'scaffolded: and it NAMES the fields still waiting, rather than only saying no'
 
+    # THE FOURTH STATE, AND THE ONE ALL THREE ABOVE PASSED (issue #1632). A document whose DEPLOY section
+    # has been DELETED is not missing, not reset, and not scaffolded -- and the scaffold gate cannot see it,
+    # because Get-DevelopmentEntryText's fallback hands that gate the guidance PREAMBLE and a blockquote
+    # nobody scaffolded carries no scaffold marker. So the gate reported a written entry over a file with no
+    # entry text whatsoever: it passes by ABSENCE.
+    #
+    # THE FIXTURE IS CUT THE WAY THE MEASURED ONE WAS, at the first occurrence of the phase heading -- a
+    # string that also sits INSIDE the guidance blockquote, in the line forbidding branch-specific content
+    # above it. That is what makes this reachable by accident rather than only by hand, so the fixture
+    # reproduces the cut instead of hand-writing its result. From Format-Development, so a change to the
+    # guidance shows up here rather than leaving this suite asserting against a document nothing writes.
+    $guidanceOnly = New-Consumer -Label 'guidance-only'
+    $wholeDoc = @(Format-Development -Branch 'feat/thing')
+    $cutAt = 0
+    for ($gi = 0; $gi -lt $wholeDoc.Count; $gi++) {
+        if ($wholeDoc[$gi] -match ([regex]::Escape(('#' * (Get-BranchCycleSectionLevel)) + ' ' + @((Get-BranchFileWording).StepPhases)[0]))) { $cutAt = $gi; break }
+    }
+    Assert-True ($cutAt -gt 0) 'no-entry: (the fixture really is cut inside the guidance, where the measured one was)'
+    Set-Entry -Dir $guidanceOnly -Lines @($wholeDoc[0..($cutAt - 1)])
+    $r = Invoke-Gate -Dir $guidanceOnly -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 1) 'no-entry: a document reduced to its guidance block refuses -- the case the scaffold gate passes by absence'
+    Assert-True ($r.Out -match 'DEPLOY section is gone') 'no-entry: and it names WHICH state this is, not "not written yet" -- the two send an author to different places'
+    Assert-True ($r.Out -notmatch 'carries a written entry') 'no-entry: and the gate never claims an entry it did not find'
+    Assert-True ($r.Out -notmatch 'keeps its shape') 'no-entry: nor reports 0 headings as a shape that passes -- refused before that line can say it'
+
+    # THE OTHER SHAPE THAT LOSES ITS ENTRY: the phases survive, the DEPLOY section does not. It is the same
+    # defect with the guidance arm of the predicate unavailable, so the phase arm has to answer alone.
+    $phasesOnly = New-Consumer -Label 'phases-only'
+    Set-Entry -Dir $phasesOnly -Lines @('## feat/thing', '', '### PLAN', '', '### CREATE', '', '- [x] Did the thing', '', '### TEST', '')
+    $r = Invoke-Gate -Dir $phasesOnly -Branch 'feat/thing'
+    Assert-True ($r.Code -eq 1 -and $r.Out -match 'DEPLOY section is gone') 'no-entry: phases kept and DEPLOY deleted refuses too -- the plan is read by name as well as by blockquote'
+
     # --- The pass, and the one that must not become a refusal ---------------------------------------
     Write-Host ''
     Write-Host 'what passes'

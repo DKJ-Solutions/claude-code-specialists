@@ -56,7 +56,10 @@
     IT IS OPT-IN, AND THAT IS NOT TIMIDITY. `gh pr checks --watch` (ship-pr.ps1) blocks for as long
     as CI takes, by design; a default bound would turn the longest CORRECT call in the workflow into
     a failure. The bound belongs on the calls that reach the network and should answer in seconds --
-    push, fetch -- and $NativeCaptureNetworkTimeoutSeconds is the shared number they pass.
+    a push, a fetch, an ls-remote, and every `gh` call that is not that one deliberate watch -- and
+    $NativeCaptureNetworkTimeoutSeconds is the shared number they all pass. NAMING BOTH COMMANDS HERE
+    IS THE POINT (issue #1639): this said "push, fetch", so a script whose every network call is a `gh`
+    call could read the whole policy and reasonably conclude it was about somebody else.
 
     Usage:
         $r = Invoke-NativeCapture -FilePath 'git' -Arguments @('push', '-u', 'origin', $branch)
@@ -85,13 +88,30 @@ $script:NativeCaptureNonInteractiveEnv = @{
     GCM_INTERACTIVE     = 'never'
 }
 
-# THE BOUND A GIT NETWORK CALL PASSES, in one place so the three sites that reach the network -- the
-# push in open-pr.ps1, the fetch in ship-pr.ps1, the fold's push in fold-changelog-entry.ps1 -- cannot
-# drift apart. Read it as $NativeCaptureNetworkTimeoutSeconds from a script that dot-sources this lib:
-# dot-sourcing runs the file in the CALLER's script scope, which is what makes $script: here readable
-# there. Two minutes is roughly twenty times the slowest honest push measured in this repo, and a
-# fraction of the fifteen minutes the reported hang sat for -- generous enough that a slow network is
-# not mistaken for a stall, short enough that a stall is reported inside one attention span.
+# THE BOUND A NETWORK CALL PASSES -- git OR gh -- in one place so the sites that reach the network
+# cannot drift apart. Read it as $NativeCaptureNetworkTimeoutSeconds from a script that dot-sources this
+# lib: dot-sourcing runs the file in the CALLER's script scope, which is what makes $script: here
+# readable there.
+#
+# DELIBERATELY NO LIST OF SITES ANY MORE, AND THE STALE ONE HAD A COST (issue #1639, September 8, 2026).
+# This comment used to open "THE BOUND A GIT NETWORK CALL PASSES" and name three sites -- open-pr's
+# push, ship-pr's fetch, the fold's push. By the time anybody read it back, six files were passing this
+# value and two of them were passing it to `gh`. Both halves misled in the same direction: a reader
+# comes HERE to learn the policy, found it described as git-only, and a script whose every network call
+# is a `gh` call therefore had no reason to think the policy was about it. That is the measured reason
+# claim-issue.ps1 shipped with three unbounded `gh` calls while every sibling bounded its own. So the
+# tree is the register rather than this paragraph:
+#   grep -rl NativeCaptureNetworkTimeoutSeconds scripts/
+#
+# TWO MINUTES, AND WHAT THAT NUMBER IS AND IS NOT SIZED OFF. It is roughly twenty times the slowest
+# honest push measured in this repo, and a fraction of the fifteen minutes the reported hang sat for --
+# generous enough that a slow network is not mistaken for a stall, short enough that a stall is
+# reported inside one attention span. THAT IS A git-push ARGUMENT, and it is REUSED for a `gh` API call
+# rather than re-derived (#1639). The reuse is sound in the only direction that matters: a
+# `gh issue view` that has not answered in two minutes is not slow, it is stalled, so the bound sits
+# far past anything honest at either end. Read it as an upper bound on patience, not as a model of
+# either command -- a caller that needs a tight bound on a fast call wants its own number, and should
+# say why beside it.
 $script:NativeCaptureNetworkTimeoutSeconds = 120
 
 # 124 is `timeout(1)`'s conventional "the command timed out" code, borrowed rather than invented so a

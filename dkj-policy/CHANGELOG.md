@@ -43,7 +43,226 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**18 / 37 minor entries** <!-- pending-tally -->
+**21 / 42 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1641-autopark-runspace · 20260908-162118
+
+The `cycle-autopark` Stop hook no longer starts a second PowerShell interpreter to run `park-cycle.ps1`.
+It runs it through the same `Invoke-CheckScript` the six SessionStart hooks have used since #1625, which
+gives ~102 ms back on **every turn** (666 ms -> 564 ms median on an ordinary turn with nothing to push,
+7 runs each) -- one interpreter start-up exactly, which is what the change removes. This hook fires far
+more often than that family, so it was paying the same avoidable start-up the most times.
+
+Two additions to the shared lib made that possible, and both are opt-in with nothing changed for its
+existing callers. `-MergeAllStreams` captures every stream rather than Write-Host and the pipeline
+alone: the session checks must not merge stderr, because a stray line would sit in front of their
+`[ERROR]` filter, while this hook has no filter and relays park-cycle verbatim -- which is what #1600
+built its `2>&1` for. `-OutputTo` keeps what a check managed to write before throwing; in-process there
+is otherwise no return value to read, and for a relaying caller those lines are the diagnosis.
+
+Separately, `Invoke-GitPark`'s `git push` was the last call in this family reaching the network
+unbounded; it now passes the same shared network timeout its three siblings do. That matters most
+exactly here, where the caller is a hook firing every turn with nobody watching a prompt to interrupt.
+
+Coverage grows with it. `hook-check-lib.ps1` arrived in #1644 with no suite of its own, and this branch
+rewrote the capture path all seven of its callers run through, so it gets one: 18 asserts over the three
+silent traps its header names, plus the two new parameters. The hook's own suite goes from 11 asserts to
+20, one of which pins the saving itself -- park-cycle reports the hook's own process id -- because every
+stream assert passes whether or not there is a child process, so nothing else would notice a silent
+return to spawning.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo's readers are its own maintainers, and the change is invisible from outside a session's
+turn timing.
+
+**Score:** N/A
+
+#### Pull Request
+
+cycle-autopark runs park-cycle in-process instead of a second interpreter
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1649](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1649)
+
+---
+
+### DEPLOY: fix/1639-claim-issue-network-bound · 20260908-161105
+
+`claim-issue` bounds all three of its `gh` calls at the shared network timeout, so a stalled `gh` is
+reported instead of waited out. This is the worst step in the workflow to hang in: the claim is the
+first move of an issue-driven assignment, so a stall there is a session that never starts with nothing
+printed to say why -- and the shape is not hypothetical, since the measurement behind #1628 is a
+checkout where `gh` returned exit 1 intermittently while working fine from the shell, minutes apart,
+in one session.
+
+**A timed-out write is reported as an unknown rather than a failure.** The read and the read-back only
+ask questions, so a stall costs nothing but the answer; `gh issue edit` changes the tracker, and a
+write that never reported back may have landed. Saying "the claim failed" there would be a claim about
+the tracker the run cannot make, so it says it does not know, stops, and names re-running as the way
+out -- an already-landed claim comes back as *already yours*.
+
+And the reason the gap existed is closed too. The shared bound described itself as *"THE BOUND A GIT
+NETWORK CALL PASSES"* and listed three sites while six files read it and two passed it to `gh`. That
+comment is the one place a script author learns the policy, so the policy read as somebody else's. It
+now names both commands and points at a `grep` instead of carrying a list no gate can keep true.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow runs this claim step, and it is the first thing their session does
+with an issue number. Unbounded, a `gh` that never answers there presents as a session that simply
+sits -- no output, no verdict, nothing naming the cause -- which is the failure that costs an operator
+the most time to diagnose and the least to fix once named. They also get the corrected policy comment,
+which is what stops the next `gh`-only script in their tree from repeating this.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue bounds its three gh calls, and the shared bound stops describing itself as git-only
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1651](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1651)
+
+---
+
+### DEPLOY: fix/1632-missing-entry-refused · 20260908-160353
+
+A branch document with its `### DEPLOY` section **deleted** carried no entry at all and passed every
+gate that exists to catch exactly that -- both of `check-branch-entry.ps1`'s document checks in CI and
+both of `open-pr.ps1`'s locally, which then composed the PR title and description out of the guidance
+block. The cause is one value standing for two states: `Get-DevelopmentEntryText` hands back the whole
+text when it finds no DEPLOY heading, which is the honest answer for a legacy entry file and the guidance
+*preamble* for today's document, and a blockquote nobody scaffolded carries no scaffold marker -- so the
+scaffold gate passed **by absence**. A new pure predicate, `Test-DevelopmentEntryMissing`, separates the
+two beside the splitter it bounds, and both readers now ask it ahead of their scaffold check. It reads
+shape rather than text, so it survives translation: no DEPLOY section *and* a plan present -- the
+scaffolder's blockquote guidance under the title, or the phases by their seam names -- is a document that
+lost its entry, while no DEPLOY section and no plan is the legacy shape whose fallback stands. Reachable
+by accident rather than only by hand, which is what earns it a gate: the measured document was produced
+by an edit truncating at `### PLAN`, a string that also sits *inside* the guidance blockquote.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Three discriminators were tried and two rejected on evidence rather than taste, and the rejections are
+the reusable part. A **level** test cannot work -- today's document title is an H2 and the flat-window
+entry heading (August 5-26, 2026) is an H2 too, so `Test-IsChangelogEntryFile` and
+`Test-BranchChangelogIsFilled` both read the broken document as an entry file, which is the same
+collision that moved the latter to the name test. The **declared branch** looked clean until
+`Get-BranchFileDeclaredBranch`'s deliberately un-narrowed `**Branch:**` fallback answered for a pre-split
+root entry as well, so refusing on it would have refused a perfectly good entry. What is left errs
+toward under-refusal on purpose: a document that lost its guidance *and* its phases is not recognised,
+because a missed refusal is the state that already exists while a false one stops a branch that worked
+yesterday. Ten shapes are pinned at the lib, five of them false-refusal cases somebody's branch is
+carrying right now.
+
+**Score:** N/A
+
+#### Pull Request
+
+Refuse a branch document whose DEPLOY section is gone
+
+Plugins: dkj-policy
+
+[PR #1647](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1647)
+
+---
+
+### DEPLOY: fix/1637-sync-main-path-print · 20260908-154618
+
+`sync-main` no longer prints a file path raw. Its primary report -- the take, hold-back and conflict
+listings -- goes through a new path-shaped display strip, and its conflict remedy no longer
+interpolates a path into a paste-ready `git diff` at all: the path is judged against the same
+allowlist a branch name is, and a refused one is replaced by `<path>` in **both** operands with a note
+naming the real path outside any command context.
+
+Two things make this more than a sweep. The double quotes that were there were the defect rather than
+the guard -- command substitution runs inside double quotes in bash and PowerShell alike, so the line
+read as protected while closing nothing, which is worse than a bare interpolation because the next
+reader sees quotes and stops looking. And the display strip had to be a second function rather than a
+reuse: `Get-DisplayRef` collapses space runs and trims, which is right for a ref (git forbids a space
+in one) and wrong for a path, where a doubled or trailing space is part of the name. Preserving one
+space per removed character is also what fixes the alignment -- a zero-width run spends format width
+without spending display columns, so a padded row used to slide against its neighbours.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The paths are the point. They come from this repo's own `HEAD` and from a filesystem walk of the
+pulled **live theme** -- which third parties edit through the Shopify theme editor, outside any
+review, and which is the entire reason that sync exists. Measured for #1637: `git ls-tree -r` and
+`git diff --name-only` hand back `assets/x$(id -un).js` and `assets/z;touch owned.js` unquoted in
+every `core.quotePath` setting, because git quotes control characters and high bytes and not shell
+metacharacters. So the consumer running this sync against a real store is the reader who was being
+handed a command to paste, built from a name they do not control.
+
+**Score:** 3
+
+#### Pull Request
+
+sync-main stops printing raw file paths: a faithful display strip and a paste refusal for the conflict remedy
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1645](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1645)
+
+---
+
+### DEPLOY: fix/1625-hook-in-process-check · 20260908-153515
+
+Every SessionStart check hook in this family spawned a second `powershell.exe` to run its own check
+script, on top of the interpreter the harness had already started for the hook. All **seven** now run
+their check **in that same interpreter**, through one shared `Invoke-CheckScript`
+([`hook-check-lib.ps1`](../scripts/lib/hook-check-lib.ps1), mirrored into `dkj-policy` and
+`dkj-team-alpha`). That is **~305–443 ms** of wall-clock off every session start, resume, clear and
+compact — bounded below by the slowest hook's own improvement (2161 ms → 1856 ms) and above by six
+concurrent synthetic hooks differing only in the spawn. Reports are unchanged, verdict for verdict.
+
+The figure is smaller than [#1625](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1625)
+filed, and deliberately so: it assumed the hooks run sequentially and named settling that as the thing to
+do first. They run in parallel — *"Claude Code runs all matching hooks in parallel"* — so the ~875 ms
+sum was never on the critical path. It is also not one spawn's 219 ms, because six simultaneous process
+creations contend rather than each costing what one costs. (The measurements are of the six that existed
+when they were taken; the seventh arrived mid-branch and was not re-measured, which is why the range is
+quoted unchanged rather than widened on an estimate.)
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The repair the issue talked itself out of turned out to be the one-liner it said was unavailable.
+`exit` inside a **dot-sourced** script does take the hook with it, and so does one inside a script
+**block** — but a `.ps1` **file** invoked with `&` gets its own scope, and its `exit` returns control
+with `$LASTEXITCODE` set. That is why no check script had to be refactored into a lib to collect this.
+
+What the change is careful about is the other direction: in-process invocation has three failure modes
+that are all **silent**. An array splats positionally, so a flag binds to the first positional parameter
+and its value is dropped; `Write-Host` never reaches the pipeline without `6>&1`, so a hook whose whole
+job is to forward `[ERROR]` and hold the rest back would forward everything; and one `Write-Host` can
+arrive as a single record holding several lines. All three are handled once, in one lib, rather than six
+times — a seventh copy that got any of them wrong would not crash, it would quietly report the wrong
+thing into the session context.
+
+**Score:** 2
+
+#### Pull Request
+
+Session-start hooks run their check in-process instead of spawning a second interpreter
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1644](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1644)
+
+---
 
 ### DEPLOY: fix/1628-claim-readback-three-states · 20260908-152548
 

@@ -7083,6 +7083,103 @@ function Get-DevelopmentEntryText {
     return $Text
 }
 
+function Test-DevelopmentEntryMissing {
+    <#
+        Pure: is this a development document whose DEPLOY section is GONE -- a file with no entry at all,
+        rather than one whose entry is merely unwritten?
+
+        WHY IT HAS TO BE ASKED SEPARATELY, AND WHY Get-DevelopmentEntryText CANNOT ANSWER IT (issue #1632).
+        That function's fallback hands back the WHOLE TEXT when there is no DEPLOY heading, and the fallback
+        is load-bearing -- a legacy branch-deployment.md IS an entry from its first line, so the whole file
+        is the honest answer there. The same fallback hands back the guidance PREAMBLE for today's document
+        with its DEPLOY section removed, and every reader downstream is entry-shaped: the scaffold gate
+        looks for the wording the scaffolder left, finds none of it in a blockquote nobody scaffolded, and
+        reports a written entry. Measured on a document reduced to nothing but its guidance -- no PLAN, no
+        CREATE, no TEST, no DEPLOY, no entry text whatsoever -- which passed both of
+        check-branch-entry.ps1's document checks and both of open-pr.ps1's.
+
+        SO THE SCAFFOLD GATE PASSES BY ABSENCE, and that is the shape this predicate closes. That gate is
+        built to refuse an entry still carrying the scaffolder's wording; delete the section that carried
+        it and there is nothing left to match. It answers "does this text still look scaffolded?" where the
+        reader needs "is there an entry?" -- two questions, which is why this is a second function rather
+        than a widened one.
+
+        HOW IT IS REACHED is what makes it worth a gate rather than a note. Not by hand-deleting a section
+        on purpose: by a script edit meant to keep the guidance and replace the body, truncating at
+        '### PLAN' -- which also occurs INSIDE the guidance blockquote, in the line forbidding
+        branch-specific content above it. The cut lands there, the body glues onto that line, and the
+        document comes out with its guidance truncated mid-sentence and no phase headings at all. The
+        failure is silent and the file LOOKS plausible, because the guidance block is long and reads like
+        content.
+
+        THE DISCRIMINATOR IS THE PLAN, AND IT READS SHAPE RATHER THAN TEXT -- the same argument #899's
+        preamble rule is built on, and it survives translation for the same reason. A development document
+        carries a plan: the scaffolder's guidance, which is BLOCKQUOTED in whatever language a consumer
+        translated it into, and/or the named phases that hold the step list. A legacy entry-only file
+        carries neither -- it opens with its entry heading and goes straight into the entry's own sections.
+        So no DEPLOY section AND no plan is the legacy shape, where the fallback stands; no DEPLOY section
+        AND a plan is a document that has lost its entry.
+
+        NOT A LEVEL TEST, and that is a repair rather than a preference. Today's document title is an H2
+        and the flat-window entry heading (August 5-26, 2026) is an H2 too, so every level test in this
+        file -- Test-IsChangelogEntryFile's, Test-BranchChangelogIsFilled's -- reads the broken document as
+        an entry file. That collision is exactly why Test-BranchChangelogIsFilled moved to the name test,
+        and a third reader keying on the level would inherit the same blindness.
+
+        NOR THE DECLARED BRANCH, which was the near miss. A development document declares its branch in
+        its title heading, which looks like a clean discriminator until Get-BranchFileDeclaredBranch's
+        '**Branch:**' fallback -- deliberately un-narrowed, and documented as sitting below the H1 title of
+        a pre-split root entry -- answers for that legacy shape too. Refusing on it would refuse a file
+        that is a perfectly good entry.
+
+        THE GUIDANCE ARM IS ANCHORED TO THE TITLE, not merely 'somewhere before the second heading'. An
+        entry BODY may legitimately quote something, and a blockquote in a legacy entry's prose must not
+        read as guidance. The scaffolder writes the block directly under the document's own heading, so
+        that is where this looks: blank lines are skipped, anything else ends the region.
+
+        AND IT ERRS TOWARD UNDER-REFUSAL. A document whose guidance AND phases have both gone along with
+        its DEPLOY section is not recognised here, and that is the safe direction for a gate: a missed
+        refusal is the state that already exists, while a false one stops a branch that worked yesterday.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    if ((Split-Development -Text $Text).Found) { return $false }
+
+    $lines  = @($Text -split '\r?\n')
+    $fenced = @(Get-FencedLineFlags -Lines $lines)
+
+    # The phases by name, from the same wording seam the scaffolder writes them from, so a repo that
+    # renamed one is read by its own name. DEPLOY is deliberately not among them: its absence is the thing
+    # being detected. Two lines rather than one, and they are the SAME two Format-Development uses to
+    # resolve its arc -- #927's fail-safe: an override present but leaving nothing usable behind falls back
+    # to the defaults, because a phase list that came back empty would make this predicate blind to a
+    # document whose guidance had also gone.
+    $phases = @((Get-BranchFileWording).StepPhases | Where-Object { $_ })
+    if ($phases.Count -eq 0) { $phases = @($script:BranchFileDefaults.StepPhases | Where-Object { $_ }) }
+
+    $seenTitle = $false
+    $inGuidance = $false
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($i -lt $fenced.Count -and $fenced[$i]) { continue }
+        $line = $lines[$i]
+        if ($line -match '^#{1,6}\s+(\S.*)$') {
+            # A named phase ANYWHERE below the title is a plan, whatever level it was written at -- the
+            # levels shifted once already and a document written on either side has to be read.
+            if ($seenTitle -and ($phases -contains $Matches[1].Trim())) { return $true }
+            if ($seenTitle) { $inGuidance = $false } else { $seenTitle = $true; $inGuidance = $true }
+            continue
+        }
+        if ($line.Trim() -eq '') { continue }
+        if ($inGuidance) {
+            # The first non-blank line under the title decides the region: a blockquote is the guidance
+            # block, anything else is an entry's own prose and ends the probe.
+            if ($line -match '^\s*>') { return $true }
+            $inGuidance = $false
+        }
+    }
+    return $false
+}
+
 function Test-BranchChangelogIsFilled {
     <#
         Pure: does the development file hold a branch's work, or is it still (back) in the reset state

@@ -64,6 +64,33 @@
     creation, so it takes a branch created by hand, cloned or fetched) is now the argument for why the
     strip COSTS nothing rather than for why the gap could be weighed and left.
 
+    IT IS NOT ONLY ABOUT REF NAMES ANY MORE, AND THE ALLOWLIST DID NOT HAVE TO CHANGE FOR THAT (issues
+    #1637, #1638, September 8, 2026). Both axes were open one class further out, at a FILE PATH: the
+    take / hold-back / conflict listings in sync-main.ps1 printed one as prose through a padded '-f'
+    format, and its conflict remedy printed one into a paste-ready `git diff --no-index` -- twice per
+    line, since the mirror path is derived from the repo path, so one hostile path poisoned both
+    operands. That command was double-quoted, which is precisely the spelling the paragraph above was
+    written to reject; it read as a guard, which is worse than a bare interpolation, because a later
+    reader sees quotes and stops looking.
+
+    THE PROVENANCE IS THE ARGUMENT, not a theory about what a filesystem allows. Those paths come from
+    this repo's own HEAD via `git ls-tree`, and from a filesystem walk of the pulled LIVE theme -- which
+    third parties edit through the Shopify theme editor, outside this repo's review, and which is the
+    reason that sync exists at all. Measured, September 8, 2026, git 2.55.0.windows.5: a tree built with
+    `git mktree` carrying `assets/x$(id -un).js`, `` assets/y`id -un`.js `` and `assets/z;touch owned.js`
+    comes back from `git diff --name-only` and `git ls-tree -r` unquoted, and `core.quotePath` is
+    irrelevant to all three -- git quotes control characters and high bytes, not shell metacharacters.
+    The mirror image of the display result: git's incidental quoting covers the \p{Cc} class and none of
+    the paste class.
+
+    SO THE TWO AXES STAY TWO, AND EACH GAINED ITS PATH SHAPE RATHER THAN A WIDER RULE. Get-PasteableRef
+    -Kind Path reuses the allowlist unchanged (a theme path passes it) and changes only the noun its
+    note speaks in and the strip that renders the value there. Get-DisplayPath is a second display
+    function rather than a parameter on the first, because it must NOT collapse or trim -- a path may
+    legitimately carry a space where a ref may not. And Get-DisplayRef is the wrong answer for a
+    command at either axis: a stripped path would hand the reader a `git diff` aimed at a different file
+    than the one on screen.
+
     WHAT THIS LIB DOES NOT DO. It is not the creation-side
     guard -- Test-BranchName in the repo-owned scripts\lib\branch-info.ps1 holds the same allowlist so a
     branch this workflow CREATES is safe by construction. Neither half closes the hole alone: that file
@@ -119,9 +146,52 @@ function Get-DisplayRef {
     return ((($Ref -replace '[\p{Cc}\p{Cf}]', ' ') -replace ' {2,}', ' ').Trim())
 }
 
+function Get-DisplayPath {
+    <#
+        Path -- a FILE PATH about to be printed as PROSE: a repository-relative one out of a git read,
+                or an absolute one off a filesystem walk.
+
+        Returns that path with every control and format character replaced by a space -- and, unlike
+        Get-DisplayRef, WITHOUT collapsing runs of spaces and WITHOUT trimming the ends.
+
+        WHY THE COLLAPSE AND THE TRIM ARE DROPPED, WHICH IS THE WHOLE REASON THIS IS A SECOND FUNCTION
+        (issue #1638). Get-DisplayRef may collapse and trim because git forbids a space in a ref name
+        outright -- `git check-ref-format` exits 128 on one -- so every space in its output is one the
+        strip itself put there and no information is lost. A path is the opposite: git, NTFS and
+        Shopify's own asset names all accept a space, a leading, trailing and doubled one included, so
+        collapsing would report a path that is not the path. These rows are what a reader compares
+        against live before merging by hand, and a path is the one thing here that has to survive being
+        read off the screen and typed back.
+
+        AND PRESERVING THE LENGTH IS WHAT FIXES THE ALIGNMENT #1638 NAMES. sync-main.ps1 prints these
+        through '{1,-46}'. A \p{Cf} run is zero-width, so it consumes format width without consuming
+        display columns and the row shifts against its neighbours -- in a list whose columns are how a
+        reader scans it at all. One space per removed character makes format width and display width
+        agree again, which a collapse would undo.
+
+        A PATH WITH NOTHING VISIBLE LEFT IS NAMED RATHER THAN BLANKED. Without the trim, the
+        all-format-character case reaches the column as spaces: a row whose path is silently not there.
+        Get-DisplayRef answers that case with '', which its callers already have wording for ("on its
+        branch"); a row in a padded table has no such wording available, so this says what happened
+        instead. It is short enough to leave the padding intact.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Path)
+
+    if ([string]::IsNullOrEmpty($Path)) { return '' }
+    $shown = $Path -replace '[\p{Cc}\p{Cf}]', ' '
+    if ([string]::IsNullOrWhiteSpace($shown)) { return '(no printable path)' }
+    return $shown
+}
+
 function Get-PasteableRef {
     <#
-        Ref         -- the ref name a printed command wants to carry.
+        Ref         -- the ref name a printed command wants to carry. Or, with -Kind Path, the file
+                       path one wants to carry: the judgement is a property of the string, not of what
+                       the string names.
+        Kind        -- 'Ref' (the default) or 'Path'. It selects the noun the refusal note speaks in
+                       and the strip that renders the value in it, and nothing else -- see the
+                       implementation note. A caller passing a path also wants -Placeholder, since
+                       '<branch>' would be the wrong hole to fill in.
         Placeholder -- what to print in the command's place when the name is refused. Defaults to
                        '<branch>', the angle-bracket convention every other printed remedy in this
                        workflow already uses for "fill this in yourself" (see ship-pr's own
@@ -145,7 +215,8 @@ function Get-PasteableRef {
     #>
     param(
         [AllowEmptyString()][AllowNull()][string]$Ref,
-        [string]$Placeholder = '<branch>'
+        [string]$Placeholder = '<branch>',
+        [ValidateSet('Ref', 'Path')][string]$Kind = 'Ref'
     )
 
     if (Test-RefPasteSafe -Ref $Ref) {
@@ -170,16 +241,35 @@ function Get-PasteableRef {
     # the tree's third copy of one pattern. Two things followed. The wording above is now the WHY and the
     # function is the WHAT, so a future correction to either lands in one place; and a case this line got
     # wrong is repaired, because Get-DisplayRef trims: a name made ENTIRELY of format characters used to
-    # strip to blanks and produce a note reading "The branch is:" with nothing after it, which is the
-    # "tells the reader nothing" failure the paragraph above exists to prevent, arriving through the
+    # strip to blanks and produce a note reading "The branch name is:" with nothing after it, which is
+    # the "tells the reader nothing" failure the paragraph above exists to prevent, arriving through the
     # strip instead of through the empty case. It now falls through to the empty wording, which is what
     # it is once the invisible characters are gone.
-    $shown = Get-DisplayRef -Ref $Ref
+    #
+    # AND -Kind Path DOES NOT INHERIT THAT REPAIR THROUGH THIS LINE, WHICH IS DELIBERATE (issue #1638).
+    # Get-DisplayPath does not trim, so an all-format-character path does not arrive here as '' and
+    # does not fall through to the empty wording -- it arrives already named, as '(no printable path)'.
+    # The two answers differ because the questions do: an unreadable BRANCH is a caller that has lost
+    # track of where it is standing, which its own wording covers; an unreadable PATH is one row of a
+    # list whose other rows are fine, and it has to stay a row.
+    # WHICH NOUN THE REFUSAL SPEAKS IN, AND WHICH STRIP RENDERS THE VALUE (issue #1637). Everything
+    # above -- the allowlist, the placeholder, the reasoning about quotes -- is already right for a FILE
+    # PATH: a printed command does not care which kind of name it was handed, and a theme path
+    # ('assets/foo.js', 'sections/main-product.liquid', 'locales/en.default.json') passes the very
+    # pattern a branch name passes. Exactly two things differ, and carrying them on one parameter is why
+    # there is no near-copy of this function sitting beside it. The NOUN, because a note reading "the
+    # branch name is" about a path sends the reader looking for the wrong kind of thing. And the STRIP:
+    # a path is rendered by Get-DisplayPath, which does not collapse or trim, because this note is the
+    # only place the real path appears and the reader is being told to put it in the command themselves
+    # -- so a path reported with its doubled or trailing spaces removed would aim them at a different
+    # file. #1638 carries the full reasoning for that difference.
+    $noun  = if ($Kind -eq 'Path') { 'file path' } else { 'branch name' }
+    $shown = if ($Kind -eq 'Path') { Get-DisplayPath -Path $Ref } else { Get-DisplayRef -Ref $Ref }
     if (-not $shown) { $shown = '(this run could not read it)' }
 
     $note = @"
-  NOTE: the branch name is not safe to paste into the line above, so it reads '$Placeholder' instead.
-  The branch is: $shown
+  NOTE: the $noun is not safe to paste into the line above, so it reads '$Placeholder' instead.
+  The $noun is: $shown
   It carries characters your shell would interpret (issue #1594), and neither single nor double quotes
   close that -- put it in the command yourself, escaped for the shell you are actually in.
 "@
