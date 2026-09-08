@@ -43,7 +43,46 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**11 / 19 minor entries** <!-- pending-tally -->
+**11 / 20 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1592-fold-commits-void-certificate · 20260908-105846
+
+`ship-pr`'s stale-certificate gate no longer refuses on a **fold** commit. A commit whose entire
+diff is the changelog plus the removal of a branch document is written by this workflow itself,
+under an exception bounded to those two paths, and carries no script, test, manifest or agent def --
+so it cannot be the case the gate was built for: a test block reaching the trunk that the shipping
+branch's CI never ran. The commit's own diff decides that, never its subject line, and every
+unreadable input leaves the commit counted exactly as before.
+
+It is why detect-and-rebase can converge on a busy trunk. Shipping PR #1571 took four attempts and
+about an hour; the three commits that voided its two refused certificates were all folds, and both
+refusals would have passed. Folds are 42% of this trunk's first-parent commits, so the rate at which
+the trunk voids a certificate roughly halves -- against a window that is about as long as CI takes
+(310-461s measured, median 374s) and cannot be made much shorter.
+
+Nothing changed at the wait. #1592 attributed the window to the non-required `claude-review` check,
+reading `lint-en-tests finished in 2s` off the check table; that 2s is the aggregator job's elapsed,
+and measured over 40 paired runs the non-required check governs 8 of them at a median excess of 0s
+across all 40 -- reconfirming #831's own 23% at n=100 rather than overturning it.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- no subscriber of a service notices this. It is entirely internal to how a branch reaches the
+trunk in this repo and in every consumer running the workflow.
+
+**Score:** N/A
+
+#### Pull Request
+
+The staleness gate no longer refuses on fold commits
+
+Plugins: dkj-policy
+
+[PR #1598](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1598)
+
+---
 
 ### DEPLOY: fix/1585-unfolded-entry-stale-checkout · 20260908-104546
 
