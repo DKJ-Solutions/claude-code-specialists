@@ -43,7 +43,46 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**26 / 51 minor entries** <!-- pending-tally -->
+**26 / 52 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1668-fixture-teardown-measured · 20260908-203035
+
+#1668 reported 413 leftover fixture trees in the temp directory and named a cause:
+`fold-changelog.tests.ps1`'s per-case tree helper never tears down. Measured, the cause does not hold.
+The helper registers every tree it builds and the register is swept twice, both since the file's
+creation commit on July 24, 2026; run to completion the suite leaks **zero**, and so does
+`new-branch.tests.ps1`, the second-largest contributor. What the standing entries have in common is
+*where* they were registered -- all after a suite's last completed sweep -- which is the signature of an
+interrupted run, and no in-process teardown reaches those.
+
+The count was also read for more than it was. Of the directory measured, 546 entries were
+`sync-pr-body-*`, written deliberately by `sync-main.ps1` for an operator to paste into
+`gh pr create --body-file` and therefore required to outlive their run, and 162 belonged to an unrelated
+tool; the suites' own share was ~215, not 413. So the largest group counted as litter was the one thing
+in that directory that is retained on purpose.
+
+`scripts/README.md` now carries both findings beside the `$PID` fixture convention, because the
+distinction decides the repair: the obvious fix is to give a helper a teardown it already has, and the
+fix that would actually reach an interrupted run's residue is a sweep by name pattern in a shared temp
+directory -- the same delete primitive `New-ScratchPath` was introduced to remove. Written down rather
+than re-measured, so the next reader of that directory does not re-file it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. `scripts/README.md` documents this repo's own script
+layer, ships in no plugin, and no behaviour a consumer invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The fixture convention records that suites DO tear down, and what a leftover actually means
+
+[PR #1674](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1674)
+
+---
 
 ### DEPLOY: fix/1665-working-copy-boundary · 20260908-202038
 
