@@ -43,6 +43,13 @@
     push event so a PR is untouched, and the lint step above it is NOT gated -- the fold commit still
     carries a green `lint-en-tests` of its own.
 
+    THE FOLD RUNNER'S STAND-DOWN (#1586) IS HERE FOR THE SAME REASON, and it is the concurrency block's
+    own consequence rather than a separate subject: the stand-down is only lossless because a push to
+    the trunk queues another run of that workflow behind this one, which is the arrangement asserted
+    above. A later reader who "harmonises" that group, or who widens the exit-2 branch into an
+    `-ne 0` test, breaks the stand-down and the three-way red diagnosis in one edit -- so both
+    directions are pinned: exit 2 exits 0, and every other code still propagates.
+
     Pure ASCII (repo convention for .ps1).
 #>
 $ErrorActionPreference = 'Stop'
@@ -141,6 +148,28 @@ Assert-True ($fom -like '*#1543*') 'and cites the issue that explains why the ev
 # verify-resolved.yml deliberately does NOT pin ref -- it reads the pushed range from PUSH_SHA and must
 # see the commits that push actually carried.
 Assert-True ($vr -match 'PUSH_SHA:\s*\$\{\{\s*github\.sha\s*\}\}') 'verify-resolved.yml still resolves the PRs from the event SHA -- pinning its checkout would break that'
+
+Write-Host "== fold-on-merge.yml: a trunk that moved under the run is a stand-down, not a red (#1586) ==" -ForegroundColor Cyan
+
+# ref: main above is read ONCE, at the checkout; the fold measures the same trunk again ~11s later, so a
+# second merge landing in that gap still trips the fold's trunk-gap guard (#1405) -- which is what the
+# file claimed it could not until #1586. The repair is keyed on the fold's exit code 2, pinned in
+# fold-changelog.tests.ps1 as the only place that returns it.
+Assert-True ($fom -match '(?m)^\s*if \(\$foldExitCode -eq 2\) \{\s*$') 'the fold step branches on exit code 2 specifically'
+Assert-True ($fom -match '(?ms)if \(\$foldExitCode -eq 2\) \{.*?exit 0') 'and exits 0 on it -- the job stands down rather than going red'
+
+# THE OTHER HALF, and the one a later sweep is most likely to break: every other non-zero code must
+# still fail. A blanket `exit 0` after the fold, or an `-ne 0`-shaped rewrite of the branch above, would
+# turn a real refusal and a ruleset-rejected push (modes 2 and 3 in this file's header) green too.
+Assert-True ($fom -match '(?m)^\s*exit \$foldExitCode\s*$') 'the step still ends by propagating the fold exit code, so modes 2 and 3 stay red'
+Assert-True ($fom -notmatch '\$foldExitCode -ne 0') 'the stand-down is not expressed as a blanket "any non-zero is fine"'
+
+# The stand-down is only safe because the guard fires before anything is folded AND because a successor
+# run is queued by the same push -- which is a property of THIS file's concurrency block above, not of
+# the script. Both halves of that argument have to travel with the block.
+Assert-True ($fom -like '*#1586*') 'the file cites the issue whose run measured the red'
+Assert-True ($fom -match '34206684361') 'and names the run, so the eleven-second window is checkable rather than asserted'
+Assert-True ($fom -like '*pre-pass*') 'and states why nothing is lost: the guard refuses before a single entry is folded'
 
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red

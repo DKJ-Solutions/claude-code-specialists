@@ -3266,6 +3266,39 @@ Write-Coverage -Category 'skill-list-plugin' -Checked $pluginSkillSpanCount `
 # (${CLAUDE_PLUGIN_ROOT}) rather than a path this check can resolve; a '~/'-relative one points into
 # the marketplace clone deliberately; an absolute URL is the repair this check asks for.
 #
+# THE TRUNCATION HALF -- the one absolute shape this check does judge (issue #1566, September 8, 2026).
+# An absolute link whose target is this repo's blob/tree base with NOTHING after it. That is not a
+# general opinion about absolute links, which stay correctly out of scope: it is the single absolute
+# shape that is provably not what the author meant, because the link text always names something more
+# specific than the repository front page. It is also, demonstrably, this check's own suggestion pasted
+# without its tail -- the anchor note below records that ten of the seventeen repairs carried one, and
+# what was measured on September 8 was SIXTEEN links across four plugin pages holding nothing but the
+# base. Sixteen against seventeen is close enough to name the mechanism: the suggestion is right, and
+# until now nothing held the RESULT of an earlier repair.
+#
+# WHY NEITHER EXISTING CHECK SEES IT, and both are right not to. Check 4 skips any target matching
+# '^(https?:|mailto:)' and could not judge it anyway -- GitHub answers '.../blob/main/' with the repo
+# root, so all sixteen returned 200 and were never dead links. This check skipped the same prefix for
+# its own reason: its subject is a RELATIVE target escaping the plugin root. So the defect sat in the
+# gap between "not dead" and "not relative", which is why it needed saying rather than catching.
+#
+# IT IS THE ONE PLACE THIS CHECK NEEDS THE SEAM FOR A VERDICT. The pattern is composed from
+# Get-RepoBlobUrl, so a repo without scripts/repo-config.ps1 gets this half not at all rather than
+# approximately -- stated in the coverage note, because a check that silently does less is worse than
+# one that says what it did not do. Keying on the configured base is also what keeps it honest going
+# forward: the shape it guards against is produced by the suggestion, and the suggestion is built from
+# that same base, so the two can never disagree about which URL counts as this repo's.
+#
+# AND THE COST OF THAT CHOICE, NAMED RATHER THAN BUILT AGAINST. A base-only link written on a PREVIOUS
+# owner name passes -- ALL SIXTEEN repaired on September 8 were on 'DaveKJohn/', which this repo left
+# behind in the September 2 transfer, and a seventeenth written that way tomorrow would not be
+# reported. Widening the pattern to any owner of a same-named repo was declined for the reason the
+# repo-citation rule in CLAUDE.md gives: the old path resolves only through a transfer redirect, so
+# recognising it here would teach the check to bless a spelling the prose rule is retiring. Measured
+# after the repair: ZERO base-only links on either owner anywhere in the tree, and every future one
+# comes from the suggestion, which writes the current base. So this is a risk with no instance, which
+# is the repo's threshold for writing it down instead of coding for it.
+#
 # A FOURTH, ROOT-RELATIVE FORM ('/path') IS PASSED OVER TOO, and that one is a risk named rather than
 # handled. On GitHub it means the repo root; in a plugin cache it means the filesystem root, so it is a
 # defect of the same family. Measured when this check landed: ZERO of them in plugin payload. The repo's
@@ -3274,14 +3307,27 @@ Write-Coverage -Category 'skill-list-plugin' -Checked $pluginSkillSpanCount `
 $pluginLinkFiles = 0
 $pluginLinkChecked = 0
 $pluginLinkEscapes = 0
+$pluginLinkTruncated = 0
 $pluginLinkMask = [System.Text.RegularExpressions.MatchEvaluator]{ param($m) ($m.Value -replace '[^\r\n]', ' ') }
 $pluginLinkBlobBase = & {
     # DOT-SOURCED IN A SCRIPTBLOCK, the idiom checks 16 and 26 established, for their reason: this is
-    # the only value here that repo-config owns, and it is wanted for the SUGGESTION in the message
-    # rather than for the verdict -- so a repo without the seam gets a plainer finding, never a wrong one.
+    # the only value here that repo-config owns. It is wanted for the SUGGESTION in the message -- so a
+    # repo without the seam gets a plainer finding, never a wrong one -- and, since #1566, for the
+    # verdict of the truncation half below, which simply does not run without it. That is the one place
+    # this check depends on the seam for an ANSWER rather than for advice, and the coverage note says so.
     $plCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
     if (Test-Path -LiteralPath $plCfg) { . $plCfg }
     if (Get-Command Get-RepoBlobUrl -ErrorAction SilentlyContinue) { Get-RepoBlobUrl } else { '' }
+}
+# THE BRANCH IS READ OUT OF THE SEAM, not assumed to be 'main'. Get-RepoBlobUrl happens to end in
+# '/blob/main/' here, but it is a repo-owned function and a consumer whose trunk is 'master' returns
+# that instead -- so the pattern is composed from whatever ref the base actually names. A directory
+# suggestion swaps blob for tree, so both spellings count; a trailing slash is optional, and so is a
+# bare anchor, because '<base>/#section' is still the front page with nothing of the path left.
+$pluginLinkBaseOnly = ''
+if ($pluginLinkBlobBase -match '^(?<stem>.+?)/blob/(?<ref>[^/]+)/$') {
+    $pluginLinkBaseOnly = '^' + [regex]::Escape($Matches['stem']) + '/(?:blob|tree)/' +
+        [regex]::Escape($Matches['ref']) + '/?(?:#\S*)?$'
 }
 foreach ($plugin in $publishedPlugins) {
     if (-not (Test-Path -LiteralPath $plugin.Root)) { continue }
@@ -3298,7 +3344,20 @@ foreach ($plugin in $publishedPlugins) {
         $pfRel = $pf.FullName.Replace($RepoRoot, '.')
         foreach ($m in $linkRegex.Matches($pluginScan)) {
             $pluginTarget = $m.Groups[1].Value.Trim()
-            if ($pluginTarget -match '^(https?:|mailto:)') { continue }
+            if ($pluginTarget -match '^(https?:|mailto:)') {
+                # THE ONE ABSOLUTE SHAPE THIS CHECK JUDGES -- see 'THE TRUNCATION HALF' above. Reported
+                # here rather than in a check of its own because it is this check's own suggestion with
+                # its tail missing, and a finding is most useful next to the advice that produced it.
+                if ($pluginLinkBaseOnly -and $pluginTarget -match $pluginLinkBaseOnly) {
+                    $pluginLinkTruncated++
+                    $pluginTruncLineNo = 1 + [regex]::Matches($pluginScan.Substring(0, $m.Index), "`n").Count
+                    Add-Error ("[plugin-link] ${pfRel}:${pluginTruncLineNo} -> '$pluginTarget' is this repo's" +
+                        " blob/tree base with nothing after it, so it resolves to the repository FRONT PAGE" +
+                        " while the link text names something more specific. Give it the path of the file it" +
+                        " names -- and the anchor, if the text names a section.")
+                }
+                continue
+            }
             if ($pluginTarget.Contains('${') -or $pluginTarget.StartsWith('~')) { continue }
             $pluginPathPart = ($pluginTarget -split '#', 2)[0]
             if (-not $pluginPathPart) { continue }
@@ -3338,13 +3397,18 @@ foreach ($plugin in $publishedPlugins) {
         }
     }
 }
+$pluginLinkTruncNote = if (-not $pluginLinkBaseOnly) {
+    ". The truncation half did NOT run: it is composed from Get-RepoBlobUrl and this repo has no scripts/repo-config.ps1 seam supplying one, so an absolute link holding nothing but this repo's blob/tree base is unasserted here"
+} else {
+    ". Absolute links are otherwise out of scope, with one exception held against the seam's own base: $pluginLinkTruncated of them carry that base and nothing after it, resolving to the repository front page while their text names a file"
+}
 Write-Coverage -Category 'plugin-link' -Checked $pluginLinkChecked `
     -Note $(if ($publishedPlugins.Count -eq 0) {
         'this repo publishes no plugin, so there is no plugin root for a link to escape -- nothing about consumer-side links is being asserted'
     } elseif ($pluginLinkChecked -eq 0) {
-        "no relative link in any of the $pluginLinkFiles markdown file(s) under the $($publishedPlugins.Count) published plugin root(s) -- every link is absolute, anchored or plugin-variable-relative, so none can escape"
+        "no relative link in any of the $pluginLinkFiles markdown file(s) under the $($publishedPlugins.Count) published plugin root(s) -- every link is absolute, anchored or plugin-variable-relative, so none can escape$pluginLinkTruncNote"
     } else {
-        "relative link(s) in $pluginLinkFiles markdown file(s) across $($publishedPlugins.Count) published plugin root(s), each resolved from where it sits and held against its OWN plugin's root rather than against plugins/ -- $pluginLinkEscapes escaping. Check 4 validates the same links against this tree, where they all work; this one asks whether they survive the trip"
+        "relative link(s) in $pluginLinkFiles markdown file(s) across $($publishedPlugins.Count) published plugin root(s), each resolved from where it sits and held against its OWN plugin's root rather than against plugins/ -- $pluginLinkEscapes escaping. Check 4 validates the same links against this tree, where they all work; this one asks whether they survive the trip$pluginLinkTruncNote"
     })
 
 

@@ -426,6 +426,14 @@ A red run of that job has **three** entirely different causes, and only the log 
 
 **Read the fold step's own last lines before concluding anything** -- once there is a fold step to read.
 
+**One refusal is deliberately not on that list, because it no longer turns the job red** (inbound #1586).
+Where a second merge lands between the job's checkout and the fold, the fold's trunk-freshness guard
+refuses -- correctly, on an entry somebody else has by then already folded -- and the placed runner
+**stands down green** instead: exit code `2` from the fold, which nothing else in that script returns. It
+is lossless because that guard fires in a pre-pass, before a single entry is folded, and because the push
+that moved your trunk queues its own run of the same job behind this one. So a `Stood down:` line in the
+log is the job working, not a fold that went missing -- and every **other** non-zero code still fails.
+
 ### Exit code
 
 `0` while the queue is off and the floor is merely unbuilt -- that is a to-do, not a defect, and your

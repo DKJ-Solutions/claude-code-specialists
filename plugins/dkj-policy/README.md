@@ -6,7 +6,7 @@ repo*, offered as something a repo can deliberately pick up. There is no sibling
 a repo has until it chooses this one is its own way of working, which it never stopped having.
 
 **It carries no specialists.** A workflow changes how the existing ones work, not who they are; the
-specialists come from [the teams](https://github.com/DKJ-Solutions/claude-code-specialists/tree/main/). Enabling this without `dkj-team-alpha` gives you skills with
+specialists come from [the teams](https://github.com/DKJ-Solutions/claude-code-specialists/tree/main/plugins/dkj-teams/). Enabling this without `dkj-team-alpha` gives you skills with
 nobody to invoke them.
 
 **This folder is the government, and its ministries sit inside it.** `dkj-policy` is the prime ministry:
@@ -199,8 +199,8 @@ stay; the skills and scripts that read them stop.
 
 ## Enabling it
 
-Part of the adoption path in [`INSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/);
-[`UNINSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/) is the mirror. It requires the core team `dkj-team-alpha`, which
+Part of the adoption path in [`INSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/INSTALL.md);
+[`UNINSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/UNINSTALL.md) is the mirror. It requires the core team `dkj-team-alpha`, which
 every consuming repo enables anyway. Enabling or disabling it is an ordinary plugin change rather than a
 migration, and there is no second one to switch between: the two directions are **on** and **off**.
 

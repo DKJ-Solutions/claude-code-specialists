@@ -236,6 +236,16 @@ independently:
   waves through a **measurement of the checkout** — the same split `open-pr` draws with
   `-SkipLint`/`-SkipTests`. A repo with no `origin/<trunk>` ref at all — no remote, or a clone that has
   never fetched — is *unmeasurable* rather than behind, and folds exactly as it always did.
+
+  **This one refusal exits `2` rather than `1`, and it is the only thing in the script that does**
+  (inbound #1586). It is still non-zero, so anything reading the run the way `ship-pr` does — `-ne 0` —
+  is unaffected, and a person sees the same refusal. The code exists for **one** caller: `fold-on-merge`,
+  the CI job re-triggered by *every* push to the trunk. There a trunk that moved between the job's
+  checkout and this pre-pass means the push that moved it has its own run of the same job queued behind
+  this one, reading a tip that includes it — so that run stands down green instead of leaving a red on
+  the trunk describing a state that is already gone. What makes the stand-down lossless is **where this
+  refusal sits**: in a pre-pass, before a single entry is folded, so the run has written nothing. A
+  refusal that could follow a partial fold must never borrow this code.
 - **After a rejected push**, the fold says *why* it was rejected. This is the half a pre-pass structurally
   cannot cover, because the measured failure was a **race** rather than a stale checkout: the trunk was
   current when the gate read it, and the other device folded the same branch inside the window before the

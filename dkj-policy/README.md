@@ -110,11 +110,18 @@ unlinks the plugin there with no error, and a machine that never ran `claude plu
 project` carries no record at all — nothing to unlink and nothing to update
 ([#1449](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1449)).
 
-**What tells you a machine is behind is the connector register, not that machine.** Each registered
-consumer's manifest in [`connectors/`](../connectors/README.md) carries the version its record was last
-seen on, and `connector-sessioncheck` reports every one that lags the source at session start —
-`scripts/sync/check-connectors.ps1` is the deliberate full run. That is the only place the answer exists,
-because the lagging checkout itself reports a plausible version and works.
+**What tells you a machine is behind is its own install record, not the connector register.** No
+manifest in [`connectors/`](../connectors/README.md) stores a version — that bookkeeping was removed
+deliberately (July 20, 2026, see [`connectors/README.md`](../connectors/README.md#the-manifest-format)):
+the check reads the version actually installed from that machine's own `installed_plugins.json` and
+compares it to the source checkout's `plugin.json`, and the register's only part in that is
+`localCheckout`, i.e. which machine record to read. `connector-sessioncheck` still reports every
+consumer that lags the source at session start, and `scripts/sync/check-connectors.ps1` is still the
+deliberate full run — that comparison is the only place the answer exists, because the lagging checkout
+itself reports a plausible version and works. And it exists only where a verified source checkout sits
+beside the consumer on that machine: with none found the check is skipped outright
+([#1587](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1587)), so silence there is not
+"up to date" — it is no verdict at all.
 
 **And two things can need catching up after the update.** `script-contract-sessioncheck` reports a
 repo-owned seam function the newer shared scripts call and this checkout has never had; a specialist that

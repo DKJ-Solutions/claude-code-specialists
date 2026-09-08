@@ -43,7 +43,159 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 11 minor entries** <!-- pending-tally -->
+**9 / 15 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1586-fold-on-merge-stale-trunk-deferral · 20260908-094224
+
+The `Fold on merge` CI job no longer goes red when two merges land within seconds of each other. Its
+checkout reads the trunk once, and the fold's trunk-freshness guard measures the same trunk again about
+eleven seconds later -- so a second merge in that gap left the job refusing on an entry another actor
+had already folded. The guard was right and the trunk ended correct; only the red was wrong, and it
+described a state that was gone by the time anybody opened it.
+
+That refusal now carries its own exit code -- `2`, the only thing in `fold-changelog-entry.ps1` that
+returns it -- and the job stands down green on that code alone, naming the reason in the log. Every
+other non-zero code still fails it, so the three real ways the job goes red are untouched. Nothing is
+lost by standing down: the guard fires in a pre-pass before a single entry is folded, and the push that
+moved the trunk queues its own run of the same job behind this one. The consumer template in
+`adopt-merge-queue.ps1` places the same behaviour, and both workflow headers stop claiming -- as
+#1543's repair did -- that `ref: <trunk>` puts that guard out of reach.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer who has adopted the CI floor gets a fold runner that stops crying wolf, and the guidance
+that goes with it: a `Stood down:` line in the log is the job working rather than a fold that went
+missing. `git fetch` + `--ff-only` before the fold was the obvious alternative and is declined in
+writing -- it narrows the window without closing it, which leaves the guardrail red *rarely*, and a
+guardrail that is wrong rarely is the one nobody reads.
+
+**Score:** 2
+
+#### Pull Request
+
+fold-on-merge stands down on a trunk that moved under it, instead of going red
+
+Plugins: dkj-policy
+
+[PR #1593](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1593)
+
+---
+
+### DEPLOY: docs/1587-staleness-source-of-truth · 20260908-093101
+
+`dkj-policy/README.md`'s staleness paragraph claimed a connector manifest "carries the version its
+record was last seen on." No manifest field has ever stored a version — that bookkeeping was removed
+by decision on July 20, 2026 (see [`connectors/README.md`](../connectors/README.md#the-manifest-format))
+— and the actual mechanism reads the version installed on that machine from its own
+`installed_plugins.json` record and compares it to the source checkout's `plugin.json`; the register's
+only part in that is `localCheckout`, i.e. which machine record to read. The rewritten paragraph keeps
+what was true (`connector-sessioncheck` still reports every lagging consumer at session start, and
+`check-connectors.ps1` is still the deliberate full run, because the lagging checkout itself reports a
+plausible version and works) and adds the case the old wording missed: with no verified source checkout
+on the machine, the check is skipped outright, so silence there is not "up to date" — it is no verdict
+at all. No other passage in the file rested on the same false premise.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this corrects one paragraph's wording about an internal maintenance mechanism (the connector
+register and the staleness check). No subscriber of a service reaches this page or is affected by
+whether the mechanism is described accurately.
+
+**Score:** N/A
+
+#### Pull Request
+
+Describe the plugin-staleness mechanism as it actually works
+
+[PR #1590](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1590)
+
+---
+
+### DEPLOY: fix/1566-truncated-plugin-links · 20260908-092431
+
+Sixteen links in the plugin payload named a file and pointed at the repository front page. A consumer
+reading `specialists-init` -- the first page a new adopter opens -- was told to read `INSTALL.md` and
+landed on the repo's home page to find it themselves. All sixteen now carry the path they name, and the
+six that named a section carry its anchor.
+
+Nothing could have caught them. GitHub answers `.../blob/main/` with the repo root, so all sixteen
+returned 200 and were never dead links; the dead-link scan skips absolute targets, and `[plugin-link]`
+skipped them too, because its subject is a *relative* target escaping the plugin root. The defect sat
+in the gap between "not dead" and "not relative".
+
+So the check that produced the shape now holds it. `[plugin-link]`'s suggestion hands the author the
+absolute form of an escaping link, anchor included; sixteen base-only links against the seventeen
+repairs that suggestion was written for is close enough to name the mechanism -- the advice was right,
+and nothing held the *result* of taking it. The new half reports an absolute link that is this repo's
+blob/tree base with nothing after it: the one absolute shape that is provably not what the author
+meant, since the link text always names something more specific. Absolute links stay otherwise out of
+scope. It keys on `Get-RepoBlobUrl`, so it cannot disagree with the suggestion about which URL counts
+as this repo's -- and in a repo without that seam it does not run and the coverage line says so.
+
+That keying has one named cost: a base-only link written on the *previous* owner name is out of reach,
+which is where all sixteen of these were. Widening to reach it was declined -- recognising a retired
+owner path would bless a spelling the repo-citation rule is retiring -- and there is no instance left to
+justify it: zero base-only links on either owner remain anywhere in the tree, and every future one comes
+from the suggestion, which writes the current base. A test pins the pass, so reaching for it later has to
+be a deliberate edit.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A gate whose own advice creates a defect class it cannot see is the shape this repo keeps paying for,
+and the reach is a consumer's first read rather than an internal document. Not a required migration and
+nothing breaks, so it stops short of 4: a reader who never clicked those links loses nothing, and one
+who did now lands where the text said.
+
+**Score:** 3
+
+#### Pull Request
+
+Give the 16 truncated absolute plugin links their real paths, and gate the shape
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1571](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1571)
+
+---
+
+### DEPLOY: fix/machine-local-note-review-findings · 20260908-091324
+
+Five review findings on the machine-local note reached `main` after the change they were about. The
+gate's reworded note (#1574) merged from a parked commit while the reviews on it were still running, so
+the text that shipped still said to keep a swept-in edit in "that file's gitignored sibling" -- singular,
+against a note whose first line lists however many paths the repo watches. A consumer with two entries
+in `Get-MachineLocalPaths` read advice with no antecedent. That is corrected here, along with a seam
+comment that called PR #1573 a branch whose "entire subject" was one hunk of a fifteen-file diff, and
+three defects in the folded changelog entry: it credited #1557 with founding the gate where #1559 did,
+used "misfires" transitively where the two neighbouring restatements do not, and switched the referent
+of "it" mid-paragraph. Nothing about when the gate fires changed, and it still only warns.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The note is printed by a shared script that travels in the plugin mirror, so its wording is what every
+consumer reads at `open-pr`. The correction matters most in the repo this text was NOT written in: one
+watched path is this repo's answer, and the sentence only breaks where somebody has configured two.
+
+**Score:** 1
+
+
+#### Pull Request
+
+Land the review findings the queue merged past on the machine-local note
+
+Plugins: dkj-policy
+
+[PR #1589](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1589)
+
+---
 
 ### DEPLOY: fix/1579-shopify-no-store-seam · 20260908-090100
 
@@ -197,15 +349,15 @@ The machine-local path gate stops giving wrong advice on the path it fires on. I
 branch's commits touch a tracked file that usually belongs to a clone -- `.claude/settings.json` here
 -- and its remedy sentence said, flatly, to drop the change from the branch because "machine-local
 plugin enablement belongs in `.claude/settings.local.json`". That is right for a machine's own extra
-enable, which is the sweep the gate was built for (#1557), and wrong for the other case the same file
-carries: a branch whose subject IS the declared, tracked set every clone inherits. Measured on PR
+enable, the sweep the gate was built for (#1559, measured on PR #1557), and wrong for the other case
+the same file carries: a branch whose subject IS the declared, tracked set every clone inherits. Measured on PR
 #1573, where the gate fired on a branch that existed to change exactly that. The note now names both
 cases and prescribes the move only for the clone's own edit; the seam comment in `repo-config.ps1`
 records which half of the advice belongs where, and the suite asserts it. Nothing about when the gate
 fires changed, and it still only warns -- what changed is that the sentence a reader acts on is true on
-both paths. The cost of leaving it was not a broken branch but a decaying reader: a warning that
-misfires advice on the intended happy path is one that gets scrolled past, and it is then scrolled past
-on the day it is right.
+both paths. The cost of leaving it was not a broken branch but a decaying reader: a warning that gives
+the wrong advice on the path it fires on is one that gets scrolled past, and it is then scrolled past on
+the day it is right.
 
 **Score:** 2
 
@@ -214,7 +366,8 @@ on the day it is right.
 The note is emitted by a shared script that travels in the plugin mirror, so every consumer running
 `open-pr` reads this text. A consumer branch that legitimately changes its own shared harness settings
 now gets advice it can follow instead of being told to move the change somewhere gitignored. Small --
-it is three sentences on a rare path -- but it is advice the reader was previously right to ignore.
+three sentences on a rare path -- but until now following that advice was the wrong move, and only a
+reader who already distrusted it came out right.
 
 **Score:** 2
 
