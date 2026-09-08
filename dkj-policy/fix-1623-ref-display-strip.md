@@ -101,6 +101,19 @@ step further out. Both are filed rather than folded in here.
 - [x] `ship-pr.ps1`: `$branchShown` judged once beside the read, at the fifteen prose sites
 - [x] `sync-main.ps1`: `$branchShown`, `$trunkShown` and a per-row strip in
       `Write-SyncPredecessorVerdict` and on the standing-branch line above it, at the twenty prose sites
+- [x] the counts #1612 pinned two days earlier are moved rather than broken. That branch asserted
+      **three** libs hand-type `[\p{Cc}\p{Cf}]` and stated the number in two more places, precisely
+      because a stale count is what hid its own gap. This branch changes both halves of it, in
+      opposite directions, and both are updated together:
+      - the libs that **type** the class go from three to **two** -- `remote-ahead-lib.ps1` acquired a
+        reason to load `ref-print-lib.ps1` for its own sake, and a private copy behind a loaded lib is
+        pure drift surface. `pr-issues-lib.ps1` keeps its own, and the reason is written at the line:
+        nothing there has a caller's reason to take the dependency;
+      - the consoles this workflow prints somebody else's words to go from three to **four** -- the
+        prose ref-name sites are the new entry, and #1623 was filed as the third counter-example to the
+        very sentence that list replaced.
+      The assert now pins WHICH libs carry it rather than how many, since the name is the part a reader
+      can act on.
 - [x] the mirrors rebuilt via `scripts/sync/build-shared-scripts.ps1`
 
 ### TEST
