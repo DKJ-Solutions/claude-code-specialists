@@ -57,6 +57,13 @@ to read the declaration with. So the check was proved directly instead, against 
 session start here goes quiet on the next release plus a `claude plugin marketplace update`, which
 `CLAUDE.md` now says in place of the old "gap in the check".
 
+**#1578 merged while this branch was being written** (`08:40Z`, followed by its fold), so `origin/main`
+carries the third state now and this branch was brought up to it by merge -- not rebase, which would
+have needed a force-push. The verification was then repeated against the **in-tree** hook at
+`plugins/dkj-teams/dkj-team-shopify/hooks/shopify-floor-sessioncheck.ps1`, which is silent. The cached
+copy on this machine is still `4.32.0` and still speaks, which is exactly the lag `CLAUDE.md` now
+names, so the sentence stands as written.
+
 ### CREATE
 
 - [x] `scripts/repo-config.ps1`: the `Get-ShopifyRepoHasNoStore` seam, `$true`, in the file's own
@@ -75,6 +82,8 @@ session start here goes quiet on the next release plus a `claude plugin marketpl
       still answers, so nothing above the insertion broke.
 - [x] #1570's own hook run against this working copy: **silent** with the seam present, and the full
       `[ERROR]` back with the seam stashed. That is the mechanism proved end to end.
+- [x] Repeated against the hook **on `main`** once #1578 merged mid-branch: silent, with the branch
+      merged up to `origin/main` rather than rebased onto it.
 - [x] Lint gate + all suites via `open-pr.ps1`, exactly as CI runs them.
 - [~] No new suite. The seam is a two-line constant with no branches; the behaviour that could regress
       lives in the check, and #1578 already ships `shopify-floor-sessioncheck.tests.ps1` covering the
