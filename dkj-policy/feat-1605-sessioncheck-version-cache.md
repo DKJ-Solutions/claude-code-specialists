@@ -37,17 +37,19 @@ Cache the plugin-versions -Brief verdict for the life of a session, keyed on the
 
 ### CREATE
 
-- [x] `scripts/lib/session-cache-lib.ps1`: the bounded read of a SessionStart hook's own stdin payload, the session-id shape check, and a per-session verdict cache under temp (read, write, reap)
+- [x] `scripts/lib/session-cache-lib.ps1`: the bounded read of a SessionStart hook's own stdin payload, the session-id shape check, and a per-session verdict cache (read, write, reap)
 - [x] `connector-sessioncheck.ps1`: the #1591 fallback asks that cache before it spawns the engine, and stores what it measured -- the matcher stays `startup|resume|clear|compact`
 - [x] `shared-scripts-lib.ps1`: register the lib as a `dkj-policy` LibOnly pair and generate the mirror, so a consumer's hook does not dot-source a file its payload lacks
 - [x] the hook's docstring: the paragraph that says the cache was "filed as #1605 rather than built here" now describes what it does, and what invalidates it
+- [x] merge `main` and answer #1666, which landed while this branch was open: it made every temp path in this layer unpredictable per run, which a cross-process cache cannot be -- so the cache leaves the shared temp root for the per-user cache directory rather than taking a third exemption from that gate
 
 ### TEST
 
-- [x] `scripts/tests/session-cache-lib.tests.ps1`: the shape check, the age bound, a corrupt entry, the reap, and the key
+- [x] `scripts/tests/session-cache-lib.tests.ps1`: the shape check, the age bound, a corrupt entry, the reap, the key, and the address
 - [x] `connector-sessioncheck.tests.ps1`: a second firing under the same session id spawns the engine ZERO times and prints the identical line; a different id re-measures; no payload means no cache
-- [x] the lint gate and every suite green (`check-plugin-integrity.ps1` + `scripts/tests/*.tests.ps1`)
-- [x] the review round on the diff: Victor (code), Sebastian (security), Edith (copy) -- five findings taken, one filed as #1659
+- [x] the review round on the diff: Victor (code), Sebastian (security), Edith (copy) -- five findings taken, one filed as #1659 and shipped by somebody else as #1666 within the hour
+- [x] the lint gate green locally, and green after the merge; the suites this diff can reach run standalone (`session-cache-lib`, `connector-sessioncheck`, `native-capture`, `test-suite-gate`, `claude-home-gate`, `shared-scripts`, `script-contract`)
+- [~] the FULL local suite pool: dropped, and it is the machine rather than the branch. Two runs were OOM-killed by the harness (16 lanes, then 4) with 816 MB free of 16 GB; an earlier full run on this same branch was green at 81/81. The required CI check `lint-en-tests` runs the same gate on a clean runner and the merge is blocked on it, so that is where the full set is proved -- it is not merged on a claim made here.
 
 ### DEPLOY: feat/1605-sessioncheck-version-cache
 
@@ -72,10 +74,19 @@ rather than the four this started with, the reasoning is written into the lib's 
 citation that does not carry it, and the direction a reader acts on self-heals: acting on "you are
 behind" means an update, after which this hook says to restart -- which is a new id and a bypass.
 
-Everything about it fails towards measuring. No session id, an unwritable temp directory, a corrupt
+Everything about it fails towards measuring. No session id, an unwritable cache directory, a corrupt
 entry, a plugin payload predating the lib: each falls back to the spawn this branch exists to avoid,
 which is exactly what the hook did before. The suite counts engine spawns on disk rather than
 inferring them from wall-clock, so "the second firing spawns nothing" is a measurement.
+
+**The cache does not live under the shared temp root**, and that answers #1666, which landed while
+this branch was open: every temp path in this layer is now composed per run with a guid, so nothing
+can be pre-planted at a name that does not exist yet. A cache is the one thing that cannot take that
+shape -- a later process has to find what an earlier one wrote, and a guid is what a later process
+cannot re-derive. So instead of a third exemption from that gate it leaves the shared root
+altogether, for the per-user cache directory (`LOCALAPPDATA`, else `XDG_CACHE_HOME`, else
+`~/.cache`), where a stable name sits in a directory only this user can write. Not under `~/.claude`
+either: that tree is what these checks READ, and one of them snapshots it.
 
 **Score:** 3
 

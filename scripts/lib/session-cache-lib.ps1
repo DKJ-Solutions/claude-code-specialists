@@ -85,8 +85,10 @@
     ever wants the idiom, that is the moment to factor it, not now (Victor, on the branch that built
     this).
 
-    Read-only outside its own directory under temp. It never writes into a repo, into ~/.claude, or
-    anywhere a check reads state from.
+    Read-only outside its own directory in the per-user cache location -- LOCALAPPDATA, else
+    XDG_CACHE_HOME, else ~/.cache; see Get-SessionCacheRoot for why it is deliberately NOT the shared
+    temp root every other scratch path in this layer uses. It never writes into a repo, into
+    ~/.claude, or anywhere a check reads state from.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
     Pure ASCII (repo convention for .ps1).
@@ -200,11 +202,28 @@ function Get-SessionCacheRoot {
         The directory session-scoped verdicts live in.
 
     .DESCRIPTION
-        Under temp, which is where every other scratch path in this repo goes (native-capture-lib,
-        park-lib, open-pr, ship-pr, sync-main all compose one there) and which on Windows is
-        per-user. NOT under ~/.claude: that tree is the plugin administration this family's checks
-        READ, and claude-home-sessioncheck snapshots it -- writing a cache into a directory whose
-        contents another check reports on is how a diagnostic starts describing itself.
+        THE PER-USER CACHE DIRECTORY, AND NOT THE SHARED SCRATCH ROOT -- which is a change of address
+        forced by #1659 and is the right answer rather than a way around its gate. Every other
+        scratch path in this script layer goes through New-ScratchPath in native-capture-lib.ps1,
+        which composes '<label>-<pid>-<guid>' under the OS temp directory: unpredictable by
+        construction, so nothing can be pre-planted at a name that does not exist until it is used.
+
+        THAT COMPOSER CANNOT SERVE THIS FILE, and the reason is the whole point of the file. A cache
+        is read by a LATER process than the one that wrote it -- the hook firing at the fourth
+        compaction has to find what the hook firing at startup left -- so its path must be derivable
+        twice. A guid is exactly what a second process cannot re-derive. The composer's own docstring
+        is about per-run scratch and does not reach this case.
+
+        SO THE EXPOSURE IS REMOVED BY LEAVING THE SHARED ROOT, not by hardening a predictable name
+        inside it. The temp root is shared on some platforms (/tmp), which is what made a predictable
+        leaf there worth closing; LOCALAPPDATA and XDG_CACHE_HOME are per-user by construction, and a
+        stable name inside a directory only this user can write is not the same subject. That is also
+        why the temp-path scan in native-capture.tests.ps1 does not need a third exemption for this
+        line: it names no temp root, because it is not in one.
+
+        NOT UNDER ~/.claude either: that tree is the plugin administration this family's checks READ,
+        and claude-home-sessioncheck snapshots it -- writing a cache into a directory whose contents
+        another check reports on is how a diagnostic starts describing itself.
 
         -Override exists for the suite, so a scenario writes into its own fixture and can assert on
         what is and is not there afterwards. Nothing in the shipped hooks passes it.
@@ -212,7 +231,21 @@ function Get-SessionCacheRoot {
     param([string]$Override = '')
 
     if ($Override) { return $Override }
-    return (Join-Path ([System.IO.Path]::GetTempPath()) 'dkj-session-cache')
+
+    # Windows first because that is what these hooks run on today, then the XDG spelling, then the
+    # convention it defaults to. HOME rather than USERPROFILE at the end: on the platforms that reach
+    # this line, that is the variable that exists.
+    $base = ''
+    foreach ($candidate in @($env:LOCALAPPDATA, $env:XDG_CACHE_HOME)) {
+        if ($candidate) { $base = $candidate; break }
+    }
+    if (-not $base -and $env:HOME) { $base = Join-Path $env:HOME '.cache' }
+    # LAST RESORT, AND IT IS THE ONE CASE THAT HAS NO GOOD ANSWER: no per-user directory is nameable,
+    # so the caller gets a path under the module itself rather than a guess at somebody's home. A
+    # write there will normally fail, which under this file's contract means "no cache" and therefore
+    # the measured answer -- the correct degradation, not a silent one.
+    if (-not $base) { $base = $PSScriptRoot }
+    return (Join-Path $base 'dkj-session-cache')
 }
 
 function Get-SessionCacheFileName {

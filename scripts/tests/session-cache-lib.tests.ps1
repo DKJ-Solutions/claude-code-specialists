@@ -205,10 +205,22 @@ try {
     Assert-True (-not $n1.Contains('subject')) '7: the subject itself never reaches the name -- it carries machine paths'
 
     # --- 8. the default root ------------------------------------------------------------------------
-    Write-Host '8. Get-SessionCacheRoot -- under temp, and nowhere a check reads state from' -ForegroundColor Cyan
+    # THE ADDRESS IS PART OF THE CONTRACT, not an implementation detail (#1659). A cache read by a
+    # LATER process cannot use New-ScratchPath's guid, so the exposure a predictable leaf in a SHARED
+    # temp root carries is removed by leaving that root rather than by hardening a name inside it --
+    # which is also what keeps this file out of the temp-path scan's exemption count.
+    Write-Host '8. Get-SessionCacheRoot -- the per-user cache directory, not the shared temp root' -ForegroundColor Cyan
     $default = Get-SessionCacheRoot
-    Assert-True ($default.StartsWith([System.IO.Path]::GetTempPath())) '8: the default root sits under temp'
+    Assert-True (-not ($default.StartsWith([System.IO.Path]::GetTempPath()))) '8: the default root is NOT under the shared temp root'
     Assert-True (-not ($default -match '\.claude')) '8: and never under ~/.claude, which is the tree these checks READ'
+    Assert-True ($default.EndsWith('dkj-session-cache')) '8: it is one named directory rather than a path composed per call'
+    $prevL = $env:LOCALAPPDATA
+    try {
+        $env:LOCALAPPDATA = Join-Path $Fixture 'localappdata'
+        Assert-Equal (Join-Path $env:LOCALAPPDATA 'dkj-session-cache') (Get-SessionCacheRoot) '8: LOCALAPPDATA is the first candidate, which is what these hooks run under today'
+    } finally {
+        $env:LOCALAPPDATA = $prevL
+    }
     Assert-Equal 'C:\somewhere\else' (Get-SessionCacheRoot -Override 'C:\somewhere\else') '8: -Override wins, which is the seam the suite uses'
 }
 finally {

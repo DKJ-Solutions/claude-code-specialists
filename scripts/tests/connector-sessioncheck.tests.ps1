@@ -313,10 +313,11 @@ function Invoke-CountedHook {
           * session-cache-lib.ps1 is copied to the hook copy's own ..\scripts\lib\ sibling, because
             that is where the hook resolves it from -- a fixture without it exercises the "no lib, so
             no cache" degradation instead, which group 5c uses deliberately;
-          * TEMP and TMP are pointed at the fixture, so the cache lands inside the scenario's own
-            tree and can be asserted on. That is not a knob added for the suite: the lib composes its
-            root with [System.IO.Path]::GetTempPath(), which reads exactly those two variables, so
-            this is the seam that already existed.
+          * LOCALAPPDATA is pointed at the fixture, so the cache lands inside the scenario's own tree
+            and can be asserted on. That is not a knob added for the suite: since #1659 the lib takes
+            its root from the per-user cache location rather than from the shared temp root -- see
+            Get-SessionCacheRoot for why a cross-process cache cannot use New-ScratchPath's guid --
+            and LOCALAPPDATA is its first candidate, so this is the seam that already existed.
 
         THE PAYLOAD IS PIPED INTO THE CHILD'S STDIN, which is how the harness sends it to a
         SessionStart hook. Passing '' pipes an empty one, which is the honest way to reach the
@@ -332,13 +333,13 @@ function Invoke-CountedHook {
     )
     $hookCopy = Join-Path $CaseDir 'hooks\connector-sessioncheck.ps1'
     $counter  = Join-Path $CaseDir 'spawns.log'
-    $tempDir  = Join-Path $CaseDir 'temp'
+    $cacheHome = Join-Path $CaseDir 'cachehome'
     if (-not (Test-Path -LiteralPath $hookCopy)) {
         New-Item -ItemType Directory -Path (Split-Path -Parent $hookCopy) -Force | Out-Null
         Copy-Item -LiteralPath $Hook -Destination $hookCopy -Force
         New-Item -ItemType Directory -Path (Join-Path $CaseDir 'scripts\task') -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $CaseDir 'scripts\lib') -Force | Out-Null
-        New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $cacheHome -Force | Out-Null
         $fake = "Add-Content -LiteralPath '$counter' -Value 'spawn'`r`nWrite-Host '$Summary'`r`nexit 0`r`n"
         [System.IO.File]::WriteAllText((Join-Path $CaseDir 'scripts\task\plugin-versions.ps1'), $fake, $Utf8)
         Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\session-cache-lib.ps1') `
@@ -346,12 +347,12 @@ function Invoke-CountedHook {
     }
     $prevP = $env:CLAUDE_PROJECT_DIR
     $prevU = $env:USERPROFILE
-    $prevT = $env:TEMP
-    $prevM = $env:TMP
+    $prevL = $env:LOCALAPPDATA
+
     $env:CLAUDE_PROJECT_DIR = $RepoDir
     $env:USERPROFILE = $HomeDir
-    $env:TEMP = $tempDir
-    $env:TMP  = $tempDir
+    $env:LOCALAPPDATA = $cacheHome
+
     Push-Location $CaseDir
     try {
         $out = $Payload | & powershell -NoProfile -ExecutionPolicy Bypass -File $hookCopy -WorkshopPathOverride (Join-Path $CaseDir 'nowhere')
@@ -362,14 +363,14 @@ function Invoke-CountedHook {
             Lines   = @($out)
             Text    = ($out -join "`n")
             Spawns  = $spawns
-            TempDir = $tempDir
+            CacheHome = $cacheHome
         }
     } finally {
         Pop-Location
         $env:CLAUDE_PROJECT_DIR = $prevP
         $env:USERPROFILE = $prevU
-        $env:TEMP = $prevT
-        $env:TMP  = $prevM
+        $env:LOCALAPPDATA = $prevL
+
     }
 }
 
@@ -488,7 +489,7 @@ try {
     Assert-Equal 0 $r2.Code '5a: exit 0 on the replaying firing'
     Assert-Equal 1 $r2.Spawns '5a: the second firing spawns NOTHING -- the whole point of #1605'
     Assert-Equal $r1.Text $r2.Text '5a: and a replayed session start reads identically to the measured one, line for line'
-    Assert-Equal 1 @(Get-ChildItem -LiteralPath (Join-Path $r2.TempDir 'dkj-session-cache') -Filter '*.json').Count '5a: exactly one cache entry, and it sits under temp -- not in the repo, not in ~/.claude'
+    Assert-Equal 1 @(Get-ChildItem -LiteralPath (Join-Path $r2.CacheHome 'dkj-session-cache') -Filter '*.json').Count '5a: exactly one cache entry, and it sits in the per-user cache directory -- not in the shared temp root, not in the repo, not in ~/.claude'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c.Repo 'dkj-session-cache'))) '5a: nothing is written into the checkout'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c.Home '.claude\dkj-session-cache'))) '5a: and nothing into the plugin administration these checks read'
 
@@ -506,7 +507,7 @@ try {
     Assert-Equal 2 $n2.Spawns '5c: without an id every firing measures -- the cache fails towards MEASURING, never towards silence'
     Assert-Equal 0 $n2.Code '5c: and the hook still exits 0'
     Assert-Equal $n1.Text $n2.Text '5c: with the verdict unchanged, so a harness that sends no id loses nothing but the saving'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $n2.TempDir 'dkj-session-cache'))) '5c: and no cache directory is created at all'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $n2.CacheHome 'dkj-session-cache'))) '5c: and no cache directory is created at all'
 
     Write-Host '5d. no session-cache-lib beside the hook -> the pre-#1605 behaviour, not an error' -ForegroundColor Cyan
     # A plugin payload predating the lib, which is the same degradation branch 4 covers for the

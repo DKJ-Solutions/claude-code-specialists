@@ -107,8 +107,12 @@
     acts on self-heals -- acting on "you are behind" means an update, after which this hook says to
     restart, and a restart is a new id and therefore a bypass.
 
-    The cache is advisory in both directions: no session id, an unwritable temp directory or a corrupt
-    entry all fall back to measuring, which is what this branch did before it existed.
+    The cache is advisory in both directions: no session id, an unwritable cache directory or a
+    corrupt entry all fall back to measuring, which is what this branch did before it existed. It
+    lives in the per-user cache location (LOCALAPPDATA, else XDG_CACHE_HOME, else ~/.cache) rather
+    than under the shared temp root every other scratch path in this layer uses -- #1659 made those
+    unpredictable per run, and a cache a LATER process has to find cannot be, so it leaves the shared
+    root instead of carrying a predictable name inside it. The lib's Get-SessionCacheRoot argues it.
 
     WHAT IT SAVED (Sylvester, 2026-09-08, one machine): a median of 1,288 ms measuring against 439 ms
     replaying, over five measure-then-replay pairs in a single run against a SYNTHETIC five-plugin
