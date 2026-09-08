@@ -7219,9 +7219,10 @@ function Test-BranchChangelogIsFilled {
         branch anywhere, so the name test reads it as empty. Measured over the 344 in this repo's history
         (#1642): 334 open at H3 and 10 at H2 -- the flat window of August 5-6 -- and NONE names a branch,
         which is the half the name test cannot see. Both levels are ones this test accepts, so the shape is
-        covered end to end; it read 'as an H2' until September 8, 2026, which was true of 10 of the 344. Every consumer with such a file still has one, and the
-        consequences are the silent kind: open-pr would leave the changelog checklist item unticked, and the
-        release cut -- whose guard is "no unfolded entry anywhere" -- would cut a release straight over it.
+        covered end to end; it read 'as an H2' until September 8, 2026, which was true of 10 of the 344.
+        Every consumer with such a file still has one, and the consequences are the silent kind: open-pr
+        would leave the changelog checklist item unticked, and the release cut -- whose guard is "no
+        unfolded entry anywhere" -- would cut a release straight over it.
         So: filled if the first non-blank line is AT an entry level, OR if the document names a branch other
         than the trunk. Each shape is answered by the test that can see it.
 
