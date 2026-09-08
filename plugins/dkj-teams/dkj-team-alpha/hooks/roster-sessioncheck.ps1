@@ -82,11 +82,25 @@ try {
         exit 0
     }
 
-    $checkArgs = @()
-    if ($ConsumerPathOverride) { $checkArgs += @('-ConsumerPathOverride', $ConsumerPathOverride) }
+    # The in-process check runner (issue #1625). Dot-sourced HERE rather than at the top of this try,
+    # BELOW the "check script not found" guard above: that guard has its own message, and a lib missing
+    # from the payload must not be what answers a question about the CHECK script. $PSScriptRoot-relative,
+    # so it resolves the same in the source tree, in the plugin mirror and in a consumer's plugin cache --
+    # lib and hook travel in one payload. Unguarded, and inside this try: a payload missing it reports
+    # itself as a skipped check rather than failing at load with nothing said.
+    . (Join-Path $PSScriptRoot '..\scripts\lib\hook-check-lib.ps1')
 
-    $out = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $checkScript @checkArgs)
-    $code = $LASTEXITCODE
+    # A HASHTABLE, NEVER AN ARRAY. In-process an array splats POSITIONALLY, so '-ConsumerPathOverride'
+    # would bind to the check's first positional parameter and the path itself would be dropped --
+    # silently, with no error anywhere. See trap 1 in hook-check-lib.ps1's header.
+    $checkArgs = @{}
+    if ($ConsumerPathOverride) { $checkArgs['ConsumerPathOverride'] = $ConsumerPathOverride }
+
+    # In this interpreter, not a second one (issue #1625): the harness already paid one interpreter
+    # start-up to run this hook, and the check does not need another.
+    $result = Invoke-CheckScript -Path $checkScript -Arguments $checkArgs
+    $out  = @($result.Output)
+    $code = $result.ExitCode
 
     # Blocking signals reach the session context. [ERROR] is the roster-sync token for a specialist
     # that is invisible in the governance doc (or lens-less); -cmatch keeps it case-exact so the word

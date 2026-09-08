@@ -32,7 +32,7 @@ land here, because a script travels to whichever plugin owns the surface that ca
 |---|---|
 | `dkj-policy` (this folder) | the branch/PR/release way of working, which is what this plugin *is* |
 | `dkj-team-shopify` | the store-facing scripts, whose surface belongs to the platform team |
-| `dkj-team-alpha` | `sync/check-roster-sync.ps1` and `lib/check-report-lib.ps1` — the roster check belongs to the core team, since the roster does |
+| `dkj-team-alpha` | `sync/check-roster-sync.ps1`, `lib/check-report-lib.ps1` and `lib/hook-check-lib.ps1` — the roster check belongs to the core team, since the roster does, and it carries the one SessionStart hook in this family that ships outside the workflow plugin |
 
 *A fourth destination, `workflow-default`, held one pair — `lib/check-report-lib.ps1` again — until
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) removed that plugin on
@@ -104,6 +104,7 @@ an absent link is a fact rather than an oversight.
 | `lib/source-repo-guard-lib.ps1` | `Assert-OwnCopy` — refuses a released copy running in the repo that maintains it | none — dot-sourced lib |
 | `lib/native-capture-lib.ps1` | `Invoke-NativeCapture`, the stderr-safe native-command wrapper | none — dot-sourced lib |
 | `lib/check-report-lib.ps1` | the `[OK]`/`[INFO]`/`[ERROR]` report helper | none — dot-sourced lib |
+| `lib/hook-check-lib.ps1` | `Invoke-CheckScript` — the in-process sibling of `native-capture-lib`: it runs a session check in the hook’s own interpreter instead of spawning a second one, which is the interpreter the harness had already paid for | none — dot-sourced lib |
 | `lib/measure-skill-lib.ps1` | the parsing/formatting half of `measure-skill.ps1`: turns `claude plugin details` output into figures, with no I/O of its own | none — dot-sourced lib |
 | `lib/measure-context-lib.ps1` | the shared helpers for measuring the always-on document path: the `@`-import walk, the byte-exact section split, and the calibrated chars-per-token factor | none — dot-sourced lib |
 | `lib/consumer-check-lib.ps1` | the two things every consumer-facing lint check opens with: which tree it is operating on, and which always-on documents it may read | none — dot-sourced lib |
