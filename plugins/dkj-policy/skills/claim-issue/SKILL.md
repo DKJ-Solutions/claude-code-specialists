@@ -115,7 +115,7 @@ and the account was absent *and* when the read had never happened -- and then pr
 |---|---|---|
 | **claimed** | the read answered and the account is on the issue | `[OK]`, and the work starts |
 | **refused** | the read answered and the account is **not** on the issue | `[ERROR]`, treat it as unclaimed, exit 1 |
-| **could not verify** | the read did not answer (`gh` absent, or a non-zero exit) | `[WARNING]` naming the exit code -- and it does **not** block |
+| **could not verify** | the read did not answer (`gh` absent, a non-zero exit, or a timeout) | `[WARNING]` naming which of the three -- and it does **not** block |
 
 **The third state does not block, and that is the point of separating it.** The write it is checking
 returned 0 and the read *before* the write answered normally, so the far likelier state is a claim
@@ -130,6 +130,24 @@ in the source repo: the old message fired, named a cause it had not measured, an
 treat the issue as unclaimed -- while a plain `gh issue view` on the same checkout, seconds later,
 showed the claim sitting there. Followed literally by a second session, that inverts the very hazard
 this step exists to prevent.
+
+## Every `gh` call is bounded, so a stall is reported rather than waited out
+
+All three network calls -- the read, the write, and the read-back -- pass the shared network bound
+(two minutes), the same one every other script in this workflow passes on a push or a fetch
+([#1639](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1639), September 8, 2026).
+They were unbounded until then, and this is the worst step in the workflow to stall in: the claim is
+the **first** move of an issue-driven assignment, so a hang here is a session that never starts, with
+nothing printed to say why. The shape is not hypothetical -- #1628's measurement is a checkout where
+`gh` was returning exit 1 intermittently while working fine from the shell, minutes apart, in one
+session, and an intermittently-unhealthy `gh` is exactly what hangs rather than exits.
+
+**A timed-out WRITE is the one case that is not simply a failure.** The read and the read-back only
+ask questions, so a stall there costs nothing but the answer. `gh issue edit` changes the tracker, and
+a write that reached the network and never reported back may have landed anyway -- so that timeout is
+reported as *this run does not know*, never as "the claim failed", and it stops. **Re-running is the
+way out and is safe**: a claim that did land comes back from the pre-write read as **already yours**,
+which is a complete answer.
 
 ## What this skill is NOT
 

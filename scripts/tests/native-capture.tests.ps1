@@ -501,6 +501,45 @@ try {
     if (Test-Path -LiteralPath $sandbox) { Remove-Item -Recurse -Force -LiteralPath $sandbox -ErrorAction SilentlyContinue }
 }
 
+# --- the shared bound describes itself accurately (#1639) -----------------------------------------
+# THIS IS A COMMENT TEST, AND IT IS THE ROOT CAUSE RATHER THAN A STYLE POINT. The bound was documented
+# as "THE BOUND A GIT NETWORK CALL PASSES" and enumerated three sites; by the time it was read back,
+# six files passed the value and two of them passed it to `gh`. A reader comes to this one place to
+# learn the policy, so a `gh`-only script found the policy described as being about git and did not
+# pick it up -- which is the measured reason claim-issue.ps1 shipped three unbounded calls. An
+# enumeration in a comment cannot be kept true by any gate, so the repair was to remove it and point
+# at the tree; these asserts hold that repair, and the count assert is what makes a re-added list fail.
+Write-Host ''
+Write-Host 'The shared network bound -- how it describes itself (#1639)' -ForegroundColor Cyan
+
+$ncLibText = [System.IO.File]::ReadAllText((Resolve-Path (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')).Path)
+
+# THE ASSERT IS ABOUT THE DECLARATION, NOT ABOUT ANY MENTION, and getting that wrong once is why it is
+# spelled this way. This repo's convention is that a correction records what the text used to say
+# verbatim, so the paragraph below the heading QUOTES the old git-only wording on purpose -- and an
+# assert that simply forbade the string would fail on the very sentence that documents the repair. The
+# subject is the column-0 comment heading, which is the thing a reader takes as the policy.
+Assert-True ($ncLibText -notmatch '(?m)^# THE BOUND A GIT NETWORK CALL PASSES') 'the bound no longer DECLARES itself git-only, which is what a gh-only script read and skipped'
+Assert-True ($ncLibText -match [regex]::Escape('"THE BOUND A GIT NETWORK CALL PASSES"')) '...while still quoting that old wording as the history it is, rather than deleting the evidence'
+Assert-True ($ncLibText -match 'git OR gh') 'it names both commands where a script author reads the policy'
+Assert-True ($ncLibText -match [regex]::Escape('grep -rl NativeCaptureNetworkTimeoutSeconds')) 'and points at the tree for the site list, instead of carrying one that goes stale'
+Assert-True ($ncLibText -notmatch 'the three sites that reach the network') 'the stale three-site enumeration is gone'
+Assert-True ($ncLibText -match '1639') 'and the reason it went is citable from the file itself'
+
+# THE NUMBER IS REUSED FOR gh RATHER THAN RE-DERIVED, and #1639 asked for that to be said out loud: the
+# two-minute figure is sized off a git push, and a comment that presents it as a bound for every
+# command would be asserting something nobody measured.
+Assert-True ($ncLibText -match 'git-push ARGUMENT') 'the number still says which command it was sized off'
+Assert-True ($ncLibText -match 'REUSED') '...and that it is reused rather than re-derived for a gh call'
+
+# AND THE SITE COUNT IS MEASURED, so the paragraph's claim about the tree is a fact rather than prose.
+# Read from the repo root, which is where the grep in that comment is meant to be run.
+$scriptsRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$readers = @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
+             Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match [regex]::Escape('NativeCaptureNetworkTimeoutSeconds') })
+Assert-True ($readers.Count -gt 3) "more than three files read the bound, which is why the enumeration was removed (found $($readers.Count))"
+Assert-True (@($readers | Where-Object { $_.Name -eq 'claim-issue.ps1' }).Count -eq 1) 'and claim-issue.ps1 is now among them (#1639)'
+
 Write-Host ''
 if ($script:fail -eq 0) {
     Write-Host "Result: $($script:pass) pass, 0 fail." -ForegroundColor Green
