@@ -968,6 +968,29 @@ foreach ($file in $entryFiles) {
     $entryBlock = "$entryContent$nl$nl---$nl$nl"
     $changelogContent = $changelogContent.Substring(0, $insertPos) + $entryBlock + $changelogContent.Substring($insertPos)
 
+    # WHERE IT LANDED, READ NOW -- BEFORE the tally rewrite below (issue #1564). Set-ChangelogPendingSummary
+    # rebuilds the whole document from its lines and returns a NEW string, so every offset taken against the
+    # current $changelogContent -- $insertPos, $listStart, $entryBlock.Length -- is stale from that line on.
+    # It only threw on the first fold after a cut: the empty-list sentence is the longest tally this repo
+    # writes, so replacing it with a counted one SHORTENS the document, while $insertPos sits at the old end
+    # because there was no entry to insert above -- and $insertPos + $entryBlock.Length then points past the
+    # new length. Reading the counts here fixes both Substring calls at once: they are position facts about
+    # the list, and the tally line is not an entry heading, so taking them before the rewrite changes neither.
+    #
+    # BOTH SIDES OF THE POSITION SINCE #1280, and the second half is what the first half could not say. Only
+    # "above N" was printed while every entry landed at the top, where the count below is always 0 by
+    # construction. A stamp-placed entry can land mid-list, and there "above 46 entries" reads exactly like
+    # the old always-top line -- so the number that tells a reader a LATE fold happened is the one that was
+    # missing. Printed only when it is not zero, so the ordinary fold's line is unchanged.
+    $entryRx = [regex]('(?m)^' + $entryHashes + ' ')
+    $tailFromEntry = $changelogContent.Substring($insertPos + $entryBlock.Length)
+    $aheadOf = @($entryRx.Matches($tailFromEntry)).Count
+    $behind = @($entryRx.Matches($changelogContent.Substring($listStart, $insertPos - $listStart))).Count
+    $placedNote = "placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' })"
+    if ($behind -gt 0) {
+        $placedNote += " and below $behind that landed later -- a LATE fold, placed by its own stamp rather than at the top"
+    }
+
     # THE PENDING TALLY, RE-DERIVED FROM THE LIST THIS RUN JUST CHANGED (issue #1515). It answers how much
     # is waiting for the next release and how much of it reaches this repo's audience -- both from the
     # entries themselves, so there is no counter here to increment and nothing that can drift. Placed
@@ -990,24 +1013,10 @@ foreach ($file in $entryFiles) {
     # gone, so a second run finds nothing to fold. The name test still earns its place upstream in
     # Resolve-BranchFilePath, for branches cut before this change that are carrying a trunk-declaring copy.
     Remove-Item -Path $filePath -Force
+    # WHERE it landed, not just that it landed: with the sections gone there is no heading name to report, so
+    # $placedNote (built above, before the tally rewrite strands its offsets) carries the position in the
+    # list instead -- which is what makes a misplacement visible without opening the file.
     $rankNote = if ($filed.RankScore -gt 0) { ", significance $($filed.RankScore)" } else { ', unranked' }
-    # WHERE it landed, not just that it landed. With the sections gone there is no heading name to report,
-    # and "folded" alone would say nothing about the one thing this script decides -- so the position in the
-    # list is printed instead, which is also what makes a misplacement visible without opening the file.
-    #
-    # BOTH SIDES OF THE POSITION SINCE #1280, and the second half is what the first half could not say. Only
-    # "above N" was printed while every entry landed at the top, where the count below is always 0 by
-    # construction. A stamp-placed entry can land mid-list, and there "above 46 entries" reads exactly like
-    # the old always-top line -- so the number that tells a reader a LATE fold happened is the one that was
-    # missing. Printed only when it is not zero, so the ordinary fold's line is unchanged.
-    $tailFromEntry = $changelogContent.Substring($insertPos + $entryBlock.Length)
-    $entryRx = [regex]('(?m)^' + $entryHashes + ' ')
-    $aheadOf = @($entryRx.Matches($tailFromEntry)).Count
-    $behind = @($entryRx.Matches($changelogContent.Substring($listStart, $insertPos - $listStart))).Count
-    $placedNote = "placed above $aheadOf existing $(if ($aheadOf -eq 1) { 'entry' } else { 'entries' })"
-    if ($behind -gt 0) {
-        $placedNote += " and below $behind that landed later -- a LATE fold, placed by its own stamp rather than at the top"
-    }
     Write-Host "Folded and removed: $file (tier $($filed.Tier)$rankNote -- $placedNote)" -ForegroundColor Green
     # Captured per iteration rather than read back afterwards. $num in particular survives from one loop
     # pass to the next, so an entry whose PR lookup found nothing would otherwise inherit the previous

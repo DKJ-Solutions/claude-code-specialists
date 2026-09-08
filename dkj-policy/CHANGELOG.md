@@ -43,7 +43,73 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 2 minor entries** <!-- pending-tally -->
+**2 / 4 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1564-fold-stale-offset-after-tally · 20260908-075318
+
+`fold-changelog-entry.ps1` crashed on the first fold after every release cut -- folding into an empty
+`## [Unreleased]` -- because it read byte offsets against the changelog *before* the pending-tally
+rewrite replaced that string with a shorter one, then used them in the "placed above N" console line.
+The crash landed between the changelog write and the commit, so `-Commit -Push` silently did neither
+and left the fold uncommitted on the trunk with the entry file already deleted. The offset-dependent
+counts now run before the tally rewrite, while the offsets are still valid; a regression test folds
+into a freshly-cut `## [Unreleased]` and checks the fold is committed.
+
+**Score:** 4
+
+Every first fold after a release cut hit this; recovering it meant a hand-typed commit of the two
+bounded paths, twice in one day per the issue. Not a 5 only because that recovery was known and
+in-bounds.
+
+#### What makes this deploy extra special
+
+A consumer running the `dkj-policy` workflow hits the same crash on their first fold after their own
+release cut -- a shipped script broken on a guaranteed code path, leaving their trunk in a silent
+half-state (`-Commit -Push` doing neither, entry file gone so `check-unfolded-entry.ps1` sees nothing).
+
+**Score:** 4
+
+#### Pull Request
+
+fold-changelog-entry.ps1 no longer crashes on the first fold after a release cut
+
+Plugins: dkj-policy
+
+[PR #1568](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1568)
+
+---
+
+### DEPLOY: docs/dkj-policy-folder-update-section · 20260908-074642
+
+`dkj-policy/README.md` now says how to **update** the plugins, not only how the folder is arranged — a
+section between the seam table and the pointer list, written for the case this repo is peculiarly
+exposed to: it consumes its own marketplace, so a session here runs the installed copy and **a push does
+not advance the local clone**. It carries the two commands per plugin, the session restart, and then the
+three things that make an update invisible until somebody looks: between two releases no version check
+can tell you the clone is behind, the install record is per-checkout and keyed on its folder path
+(#1449), and the only place a lagging machine is actually visible is the connector register. It closes
+on the two catch-ups an update can require — the seam function `script-contract-sessioncheck` reports,
+and the roster row and lens a newly arrived specialist needs.
+
+The same edit narrows this page's intro, which called the index **two** sections below the divider and
+is now three.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — this is the source repo's own folder index, and nothing here travels to a subscriber. The
+consumer-facing half of the same subject shipped in #1565, on the plugin's own page.
+
+**Score:** N/A
+
+#### Pull Request
+
+Say how to update the plugins in another checkout of this repo
+
+[PR #1567](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1567)
+
+---
 
 ### DEPLOY: docs/dkj-policy-update-section · 20260908-072707
 
