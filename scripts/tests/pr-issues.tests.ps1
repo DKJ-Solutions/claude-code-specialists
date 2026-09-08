@@ -1685,6 +1685,26 @@ $mqOnly = Get-DirectPushBlockingRules -BranchRulesJson '[{"type":"merge_queue","
 Assert-True $mqOnly.Readable 'a merge_queue-only payload is readable'
 Assert-Equal 0 $mqOnly.Blocking.Count 'and merge_queue is NOT a fold-push blocker -- Get-MergeQueueVerdict owns that question (#1506)'
 
+# AND ship-pr.ps1 DEFERS THE TRUNK-HOLDER REFUSAL PAST THIS VERDICT (issue #1572). Step 0a reads whether
+# another worktree holds 'main'; that refusal used to fire immediately, on the ground that "step 5 could
+# not fold after the merge" -- which does not hold under a queue, where this session folds nothing (the
+# queue's own push to main runs fold-on-merge.yml). It blocked the exact workflow the lane exists for,
+# since step 2b (#1073) leaves the primary standing on the trunk on purpose. So the READ stays first --
+# it is free and local, and a network read must not cost it -- the queue verdict is computed next, and
+# the refusal fires only where -not $queueActive. Same shape and justification #1506 gave the fold-push
+# verdict one block down. Without these asserts a later edit can slide the refusal back above the verdict
+# and re-break the lane workflow with every helper test still green -- this file is ship-pr's only caller.
+$idxTrunkRead   = $shipText.IndexOf('Get-WorktreeHoldingBranch -PorcelainLines')
+$idxQueueRead   = $shipText.IndexOf('Get-MergeQueueVerdict -BranchRulesJson')
+$idxTrunkRefuse = $shipText.IndexOf('if ($trunkHolder -and -not $queueActive)')
+$idxTrunkNote   = $shipText.IndexOf('if ($trunkHolder -and $queueActive)')
+Assert-True ($idxTrunkRead -ge 0) 'ship-pr.ps1 reads whether another worktree holds the trunk (#1069)'
+Assert-True ($idxTrunkRefuse -ge 0) 'and its refusal is gated on -not $queueActive (#1572)'
+Assert-True ($idxTrunkRead -lt $idxQueueRead) 'the free local worktree read runs before the network queue read -- the network read must not cost the local one'
+Assert-True ($idxQueueRead -lt $idxTrunkRefuse) 'and the queue verdict is known BEFORE the trunk-holder refusal, so a lane ship is not refused on a queue where step 5 folds nothing'
+Assert-True ($idxTrunkNote -ge 0 -and $idxTrunkNote -gt $idxQueueRead) 'under a queue the held trunk is noted, not refused'
+Assert-True ($shipText -like '*not a blocker under a queue: step 5 folds nothing here (#1572)*') 'and the note says why, naming the issue'
+
 # --- Get-RequiredCheckRunIds: which Actions run sits behind a named check? (issue #1292 re-anchor) ---
 # THE RE-ANCHOR: the retired Get-CertifyingRunTimestamp read a check's own startedAt directly out of
 # the checks payload -- a red-team caught that startedAt under-refuses (it can only be LATER than the

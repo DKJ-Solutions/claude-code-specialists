@@ -43,7 +43,122 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 8 minor entries** <!-- pending-tally -->
+**6 / 11 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1579-shopify-no-store-seam · 20260908-090100
+
+This repo now declares that it has no Shopify store, so `dkj-team-shopify`'s floor check stops asking it
+for a live theme id it cannot truthfully give. `scripts/repo-config.ps1` answers
+`Get-ShopifyRepoHasNoStore` with `$true` -- the seam inbound #1570 added to the check -- and the
+`CLAUDE.md` repo slot no longer describes that permanent `[ERROR]` as a gap in the check, because it is
+not one any more. The "do not silence it by seeding a theme id" warning stays: a declaration says there
+is no store, an id says there is one and names it, and only the first of those is true here. The
+session start on a given machine goes quiet once the plugin change reaches its marketplace clone
+through a release, which the slot now states rather than leaving a reader to wonder why the message
+persists.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a consumer of the plugins. Both files are this repo's own layer:
+`scripts/repo-config.ps1` is repo-local configuration and never ships, and `CLAUDE.md`'s repo slot is
+explicitly the part a copying repo replaces. The seam it answers was shipped by #1570; this branch only
+answers it.
+
+**Score:** N/A
+
+#### Pull Request
+
+This repo declares it has no Shopify store, so the floor check goes quiet
+
+[PR #1583](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1583)
+
+---
+
+### DEPLOY: fix/1572-lane-ship-queue-trunk-holder · 20260908-085026
+
+`ship-pr.ps1` refused a lane ship whenever another worktree (the primary checkout) held `main`, on the
+ground that "step 5 could not fold after the merge" -- but under a merge queue step 5 folds nothing:
+the queue's own push to `main` runs `fold-on-merge.yml`. The refusal therefore blocked the exact
+lane workflow `ship-pr` itself recommends, since step 2b (#1073) leaves the primary on the trunk on
+purpose. The refusal now runs *after* the queue verdict and is gated on `-not $queueActive`, the same
+shape #1506 established for the fold-push verdict; under a queue the held trunk is noted, not refused.
+Where no queue is read the guard is unchanged.
+
+**Score:** 4
+
+The lane ship path -- the one `ship-pr` prints while waiting on CI -- was simply broken on a queued
+trunk. Each occurrence was worked around by hand (moving the primary off the trunk, against the
+orchestrator's "end on the trunk" rule for the duration of the ship).
+
+#### What makes this deploy extra special
+
+A consumer running `dkj-policy` *with a merge queue on their trunk* hits the same refusal if they
+follow `ship-pr`'s own advice to ship from a lane. Bounded audience -- GitHub only offers merge queue
+on private repos under Enterprise/Team -- but for those repos the lane ship was unusable.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr no longer refuses a lane ship on a queued trunk where it folds nothing
+
+Plugins: dkj-policy
+
+[PR #1576](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1576)
+
+---
+
+### DEPLOY: fix/1575-prune-merged-dirty-guard · 20260908-084930
+
+`prune-merged.ps1` no longer refuses a dirty working tree on runs that could never move it. The
+refusal's own ground is step 4c -- stepping off the branch you are standing on in order to reap it --
+and that step is unreachable when HEAD is the trunk (never a reap candidate), when HEAD is detached,
+and under `-DryRun` (which deletes nothing). The guard now asks exactly that reachability question, so
+those runs proceed; a dirty tree they pass through is reported with the reason it was harmless, rather
+than passed over in silence.
+
+This is the command the orchestrator's lens tells a session to run mid-assignment in place of
+classifying `git ls-remote` output by hand -- and mid-assignment is exactly when a checkout has
+uncommitted work in it, so the guard was blocking the report in the state the advice was written for.
+The two ways out it offered are the wrong price for a read: parking commits to a branch, and stashing
+touches a file the session was told to leave alone.
+
+Nothing the guard protected is given up. A dirty checkout standing on a non-trunk branch refuses
+exactly as before, because that branch can be squash-merged while the work is uncommitted, and that is
+the case where the step-off drags it onto the trunk. The refusal now names the branch that makes it
+reachable, and offers `-DryRun` beside commit, park and stash.
+
+That last case is why the doc half moved too. The orchestrator's lens and the consumer-facing skill page
+for this script now name `-DryRun` as the route for a session standing on a branch with uncommitted
+work, which is the ordinary mid-assignment shape: it deletes nothing, so it never has to step off, and
+the classification it prints -- the paste-ready delete command for a merged leftover,
+`Kept ... -- live work` for everything else -- is identical to the full run's. The skill page had gone
+further than stale; it still described the refusal as unconditional, which is what a consumer would have
+read.
+
+The suite's own dirty case ran from the trunk, so it had been pinning the defect; it is re-pointed at a
+branch, and two cases are added for the arms that now proceed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this is a maintenance script in the development workflow. No subscriber of a service reaches it,
+and nothing about a published artifact changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+prune-merged only refuses a dirty tree where the run could actually step off it
+
+Plugins: dkj-policy
+
+[PR #1581](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1581)
+
+---
 
 ### DEPLOY: fix/1570-shopify-floor-no-store-seam · 20260908-084027
 
