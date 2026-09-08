@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**0 / 1 patch entry** <!-- pending-tally -->
+**1 / 2 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/dkj-policy-update-section · 20260908-072707
+
+The `dkj-policy` plugin page now says how to **update** the plugin, not only how to enable it — a
+`## Updating it` section beside `## Enabling it`. It carries the two commands, the session restart, and
+the ministry's own pair; then the reason the section has to exist at all: the cached marketplace clone
+and the install record are both **per-machine** state keyed on the checkout's folder path, so a version
+picked up on one machine changes nothing on the next one and no session says so. It closes on what a
+consumer needs afterwards: the script-contract catch-up an update can require — the shared scripts may
+call a repo-owned function that checkout has never had (#147), which `script-contract-sessioncheck`
+reports and `adopt-dkj-policy` Part 2 fills in — and the assurance that an update never touches the
+consumer's own `dkj-policy/` folder, so work in flight cannot be lost.
+No measurement is restated: the page links the family's `INSTALL.md` for those.
+
+The same edit corrects that file's 13 `DaveKJohn/claude-code-specialists` citations to the canonical
+`DKJ-Solutions/…`, under the rule that corrects them in a file being edited anyway.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+For a consumer running this workflow in more than one checkout — which is every consumer with a laptop
+and a desktop — the page they read now answers the question that sends them to the wrong tree: *why is
+this machine behind, and what do I run here?* The answer was only ever in the family's adoption page,
+one repo away from the plugin they had just installed.
+
+**Score:** 2
+
+#### Pull Request
+
+Say how to update dkj-policy on every other machine
+
+Plugins: dkj-policy
+
+[PR #1565](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1565)
+
+---
 
 ### DEPLOY: fix/1562-origin-remote-redirect · 20260907-211130
 
