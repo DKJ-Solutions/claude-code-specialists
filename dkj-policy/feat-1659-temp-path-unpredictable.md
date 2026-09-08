@@ -112,10 +112,11 @@ The PR title is narrowed to *shipping* scripts for the same reason.
 
 ### DEPLOY: feat/1659-temp-path-unpredictable
 
-Seven scripts composed their temp path as `<label>-$PID`, which is a name a local actor can reach
-first: `New-Item -Force` and `WriteAllText` both follow a symlink or junction, so a pre-planted link
-redirects the write, and where the script then deletes recursively there, the same window is a delete
-primitive in somebody else's directory. All seven now call one composer, `New-ScratchPath`, which
+Seven sites across six scripts composed their temp path as `<label>-$PID`, which is a name a local
+actor can reach first: `New-Item -Force` and `WriteAllText` both follow a symlink or junction, so a
+pre-planted link redirects the write, and where the script then deletes recursively there, the same
+window is a delete primitive in somebody else's directory. All seven now call one composer,
+`New-ScratchPath`, which
 returns `<temp>/<label>-<pid>-<guid>` -- there is no name to plant at. A reparse-point check was the
 obvious alternative and was declined on the measurement: it is a check-then-write, and on macOS `/tmp`
 is itself a symlink, so the same check refuses a whole platform for the ordinary case. A scan in

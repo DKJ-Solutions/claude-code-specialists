@@ -569,43 +569,62 @@ Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'a/../../b' }) 'and so 
 Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'ok' -Extension 'md' }) 'an extension missing its dot is refused rather than silently glued to the guid'
 
 Write-Host ''
-Write-Host 'Every temp path this script layer composes carries a guid (#1659)' -ForegroundColor Cyan
+Write-Host 'Every temp path the SHIPPING scripts compose carries a guid (#1659)' -ForegroundColor Cyan
 
 # THE SCAN, RATHER THAN A NOTE IN A DOC. #1659 was filed because seven sites had each hand-composed
 # "<label>-$PID" and nothing stopped an eighth; a rule enforced by memory is one that gets skipped.
-# A statement that reaches GetTempPath() THROUGH Join-Path is composing a path something will write at,
-# and it has to carry a guid -- which in practice means calling New-ScratchPath. A statement that merely
-# READS the temp root (check-claude-home enumerates it among the roots a fixture may sit under) has no
-# Join-Path and is deliberately not the subject.
 #
-# ONE LINE IS EXEMPT, BY ITS EXACT TEXT: New-ScratchPath's own composition, which builds $leaf with the
-# guid on the line above so the statement itself carries none. Exempting the FILE would have taken
-# Invoke-NativeCaptureUtf8's composer out of the scan with it -- the site this rule most wants covered.
+# THE RULE IS ON THE TEMP ROOT ITSELF, rather than on the
+# join standing beside it. Requiring the two together on one line was the first shape, and it had a hole
+# a reformat walks straight through: assign the root to a variable on one line, join to it on the next,
+# and the composition is invisible to a line scan while being exactly what the rule forbids. So any
+# non-comment line naming a temp root -- the .NET call, or the TEMP/TMP environment variables, which is
+# the second spelling of the same hole -- must carry a guid or an explicit exemption marker. That also
+# drops the "a mere READER of the temp root is not the subject" carve-out: a reader is now declared
+# rather than inferred.
 #
-# scripts/tests/ is out of scope here because it has its own, stricter rule and its own enforcer:
-# test-suite-gate.tests.ps1 requires $PID or a guid in every fixture path, for a different reason
-# (two concurrent runs tearing down each other's tree).
-$composerLine = '$path = Join-Path ([System.IO.Path]::GetTempPath()) $leaf'
+# THIS PARAGRAPH IS WORDED TO KEEP THE TWO TOKENS OFF ONE LINE, and that is not fussiness. The scanner in
+# test-suite-gate.tests.ps1 reads every line of every file in this directory, comments and string
+# literals included, and it flagged an earlier draft of this very comment as a predictable fixture path.
+# A guard's own prose is inside the tree its sibling guard measures.
+#
+# THE EXEMPTION IS A MARKER AT THE SITE, not a match on the line's source text. Two lines cannot carry a
+# guid honestly: New-ScratchPath's own composition (it USES the guid built one line above) and
+# check-claude-home's enumeration of the temp roots (it composes nothing). Pinning the first by its
+# exact text was the first shape, and a rename of $leaf or a reflow of that one line would have turned
+# the scan against its own composer. '# temp-path-exempt:' says so where a reader and a diff both see
+# it, and the count below is what stops a third appearing quietly.
+#
+# scripts/tests/ is out of scope: fixtures have their own rule (test-suite-gate.tests.ps1 requires $PID
+# or a guid) and it answers a DIFFERENT question -- two concurrent runs tearing down each other's tree,
+# not a hostile neighbour -- so it leaves the exposure standing there. Measured September 8, 2026: 108
+# predictable fixture paths across 66 files, 53 of them opening with a recursive delete at that path.
+# Pre-existing, larger than the half this scan closes, and filed as #1664 rather than swept in with it.
+# Built from fragments so this pattern does not itself read as one of the tokens it hunts -- see the
+# paragraph above about a guard's prose living inside the tree its sibling guard measures.
+$tempRootPattern = 'Get' + 'TempPath' + '|\$env:TEMP\b|\$env:TMP\b'
 $tempOffenders = @()
+$tempExempt    = @()
 foreach ($f in @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
                  Where-Object { $_.Directory.Name -ne 'tests' })) {
     $n = 0
     foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
         $n++
         $t = $line.Trim()
-        if ($t.StartsWith('#'))        { continue }
-        if ($t -notmatch 'GetTempPath') { continue }
-        if ($t -notmatch 'Join-Path')   { continue }
-        if ($t -eq $composerLine)       { continue }
-        if ($t -match 'NewGuid')        { continue }
+        if ($t.StartsWith('#'))               { continue }
+        if ($t -notmatch $tempRootPattern)    { continue }
+        if ($t -match 'temp-path-exempt')     { $tempExempt += ('{0}:{1}' -f $f.Name, $n); continue }
+        if ($t -match 'NewGuid')              { continue }
         $tempOffenders += ('{0}:{1}' -f $f.Name, $n)
     }
 }
-Assert-True ($tempOffenders.Count -eq 0) ('no script composes a temp path without a guid' + $(if ($tempOffenders.Count) { ' -- ' + ($tempOffenders -join ', ') } else { '' }))
+Assert-True ($tempOffenders.Count -eq 0) ('no shipping script composes a temp path without a guid' + $(if ($tempOffenders.Count) { ' -- ' + ($tempOffenders -join ', ') } else { '' }))
+Assert-True ($tempExempt.Count -eq 2) ("exactly two lines are declared exempt -- the composer and check-claude-home's reader (found $($tempExempt.Count): " + ($tempExempt -join ', ') + ')')
 
 # AND THE CONVERSION IS PINNED AT ITS CALL SITES, so a revert to a hand-composed path fails here rather
 # than only in the scan above -- which a reverter could satisfy by adding a guid and leaving the class
-# scattered again. Six sites, one composer.
+# scattered again. FIVE CALLER FILES, not five sites: open-pr.ps1 holds two of the seven sites, which is
+# why the two counts in this branch differ and why this comment says which unit it is using.
 $scratchCallers = @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
                     Where-Object { $_.Directory.Name -ne 'tests' -and $_.Name -ne 'native-capture-lib.ps1' } |
                     Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'New-ScratchPath' })

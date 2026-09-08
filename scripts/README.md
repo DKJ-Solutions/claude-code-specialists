@@ -94,7 +94,9 @@ them. A guid removes the target instead of checking for one — a reparse-point 
 with a window, and it cannot be applied to the temp root at all, because on macOS `/tmp` *is* a symlink.
 `native-capture.tests.ps1` enforces this over `scripts/**` outside `tests/` and names the offending
 `file:line`. The `$PID` convention above is the sibling rule for **fixtures**, and it answers a different
-question — two concurrent runs, not a hostile neighbour.
+question — two concurrent runs, not a hostile neighbour — which is why it leaves that exposure standing
+in `tests/`: 108 predictable fixture paths across 66 files, 53 of them opening with a recursive delete,
+[#1664](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1664).
 
 `repo-config.ps1` sits at the top level rather than in a directory, deliberately: it is **not machinery
 but data** — this repo's own answers to the seam the shared scripts read (the trunk name, the lint script,

@@ -204,7 +204,11 @@ function New-ScratchPath {
     }
 
     $leaf = "$Label-$PID-" + [guid]::NewGuid().ToString('n') + $Extension
-    $path = Join-Path ([System.IO.Path]::GetTempPath()) $leaf
+    # The marker is what native-capture.tests.ps1's scan reads: this one line cannot carry the guid the
+    # rule asks for, because it is the line that USES the guid built above. Declared at the site rather
+    # than matched by its source text, so renaming $leaf or reflowing this line does not turn the scan
+    # against its own composer.
+    $path = Join-Path ([System.IO.Path]::GetTempPath()) $leaf # temp-path-exempt: this IS the composer
     if ($Directory) { New-Item -ItemType Directory -Path $path | Out-Null }
     return $path
 }
