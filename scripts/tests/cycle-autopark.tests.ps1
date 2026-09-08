@@ -191,9 +191,9 @@ try {
 
     # --- (f) park-cycle RUNS IN THE HOOK'S OWN PROCESS -- the #1641 contract ----------------------
     # THE SUBJECT OF #1641: the hook spawned a whole second powershell.exe to run one script, on every
-    # turn. Measured on the real park-cycle, 7 runs each: 867 ms median spawning against 695 ms through a
-    # runspace. Nothing above would notice a return to a child process -- every stream assert passes
-    # either way, which is exactly why the saving needs an assert of its own rather than a comment.
+    # turn. Measured on the real park-cycle, ordinary turn, 7 runs each: 666 ms median spawning against
+    # 564 ms in-process. Nothing above would notice a return to a child process -- every stream assert
+    # passes either way, which is exactly why the saving needs an assert of its own rather than a comment.
     # $PID is the whole test: in-process it IS the hook's, and no spawn can fake that.
     Write-Host "cycle-autopark.ps1 -- park-cycle runs in-process, not in a second interpreter (#1641)" -ForegroundColor Cyan
     $rF = Invoke-HookWithPid -ScriptOverride (New-Stub -Label 'f' -Body 'Write-Host "child-pid=$PID"')

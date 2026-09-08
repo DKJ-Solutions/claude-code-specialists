@@ -92,17 +92,23 @@ one.
 
 #### The size, re-measured here rather than taken from the report
 
-#1641 reports 219 ms and reads it as the saving; that is the spawn's own cost. Measured on this machine
-(Windows PowerShell 5.1, 7 runs each, median), against the **real** park-cycle:
+#1641 reports 219 ms and reads it as the saving; that is the spawn's own cost on the machine that filed
+it. Measured here (Windows PowerShell 5.1, 7 runs each, median) against the **real** park-cycle, on an
+**ordinary turn** -- branch in sync with origin, so park-cycle finds nothing to push, which is what most
+turns look like:
 
-| the turn being measured | spawn | in-process | back |
+| | spawn | in-process | back |
 |---|---|---|---|
-| nothing to push -- the ordinary turn | 867 ms | 674 ms | ~193 ms |
-| a document to commit and push | 1207 ms | 1084 ms | ~123 ms |
+| the full hook, ordinary turn | 666 ms | 564 ms | ~102 ms |
 
-The first row is the one that matters, because most turns do not touch the branch document. The saving
-exceeds the ~102 ms a bare interpreter start costs, because park-cycle dot-sources several libs and
-does that inside an engine the hook process has already warmed.
+**The state of the tree has to be stated, because it moves the number more than the change does.** A turn
+with a document to commit and push reaches the network, and both sides then land near 1.2 s with the same
+delta buried in it -- so a figure quoted without saying which turn it measured is not reproducible. The
+ordinary turn is the honest one to optimise against.
+
+~102 ms is one interpreter start-up **exactly**: the same 102 ms a bare `powershell -File <script that
+only exits>` costs on this machine, measured separately at the start. That agreement is the reason the
+figure is quoted at all -- the change removes one process, and the saving is the cost of one process.
 
 ### CREATE
 
@@ -123,9 +129,9 @@ does that inside an engine the hook process has already warmed.
 
 The `cycle-autopark` Stop hook no longer starts a second PowerShell interpreter to run `park-cycle.ps1`.
 It runs it through the same `Invoke-CheckScript` the six SessionStart hooks have used since #1625, which
-gives ~193 ms back on **every turn** (867 ms -> 674 ms median on a turn with nothing to push, 7 runs
-each). This hook fires far more often than that family, so it was paying the same avoidable start-up the
-most times.
+gives ~102 ms back on **every turn** (666 ms -> 564 ms median on an ordinary turn with nothing to push,
+7 runs each) -- one interpreter start-up exactly, which is what the change removes. This hook fires far
+more often than that family, so it was paying the same avoidable start-up the most times.
 
 Two additions to the shared lib made that possible, and both are opt-in with nothing changed for its
 existing callers. `-MergeAllStreams` captures every stream rather than Write-Host and the pipeline

@@ -36,8 +36,10 @@
     `powershell.exe` to run one script, on EVERY turn -- so the avoidable start-up the SessionStart family
     pays per session, this paid per turn. It now goes through the same Invoke-CheckScript those six use
     since #1625, with -MergeAllStreams for the capture the paragraph above is about. MEASURED here on the
-    real park-cycle, Windows PowerShell 5.1, 7 runs each, median: 867 ms spawning against 674 ms in-process
-    -- ~193 ms back per turn.
+    real park-cycle on an ORDINARY turn -- branch in sync with origin, so park-cycle finds nothing to push,
+    which is what most turns look like -- Windows PowerShell 5.1, 7 runs each, median: 666 ms spawning
+    against 564 ms in-process. ~102 ms back per turn, which is one interpreter start-up exactly: the same
+    102 ms a bare `powershell -File <script that only exits>` costs on this machine, measured separately.
 
     A RUNSPACE WAS BUILT FIRST AND THROWN AWAY, and the reason is worth keeping because it is the trap this
     file would otherwise invite back. The premise was that park-cycle.ps1 calls `exit` at fourteen
