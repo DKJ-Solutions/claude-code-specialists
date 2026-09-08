@@ -13,7 +13,15 @@
     of another consumer in its context; inside the workshop itself, the full check runs.
 
     The hook is intentionally soft:
-    - no (verified) workshop checkout -> a notification and done (exit 0);
+    - no (verified) workshop checkout -> the register checks cannot run, and since #1591 the hook
+        answers the ONE question a consumer machine can answer on its own instead of saying nothing:
+        it runs the plugin-carried plugin-versions.ps1 in -Brief mode and reports whether this
+        checkout's installed plugin version is the one the local marketplace clone holds. Only an
+        install that is BEHIND its clone is surfaced as a finding; a stale CLONE is deliberately not
+        one (it is a cache this checkout does not own, and shouting about it teaches the reader to
+        skim). Every branch of that path says the register checks did not run -- the #533 lesson
+        applied to a new code path, since a reader told "no errors" about checks that never happened
+        has been handed a positive all-clear for nothing. Still exit 0;
     - blocking signals only ([FOUT]/[ERROR]/[DRIFTED]) -> compact summary in the
         session context, never a block; [INFO] is registry administration (the sync status and
         registration of consumers) -- sometimes updated here, often the concern of another
@@ -174,7 +182,68 @@ try {
     }
 
     if (-not $workshop) {
-        Write-Host 'connector-sessioncheck: no verified workshop checkout found on this machine -- check skipped.'
+        # NO SIBLING SOURCE CHECKOUT -- the ORDINARY state of a consumer, not an edge case (#1591).
+        # check-connectors.ps1 is source-only and is not plugin-carried, so there is nothing here to
+        # delegate the register checks to and they genuinely cannot run. What this hook printed
+        # instead was 'check skipped', and a session on such a machine got no version signal AT ALL
+        # -- which is every consumer that does not happen to keep a dev checkout beside it.
+        #
+        # What a consumer machine CAN answer on its own is the version question, from two things it
+        # already has: the install record keyed on this checkout's path, and the marketplace clone.
+        # plugin-versions.ps1 -Brief is exactly that answer, reduced to marker lines.
+        #
+        # DUAL CONTEXT, OWN COPY FIRST -- and the order matters for a reason that is easy to miss.
+        # In the repo that maintains these scripts this branch is unreachable (that repo IS the
+        # workshop, so $workshop resolves above), but the mirror beside this hook carries the
+        # source-repo guard, which REFUSES a released copy run from inside that repo. A refusal
+        # printed into a session start is precisely what this hook must never produce, so the repo's
+        # own copy is preferred wherever one exists and the mirror is the consumer's path.
+        $engine = $null
+        foreach ($cand in @(
+            (Join-Path $cwd 'scripts\task\plugin-versions.ps1'),
+            (Join-Path $PSScriptRoot '..\scripts\task\plugin-versions.ps1')
+        )) {
+            if (Test-Path -LiteralPath $cand -PathType Leaf) { $engine = $cand; break }
+        }
+
+        if (-not $engine) {
+            # A plugin install predating the mirror. Degrade to the line this hook printed before
+            # rather than inventing one: the state is the same as it always was.
+            Write-Host 'connector-sessioncheck: no verified workshop checkout found on this machine, and no plugin-versions engine beside this hook -- check skipped.'
+            exit 0
+        }
+
+        $vout = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $engine -Brief)
+        $vcode = $LASTEXITCODE
+        $vsignals = @($vout | Where-Object { $_ -cmatch '^\s*\[ERROR\]' })
+        $vnotices = @($vout | Where-Object { $_ -cmatch '^\s*\[INFO\]' })
+        $vsummary = @($vout | Where-Object { $_ -cmatch '^\s*\[SUMMARY\]' } | ForEach-Object { $_.Trim() }) | Select-Object -First 1
+
+        # EVERY BRANCH BELOW SAYS THE REGISTER CHECKS DID NOT RUN. That is the #533 lesson applied
+        # to a new code path: a reader told 'no errors' about a run that never examined the register
+        # has been handed a positive all-clear for checks that did not happen. What is reported here
+        # is one question out of five, and the line says so.
+        $skipped = 'no source checkout on this machine, so the register checks (consumer registration, lens inventory, agent-def drift) did not run'
+
+        if (-not $vsummary -and $vsignals.Count -eq 0 -and $vnotices.Count -eq 0) {
+            # The engine produced nothing this hook recognises -- a broken install, or a shape change.
+            # Its own branch, so it is neither reported as a finding nor as an all-clear.
+            Write-Host "connector-sessioncheck: $skipped, and the version check produced no readable output (exit $vcode) -- run the plugin-versions skill to see why."
+        } elseif ($vsignals.Count -gt 0) {
+            Write-Host "connector-sessioncheck: $skipped. This checkout is behind the marketplace clone:"
+            foreach ($line in $vsignals) { Write-Host "  $($line.Trim())" }
+            # The [INFO] lines ride along HERE and only here: beside a real finding they are context
+            # for a run that already has something wrong. On a clean run they would be permanent
+            # session-start noise -- a third-party plugin from another marketplace reports
+            # 'cannot determine' at every single start and there is nothing to do about it.
+            foreach ($line in $vnotices) { Write-Host "  $($line.Trim())" }
+            if ($vsummary) { Write-Host "  $vsummary" }
+            Write-Host '  (then restart the session -- a skill or hook that arrives with an update is not in a session that started before it.)'
+        } else {
+            # Nothing actionable. One line, carrying the tally rather than a bare all-clear, so
+            # 'up to date' is distinguishable from 'could not be determined'.
+            Write-Host "connector-sessioncheck: $skipped. Version check: $($vsummary -replace '^\[SUMMARY\]\s*', '')"
+        }
         exit 0
     }
 

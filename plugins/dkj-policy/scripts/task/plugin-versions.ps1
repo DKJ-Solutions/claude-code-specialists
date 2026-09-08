@@ -53,13 +53,19 @@
     The home directory that '~/.claude' hangs off, for the test suite -- so a fixture can point both
     the install record and the marketplace clone at a scratch tree. A consumer never types this.
 
+.PARAMETER Brief
+    Emit one marker-prefixed line per plugin that has something to say, plus a [SUMMARY] tally, and
+    nothing else -- no header, no per-plugin block, no colour. This is the shape a SessionStart hook
+    can put in front of a session (#1591); a person reading the answer wants the default view.
+
 .EXAMPLE
     ./scripts/task/plugin-versions.ps1
 #>
 [CmdletBinding()]
 param(
     [string]$RootOverride = '',
-    [string]$UserHomeOverride = ''
+    [string]$UserHomeOverride = '',
+    [switch]$Brief
 )
 
 Set-StrictMode -Version Latest
@@ -179,10 +185,20 @@ function Compare-Version {
 $enabled = Get-EnabledPlugins -RepoRoot $repoRoot -UserHomeOverride $UserHomeOverride
 $ids = @($enabled.Ids)
 
-Write-Host ""
-Write-Host "plugin-versions -- $repoRoot" -ForegroundColor Cyan
+if (-not $Brief) {
+    # The header names the checkout being reported on, which is the first thing a person reading the
+    # default view needs and the last thing a session start does: -Brief is read by a hook that
+    # already knows which repo it is in, and an absolute path is the one thing worth not repeating
+    # into a session's context on every start.
+    Write-Host ""
+    Write-Host "plugin-versions -- $repoRoot" -ForegroundColor Cyan
+}
 
 if ($ids.Count -eq 0) {
+    if ($Brief) {
+        Write-Host "[INFO] no plugins are enabled for this checkout -- nothing to compare."
+        exit 0
+    }
     Write-Host ""
     Write-Host "No plugins are enabled for this checkout." -ForegroundColor Yellow
     Write-Host "  Consulted: $($enabled.Summary)."
@@ -375,6 +391,53 @@ $good = @($rows | Where-Object { @('match', 'ver-match') -contains $_.Code })
 $behind = @($rows | Where-Object { @('behind', 'clone-behind') -contains $_.Code })
 $unknown = @($rows | Where-Object { $_.Code -eq 'indeterminate' })
 $total = $rows.Count
+
+# --- brief mode: marker lines a session start can carry, and nothing else -----------------------
+
+if ($Brief) {
+    <#
+        WHY THIS IS A MODE AND NOT A SECOND SCRIPT (#1591). On a machine with no sibling source
+        checkout beside the consumer, connector-sessioncheck.ps1 has nothing to delegate to --
+        check-connectors.ps1 is source-only and is not plugin-carried -- so the hook printed
+        'no verified workshop checkout found -- check skipped' and a session got no version signal at
+        all. That is the ordinary state of every consumer, not an edge case. This mode is what the
+        hook prints there: the same rows the default view builds, reduced to one line per plugin that
+        has something to say.
+
+        THE MARKER SPLIT IS #1591'S OWN INSTRUCTION, not a preference. Only an install that is BEHIND
+        its clone is an [ERROR], because it is the only verdict a reader closes with a command here
+        and now. A stale CLONE is real and is deliberately NOT an error: it is the state of a cache
+        this checkout does not own, it costs nothing until the next update, and a session start that
+        shouts about it teaches the reader to skim the marker that does matter. Everything
+        undetermined is [INFO] for the same reason -- 'cannot determine' reports this machine's
+        bookkeeping, not a defect in the plugin.
+
+        A PLUGIN THAT IS UP TO DATE EMITS NOTHING, and the [SUMMARY] line is what keeps that from
+        being ambiguous: it carries the count, so silence per plugin reads as 'up to date' rather
+        than as 'not examined'. Under lockstep that is most of the run, which is the whole cost
+        argument for a brief mode existing.
+    #>
+    $behindOnly = @($rows | Where-Object { $_.Code -eq 'behind' })
+    $staleClone = @($rows | Where-Object { $_.Code -eq 'clone-behind' })
+
+    foreach ($row in $rows) {
+        if ($row.Code -eq 'behind') {
+            $line = "[ERROR] $($row.Id): $($row.Verdict)"
+            if ($row.Action) { $line += " -- $($row.Action)" }
+            Write-Host $line
+        } elseif (@('clone-behind', 'indeterminate') -contains $row.Code) {
+            Write-Host "[INFO] $($row.Id): $($row.Verdict)"
+        }
+        # 'match' / 'ver-match': nothing to say, and the summary below says how many.
+    }
+
+    $parts = @("$($behindOnly.Count) behind")
+    if ($staleClone.Count -gt 0) { $parts += "$($staleClone.Count) ahead of a stale clone" }
+    if ($unknown.Count -gt 0)    { $parts += "$($unknown.Count) undetermined" }
+    $parts += "$($good.Count) up to date"
+    Write-Host "[SUMMARY] $total plugin(s) enabled here: $($parts -join ', ')."
+    exit 0
+}
 
 Write-Host ""
 if ($good.Count -eq $total) {
