@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**26 / 54 minor entries** <!-- pending-tally -->
+**27 / 55 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1676-remote-ahead-tip-short-read · 20260908-220203
+
+The remote-ahead warning now says when it could not read the diverged branch's tip, instead of dropping
+that half of the sentence in silence. `Get-RemoteAheadNote` reads an empty `git log` capture on exit code 0
+as a failure to read rather than as nothing to report, names which of three reasons it was, and states
+that the author and the subject are missing from the warning and not absent from the branch.
+
+The silent drop degraded the guard to exactly the sentence #1439 was filed for being insufficient: "1
+commit(s) behind" reads identically for another session's push and for a fast-forward of your own autopark,
+and the author and the subject are what separate them. It degraded on the loaded machine, which is when two
+sessions are most likely to be racing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`remote-ahead-lib.ps1` is a shipping script, so this reaches every consumer through the next release, at
+all three doors that ask the question -- `new-branch`'s resume warning, `open-pr`'s remote-ahead gate and
+`park-cycle`'s refused-push report. Nothing a consumer types changes; the sentence gains a clause it used
+to omit.
+
+**Score:** 3
+
+#### Pull Request
+
+The remote-ahead warning says when it could not read the tip, instead of dropping it in silence
+
+Plugins: dkj-policy
+
+[PR #1681](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1681)
+
+---
 
 ### DEPLOY: feat/1605-sessioncheck-version-cache · 20260908-204605
 
