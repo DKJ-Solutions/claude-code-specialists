@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 2 minor entries** <!-- pending-tally -->
+**1 / 3 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/dkj-policy-folder-update-section · 20260908-074642
+
+`dkj-policy/README.md` now says how to **update** the plugins, not only how the folder is arranged — a
+section between the seam table and the pointer list, written for the case this repo is peculiarly
+exposed to: it consumes its own marketplace, so a session here runs the installed copy and **a push does
+not advance the local clone**. It carries the two commands per plugin, the session restart, and then the
+three things that make an update invisible until somebody looks: between two releases no version check
+can tell you the clone is behind, the install record is per-checkout and keyed on its folder path
+(#1449), and the only place a lagging machine is actually visible is the connector register. It closes
+on the two catch-ups an update can require — the seam function `script-contract-sessioncheck` reports,
+and the roster row and lens a newly arrived specialist needs.
+
+The same edit narrows this page's intro, which called the index **two** sections below the divider and
+is now three.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — this is the source repo's own folder index, and nothing here travels to a subscriber. The
+consumer-facing half of the same subject shipped in #1565, on the plugin's own page.
+
+**Score:** N/A
+
+#### Pull Request
+
+Say how to update the plugins in another checkout of this repo
+
+[PR #1567](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1567)
+
+---
 
 ### DEPLOY: docs/dkj-policy-update-section · 20260908-072707
 
