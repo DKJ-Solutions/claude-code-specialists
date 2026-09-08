@@ -7252,6 +7252,87 @@ function Get-UnfoldedTrunkEntry {
     return $findings.ToArray()
 }
 
+function Test-BranchFoldedOnRef {
+    <#
+        Has $Branch's entry ALREADY been folded on $Ref -- read off CHANGELOG.md at that ref through the
+        one definition of a folded heading this file already carries. $true when the entry is there,
+        $false when the changelog is readable and does not name the branch, and $null when the question
+        could not be asked at all. Issue #1601.
+
+        WHY IT IS THIS QUESTION AND NOT THE ABSENT DOCUMENT. check-unfolded-entry.ps1 used to answer
+        "already folded upstream?" with 'git cat-file -e <ref>:<document>' -- the cheap half of the same
+        fold commit, which REMOVES the document and ADDS the entry in one go. Absent-on-origin is the
+        fold's signature only where absence can have no other cause, and #1585 secured that with a
+        gap gate: ask only when the checkout is BEHIND. But a gap is not a direction. HEAD..origin/<trunk>
+        is non-zero in a DIVERGED state too, and there a document committed locally and never pushed is
+        also absent on origin -- so the cheap half answered "folded" about a fold that is still owed, and
+        the reader was sent at a 'git pull --ff-only' that cannot fast-forward. Reproduced September 8,
+        2026 on a fixture one ahead and one behind: [WARN] ... ALREADY been folded, exit 0.
+
+        SO THE EXPENSIVE HALF IS READ INSTEAD, and it costs one blob. The entry's presence in the
+        changelog has exactly one cause -- a fold -- whichever way the checkout has drifted, which is what
+        makes the gap gate UNNECESSARY rather than merely sufficient. The check keeps measuring the gap,
+        because a reader who is behind still needs to be told so; it no longer CLASSIFIES on it.
+
+        NO SECOND DEFINITION OF A FOLDED ENTRY, which is the reason this is a function here rather than
+        four lines in the check. Get-FoldedEntryForBranch is that definition, and it already matches the
+        branch as a whole name across both heading shapes -- the backticked one every entry folded before
+        September 3, 2026 carries, and the bare one written since (#1335). A regex in the check would be
+        free to disagree with it, which is the drift Get-UnfoldedTrunkEntry exists to prevent for the
+        sibling question.
+
+        $null IS NOT $false, AND EVERY CALLER MUST KEEP THEM APART -- the same rule Get-TrunkGap's
+        Measured field states. No ref, no changelog at that ref, no branch to key on, or no
+        Invoke-NativeCapture in the session: each of those means "could not tell", and a caller that read
+        it as "not folded" would report a skipped fold it never measured. The check treats it as NOT
+        FOLDED deliberately and says so at its own call site: an unanswerable question there leaves the
+        leftover reported, which is the pre-#1585 behaviour and the safe direction to fail in.
+
+        AN ENTRY WHOSE HEADING NAMES NO BRANCH cannot be matched, and that limit is Get-FoldedEntryForBranch's
+        own -- it predates this function and is documented there. Such an entry reads as $false here, so its
+        document stays reported rather than silently waved through.
+
+        THE CHANGELOG'S PATH DEFAULTS TO THE WORKFLOW FOLDER'S OWN, which is Get-DefaultChangelogPath's
+        answer without reaching into seam-lib.ps1 from here -- Get-BranchFilePaths already names that
+        folder, and ReservedNames already names CHANGELOG.md inside it. A repo that states
+        Get-ChangelogPath passes the seam's answer in; the caller resolves it, because a lib that went
+        looking for a repo root to resolve a seam is a lib that can find the wrong tree (the same call
+        ReservedNames itself gets).
+    #>
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        # The ref to read the changelog at -- 'refs/remotes/origin/main' from the caller's own gap
+        # measurement, so nothing here fetches.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Ref,
+        # The branch the entry would name. Empty -> $null: there is nothing to key on.
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Branch,
+        # The changelog's repo-relative path. Empty -> '<workflow folder>/CHANGELOG.md'.
+        [string]$ChangelogRel = ''
+    )
+
+    if (-not $Ref -or [string]::IsNullOrWhiteSpace($Branch)) { return $null }
+    if (-not (Get-Command Invoke-NativeCapture -ErrorAction SilentlyContinue)) { return $null }
+
+    if (-not $ChangelogRel) {
+        $paths = Get-BranchFilePaths
+        $ChangelogRel = "$($paths.Directory)/CHANGELOG.md"
+    }
+    # A LITERAL Replace RATHER THAN -replace: git wants forward slashes in a pathspec, and a caller may
+    # hand over a seam answer written the Windows way. -replace takes a REGEX, where a backslash is the
+    # escape character rather than the thing being matched.
+    $ChangelogRel = $ChangelogRel.Replace('\', '/')
+
+    # -DiscardStderr because a missing path is git's own message and this function reports it as $null
+    # rather than printing it: the caller is deciding how to word a finding, not diagnosing git.
+    $show = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'show', "${Ref}:$ChangelogRel") -DiscardStderr
+    if ($show.ExitCode -ne 0) { return $null }
+
+    $text = ($show.Output -join "`n")
+    if ([string]::IsNullOrWhiteSpace($text)) { return $false }
+
+    return ($null -ne (Get-FoldedEntryForBranch -ChangelogText $text -Branch $Branch))
+}
+
 function Get-RetiredBranchDocNames {
     <#
         The RETIRED names of the branch's working document, as literal strings a prose page can carry --

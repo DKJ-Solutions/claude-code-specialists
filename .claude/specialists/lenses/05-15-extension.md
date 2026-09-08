@@ -655,6 +655,40 @@ infrastructure.
   mirrored into the workflow plugin and also driven by `unfolded-entry-sessioncheck.ps1`. Advisory, not
   in `main-ci-gate`. The full reasoning is in the `#1244` chain-reaction passage on the `ci.yml` bullet
   above; the detector is `Get-UnfoldedTrunkEntry` in `entry-scaffold-lib.ps1`.
+
+  **Since [#1585](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1585) the check tells a
+  SKIPPED fold from a checkout that is merely BEHIND**, and that distinction is invisible from the working
+  copy alone: a stale checkout still has the document on disk and still has a `CHANGELOG.md` without the
+  entry, so the detector reported a fold that `fold-on-merge.yml` had already pushed. The extra question
+  costs no network — `Get-TrunkGap -NoFetch` names `refs/remotes/origin/<trunk>`, and each leftover is then
+  asked whether **its branch's entry is already in `CHANGELOG.md` on that ref**, via `Test-BranchFoldedOnRef`
+  in `entry-scaffold-lib.ps1`.
+
+  **It asked the OTHER half of the fold commit until
+  [#1601](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1601), and that half was
+  guessable rather than decisive.** The fold removes the document and adds the entry in one commit, so
+  #1585 asked the cheap half — `git cat-file -e origin/<trunk>:<rel>`, is the document gone upstream — and
+  fenced off absence's other causes with a gap gate: ask only when the gap is non-zero. **A gap is not a
+  direction.** `HEAD..origin/<trunk>` is non-zero in a **diverged** checkout too, and there a document
+  committed locally and never pushed is also absent on origin — so a fold that was still owed was reported
+  as already landed, with `git pull --ff-only` as the remedy, a pull that cannot fast-forward. Filed from a
+  pre-merge review as inferred rather than measured; reproduced on a fixture one commit ahead and one behind
+  before the repair. The entry's presence has exactly one cause whichever way a checkout has drifted, so the
+  gate is **gone rather than widened** — it was sufficient and never necessary — and the gap is still
+  measured, for the wording alone.
+
+  **The match lives in the lib and not in the check, deliberately**: `Get-FoldedEntryForBranch` is this
+  tree's one definition of a folded heading, and a regex in the check would be free to disagree with it —
+  the drift `Get-UnfoldedTrunkEntry` exists to prevent for the sibling question. That is exactly why #1585
+  named the state instead of guarding it: doing it properly meant a lib function, which was more than that
+  repair was. **`Test-BranchFoldedOnRef` returns `$null` for a question it could not ask**, and the check
+  reads that as *not folded* rather than as *folded* — an unanswerable question leaves the `[ERROR]`
+  standing.
+
+  **Nothing in CI changed, and the reason is no longer the gate**: on a push to `main` the pushed commit
+  **is** `origin/<trunk>`, its `CHANGELOG.md` does not carry the entry, and the leftover is reported exactly
+  as before — so `fold-on-merge.yml`'s `'\[ERROR\] the trunk carries'` match is still the exact headline the
+  stranded case prints.
 - **`.github/workflows/fold-on-merge.yml` + `FOLD_PUSH_TOKEN`** — the fold that survives a merge the
   shipping session never sees (a queue merge or a UI merge), by running the same fold this repo
   otherwise only runs from `ship-pr.ps1`'s own next step, on every `push` to `main` (issue #1493, PR

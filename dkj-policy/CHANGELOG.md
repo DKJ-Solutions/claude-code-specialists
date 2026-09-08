@@ -43,7 +43,214 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**10 / 18 minor entries** <!-- pending-tally -->
+**14 / 24 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1600-branch-pickup-divergence · 20260908-121846
+
+A branch resumed from a handoff note now learns that another session is already on it -- at the moment
+of pickup, and again on every turn after it.
+
+Two sessions had run the same pre-PR review on one parked branch in full, each finding real defects the
+other missed, and neither learned of the other until the push at the very end. The signal existed for
+half an hour: `cycle-autopark`'s push is refused the moment the other side pushes, every turn. What was
+missing was delivery. The refusal now fetches that one ref and **names the other side** -- how far
+behind, and the remote tip's author and subject, which is what separates a collision from a
+fast-forward of your own autopark -- where it used to say *"run park-cycle by hand for the reason
+(diverged from origin?)"* and send the reader for an answer the run already held. The Stop hook carries
+the child's stderr into its report, so no line park-cycle writes can be lost to the stream it chose.
+
+And the pickup route that carries the guard is now the one the documentation prescribes: `park`'s
+"picking a parked branch back up" opens with `new-branch.ps1 -Name <the parked branch>` -- idempotent,
+and the only resume that counts the gap and names the tip -- instead of leaving `git checkout` as the
+implied route, which is the door this incident came through three days after
+[#1439](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1439) closed the other one.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+Every consumer of this workflow runs `cycle-autopark` on every turn, so this changes what their sessions
+are told at the moment two of them collide -- and duplicated work is expensive in a way wasted tokens
+are not: the measured pair each found defects the other missed, so either winning outright would have
+shipped a bug. It arrives on a plugin update with nothing to adopt.
+
+**Score:** 4
+
+#### Pull Request
+
+A resumed branch learns another session is on it, at pickup and every turn
+
+Plugins: dkj-policy
+
+[PR #1613](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1613)
+
+---
+
+### DEPLOY: docs/1597-readme-six-enabled-plugins · 20260908-115352
+
+The `dkj-policy/` folder index no longer describes this repo as enabling two plugins. Its "Updating the
+plugins" section states that `.claude/settings.json` enables every plugin in the marketplace and prints
+an update command for each of the six, so an update round in another checkout of this repo no longer
+leaves four plugins silently behind.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — an internal maintenance document of this repo. No consumer reads it, and nothing about the
+plugins they install changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name all six enabled plugins in the dkj-policy folder index
+
+[PR #1610](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1610)
+
+---
+
+### DEPLOY: fix/1601-folded-upstream-diverged-checkout · 20260908-113102
+
+`check-unfolded-entry.ps1` told a checkout that is both ahead of and behind `origin/<trunk>` that its
+unfolded entry had already been folded upstream, and sent it at a `git pull --ff-only` that cannot
+fast-forward. The fold was still owed. It now asks whether the branch's entry is present in
+`CHANGELOG.md` on the remote-tracking ref -- the other half of the same fold commit -- through
+`Test-BranchFoldedOnRef`, a new function in `entry-scaffold-lib.ps1` that reads the changelog at that
+ref via the existing `Get-FoldedEntryForBranch` rather than defining a second idea of what a folded
+entry looks like. The entry's presence has exactly one cause whichever way a checkout has drifted, so
+the gap gate #1585 needed is gone: it was sufficient, never necessary. Nothing changes in CI or for a
+checkout that is merely behind.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The repair is the one #1601 itself named, down to the function's place in the tree -- and the reason
+#1585 named the state instead of guarding it (a second definition of a folded entry) is what shaped
+it: the match stays in the lib, beside the definition it must not disagree with.
+
+The fixture is the part worth reading. `Push-UpstreamFold` had written only the deletion half of the
+fold commit, which was invisible while the check asked about that same half; the moment the check
+asked the other question, the suite could no longer answer it. A fixture that models half a commit
+proves nothing about the other half, and this one had been passing for exactly as long as the check
+was looking the same way it was.
+
+**Score:** 1
+
+#### Pull Request
+
+Read the entry on the ref, not the absent document, in check-unfolded-entry
+
+Plugins: dkj-policy
+
+[PR #1608](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1608)
+
+---
+
+### DEPLOY: feat/plugin-version-overview-v2 · 20260908-111715
+
+A second pre-PR review pass on `plugin-versions.ps1` repairs the one defect its first pass shipped
+with the trunk still carrying: where an install's recorded commit is reachable in the marketplace
+clone but not an ancestor of its HEAD -- the state a history rewrite in the clone leaves behind -- the
+verdict skipped the version-string tiebreaker its own sibling branch already used, and concluded
+unconditionally that the install was ahead. The consequence was a wrong instruction:
+`claude plugin marketplace update` printed where `claude plugin update` was the one that would have
+closed the gap. Alongside it: four smaller output defects in the same script (a stray blank, a
+wrongly-printed `HEAD`, a missing-sha line blaming the wrong side, and two culture-aware sorts brought
+onto this project's ordinal-sort invariant), input sanitising on the sha before it reaches `git`, the
+test coverage that closes the gap which let the original bug ship unnoticed, a token cut to the
+skill's always-on frontmatter, and two small wording fixes.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer of the `dkj-policy` workflow whose marketplace clone has been through a history rewrite
+stops being told to run the wrong command. Every consumer with `dkj-policy` enabled also pays a
+slightly cheaper always-on cost for this skill, and reads clearer wording on its page. Bounded
+reach: the wrong-instruction bug only fires on a clone that has actually been rebased or force-pushed
+since the install was recorded, which is not the common case.
+
+**Score:** 2
+
+#### Pull Request
+
+Second pre-PR review pass on plugin-versions
+
+Plugins: dkj-policy
+
+[PR #1604](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1604)
+
+---
+
+### DEPLOY: fix/1592-fold-commits-void-certificate · 20260908-105846
+
+`ship-pr`'s stale-certificate gate no longer refuses on a **fold** commit. A commit whose entire
+diff is the changelog plus the removal of a branch document is written by this workflow itself,
+under an exception bounded to those two paths, and carries no script, test, manifest or agent def --
+so it cannot be the case the gate was built for: a test block reaching the trunk that the shipping
+branch's CI never ran. The commit's own diff decides that, never its subject line, and every
+unreadable input leaves the commit counted exactly as before.
+
+It is why detect-and-rebase can converge on a busy trunk. Shipping PR #1571 took four attempts and
+about an hour; the three commits that voided its two refused certificates were all folds, and both
+refusals would have passed. Folds are 42% of this trunk's first-parent commits, so the rate at which
+the trunk voids a certificate roughly halves -- against a window that is about as long as CI takes
+(310-461s measured, median 374s) and cannot be made much shorter.
+
+Nothing changed at the wait. #1592 attributed the window to the non-required `claude-review` check,
+reading `lint-en-tests finished in 2s` off the check table; that 2s is the aggregator job's elapsed,
+and measured over 40 paired runs the non-required check governs 8 of them at a median excess of 0s
+across all 40 -- reconfirming #831's own 23% at n=100 rather than overturning it.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- no subscriber of a service notices this. It is entirely internal to how a branch reaches the
+trunk in this repo and in every consumer running the workflow.
+
+**Score:** N/A
+
+#### Pull Request
+
+The staleness gate no longer refuses on fold commits
+
+Plugins: dkj-policy
+
+[PR #1598](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1598)
+
+---
+
+### DEPLOY: fix/1585-unfolded-entry-stale-checkout · 20260908-104546
+
+The skipped-fold check no longer reports a landed fold as a missing one. A checkout that is merely
+behind `origin/<trunk>` now gets a `[WARN]` naming the gap and `git pull --ff-only`, instead of an
+`[ERROR]` pointing at a fold that would refuse on that same stale trunk; where a fold really is owed the
+report is unchanged, and now also says to pull first. The extra question costs no network and is asked
+only at a non-zero gap, so CI and an offline session both behave exactly as before.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer's session start stops raising a red `[ERROR]` for the ordinary state of being a few commits
+behind, and the one line it prints instead is the command that fixes it. That noise was
+indistinguishable from the real skipped-fold state the check exists to catch, which is what made it
+worth repairing rather than tolerating.
+
+**Score:** 3
+
+#### Pull Request
+
+Tell a stale checkout apart from a skipped fold in check-unfolded-entry
+
+Plugins: dkj-policy
+
+[PR #1603](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1603)
+
+---
 
 ### DEPLOY: feat/plugin-version-overview · 20260908-102335
 

@@ -335,6 +335,10 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 # the decision they carry -- does another worktree hold the trunk? -- is the one part of this repair that
 # CAN be tested, and this file cannot be.
 . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
+# For step 3b's fold exemption (#1592): Get-SeamValue + Get-DefaultChangelogPath answer where THIS repo's
+# changelog is, which is half of the two-path bound a fold commit has to fit inside. Same plugin-payload
+# sibling and the same unguarded dot-source open-pr.ps1 and fold-changelog-entry.ps1 already use for it.
+. (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -1266,6 +1270,26 @@ if ($waitReport) {
 # (`strict_required_status_checks_policy: true`) remains available and closes the gap completely -- it
 # is Dave's call, not this script's, and is not made here.
 #
+# ONE EXEMPTION SINCE #1592, AND IT IS NOT THAT DECLINED PATH FILTER. The paragraph above declines to ask
+# which files an ARBITRARY gained commit touched, and that stands. A FOLD commit is not arbitrary: this
+# workflow writes it, straight onto the trunk, under an exception bounded to two paths and enforced by git
+# ('git commit -- <paths>'), so its diff is the changelog plus the removal of a branch document and nothing
+# else. Test-IsFoldOnlyCommit re-derives that bound from the commit's own diff -- never from its subject --
+# and such a commit carries no script, no test, no manifest and no agent def, so it cannot be the case #1292
+# was filed on. Measured on the two refusals #1592 reported: all three voiding commits were folds, and both
+# refusals would have passed. Folds were 10 of the trunk's 19 first-parent commits in that window, and 71
+# of 169 (42%) over the four days to that morning, so the
+# exemption roughly halves the rate at which the trunk voids a certificate -- which is what decides whether
+# detect-and-rebase converges, the window being about as long as CI itself takes (5-7 min here).
+#
+# AND #1592's OWN REASON DID NOT HOLD, which is why nothing at step 3's wait changed. It read
+# 'lint-en-tests finished in 2s' off the check table and concluded the window was the non-required
+# 'claude-review' wait; that 2s is the AGGREGATOR job's elapsed (ci.yml: needs: [lint, suites], two string
+# compares on ubuntu), so the required check cannot conclude before the two windows-latest legs it waits
+# on. Over the last 40 paired pull_request runs CI itself takes 310-461s (median 374s) and the non-required
+# check governs 8 of them -- 20%, median excess 0s across all 40 and about 6 minutes in the 8 where it does
+# govern -- which reconfirms #831's n=100 finding of 23% rather than overturning it.
+#
 # THE ANCHOR IS THE CERTIFYING RUN'S OWN created_at, NOT A CHECK'S startedAt -- RE-ANCHORED AFTER A
 # RED-TEAM CAUGHT THE FIRST VERSION'S BIAS THE WRONG WAY ROUND (September 3, 2026). The first build read
 # a required check's own `startedAt`, reasoned as "conservative because queueing only pushes it LATER
@@ -1410,7 +1434,68 @@ certificate anyway.
         }
 
         $newMainCommits = @($mainLog.Output | Where-Object { $_ -and "$_".Trim() })
-        $staleVerdict = Get-StaleCertificateVerdict -NewMainCommits $newMainCommits
+
+        # THE FOLD IS DISCOUNTED, AND ONLY THE FOLD (issue #1592, September 8, 2026). A commit whose whole
+        # diff is the changelog plus the removal of a branch document is written by fold-changelog-entry.ps1
+        # under a named exception bounded to exactly those two paths -- it carries no script, no test, no
+        # manifest and no agent def, so it cannot be the "test block on the trunk that this branch's CI never
+        # ran" that #1292 exists to catch. Test-IsFoldOnlyCommit decides that from the commit's OWN diff, not
+        # from its subject line, and its header carries the measurement: of the three commits that voided PR
+        # #1571's two refused certificates, all three were folds, and folds were 10 of the trunk's 19
+        # first-parent commits in that window.
+        #
+        # ONE LOCAL git show PER GAINED COMMIT, and the count is what makes that cheap: this block only runs
+        # when 'main' has moved at all, and it had moved by 1 or 2 commits in the measured refusals. No
+        # network, and nothing is read when the trunk has not moved.
+        #
+        # FAILS CLOSED, LIKE EVERY OTHER READ IN THIS STEP. A diff that will not read, or a seam that does
+        # not resolve, leaves the commit counted exactly as it was before this exemption existed -- the
+        # refusal below is then the same refusal it always was, which is the safe direction for a gate whose
+        # only job is catching "green PR, red trunk".
+        $foldExemptCommits = @()
+        if ($newMainCommits.Count -gt 0) {
+            $changelogForFold = ''
+            $entryDirForFold = ''
+            # Read once and held: Get-BranchFilePaths is pure and static, so two calls could never answer
+            # differently -- but a reader has to establish that before they can be sure, and one variable
+            # says it instead.
+            $reservedForFold = @()
+            try {
+                $changelogForFold = Get-SeamValue -Name 'Get-ChangelogPath' -Default (Get-DefaultChangelogPath -RepoRoot $repoRoot)
+                $branchPathsForFold = Get-BranchFilePaths
+                $entryDirForFold = $branchPathsForFold.Directory
+                $reservedForFold = @($branchPathsForFold.ReservedNames)
+            } catch {
+                $changelogForFold = ''
+                $entryDirForFold = ''
+            }
+            if ($changelogForFold -and $entryDirForFold) {
+                foreach ($gained in $newMainCommits) {
+                    $sha = "$gained".Trim()
+                    # --format= empties the header so only the name-status body comes back; -DiscardStderr
+                    # because this output is PARSED, the same reason the first-parent log above carries it.
+                    #
+                    # AND -Utf8, BECAUSE THESE PATHS ARE DATA (issue #907). Branch names here are ASCII by
+                    # this repo's own naming rule, so the console code page cannot change today's answer --
+                    # but this call compares its output against two seam-supplied paths, which is exactly the
+                    # class the lib's own header says must not be decoded with the console's code page. It
+                    # fails in the safe direction either way (a mis-decoded path matches nothing and the
+                    # commit stays counted), so this is the convention being followed rather than a bug being
+                    # fixed; the alternative was a comment explaining why this one call is the odd one out.
+                    $diffRead = Invoke-NativeCapture -Utf8 -FilePath 'git' -DiscardStderr -Arguments @('show', '--name-status', '--format=', $sha)
+                    if ($diffRead.ExitCode -ne 0) { continue }
+                    if (Test-IsFoldOnlyCommit -NameStatusLines @($diffRead.Output) -ChangelogPath $changelogForFold `
+                            -EntryDirectory $entryDirForFold -ReservedNames $reservedForFold) {
+                        $foldExemptCommits += $sha
+                    }
+                }
+            }
+        }
+
+        $staleVerdict = Get-StaleCertificateVerdict -NewMainCommits $newMainCommits -ExemptCommits $foldExemptCommits
+        if ($staleVerdict.ExemptCount -gt 0) {
+            Write-Host "  stale-CI check: $($staleVerdict.ExemptCount) of $($newMainCommits.Count) commit(s) 'main' gained are fold commits (changelog + branch document only) -- discounted (issue #1592)." -ForegroundColor DarkGray
+        }
         if ($staleVerdict.Stale) {
             # SUBSTRING GUARDED BY LENGTH, not assumed. -DiscardStderr above makes a non-SHA line in
             # $newMainCommits unlikely, not impossible, and this refusal is the one place in the whole
@@ -1421,6 +1506,12 @@ certificate anyway.
             $shownShas = ($staleVerdict.Commits | Select-Object -First 5 | ForEach-Object {
                 if ($_.Length -gt 8) { $_.Substring(0, 8) } else { $_ }
             }) -join ', '
+            # The discounted folds are named in the refusal too, because the operator's next move is to look
+            # at the trunk -- and a count that is smaller than what 'git log' shows them reads as a bug in
+            # this gate unless the difference is stated here.
+            $exemptClause = if ($staleVerdict.ExemptCount -gt 0) {
+                "`n($($staleVerdict.ExemptCount) further commit(s) landed in the same window and were discounted as folds -- changelog plus a branch document, issue #1592.)"
+            } else { '' }
             # THE REMEDY LEADS WITH A CHECKOUT, BECAUSE THIS RUN HAS ALREADY MOVED THE TREE (#1588).
             # Step 2b hands the primary checkout back to the trunk the moment the PR exists (#1073), and
             # this gate fires long after that -- past the whole CI wait. So the operator reading the
@@ -1444,7 +1535,7 @@ certificate anyway.
             # NOT the gate performing the update itself -- that is option 3 in #1325 and a larger decision.
             Write-Error @"
 stale-CI certificate: 'main' gained $($staleVerdict.Count) commit(s) after the run that certified PR #$pr
-started (issue #1292) -- NOT merged.
+started (issue #1292) -- NOT merged.$exemptClause
 
 The required check(s) ($(Format-CheckNameList -Names $staleCheckNames)) tested GitHub's merge ref as it
 stood when that run was created; anything landed on 'main' since is untested against this branch. Newest
