@@ -318,7 +318,8 @@ foreach ($site in @(
     @{ Text = $shipText; Needle = '& "$foldScript" -Branch $($branchPaste.Token) -Push'; Label = 'ship-pr: the fold-by-hand line after a failed worktree add' },
     @{ Text = $shipText; Needle = 'checkout $($branchPaste.Token)"'; Label = 'ship-pr: the "move this tree off main" warning' },
     @{ Text = $syncText; Needle = 'git push -u origin $($branchPaste.Token)'; Label = 'sync-main: the push-by-hand remedy' },
-    @{ Text = $syncText; Needle = 'gh pr create --base $trunk --head $($branchPaste.Token)'; Label = 'sync-main: the gh pr create hand-over line' }
+    @{ Text = $syncText; Needle = 'gh pr create --base $($trunkPaste.Token) --head $($branchPaste.Token)'; Label = 'sync-main: the gh pr create hand-over line, BOTH halves judged (#1627)' },
+    @{ Text = $syncText; Needle = 'gh pr list --head $($sPaste.Token) --state open'; Label = 'sync-main: the per-predecessor pr list line (#1627)' }
 )) {
     Assert-True ($site.Text.Contains($site.Needle)) "names the token, not the raw ref -- $($site.Label)"
 }
@@ -339,10 +340,16 @@ Assert-True (([regex]::Matches($syncText, [regex]::Escape('$branchPaste.Note')))
 Write-Host ''
 Write-Host 'No raw ref left in a printed command, in either script' -ForegroundColor Cyan
 
+# AND THE TRUNK JOINED THE SCAN ON #1627, which is the same lesson a second time: #1594 reported three of
+# seven sites and this scan exists because a list goes stale. It read for `$branch` only, so the raw
+# `--base $trunk` sat beside a judged `--head` in ONE printed command and no assert saw it. `--head
+# $($s.Branch)` is the other half of that blind spot -- a ref this script never composed.
 $rawInCommand = @(
     'git checkout $branch',
     'git push -u origin $branch',
     '--head $branch',
+    '--base $trunk',
+    '--head $($s.Branch)',
     '-Branch $branch -Commit',
     '-Branch $branch -Push',
     '-Branch $branch -RepoRoot'
@@ -363,6 +370,15 @@ Write-Host 'The prose sites -- judged once, beside the read that produced the na
 Assert-True ($shipText -match [regex]::Escape('$branchShown = Get-DisplayRef -Ref $branch')) 'ship-pr.ps1 strips the branch once, beside the read that produced it'
 Assert-True ($syncText -match [regex]::Escape('$branchShown = Get-DisplayRef -Ref $branch')) 'sync-main.ps1 strips the branch once, beside the composition that produced it'
 Assert-True ($syncText -match [regex]::Escape('$trunkShown   = Get-DisplayRef -Ref $trunk')) 'sync-main.ps1 strips the trunk name too -- same seam, and it is printed in nine sentences'
+
+# THE PASTE HALF OF THE SAME SEAM ANSWER (#1627). #1623 judged the trunk for prose and left it raw in the
+# one printed COMMAND that carries it, saying so in its own comment -- so the two axes are asserted side
+# by side here, on one value, which is the clearest place to see that a seam answer needs both.
+Assert-True ($syncText -match [regex]::Escape("`$trunkPaste   = Get-PasteableRef -Ref `$trunk -Placeholder '<trunk>'")) 'sync-main.ps1 judges the trunk for the printed command too, beside the display copy'
+Assert-True ($syncText -match [regex]::Escape('$trunkPaste.Note')) 'and prints the trunk note, so a refused base is explained rather than silently a placeholder'
+Assert-True ($syncText -match [regex]::Escape("Placeholder '<trunk>'")) "the trunk gets its OWN placeholder -- one command can print two, and '<branch>' twice is unreadable"
+Assert-True ($syncText -match [regex]::Escape('$sPaste = Get-PasteableRef -Ref ([string]$s.Branch)')) 'sync-main.ps1 judges each standing predecessor separately, since one line is printed per branch'
+Assert-True ($syncText -match [regex]::Escape('$sPaste.Note')) 'and prints that note beneath its own line, so two unsafe predecessors stay tellable apart'
 
 # NOT A SINGLE QUOTED RAW REF LEFT IN EITHER SCRIPT. Every prose site in both files wraps the name in
 # single quotes or drops it bare into a sentence; the quoted form is the one a scan can hold without false

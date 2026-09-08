@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**21 / 42 minor entries** <!-- pending-tally -->
+**22 / 43 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1627-trunk-and-lsremote-paste · 20260908-170957
+
+Two printed commands in `sync-main.ps1` no longer hand you a ref name your shell would act on. The
+`gh pr create` line routed `--head` through the paste guard and left `--base` raw beside it, so one
+command was visibly half-protected -- and the base is no safer for being the trunk: it is
+`Get-TrunkBranchName`, a seam answer a consumer wrote, which git has never validated. It now carries
+its own `<trunk>` placeholder and its own note, separate from the branch's, because a command printing
+two placeholders has to let you tell them apart. The `gh pr list` line the standing-predecessor refusal
+hands over is judged per branch, and those names are the most externally-authored refs in the script:
+they come off `git ls-remote`, so whoever pushed a branch under the sync prefix chose them, and
+`git check-ref-format` accepts `;`, `$(` and a backtick alike. A refused name prints as a placeholder
+with the real branch named beneath as prose, where its characters are inert -- so you can still act on
+it. #1623's comment, which named this very line as a place the raw trunk stays, is corrected in the
+same change.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `sync-main` is the reader of both lines. The `gh pr list` one is the sharper of the
+two for them: it is printed by a refusal, at the moment they are being told to go look at somebody
+else's branch, and that branch was named by whoever pushed it -- which in a Shopify repo can be another
+machine or another person. Nothing about the ordinary path changes: a normal branch name is safe by the
+allowlist, so both commands print exactly as before and remain copy-and-run.
+
+**Score:** 3
+
+#### Pull Request
+
+sync-main judges the trunk and each predecessor before printing a command
+
+Plugins: dkj-team-shopify
+
+[PR #1648](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1648)
+
+---
 
 ### DEPLOY: fix/1641-autopark-runspace · 20260908-162118
 
