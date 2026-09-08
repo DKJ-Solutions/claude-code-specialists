@@ -76,6 +76,26 @@ a count is what went stale here, and naming the first command cannot go stale on
       every invocation and say nothing the comment does not.
 - [~] Nothing changed about the gate's behaviour. The issue scopes it out by name, and having the gate
       perform the update itself is option 3 in #1325 -- a larger decision that is not this branch's.
+- [~] `$branch` is NOT quoted or sanitised in the printed command, and that is filed rather than fixed:
+      [#1594](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1594). The security review
+      called it blocking; the proposed repair does not hold, which is why it is an issue and not a line
+      here. `git check-ref-format --branch` accepts `;`, `&`, `|`, a backtick, `$(` and a single quote in
+      a branch name, so **double quotes do not close it** -- measured, a branch named `x$(id -un)` still
+      substitutes inside them under bash -- and **single quotes do not either**, since `fix/it's-fine` is
+      a legal name. `remote-ahead-lib.ps1`'s `[\p{Cc}\p{Cf}]` strip does not reach ordinary ASCII
+      punctuation. So the repair is a validation-or-refusal decision across all **three** sites that
+      print a branch name into a paste-ready command (`ship-pr.ps1:1372` here, `:1973` and
+      `sync-main.ps1:1111` pre-existing), and repairing one of three would leave the file inconsistent.
+
+#### Two review findings, and what happened to each
+
+- **Victor:** clean, plus one nit taken -- the portable page stated flatly that the operator is standing
+  on the trunk, while step 2b's return is conditional (`Get-TrunkReturnDecision` declines on a dirty tree
+  or a worktree already holding the trunk). Softened, since that page is what a consumer reads and a
+  consumer whose step 2b declined would find it plainly wrong.
+- **Sebastian:** the finding above. His symptom stands and his measurement of `check-ref-format` is
+  right; his proposed repair does not survive its own test, which is the fifth of the six ways a report
+  fails on pickup. Both halves are in #1594 so the next reader does not re-derive them.
 
 ### TEST
 
