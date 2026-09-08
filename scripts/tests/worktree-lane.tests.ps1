@@ -29,6 +29,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot          = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $WorktreeLaneSrc   = Join-Path $RepoRoot 'scripts\task\worktree-lane.ps1'
 $NewBranchSrc      = Join-Path $RepoRoot 'scripts\task\new-branch.ps1'
 $BranchInfoSrc     = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
@@ -93,6 +97,23 @@ function Invoke-Git {
     } finally { $ErrorActionPreference = $prevEap }
 }
 
+function Invoke-FixtureGit {
+    <#
+        A fixture MUTATION: the same call, with the verdict READ instead of piped to Out-Null.
+
+        THIS IS THE CASE ISSUE #1635 NAMED. Invoke-Git above already returns the exit code -- it has the
+        better helper of the two shapes in this directory -- and the fixture builder then threw it away
+        at every line, which lands in exactly the same place as having no verdict at all.
+
+        The reads keep using Invoke-Git directly, and so does the ref probe at the '(a)' case: a missing
+        ref is the answer that case asked for, so counting exit 1 there as a broken fixture would report
+        a passing negative case as a defect.
+    #>
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    $r = Invoke-Git -Arguments $Arguments
+    Assert-FixtureGitOk -Code $r.Code -GitArgs $Arguments -Output $r.Out
+}
+
 function New-Fixture {
     <#
         A throwaway repo with the scripts copied in, one commit on 'main', and a bare 'origin' that
@@ -122,18 +143,18 @@ function New-Fixture {
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }
 
-    Invoke-Git @('init', '-q', $dir)                                        | Out-Null
-    Invoke-Git @('-C', $dir, 'config', 'user.email', 'tycho-tests@local.invalid') | Out-Null
-    Invoke-Git @('-C', $dir, 'config', 'user.name',  'Tycho Tests')         | Out-Null
+    Invoke-FixtureGit @('init', '-q', $dir)
+    Invoke-FixtureGit @('-C', $dir, 'config', 'user.email', 'tycho-tests@local.invalid')
+    Invoke-FixtureGit @('-C', $dir, 'config', 'user.name',  'Tycho Tests')
     # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-    Invoke-Git @('-C', $dir, 'config', 'commit.gpgsign', 'false')           | Out-Null
-    Invoke-Git @('-C', $dir, 'symbolic-ref', 'HEAD', 'refs/heads/main')     | Out-Null
+    Invoke-FixtureGit @('-C', $dir, 'config', 'commit.gpgsign', 'false')
+    Invoke-FixtureGit @('-C', $dir, 'symbolic-ref', 'HEAD', 'refs/heads/main')
     [System.IO.File]::WriteAllText((Join-Path $dir 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
-    Invoke-Git @('-C', $dir, 'add', '-A')                                   | Out-Null
-    Invoke-Git @('-C', $dir, 'commit', '-q', '-m', 'init')                   | Out-Null
-    Invoke-Git @('init', '--bare', '-q', $bareRemote)                        | Out-Null
-    Invoke-Git @('-C', $dir, 'remote', 'add', 'origin', $bareRemote)         | Out-Null
-    Invoke-Git @('-C', $dir, 'push', '-q', '-u', 'origin', 'main')           | Out-Null
+    Invoke-FixtureGit @('-C', $dir, 'add', '-A')
+    Invoke-FixtureGit @('-C', $dir, 'commit', '-q', '-m', 'init')
+    Invoke-FixtureGit @('init', '--bare', '-q', $bareRemote)
+    Invoke-FixtureGit @('-C', $dir, 'remote', 'add', 'origin', $bareRemote)
+    Invoke-FixtureGit @('-C', $dir, 'push', '-q', '-u', 'origin', 'main')
 
     $script:fixtures += $dir
     $script:fixtures += $bareRemote
@@ -265,8 +286,8 @@ try {
 
     # --- (e) HandBack refuses while the PRIMARY is dirty -------------------------------------------
     Write-Host "worktree-lane.ps1 -HandBack -- refuses on a dirty primary" -ForegroundColor Cyan
-    Invoke-Git @('-C', $laneD, 'add', '-A')                       | Out-Null
-    Invoke-Git @('-C', $laneD, 'commit', '-q', '-m', 'lane work') | Out-Null
+    Invoke-FixtureGit @('-C', $laneD, 'add', '-A')
+    Invoke-FixtureGit @('-C', $laneD, 'commit', '-q', '-m', 'lane work')
     [System.IO.File]::WriteAllText((Join-Path $fd 'dirty.txt'), "x`n")
     $rE = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $laneD)
     Assert-Equal 1 $rE.Code "dirty primary: exit 1"
@@ -324,5 +345,12 @@ try {
 
 Write-Host ""
 Write-Host "worktree-lane.tests.ps1: $script:pass passed, $script:fail failed" -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'worktree-lane.ps1'
 if ($script:fail -gt 0) { exit 1 }
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
+    exit 1
+}
 exit 0

@@ -155,6 +155,64 @@ function Format-GateSeconds {
     return [string]::Format($script:NativeCaptureInvariant, ('{0:N' + $Decimals + '}'), $Seconds)
 }
 
+function New-ScratchPath {
+    <#
+        A path under the OS temp directory that NOBODY ELSE CAN NAME IN ADVANCE -- and, with
+        -Directory, the directory itself, created here rather than by the caller.
+
+        WHY THIS EXISTS RATHER THAN A Join-Path AT EACH CALL SITE (issue #1659). Seven sites in this
+        script layer composed a temp path from a label and $PID alone, and $PID is neither secret nor
+        large: a local actor who can write to the temp directory can pre-plant a symlink or a junction
+        at the exact leaf before the script's first write. New-Item -ItemType Directory -Force and
+        [System.IO.File]::WriteAllText both FOLLOW a reparse point, so the write lands wherever the link
+        points. The content is not attacker-controlled at any of the seven, but the LOCATION is -- and
+        two of them delete recursively at that path afterwards, which turns the same window into a
+        delete primitive somewhere else.
+
+        THE GUID CLOSES IT BY REMOVING THE TARGET, NOT BY CHECKING FOR ONE. Testing the composed path
+        for a reparse point before writing was the other candidate and was declined: it is a
+        check-then-write with a window between the halves, and it cannot be applied to the temp ROOT at
+        all, because on macOS /tmp IS a symlink (to /private/tmp) -- a check there refuses a whole
+        platform for the ordinary case. Nothing can be pre-planted at a name that does not exist until
+        the moment it is used, so this function needs no such check and deliberately carries none.
+
+        $PID STAYS IN THE LEAF, in front of the GUID. It buys nothing against an attacker and is not
+        there for that: it is what makes a leftover attributable to a run that is still alive, which is
+        exactly what the retained-capture note (#1636) and ship-pr's fold-worktree line print for a
+        reader. scripts/README.md's fixture convention already names both spellings for that reason.
+
+        THE LABEL IS VALIDATED, because it is the one half a caller composes: ship-pr's carries a PR
+        number, verify-resolved-issues' an issue number and sync-main's a branch name. A segment held to
+        [A-Za-z0-9._-] with no leading dot can hold no separator and no '..', so the result is a direct
+        child of the temp directory whatever a caller passes it.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        # '.md', '.txt' -- for a FILE path. Omitted for a directory, and for a path something else
+        # creates (git worktree add makes ship-pr's).
+        [string]$Extension = '',
+        # Create the directory here, and WITHOUT -Force: at a name nothing can have reached first, an
+        # existing item means something is badly wrong and earns the throw rather than a silent reuse.
+        [switch]$Directory
+    )
+
+    if ($Label -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+        throw "New-ScratchPath: -Label '$Label' is not a single safe path segment (letters, digits, '.', '_' and '-', not starting with a dot)."
+    }
+    if ($Extension -and $Extension -notmatch '^\.[A-Za-z0-9]+$') {
+        throw "New-ScratchPath: -Extension '$Extension' is not a plain dotted extension (e.g. '.md')."
+    }
+
+    $leaf = "$Label-$PID-" + [guid]::NewGuid().ToString('n') + $Extension
+    # The marker is what native-capture.tests.ps1's scan reads: this one line cannot carry the guid the
+    # rule asks for, because it is the line that USES the guid built above. Declared at the site rather
+    # than matched by its source text, so renaming $leaf or reflowing this line does not turn the scan
+    # against its own composer.
+    $path = Join-Path ([System.IO.Path]::GetTempPath()) $leaf # temp-path-exempt: this IS the composer
+    if ($Directory) { New-Item -ItemType Directory -Path $path | Out-Null }
+    return $path
+}
+
 function ConvertTo-NativeArgumentToken {
     <#
         One argument, quoted the way CreateProcess parses it back apart. Start-Process joins
@@ -1119,7 +1177,7 @@ function Invoke-TestSuiteGate {
         $scopeLabel = if ($ShardCount -gt 1) { "shard $Shard/$ShardCount -- $($suites.Count) of $poolTotal" } else { "all $($suites.Count)" }
         Write-Host "test gate: running $scopeLabel test suites for $Context ($modeLabel)..." -ForegroundColor Cyan
 
-        $captureDir = Join-Path ([System.IO.Path]::GetTempPath()) ("test-suite-gate-$PID")
+        $captureDir = New-ScratchPath -Label 'test-suite-gate' -Directory
         # THE FAILING SUITES' CAPTURE FILES, so the 'finally' below can keep exactly those and delete the
         # rest -- issue #1636. Collected in the reap loop because that is the only place a suite's exit code
         # and its two file paths are held at once; after $running.Remove the paths are gone, the same reason
@@ -1127,9 +1185,6 @@ function Invoke-TestSuiteGate {
         $failedCaptureFiles = New-Object System.Collections.ArrayList
 
         try {
-            if (Test-Path -LiteralPath $captureDir) { Remove-Item -Recurse -Force -LiteralPath $captureDir }
-            New-Item -ItemType Directory -Path $captureDir -Force | Out-Null
-
             $queue = New-Object System.Collections.Queue
             foreach ($s in $suites) { $queue.Enqueue($s) | Out-Null }
             $running = New-Object System.Collections.ArrayList
@@ -1213,8 +1268,10 @@ function Invoke-TestSuiteGate {
             # $retainedCaptureDir stays empty -- so the note below is printed only when there is something
             # at the other end of it.
             #
-            # $captureDir CARRIES $PID, so a retained directory cannot collide with a later run's, and the
-            # Remove-Item at the top of the try clears a stale one should a PID ever be reused.
+            # $captureDir IS UNPREDICTABLE AND PER-RUN (New-ScratchPath, issue #1659), so a retained directory
+            # cannot collide with a later run's -- not even one that reuses this PID. It used to be
+            # "test-suite-gate-$PID" and the try opened by deleting whatever stood there, a recursive delete
+            # at a name anyone could have planted a junction at; there is no stale one to clear now.
             if (Test-Path -LiteralPath $captureDir) {
                 $keep = @()
                 foreach ($f in @($failedCaptureFiles)) {

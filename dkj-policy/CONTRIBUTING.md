@@ -9,8 +9,8 @@ complete CONTRIBUTING file. Because that should be the center of this folder."*
 **It sits on top of the repo's [`CLAUDE.md`](../CLAUDE.md) and wins over it on conflict** (Dave,
 August 14, 2026). That page describes what holds here whether or not this plugin is installed — never
 directly on `main`, branch + PR, CI green, and the three direct-on-`main` exceptions with their bounds. This
-page carries what the **workflow** adds: the four gates, how those three exceptions actually run, and the
-measurements behind them.
+page carries what the **workflow** adds: the gates on the branch dossier, how those three exceptions actually
+run, and the measurements behind them.
 
 The split is worth what it costs for the reason that page gives: the root loads on **every** session, this
 page only when a session touches this folder. A rule that bites only while the workflow is in play does not
@@ -228,15 +228,18 @@ gets **no check suite at all** — so `lint-en-tests` could never go green and t
 full measurement, including why the fold is not the fix and why a `.gitattributes` merge strategy would not
 have worked either, is in
 [`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md#why-the-name-carries-the-branch).
-**Nothing identifies a document by its filename**, then or now: the fold and all four gates read the branch
-out of the document's own heading, which is what keeps a `-v2` suffix free.
+**Nothing identifies a document by its filename**, then or now: the fold and every gate that needs to know
+which branch a document belongs to read it out of the document's own heading, which is what keeps a `-v2`
+suffix free.
 
 **Four `###` headings and never a fifth**, and nothing branch-specific above `### PLAN` (Dave, August 26, 2026).
 PLAN, CREATE, TEST and DEPLOY are the whole top level; a section needing its own heading goes in as a `####`
 under whichever of the four owns it, and everything between the title and `### PLAN` is the scaffolder's generic
-guidance. No gate reads a heading, so both are conventions a writer keeps — measured the day they were
-stated: `check-branch-entry.ps1` gives byte-identical output at four headings and at five. Recorded, with
-that measurement, in
+guidance. **Both were conventions a writer kept, and now a gate refuses both here** — measured the day they
+were stated, when `check-branch-entry.ps1` gave byte-identical output at four headings and at five. That
+day closed the measurement; [§3.2.5](#325-the-shape-gate-on-the-document-around-the-entry) is what closed
+the gap it left, and it carries which half holds in a consumer and which is this repo's own. Recorded --
+both rules, and the reasoning behind each, though not the measurement itself -- in
 [`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md).
 
 **Pick the prefix by what actually changes**, not by which files move along: `docs/` is purely text, `feat/`
@@ -386,7 +389,7 @@ escapable by not using the scripts. The repo's own lint and test gates are separ
 **And before any of them, one thing that is not a gate: `open-pr.ps1` COMMITS that document if it differs
 from `HEAD`** ([#1269](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1269), September 3, 2026).
 Every reader above reads the working tree; the push ships `HEAD`; and the fold, the DEPLOY lock and the CI
-check in 3.2.5 all read the committed copy. Measured on PR #1267: the run passed every gate against a
+check in 3.2.6 all read the committed copy. Measured on PR #1267: the run passed every gate against a
 filled-in working copy, pushed the empty scaffold, published the filled-in body, and CI failed on arrival.
 It commits that one file and nothing else — never `git add -A`, and anything else you had staged stays
 staged. Why it commits rather than refusing, and why neither the dirty-tree warning nor the backing gate
@@ -520,7 +523,50 @@ the network, not about the section, and a gate that refused on that would be ref
 there: this section is what step 5 folds verbatim into `CHANGELOG.md`, so a lock satisfied by a stray checkout's
 document would be approving the fold of a section it never read.
 
-#### 3.2.5. the CI gate, because the four above are local
+#### 3.2.5. the shape gate, on the document around the entry
+
+**September 8, 2026**
+([#1650](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650)). Two rules Dave enforced by
+reading on August 26, 2026 — **four `###` headings and never a fifth**, and **nothing branch-specific above
+`### PLAN`**, both stated under 3.1 — were checked in exactly one place: the CI gate below, which *reports*
+rather than refuses. So none of the four gates above ever saw them, and nothing refused a malformed document
+before the push.
+
+**What that cost, measured on this repo's own PR #1644.** Its document lost its `### PLAN` heading and most
+of its guidance block to a splice that anchored on the string `### PLAN` — which occurs inside the guidance
+blockquote as well, in the very line forbidding branch-specific content above it. Push, PR, the required
+check, the merge and the fold all completed. Each gate above was right on its own terms: every step above
+DEPLOY was resolved, DEPLOY matched what the PR published, and there was committed work behind the plan.
+
+**And an advisory red is the wrong instrument here, for a reason peculiar to this document.** Step 5
+**removes** `dkj-policy/<branch>.md` on a successful fold, so after the ship the red check points at a path
+that no longer exists and a reader following it finds nothing to open. The evidence is destroyed by the thing
+whose success it was warning about — a far weaker signal than an ordinary advisory failure, where the file is
+still there to inspect.
+
+**The repair was the seam, not a new rule.** Both rules are one function now,
+`Get-DevelopmentShapeFindings` in `entry-scaffold-lib.ps1`, so `open-pr` refuses on them while the file is
+still on disk and the author is still holding it, and the CI gate below reports exactly what it reported
+before, on the same text, from the same code. **It fires between 3.2.1 and 3.2.2** — the numbering here is
+reading order, and the run order asks three questions about one document: is there an entry, has it been
+written, does the document around it still hold its form.
+
+**`-Force`-able, like the scaffold gate above** and for its reason: the predicate reads a shape rather than
+words, and a consumer holding a document nobody here has seen must have a way through a gate that is wrong
+about them.
+
+**The scoping is asymmetric, and that is the design rather than an inconsistency.** The heading count is the
+source repo's own rule — [`DEVELOPMENT-portable.md`](../plugins/dkj-policy/DEVELOPMENT-portable.md) states
+heading-blindness as a *feature*, because a consumer may keep headings of their own in a document they
+adopted — so it runs behind `Test-IsWorkflowSourceRepo`, and the caller passes that answer in. The preamble
+rule holds **everywhere**, because it reads the shape and not the text: the guidance block is blockquoted in
+whatever language it was translated into.
+
+**Two things this deliberately did not do.** `branch-entry` was **not** made a required check — that is a
+ruleset change and Dave's own act, and it would put a check that *reports* significance in front of every
+merge. And the CI half still reports rather than refuses, which is the design stated immediately below.
+
+#### 3.2.6. the CI gate, because the five above are local
 
 **August 20, 2026** (inbound
 [#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). The gates above live in
@@ -529,7 +575,7 @@ opened in the GitHub UI, meets none of them. The convention was therefore enforc
 scripts — and a convention that enforces nothing rots quietly, which matters here because `CHANGELOG.md` is
 the only readable answer to "what is merged but not yet released".
 
-**It re-checks three of the four, and the backing gate is deliberately not among them** (August 28, 2026).
+**It re-checks every one of them but the backing gate, and that exclusion is deliberate** (August 28, 2026).
 That gate's whole subject is what sits **uncommitted in a working copy**, and a CI runner has no working copy
 — it checks out the commit, so its tree is clean by construction and the measurement there would always read
 zero. A check that cannot fail is not a check, and adding one would state a guarantee CI is in no position to
@@ -539,10 +585,13 @@ author can still act on it.
 
 [`check-branch-entry.ps1`](../scripts/lint/check-branch-entry.ps1) closes that, and
 [`.github/workflows/branch-entry.yml`](../.github/workflows/branch-entry.yml) is the handful of lines that call
-it on every PR. **It adds no rule of its own** — it calls the same `Test-BranchChangelogIsFilled` and
-`Get-EntryScaffoldFindings` that `open-pr` calls, and, given the PR number, the same `Test-DeployLock` that
-`ship-pr` calls. So there is one definition of "written" in the system and one of "diverged", rather than a
-second pair in CI. **Reading a PR body is why the workflow carries read access to pull requests** — the entry
+it on every PR. **It adds no rule of its own** — it calls the same `Test-BranchChangelogIsFilled`,
+`Get-EntryScaffoldFindings` and `Get-DevelopmentShapeFindings` that `open-pr` calls, and, given the PR
+number, the same `Test-DeployLock` that `ship-pr` calls. So there is one definition of "written" in the
+system, one of "in shape" and one of "diverged", rather than a second set in CI. **That claim only became
+exact on September 8, 2026**: the shape rules were this script's own until 3.2.5 moved them out, which is
+the whole of #1650 — a sentence promising no rule of its own, standing over the one rule that lived nowhere
+else. **Reading a PR body is why the workflow carries read access to pull requests** — the entry
 checks themselves need no token, no network and no PR, so the lock is opt-in by parameter and the gate stays
 runnable on a branch that has none.
 

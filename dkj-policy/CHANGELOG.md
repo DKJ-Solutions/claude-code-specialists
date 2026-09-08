@@ -43,7 +43,297 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**22 / 43 minor entries** <!-- pending-tally -->
+**26 / 50 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1659-temp-path-unpredictable · 20260908-190619
+
+Seven sites across six scripts composed their temp path as `<label>-$PID`, which is a name a local
+actor can reach first: `New-Item -Force` and `WriteAllText` both follow a symlink or junction, so a
+pre-planted link redirects the write, and where the script then deletes recursively there, the same
+window is a delete primitive in somebody else's directory. All seven now call one composer,
+`New-ScratchPath`, which
+returns `<temp>/<label>-<pid>-<guid>` -- there is no name to plant at. A reparse-point check was the
+obvious alternative and was declined on the measurement: it is a check-then-write, and on macOS `/tmp`
+is itself a symlink, so the same check refuses a whole platform for the ordinary case. A scan in
+`native-capture.tests.ps1` now fails on the eighth site, which is what the class needed more than the
+seven edits did.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. These are the workflow's own scripts, and the hardening
+is against a local actor on the machine running them; no behaviour a consumer invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+No shipping script composes a predictable temp path any more
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1666](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1666)
+
+---
+
+### DEPLOY: fix/1655-unjudged-fixture-git-check · 20260908-185415
+
+A test suite can no longer reintroduce the fixture-git idiom that #1635 swept out. Check 35
+(`[fixture-git]`) walks `scripts/tests/` for a git command whose output is discarded and whose exit
+code is judged on neither the same statement nor the next -- the idiom that made a git which FAILED
+indistinguishable from one that worked, so every assert below it read a repo that was never built and
+blamed the script under test.
+
+The sweep it enforces turned out to be unfinished, which is the finding rather than a side note. The
+matcher read **27 unjudged calls still standing in four files** -- `find-specialist-mentions`,
+`shared-scripts`, `source-repo-guard` and `fresh-consumer.measure`, whose spellings (`git ... 2>&1 |
+Out-Null` with no `&`, and `& $git @(...)` over a scriptblock) the earlier search never reached. All
+27 are converted here, so the check is born green with **zero exemptions**. Over the pre-sweep tree it
+reads 182 findings in 18 files: the house style, measured.
+
+What makes the check possible at all is that a git QUESTION reads its exit code **immediately** --
+`rev-parse --verify --quiet` on a ref expected to be absent answers with exit 1 and is judged on the
+next line. So a call is cleared when `$LASTEXITCODE` appears in the same statement or the next one, no
+verb is special-cased, and no file is exempt: **zero probe false positives over both trees**. The
+subject is deliberately a *discarded* result rather than every unjudged call -- widening to a bare
+statement pipeline yields 20 findings here and all 20 are value-returning questions. All three ways to
+discard are covered (`| Out-Null`, `$null =`, a `[void]` cast), each after one shared unwrap of any
+`(...)` so a pair of brackets is not an escape hatch, and the clearing condition reads the AST rather
+than the line text. None of those three came from the measurement -- this tree holds only the plainest
+spelling of each -- but from probing the check's own stated boundary and from the review that followed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here reaches a consumer's own repo: the check reads `scripts/tests/`, which is workshop-only
+and mirrored into no plugin. One portable page does change -- the system-administration manual gains
+a tenth PowerShell trap (`@($i, $i + 1)` is `@($i, $i) + 1`, the comma binding tighter than the
+addition), which travels to every consumer at the next release and is worth having: it produced nine
+false findings inside the very pass that was deciding whether this check's false-positive rate was
+acceptable.
+
+**Score:** 1
+
+#### Pull Request
+
+A lint check for the unjudged fixture-git idiom, and the four suites the #1635 sweep missed
+
+Plugins: dkj-team-alpha
+
+[PR #1663](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1663)
+
+---
+
+### DEPLOY: fix/1650-shape-gate-local · 20260908-182018
+
+The branch document's **shape** rules -- four `###` headings and never a fifth, and nothing
+branch-specific above the first phase -- are one shared function now
+(`Get-DevelopmentShapeFindings`), and `open-pr` refuses on them before the push. They lived only in
+`check-branch-entry.ps1`, which runs in CI and only advisorily, so nothing stopped a malformed document:
+PR #1644 shipped through push, the required check, the merge and the fold with its `### PLAN` heading and
+most of its guidance block gone, every other gate correctly green -- and the fold then deleted the very
+file the one red check named, so the evidence was destroyed by the thing whose success it was warning
+about. CI still reports rather than refuses, from the same code, and `branch-entry` is still not a
+required check.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer gets the same refusal, before the push, on the half of the rule that applies to them: branch
+content in the generic guidance block. The heading-count half stays the source repo's own, so a document
+where they keep a heading of their own is still not refused. Documented as its own gate on the `open-pr`
+skill page and in the portable contributing page, both of which travel with the plugin.
+
+**Score:** 3
+
+#### Pull Request
+
+The branch-document shape rule becomes a shared function and refuses before the push
+
+Plugins: dkj-policy
+
+[PR #1661](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1661)
+
+---
+
+### DEPLOY: docs/1656-gate-count-readme · 20260908-180529
+
+The `dkj-policy` README's one-paragraph summary no longer counts the gates. It read *"Four gates hold the
+whole thing together, and none of them is advisory"* and now reads *"Gates on the branch's own paperwork
+hold the whole thing together"* -- the same claim, with the half that goes stale removed and the half that
+does the work kept verbatim.
+
+The count was correct when it was written and is correct today. What it was not is durable: the paragraph
+sits one sentence above the pointer to
+[`CONTRIBUTING-portable.md`](../plugins/dkj-policy/CONTRIBUTING-portable.md), whose matching sentence
+becomes "Five further gates" the moment
+[#1650](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650) lands -- so the summary would
+have started contradicting its own next paragraph without anybody editing it. That is the second time this
+count has gone stale by standing still, which is the argument for naming the gates instead: *"Gates on the
+branch's own paperwork"* is what `CONTRIBUTING-portable.md` already calls them, and it stays true at four,
+five or six.
+
+Deliberately scoped to this one sentence. The other counts in the tree are either a different subject or
+sit in files #1650's own branch is already editing; the one it leaves behind,
+`CONTRIBUTING.md:380`, is filed on
+[that thread](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650#issuecomment-5589481061)
+rather than swept from here.
+
+**Score:** 1
+
+A wrong number in a summary paragraph misleads nobody today -- it prevents a contradiction that has not
+happened yet, and names the failure it prevents. Cosmetic in isolation; worth doing because the alternative
+is finding it a third time.
+
+#### What makes this deploy extra special
+
+This page ships with the plugin, and it is the one the README itself calls *"the page to read"* before
+handing a consumer to `CONTRIBUTING-portable.md`. A consumer adopting the workflow reads the summary and
+the page it points at in that order, so the pending contradiction would have landed on them first and with
+nothing in their own tree to explain it.
+
+**Score:** 1
+
+They read a paragraph that stays true instead of one that quietly stops being true. Cosmetic on arrival,
+and invisible if it works.
+
+#### Pull Request
+
+Drop the gate count from the dkj-policy README's opening paragraph
+
+Plugins: dkj-policy
+
+[PR #1658](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1658)
+
+---
+
+### DEPLOY: docs/1642-pre-split-entry-shape · 20260908-175640
+
+Four comments in `../scripts/lib/entry-scaffold-lib.ps1` and its guardrail suite described the
+pre-split root changelog entry incompatibly -- an H2 title naming no branch in one place, an H1 title
+with a `**Branch:**` line below it in the other -- and each was the stated reason a piece of live
+behaviour survives. The history settles it: of the **344** pre-split root entries this repo has ever
+had, **0** carry a `**Branch:**` line and **0** open with an H1 (334 open at H3, 10 at H2 in the flat
+window of August 5-6, 2026). The `**Branch:**` shape was never a root entry at all -- it sat below the
+H1 title of the pre-split **per-branch** files, `branch/branch-changelog.md` (`# Branch changelog`) and
+`branch/branch-progress.md` -- and the release cut's root scan is non-recursive, so `branch/` was never
+in its reach either. All four sites now name that file, cite the measurement, and keep the one
+justification that survives it: the fallback's regex is anchored end to end, which is what makes it
+safe to leave un-narrowed. `Test-BranchChangelogIsFilled`'s docstring reads `AT AN ENTRY LEVEL` rather
+than `as an H2`, since it accepts both and both were written. Behaviour is unchanged -- the report had
+already established the code handles each shape correctly, and this measurement agrees -- but the
+guardrail suite gains the H3 assert it never had, which is the shape 334 of those 344 files actually
+have.
+
+The failure this prevents had not happened yet: a maintainer following the un-corrected comments would
+conclude that a root entry declares its branch, therefore that the name test already answers for it,
+therefore that the level test beside it is dead -- and removing it is exactly what would let the
+release cut, whose guard is "no unfolded entry anywhere", cut straight over all 344.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. The corrected text travels to consumers in the `dkj-policy` mirror, but nothing a consumer runs
+changes: this is comment prose and one added assert in the source repo's own suite.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the legacy shape the '**Branch:**' fallback actually answers for
+
+Plugins: dkj-policy
+
+[PR #1657](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1657)
+
+---
+
+### DEPLOY: fix/1635-fixture-git-judged-siblings · 20260908-173553
+
+A test fixture's own git commands are now judged in every suite that builds one. The standing idiom was
+`& git -C $dir init -q 2>$null | Out-Null` inside a lowered `$ErrorActionPreference` -- and lowering the
+preference is right and stays, because git writes ordinary progress to stderr and under `EAP=Stop` that
+is a terminating error before any exit code is read. What was wrong is that the **exit code went with
+it**: a git command that failed was indistinguishable from one that worked. That matters more in a
+fixture than in production code, where a failed git usually goes on to fail visibly: a fixture that
+ignores one produces a repo that is *plausible* -- it exists, it has a HEAD, it just does not hold what
+the case assumed -- and every assert below it then measures the wrong thing, attributing the failure to
+the script under test. Thirty concurrent lanes over one temp tree make a transient `index.lock` sharing
+violation ordinary rather than rare, so the shape to expect is a suite that is red under the gate, green
+alone, and silent about why.
+
+`scripts/lib/fixture-git-lib.ps1` now holds that rule once -- judge, print git's own output, count, and
+fail the run on the count **even when every assert passed**, because a clean sweep over a repo that was
+never built proves less than it appears to. Seventeen suites route through it; each keeps its own helper
+signature, so the pass was a substitution rather than fifteen redesigns. Reads and existence probes are
+deliberately not subjects, and the two that were converted by mistake are back to a raw `& git` with the
+reason at the call site. `sync-main.tests.ps1` -- where #1622 wrote the rule inline, merged from `main`
+part-way through this branch -- reads the shared source too, so the forty lines exist once rather than
+sixteen times.
+
+**Score:** 3
+
+A red gate now names the broken fixture instead of the script that was fine, which is the difference
+between reading a failure and spending a 190s run reproducing one that may not reproduce. Noticed the
+moment it fires and invisible until then, so not higher.
+
+#### What makes this deploy extra special
+
+Nothing -- this is the source repo's own test suites, which no consumer runs and no release ships. The
+lib is workshop-only by design: nothing under `scripts/tests/` is mirrored into a plugin.
+
+**Score:** N/A
+
+#### Pull Request
+
+fixture git commands are judged in every suite
+
+[PR #1646](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1646)
+
+---
+
+### DEPLOY: fix/1629-predecessor-paths-quotepath · 20260908-172319
+
+`sync-main`'s standing-predecessor verdict now reads its file lists correctly, and prints them safely.
+Two defects, and the first is the one that gave a wrong answer: the `git diff` that asks what a
+predecessor branch captured set no `core.quotePath`, so git quoted any path with a byte above 0x7F while
+the paths it was compared against arrived decoded. A theme file with an accent in its name matched
+nothing, and a branch this run supersedes exactly was reported as independent -- which tells you to keep
+a redundant sync PR open, while naming a path that is in the run. That read now forces the flag and
+decodes it, the pair inbound #821 established and the neighbouring reads already used. Second, the paths
+printed under each verdict row are stripped of control and format characters, like the branch name
+#1623 stripped six lines above them. That strip became necessary rather than tidy with the first fix:
+git C-quotes a control character in every `core.quotePath` setting -- measured on 2.55 -- so it was
+closing that half by accident, and decoding on purpose hands the printer a live escape instead. Format
+characters were never covered either way. The strip is `Get-DisplayPath`, the path-shaped one #1638
+added, which does not collapse runs or trim -- so a path with a real space in it still names the file it
+names.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer with a non-ASCII theme file name was getting a wrong verdict, and nothing said so: the run
+was green, the report was confident, and the named path looked like evidence. The accented filename is
+not hypothetical in a Shopify theme, and the failure needed no hostile input at all -- just an accent
+and a standing sync PR. The second half prevents a file name from repainting the report it appears in.
+Nothing changes for an all-ASCII theme.
+
+**Score:** 3
+
+#### Pull Request
+
+sync-main reads and prints a predecessor's file paths correctly
+
+Plugins: dkj-team-shopify
+
+[PR #1652](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1652)
+
+---
 
 ### DEPLOY: fix/1627-trunk-and-lsremote-paste · 20260908-170957
 

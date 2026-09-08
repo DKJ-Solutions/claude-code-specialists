@@ -153,7 +153,10 @@ function Get-ScratchRoots {
     if ($Override) {
         foreach ($r in ($Override -split ';')) { if ($r.Trim()) { $roots += $r.Trim() } }
     } else {
-        foreach ($v in @($env:TEMP, $env:TMP, [System.IO.Path]::GetTempPath(), '/tmp', '/var/folders')) {
+        # This READS the temp roots to recognise a fixture path; it composes nothing and writes
+        # nowhere, so #1659's guid rule has no subject here -- hence the marker on the line itself,
+        # which native-capture.tests.ps1 counts.
+        foreach ($v in @($env:TEMP, $env:TMP, [System.IO.Path]::GetTempPath(), '/tmp', '/var/folders')) { # temp-path-exempt: reader, not composer
             if ($v) { $roots += $v }
         }
     }

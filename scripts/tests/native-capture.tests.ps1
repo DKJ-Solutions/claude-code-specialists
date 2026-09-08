@@ -541,6 +541,98 @@ Assert-True ($readers.Count -gt 3) "more than three files read the bound, which 
 Assert-True (@($readers | Where-Object { $_.Name -eq 'claim-issue.ps1' }).Count -eq 1) 'and claim-issue.ps1 is now among them (#1639)'
 
 Write-Host ''
+Write-Host ''
+Write-Host 'New-ScratchPath -- a temp path nobody can name in advance (#1659)' -ForegroundColor Cyan
+
+$tempRoot = ([System.IO.Path]::GetTempPath()).TrimEnd('\', '/')
+
+$p1 = New-ScratchPath -Label 'ccs-scratch-test'
+$p2 = New-ScratchPath -Label 'ccs-scratch-test'
+Assert-True ($p1 -ne $p2) 'two calls with the SAME label return different paths -- there is no name to pre-plant a junction at'
+Assert-True ((Split-Path -Parent $p1) -eq $tempRoot) 'the result is a direct child of the temp directory'
+Assert-True ((Split-Path -Leaf $p1) -match "^ccs-scratch-test-$PID-[0-9a-f]{32}$") 'the leaf is <label>-<pid>-<32 hex>, so a leftover is still attributable to a run that is still alive'
+Assert-True (-not (Test-Path -LiteralPath $p1)) 'nothing is created without -Directory -- ship-pr hands its path to `git worktree add`, which makes it'
+
+Assert-True ((New-ScratchPath -Label 'ccs-scratch-test' -Extension '.md') -match '\.md$') '-Extension lands at the end, after the guid'
+
+$pd = New-ScratchPath -Label 'ccs-scratch-test' -Directory
+try {
+    Assert-True (Test-Path -LiteralPath $pd -PathType Container) '-Directory creates the directory itself'
+} finally { Remove-Item -Recurse -Force -LiteralPath $pd -ErrorAction SilentlyContinue }
+
+# THE LABEL IS THE ONE HALF A CALLER COMPOSES -- ship-pr puts a PR number in it, verify-resolved-issues
+# an issue number, sync-main a branch name. These pin that no value of it can walk out of the temp
+# directory, which is the property the "direct child" assert above states and this one enforces.
+function Test-ScratchThrows { param([scriptblock]$Body) try { & $Body | Out-Null; return $false } catch { return $true } }
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label '..' }) 'a label of ".." is refused'
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'a/../../b' }) 'and so is one carrying a separator, so no label can leave the temp directory'
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'ok' -Extension 'md' }) 'an extension missing its dot is refused rather than silently glued to the guid'
+
+Write-Host ''
+Write-Host 'Every temp path the SHIPPING scripts compose carries a guid (#1659)' -ForegroundColor Cyan
+
+# THE SCAN, RATHER THAN A NOTE IN A DOC. #1659 was filed because seven sites had each hand-composed
+# "<label>-$PID" and nothing stopped an eighth; a rule enforced by memory is one that gets skipped.
+#
+# THE RULE IS ON THE TEMP ROOT ITSELF, rather than on the
+# join standing beside it. Requiring the two together on one line was the first shape, and it had a hole
+# a reformat walks straight through: assign the root to a variable on one line, join to it on the next,
+# and the composition is invisible to a line scan while being exactly what the rule forbids. So any
+# non-comment line naming a temp root -- the .NET call, or the TEMP/TMP environment variables, which is
+# the second spelling of the same hole -- must carry a guid or an explicit exemption marker. That also
+# drops the "a mere READER of the temp root is not the subject" carve-out: a reader is now declared
+# rather than inferred.
+#
+# THIS PARAGRAPH IS WORDED TO KEEP THE TWO TOKENS OFF ONE LINE, and that is not fussiness. The scanner in
+# test-suite-gate.tests.ps1 reads every line of every file in this directory, comments and string
+# literals included, and it flagged an earlier draft of this very comment as a predictable fixture path.
+# A guard's own prose is inside the tree its sibling guard measures.
+#
+# THE EXEMPTION IS A MARKER AT THE SITE, not a match on the line's source text. Two lines cannot carry a
+# guid honestly: New-ScratchPath's own composition (it USES the guid built one line above) and
+# check-claude-home's enumeration of the temp roots (it composes nothing). Pinning the first by its
+# exact text was the first shape, and a rename of $leaf or a reflow of that one line would have turned
+# the scan against its own composer. '# temp-path-exempt:' says so where a reader and a diff both see
+# it, and the count below is what stops a third appearing quietly.
+#
+# scripts/tests/ is out of scope: fixtures have their own rule (test-suite-gate.tests.ps1 requires $PID
+# or a guid) and it answers a DIFFERENT question -- two concurrent runs tearing down each other's tree,
+# not a hostile neighbour -- so it leaves the exposure standing there. Measured September 8, 2026: 108
+# predictable fixture paths across 66 files, 53 of them opening with a recursive delete at that path.
+# Pre-existing, larger than the half this scan closes, and filed as #1664 rather than swept in with it.
+# Built from fragments so this pattern does not itself read as one of the tokens it hunts -- see the
+# paragraph above about a guard's prose living inside the tree its sibling guard measures.
+$tempRootPattern = 'Get' + 'TempPath' + '|\$env:TEMP\b|\$env:TMP\b'
+$tempOffenders = @()
+$tempExempt    = @()
+foreach ($f in @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
+                 Where-Object { $_.Directory.Name -ne 'tests' })) {
+    $n = 0
+    foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
+        $n++
+        $t = $line.Trim()
+        if ($t.StartsWith('#'))               { continue }
+        if ($t -notmatch $tempRootPattern)    { continue }
+        if ($t -match 'temp-path-exempt')     { $tempExempt += ('{0}:{1}' -f $f.Name, $n); continue }
+        if ($t -match 'NewGuid')              { continue }
+        $tempOffenders += ('{0}:{1}' -f $f.Name, $n)
+    }
+}
+Assert-True ($tempOffenders.Count -eq 0) ('no shipping script composes a temp path without a guid' + $(if ($tempOffenders.Count) { ' -- ' + ($tempOffenders -join ', ') } else { '' }))
+Assert-True ($tempExempt.Count -eq 2) ("exactly two lines are declared exempt -- the composer and check-claude-home's reader (found $($tempExempt.Count): " + ($tempExempt -join ', ') + ')')
+
+# AND THE CONVERSION IS PINNED AT ITS CALL SITES, so a revert to a hand-composed path fails here rather
+# than only in the scan above -- which a reverter could satisfy by adding a guid and leaving the class
+# scattered again. FIVE CALLER FILES, not five sites: open-pr.ps1 holds two of the seven sites, which is
+# why the two counts in this branch differ and why this comment says which unit it is using.
+$scratchCallers = @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
+                    Where-Object { $_.Directory.Name -ne 'tests' -and $_.Name -ne 'native-capture-lib.ps1' } |
+                    Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'New-ScratchPath' })
+Assert-True ($scratchCallers.Count -ge 5) "the composer is used across the script layer rather than in one place (found $($scratchCallers.Count) files)"
+foreach ($expected in @('park-lib.ps1', 'open-pr.ps1', 'ship-pr.ps1', 'verify-resolved-issues.ps1', 'sync-main.ps1')) {
+    Assert-True (@($scratchCallers | Where-Object { $_.Name -eq $expected }).Count -eq 1) "$expected composes its temp path through New-ScratchPath"
+}
+
 if ($script:fail -eq 0) {
     Write-Host "Result: $($script:pass) pass, 0 fail." -ForegroundColor Green
     exit 0

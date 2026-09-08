@@ -127,12 +127,25 @@ function Invoke-Gate {
         # stays so a FAILING assert prints one readable line.
         Flat    = ($text -replace '\s+', ' ')
         Seconds = $sw.Elapsed.TotalSeconds
-        # The capture directory THIS run would have used, derived from the child's own PID (see the
-        # driver) -- issue #1636. Present whether or not the run kept it, so both the green case ("gone")
-        # and the red case ("kept, and holds the failing suite") ask about one known path.
+        # The child's own PID, printed by the driver -- issue #1636. It is what makes the two capture
+        # cases ask about THIS run rather than about whichever other gate run happens to be alive.
+        CapturePid = $(
+            $m = [regex]::Match($text, 'GATE-PID:\s*(\d+)')
+            if ($m.Success) { $m.Groups[1].Value } else { '' }
+        )
+        # The capture directory this run LEFT BEHIND, or '' where it left none -- which is the green
+        # case's whole assertion. Found rather than composed since #1659: the leaf is
+        # "test-suite-gate-<pid>-<guid>" now, so the PID narrows it to this run and nothing else can,
+        # while the guid is what a pre-planted junction has no name to sit at. A green run matches zero
+        # and a red run exactly one; more than one would mean the PID was reused inside this run's own
+        # lifetime, which cannot happen while that process is still alive to print it.
         CaptureDir = $(
             $m = [regex]::Match($text, 'GATE-PID:\s*(\d+)')
-            if ($m.Success) { Join-Path ([System.IO.Path]::GetTempPath()) ("test-suite-gate-" + $m.Groups[1].Value) } else { '' }
+            if ($m.Success) {
+                $hit = @(Get-ChildItem -LiteralPath ([System.IO.Path]::GetTempPath()) -Directory `
+                                       -Filter ("test-suite-gate-" + $m.Groups[1].Value + "-*") -ErrorAction SilentlyContinue)
+                if ($hit.Count -eq 1) { $hit[0].FullName } else { '' }
+            } else { '' }
         )
     }
 }
@@ -212,9 +225,10 @@ if (`$ResidentCount -ge 0) {
     `$script:GateResidentCount = `$ResidentCount
     function Get-ResidentPowerShellCount { return `$script:GateResidentCount }
 }
-# THE CHILD'S OWN PID, printed so the retention cases (issue #1636) can name the capture directory
-# EXACTLY rather than diffing the temp folder for one. \$captureDir is "test-suite-gate-\$PID" of the
-# process that runs the gate, which is this child -- and a diff-based test would be answered by whichever
+# THE CHILD'S OWN PID, printed so the retention cases (issue #1636) can find the capture directory of
+# THIS run rather than diffing the temp folder for one. \$captureDir is "test-suite-gate-\$PID-<guid>"
+# (New-ScratchPath, #1659) of the process that runs the gate, which is this child -- the guid is why the
+# driver cannot compose the path, and the PID is why a search for it cannot be answered by whichever
 # other gate run happened to be alive, this suite's own outer gate included.
 Write-Host "GATE-PID: `$PID"
 `$r = Invoke-TestSuiteGate -TestsDir `$TestsDir -Context 'the fixture' -MaxParallel `$MaxParallel
@@ -275,8 +289,8 @@ Write-Host "GATE-RESULT: `$r"
 
     # A GREEN RUN KEEPS NOTHING -- the half of #1636 that must not regress into litter. The retention is
     # for evidence of a failure, so a passing gate has to leave the temp folder exactly as it found it.
-    Assert-True ($r.CaptureDir -ne '') 'the driver reported its own PID, so the capture path is known'
-    Assert-True (-not (Test-Path -LiteralPath $r.CaptureDir)) 'a green run deletes its capture directory -- no litter'
+    Assert-True ($r.CapturePid -ne '') 'the driver reported its own PID, so this run''s capture directory is findable'
+    Assert-True ($r.CaptureDir -eq '') 'a green run deletes its capture directory -- no litter'
     Assert-True ($r.Flat -notmatch 'output kept at') 'and says nothing about kept output'
 
     # --- 3. A failing suite: the exit code, the marked header, the named summary --------------------
@@ -297,6 +311,9 @@ Write-Host "GATE-RESULT: `$r"
     # through 'tail', a scrollback limit or a truncated CI log. So three things are asserted: the directory
     # is still there, it holds the FAILING suite's stdout with its marker in it, and it does NOT hold the
     # passing sibling's -- otherwise a red run over 79 suites leaves 78 files of green noise behind.
+    # A STAND-IN WHERE NOTHING WAS FOUND, so a regression here FAILS the asserts below instead of
+    # throwing on Test-Path/Join-Path with an empty string and taking the rest of this suite with it.
+    if (-not $r.CaptureDir) { $r.CaptureDir = Join-Path $Fixture 'no-capture-directory-was-kept' }
     $script:KeptCaptureDirs += $r.CaptureDir
     Assert-True (Test-Path -LiteralPath $r.CaptureDir) 'a red run KEEPS its capture directory'
     Assert-Says $r.Flat "output kept at $($r.CaptureDir)" 'and the verdict names the path, the line a session copies'

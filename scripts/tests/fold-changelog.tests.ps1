@@ -39,6 +39,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot         = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $FoldSrc          = Join-Path $RepoRoot 'scripts\release\fold-changelog-entry.ps1'
 $RepoConfigSrc    = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
@@ -46,6 +50,8 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 # rank from, and the ranked insert offset. A $PSScriptRoot-relative sibling of the fold script, so the
 # fixture has to carry it.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# And entry-scaffold-lib.ps1's own sibling, since #1650: it dot-sources this one for Get-DisplayRef.
+$RefPrintLibSrc   = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 # The plugin tree: Get-TouchedPlugins and the roots it reads, for the 'Plugins:' line. Also a
 # $PSScriptRoot-relative sibling of the fold script, so the fixture carries it for the same reason.
 $PluginTreeSrc    = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
@@ -159,6 +165,9 @@ function New-FoldFixture {
     Copy-Item -LiteralPath $FoldSrc          -Destination (Join-Path $dir 'scripts\release\fold-changelog-entry.ps1') -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')       -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')       -Force
+    # A sibling of a sibling since #1650: entry-scaffold-lib.ps1 dot-sources ref-print-lib.ps1 for
+    # Get-DisplayRef, so a fixture carrying the one and not the other loads a lib that throws.
+    Copy-Item -LiteralPath $RefPrintLibSrc   -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')            -Force
     Copy-Item -LiteralPath $PluginTreeSrc    -Destination (Join-Path $dir 'scripts\lib\plugin-tree-lib.ps1')          -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')                 -Force
     Copy-Item -LiteralPath $RepoConfigSrc    -Destination (Join-Path $dir 'scripts\repo-config.ps1')                  -Force
@@ -335,17 +344,17 @@ function Initialize-FoldGitRepo {
        becomes a terminating NativeCommandError before any exit code is read. EAP is dropped to Continue
        for the duration instead. #>
     param([Parameter(Mandatory = $true)][string]$Dir)
-    $prevEap = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        & git -C $Dir init --quiet                          | Out-Null
-        & git -C $Dir config user.name  'fold test'         | Out-Null
-        & git -C $Dir config user.email 'fold@test.invalid' | Out-Null
-        & git -C $Dir config core.autocrlf false            | Out-Null
-        & git -C $Dir config commit.gpgsign false           | Out-Null
-        & git -C $Dir add -A                                | Out-Null
-        & git -C $Dir commit -m 'baseline' --quiet          | Out-Null
-    } finally { $ErrorActionPreference = $prevEap }
+    # EACH CALL IS JUDGED rather than piped to Out-Null (issue #1635). The EAP is still lowered -- inside
+    # the helper now -- for exactly the reason the paragraph above gives; what changed is that the exit
+    # code no longer goes to Out-Null with the output. A baseline commit that fails leaves a repo with no
+    # HEAD to fold onto, and every -Commit case below then fails naming the script under test.
+    Invoke-FixtureGitIn $Dir init --quiet
+    Invoke-FixtureGitIn $Dir config user.name  'fold test'
+    Invoke-FixtureGitIn $Dir config user.email 'fold@test.invalid'
+    Invoke-FixtureGitIn $Dir config core.autocrlf false
+    Invoke-FixtureGitIn $Dir config commit.gpgsign false
+    Invoke-FixtureGitIn $Dir add -A
+    Invoke-FixtureGitIn $Dir commit -m 'baseline' --quiet
 }
 
 function Invoke-Git {
@@ -1445,15 +1454,11 @@ function Initialize-SecondDevice {
     param([Parameter(Mandatory = $true)][string]$Bare, [Parameter(Mandatory = $true)][string]$Dir)
     if (Test-Path -LiteralPath $Dir) { Remove-Item -Recurse -Force -LiteralPath $Dir }
     $script:fixtures += $Dir
-    $prevEap = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        & git clone --quiet $Bare $Dir                       | Out-Null
-        & git -C $Dir config user.name  'fold test 2'        | Out-Null
-        & git -C $Dir config user.email 'fold2@test.invalid' | Out-Null
-        & git -C $Dir config core.autocrlf false             | Out-Null
-        & git -C $Dir config commit.gpgsign false            | Out-Null
-    } finally { $ErrorActionPreference = $prevEap }
+    Invoke-FixtureGitJudged @('clone', '--quiet', $Bare, $Dir)
+    Invoke-FixtureGitIn $Dir config user.name  'fold test 2'
+    Invoke-FixtureGitIn $Dir config user.email 'fold2@test.invalid'
+    Invoke-FixtureGitIn $Dir config core.autocrlf false
+    Invoke-FixtureGitIn $Dir config commit.gpgsign false
     # LOUD RATHER THAN EMPTY. A clone that checks nothing out leaves a directory with no fold script in it,
     # and every fold invoked against it then dies in the PowerShell launcher -- an exit code that names no
     # cause, on assertions about behaviour that never ran. This is a fixture precondition, so it throws.
@@ -1600,5 +1605,12 @@ Assert-True ($rV.Output -notmatch 'Do NOT push this commit by hand')    'diverge
 foreach ($f in $script:fixtures) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
 Write-Host ""
 Write-Host "Result: $($script:pass) pass, $($script:fail) fail." -ForegroundColor $(if ($script:fail -gt 0) { 'Red' } else { 'Green' })
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'fold-changelog-entry.ps1'
 if ($script:fail -gt 0) { exit 1 }
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
+    exit 1
+}
 exit 0

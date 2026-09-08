@@ -103,7 +103,7 @@ had already drifted**: each refuses a merge over a missing significance score, w
 workflow deliberately places at the *release cut* instead.
 
 So the gate ships as a script, `check-branch-entry.ps1`, and this part places the six lines that call
-it. It adds no rule of its own -- it calls the same two functions `open-pr` calls -- and it reports the
+it. It adds no rule of its own -- it calls the same functions `open-pr` calls -- and it reports the
 significance rather than refusing on it.
 
 **Which branches owe nothing** is a seam: `Get-EntryGateExemptPrefixes` in your `scripts/repo-config.ps1`,

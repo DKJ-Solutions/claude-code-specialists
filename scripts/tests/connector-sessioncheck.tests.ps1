@@ -88,6 +88,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $Hook     = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\connector-sessioncheck.ps1'
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "connector-sessioncheck-test-$PID"
 $Utf8     = New-Object System.Text.UTF8Encoding $false
@@ -123,6 +127,11 @@ function Git-X {
     $ErrorActionPreference = 'Continue'
     try {
         $out = & git -C $Dir @GitArgs 2>&1
+        # THE EXIT CODE IS JUDGED (issue #1635). This helper returned the output and dropped the verdict,
+        # so a failed fixture command was indistinguishable from a working one. Every call in this file
+        # is expected to succeed -- there is no negative probe among them -- so judging the reads along
+        # with the mutations costs nothing and covers both.
+        Assert-FixtureGitOk -Code $LASTEXITCODE -GitArgs (@('-C', $Dir) + @($GitArgs)) -Output $out
         return (($out | ForEach-Object { "$_" }) -join "`n").Trim()
     } finally {
         $ErrorActionPreference = $prev
@@ -518,5 +527,12 @@ finally {
 
 Write-Host ''
 Write-Host "Result: $script:pass pass, $script:fail fail." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'connector-sessioncheck.ps1'
 if ($script:fail -gt 0) { exit 1 }
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
+    exit 1
+}
 exit 0

@@ -136,12 +136,17 @@ $falsePositives = @($scanned | Where-Object {
 Assert-True ($falsePositives.Count -eq 0) `
     "no content-scanned root doc reads as a stray entry (false positives: $($falsePositives -join ', '))"
 
-# 4. THE POSITIVE CASE: a genuine legacy root entry -- opens with its own title as an H2, names no
-#    branch -- must still be caught, or the inversion traded a false-positive bug for a false-negative
+# 4. THE POSITIVE CASE: a genuine legacy root entry -- opens with its own title AT AN ENTRY LEVEL, names
+#    no branch -- must still be caught, or the inversion traded a false-positive bug for a false-negative
 #    one. This is exactly the pre-split shape entry-scaffold-lib.ps1's own docstring describes.
+#    BOTH LEVELS ARE ASSERTED, because both were written: of the 344 root entries in this repo's history
+#    334 open at H3 and 10 at H2 (#1642), and the H3 majority carried no assert until September 8, 2026.
 $legacyEntryText = "## feat: something a branch once did`n`nSome body text.`n"
 Assert-True (Test-BranchChangelogIsFilled -Text $legacyEntryText) `
     'a legacy pre-split root entry (H2 title, no declared branch) still reads as stray'
+$legacyEntryTextH3 = "### feat: something a branch once did`n`nSome body text.`n"
+Assert-True (Test-BranchChangelogIsFilled -Text $legacyEntryTextH3) `
+    'and the H3 form -- 334 of the 344 real ones -- reads as stray too'
 $normalDocText = "# Just a Title`n`nSome body text that is not an entry.`n"
 Assert-True (-not (Test-BranchChangelogIsFilled -Text $normalDocText)) `
     'and an ordinary document (H1 title) does not'
@@ -188,8 +193,9 @@ Assert-True ('' -eq (Get-BranchFileDeclaredBranch -Text "## Overview`n`nSome bod
 Assert-True ('' -eq (Get-BranchFileDeclaredBranch -Text "# Notes`n`n## Maintenance`n`nBody.`n")) `
     'and un-narrowed it is the same answer, so the guard is in the pattern rather than in the switch'
 # THE '**Branch:**' FALLBACK IS NOT NARROWED, and it is the one shape that sits BELOW the title -- a
-# pre-split root entry, which is precisely the file this scan exists to catch. Its label is read from the
-# wording rather than typed, for the same reason the predicate reads it that way.
+# pre-split PER-BRANCH file ('branch/branch-changelog.md', titled '# Branch changelog'), and NOT a root
+# entry: no root entry ever carried this line, and the root scan is non-recursive anyway (#1642). Its
+# label is read from the wording rather than typed, for the same reason the predicate reads it that way.
 $branchLabel = (Get-BranchFileWording).BranchLabel
 $legacyLine = "# A title nobody folded`n`n**${branchLabel}:** ``feat/pre-split```n`nBody.`n"
 Assert-True (Test-BranchChangelogIsFilled -Text $legacyLine -OpeningHeadingOnly) `

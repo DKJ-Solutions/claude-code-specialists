@@ -114,7 +114,7 @@ foreach ($issue in $declared) {
     }
 
     Write-Warning "  #$issue is still $stateText after the merge -- closing it explicitly."
-    $commentFile = Join-Path ([System.IO.Path]::GetTempPath()) "verify-resolved-$issue-$PID.md"
+    $commentFile = New-ScratchPath -Label "verify-resolved-$issue" -Extension '.md'
     $commentText = "Resolved by PR #$Pr, merged into main.`n`nClosed by verify-resolved-issues.ps1: the PR body declared this issue with a closing keyword, but it was still open after the merge."
     [System.IO.File]::WriteAllText($commentFile, $commentText, (New-Object System.Text.UTF8Encoding $false))
     try {

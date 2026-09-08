@@ -1,6 +1,6 @@
 ---
 name: check-branch-entry
-description: Answer whether this branch carries a WRITTEN changelog entry, the way the CI gate answers it -- so you learn it before the push rather than from a red check. Use it on a branch whose work is finished, when a PR was opened outside open-pr, or when a red "Branch entry" check needs explaining. It adds no rule of its own: it calls the same two functions open-pr calls, and -- given a PR number -- the same DEPLOY-lock function ship-pr calls, so a section edited after the PR opened is refused here too. It reports the significance rather than refusing on it, because that refusal belongs to the release cut.
+description: Answer whether this branch carries a WRITTEN changelog entry, the way the CI gate answers it -- so you learn it before the push rather than from a red check. Use it on a branch whose work is finished, when a PR was opened outside open-pr, or when a red "Branch entry" check needs explaining. It adds no rule of its own: it calls the same functions open-pr calls, and -- given a PR number -- the same DEPLOY-lock function ship-pr calls, so a section edited after the PR opened is refused here too. It reports the significance rather than refusing on it, because that refusal belongs to the release cut.
 ---
 
 # check-branch-entry -- is the entry written?
@@ -28,9 +28,13 @@ So this is the same answer as a script, callable from CI. `adopt-dkj-policy`'s P
 calls it (`.github/workflows/branch-entry.yml`), and this skill is for asking the question yourself.
 
 **It adds no rule of its own**, and that is the design rather than modesty. It calls
-`Test-BranchChangelogIsFilled` and `Get-EntryScaffoldFindings` -- the two functions `open-pr` calls -- and,
-when you pass `-Pr`, `Test-DeployLock`, the one `ship-pr` calls. So there is exactly one definition of
-"written" in the system, and one of "diverged". Both existing consumers wrote this gate by
+`Test-BranchChangelogIsFilled`, `Test-DevelopmentEntryMissing`, `Get-EntryScaffoldFindings` and
+`Get-DevelopmentShapeFindings` -- the same functions `open-pr` calls -- and, when you pass `-Pr`,
+`Test-DeployLock`, the one `ship-pr` calls. So there is exactly one definition of "written" in the system,
+one of "in shape" and one of "diverged". **The claim is only exact from September 8, 2026**: the shape
+rules were this script's own until then, and a page promising no rule of its own stood over the one rule
+that lived nowhere else -- source repo
+[#1650](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650). Both existing consumers wrote this gate by
 hand in shell before it shipped, which is a second definition in every repo, free to drift from the fold
 that reads the first one; inbound
 [#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789) is the report, and both had

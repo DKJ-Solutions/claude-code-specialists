@@ -20,6 +20,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot         = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $ParkBranchSrc    = Join-Path $RepoRoot 'scripts\task\park-branch.ps1'
 # park-branch dot-sources this sibling shared lib for every git call (the #107 stderr guard), so the
 # fixture must carry it too.
@@ -94,19 +98,19 @@ function New-Fixture {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $dir init -q 2>$null | Out-Null
-        & git -C $dir config user.email 'tycho-tests@local.invalid' 2>$null | Out-Null
-        & git -C $dir config user.name 'Tycho Tests' 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir init -q
+        Invoke-FixtureGitIn $dir config user.email 'tycho-tests@local.invalid'
+        Invoke-FixtureGitIn $dir config user.name 'Tycho Tests'
         # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-        & git -C $dir config commit.gpgsign false 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir config commit.gpgsign false
         # symbolic-ref instead of checkout -b: works on a still-unborn HEAD regardless of git's own
         # init.defaultBranch setting, and gives no error if HEAD happens to already be named 'main'.
-        & git -C $dir symbolic-ref HEAD refs/heads/main 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir symbolic-ref HEAD refs/heads/main
         [System.IO.File]::WriteAllText((Join-Path $dir 'README.md'), "# fixture`n", (New-Object System.Text.UTF8Encoding $false))
-        & git -C $dir add -A 2>$null | Out-Null
-        & git -C $dir commit -q -m 'init' 2>$null | Out-Null
-        & git init --bare -q $bareRemote 2>$null | Out-Null
-        & git -C $dir remote add origin $bareRemote 2>$null | Out-Null
+        Invoke-FixtureGitIn $dir add -A
+        Invoke-FixtureGitIn $dir commit -q -m 'init'
+        Invoke-FixtureGitJudged @('init', '--bare', '-q', $bareRemote)
+        Invoke-FixtureGitIn $dir remote add origin $bareRemote
     } finally {
         $ErrorActionPreference = $prevEap
     }
@@ -162,7 +166,7 @@ function Checkout-NewBranch {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $Dir checkout -q -b $Name 2>$null | Out-Null
+        Invoke-FixtureGitIn $Dir checkout -q -b $Name
     } finally { $ErrorActionPreference = $prevEap }
 }
 
@@ -185,7 +189,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $fixtureB 'README.md'), "# fixture edited`n", (New-Object System.Text.UTF8Encoding $false))
     [System.IO.File]::WriteAllText((Join-Path $fixtureB 'staged.txt'), "staged`n", (New-Object System.Text.UTF8Encoding $false))
     $prevEap = $ErrorActionPreference
-    try { $ErrorActionPreference = 'Continue'; & git -C $fixtureB add -- 'staged.txt' 2>$null | Out-Null } finally { $ErrorActionPreference = $prevEap }
+    try { $ErrorActionPreference = 'Continue'; Invoke-FixtureGitIn $fixtureB add -- 'staged.txt' } finally { $ErrorActionPreference = $prevEap }
     [System.IO.File]::WriteAllText((Join-Path $fixtureB 'untracked.txt'), "untracked`n", (New-Object System.Text.UTF8Encoding $false))
 
     $rB = Invoke-ParkBranch -Dir $fixtureB
@@ -222,8 +226,8 @@ try {
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
-        & git -C $fixtureC add -A 2>$null | Out-Null
-        & git -C $fixtureC commit -q -m 'local work' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixtureC add -A
+        Invoke-FixtureGitIn $fixtureC commit -q -m 'local work'
     } finally { $ErrorActionPreference = $prevEap }
     $countBeforeC = Get-CommitCount -Dir $fixtureC
 
@@ -281,11 +285,11 @@ try {
     try {
         $ErrorActionPreference = 'Continue'
         [System.IO.File]::WriteAllText((Join-Path $fixtureE 'first.txt'), "one`n", (New-Object System.Text.UTF8Encoding $false))
-        & git -C $fixtureE add -A 2>$null | Out-Null
-        & git -C $fixtureE commit -q -m 'first' 2>$null | Out-Null
-        & git -C $fixtureE push -q -u origin 'fix/diverged' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixtureE add -A
+        Invoke-FixtureGitIn $fixtureE commit -q -m 'first'
+        Invoke-FixtureGitIn $fixtureE push -q -u origin 'fix/diverged'
         # Rewrite the tip that origin already has: local and origin now share no descendant line.
-        & git -C $fixtureE commit -q --amend -m 'first (rewritten)' 2>$null | Out-Null
+        Invoke-FixtureGitIn $fixtureE commit -q --amend -m 'first (rewritten)'
     } finally { $ErrorActionPreference = $prevEap }
     # Something outstanding, so park reaches the push through its normal commit path rather than the
     # nothing-to-commit shortcut.
@@ -319,8 +323,15 @@ try {
 }
 
 Write-Host ""
+# A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every
+# assert passed, because a clean sweep over a repo that was never built proves less than it appears to.
+$fixtureBroken = Write-FixtureGitSummary -Subject 'park-branch.ps1'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

@@ -3848,6 +3848,173 @@ Write-Coverage -Category 'section-number' -Checked $secChecked `
         "column-0 '# --- <n>. ' section header(s) across $secFiles script file(s), each held against the one before it for uniqueness and ascending order, plus the second spelling '# --- Check <n>: ' which is a finding wherever it appears -- $secFindings in all. Indented '# ---' markers are deliberately NOT subjects: the lint suites use them inside functions under their own numbering, and they are not file sections"
     })
 
+# --- 35. a test fixture's own git command is judged -------------------------------------------------
+# WHAT #1635 SWEPT, AND WHY A SWEEP IS NOT AN ANSWER (issue #1655). scripts/lib/fixture-git-lib.ps1 exists
+# because a suite in scripts/tests/ builds its fixture with git and the standing idiom for those calls was
+#
+#     & git -C $dir init -q 2>$null | Out-Null
+#
+# which discards the exit code along with the output. That is worse in a fixture than in production code:
+# a production script that ignores a failed git usually goes on to fail visibly, while a fixture that
+# ignores one produces a repo that is PLAUSIBLE -- it exists, it has a HEAD, it just does not hold what
+# the case assumed -- and every assert below it then measures the wrong thing, attributing the failure to
+# the script under test, which is the one place it certainly is not. Under the parallel gate a transient
+# index.lock or a scanner holding a file makes that ordinary rather than rare, so the shape to expect is a
+# suite red under the gate, green on its own, and silent about why (the #1622 sighting).
+#
+# THE IDIOM WAS THE HOUSE STYLE, WHICH IS WHY A CONVENTION CANNOT HOLD IT. It was copied from suite to
+# suite for as long as this directory has existed, in several spellings, and the next fixture builder will
+# be written by copying the nearest neighbour exactly as those were. #1635 converted the neighbours; it
+# left nothing that refuses the next copy.
+#
+# THE MEASUREMENT THIS CHECK WAS BUILT ON, taken before it was written, because the reason it did not ship
+# with #1635 was an honest one: this repo has scar tissue from checks born needing an exemption list (the
+# stale-path check declined at 124 findings all false, in the system-administration lens), and there is a
+# real false-positive class here -- a git call that is a QUESTION rather than a mutation. A
+# 'rev-parse --verify --quiet' on a ref EXPECTED to be absent answers with exit 1 and is judged by the very
+# next line; counting it would report every negative case as a defect. Three numbers settled it:
+#
+#   * over the tree as #1635 left it: 27 findings, in 4 files -- so the sweep did NOT finish. It missed
+#     find-specialist-mentions, shared-scripts, source-repo-guard and fresh-consumer.measure, whose
+#     spellings ('git ... 2>&1 | Out-Null' with no '&', and '& $git @(...)' over a scriptblock) its own
+#     search did not reach. All 27 were converted on this branch, so the check is born green with 0
+#     exemptions.
+#   * over the tree BEFORE the sweep (130dd259~1): 182 findings, in 18 files -- the house style, measured.
+#   * probe false positives, both trees: ZERO. Not one 'rev-parse'/'ls-remote'/'show-ref' call appears in
+#     either finding set, because the judged rule below clears them.
+#
+# WHAT MAKES THE TWO CLASSES SEPARABLE, and it is the cheap property rather than a list of git verbs: a
+# question's exit code is READ, and read immediately. So a call is cleared when $LASTEXITCODE (or
+# Assert-FixtureGitOk) appears in the same statement or the next one -- which is what
+# 'return ($LASTEXITCODE -eq 0)' after a rev-parse does, and what publish-to-business's deliberately
+# failing probe does with '$probeCode = $LASTEXITCODE'. No verb is special-cased and no file is exempt.
+#
+# THE SUBJECT IS A DISCARDED RESULT, NOT EVERY UNJUDGED CALL, and that boundary was measured too. Widening
+# it to a bare statement pipeline -- 'git log --oneline' with no Out-Null -- yields 20 findings on this
+# tree, and all 20 are value-returning questions (a helper's implicit return, 'return @(& git ...)'), i.e.
+# 20/20 false. Discarding the output AND ignoring the exit code is the combination that means nothing git
+# said was read; either one alone is ordinary.
+#
+# TWO INVOCATION SPELLINGS, because both exist here and a check written BECAUSE spellings vary must not
+# repeat the sweep's mistake: a command named 'git', and '& $git' where the variable is named exactly
+# 'git' -- source-repo-guard's scriptblock over Invoke-NativeCapture, which returns an ExitCode the call
+# site was throwing away. A wrapper under any other name is out of reach and is not claimed to be covered.
+#
+# NOT SKIPPABLE, and it shares the parse and the walk of the script set with checks 31 and 33 through
+# Get-PsScriptCommandAsts (issue #1358) rather than parsing scripts/tests/ a second time.
+$fixtureGitFiles    = @(Get-PsScriptFiles | Where-Object { $_.FullName -match '\\scripts\\tests\\' })
+$fixtureGitFindings = 0
+foreach ($fgFile in $fixtureGitFiles) {
+    $fgRel = $fgFile.FullName.Replace($RepoRoot, '.')
+    foreach ($fgCmd in (Get-PsScriptCommandAsts -Path $fgFile.FullName)) {
+        # -- is this a git call, in either spelling --------------------------------------------------
+        $fgName = $fgCmd.GetCommandName()
+        $isGit = ($fgName -eq 'git')
+        if (-not $isGit) {
+            $fgFirst = $fgCmd.CommandElements[0]
+            $isGit = ($fgFirst -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                      $fgFirst.VariablePath.UserPath -eq 'git')
+        }
+        if (-not $isGit) { continue }
+
+        $fgPipe = $fgCmd.Parent
+        if ($fgPipe -isnot [System.Management.Automation.Language.PipelineAst]) { continue }
+
+        # -- climb out of any wrapping, ONCE, for all three discard spellings ------------------------
+        # THE UNWRAP IS SHARED RATHER THAN PER-SPELLING, and that is the repair for the way this was
+        # first written: only the [void] arm walked out of '(...)', so '$null = (& git ...)' and
+        # '(& git ...) | Out-Null' were both silently skipped -- the exact call this check exists to
+        # catch, wearing one pair of brackets. Neither spelling exists in this tree today, which is why
+        # the measurement could not see it and a review of the code could; a check whose three arms
+        # disagree about wrapping teaches the shape that gets past it.
+        #
+        # Parentheses, a cast and the CommandExpression/Pipeline pair a wrapped call is re-wrapped in are
+        # all climbed, so every spelling below is judged on the SAME node: the outermost pipeline the git
+        # call ultimately sits in.
+        $fgOuter    = $fgPipe
+        $fgVoidCast = $false
+        while ($fgOuter.Parent) {
+            $fgUp = $fgOuter.Parent
+            if ($fgUp -is [System.Management.Automation.Language.ConvertExpressionAst]) {
+                if ($fgUp.Type.TypeName.Name -match '^(void|System\.Void)$') { $fgVoidCast = $true }
+                $fgOuter = $fgUp; continue
+            }
+            if ($fgUp -is [System.Management.Automation.Language.ParenExpressionAst] -or
+                $fgUp -is [System.Management.Automation.Language.CommandExpressionAst] -or
+                $fgUp -is [System.Management.Automation.Language.PipelineAst]) { $fgOuter = $fgUp; continue }
+            break
+        }
+
+        # -- is the result discarded -----------------------------------------------------------------
+        $fgDiscarded = $fgVoidCast
+        if ($fgOuter -is [System.Management.Automation.Language.PipelineAst]) {
+            $fgLast = $fgOuter.PipelineElements[$fgOuter.PipelineElements.Count - 1]
+            if ($fgLast -is [System.Management.Automation.Language.CommandAst] -and
+                $fgLast.GetCommandName() -eq 'Out-Null') { $fgDiscarded = $true }
+        }
+        $fgAssign = $fgOuter.Parent
+        if ($fgAssign -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+            $fgAssign.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+            $fgAssign.Left.VariablePath.UserPath -eq 'null') { $fgDiscarded = $true }
+        if (-not $fgDiscarded) { continue }
+
+        # -- is the exit code judged, here or on the next statement ----------------------------------
+        # The statement this pipeline IS, which is the pipeline itself wherever it sits directly in a
+        # block, and its enclosing statement (an assignment, say) otherwise.
+        $fgStmt = $fgOuter
+        while ($fgStmt.Parent -and
+               $fgStmt.Parent -isnot [System.Management.Automation.Language.StatementBlockAst] -and
+               $fgStmt.Parent -isnot [System.Management.Automation.Language.NamedBlockAst]) {
+            $fgStmt = $fgStmt.Parent
+        }
+        $fgBlock = $fgStmt.Parent
+        $fgJudged = $false
+        if ($fgBlock) {
+            $fgStmts = @($fgBlock.Statements)
+            $fgIdx = 0
+            while ($fgIdx -lt $fgStmts.Count -and $fgStmts[$fgIdx] -ne $fgStmt) { $fgIdx++ }
+            # PARENTHESISED DELIBERATELY: '@($a, $a + 1)' is '@($a, $a) + 1' in PowerShell -- the comma
+            # binds tighter than the addition -- which silently checks the wrong statements and reports
+            # a judged call as a finding. Measured while building this check.
+            foreach ($fgJ in @($fgIdx, ($fgIdx + 1))) {
+                if ($fgJ -ge $fgStmts.Count) { continue }
+                # THROUGH THE PARSER, NOT BY LINE MATCHING -- the same rule check 31 states for the same
+                # reason, and it applies with extra force to a clearing condition: a text match on
+                # '$LASTEXITCODE' is satisfied by the name appearing in a single-quoted string or a
+                # trailing comment, which would clear a GENUINE miss and leave nothing to notice. A
+                # VariableExpressionAst is a read (an interpolated "$LASTEXITCODE" is one too, correctly);
+                # a comment is not in the AST at all.
+                $fgJudged = $fgJudged -or @($fgStmts[$fgJ].FindAll({
+                    param($n)
+                    ($n -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                     $n.VariablePath.UserPath -eq 'LASTEXITCODE') -or
+                    ($n -is [System.Management.Automation.Language.CommandAst] -and
+                     $n.GetCommandName() -eq 'Assert-FixtureGitOk')
+                }, $true)).Count -gt 0
+            }
+        }
+        if ($fgJudged) { continue }
+
+        $fgSample = ($fgCmd.Extent.Text -replace '\s+', ' ').Trim()
+        if ($fgSample.Length -gt 120) { $fgSample = $fgSample.Substring(0, 120) + '...' }
+        Add-Error ("[fixture-git] ${fgRel}:$($fgCmd.Extent.StartLineNumber): a fixture git command whose" +
+            " output is discarded and whose exit code is never read -- so a git that FAILED is" +
+            " indistinguishable from one that worked, and every assert below it may be reading a repo that" +
+            " was never built. Route it through Invoke-FixtureGitIn / Invoke-FixtureGitJudged" +
+            " (scripts/lib/fixture-git-lib.ps1, issue #1635), which lowers `$ErrorActionPreference for the" +
+            " call, judges the exit code and counts a failure for Write-FixtureGitSummary. If this call is" +
+            " a QUESTION whose non-zero exit is the answer, read `$LASTEXITCODE on the next statement and" +
+            " it stops being a finding. Found: `"$fgSample`"")
+        $fixtureGitFindings++
+    }
+}
+Write-Coverage -Category 'fixture-git' -Checked $fixtureGitFiles.Count `
+    -Note $(if ($fixtureGitFiles.Count -eq 0) {
+        'no .ps1 found under scripts/tests/ -- an unjudged fixture git command could not have been seen'
+    } else {
+        "script file(s) under scripts/tests/ walked for a git command (named 'git', or invoked through a variable named exactly `$git) whose result is DISCARDED (| Out-Null, `$null =, or a [void] cast -- each judged after ONE shared unwrap of any (...) or cast, so a pair of brackets is not an escape hatch) and whose exit code is judged, through the AST rather than the line text, on neither the same statement nor the next -- $fixtureGitFindings finding(s). The immediate-read rule is what separates a fixture MUTATION from a git QUESTION such as 'rev-parse --verify --quiet' on a ref expected to be absent: zero probe false positives over both the current tree and the pre-#1635 tree (182 findings there, in 18 files). Born green: 27 findings at introduction, in the 4 files that sweep missed, all converted rather than exempted, 0 exemptions. A bare statement pipeline is deliberately NOT a subject -- widening to it yields 20 findings here and 20/20 are value-returning questions"
+    })
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green
