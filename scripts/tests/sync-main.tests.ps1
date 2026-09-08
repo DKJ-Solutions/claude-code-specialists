@@ -669,7 +669,10 @@ try {
     Assert-True ($evil.Out -match [regex]::Escape('gh pr list --head <branch> --state open')) 'guard/unsafe: the printed command carries the placeholder, not the name'
     Assert-True ($evil.Out -notmatch [regex]::Escape('gh pr list --head sync/live-2026-08-17;touch')) 'guard/unsafe: and never the raw name after a command word'
     Assert-True ($evil.Out -match 'not safe to paste into the line above') 'guard/unsafe: the note explains why the line reads a placeholder'
-    Assert-True ($evil.Out -match [regex]::Escape('The branch is: sync/live-2026-08-17;touch')) 'guard/unsafe: and names the real branch as PROSE, so the reader can still act on it'
+    # 'The branch name is:' -- the note's own noun, which #1637 made a function of -Kind. Asserted with
+    # the noun rather than around it, because that word is the half telling the reader WHAT kind of thing
+    # to go looking for, and a path-shaped note here would be the wrong answer rather than a wording nit.
+    Assert-True ($evil.Out -match [regex]::Escape('The branch name is: sync/live-2026-08-17;touch')) 'guard/unsafe: and names the real branch as PROSE, so the reader can still act on it'
 
     # A MERGED BRANCH IS NOT A PREDECESSOR. Its ref lingers here because the fixture has no
     # delete_branch_on_merge, which is exactly the consumer this script must not refuse forever.
