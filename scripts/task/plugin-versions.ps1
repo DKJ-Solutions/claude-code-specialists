@@ -420,13 +420,42 @@ if ($Brief) {
     $behindOnly = @($rows | Where-Object { $_.Code -eq 'behind' })
     $staleClone = @($rows | Where-Object { $_.Code -eq 'clone-behind' })
 
+    # EVERY FIELD ON A BRIEF LINE IS SANITIZED, and this mode is where that stops being optional
+    # (Sebastian, on #1591). The default view above prints to a terminal somebody is reading; these
+    # lines are forwarded verbatim into a session's CONTEXT by connector-sessioncheck, on the common
+    # consumer path, at every start and every compaction. Two of the three fields are not the tool's
+    # own words:
+    #
+    #   * Id is an 'enabledPlugins' KEY NAME -- an arbitrary JSON string from a settings file, which
+    #     check-report-lib's own docstring names as the value class Format-SafeToken was built for
+    #     (inbound #309);
+    #   * Verdict and Action embed the version strings read from a per-plugin plugin.json inside a
+    #     marketplace clone, which is a git clone of a THIRD-PARTY repository.
+    #
+    # A newline in any of them forges a line. That is not only a prompt-injection surface: the hook
+    # selects the tally by matching '[SUMMARY]', so a forged 'up to date' summary smuggled inside a
+    # 'behind' row's own text could SUPPRESS the real warning that a plugin needs updating. Sanitizing
+    # at the point of emission closes both, and the marker vocabulary stays the tool's alone.
+    #
+    # TWO DIFFERENT SIBLINGS, because the Id and the verdict are not the same kind of value and the
+    # id charset would wreck a sentence. Format-SuspectToken for the Id: it IS an id, so that charset
+    # is exactly right, and where sanitizing altered it the reader is TOLD -- otherwise a stripped id
+    # reads as a valid one, and the id is the half somebody would act on. Format-SafeProseToken for
+    # the verdict and the action, which are sentences: it strips control characters, collapses the
+    # whitespace (which is also what neutralizes U+2028/U+2029, per that lib's own note), and
+    # SUBSTITUTES square brackets rather than deleting them -- which is the pass that closes the
+    # suppression chain, because a forged '[SUMMARY] ... up to date' smuggled into a version string
+    # becomes '(SUMMARY) ... up to date' and no hook counts it as a marker.
     foreach ($row in $rows) {
+        $safeId = Format-SuspectToken -Value ([string]$row.Id)
+        $safeVerdict = Format-SafeProseToken -Value ([string]$row.Verdict) -MaxLength 400
+        $safeAction = Format-SafeProseToken -Value ([string]$row.Action) -MaxLength 200
         if ($row.Code -eq 'behind') {
-            $line = "[ERROR] $($row.Id): $($row.Verdict)"
-            if ($row.Action) { $line += " -- $($row.Action)" }
+            $line = "[ERROR] ${safeId}: $safeVerdict"
+            if ($safeAction) { $line += " -- $safeAction" }
             Write-Host $line
         } elseif (@('clone-behind', 'indeterminate') -contains $row.Code) {
-            Write-Host "[INFO] $($row.Id): $($row.Verdict)"
+            Write-Host "[INFO] ${safeId}: $safeVerdict"
         }
         # 'match' / 'ver-match': nothing to say, and the summary below says how many.
     }

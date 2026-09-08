@@ -504,7 +504,7 @@ try {
     New-FixtureConsumer -ExtensionIds @('06-16')
     $r = Invoke-HookIsolated -RepoDir $Fixture -HomeDir $HookHome -ScriptArgs @('-WorkshopPathOverride', (Join-Path $Fixture 'does-not-exist'))
     Assert-Equal 0 $r.Code 'hook without a workshop: exit code 0'
-    Assert-Match 'register checks \(consumer registration, lens inventory, agent-def drift\) did not run' $r.Out 'hook without a workshop: the #533 lesson -- says the register checks did not run'
+    Assert-Match 'register checks \(consumer registration, lens inventory, agent-def drift\) did not run' $r.Out 'hook without a workshop: the [UNREGISTERED] lesson of 2026-07-28 -- says the register checks did not run'
     Assert-Match 'Version check: 1 plugin\(s\) enabled here: 0 behind, 1 undetermined, 0 up to date\.' $r.Out 'hook without a workshop: falls back to the plugin-versions -Brief summary (no clone at all here -> undetermined, not an error)'
 
     # 9b. With the real workshop: integration smoke. Which branch (in-sync or signals) fires depends
