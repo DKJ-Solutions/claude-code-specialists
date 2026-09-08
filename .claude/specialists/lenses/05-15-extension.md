@@ -771,8 +771,24 @@ infrastructure.
     within seconds, so the slower runner read a tree one commit behind origin and the fold's trunk-gap
     guard (#1405) refused — a false red on every `ship-pr` merge. `ref: main` (here) / `ref: <trunk>`
     (the template) makes the job read "does the trunk carry a leftover NOW", which is the question it
-    exists for, and makes the trunk-gap guard unreachable here rather than load-bearing. `verify-resolved`
-    keeps the event SHA — it resolves *this push's* PRs and has no trunk-gap guard.
+    exists for. `verify-resolved` keeps the event SHA — it resolves *this push's* PRs and has no
+    trunk-gap guard.
+  - **#1586 — and `ref: main` did NOT make the trunk-gap guard unreachable, which is what #1543's repair
+    claimed and what both workflow headers said until this was measured.** The ref is read **once**, at
+    the checkout; the guard measures the same trunk again from inside the fold, about eleven seconds
+    later. So a second merge landing in that gap still trips it — run `34206684361`, 2026-09-08: the
+    checkout took `e8ca4cb7` (`merge: … (#1576)`) at 08:50:31, so the leftover was genuinely on the trunk
+    and correctly found, and by 08:50:42 the shipping session had pushed *that branch's own fold*, leaving
+    this checkout 1 behind. The guard was right, the trunk ended correct, and the job went red for a state
+    that no longer existed. **The repair is the stand-down, not a fetch:** the fold's trunk-freshness
+    refusal now exits **2** — the only thing in that script that does — and the job exits 0 on that code
+    alone, because the push that moved the trunk queues its own run of the same job behind this one
+    (that is #1544's group, above, doing load-bearing work) and the guard fires in a **pre-pass**, so
+    nothing was written. **`git fetch` + `--ff-only` before the fold was the candidate and was declined**:
+    it narrows the window from ~11s to ~1s without closing it, leaving the job red *rarely*, which is
+    worse than predictably red and is still the fourth self-healing meaning #1539's triage exists to keep
+    out. The list below therefore stays **three**: a stand-down is this job declining to answer a question
+    a successor run is already queued to answer, not a way of failing.
   - **#1544 — the concurrency group is constant per trunk.** Keyed on `github.sha` it was its own group
     every run and serialised nothing, so two trunk pushes close together raced — and this job *pushes*.
     `github.ref` keeps `cancel-in-progress: false` (no fold dropped) and adds queueing (no race). Same

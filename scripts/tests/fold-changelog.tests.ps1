@@ -1478,7 +1478,12 @@ Invoke-Git -Dir $devS -GitArgs @('commit', '--quiet', '-m', 'other work') | Out-
 Invoke-Git -Dir $devS -GitArgs @('push', '--quiet')                       | Out-Null
 
 $rS = Invoke-Fold -Dir $dirS -Branch 'feat/stale-thing-v1' -ExtraArgs @('-Push')
-Assert-Equal 1 $rS.ExitCode                                             'stale trunk: the run ends non-zero'
+# EXIT CODE 2, AND THE NUMBER IS THE POINT (inbound #1586). fold-on-merge.yml translates exactly this
+# code into a stood-down green, because a job re-triggered by the very push that made the checkout stale
+# has a successor run already queued to answer the same question. Pinned here rather than left as
+# "non-zero" -- which is what this assert said while pinning 1 -- because the workflow and the
+# adopt-merge-queue template now BOTH read it, across a release boundary each.
+Assert-Equal 2 $rS.ExitCode                                             'stale trunk: the run ends on 2 -- the code fold-on-merge.yml stands down on (#1586)'
 Assert-True ($rS.Output -match 'Refused')                               'stale trunk: and says it refused rather than half-folding'
 Assert-True ($rS.Output -match '1 behind origin/main')                  'stale trunk: naming HOW FAR behind, as a number'
 Assert-True (Test-Path (Join-Path $dirS 'feat-stale-thing-v1.md'))      'stale trunk: the entry file is left exactly where it was'
@@ -1494,6 +1499,22 @@ $rSF = Invoke-Fold -Dir $dirS -Branch 'feat/stale-thing-v1' -ExtraArgs @('-SkipT
 Assert-Equal 0 $rSF.ExitCode                                            'stale trunk: -SkipTrunkCheck folds anyway'
 Assert-True ((Get-Changelog -Dir $dirS) -match 'Folded on a stale trunk') `
     'stale trunk: -SkipTrunkCheck writes the entry'
+
+# AND NO SECOND PATH MAY REACH THAT CODE (inbound #1586). fold-on-merge.yml reads exit 2 as "nothing was
+# written, a successor run will fold it" and exits GREEN on it -- so a refusal that CAN follow a partial
+# fold, or one no successor run answers, must never return it. Every other refusal in this suite is
+# pinned at 1 above (the pre-pass, the flat window, the duplicate gate); this asserts the property at its
+# source, which is the only place that stays true when a new refusal is added tomorrow.
+# $foldSrcText<x>, never $foldSrc: $FoldSrc is the PATH this suite copies into every fixture, and
+# PowerShell variable names are case-insensitive -- so a read into $foldSrc replaces that path with the
+# script's own text and every later fixture dies in Copy-Item on a filename made of source code. The two
+# asserts above at 417 and 1081 already use the $foldSrcText<x> shape for exactly this reason.
+$foldSrcTextExit = [System.IO.File]::ReadAllText($FoldSrc, [System.Text.Encoding]::UTF8)
+$exit2Count = ([regex]::Matches($foldSrcTextExit, '(?m)^\s*exit\s+2\s*$')).Count
+Assert-Equal 1 $exit2Count 'stale trunk: exit 2 is returned from exactly ONE place in the fold script'
+Assert-True ($foldSrcTextExit -match '(?ms)Refused: this checkout is.*?exit 2') `
+    'stale trunk: and that one place is the trunk-freshness refusal itself, not some later failure'
+Assert-True ($foldSrcTextExit -like '*#1586*') 'stale trunk: the refusal cites the issue that explains why its code is its own'
 
 # A REPO WITH NO ORIGIN CANNOT BE BEHIND ONE, and this is the assert that keeps the gate from refusing
 # every other fold in this suite: Get-TrunkGap reports "could not measure", which a caller must never
