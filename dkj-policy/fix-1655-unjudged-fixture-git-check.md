@@ -33,21 +33,82 @@
 
 ### PLAN
 
+#### The measurement had to come before the check, and #1655 said so
+
+The issue deliberately did not add the check, on the ground that the honest version of it needs a
+measurement nobody had taken: this tree has a real false-positive class -- a git call that is a
+QUESTION rather than a mutation -- and a rule that cannot tell the two apart is not worth having.
+So the first step was a throwaway matcher run over two trees, and the check was only written once
+the numbers said the classes separate cheaply.
+
+- [x] Write a candidate matcher and run it over the tree as it stands -- expected 0 per the issue,
+      measured **27 findings in 4 files**, so the #1635 sweep did not finish
+- [x] Run the same matcher over the pre-sweep tree (`130dd259~1`) -- **182 findings in 18 files**
+- [x] Classify every finding in both sets by hand: **0 probe false positives** in either
+- [x] Measure the boundary the check does NOT take -- widening to a bare statement pipeline yields
+      20 findings here, **20/20 value-returning questions**, which settles the "discarded" rule
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Convert the 27 remaining call sites onto `scripts/lib/fixture-git-lib.ps1`, so the check is
+      born green with no exemption list: `find-specialist-mentions.tests.ps1` (6),
+      `shared-scripts.tests.ps1` (11), `source-repo-guard.tests.ps1` (9),
+      `fresh-consumer.measure.ps1` (1)
+- [x] Add check 35 (`[fixture-git]`) to `scripts/lint/check-plugin-integrity.ps1`, sharing the parse
+      and the walk with checks 31 and 33 through `Get-PsScriptCommandAsts`
+- [x] Close the loop in `fixture-git-lib.ps1`'s own docstring, which said nothing enforced it
+- [x] Record the measurement in the system-administration lens, beside the other checks' own
+- [x] Record the PowerShell comma-precedence trap in the portable manual -- it bit inside this work,
+      and it is the source's layer rather than the lens's
 
 ### TEST
 
+- [x] 13 new asserts in `check-plugin-integrity-docs.tests.ps1` (scenarios 76-84), pinning the
+      boundary and not only the finding: the question, the converted form, the second invocation
+      spelling, both other discard forms, the bare pipeline, and the scope
+- [x] Probe the check's own stated boundary rather than trusting it -- which found the `[void]` gap
+      the measurement could not, this tree holding only two of the three discard spellings
+- [x] The four converted suites green on their own (31 / 608 / 46 / 15 asserts)
+- [x] The full lint gate green -- `[fixture-git] checked 85 -- 0 finding(s)`
+- [x] The full test gate green -- all 81 suites in 211s
+
 ### DEPLOY: fix/1655-unjudged-fixture-git-check
 
-**Score:**
+A test suite can no longer reintroduce the fixture-git idiom that #1635 swept out. Check 35
+(`[fixture-git]`) walks `scripts/tests/` for a git command whose output is discarded and whose exit
+code is judged on neither the same statement nor the next -- the idiom that made a git which FAILED
+indistinguishable from one that worked, so every assert below it read a repo that was never built and
+blamed the script under test.
+
+The sweep it enforces turned out to be unfinished, which is the finding rather than a side note. The
+matcher read **27 unjudged calls still standing in four files** -- `find-specialist-mentions`,
+`shared-scripts`, `source-repo-guard` and `fresh-consumer.measure`, whose spellings (`git ... 2>&1 |
+Out-Null` with no `&`, and `& $git @(...)` over a scriptblock) the earlier search never reached. All
+27 are converted here, so the check is born green with **zero exemptions**. Over the pre-sweep tree it
+reads 182 findings in 18 files: the house style, measured.
+
+What makes the check possible at all is that a git QUESTION reads its exit code **immediately** --
+`rev-parse --verify --quiet` on a ref expected to be absent answers with exit 1 and is judged on the
+next line. So a call is cleared when `$LASTEXITCODE` appears in the same statement or the next one, no
+verb is special-cased, and no file is exempt: **zero probe false positives over both trees**. The
+subject is deliberately a *discarded* result rather than every unjudged call -- widening to a bare
+statement pipeline yields 20 findings here and all 20 are value-returning questions. All three ways to
+discard are covered (`| Out-Null`, `$null =`, a `[void]` cast); the third came from probing the check's
+stated boundary, since this tree holds only the first two and the measurement could not see it.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+Nothing here reaches a consumer's own repo: the check reads `scripts/tests/`, which is workshop-only
+and mirrored into no plugin. One portable page does change -- the system-administration manual gains
+a tenth PowerShell trap (`@($i, $i + 1)` is `@($i, $i) + 1`, the comma binding tighter than the
+addition), which travels to every consumer at the next release and is worth having: it produced nine
+false findings inside the very pass that was deciding whether this check's false-positive rate was
+acceptable.
+
+**Score:** 1
 
 #### Pull Request
 
 A lint check for the unjudged fixture-git idiom, and the four suites the #1635 sweep missed
-
