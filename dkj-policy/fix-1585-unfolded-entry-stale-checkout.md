@@ -33,19 +33,62 @@
 
 ### PLAN
 
+#### What #1585 reported, and what was verified before building
+
+`check-unfolded-entry.ps1` reads the working copy only, so a checkout that is merely behind
+`origin/main` reports a fold that has already landed as one that never ran -- and points at
+`fold-changelog-entry.ps1`, which refuses on a stale checkout anyway. Verified against the tree before
+starting: the script makes no git call at all, and neither it nor `Get-UnfoldedTrunkEntry` has any
+notion of a remote-tracking ref. The symptom stands as filed.
+
+The issue offered two shapes. The one taken is a hybrid of both, and narrower than either: the gap is
+measured with the existing shared `Get-TrunkGap -NoFetch`, and only when it is non-zero is each leftover
+asked whether it still exists on `origin/<trunk>`. Asking the presence question alone would misread an
+UNCOMMITTED document as an already-folded one; measuring the gap alone would not know which of several
+leftovers the pull actually clears.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lint/check-unfolded-entry.ps1`: measure the trunk gap (`Get-TrunkGap -NoFetch`) and, only
+      at a non-zero gap, split the leftovers into already-folded-on-origin and genuinely stranded
+- [x] The all-folded case reports `[WARN]` and exits 0 with `git pull --ff-only` as the remedy; the
+      stranded case keeps its `[ERROR]`, its exit 1 and its exact headline, and now also names the gap
+      because the fold it prints would refuse on it
+- [x] `native-capture-lib.ps1` dot-sourced guarded, so a plugin cache predating this degrades to the
+      pre-#1585 report instead of throwing at a session start
+- [x] `unfolded-entry-sessioncheck.ps1`: a `[WARN]` branch with its own headline -- the error sentence
+      "its fold never ran" is the mis-statement #1585 reported, so it must not carry this case
+- [x] `.claude/specialists/lenses/05-15-extension.md`: the distinction recorded on the bullet that owns
+      the check
+- [x] `scripts/sync/build-shared-scripts.ps1` run, so the plugin mirror matches
 
 ### TEST
 
+- [x] `scripts/tests/unfolded-entry-gate.tests.ps1`: seven new asserts on real git fixtures -- no origin
+      at all, an origin in sync, the fold landed upstream, a mixed tree, and the hook's `[WARN]` headline
+- [x] All 20 asserts pass; the 13 pre-existing ones are untouched
+- [x] The two CI consumers checked by reading rather than by running: `fold-on-merge.yml` matches on
+      `[ERROR] the trunk carries`, which the stranded case still prints verbatim, and both workflows run
+      at a gap of 0, where the new arm is unreachable
+
 ### DEPLOY: fix/1585-unfolded-entry-stale-checkout
 
-**Score:**
+The skipped-fold check no longer reports a landed fold as a missing one. A checkout that is merely
+behind `origin/<trunk>` now gets a `[WARN]` naming the gap and `git pull --ff-only`, instead of an
+`[ERROR]` pointing at a fold that would refuse on that same stale trunk; where a fold really is owed the
+report is unchanged, and now also says to pull first. The extra question costs no network and is asked
+only at a non-zero gap, so CI and an offline session both behave exactly as before.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer's session start stops raising a red `[ERROR]` for the ordinary state of being a few commits
+behind, and the one line it prints instead is the command that fixes it. That noise was
+indistinguishable from the real skipped-fold state the check exists to catch, which is what made it
+worth repairing rather than tolerating.
+
+**Score:** 3
 
 #### Pull Request
 
