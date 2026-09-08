@@ -60,6 +60,54 @@ Filed alongside, out of scope for this branch: #1587 (`dkj-policy/README.md:102-
 non-existent connector-manifest version field) and #1591 (the `connector-sessioncheck` "check
 skipped" fallback -- the session-start half, deferred here to keep the branch focused).
 
+#### The owed review, re-run and closed -- 2026-09-08
+
+Picked up from the handoff above while working #1591, which cannot be built until this branch lands.
+`main` was merged in first (the trunk had moved four commits). All three reviewers ran on
+`origin/main...HEAD`.
+
+**Sebastian -- no blocking findings, and the named question is answered: NO leak.** Only the running
+user's own home-derived paths reach stdout (the clone directory and the `installed_plugins.json`
+path); no other checkout's path, no other repo's name, no token. Nothing machine-specific was
+committed either -- the SKILL.md example block already carries a `<path>` placeholder and the
+fixtures use scratch temp trees with synthetic shas. Injection is safe by construction:
+`Invoke-NativeCapture` calls git through PowerShell's call operator with an array-splatted argument
+list, so no shell parses `$instSha`. Three advisories he would not block on, recorded here rather
+than repaired: check 22 (`skill-command`) does not reach fenced example OUTPUT blocks, so that page
+is safe by authorship and not by gate; an `$instSha` beginning with `-` could be read by git as an
+option rather than a revision, and no scenario exercises it; and `$id`/`$mp`/`$name` are
+interpolated into the printed remediation commands unquoted, where `plugin.json`'s `name` is only
+gated non-empty.
+
+**Victor -- one confirmed defect, repaired here.** The catch-all verdict could print a bare
+`cannot determine -- ` with the reason missing: the branch fires as soon as ONE field is absent on
+each side, while `$missing` was built per side and required BOTH. Reachable in an ordinary state --
+an install record with a version but no `gitCommitSha` (every record written before that field
+existed) against a clone with a HEAD but no readable `plugin.json` version. `$missing` is now
+derived per field, so it cannot be empty where the branch is reachable. His two lesser findings are
+also in: `Compare-Version`'s docstring claimed -1/0/1 where the ordinal fallback returns a raw
+magnitude (sign-only is now stated, and that every caller must test the sign), and the
+`-not $cloneHasPlugin` branch was the one "the clone cannot answer" case naming no repair command.
+
+**Edith -- four findings in this branch's own text, all four in.** The quoted string
+*"no verified workshop checkout found -- check skipped"* was attributed to `check-connectors.ps1`
+check 4 and is printed by the HOOK, `connector-sessioncheck.ps1`, on an early-exit path that never
+reaches the check at all -- so a reader grepping the check for it finds nothing. Both the docstring
+and the skill page now name the hook and say why the distinction matters. Beyond that: `AHEAD` and
+`ahead` split across nine emitted verdicts by which branch produced them, unified on the uppercase
+key word the suite already pinned; `sibling dev checkout` and `sibling source checkout` used for one
+thing, unified on the latter; and `same major version string` reads as a claim about semver's major
+component where the branch actually fires on the whole string being unchanged, so it is now `same
+version string`.
+
+**Tycho -- the regression is pinned.** Scenarios 12 and 13 in
+`scripts/tests/plugin-versions.tests.ps1` cover both asymmetric states, each asserting that the
+verdict is never bare AND that it names the specific absent fields -- so a future per-side
+regression fails on the vague message rather than passing. 59 asserts -> 69, all green.
+
+Filed by this pickup, out of scope here: #1597 (`dkj-policy/README.md` still names two of the six
+plugins this repo enables, pre-existing on `main` and untouched by this branch).
+
 ### CREATE
 
 - [x] `scripts/task/plugin-versions.ps1` -- the canonical script. Dual-context repo root, source-repo

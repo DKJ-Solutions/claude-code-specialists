@@ -37,10 +37,13 @@ brought back.
 ## The question it answers, and why nothing else does
 
 "Is the plugin version this checkout loads the same as the one the marketplace clone holds, and if not,
-which command closes the gap?" The connector session check (`check-connectors.ps1` check 4) is the
-nearest existing signal, and it goes **inert** on a plain consumer with no sibling dev checkout beside
-it -- it prints *"no verified workshop checkout found -- check skipped"* and gives no version answer at
-all. This skill needs no dev checkout: it reads what every consumer machine has.
+which command closes the gap?" The connector session check is the nearest existing signal, and it goes
+**inert** on a plain consumer with no sibling source checkout beside it. Two files, and it is worth
+keeping them apart: the hook (`connector-sessioncheck.ps1`) prints
+*"no verified workshop checkout found -- check skipped"* on its own early-exit path, so
+`check-connectors.ps1` -- and with it the check 4 that compares versions -- is never invoked. That
+string is the hook's own; grepping the check for it finds nothing. Either way you get no version
+answer. This skill needs no source checkout: it reads what every consumer machine has.
 
 Two facts make the reading trustworthy:
 
@@ -72,7 +75,7 @@ dkj-policy@claude-code-specialists
 dkj-team-alpha@claude-code-specialists
   installed here     4.32.0  3e13000b3fbe  project
   marketplace clone  4.32.0  HEAD 437366a44132
-  verdict            the clone is AHEAD of your install (same major version string 4.32.0, newer commit)
+  verdict            the clone is AHEAD of your install (same version string 4.32.0, newer commit)
                      -> claude plugin update dkj-team-alpha@claude-code-specialists --scope project
 ```
 
@@ -81,7 +84,7 @@ dkj-team-alpha@claude-code-specialists
 | what it reads | verdict |
 |---|---|
 | install `gitCommitSha` **==** clone HEAD | **up to date.** The clone itself may still lag origin -- `claude plugin marketplace update <marketplace>` refreshes it if you expect newer. |
-| install `gitCommitSha` is an **ancestor** of clone HEAD | **the clone is ahead of your install** -> `claude plugin update <id> --scope project`. Fires even when the two `version` strings are equal -- the sha is the finer truth. |
+| install `gitCommitSha` is an **ancestor** of clone HEAD | **the clone is AHEAD of your install** -> `claude plugin update <id> --scope project`. Fires even when the two `version` strings are equal -- the sha is the finer truth. |
 | install `gitCommitSha` exists but is **not** an ancestor of clone HEAD, or is unknown to the clone | **your install is ahead, or the clone is stale** -> `claude plugin marketplace update <marketplace>`. If the install `version` is also behind, it says so and names `claude plugin update` first. |
 | **no `gitCommitSha`** on one side (an older record shape, or a non-git marketplace fetch) | the two `version` strings are compared instead, and the line says a sha was not available. |
 | a whole side is **missing** -- no marketplace clone, no install record for this checkout, conflicting records | **cannot determine**, and the line says which side and the command that would fix it. |

@@ -7,9 +7,12 @@
 .DESCRIPTION
     ANSWERS A QUESTION NO EXISTING CHECK DOES: "is the plugin version this checkout loads the same as
     the one the marketplace clone holds, and if not, which command closes the gap?" The connector
-    session check (check-connectors.ps1 check 4) goes inert on a plain consumer with no sibling source
-    checkout -- it prints "no verified workshop checkout found -- check skipped" and gives no version
-    signal at all. This script needs only two things every consumer machine already has:
+    session check goes inert on a plain consumer with no sibling source checkout: the HOOK
+    (connector-sessioncheck.ps1) prints "no verified workshop checkout found -- check skipped" on its
+    own early-exit path and never reaches check-connectors.ps1, whose check 4 is the version
+    comparison that then never runs. So there is no version signal at all. Naming the hook rather
+    than the check matters: that string is the hook's, and grepping check-connectors.ps1 for it finds
+    nothing. This script needs only two things every consumer machine already has:
 
       1. THE INSTALL RECORD -- ~/.claude/plugins/installed_plugins.json, the record whose projectPath
          is this checkout, read via Get-InstallRecord. Its .version, .gitCommitSha and .scope are what
@@ -27,7 +30,7 @@
       - install sha == clone HEAD                -> up to date. The clone itself may still lag origin;
                                                    `claude plugin marketplace update <marketplace>`
                                                    refreshes it if you expect newer.
-      - install sha is an ANCESTOR of clone HEAD -> the clone is ahead of your install
+      - install sha is an ANCESTOR of clone HEAD -> the clone is AHEAD of your install
                                                    -> `claude plugin update <id> --scope project`
       - install sha exists but is NOT an ancestor of clone HEAD, or is unknown to the clone
                                                 -> your install is ahead, or the clone is stale
@@ -157,8 +160,10 @@ function Resolve-Clone {
 }
 
 function Compare-Version {
-    # -1 / 0 / 1 for a < b / a == b / a > b, [version] where both parse, ordinal string compare
-    # otherwise. $null when either side is empty.
+    # Negative / zero / positive for a < b / a == b / a > b: exactly -1 / 0 / 1 from [version] where
+    # both sides parse, otherwise the raw ordinal string comparison, whose SIGN is the answer and
+    # whose magnitude is not. $null when either side is empty. Every caller tests the sign only, and
+    # a future one must too.
     param([AllowEmptyString()][string]$A, [AllowEmptyString()][string]$B)
     if (-not $A -or -not $B) { return $null }
     $va = $null; $vb = $null
@@ -257,7 +262,12 @@ foreach ($id in ($ids | Sort-Object)) {
         $verdict = "cannot determine -- no marketplace clone to compare against"
         $action = "add it once: claude plugin marketplace add <owner>/<repo>"
     } elseif (-not $cloneHasPlugin) {
+        # Every other 'the clone cannot answer' branch names the command that would repair it, and
+        # this one read as a dead end for want of one. A refresh is the right first move either way:
+        # a plugin added upstream since the last refresh is absent from a clone that is merely
+        # behind, and a clone whose marketplace.json will not parse is re-fetched by the same command.
         $verdict = if ($clone.Error) { "cannot determine -- the clone's marketplace.json could not be read" } else { "cannot determine -- '$name' is not in the clone's marketplace.json" }
+        $action = "refresh the clone and re-run: claude plugin marketplace update $mp"
     } elseif ($recs.Count -gt 1) {
         $verdict = "cannot determine -- this checkout has $($recs.Count) conflicting install records"
         $action = "repair: claude plugin install $id --scope project"
@@ -279,11 +289,11 @@ foreach ($id in ($ids | Sort-Object)) {
             $verCmp = Compare-Version -A $instVer -B $cloneVer
             if ($null -ne $verCmp -and $verCmp -lt 0) {
                 $code = 'behind'
-                $verdict = "the clone is ahead of your install ($instVer -> $cloneVer); the clone is a non-git fetch so the commit history cannot confirm direction"
+                $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer); the clone is a non-git fetch so the commit history cannot confirm direction"
                 $action = "claude plugin update $id --scope project"
             } elseif ($null -ne $verCmp -and $verCmp -gt 0) {
                 $code = 'clone-behind'
-                $verdict = "your install ($instVer) is ahead of the clone ($cloneVer)"
+                $verdict = "your install ($instVer) is AHEAD of the clone ($cloneVer)"
                 $action = "claude plugin marketplace update $mp"
             } else {
                 $verdict = "cannot determine -- versions match ($instVer) but the recorded shas differ and the clone is a non-git fetch with no history to compare"
@@ -295,7 +305,7 @@ foreach ($id in ($ids | Sort-Object)) {
                 $verCmp = Compare-Version -A $instVer -B $cloneVer
                 if ($null -ne $verCmp -and $verCmp -lt 0) {
                     $code = 'behind'
-                    $verdict = "your install ($instVer, $(Format-ShortSha $instSha)) is behind the clone ($cloneVer) and its commit is not in the clone's history"
+                    $verdict = "your install ($instVer, $(Format-ShortSha $instSha)) is BEHIND the clone ($cloneVer) and its commit is not in the clone's history"
                     $action = "claude plugin update $id --scope project  (then re-run; if it still differs: claude plugin marketplace update $mp)"
                 } else {
                     $code = 'clone-behind'
@@ -306,7 +316,7 @@ foreach ($id in ($ids | Sort-Object)) {
                 $anc = (Invoke-CloneGit -CloneDir $clone.Dir -GitArgs @('merge-base', '--is-ancestor', $instSha, 'HEAD')).ExitCode -eq 0
                 if ($anc) {
                     $code = 'behind'
-                    $verdict = "the clone is AHEAD of your install (same major version string $instVer, newer commit)"
+                    $verdict = "the clone is AHEAD of your install (same version string $instVer, newer commit)"
                     if ($instVer -and $cloneVer -and $instVer -ne $cloneVer) { $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer)" }
                     $action = "claude plugin update $id --scope project"
                 } else {
@@ -328,13 +338,23 @@ foreach ($id in ($ids | Sort-Object)) {
             $action = "claude plugin update $id --scope project"
         } else {
             $code = 'clone-behind'
-            $verdict = "your install ($instVer) is ahead of the clone ($cloneVer) -- the clone is stale"
+            $verdict = "your install ($instVer) is AHEAD of the clone ($cloneVer) -- the clone is stale"
             $action = "claude plugin marketplace update $mp"
         }
     } else {
+        # NAME WHICHEVER OF THE FOUR FIELDS IS ACTUALLY ABSENT, per field and not per side. This
+        # branch is reached as soon as ONE field is missing on each side -- not both -- so a
+        # per-side 'both empty' test leaves reachable states with nothing to say: an install record
+        # carrying a version but no sha (every record written before GitCommitSha existed) against
+        # a clone carrying a HEAD but no readable plugin.json version printed a bare
+        # 'cannot determine -- ' with the reason missing. The row's Code and the summary counters
+        # were right throughout, which is why nothing else showed it. Found by Victor on the pickup
+        # of this branch; the asymmetric combination is pinned in the suite.
         $missing = @()
-        if (-not $instSha -and -not $instVer) { $missing += 'no version/sha on the install side' }
-        if (-not $clone.Head -and -not $cloneVer) { $missing += 'no HEAD/version on the clone side' }
+        if (-not $instVer)    { $missing += 'no version in the install record' }
+        if (-not $instSha)    { $missing += 'no commit sha in the install record' }
+        if (-not $cloneVer)   { $missing += "no version in the clone's plugin.json" }
+        if (-not $clone.Head) { $missing += 'no HEAD or sha on the clone side' }
         $verdict = "cannot determine -- $($missing -join '; ')"
     }
 

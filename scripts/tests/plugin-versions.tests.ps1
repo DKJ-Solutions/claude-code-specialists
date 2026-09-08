@@ -29,6 +29,11 @@
       9  a foreign plugin id not in the clone's marketplace   -> "cannot determine", no error
       10 no plugins enabled                                   -> a sentence, exit 0
       11 projectPath separator / trailing-slash insensitivity -> still matched, "up to date"
+      12 asymmetric gap (a): install has a version but no sha, -> the catch-all verdict names BOTH
+         clone has HEAD but no readable plugin.json version       missing fields, never a bare
+                                                                    "cannot determine -- " (regression)
+      13 asymmetric gap (b): install has a sha but no version, -> same regression, opposite side
+         clone has a version but no HEAD/.gcs-sha
     Every scenario asserts exit code 0 explicitly (this is a report, not a gate).
 
     Dependency-free (no Pester), same style as check-report-lib.tests.ps1 / adopt-workflow-folder.tests.ps1.
@@ -234,7 +239,7 @@ try {
     Assert-Equal 0 $r.Code '2: exit 0'
     Assert-True ($shaA -ne $shaB) '2: fixture sanity -- the clone really advanced a commit'
     Assert-Has  $r 'the clone is AHEAD of your install' '2: verdict says the clone is ahead'
-    Assert-Has  $r 'same major version string 4.32.0' '2: and that the version string is unchanged'
+    Assert-Has  $r 'same version string 4.32.0' '2: and that the version string is unchanged'
     Assert-Has  $r $UPD '2: the action is the per-plugin update command'
     Assert-Has  $r '1 of 1 plugin(s) behind' '2: the summary counts it as behind'
     Assert-Lacks $r 'up to date' '2: it is not reported as current'
@@ -375,6 +380,42 @@ try {
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
     Assert-Equal 0 $r.Code '11b: exit 0'
     Assert-Has  $r 'up to date -- your install is at the clone''s HEAD' '11b: a trailing-separator projectPath still matches'
+
+    # --- 12. Asymmetric gap (a): version but no sha on the install side, HEAD but no readable ---------
+    # -- plugin.json version on the clone side. NEITHER side is fully empty, so the pre-fix per-SIDE
+    # test ("-not $instSha -and -not $instVer" / "-not $clone.Head -and -not $cloneVer") never fires on
+    # either line, and the catch-all verdict used to print a bare "cannot determine -- " with the
+    # reason missing -- the Code and the summary tally stayed right throughout, which is why nothing
+    # else surfaced it. This is the exact defect Victor found on pickup of that branch; the fix names
+    # the missing fields per FIELD instead of per side.
+    Write-Host "12. asymmetric gap (a): version/no-sha vs HEAD/no-version -> reason is named, not blank" -ForegroundColor Cyan
+    $c = New-Case 'gap-a'
+    New-Clone -Dir $c.Clone -Version '' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '12a: exit 0'
+    Assert-True (-not ($r.Text -match 'cannot determine --[ \t]*\r?\n')) '12a: the regression itself -- the verdict is never a bare "cannot determine --" with the reason missing'
+    Assert-Has  $r 'no commit sha in the install record' '12a: names the missing sha on the install side'
+    Assert-Has  $r "no version in the clone's plugin.json" '12a: names the missing version on the clone side'
+    Assert-Has  $r '-- 1 could not be determined' '12a: still counted as indeterminate in the summary tally'
+
+    # --- 13. Asymmetric gap (b): the symmetric flip -- sha but no version on the install side, ---------
+    # -- version but no HEAD/.gcs-sha on the clone side (a non-git fetch missing its sha file). Same
+    # defect, opposite side: a per-side test that only ever fires on one side's both-empty state leaves
+    # this state silent too.
+    Write-Host "13. asymmetric gap (b): sha/no-version vs version/no-HEAD -> reason is named, not blank" -ForegroundColor Cyan
+    $c = New-Case 'gap-b'
+    New-Clone -Dir $c.Clone -Version '4.33.0' -NoGit | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @(
+        (New-Rec -ProjectPath $c.Repo -Version '' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '13: exit 0'
+    Assert-True (-not ($r.Text -match 'cannot determine --[ \t]*\r?\n')) '13: the regression itself -- the verdict is never a bare "cannot determine --" with the reason missing'
+    Assert-Has  $r 'no version in the install record' '13: names the missing version on the install side'
+    Assert-Has  $r 'no HEAD or sha on the clone side' '13: names the missing HEAD/sha on the clone side'
+    Assert-Has  $r '-- 1 could not be determined' '13: still counted as indeterminate in the summary tally'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
