@@ -13,6 +13,9 @@
 $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $PSScriptRoot '..\lib\shared-scripts-lib.ps1')
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -590,7 +593,7 @@ if ($args -contains 'create') {
     # A real (throwaway) git repo + a local bare remote, so open-pr's own 'git push -u origin
     # <branch>' succeeds without touching a real remote.
     New-Item -ItemType Directory -Path $prBareRemote -Force | Out-Null
-    git init --bare --quiet $prBareRemote 2>&1 | Out-Null
+    Invoke-FixtureGitJudged @('init', '--bare', '--quiet', $prBareRemote)
     New-Item -ItemType Directory -Path (Join-Path $prFixtureRoot '.github') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $prFixtureRoot 'scripts\lib') -Force | Out-Null
     Copy-Item -Path (Join-Path $RepoRoot 'scripts\lib\branch-info.ps1') -Destination (Join-Path $prFixtureRoot 'scripts\lib\branch-info.ps1') -Force
@@ -603,17 +606,17 @@ if ($args -contains 'create') {
     [System.IO.File]::WriteAllText((Join-Path $prFixtureRoot 'feat-openpr-101-test.md'), $prEntryContent, $Utf8NoBomTest)
 
     Set-Location $prFixtureRoot
-    git init --quiet 2>&1 | Out-Null
-    git config user.email 'tycho@test.local' 2>&1 | Out-Null
-    git config user.name 'Tycho Test' 2>&1 | Out-Null
+    Invoke-FixtureGitJudged @('init', '--quiet')
+    Invoke-FixtureGitJudged @('config', 'user.email', 'tycho@test.local')
+    Invoke-FixtureGitJudged @('config', 'user.name', 'Tycho Test')
     # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-    git config commit.gpgsign false 2>&1 | Out-Null
-    git remote add origin $prBareRemote 2>&1 | Out-Null
-    git add -A 2>&1 | Out-Null
-    git commit --quiet -m 'initial' 2>&1 | Out-Null
-    git branch -M main 2>&1 | Out-Null
-    git push --quiet -u origin main 2>&1 | Out-Null
-    git checkout --quiet -b $prBranch 2>&1 | Out-Null
+    Invoke-FixtureGitJudged @('config', 'commit.gpgsign', 'false')
+    Invoke-FixtureGitJudged @('remote', 'add', 'origin', $prBareRemote)
+    Invoke-FixtureGitJudged @('add', '-A')
+    Invoke-FixtureGitJudged @('commit', '--quiet', '-m', 'initial')
+    Invoke-FixtureGitJudged @('branch', '-M', 'main')
+    Invoke-FixtureGitJudged @('push', '--quiet', '-u', 'origin', 'main')
+    Invoke-FixtureGitJudged @('checkout', '--quiet', '-b', $prBranch)
 
     $env:CLAUDE_PROJECT_DIR = $prFixtureRoot
     $env:GH_ARGS_CAPTURE = $prArgsCapture
@@ -1097,8 +1100,15 @@ foreach ($p in @($pairs | Where-Object { $_.SkillParamsExempt.Count -gt 0 })) {
 }
 
 Write-Host ""
+# ABOVE THE VERDICT AND EVEN ON A GREEN RUN: a clean sweep over a fixture repo that was never built
+# proves less than it appears to, so the count decides the exit code too (issue #1635).
+$fixtureBroken = Write-FixtureGitSummary -Subject 'the shared-scripts mechanics'
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

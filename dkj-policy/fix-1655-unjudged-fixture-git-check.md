@@ -63,16 +63,27 @@ the numbers said the classes separate cheaply.
 
 ### TEST
 
-- [x] 12 new asserts in `check-plugin-integrity-docs.tests.ps1` (scenarios 76-84), pinning the
+- [x] 15 new asserts in `check-plugin-integrity-docs.tests.ps1` (scenarios 76-84), pinning the
       boundary and not only the finding: the question, the converted form, the second invocation
-      spelling, both other discard forms, the bare pipeline, and the scope
+      spelling, all three discard forms and their parenthesised variants, the AST-based clearing
+      condition, the bare pipeline, and the scope
 - [x] Probe the check's own stated boundary rather than trusting it -- which found the `[void]` gap
       the measurement could not, this tree holding only two of the three discard spellings
+- [x] Code review found the same class one level deeper: only the `[void]` arm climbed out of
+      `(...)`, so `$null = (& git ...)` and `(& git ...) | Out-Null` were both skipped. The unwrap is
+      now shared by all three arms
+- [x] And the clearing condition moved off line text onto the AST -- a `$LASTEXITCODE` sitting in a
+      single-quoted string or a comment would otherwise clear a genuine miss, leaving nothing to notice
 - [x] The three converted SUITES green on their own -- `find-specialist-mentions` (31 asserts),
       `shared-scripts` (608), `source-repo-guard` (46) -- plus `fixture-git-lib.tests.ps1` (15),
       which covers the lib they were converted onto. The fourth converted file,
       `fresh-consumer.measure.ps1`, is a measurement and asserts nothing by design, so it is checked
       by parse and by resolving its new dot-source rather than by a count
+- [x] Cost review: check 35 itself is free on a gate run (11.21s vs 11.26s without it, 3 runs each --
+      it rides the existing `Get-PsScriptCommandAsts` cache). The scenarios were not: written one
+      rewrite-and-reinvoke per shape they cost 12 child gate runs, taking the docs suite from 54.5s to
+      63.7s. Batched by expected verdict -- everything that must fire in one run, everything that must
+      stay silent in the next -- that is 3 invocations and 57.3s, **+2.8s instead of +9.2s**, same asserts
 - [x] The full lint gate green -- `[fixture-git] checked 85 -- 0 finding(s)`
 - [x] The full test gate green -- all 81 suites in 211s
 
@@ -97,8 +108,10 @@ next line. So a call is cleared when `$LASTEXITCODE` appears in the same stateme
 verb is special-cased, and no file is exempt: **zero probe false positives over both trees**. The
 subject is deliberately a *discarded* result rather than every unjudged call -- widening to a bare
 statement pipeline yields 20 findings here and all 20 are value-returning questions. All three ways to
-discard are covered (`| Out-Null`, `$null =`, a `[void]` cast); the third came from probing the check's
-stated boundary, since this tree holds only the first two and the measurement could not see it.
+discard are covered (`| Out-Null`, `$null =`, a `[void]` cast), each after one shared unwrap of any
+`(...)` so a pair of brackets is not an escape hatch, and the clearing condition reads the AST rather
+than the line text. None of those three came from the measurement -- this tree holds only the plainest
+spelling of each -- but from probing the check's own stated boundary and from the review that followed.
 
 **Score:** 3
 

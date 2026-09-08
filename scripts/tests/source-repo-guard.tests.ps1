@@ -27,6 +27,9 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $GuardLib = Join-Path $RepoRoot 'scripts\lib\source-repo-guard-lib.ps1'
 
 $script:pass = 0
@@ -188,6 +191,11 @@ try {
     # asserts the obvious way reproduced it immediately: `git worktree add` printed 'Preparing worktree'
     # and the suite died on a successful command.
     . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+    # KEPT FOR THE ONE git CALL THAT IS A QUESTION -- '--version', whose non-zero exit IS the answer and
+    # is read in the same statement. Every fixture MUTATION below goes through Invoke-FixtureGitJudged
+    # instead (issue #1635): those had their exit code discarded by '| Out-Null', so a worktree or a clone
+    # that never got built read exactly like one that did, and the asserts below then measured a tree the
+    # case never made.
     $git = {
         param([string[]]$Arguments)
         Invoke-NativeCapture -FilePath 'git' -Arguments $Arguments
@@ -200,18 +208,18 @@ try {
         Write-Host '  [SKIP] git is not available -- the worktree asserts did not run' -ForegroundColor Yellow
     } else {
         $gitSrc = New-Tree -Label 'gitsrc' -Publishes -Local; $fixtures += $gitSrc
-        & $git @('-C', $gitSrc, 'init', '--quiet')                            | Out-Null
-        & $git @('-C', $gitSrc, 'config', 'user.email', 'suite@example.invalid') | Out-Null
-        & $git @('-C', $gitSrc, 'config', 'user.name', 'Suite')               | Out-Null
-        & $git @('-C', $gitSrc, 'config', 'commit.gpgsign', 'false')          | Out-Null
-        & $git @('-C', $gitSrc, 'add', '-A')                                  | Out-Null
-        & $git @('-C', $gitSrc, 'commit', '--quiet', '-m', 'fixture')         | Out-Null
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'init', '--quiet')
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'config', 'user.email', 'suite@example.invalid')
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'config', 'user.name', 'Suite')
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'config', 'commit.gpgsign', 'false')
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'add', '-A')
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'commit', '--quiet', '-m', 'fixture')
 
         # The lane lives OUTSIDE the repo root, exactly as worktree-lane.ps1 places it -- a worktree
         # inside the tree would be walked by the lint gate's link scan and by the suites.
         $lane = Join-Path ([System.IO.Path]::GetTempPath()) ("guard-lane-" + [System.Guid]::NewGuid().ToString('N').Substring(0, 8))
         $fixtures += $lane
-        & $git @('-C', $gitSrc, 'worktree', 'add', '--detach', $lane) | Out-Null
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'worktree', 'add', '--detach', $lane)
         $laneScript = Join-Path $lane 'scripts\task\park-branch.ps1'
 
         Assert-True (Test-Path -LiteralPath $laneScript) 'the worktree carries the committed script'
@@ -222,7 +230,7 @@ try {
         # repository, answers with its own --git-common-dir, and is still refused.
         $clone = Join-Path ([System.IO.Path]::GetTempPath()) ("guard-clone-" + [System.Guid]::NewGuid().ToString('N').Substring(0, 8))
         $fixtures += $clone
-        & $git @('clone', '--quiet', $gitSrc, $clone) | Out-Null
+        Invoke-FixtureGitJudged @('clone', '--quiet', $gitSrc, $clone)
         $cloneScript = Join-Path $clone 'scripts\task\park-branch.ps1'
         Assert-True (Test-Path -LiteralPath $cloneScript) 'the clone carries the script too -- the two shapes are indistinguishable on disk'
         Assert-Equal 'scripts\task\park-branch.ps1' (Get-OwnCopyPath -ScriptPath $cloneScript -RepoRoot $gitSrc) `
@@ -238,7 +246,7 @@ try {
 
         # Leave no worktree registered behind: the fixture directory is deleted in the finally block, and a
         # stale registration would make later `git worktree` calls in the fixture repo complain.
-        & $git @('-C', $gitSrc, 'worktree', 'remove', '--force', $lane) | Out-Null
+        Invoke-FixtureGitJudged @('-C', $gitSrc, 'worktree', 'remove', '--force', $lane)
     }
 }
 finally {
@@ -459,8 +467,16 @@ foreach ($ex in $guardExempt) {
 }
 
 Write-Host ''
+# ABOVE THE VERDICT AND EVEN ON A GREEN RUN: judging the fixture's git calls buys nothing unless the
+# count reaches the exit code, and this suite's worktree and clone cases are exactly the ones whose
+# absence reads as a passing assert (issue #1635).
+$fixtureBroken = Write-FixtureGitSummary -Subject 'the source-repo guard'
 if ($script:fail -gt 0) {
     Write-Host "FAILED: $($script:fail) of $($script:pass + $script:fail) asserts." -ForegroundColor Red
+    exit 1
+}
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
     exit 1
 }
 Write-Host "OK: all $($script:pass) asserts passed." -ForegroundColor Green

@@ -2127,6 +2127,90 @@ all. The machine's own resolution — `$env:TEMP` and a literal `\temp\` path se
 What is pinned instead is the boundary logic those roots feed, including that a sibling directory whose
 name merely *begins* with a scratch root's name is not inside it.
 
+#### Check 35, and the sweep that reported itself finished (September 8, 2026, [#1655](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1655))
+
+**The check exists because a sweep is not an enforcement**, and this one is the cleanest instance of that
+this repo has. [#1635](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1635) moved the
+judging of a test fixture's own git commands into
+[`scripts/lib/fixture-git-lib.ps1`](../../../scripts/lib/fixture-git-lib.ps1) and converted seventeen
+suites onto it — and left nothing that refuses the next copy of the idiom it removed. The idiom was never
+a mistake somebody made once; it was the **house style**, copied from suite to suite for as long as
+`scripts/tests/` has existed, and the next fixture builder is written by copying the nearest neighbour.
+
+**What the measurement actually found, and it is not what the report predicted.** #1655 asked for the
+matcher to be run over the swept tree, expecting zero, and over the pre-sweep tree, expecting the fifteen
+suites it had counted. The first number came back **27, in four files** — `find-specialist-mentions`,
+`shared-scripts`, `source-repo-guard` and `fresh-consumer.measure`, whose spellings the sweep's own search
+never reached: `git ... 2>&1 | Out-Null` with no `&`, and `& $git @(...)` over a scriptblock. So the
+branch that added the check also finished the sweep, and the check is born green with **0 exemptions**.
+The pre-sweep tree read **182 findings across 18 files** — the house style, measured.
+
+**The reason #1635 did not just add the check was a good one, and answering it was the work.** This repo
+has scar tissue from checks born needing an exemption list (the stale-path check declined at 124 findings
+all false, above), and there is a real false-positive class here: a git call that is a **question** rather
+than a mutation. A `rev-parse --verify --quiet` on a ref *expected* to be absent answers with exit 1 and
+is judged on the very next line; counting it would report every negative case as a defect, and #1635's own
+conversion hit that class twice.
+
+**What separates the two classes is cheap, and it is not a list of git verbs**: a question's exit code is
+**read, and read immediately**. So a call is cleared when `$LASTEXITCODE` or `Assert-FixtureGitOk` appears
+in the same statement or the next one. Over both trees that rule produced **zero probe false positives** —
+not one `rev-parse`, `ls-remote` or `show-ref` call appears in either finding set — and it also clears
+`publish-to-business.tests.ps1`'s deliberately failing probe, which reads `$probeCode = $LASTEXITCODE`.
+
+**The subject is a DISCARDED result, not every unjudged call, and that bound was measured too.** Widening
+it to a bare statement pipeline (`git log --oneline` with no `Out-Null`) yields **20 findings on this tree
+and 20/20 are false** — every one a value-returning question, a helper's implicit return or
+`return @(& git ...)`. Discarding the output *and* ignoring the exit code is the combination meaning
+nothing git said was read; either alone is ordinary.
+
+**And the check's own stated boundary was probed rather than trusted, which is what found the gaps the
+measurement could not.** Running contrived shapes past it turned up a third way to throw a result away —
+a `[void]` cast — that this tree simply does not contain, so no amount of measuring it would have
+surfaced. Leaving it out would not have stopped the idiom; it would have renamed it, and the finding's
+own message would have become advice on how to get past the check. The rule generalises: a measurement
+tells you what a check catches *here*, and only a probe tells you what it would wave through.
+
+**The code review then found the same class one level deeper, and that one is the more instructive
+half.** Adding the `[void]` arm meant walking out of the `(...)` a cast requires — and only that arm did
+it, so `$null = (& git ...)` and `(& git ...) | Out-Null` were both silently skipped: the exact call the
+check exists to catch, wearing one pair of brackets. Neither spelling exists in this tree, so the probe
+above did not reach them either; what found it was noticing that three arms of one check disagreed about
+wrapping. **The repair is that the unwrap is now shared rather than written per-arm** — climbed once, so
+every discard spelling is judged on the same node. A guard whose arms disagree about a detail teaches
+whichever shape the weakest arm accepts.
+
+**The clearing condition moved onto the AST in the same pass**, for the reason check 31 already states —
+*through the parser, not by line matching* — and it applies with extra force to a condition that
+**clears** a finding: a text match on `$LASTEXITCODE` is satisfied by the name sitting in a single-quoted
+string or a trailing comment, and a wrongly cleared miss leaves nothing behind to notice. A
+`VariableExpressionAst` is a read; a comment is not in the AST at all.
+
+**Two invocation spellings are in scope, because a check written BECAUSE spellings vary must not repeat
+the sweep's mistake**: a command named `git`, and `& $git` where the variable is named exactly `git`. A
+wrapper under any other name is out of reach, and the check's own comment says so rather than implying
+coverage it does not have.
+
+**The check is free on a gate run; its TESTS were not, and that is where the cost review earned its
+place.** Check 35 rides the `Get-PsScriptCommandAsts` cache checks 31 and 33 already populate, so the
+gate measures 11.21s with it against 11.26s without — noise. But each scenario asserting on gate output
+spawns a fresh PowerShell over the ~4,000-line script, ~1.1s of interpreter start and parse whatever it
+asserts, and written the obvious way — one rewrite-and-reinvoke per shape — the scenarios cost **12
+invocations, taking the docs suite from 54.5s to 63.7s (+17%)** on a file that runs on every push and
+again in CI. The shapes are independent, so they batch by **expected verdict**: everything that must fire
+in one run, everything that must stay silent in the next. Same asserts, **3 invocations, +2.8s instead of
++9.2s**. What pays for it is that each probe carries its shape in its file name, so one run's output still
+says which shape failed — batching scenarios that could not be told apart afterwards would trade a real
+diagnostic for the seconds, which is a different and worse deal.
+
+**And the probe that took this measurement carried the defect it was measuring for.** Its first run
+reported 36 findings including nine `rev-parse` probes that the next-statement rule should have cleared —
+because `@($i, $i + 1)` is `@($i, $i) + 1` in PowerShell, the comma binding tighter than the addition, so
+it silently checked statements `$i`, `$i` and `1`. Nine false positives from a two-character omission, in
+the pass whose whole job was deciding whether the false-positive rate was acceptable. The parenthesised
+form is now in the check with a comment saying why, and it belongs beside the other traps that produce
+well-formed wrong output.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

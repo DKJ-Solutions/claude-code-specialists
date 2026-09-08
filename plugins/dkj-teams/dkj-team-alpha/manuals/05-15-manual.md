@@ -145,12 +145,12 @@ and safe hook construction.
   which arrivals are expendable, because some will be. And verify it the only way that works: read the
   conclusions of the runs the group has actually produced, not the YAML.
 
-## Nine PowerShell traps that produce well-formed wrong output
+## Ten PowerShell traps that produce well-formed wrong output
 
-All nine were measured in this system, not read about, and they share the property that makes them
+All ten were measured in this system, not read about, and they share the property that makes them
 expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
 something other than what the author meant. None is caught by a linter, so each is worth an assert.
-Eight are PowerShell's own; the last is the same class one layer out, in the tooling you reach for
+Nine are PowerShell's own; the last is the same class one layer out, in the tooling you reach for
 to repair a PowerShell file.
 
 - **`[ordered]@{ 2 = '...' }`'s indexer takes a positional index as well as a key.** For an integer the
@@ -246,6 +246,17 @@ to repair a PowerShell file.
   convention — one variable renamed for safety while its neighbours keep the pattern reads as a mistake
   and teaches nothing. There is no scoping operator that fixes it either, which is why it is a naming rule
   rather than a mechanism.
+- **The comma binds tighter than the arithmetic, so `@($i, $i + 1)` is `@($i, $i) + 1`.** PowerShell parses
+  the comma as the array operator before it evaluates the addition, so that expression yields three
+  elements — `$i`, `$i`, and `1` — rather than the two consecutive indices it reads as. Nothing errors: the
+  result is an array of integers, which is what the loop below it wanted, so every downstream operation
+  succeeds against the wrong indices. Measured while building the lint check that hunts unjudged fixture
+  git calls, in the pass whose entire job was deciding whether the check's false-positive rate was
+  acceptable: it walked statements `$i`, `$i` and `1` instead of `$i` and `$i + 1`, so it never read the
+  *next* statement, and nine correctly-judged git probes came back as findings. A two-character omission
+  produced the exact evidence that would have killed the check. **Parenthesise any arithmetic inside an
+  array literal** — `@($i, ($i + 1))` — and treat a measurement whose result argues against the thing you
+  are building as the one most worth re-deriving before you act on it.
 - **A `sed` substitution meant to write a code-point escape can silently write the wrong literal instead.**
   GNU `sed`'s replacement syntax treats `\u` as "uppercase the next character," not as a code-point escape —
   so `sed -i 's/\[-–—,\]/[-\u2013\u2014,]/'` consumed the backslash before each escape and wrote the literal
@@ -260,7 +271,7 @@ to repair a PowerShell file.
   written line back and check the code points rather than trusting the substitution. No gate can stand in
   for that read-back, because a mangled repair passes an ASCII check by construction.
 
-The general shape behind all nine, worth carrying to the next one: when a mistake cannot announce itself,
+The general shape behind all ten, worth carrying to the next one: when a mistake cannot announce itself,
 the assert is the announcement. Prefer a test over a comment for anything in this class.
 
 ## Sylvester is lazy
