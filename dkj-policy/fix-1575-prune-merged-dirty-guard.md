@@ -57,6 +57,8 @@ work, not the repair.
 - [x] Update the header: step 1's description, the new `THE GUARD IS ABOUT THE STEP-OFF` block, and the
       `-DryRun` parameter note.
 - [x] Mirror into the plugin (`build-shared-scripts.ps1`).
+- [x] The doc half: the orchestrator's lens is the sentence the issue's "why it matters" is about, so it
+      now names `-DryRun` as the route on a dirty branch -- the one state that still refuses.
 
 ### TEST
 
@@ -90,6 +92,12 @@ Nothing the guard protected is given up. A dirty checkout standing on a non-trun
 exactly as before, because that branch can be squash-merged while the work is uncommitted, and that is
 the case where the step-off drags it onto the trunk. The refusal now names the branch that makes it
 reachable, and offers `-DryRun` beside commit, park and stash.
+
+That last case is why the doc half moved too: the orchestrator's lens now names `-DryRun` as the route
+for a session that is standing on a branch with uncommitted work, which is the ordinary mid-assignment
+shape. It deletes nothing, so it never has to step off, and the classification it prints -- the
+paste-ready delete command for a merged leftover, `Kept ... -- live work` for everything else -- is
+identical to the full run's.
 
 The suite's own dirty case ran from the trunk, so it had been pinning the defect; it is re-pointed at a
 branch, and two cases are added for the arms that now proceed.
