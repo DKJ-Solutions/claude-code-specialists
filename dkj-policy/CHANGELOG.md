@@ -43,7 +43,52 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**21 / 41 minor entries** <!-- pending-tally -->
+**21 / 42 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1641-autopark-runspace · 20260908-162118
+
+The `cycle-autopark` Stop hook no longer starts a second PowerShell interpreter to run `park-cycle.ps1`.
+It runs it through the same `Invoke-CheckScript` the six SessionStart hooks have used since #1625, which
+gives ~102 ms back on **every turn** (666 ms -> 564 ms median on an ordinary turn with nothing to push,
+7 runs each) -- one interpreter start-up exactly, which is what the change removes. This hook fires far
+more often than that family, so it was paying the same avoidable start-up the most times.
+
+Two additions to the shared lib made that possible, and both are opt-in with nothing changed for its
+existing callers. `-MergeAllStreams` captures every stream rather than Write-Host and the pipeline
+alone: the session checks must not merge stderr, because a stray line would sit in front of their
+`[ERROR]` filter, while this hook has no filter and relays park-cycle verbatim -- which is what #1600
+built its `2>&1` for. `-OutputTo` keeps what a check managed to write before throwing; in-process there
+is otherwise no return value to read, and for a relaying caller those lines are the diagnosis.
+
+Separately, `Invoke-GitPark`'s `git push` was the last call in this family reaching the network
+unbounded; it now passes the same shared network timeout its three siblings do. That matters most
+exactly here, where the caller is a hook firing every turn with nobody watching a prompt to interrupt.
+
+Coverage grows with it. `hook-check-lib.ps1` arrived in #1644 with no suite of its own, and this branch
+rewrote the capture path all seven of its callers run through, so it gets one: 18 asserts over the three
+silent traps its header names, plus the two new parameters. The hook's own suite goes from 11 asserts to
+20, one of which pins the saving itself -- park-cycle reports the hook's own process id -- because every
+stream assert passes whether or not there is a child process, so nothing else would notice a silent
+return to spawning.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo's readers are its own maintainers, and the change is invisible from outside a session's
+turn timing.
+
+**Score:** N/A
+
+#### Pull Request
+
+cycle-autopark runs park-cycle in-process instead of a second interpreter
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1649](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1649)
+
+---
 
 ### DEPLOY: fix/1639-claim-issue-network-bound · 20260908-161105
 
